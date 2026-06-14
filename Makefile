@@ -232,6 +232,12 @@ test-ci:
 		--junitxml=junit.xml \
 		--timeout=60
 
+test-integration:
+	@$(UV) run pytest -q tests/integration -m integration --timeout=60
+
+test-integration-real:
+	@RUN_REAL_MASTODON_TESTS=1 $(UV) run pytest -q tests/integration -m integration --timeout=60
+
 tox:
 	@$(UV) run tox
 

@@ -43,16 +43,25 @@ subsequent reads.
   `changelogmanager` (`keepachangelog-manager-fork`), configured under
   `[tool.changelogmanager]` in `pyproject.toml`.
 
-### Tests (36 total, all green)
+### Tests (43 in default run, all green; integration suite opt-in on top)
 
 | File | Count | What it covers |
 |------|-------|----------------|
 | `tests/test_contract_core.py` | 13 | Mastodon.py-driven: verify creds, post/read/delete, follow→timeline, unfollow, notifications, locked follow-requests, favourite, reblog, mentions/hashtags, bookmark, search/lookup |
 | `tests/test_contract_extended.py` | 14 | edit/history, source, reply/context, poll create+vote, media upload+attach, lists, scheduled, filters v2, prefs/markers, block/mute, search v2, update_credentials, conversations, pagination |
+| `tests/test_contract_pagination.py` | 3 | `Link`-header round-trips via Mastodon.py `.fetch_next()` across 25 items: home timeline, account_statuses, notifications |
 | `tests/test_unit.py` | 5 | version parsing, config precedence, seed idempotency |
 | `tests/test_versions.py` | 1 | parametrized over both pinned versions |
 | `tests/test_file_db.py` | 1 | file-backed SQLite (StaticPool/threading) |
 | `tests/test_cli.py` | 2 | import + version smoke |
+| `tests/mock_only/test_mock_endpoints.py` | 3 | `mock_only`: `/api/v1/_mock/login` issues a working token, unknown→404, `/api/v1/_mock/reset` restores seed state |
+
+**Opt-in (excluded from default run, `-m 'not integration'`):**
+
+| File | What it covers |
+|------|----------------|
+| `tests/integration/test_integration_readonly.py` | 8 read-only tests, parametrized `mock`/`real`: verify_credentials/instance/account/timeline/status/notifications shape + pagination, missing-status 404 |
+| `tests/integration/test_integration_write_mock_only.py` | post→read-back→delete→404 round-trip (`mock_only`) |
 
 Quality gates all pass: **ruff**, **black**, **mypy --strict**, pytest (random
 order + xdist).
@@ -127,13 +136,30 @@ it diverges:
 
 ### P0 — harden the "Full" surface (highest value)
 
-- [ ] Add a **pagination round-trip** contract test (`Link` header → Mastodon.py
+- [x] Add a **pagination round-trip** contract test (`Link` header → Mastodon.py
       `.fetch_next()`), covering home timeline + notifications + account_statuses.
+      Done in `tests/test_contract_pagination.py` (3 tests, posts 25 items and
+      drains all pages; asserts no dupes + newest-first ordering).
 - [ ] Add contract tests for the gaps in §3 (items 2, 3, 5, 7) and fix any
       divergence found.
-- [ ] Add a **`mock_only/` test dir** + `@pytest.mark.mock_only` marker (per
-      `spec/06-testing.md` §2.4) and move `/api/v1/_mock/*` tests there, so a future
-      dual mock/real suite can exclude them cleanly.
+- [x] Add a **`mock_only/` test dir** + `@pytest.mark.mock_only` marker (per
+      `spec/06-testing.md` §2.4). `tests/mock_only/test_mock_endpoints.py` covers
+      `/api/v1/_mock/login` + `/api/v1/_mock/reset`. Marker registered in
+      pyproject. (No pre-existing `_mock/*` tests needed moving.)
+
+### P0.5 — in-repo dual mock/real integration suite (NEW, done)
+
+- [x] `tests/integration/` runs the **same read-only tests against both the mock
+      and a live Mastodon**, driven over a real HTTP endpoint (never in-process).
+      The `mastodon_client` fixture is parametrized `["mock", "real"]`; `real` is
+      skipped unless `RUN_REAL_MASTODON_TESTS=1` and credentials resolve (env vars
+      `REAL_MASTODON_URL`/`REAL_MASTODON_TOKEN`, else `../mastodon_is_my_blog/.env`).
+      All real-backend ops are **read-only** (safe to point at a real account);
+      write round-trips (`test_integration_write_mock_only.py`) are `mock_only`.
+      The suite is auto-marked `integration` and **excluded from the default run**
+      (`addopts = "... -m 'not integration'"`); run it via `make test-integration`
+      or `make test-integration-real`. Validated green against mastodon.social
+      (v4.6.0-nightly) — the mock's read surface matches the real server.
 
 ### P1 — fill remaining Stub→Full where cheap
 

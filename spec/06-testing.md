@@ -112,6 +112,16 @@ def test_follow_then_timeline(two_users):
 
 ## 2. Using `mastodon_mock` in a consuming project's dual suite
 
+> **Now also implemented in-repo** as `tests/integration/` (see
+> [next_phase.md](next_phase.md) §P0.5). That suite proves the pattern below against
+> *both* the mock and a live Mastodon: the `mastodon_client` fixture is parametrized
+> `["mock", "real"]`, the `real` leg is skipped unless `RUN_REAL_MASTODON_TESTS=1`
+> (credentials from `REAL_MASTODON_URL`/`REAL_MASTODON_TOKEN` or a local `.env`), every
+> real-backend op is **read-only**, and the whole suite is auto-marked `integration`
+> and excluded from the default `pytest` run. Run it with `make test-integration`
+> (mock only) or `make test-integration-real` (both). The snippet below is the
+> consuming-project template; the in-repo version follows it closely.
+
 This is the actual deliverable the user is building toward — `mastodon_mock` exists so
 *another* project's test suite can do:
 

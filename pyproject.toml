@@ -109,11 +109,13 @@ default-groups = ["dev"]
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
-addopts = "-q --timeout=60"
+addopts = "-q --timeout=60 -m 'not integration'"
 norecursedirs = ["vendor", "scripts", "dist", "build"]
 markers = [
     "slow: performance benchmarks (run with -m slow)",
     "integration: integration tests (run with -m integration)",
+    "mock_only: tests that exercise mastodon_mock-specific behavior and must not run against a real server",
+    "real_server: dual-backend tests that also run against a live Mastodon when RUN_REAL_MASTODON_TESTS=1",
 ]
 junit_family = "xunit1"
 
