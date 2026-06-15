@@ -28,6 +28,19 @@ dependencies = [
     "python-multipart>=0.0.9",
 ]
 
+[project.optional-dependencies]
+# The test-ergonomics sugar (mastodon_mock.testing): MockServer, the context
+# manager / decorator, and the pytest plugin. `uvicorn` is already a core dep;
+# `mastodon.py` is only needed by the client() helper, so it lives here.
+test = [
+    "uvicorn>=0.30.0",
+    "mastodon.py>=2.2.1",
+    "httpx>=0.27.0",
+]
+
+[project.entry-points.pytest11]
+mastodon_mock = "mastodon_mock.testing.plugin"
+
 [project.urls]
 Repository = "https://github.com/matthewdeanmartin/mastodon_mock"
 Documentation = "https://mastodon_mock.readthedocs.io/en/latest/"

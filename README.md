@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/mastodon_mock.svg)](https://badge.fury.io/py/mastodon_mock)
 [![CI](https://github.com/matthewdeanmartin/mastodon_mock/actions/workflows/build.yml/badge.svg)](https://github.com/matthewdeanmartin/mastodon_mock/actions/workflows/build.yml)
 [![Python versions](https://img.shields.io/pypi/pyversions/mastodon_mock.svg)](https://pypi.org/project/mastodon_mock/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/LICENSE)
 
 `mastodon_mock` is a stateful, in-process mock of the Mastodon REST API. It runs a real
 FastAPI server backed by a minimal in-memory (or on-disk) SQLite database, so client code
@@ -54,16 +54,17 @@ See `mastodon_mock --help` for the full command reference.
 
 Configuration is resolved in this order: an explicit `--config` path (or
 `./.mastodon_mock.toml`), then a `[tool.mastodon_mock]` table in `./pyproject.toml`,
-then built-in defaults. See [docs/overview/README.md](docs/overview/README.md) for details.
+then built-in defaults. See [https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/overview/README.md](docs/overview/README.md) for details.
 
 ## Contributing
 
-See [CONTRIBUTING.md](docs/extending/CONTRIBUTING.md).
+See [CONTRIBUTING.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/extending/CONTRIBUTING.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/LICENSE).
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md).
+docs/overview/README.md
+See [CHANGELOG.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/CHANGELOG.md).

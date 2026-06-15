@@ -1,25 +1,24 @@
-"""Shared pytest fixtures: a live uvicorn server driven via Mastodon.py."""
+"""Shared pytest fixtures, now layered on the shipped ``MockServer`` sugar.
+
+This file dogfoods ``mastodon_mock.testing``: the repo is the first consumer of
+its own test-ergonomics sugar. The historical fixture names (``live_server``,
+``alice``, ``fast_server``, …) are kept as thin wrappers so existing tests don't
+change. The seed matches what those tests assume.
+"""
 
 from __future__ import annotations
 
-import socket
-import threading
-import time
 from collections.abc import Iterator
 
-import httpx
 import pytest
-import uvicorn
 from mastodon import Mastodon
 
-from mastodon_mock.app import create_app
 from mastodon_mock.config import (
-    DatabaseConfig,
-    MastodonMockConfig,
     SeedAccount,
     SeedConfig,
     SeedFollow,
 )
+from mastodon_mock.testing import MockServer
 
 TEST_SEED = SeedConfig(
     accounts=[
@@ -34,33 +33,11 @@ TEST_SEED = SeedConfig(
 )
 
 
-def _free_port() -> int:
-    """Return an OS-assigned free TCP port."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
-
-
-def _start_server() -> Iterator[str]:
-    """Start a uvicorn server on a free port with the shared TEST_SEED; yield its URL."""
-    config = MastodonMockConfig(database=DatabaseConfig(path=":memory:"), seed=TEST_SEED)
-    app = create_app(config)
-    port = _free_port()
-    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    deadline = time.time() + 10
-    while not server.started and time.time() < deadline:
-        time.sleep(0.02)
-    yield f"http://127.0.0.1:{port}"
-    server.should_exit = True
-    thread.join(timeout=5)
-
-
 @pytest.fixture()
 def live_server() -> Iterator[str]:
     """Function-scoped server: a brand-new in-memory DB + seed per test (full isolation)."""
-    yield from _start_server()
+    with MockServer(seed=TEST_SEED) as server:
+        yield server.base_url
 
 
 # --- Session-scoped variant (spec/07 pattern 2): one server for the whole run,
@@ -70,17 +47,17 @@ def live_server() -> Iterator[str]:
 
 
 @pytest.fixture(scope="session")
-def _session_server() -> Iterator[str]:
+def _session_server() -> Iterator[MockServer]:
     """One uvicorn server shared across the whole test session."""
-    yield from _start_server()
+    with MockServer(seed=TEST_SEED) as server:
+        yield server
 
 
 @pytest.fixture()
-def fast_server(_session_server: str) -> str:
+def fast_server(_session_server: MockServer) -> str:
     """The session server, reset to seed state before each test that uses it."""
-    resp = httpx.post(f"{_session_server}/api/v1/_mock/reset")
-    resp.raise_for_status()
-    return _session_server
+    _session_server.reset()
+    return _session_server.base_url
 
 
 @pytest.fixture()

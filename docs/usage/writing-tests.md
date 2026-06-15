@@ -49,7 +49,117 @@ The `access_token` you set is exactly what you pass to `Mastodon(access_token=..
 account without a token exists in the database (so it can be followed, mentioned, searched)
 but can't be logged in as.
 
-## Pytest fixtures
+## Zero-boilerplate fixtures (the easy path)
+
+Install the test extra and the fixtures, context manager, and decorator are available
+immediately — no `conftest.py` boilerplate, no readiness loops, no port juggling:
+
+```bash
+pip install mastodon_mock[test]
+```
+
+The pytest plugin auto-registers (via a `pytest11` entry point), so the fixtures appear with
+nothing in your `conftest.py`:
+
+```python
+def test_follow(mastodon_mock_server):          # a started MockServer, fresh per test
+    alice = mastodon_mock_server.client("alice")
+    bob = mastodon_mock_server.client("bob")
+    alice.account_follow(bob.account_verify_credentials().id)
+    bob.status_post("hi")
+    assert any("hi" in s.content for s in alice.timeline_home())
+```
+
+`mastodon_mock_server.client("alice")` looks up the seeded account's token for you, so you
+never handle tokens by hand. The default seed provides `alice`, `bob`, `carol`, and a
+tokenless remote `dave`.
+
+### Fixtures provided
+
+| Fixture                  | Scope    | Yields                  | Notes                                          |
+| ------------------------ | -------- | ----------------------- | ---------------------------------------------- |
+| `mastodon_mock_server`   | function | `MockServer` (started)  | Fresh in-memory DB + seed per test. Isolated.  |
+| `mastodon_mock_session`  | session  | `MockServer` (started)  | One server for the whole run.                  |
+| `mastodon_mock_reset`    | function | `MockServer`            | The session server, `reset()`-ed before each test. |
+| `mastodon_mock_client`   | function | `Mastodon`              | Logged in as the first seeded account.         |
+
+### Customising the seed
+
+Per-test, with the `mastodon_mock` marker:
+
+```python
+import pytest
+from mastodon_mock.config import SeedConfig, SeedAccount
+
+CUSTOM_SEED = SeedConfig(accounts=[SeedAccount(username="zed", access_token="zed_token")])
+
+@pytest.mark.mastodon_mock(seed=CUSTOM_SEED)
+def test_with_custom_seed(mastodon_mock_server):
+    zed = mastodon_mock_server.client("zed")
+    ...
+```
+
+Project-wide, by overriding the `mastodon_mock_config` fixture in your `conftest.py`:
+
+```python
+# conftest.py — optional, project-wide default seed/config
+import pytest
+from mastodon_mock.config import MastodonMockConfig, DatabaseConfig
+
+@pytest.fixture()
+def mastodon_mock_config():
+    return MastodonMockConfig(database=DatabaseConfig(path=":memory:"), seed=MY_SEED)
+```
+
+Precedence: per-test marker > `mastodon_mock_config` fixture > built-in default.
+
+### Context manager and decorator (non-pytest, or moto muscle memory)
+
+For scripts, non-pytest tests, or when a test needs more than one server, use
+`mock_mastodon` as a context manager:
+
+```python
+from mastodon_mock.testing import mock_mastodon
+
+with mock_mastodon(seed=MY_SEED) as server:
+    server.client("alice").status_post("hello")
+# server stopped on exit, even on exception
+```
+
+Or as a decorator — it injects the started `MockServer` as `mastodon_server`:
+
+```python
+@mock_mastodon(seed=MY_SEED)
+def test_thing(mastodon_server):
+    mastodon_server.client("alice").status_post("hi")
+```
+
+`mock_mastodon` is dual-use, exactly like moto's `mock_aws`: bare it's a context manager,
+wrapping a function it's a decorator. Pass `@mock_mastodon(inject=False)` to run the body
+inside a server without changing the signature.
+
+### The `MockServer` primitive
+
+All three styles funnel through one small handle you can also use directly:
+
+```python
+from mastodon_mock.testing import MockServer
+
+server = MockServer(seed=...)        # not yet started
+server.start()                       # binds a free port, waits for readiness
+server.base_url                      # "http://127.0.0.1:54321"
+server.client("alice")               # -> a logged-in Mastodon client
+server.client(token="raw_token")     # explicit token
+server.reset()                       # POST /api/v1/_mock/reset
+server.stop()                        # signals exit, joins the thread
+```
+
+`start()`/`stop()` are idempotent and `MockServer` is itself a context manager.
+
+## Hand-rolled fixtures (full control)
+
+If you can't take the `test` extra, or want to own the lifecycle, the patterns below are
+exactly what the shipped sugar does under the hood.
 
 ### Pattern 1 — a fresh server per test (maximum isolation)
 
