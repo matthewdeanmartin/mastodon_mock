@@ -298,7 +298,7 @@ async def status_update_quote_approval_policy(
         return _validation_error(f"Invalid quote_approval_policy. Valid values are {sorted(valid)}")
     if status.visibility in ("private", "direct"):
         policy = "nobody"
-    status.quote_approval_policy = policy
+    status.quote_approval_policy = str(policy)
     db.commit()
     return serialize_status(db, status, config, account)
 

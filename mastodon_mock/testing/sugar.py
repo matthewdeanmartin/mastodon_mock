@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from mastodon_mock.config import MastodonMockConfig, SeedConfig
 from mastodon_mock.testing.server import MockServer
@@ -73,7 +73,7 @@ class _MockMastodon:
                     kwargs[self._inject_as] = server
                 return func(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return cast(F, wrapper)
 
 
 def mock_mastodon(

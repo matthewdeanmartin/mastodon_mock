@@ -214,7 +214,9 @@ def admin_account_unsuspend(account_id: str, db: DbSession, config: Config, acco
 
 
 @router.post("/api/v1/admin/accounts/{account_id}/unsensitive")
-def admin_account_unsensitive(account_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
+def admin_account_unsensitive(
+    account_id: str, db: DbSession, config: Config, account: RequiredAccount
+) -> dict[str, Any]:
     """Clear the force-sensitive flag on an account."""
     target = _record_or_404(db, Account, account_id)
     target.sensitized = False

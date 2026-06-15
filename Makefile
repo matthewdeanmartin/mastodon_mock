@@ -27,7 +27,7 @@ DOCS_CHANGELOG := docs/CHANGELOG.md
 	explore refurb crosshair deptry import-linter \
 	security bandit audit \
 	smoke test test-ci tox \
-	typecheck typecheck-mypy \
+	typecheck typecheck-mypy typecheck-ty typecheck-pyrefly \
 	metadata metadata-check version-check dev-status \
 	gha-validate gha-pin gha-upgrade publish-gha \
 	prerelease publish-check publish \
@@ -50,7 +50,7 @@ help:
 	@echo "  tox                    Run tests across py310-py313 via tox-uv"
 	@echo "  smoke                  CLI smoke checks (--help, --version)"
 	@echo ""
-	@echo "  typecheck              Run mypy strict"
+	@echo "  typecheck              Run mypy strict + ty + pyrefly"
 	@echo "  security               Run bandit + uv audit + pip-audit"
 	@echo ""
 	@echo "  metadata               Regenerate __about__.py from pyproject.toml"
@@ -259,10 +259,16 @@ tox:
 
 # ── Type checking ─────────────────────────────────────────────────────────────
 
-typecheck: typecheck-mypy
+typecheck: typecheck-mypy typecheck-ty typecheck-pyrefly
 
 typecheck-mypy:
-	@$(UV) run mypy --hide-error-context $(PACKAGE) tests
+	@$(UV) run mypy --hide-error-context $(PACKAGE)
+
+typecheck-ty:
+	@$(UV) run ty check $(PACKAGE)
+
+typecheck-pyrefly:
+	@$(UV) run pyrefly check $(PACKAGE)
 
 # ── Metadata / version ───────────────────────────────────────────────────────
 
@@ -328,4 +334,6 @@ check-ci: format-check lint-check security test-ci typecheck metadata-check vers
 	@echo "CI checks passed."
 
 prerelease: check dev-status docs-check smoke spell publish-check
+	@echo "Pre-release checks complete — ready to publish."
+lease: check dev-status docs-check smoke spell publish-check
 	@echo "Pre-release checks complete — ready to publish."

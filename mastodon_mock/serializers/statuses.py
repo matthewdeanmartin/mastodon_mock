@@ -76,7 +76,8 @@ def serialize_status(
 ) -> dict[str, Any]:
     """Serialize a status, including viewer-relative flags and nested reblog."""
     account = status.account or session.get(Account, status.account_id)
-    assert account is not None  # account_id is a required FK
+    if account is None:
+        raise RuntimeError(f"Account {status.account_id} not found for status {status.id}")
     acct = account_acct(account.username, account.domain)
 
     reblog_data = None

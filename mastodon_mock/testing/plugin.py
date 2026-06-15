@@ -22,7 +22,7 @@ Config/seed precedence: per-test ``@pytest.mark.mastodon_mock`` marker >
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -30,14 +30,14 @@ from mastodon_mock.config import MastodonMockConfig, SeedConfig
 from mastodon_mock.testing.server import MockServer
 
 if TYPE_CHECKING:
-    from mastodon import Mastodon
+    from mastodon.Mastodon import Mastodon
 
 
 def pytest_configure(config: pytest.Config) -> None:
     """Register the ``mastodon_mock`` marker to avoid PytestUnknownMarkWarning."""
     config.addinivalue_line(
         "markers",
-        "mastodon_mock(config=..., seed=...): configure the mastodon_mock test " "server for this test.",
+        "mastodon_mock(config=..., seed=...): configure the mastodon_mock test server for this test.",
     )
 
 
@@ -101,7 +101,7 @@ def mastodon_mock_reset(mastodon_mock_session: MockServer) -> MockServer:
 
 
 @pytest.fixture
-def mastodon_mock_client(mastodon_mock_server: MockServer) -> Mastodon:
+def mastodon_mock_client(mastodon_mock_server: MockServer) -> Any:
     """A ``Mastodon`` client logged in as the first seeded account."""
     return mastodon_mock_server.client()
 

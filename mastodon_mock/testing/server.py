@@ -135,7 +135,7 @@ class MockServer:
             self._thread.join(timeout=self._shutdown_timeout)
             if self._thread.is_alive():
                 logger.warning(
-                    "mock server thread did not join within %gs; " "relying on daemon backstop",
+                    "mock server thread did not join within %gs; relying on daemon backstop",
                     self._shutdown_timeout,
                 )
         self._server = None
@@ -182,7 +182,7 @@ class MockServer:
 
     # --- helpers ----------------------------------------------------------
 
-    def client(self, username: str | None = None, *, token: str | None = None) -> Mastodon:
+    def client(self, username: str | None = None, *, token: str | None = None) -> Any:
         """Return a ``Mastodon`` client pointed at this server.
 
         Args:
@@ -198,13 +198,13 @@ class MockServer:
             LookupError: If the username isn't seeded or has no token, or if no
                 seeded account has a token when defaulting.
         """
-        from mastodon import Mastodon  # lazy: only needed by the client() helper
+        from mastodon.Mastodon import Mastodon as MastodonClient  # lazy
 
         if username is not None and token is not None:
             raise ValueError("Pass either `username` or `token`, not both.")
 
         resolved = token if token is not None else self._resolve_token(username)
-        return Mastodon(access_token=resolved, api_base_url=self.base_url)
+        return MastodonClient(access_token=resolved, api_base_url=self.base_url)
 
     def _resolve_token(self, username: str | None) -> str:
         """Resolve a seeded username (or the default account) to its token."""

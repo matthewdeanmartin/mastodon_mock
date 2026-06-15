@@ -117,6 +117,8 @@ dev = [
     "crosshair-tool>=0.0.80",
     "deptry>=0.20.0",
     "import-linter>=2.0",
+    "pyrefly>=1.0.0",
+    "ty>=0.0.49",
 ]
 
 [tool.uv]
