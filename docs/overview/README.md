@@ -43,4 +43,4 @@ follows) created on startup.
 mastodon_mock serve --in-memory
 ```
 
-See the [top-level README](../../README.md) for installation and the full CLI reference.
+See the [top-level README](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/README.md) for installation and the full CLI reference.

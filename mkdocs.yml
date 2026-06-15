@@ -2,7 +2,7 @@
 site_name: mastodon_mock
 site_url: https://mastodon_mock.readthedocs.io/
 site_author: Matthew Martin <matthewdeanmartin@gmail.com>
-site_description: Stateful Mastodon mock server that mocks the REST API with a minimal in-memory/sqlite database
+site_description: Stateful in-memory/SQLite mock of the Mastodon REST API for testing Mastodon clients
 repo_url: https://github.com/matthewdeanmartin/mastodon_mock
 theme:
   name: readthedocs
@@ -16,9 +16,13 @@ markdown_extensions:
 nav:
   - Overview:
       - Readme.md: overview/README.md
+      - How It Works: overview/how-it-works.md
   - Installation: installation.md
   - Usage:
       - Quick Start: usage/quickstart.md
+      - Writing Tests: usage/writing-tests.md
+  - Reference:
+      - What Is and Isn't Mocked: reference/coverage.md
   - Contributing: extending/CONTRIBUTING.md
   - Change Log: CHANGELOG.md
 validation:

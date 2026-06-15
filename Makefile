@@ -10,6 +10,8 @@ MARKDOWN_TARGETS := README.md CHANGELOG.md AGENTS.md docs
 YAML_TARGETS := .github mkdocs.yml .readthedocs.yaml
 GHA_WORKFLOWS := .github/workflows
 ABOUT_FILE := mastodon_mock/__about__.py
+CHANGELOG := CHANGELOG.md
+DOCS_CHANGELOG := docs/CHANGELOG.md
 
 .PHONY: \
 	sync \
@@ -19,6 +21,7 @@ ABOUT_FILE := mastodon_mock/__about__.py
 	lint lint-check ruff-fix ruff-check pylint pylint-tests pylint-spelling \
 	spell \
 	docs-check docs-check-docstrings docs-check-links docs-check-pydoctest griffe \
+	changelog-verify changelog-sync \
 	build-docs \
 	dead-code vulture deadcode \
 	explore refurb crosshair deptry import-linter \
@@ -145,7 +148,7 @@ spell: pylint-spelling
 
 # ── Documentation checks ─────────────────────────────────────────────────────
 
-docs-check: docs-check-docstrings docs-check-pydoctest docs-check-links
+docs-check: docs-check-docstrings docs-check-pydoctest docs-check-links changelog-verify
 
 docs-check-docstrings:
 	@$(UV) run interrogate $(PACKAGE) --verbose --fail-under 70
@@ -162,7 +165,20 @@ griffe:
 	@echo "=== griffe API surface check (advisory) ==="
 	@$(UV) run griffe check $(PACKAGE) || true
 
-build-docs:
+# ── Changelog ────────────────────────────────────────────────────────────────
+# The canonical changelog lives at the repo root; mkdocs needs a copy inside
+# docs/ for its nav. changelog-sync validates + formats the root file, then
+# copies it into docs/ so the two never drift.
+
+changelog-verify:
+	@$(UV) run kacl-cli -f $(CHANGELOG) verify
+
+changelog-sync: changelog-verify
+	@$(UV) run mdformat $(CHANGELOG)
+	@cp $(CHANGELOG) $(DOCS_CHANGELOG)
+	@echo "Synced $(CHANGELOG) -> $(DOCS_CHANGELOG)"
+
+build-docs: changelog-sync
 	@$(UV) run mkdocs build
 
 # ── Dead code analysis (advisory — non-blocking) ─────────────────────────────
