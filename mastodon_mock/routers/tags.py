@@ -30,8 +30,7 @@ def _is_following(db: DbSession, account_id: int | None, name: str) -> bool:
     if account_id is None:
         return False
     return (
-        db.scalar(select(FollowedTag).where(FollowedTag.account_id == account_id, FollowedTag.name == name))
-        is not None
+        db.scalar(select(FollowedTag).where(FollowedTag.account_id == account_id, FollowedTag.name == name)) is not None
     )
 
 
@@ -40,8 +39,7 @@ def _is_featuring(db: DbSession, account_id: int | None, name: str) -> bool:
     if account_id is None:
         return False
     return (
-        db.scalar(select(FeaturedTag).where(FeaturedTag.account_id == account_id, FeaturedTag.name == name))
-        is not None
+        db.scalar(select(FeaturedTag).where(FeaturedTag.account_id == account_id, FeaturedTag.name == name)) is not None
     )
 
 
@@ -63,9 +61,7 @@ def featured_tags_for(db: DbSession, config: Config, acc: Account) -> list[dict[
     account's statuses bearing each featured tag.
     """
     acct = account_acct(acc.username, acc.domain)
-    rows = db.scalars(
-        select(FeaturedTag).where(FeaturedTag.account_id == acc.id).order_by(FeaturedTag.id.desc())
-    ).all()
+    rows = db.scalars(select(FeaturedTag).where(FeaturedTag.account_id == acc.id).order_by(FeaturedTag.id.desc())).all()
     out: list[dict[str, Any]] = []
     for row in rows:
         count, last = db.execute(
@@ -111,9 +107,7 @@ def featured_tags(db: DbSession, config: Config, account: RequiredAccount) -> li
 @router.get("/api/v1/featured_tags/suggestions")
 def featured_tag_suggestions(db: DbSession, config: Config, account: RequiredAccount) -> list[dict[str, Any]]:
     """The user's 10 most-used, not-yet-featured hashtags (suggested to feature)."""
-    featured = set(
-        db.scalars(select(FeaturedTag.name).where(FeaturedTag.account_id == account.id)).all()
-    )
+    featured = set(db.scalars(select(FeaturedTag.name).where(FeaturedTag.account_id == account.id)).all())
     rows = db.execute(
         select(StatusTag.name, func.count().label("count"), func.max(Status.created_at).label("last"))
         .join(Status, Status.id == StatusTag.status_id)
@@ -126,9 +120,7 @@ def featured_tag_suggestions(db: DbSession, config: Config, account: RequiredAcc
     for name, count, last in rows:
         if name in featured:
             continue
-        out.append(
-            serialize_featured_tag(name, config, acct, statuses_count=int(count), last_status_at=iso(last))
-        )
+        out.append(serialize_featured_tag(name, config, acct, statuses_count=int(count), last_status_at=iso(last)))
         if len(out) >= 10:
             break
     return out
@@ -178,9 +170,7 @@ def tag(hashtag: str, db: DbSession, config: Config, account: CurrentAccount) ->
 def tag_follow(hashtag: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Follow a hashtag (idempotent)."""
     name = hashtag.lower().lstrip("#")
-    existing = db.scalar(
-        select(FollowedTag).where(FollowedTag.account_id == account.id, FollowedTag.name == name)
-    )
+    existing = db.scalar(select(FollowedTag).where(FollowedTag.account_id == account.id, FollowedTag.name == name))
     if existing is None:
         db.add(FollowedTag(account_id=account.id, name=name))
         db.commit()
@@ -191,9 +181,7 @@ def tag_follow(hashtag: str, db: DbSession, config: Config, account: RequiredAcc
 def tag_unfollow(hashtag: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Unfollow a hashtag (idempotent)."""
     name = hashtag.lower().lstrip("#")
-    existing = db.scalar(
-        select(FollowedTag).where(FollowedTag.account_id == account.id, FollowedTag.name == name)
-    )
+    existing = db.scalar(select(FollowedTag).where(FollowedTag.account_id == account.id, FollowedTag.name == name))
     if existing is not None:
         db.delete(existing)
         db.commit()
@@ -213,9 +201,7 @@ def tag_feature(hashtag: str, db: DbSession, config: Config, account: RequiredAc
 def tag_unfeature(hashtag: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Unfeature a hashtag (newer alias; returns a ``Tag``)."""
     name = hashtag.lower().lstrip("#")
-    existing = db.scalar(
-        select(FeaturedTag).where(FeaturedTag.account_id == account.id, FeaturedTag.name == name)
-    )
+    existing = db.scalar(select(FeaturedTag).where(FeaturedTag.account_id == account.id, FeaturedTag.name == name))
     if existing is not None:
         db.delete(existing)
         db.commit()
@@ -227,9 +213,7 @@ def tag_unfeature(hashtag: str, db: DbSession, config: Config, account: Required
 
 def _ensure_featured(db: DbSession, account_id: int, name: str) -> FeaturedTag:
     """Find-or-create a featured-tag row for ``account_id`` + ``name``."""
-    existing = db.scalar(
-        select(FeaturedTag).where(FeaturedTag.account_id == account_id, FeaturedTag.name == name)
-    )
+    existing = db.scalar(select(FeaturedTag).where(FeaturedTag.account_id == account_id, FeaturedTag.name == name))
     if existing is not None:
         return existing
     row = FeaturedTag(account_id=account_id, name=name)

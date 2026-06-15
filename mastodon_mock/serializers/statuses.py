@@ -108,9 +108,9 @@ def serialize_status(
             revoked = status.quote_state == "revoked"
             quote_data = {
                 "state": status.quote_state,
-                "quoted_status": None
-                if revoked
-                else serialize_status(session, quoted, config, viewer, _depth=_depth + 1),
+                "quoted_status": (
+                    None if revoked else serialize_status(session, quoted, config, viewer, _depth=_depth + 1)
+                ),
             }
 
     favourited = reblogged = bookmarked = muted = pinned = False

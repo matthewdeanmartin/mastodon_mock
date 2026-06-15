@@ -38,6 +38,7 @@ router = APIRouter()
 # just much shorter.
 _TRANSLATION_TARGETS = ["en", "es", "fr", "de", "ja", "pt"]
 
+
 # Default custom emojis, returned in the real ``CustomEmoji`` shape. Configurable
 # behaviour is intentionally minimal — these exist so callers that iterate emoji
 # get a non-empty, correctly-shaped sample.
@@ -87,9 +88,7 @@ def instance_activity(db: DbSession) -> list[dict[str, str]]:
         start = end - timedelta(weeks=1)
         statuses = (
             db.scalar(
-                select(func.count())
-                .select_from(Status)
-                .where(Status.created_at >= start, Status.created_at < end)
+                select(func.count()).select_from(Status).where(Status.created_at >= start, Status.created_at < end)
             )
             or 0
         )
@@ -103,8 +102,9 @@ def instance_activity(db: DbSession) -> list[dict[str, str]]:
         )
         logins = (
             db.scalar(
-                select(func.count(func.distinct(Status.account_id)))
-                .where(Status.created_at >= start, Status.created_at < end)
+                select(func.count(func.distinct(Status.account_id))).where(
+                    Status.created_at >= start, Status.created_at < end
+                )
             )
             or 0
         )
@@ -287,12 +287,7 @@ def trends_statuses(
     limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Trending statuses: the most-favourited public local statuses."""
-    fav_count = (
-        select(func.count())
-        .select_from(Favourite)
-        .where(Favourite.status_id == Status.id)
-        .scalar_subquery()
-    )
+    fav_count = select(func.count()).select_from(Favourite).where(Favourite.status_id == Status.id).scalar_subquery()
     stmt = (
         select(Status)
         .where(Status.visibility.in_(["public", "unlisted"]), Status.reblog_of_id.is_(None))

@@ -60,6 +60,7 @@ def _record_or_404(db: Session, model: Any, record_id: str) -> Any:
 
 def _apply_account_status_filter(accounts: list[Account], status: str) -> list[Account]:
     """Filter accounts by the AdminAccount moderation status string."""
+
     def matches(account: Account) -> bool:
         if status == "active":
             return account.approved and not account.suspended and not account.disabled and not account.silenced
@@ -718,9 +719,7 @@ async def admin_create_canonical_email_block(
     if not digest:
         email = body.get("email")
         if not email:
-            raise HTTPException(
-                status_code=422, detail="Either 'email' or 'canonical_email_hash' must be provided."
-            )
+            raise HTTPException(status_code=422, detail="Either 'email' or 'canonical_email_hash' must be provided.")
         digest = _canonicalize_email(email)
     block = AdminCanonicalEmailBlock(canonical_email_hash=digest)
     db.add(block)

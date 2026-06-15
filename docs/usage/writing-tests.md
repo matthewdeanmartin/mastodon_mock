@@ -76,12 +76,12 @@ tokenless remote `dave`.
 
 ### Fixtures provided
 
-| Fixture                  | Scope    | Yields                  | Notes                                          |
+| Fixture | Scope | Yields | Notes |
 | ------------------------ | -------- | ----------------------- | ---------------------------------------------- |
-| `mastodon_mock_server`   | function | `MockServer` (started)  | Fresh in-memory DB + seed per test. Isolated.  |
-| `mastodon_mock_session`  | session  | `MockServer` (started)  | One server for the whole run.                  |
-| `mastodon_mock_reset`    | function | `MockServer`            | The session server, `reset()`-ed before each test. |
-| `mastodon_mock_client`   | function | `Mastodon`              | Logged in as the first seeded account.         |
+| `mastodon_mock_server` | function | `MockServer` (started) | Fresh in-memory DB + seed per test. Isolated. |
+| `mastodon_mock_session` | session | `MockServer` (started) | One server for the whole run. |
+| `mastodon_mock_reset` | function | `MockServer` | The session server, `reset()`-ed before each test. |
+| `mastodon_mock_client` | function | `Mastodon` | Logged in as the first seeded account. |
 
 ### Customising the seed
 

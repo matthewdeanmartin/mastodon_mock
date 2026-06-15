@@ -24,7 +24,7 @@ from mastodon_mock.config import (
 from mastodon_mock.testing.seed import DEFAULT_TEST_SEED
 
 if TYPE_CHECKING:
-    from mastodon import Mastodon
+    pass
 
 logger = logging.getLogger(__name__)
 

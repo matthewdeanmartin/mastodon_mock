@@ -8,12 +8,12 @@ method that hits each route) lives in the
 
 ## Coverage levels
 
-| Level      | Meaning                                                                                     |
+| Level | Meaning |
 |------------|---------------------------------------------------------------------------------------------|
-| **Full**   | Real, persisted state. Writes are reflected in later reads. Safe to assert behaviour on.    |
-| **Static** | Fixed-shape response, no persistence. The shape is correct; the values don't change.        |
-| **Stub**   | Minimal valid shape (usually an empty list/dict) so the client doesn't error. No behaviour. |
-| **OOS**    | Out of scope — the route isn't implemented; the client gets a `404`.                        |
+| **Full** | Real, persisted state. Writes are reflected in later reads. Safe to assert behaviour on. |
+| **Static** | Fixed-shape response, no persistence. The shape is correct; the values don't change. |
+| **Stub** | Minimal valid shape (usually an empty list/dict) so the client doesn't error. No behaviour. |
+| **OOS** | Out of scope — the route isn't implemented; the client gets a `404`. |
 
 ## Fully stateful (assert freely)
 

@@ -8,8 +8,7 @@ pytest_plugins = ["pytester"]
 
 
 def test_default_server_and_client_fixtures_are_usable(pytester: pytest.Pytester) -> None:
-    pytester.makepyfile(
-        """
+    pytester.makepyfile("""
         from mastodon_mock.testing.server import MockServer
 
 
@@ -23,8 +22,7 @@ def test_default_server_and_client_fixtures_are_usable(pytester: pytest.Pytester
             account = mastodon_mock_client.account_verify_credentials()
             assert account.username == "alice"
             assert account.acct == "alice"
-        """
-    )
+        """)
 
     result = pytester.runpytest("-q")
 
@@ -32,8 +30,7 @@ def test_default_server_and_client_fixtures_are_usable(pytester: pytest.Pytester
 
 
 def test_project_can_override_default_config_fixture(pytester: pytest.Pytester) -> None:
-    pytester.makeconftest(
-        """
+    pytester.makeconftest("""
         import pytest
 
         from mastodon_mock.config import DatabaseConfig, MastodonMockConfig, SeedAccount, SeedConfig
@@ -53,16 +50,13 @@ def test_project_can_override_default_config_fixture(pytester: pytest.Pytester) 
                     ]
                 ),
             )
-        """
-    )
-    pytester.makepyfile(
-        """
+        """)
+    pytester.makepyfile("""
         def test_client_uses_project_config_fixture(mastodon_mock_client):
             account = mastodon_mock_client.account_verify_credentials()
             assert account.username == "fixture_user"
             assert account.display_name == "Fixture User"
-        """
-    )
+        """)
 
     result = pytester.runpytest("-q")
 
@@ -70,8 +64,7 @@ def test_project_can_override_default_config_fixture(pytester: pytest.Pytester) 
 
 
 def test_marker_seed_takes_precedence_over_project_config_fixture(pytester: pytest.Pytester) -> None:
-    pytester.makeconftest(
-        """
+    pytester.makeconftest("""
         import pytest
 
         from mastodon_mock.config import DatabaseConfig, MastodonMockConfig, SeedAccount, SeedConfig
@@ -87,10 +80,8 @@ def test_marker_seed_takes_precedence_over_project_config_fixture(pytester: pyte
                     ]
                 ),
             )
-        """
-    )
-    pytester.makepyfile(
-        """
+        """)
+    pytester.makepyfile("""
         import pytest
 
         from mastodon_mock.config import SeedAccount, SeedConfig
@@ -111,8 +102,7 @@ def test_marker_seed_takes_precedence_over_project_config_fixture(pytester: pyte
             account = mastodon_mock_client.account_verify_credentials()
             assert account.username == "marker_user"
             assert account.display_name == "Marker User"
-        """
-    )
+        """)
 
     result = pytester.runpytest("-q")
 
@@ -120,8 +110,7 @@ def test_marker_seed_takes_precedence_over_project_config_fixture(pytester: pyte
 
 
 def test_marker_config_can_override_one_test_without_leaking(pytester: pytest.Pytester) -> None:
-    pytester.makepyfile(
-        """
+    pytester.makepyfile("""
         import pytest
 
         from mastodon_mock.config import DatabaseConfig, MastodonMockConfig, SeedAccount, SeedConfig
@@ -143,8 +132,7 @@ def test_marker_config_can_override_one_test_without_leaking(pytester: pytest.Py
 
         def test_unmarked_test_gets_builtin_default_seed(mastodon_mock_client):
             assert mastodon_mock_client.account_verify_credentials().username == "alice"
-        """
-    )
+        """)
 
     result = pytester.runpytest("-q")
 
@@ -152,8 +140,7 @@ def test_marker_config_can_override_one_test_without_leaking(pytester: pytest.Py
 
 
 def test_session_reset_fixture_restores_seed_state_between_tests(pytester: pytest.Pytester) -> None:
-    pytester.makepyfile(
-        """
+    pytester.makepyfile("""
         def test_can_mutate_session_server_after_reset(mastodon_mock_reset):
             client = mastodon_mock_reset.client("alice")
             posted = client.status_post("temporary session state")
@@ -165,8 +152,7 @@ def test_session_reset_fixture_restores_seed_state_between_tests(pytester: pytes
             account = client.account_verify_credentials()
             statuses = client.account_statuses(account.id)
             assert all(status.content != "<p>temporary session state</p>" for status in statuses)
-        """
-    )
+        """)
 
     result = pytester.runpytest("-q")
 

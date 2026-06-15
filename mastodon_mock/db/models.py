@@ -461,9 +461,7 @@ class Report(Base):
     action_taken: Mapped[bool] = mapped_column(Boolean, default=False)
     action_taken_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     assigned_account_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=True)
-    action_taken_by_account_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=True
-    )
+    action_taken_by_account_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

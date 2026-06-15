@@ -91,9 +91,7 @@ def serialize_admin_report(session: Session, report: Report, config: MastodonMoc
     reporter = session.get(Account, report.account_id)
     target = session.get(Account, report.target_account_id)
     assigned = session.get(Account, report.assigned_account_id) if report.assigned_account_id else None
-    acted_by = (
-        session.get(Account, report.action_taken_by_account_id) if report.action_taken_by_account_id else None
-    )
+    acted_by = session.get(Account, report.action_taken_by_account_id) if report.action_taken_by_account_id else None
 
     from mastodon_mock.serializers.statuses import serialize_status
 

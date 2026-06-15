@@ -30,7 +30,7 @@ from mastodon_mock.config import MastodonMockConfig, SeedConfig
 from mastodon_mock.testing.server import MockServer
 
 if TYPE_CHECKING:
-    from mastodon.Mastodon import Mastodon
+    pass
 
 
 def pytest_configure(config: pytest.Config) -> None:

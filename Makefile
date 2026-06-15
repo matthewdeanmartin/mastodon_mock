@@ -235,14 +235,14 @@ smoke:
 	@$(UV) run bash scripts/basic_checks.sh
 
 test:
-	@$(UV) run pytest -q \
+	@$(UV) run pytest -q -p no:sugar \
 		--cov=$(PACKAGE) \
 		--cov-report=html \
 		--junitxml=junit.xml \
 		--timeout=60
 
 test-ci:
-	@$(UV) run pytest -q -n auto --dist=loadfile \
+	@$(UV) run pytest -q -p no:sugar -n auto --dist=loadfile \
 		--cov=$(PACKAGE) \
 		--cov-report=xml \
 		--junitxml=junit.xml \
