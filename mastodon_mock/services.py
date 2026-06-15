@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -69,6 +70,9 @@ def do_follow(session: Session, follower: Account, target: Account) -> Relations
 
     Returns the follower → target relationship row.
     """
+    if follower.id == target.id:
+        raise HTTPException(status_code=422, detail="Validation failed: You cannot follow yourself")
+
     forward = get_or_create_relationship(session, follower.id, target.id)
     backward = get_or_create_relationship(session, target.id, follower.id)
 

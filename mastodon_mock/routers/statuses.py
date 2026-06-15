@@ -91,6 +91,12 @@ def _get_status_or_404(db: DbSession, status_id: str) -> Status:
     return status
 
 
+def _require_status_owner(status: Status, account: Account) -> None:
+    """Raise 403 unless ``account`` owns ``status``."""
+    if status.account_id != account.id:
+        raise HTTPException(status_code=403, detail="This action is not allowed")
+
+
 async def _form_or_json(request: Request) -> dict[str, Any]:
     """Read params from either JSON body or form-encoded body."""
     content_type = request.headers.get("content-type", "")
@@ -306,6 +312,7 @@ async def update_status(
 ) -> dict[str, Any]:
     """Edit a status, snapshotting the prior version into history."""
     status = _get_status_or_404(db, status_id)
+    _require_status_owner(status, account)
     params = await _form_or_json(request)
 
     # snapshot current state
@@ -344,6 +351,7 @@ def delete_status(
 ) -> dict[str, Any]:
     """Delete a status, returning its serialized (now-deleted) shape."""
     status = _get_status_or_404(db, status_id)
+    _require_status_owner(status, account)
     data = serialize_status(db, status, config, account)
     data["text"] = status.text
 
@@ -360,6 +368,10 @@ def delete_status(
 def reblog(status_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Boost a status (creates a reblog row + notifies the author)."""
     original = _get_status_or_404(db, status_id)
+    existing = db.scalar(select(Status).where(Status.reblog_of_id == original.id, Status.account_id == account.id))
+    if existing is not None:
+        return serialize_status(db, existing, config, account)
+
     reblog_row = Status(
         account_id=account.id,
         content="",

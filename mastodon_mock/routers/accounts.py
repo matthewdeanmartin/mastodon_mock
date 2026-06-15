@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Form, HTTPException, Request, Response, UploadFile
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 
 from mastodon_mock.db.models import (
     Account,
     Relationship,
     Status,
+    StatusMention,
     StatusTag,
     UserList,
     UserListAccount,
@@ -203,6 +204,7 @@ def account_statuses(
     from mastodon_mock.db.models import MediaAttachment, Pin
 
     query = select(Status).where(Status.account_id == acc.id)
+    query = _filter_account_statuses_visible_to(query, viewer)
     if exclude_replies:
         query = query.where(Status.in_reply_to_id.is_(None))
     if exclude_reblogs:
@@ -227,6 +229,27 @@ def account_statuses(
     )
     set_link_header(request, response, page)
     return [serialize_status(db, s, config, viewer) for s in page.items]
+
+
+def _filter_account_statuses_visible_to(query: Any, viewer: Account | None) -> Any:
+    """Apply Mastodon profile-timeline visibility rules to a status query."""
+    public_profile = Status.visibility.in_(("public", "unlisted"))
+    if viewer is None:
+        return query.where(public_profile)
+
+    followed_accounts = select(Relationship.target_account_id).where(
+        Relationship.source_account_id == viewer.id,
+        Relationship.following.is_(True),
+    )
+    mentioned_statuses = select(StatusMention.status_id).where(StatusMention.account_id == viewer.id)
+    return query.where(
+        or_(
+            public_profile,
+            Status.account_id == viewer.id,
+            and_(Status.visibility == "private", Status.account_id.in_(followed_accounts)),
+            and_(Status.visibility == "direct", Status.id.in_(mentioned_statuses)),
+        )
+    )
 
 
 @router.get("/api/v1/accounts/{account_id}/following")

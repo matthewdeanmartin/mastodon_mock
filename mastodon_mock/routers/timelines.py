@@ -15,7 +15,7 @@ from mastodon_mock.serializers.statuses import serialize_status
 
 router = APIRouter()
 
-_PUBLIC_VISIBILITIES = ("public", "unlisted")
+_PUBLIC_VISIBILITIES = ("public",)
 
 
 @router.get("/api/v1/timelines/home")
@@ -58,7 +58,7 @@ def timeline_public(
     remote: bool = False,
     only_media: bool = False,
 ) -> list[dict[str, Any]]:
-    """All public/unlisted statuses; ``local``/``remote`` filter by domain."""
+    """All public statuses; ``local``/``remote`` filter by domain."""
     query = select(Status).where(
         Status.visibility.in_(_PUBLIC_VISIBILITIES),
         Status.reblog_of_id.is_(None),
