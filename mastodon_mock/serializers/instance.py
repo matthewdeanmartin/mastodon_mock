@@ -11,9 +11,15 @@ from mastodon_mock.config import MastodonMockConfig
 from mastodon_mock.db.models import Account, Status
 from mastodon_mock.versioning import api_version_for
 
+# The advertised status length limit. The write path enforces the *same*
+# constant (see routers/statuses.py) so the mock can't claim 500 in instance
+# metadata while silently accepting longer posts.
+MAX_STATUS_CHARACTERS = 500
+MAX_MEDIA_ATTACHMENTS = 4
+
 _STATUS_CONFIG = {
-    "max_characters": 500,
-    "max_media_attachments": 4,
+    "max_characters": MAX_STATUS_CHARACTERS,
+    "max_media_attachments": MAX_MEDIA_ATTACHMENTS,
     "characters_reserved_per_url": 23,
 }
 _MEDIA_CONFIG = {

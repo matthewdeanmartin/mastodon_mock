@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request, Response, UploadFile
 from sqlalchemy import or_, select
 
 from mastodon_mock.db.models import (
@@ -18,7 +18,7 @@ from mastodon_mock.db.models import (
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.pagination import paginate
-from mastodon_mock.routers.helpers import PageQuery, set_link_header
+from mastodon_mock.routers.helpers import PageQuery, array_query, set_link_header
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
 from mastodon_mock.serializers.relationships import serialize_relationship
@@ -55,14 +55,13 @@ def verify_credentials(account: RequiredAccount, db: DbSession, config: Config) 
 
 @router.get("/api/v1/accounts/relationships")
 def account_relationships(
+    request: Request,
     db: DbSession,
     account: RequiredAccount,
-    id: Annotated[list[str] | None, Query()] = None,
 ) -> list[dict[str, Any]]:
     """Return relationships from the authed account to each requested account."""
-    ids = id or []
     out = []
-    for raw in ids:
+    for raw in array_query(request, "id"):
         try:
             target_id = int(raw)
         except (ValueError, TypeError):
@@ -99,12 +98,33 @@ def account_lookup(db: DbSession, config: Config, acct: str) -> dict[str, Any]:
     return serialize_account(db, found, config)
 
 
+async def _ids_from_query_or_json(request: Request) -> list[str]:
+    """Collect ``id``/``id[]`` ids from the query string or a JSON body.
+
+    ``account_familiar_followers`` is the odd one out: Mastodon.py sends its ids in
+    a JSON body (``use_json=True``) on a GET, so query parsing alone misses them.
+    """
+    ids = array_query(request, "id")
+    if ids:
+        return ids
+    try:
+        body = await request.json()
+    except Exception:
+        return []
+    raw_ids = body.get("id") if isinstance(body, dict) else None
+    if raw_ids is None:
+        return []
+    if not isinstance(raw_ids, list):
+        raw_ids = [raw_ids]
+    return [str(x) for x in raw_ids]
+
+
 @router.get("/api/v1/accounts/familiar_followers")
-def account_familiar_followers(
+async def account_familiar_followers(
+    request: Request,
     db: DbSession,
     config: Config,
     account: RequiredAccount,
-    id: Annotated[list[str], Query()],
 ) -> list[dict[str, Any]]:
     """Return, per requested account, followers shared with the authed user."""
     my_followers = {
@@ -114,7 +134,7 @@ def account_familiar_followers(
         ).all()
     }
     out = []
-    for raw in id:
+    for raw in await _ids_from_query_or_json(request):
         try:
             target_id = int(raw)
         except (ValueError, TypeError):
@@ -140,13 +160,13 @@ def account_familiar_followers(
 
 @router.get("/api/v1/accounts")
 def accounts_many(
+    request: Request,
     db: DbSession,
     config: Config,
-    id: Annotated[list[str] | None, Query()] = None,
 ) -> list[dict[str, Any]]:
     """Fetch multiple accounts by ``id[]``."""
     out = []
-    for raw in id or []:
+    for raw in array_query(request, "id"):
         try:
             acc = db.get(Account, int(raw))
         except (ValueError, TypeError):

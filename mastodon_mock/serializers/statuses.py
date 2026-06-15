@@ -99,6 +99,15 @@ def serialize_status(
         if app is not None:
             application = {"name": app.name, "website": app.website}
 
+    quote_data = None
+    if status.quoted_status_id is not None and _depth == 0:
+        quoted = session.get(Status, status.quoted_status_id)
+        if quoted is not None:
+            quote_data = {
+                "state": "accepted",
+                "quoted_status": serialize_status(session, quoted, config, viewer, _depth=_depth + 1),
+            }
+
     favourited = reblogged = bookmarked = muted = pinned = False
     if viewer is not None:
         favourited = _count(session, Favourite, account_id=viewer.id, status_id=status.id) > 0
@@ -144,6 +153,7 @@ def serialize_status(
         "card": None,
         "poll": poll_data,
         "application": application,
+        "quote": quote_data,
         "filtered": [],
     }
     return data

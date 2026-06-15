@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from sqlalchemy import func, select
 
-from mastodon_mock.db.models import Account
+from mastodon_mock.db.models import Account, Status
 from mastodon_mock.deps import Config, DbSession
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.instance import (
@@ -78,11 +79,30 @@ def instance_directory(
     order: str = "active",
     local: bool = False,
 ) -> list[dict[str, Any]]:
-    """List accounts in the profile directory."""
+    """List accounts in the profile directory.
+
+    ``order=active`` (Mastodon's default) sorts by most recent activity — the
+    account's latest status time, newest first, with never-posted accounts last.
+    ``order=new`` sorts by account creation time, newest first.
+    """
     query = db.query(Account)
     if local:
         query = query.filter(Account.domain.is_(None))
-    query = query.order_by(Account.created_at.desc()).offset(offset).limit(min(limit, 80))
+
+    if order == "new":
+        query = query.order_by(Account.created_at.desc())
+    else:  # "active" (default): most-recently-active first
+        last_status_at = (
+            select(func.max(Status.created_at))
+            .where(Status.account_id == Account.id, Status.reblog_of_id.is_(None))
+            .scalar_subquery()
+        )
+        # COALESCE to the account's own creation time so never-posted accounts
+        # still sort deterministically (below those who have posted).
+        activity = func.coalesce(last_status_at, Account.created_at)
+        query = query.order_by(activity.desc(), Account.id.desc())
+
+    query = query.offset(offset).limit(min(limit, 80))
     return [serialize_account(db, acc, config) for acc in query.all()]
 
 

@@ -103,6 +103,8 @@ class Status(Base):
     poll_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("polls.id"), nullable=True)
     url: Mapped[str | None] = mapped_column(String, nullable=True)
     application_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("oauth_apps.id"), nullable=True)
+    # The status this one quotes (Mastodon 4.5+ quote posts), if any.
+    quoted_status_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=True)
     # Snapshots of past versions for status_history(); list of dicts.
     edit_history: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
 

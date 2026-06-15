@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from mastodon_mock.config import MastodonMockConfig
 from mastodon_mock.db.base import Base, init_engine, make_session_factory
 from mastodon_mock.db.seed import apply_seed_data
+from mastodon_mock.middleware import add_middleware
 from mastodon_mock.routers import (
     accounts,
     conversations,
@@ -47,6 +48,8 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
     app.state.media_path = media_path
+
+    add_middleware(app, config)
 
     for module in (
         oauth,

@@ -42,7 +42,7 @@ to a concrete client call.
 | GET | `/.well-known/nodeinfo` + nodeinfo doc | `instance_nodeinfo()` | **Static** — minimal 2.0 schema doc with `software.name="mastodon_mock"`, `software.version=mocked_version` |
 | GET | `/api/v1/instance/rules` | `instance_rules()` | **Static** — empty list by default, configurable via seed config |
 | GET | `/api/v1/instance/terms_of_service` | `instance_terms_of_service()` | **Stub** — `MastodonNotFoundError` (404) — matches instances with no ToS configured |
-| GET | `/api/v1/directory` | `instance_directory()` | **Full** — lists seeded accounts ordered by `created_at`/`active_users` per params |
+| GET | `/api/v1/directory` | `instance_directory()` | **Full** — `order=active` (default) sorts by most recent status time, `order=new` by account `created_at`; `local` filters to local accounts |
 | GET | `/api/v1/custom_emojis` | `custom_emojis()` | **Stub** — empty list |
 | GET | `/api/v1/announcements` | `announcements()` | **Stub** — empty list |
 | POST | `/api/v1/announcements/{id}/dismiss` | `announcement_dismiss()` | **OOS** (no announcements exist to dismiss) |
@@ -114,13 +114,13 @@ to a concrete client call.
 | GET | `/api/v1/statuses/{id}/card` | `status_card()` (pre-3.0 fallback) | **Stub** — `status.card` is always `None`/absent; `status_card` on a 4.x mock will use the `Status.card` field path instead and this route is unused |
 | GET | `/api/v1/statuses/{id}/history` | `status_history()` | **Full** — one entry per edit, see "Edits" below |
 | GET | `/api/v1/statuses/{id}/source` | `status_source()` | **Full** |
-| GET | `/api/v1/statuses/{id}/quotes` | `status_quotes()` | **Stub** — empty paginated list (quotes are a 4.5+ niche feature; can upgrade to Full later if needed) |
+| GET | `/api/v1/statuses/{id}/quotes` | `status_quotes()` | **Full** — paginated list of statuses quoting this one (4.5+). Quote posts via `quoted_status_id`; serializer emits `quote = {state: "accepted", quoted_status}`. |
 
 ## `routers/statuses.py` — statuses (write) — **highest priority**
 
 | Method | Path | Mastodon.py caller(s) | Coverage |
 |--------|------|------------------------|----------|
-| POST | `/api/v1/statuses` | `status_post()`, `toot()`, `status_reply()` | **Full** — creates `statuses` row; parses `@mentions` from text into `status_mentions`; parses `#hashtags` into `status_tags`; honors `in_reply_to_id`, `visibility`, `sensitive`, `spoiler_text`, `language`, `media_ids` (attaches existing `media_attachments`), `poll` (creates `polls`+`poll_options`), `scheduled_at` (creates `scheduled_statuses` row instead and returns `ScheduledStatus`). Generates `mention` notifications for each mentioned account. `idempotency_key` honored via an in-memory/db dedup table keyed by `(account_id, idempotency_key)` within a short TTL. |
+| POST | `/api/v1/statuses` | `status_post()`, `toot()`, `status_reply()` | **Full** — creates `statuses` row; parses `@mentions` from text into `status_mentions`; parses `#hashtags` into `status_tags`; honors `in_reply_to_id`, `visibility`, `sensitive`, `spoiler_text`, `language`, `media_ids` (attaches existing `media_attachments`), `poll` (creates `polls`+`poll_options`), `quoted_status_id`/`quote_id` (sets `statuses.quoted_status_id` if it resolves; emitted as `quote`), `scheduled_at` (creates a `scheduled_statuses` row and returns `ScheduledStatus` only when ≥ ~5 min out, otherwise publishes immediately; due rows publish lazily on list read). Generates `mention` notifications for each mentioned account. `idempotency_key` honored via an in-memory/db dedup table keyed by `(account_id, idempotency_key)` within a short TTL. |
 | PUT | `/api/v1/statuses/{id}` | `status_update()` | **Full** — updates `content`/`text`/`spoiler_text`/`sensitive`/`media_ids`/poll; appends a `StatusEdit` snapshot to history; sets `edited_at` |
 | DELETE | `/api/v1/statuses/{id}` | `status_delete()` | **Full** — deletes row (or soft-delete flag); returns deleted status shape with `text` set. `delete_media=True` also deletes attached `media_attachments` |
 | POST | `/api/v1/statuses/{id}/reblog` | `status_reblog()` | **Full** — creates a new `statuses` row with `reblog_of_id` set; generates `reblog` notification for original author |
@@ -167,7 +167,11 @@ to a concrete client call.
 | POST | `/api/v1/notifications/{id}/dismiss` (and bulk variant) | `notifications_dismiss()` | **Full** — sets `read=True` / deletes |
 | GET/PATCH | `/api/v2/notifications/policy` | `notifications_policy()`, `update_notifications_policy()` | **Stub** — returns a fixed "accept everything" policy; PATCH accepted and ignored |
 | `/api/v1/notifications/requests*` | `notification_request*()` | **Stub** — empty list / 404 |
-| `/api/v2/notifications*` (grouped) | `grouped_notifications()`, etc. | **OOS** — Mastodon.py's grouped-notification helpers are 4.3+ niceties; mock returns ungrouped via v1-shape fallback or 404. Revisit if a consuming test needs it. |
+| GET | `/api/v2/notifications` | `grouped_notifications()` | **Full** — groups favourite/follow/reblog by target into `NotificationGroup`s; other types stay individual. Returns the `accounts`/`statuses`/`notification_groups` container with `Link` pagination. |
+| GET | `/api/v2/notifications/unread_count` | `unread_grouped_notifications_count()` | **Full** — counts unread *groups*, not rows |
+| GET | `/api/v2/notifications/{group_key}` | `grouped_notification()` | **Full** — single-group container; 404 if no members |
+| POST | `/api/v2/notifications/{group_key}/dismiss` | `dismiss_grouped_notification()` | **Full** — deletes every notification in the group |
+| GET | `/api/v2/notifications/{group_key}/accounts` | `grouped_notification_accounts()` | **Full** — distinct actor accounts, newest first |
 
 ## `routers/media.py`
 

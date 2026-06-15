@@ -45,3 +45,15 @@ def set_link_header(
     header = link_header(base, page, extra_params)
     if header:
         response.headers["Link"] = header
+
+
+def array_query(request: Request, name: str) -> list[str]:
+    """Read a repeatable query param under both ``name`` and ``name[]``.
+
+    Mastodon.py serializes list arguments as ``name[]=a&name[]=b`` (see
+    ``Mastodon.__generate_params``), so a plain ``name`` FastAPI ``Query`` binding
+    would silently drop the values. Reading both keeps bulk-by-id endpoints honest.
+    """
+    qp = request.query_params
+    values = list(qp.getlist(name)) + list(qp.getlist(f"{name}[]"))
+    return [v for v in values if v]

@@ -36,6 +36,22 @@ class AuthConfig(BaseModel):
 
     # If true, any/no bearer token maps to the first seeded account.
     permissive: bool = False
+    # If true, enforce coarse OAuth scopes (read/write/follow) on the token.
+    # Off by default — the mock stores+echoes scopes but does not check them.
+    enforce_scopes: bool = False
+
+
+class RateLimitConfig(BaseModel):
+    """Opt-in rate limiting (off by default).
+
+    When ``enabled``, the mock returns ``429`` + ``X-RateLimit-*`` headers after
+    ``limit`` requests within ``window_seconds``, so consuming suites can exercise
+    Mastodon.py's ``ratelimit_method`` handling. A documented stretch goal.
+    """
+
+    enabled: bool = False
+    limit: int = 300
+    window_seconds: int = 300
 
 
 class SeedAccount(BaseModel):
@@ -90,6 +106,7 @@ class MastodonMockConfig(BaseModel):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
+    ratelimit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     seed: SeedConfig = Field(default_factory=lambda: DEFAULT_SEED)
     rules: list[str] = Field(default_factory=list)
 

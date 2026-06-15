@@ -5,10 +5,11 @@ See spec/03-api-coverage.md "statuses (write)".
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Annotated, Any
+from datetime import datetime, timedelta
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
 from mastodon_mock.db.models import (
@@ -26,6 +27,8 @@ from mastodon_mock.db.models import (
     utcnow,
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
+from mastodon_mock.pagination import paginate
+from mastodon_mock.routers.helpers import PageQuery, array_query, set_link_header
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.common import iso
 from mastodon_mock.serializers.misc import serialize_scheduled_status
@@ -34,9 +37,50 @@ from mastodon_mock.serializers.statuses import (
     serialize_status_edit,
     serialize_status_source,
 )
+from mastodon_mock.serializers.instance import MAX_MEDIA_ATTACHMENTS, MAX_STATUS_CHARACTERS
 from mastodon_mock.services import add_notification, attach_mentions_and_tags
 
 router = APIRouter()
+
+# Mastodon publishes immediately (rather than scheduling) when scheduled_at is
+# within this window of "now". Match its documented ~5 minute minimum lead time.
+SCHEDULE_THRESHOLD = timedelta(minutes=5)
+
+
+def _validation_error(message: str) -> JSONResponse:
+    """A Mastodon-shaped 422 (``{"error": ...}``), what Mastodon.py expects."""
+    return JSONResponse(status_code=422, content={"error": message})
+
+
+def _validate_status_params(params: dict[str, Any]) -> JSONResponse | None:
+    """Reject posts a real Mastodon would 422, returning the error response.
+
+    Mirrors the server-side checks Mastodon.py callers rely on:
+
+    * a status with no text *and* no media/poll is empty → rejected;
+    * text longer than ``max_characters`` (the value advertised on
+      ``/api/v1/instance``) is rejected;
+    * more than ``max_media_attachments`` media ids is rejected.
+
+    Returns ``None`` when the post is acceptable.
+    """
+    text = str(params.get("status") or "")
+    media_ids = params.get("media_ids")
+    media_count = len(media_ids) if isinstance(media_ids, list) else (1 if media_ids else 0)
+    has_poll = isinstance(params.get("poll"), dict)
+
+    if not text.strip() and media_count == 0 and not has_poll:
+        return _validation_error("Validation failed: Text can't be blank")
+    if len(text) > MAX_STATUS_CHARACTERS:
+        return _validation_error(
+            f"Validation failed: Text is too long (maximum is {MAX_STATUS_CHARACTERS} characters)"
+        )
+    if media_count > MAX_MEDIA_ATTACHMENTS:
+        return _validation_error(
+            f"Validation failed: Media attachments count is too high "
+            f"(maximum is {MAX_MEDIA_ATTACHMENTS})"
+        )
+    return None
 
 
 def _get_status_or_404(db: DbSession, status_id: str) -> Status:
@@ -75,14 +119,14 @@ async def _form_or_json(request: Request) -> dict[str, Any]:
 
 @router.get("/api/v1/statuses")
 def statuses_many(
+    request: Request,
     db: DbSession,
     config: Config,
     viewer: CurrentAccount,
-    id: Annotated[list[str] | None, Query()] = None,
 ) -> list[dict[str, Any]]:
     """Fetch multiple statuses by ``id[]``."""
     out = []
-    for raw in id or []:
+    for raw in array_query(request, "id"):
         try:
             s = db.get(Status, int(raw))
         except (ValueError, TypeError):
@@ -178,9 +222,29 @@ def status_source(status_id: str, db: DbSession) -> dict[str, Any]:
 
 
 @router.get("/api/v1/statuses/{status_id}/quotes")
-def status_quotes() -> list[Any]:
-    """Stub: empty quote list."""
-    return []
+def status_quotes(
+    status_id: str,
+    request: Request,
+    response: Response,
+    db: DbSession,
+    config: Config,
+    viewer: CurrentAccount,
+    params: PageQuery,
+) -> list[dict[str, Any]]:
+    """Statuses that quote the given status (Mastodon 4.5+)."""
+    status = _get_status_or_404(db, status_id)
+    query = select(Status).where(Status.quoted_status_id == status.id)
+    page = paginate(
+        db,
+        query,
+        Status.id,
+        max_id=params.max_id,
+        min_id=params.min_id,
+        since_id=params.since_id,
+        limit=params.limit,
+    )
+    set_link_header(request, response, page)
+    return [serialize_status(db, s, config, viewer) for s in page.items]
 
 
 # --- Writes ---
@@ -192,7 +256,7 @@ async def post_status(
     db: DbSession,
     config: Config,
     account: RequiredAccount,
-) -> dict[str, Any]:
+) -> Any:
     """Create a status (or a scheduled status). The core write path."""
     params = await _form_or_json(request)
 
@@ -206,53 +270,27 @@ async def post_status(
             if prior is not None:
                 return serialize_status(db, prior, config, account)
 
-    text = str(params.get("status") or "")
-    scheduled_at = params.get("scheduled_at")
-    if scheduled_at:
+    # Reject what a real Mastodon would 422 (empty text, over-length, too much
+    # media) *before* touching the DB — a consuming bot must see the failure
+    # rather than a phantom success.
+    invalid = _validate_status_params(params)
+    if invalid is not None:
+        return invalid
+
+    scheduled_at = _parse_dt(params.get("scheduled_at"))
+    # Mastodon only *schedules* when scheduled_at is far enough in the future
+    # (~5 min). A near/past scheduled_at publishes immediately and returns a Status.
+    if scheduled_at is not None and scheduled_at - utcnow() > SCHEDULE_THRESHOLD:
         sched = ScheduledStatus(
             account_id=account.id,
-            scheduled_at=_parse_dt(scheduled_at) or utcnow(),
+            scheduled_at=scheduled_at,
             params={k: v for k, v in params.items()},
         )
         db.add(sched)
         db.commit()
         return serialize_scheduled_status(sched)
 
-    visibility = str(params.get("visibility") or account.default_privacy or "public")
-    in_reply_to_id = _to_int(params.get("in_reply_to_id"))
-    in_reply_to_account_id = None
-    if in_reply_to_id is not None:
-        parent = db.get(Status, in_reply_to_id)
-        if parent is not None:
-            in_reply_to_account_id = parent.account_id
-
-    poll_params = params.get("poll")
-
-    status = Status(
-        account_id=account.id,
-        content=f"<p>{text}</p>",
-        text=text,
-        visibility=visibility,
-        sensitive=_to_bool(params.get("sensitive")),
-        spoiler_text=str(params.get("spoiler_text") or ""),
-        language=params.get("language"),
-        in_reply_to_id=in_reply_to_id,
-        in_reply_to_account_id=in_reply_to_account_id,
-        application_id=None,
-        created_at=utcnow(),
-        edit_history=[],
-    )
-    db.add(status)
-    db.flush()
-
-    _attach_media(db, status, params.get("media_ids"))
-
-    if isinstance(poll_params, dict):
-        _create_poll(db, status, poll_params)
-
-    mentioned = attach_mentions_and_tags(db, status.id, account.id, text)
-    for m in mentioned:
-        add_notification(db, recipient_id=m.id, from_account_id=account.id, type_="mention", status_id=status.id)
+    status = _create_status_from_params(db, account, params)
 
     if idempotency_key:
         db.add(Idempotency(account_id=account.id, key=idempotency_key, status_id=status.id))
@@ -464,7 +502,8 @@ def translate(status_id: str, db: DbSession) -> dict[str, Any]:
 
 @router.get("/api/v1/scheduled_statuses")
 def list_scheduled(db: DbSession, account: RequiredAccount) -> list[dict[str, Any]]:
-    """List the authed user's scheduled statuses."""
+    """List the authed user's scheduled statuses (publishing any now due)."""
+    _publish_due_scheduled(db, account)
     rows = db.scalars(
         select(ScheduledStatus).where(ScheduledStatus.account_id == account.id).order_by(ScheduledStatus.id)
     ).all()
@@ -502,6 +541,77 @@ def delete_scheduled(scheduled_id: str, db: DbSession, account: RequiredAccount)
 
 
 # --- helpers ---
+
+
+def _create_status_from_params(db: DbSession, account: Account, params: dict[str, Any]) -> Status:
+    """Create a real status row from post params (shared by immediate + scheduled publish).
+
+    Wires reply targets, media, poll, and mention/tag notifications. The caller is
+    responsible for committing and for idempotency bookkeeping.
+    """
+    text = str(params.get("status") or "")
+    visibility = str(params.get("visibility") or account.default_privacy or "public")
+    in_reply_to_id = _to_int(params.get("in_reply_to_id"))
+    in_reply_to_account_id = None
+    if in_reply_to_id is not None:
+        parent = db.get(Status, in_reply_to_id)
+        if parent is not None:
+            in_reply_to_account_id = parent.account_id
+
+    # Standard Mastodon 4.5+ uses ``quoted_status_id``; accept ``quote_id`` too
+    # (the fedibird extension Mastodon.py also sends). Only set if it resolves.
+    quoted_status_id = _to_int(params.get("quoted_status_id") or params.get("quote_id"))
+    if quoted_status_id is not None and db.get(Status, quoted_status_id) is None:
+        quoted_status_id = None
+
+    status = Status(
+        account_id=account.id,
+        content=f"<p>{text}</p>",
+        text=text,
+        visibility=visibility,
+        sensitive=_to_bool(params.get("sensitive")),
+        spoiler_text=str(params.get("spoiler_text") or ""),
+        language=params.get("language"),
+        in_reply_to_id=in_reply_to_id,
+        in_reply_to_account_id=in_reply_to_account_id,
+        quoted_status_id=quoted_status_id,
+        application_id=None,
+        created_at=utcnow(),
+        edit_history=[],
+    )
+    db.add(status)
+    db.flush()
+
+    _attach_media(db, status, params.get("media_ids"))
+
+    poll_params = params.get("poll")
+    if isinstance(poll_params, dict):
+        _create_poll(db, status, poll_params)
+
+    mentioned = attach_mentions_and_tags(db, status.id, account.id, text)
+    for m in mentioned:
+        add_notification(db, recipient_id=m.id, from_account_id=account.id, type_="mention", status_id=status.id)
+
+    return status
+
+
+def _publish_due_scheduled(db: DbSession, account: Account) -> None:
+    """Lazily convert any of ``account``'s scheduled statuses whose time has passed.
+
+    Mastodon has a background worker that publishes scheduled statuses; the mock
+    has no time driver, so we publish them on read instead. Each due row becomes a
+    real status and is removed from the scheduled list.
+    """
+    now = utcnow()
+    due = db.scalars(
+        select(ScheduledStatus).where(ScheduledStatus.account_id == account.id, ScheduledStatus.scheduled_at <= now)
+    ).all()
+    if not due:
+        return
+    for sched in due:
+        _create_status_from_params(db, account, dict(sched.params or {}))
+        db.delete(sched)
+    db.commit()
 
 
 def _get_scheduled_or_404(db: DbSession, scheduled_id: str) -> ScheduledStatus:

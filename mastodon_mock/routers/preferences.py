@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from sqlalchemy import select
 
 from mastodon_mock.db.models import Marker, utcnow
 from mastodon_mock.deps import DbSession, RequiredAccount
+from mastodon_mock.routers.helpers import array_query
 from mastodon_mock.serializers.misc import serialize_marker, serialize_preferences
 
 router = APIRouter()
@@ -22,12 +23,12 @@ def preferences(account: RequiredAccount) -> dict[str, Any]:
 
 @router.get("/api/v1/markers")
 def get_markers(
+    request: Request,
     db: DbSession,
     account: RequiredAccount,
-    timeline: Annotated[list[str] | None, Query()] = None,
 ) -> dict[str, Any]:
     """Return read markers for the requested timelines."""
-    timelines = timeline or ["home", "notifications"]
+    timelines = array_query(request, "timeline") or ["home", "notifications"]
     out: dict[str, Any] = {}
     for tl in timelines:
         marker = db.scalar(select(Marker).where(Marker.account_id == account.id, Marker.timeline == tl))
