@@ -25,7 +25,7 @@ GROUPABLE_TYPES = frozenset({"favourite", "follow", "reblog"})
 def group_key_for(notification: Notification) -> str:
     """Deterministic, re-derivable group key for a notification.
 
-    Groupable types collapse by ``(type, status/​follow target)``; everything else
+    Groupable types collapse by ``(type, status/follow target)``; everything else
     gets a unique per-notification key. Treated as opaque by clients, but we keep it
     stable so the single-group / dismiss / accounts endpoints can re-derive it.
     """

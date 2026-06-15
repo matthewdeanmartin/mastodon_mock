@@ -46,8 +46,12 @@ echo "--- global flags ---"
 check "mastodon_mock --help"    run_cli --help
 check "mastodon_mock --version" run_cli --version
 
-# TODO: add subcommand smoke checks here, e.g.:
-# check "mastodon_mock <subcommand> --help"  run_cli <subcommand> --help
+echo ""
+echo "--- subcommands ---"
+check        "mastodon_mock serve --help"      run_cli serve --help
+check        "mastodon_mock db --help"         run_cli db --help
+check_fails  "mastodon_mock db (no subcmd)"    run_cli db
+check_fails  "mastodon_mock bogus-subcommand"  run_cli bogus-subcommand
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

@@ -1,20 +1,23 @@
 [project]
 name = "mastodon_mock"
 version = "0.1.0"
-description = "Stateful Mastodon mock server that mocks the REST API with a minimal in-memory/sqlite database"
+description = "Stateful in-memory/SQLite mock of the Mastodon REST API for testing Mastodon clients"
 readme = "README.md"
 authors = [{ name = "Matthew Martin", email = "matthewdeanmartin@gmail.com" }]
-keywords = ["mastodon_mock"]
+keywords = ["mastodon", "mock", "fastapi", "testing", "fediverse", "rest-api", "mastodon.py"]
 license = "MIT"
 requires-python = ">=3.13"
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Software Development :: Testing :: Mocking",
 ]
 dependencies = [
     "fastapi>=0.115.0",

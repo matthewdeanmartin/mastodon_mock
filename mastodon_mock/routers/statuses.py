@@ -31,13 +31,13 @@ from mastodon_mock.pagination import paginate
 from mastodon_mock.routers.helpers import PageQuery, array_query, set_link_header
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.common import iso
+from mastodon_mock.serializers.instance import MAX_MEDIA_ATTACHMENTS, MAX_STATUS_CHARACTERS
 from mastodon_mock.serializers.misc import serialize_scheduled_status
 from mastodon_mock.serializers.statuses import (
     serialize_status,
     serialize_status_edit,
     serialize_status_source,
 )
-from mastodon_mock.serializers.instance import MAX_MEDIA_ATTACHMENTS, MAX_STATUS_CHARACTERS
 from mastodon_mock.services import add_notification, attach_mentions_and_tags
 
 router = APIRouter()
@@ -72,13 +72,10 @@ def _validate_status_params(params: dict[str, Any]) -> JSONResponse | None:
     if not text.strip() and media_count == 0 and not has_poll:
         return _validation_error("Validation failed: Text can't be blank")
     if len(text) > MAX_STATUS_CHARACTERS:
-        return _validation_error(
-            f"Validation failed: Text is too long (maximum is {MAX_STATUS_CHARACTERS} characters)"
-        )
+        return _validation_error(f"Validation failed: Text is too long (maximum is {MAX_STATUS_CHARACTERS} characters)")
     if media_count > MAX_MEDIA_ATTACHMENTS:
         return _validation_error(
-            f"Validation failed: Media attachments count is too high "
-            f"(maximum is {MAX_MEDIA_ATTACHMENTS})"
+            f"Validation failed: Media attachments count is too high " f"(maximum is {MAX_MEDIA_ATTACHMENTS})"
         )
     return None
 
@@ -284,7 +281,7 @@ async def post_status(
         sched = ScheduledStatus(
             account_id=account.id,
             scheduled_at=scheduled_at,
-            params={k: v for k, v in params.items()},
+            params=dict(params.items()),
         )
         db.add(sched)
         db.commit()
@@ -648,8 +645,6 @@ def _create_poll(db: DbSession, status: Status, poll_params: dict[str, Any]) -> 
     expires_in = poll_params.get("expires_in")
     expires_at = None
     if expires_in:
-        from datetime import timedelta
-
         expires_at = utcnow() + timedelta(seconds=int(expires_in))
     poll = Poll(
         status_id=status.id,

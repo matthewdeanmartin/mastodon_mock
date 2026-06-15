@@ -12,10 +12,28 @@ disable=
     too-many-locals,
     too-many-branches,
     too-many-statements,
+    too-many-return-statements,
+    too-many-nested-blocks,
+    too-many-boolean-expressions,
+    too-many-ancestors,
+    too-many-lines,
     too-few-public-methods,
     duplicate-code,
     import-error,
-    logging-fstring-interpolation
+    logging-fstring-interpolation,
+    not-callable,
+    assignment-from-no-return,
+    # FastAPI route handlers keep dependency-injected and API-compat query
+    # params even when a given handler does not read them.
+    unused-argument,
+    # Defensive request-body parsing (JSON or form) intentionally catches broadly.
+    broad-exception-caught,
+    # Serializers import each other lazily inside functions to break import cycles.
+    import-outside-toplevel,
+    # Some query/path params mirror the Mastodon API names (e.g. ``type``).
+    redefined-builtin,
+    # Route handler names intentionally reuse domain nouns as parameter names.
+    redefined-outer-name
 
 [FORMAT]
 max-line-length=120

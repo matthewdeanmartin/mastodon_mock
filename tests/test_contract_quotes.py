@@ -41,7 +41,7 @@ def test_quotes_endpoint_lists_quoting_statuses(alice: Mastodon, bob: Mastodon) 
 
     # A status nobody quotes has an empty quote list.
     lonely = alice.status_post("nobody quotes me")
-    assert list(alice.status_quotes(lonely.id)) == []
+    assert not list(alice.status_quotes(lonely.id))
 
 
 def test_quote_of_missing_status_is_dropped(alice: Mastodon) -> None:

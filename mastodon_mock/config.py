@@ -89,8 +89,9 @@ class SeedConfig(BaseModel):
     statuses: list[SeedStatus] = Field(default_factory=list)
 
 
+# mock seed token below is not a real credential
 DEFAULT_SEED = SeedConfig(
-    accounts=[SeedAccount(username="testuser", display_name="Test User", access_token="mock_token")],
+    accounts=[SeedAccount(username="testuser", display_name="Test User", access_token="mock_token")],  # nosec B106
 )
 
 

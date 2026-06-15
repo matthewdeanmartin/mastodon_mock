@@ -1,2 +1,3 @@
 # Add project-specific words here, one per line.
 # These words will be ignored by codespell and pylint spelling checks.
+selectin

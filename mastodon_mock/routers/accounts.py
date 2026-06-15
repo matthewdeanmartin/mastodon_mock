@@ -177,7 +177,7 @@ def accounts_many(
 
 
 @router.get("/api/v1/accounts/{account_id}")
-def account(account_id: str, db: DbSession, config: Config) -> dict[str, Any]:
+def get_account(account_id: str, db: DbSession, config: Config) -> dict[str, Any]:
     """Fetch a single account."""
     acc = _get_account_or_404(db, account_id)
     return serialize_account(db, acc, config)

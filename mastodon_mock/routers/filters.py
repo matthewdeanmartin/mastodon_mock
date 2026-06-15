@@ -49,8 +49,14 @@ def _parse_dt(value: Any) -> datetime | None:
 
 
 def _context(params: dict[str, Any]) -> list[str]:
-    """Extract the ``context[]`` list from params."""
+    """Extract the context list from params.
+
+    Mastodon.py sends list params JSON-encoded as ``context`` but form-encoded
+    as ``context[]``; accept either spelling.
+    """
     ctx = params.get("context")
+    if ctx is None:
+        ctx = params.get("context[]")
     if isinstance(ctx, list):
         return [str(c) for c in ctx]
     if ctx:
@@ -99,7 +105,7 @@ async def update_filter_v2(filter_id: str, request: Request, db: DbSession, acco
     params = await _params(request)
     if "title" in params:
         filt.title = str(params["title"])
-    if "context" in params:
+    if "context" in params or "context[]" in params:
         filt.context = _context(params)
     if "filter_action" in params:
         filt.filter_action = str(params["filter_action"])
@@ -211,7 +217,7 @@ async def update_filter_v1(filter_id: str, request: Request, db: DbSession, acco
         filt.title = str(params["phrase"])
         if filt.keywords:
             filt.keywords[0].keyword = str(params["phrase"])
-    if "context" in params:
+    if "context" in params or "context[]" in params:
         filt.context = _context(params)
     if "irreversible" in params:
         filt.filter_action = "hide" if str(params["irreversible"]).lower() in ("true", "1", "on") else "warn"

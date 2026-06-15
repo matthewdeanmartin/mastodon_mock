@@ -19,6 +19,31 @@ the latest release to receive security patches.
 | latest  | Yes       |
 | older   | No        |
 
+## Scope
+
+`mastodon_mock` is a **testing and local-development tool**. It is a mock of the Mastodon
+REST API and is **not** a production server. By design it does not implement real
+authentication or authorization: access tokens are random opaque strings mapped 1:1 to
+seeded accounts, the `client_credentials` grant always succeeds, and there is no password
+hashing, email verification, or rate-limit enforcement beyond what tests require. Do not
+expose it to untrusted networks or use it to store real user data.
+
+In scope for security reports:
+
+- Vulnerabilities that allow code execution, path traversal, or filesystem access outside
+  the configured database/media paths when running the server as documented.
+- Issues in the build/release pipeline or published artifacts (e.g. a compromised
+  dependency in the wheel).
+- Crashes or unbounded resource use triggered by ordinary, well-formed API requests.
+
+Out of scope (these are intentional mock behaviours, not vulnerabilities):
+
+- Weak/faked authentication, predictable tokens, or the always-succeeding
+  `client_credentials` grant.
+- Lack of input sanitisation on content stored and echoed back (the mock stores what
+  clients send so tests can assert on it).
+- Running the mock on a public interface — it is meant for `127.0.0.1` / CI use only.
+
 ## Reporting a Vulnerability
 
 Please **do not** report security vulnerabilities through public GitHub issues.

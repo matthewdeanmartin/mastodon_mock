@@ -104,7 +104,7 @@ async def media_update(media_id: str, request: Request, db: DbSession) -> dict[s
     media = _media_or_404(db, media_id)
     form: dict[str, Any] = {}
     try:
-        form = {k: v for k, v in (await request.form()).items()}
+        form = dict((await request.form()).items())
     except Exception:
         form = {}
     if (desc := form.get("description")) is not None:
