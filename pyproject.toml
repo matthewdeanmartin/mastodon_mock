@@ -1,6 +1,6 @@
 [project]
 name = "mastodon_mock"
-version = "0.1.0"
+version = "0.0.1"
 description = "Stateful in-memory/SQLite mock of the Mastodon REST API for testing Mastodon clients"
 readme = "README.md"
 authors = [{ name = "Matthew Martin", email = "matthewdeanmartin@gmail.com" }]
