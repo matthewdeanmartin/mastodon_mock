@@ -51,6 +51,21 @@ class Account(Base):
     default_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
     default_language: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Admin / moderation state (see spec/03-api-coverage.md "admin"). These back
+    # the AdminAccount entity and the moderation actions; they have no effect on
+    # the public API surface beyond being reported.
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
+    ip: Mapped[str | None] = mapped_column(String, nullable=True)
+    role: Mapped[str] = mapped_column(String, default="user")
+    locale: Mapped[str] = mapped_column(String, default="en")
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=True)
+    approved: Mapped[bool] = mapped_column(Boolean, default=True)
+    disabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    silenced: Mapped[bool] = mapped_column(Boolean, default=False)
+    suspended: Mapped[bool] = mapped_column(Boolean, default=False)
+    sensitized: Mapped[bool] = mapped_column(Boolean, default=False)
+    invite_request: Mapped[str | None] = mapped_column(String, nullable=True)
+
     __table_args__ = (UniqueConstraint("username", "domain", name="uq_account_username_domain"),)
 
 
@@ -105,6 +120,11 @@ class Status(Base):
     application_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("oauth_apps.id"), nullable=True)
     # The status this one quotes (Mastodon 4.5+ quote posts), if any.
     quoted_status_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=True)
+    # Quote state of *this* status's quote ("accepted"/"revoked"/"pending"); only
+    # meaningful when quoted_status_id is set.
+    quote_state: Mapped[str] = mapped_column(String, default="accepted")
+    # Who may quote *this* status: "public" | "followers" | "nobody" (4.5+).
+    quote_approval_policy: Mapped[str] = mapped_column(String, default="public")
     # Snapshots of past versions for status_history(); list of dicts.
     edit_history: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
 
@@ -129,6 +149,36 @@ class StatusTag(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
     status_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("statuses.id"), index=True)
     name: Mapped[str] = mapped_column(String, index=True)
+
+
+class FollowedTag(Base):
+    """A hashtag followed by an account (``tag_follow``/``tag_unfollow``)."""
+
+    __tablename__ = "followed_tags"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    name: Mapped[str] = mapped_column(String, index=True)
+
+    __table_args__ = (UniqueConstraint("account_id", "name", name="uq_followed_tag"),)
+
+
+class FeaturedTag(Base):
+    """A hashtag an account features on its profile.
+
+    Backs ``featured_tag_create``/``featured_tag_delete`` and the newer
+    ``tag_feature``/``tag_unfeature``. ``statuses_count``/``last_status_at`` are
+    derived at read time from the account's statuses using the tag.
+    """
+
+    __tablename__ = "featured_tags"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    name: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    __table_args__ = (UniqueConstraint("account_id", "name", name="uq_featured_tag"),)
 
 
 class MediaAttachment(Base):
@@ -386,3 +436,92 @@ class ConversationRead(Base):
     conversation_id: Mapped[str] = mapped_column(String, index=True)
 
     __table_args__ = (UniqueConstraint("account_id", "conversation_id", name="uq_conversation_read"),)
+
+
+# --- Admin / moderation (see spec/03-api-coverage.md "admin") -----------------
+
+
+class Report(Base):
+    """A moderation report filed against an account.
+
+    Backs both the (consumer-facing) ``/api/v1/reports`` create endpoint and the
+    admin report API. ``status_ids`` holds the reported status ids as JSON.
+    """
+
+    __tablename__ = "reports"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    target_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    comment: Mapped[str] = mapped_column(Text, default="")
+    category: Mapped[str] = mapped_column(String, default="other")
+    forwarded: Mapped[bool] = mapped_column(Boolean, default=False)
+    status_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    rule_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    action_taken: Mapped[bool] = mapped_column(Boolean, default=False)
+    action_taken_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    assigned_account_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=True)
+    action_taken_by_account_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("accounts.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class AdminDomainBlock(Base):
+    """An instance-wide domain block (admin API)."""
+
+    __tablename__ = "admin_domain_blocks"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    domain: Mapped[str] = mapped_column(String, index=True)
+    severity: Mapped[str] = mapped_column(String, default="silence")
+    reject_media: Mapped[bool] = mapped_column(Boolean, default=False)
+    reject_reports: Mapped[bool] = mapped_column(Boolean, default=False)
+    private_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    public_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    obfuscate: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class AdminDomainAllow(Base):
+    """An instance-wide domain allow (allowlist mode; admin API)."""
+
+    __tablename__ = "admin_domain_allows"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    domain: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class AdminEmailDomainBlock(Base):
+    """A blocked email domain for signups (admin API)."""
+
+    __tablename__ = "admin_email_domain_blocks"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    domain: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class AdminCanonicalEmailBlock(Base):
+    """A canonical (hashed) email block (admin API)."""
+
+    __tablename__ = "admin_canonical_email_blocks"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    canonical_email_hash: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class AdminIpBlock(Base):
+    """A blocked IP address or CIDR range (admin API)."""
+
+    __tablename__ = "admin_ip_blocks"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    ip: Mapped[str] = mapped_column(String, index=True)
+    severity: Mapped[str] = mapped_column(String, default="no_access")
+    comment: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

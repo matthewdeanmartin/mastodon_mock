@@ -103,9 +103,13 @@ def serialize_status(
     if status.quoted_status_id is not None and _depth == 0:
         quoted = session.get(Status, status.quoted_status_id)
         if quoted is not None:
+            # A revoked quote hides the quoted status (matching real Mastodon).
+            revoked = status.quote_state == "revoked"
             quote_data = {
-                "state": "accepted",
-                "quoted_status": serialize_status(session, quoted, config, viewer, _depth=_depth + 1),
+                "state": status.quote_state,
+                "quoted_status": None
+                if revoked
+                else serialize_status(session, quoted, config, viewer, _depth=_depth + 1),
             }
 
     favourited = reblogged = bookmarked = muted = pinned = False
@@ -154,6 +158,7 @@ def serialize_status(
         "poll": poll_data,
         "application": application,
         "quote": quote_data,
+        "quote_approval_policy": status.quote_approval_policy,
         "filtered": [],
     }
     return data

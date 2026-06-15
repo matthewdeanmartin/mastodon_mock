@@ -64,6 +64,9 @@ class SeedAccount(BaseModel):
     locked: bool = False
     bot: bool = False
     access_token: str | None = None
+    # Admin / moderation seed fields (optional).
+    email: str | None = None
+    role: str = "user"
 
 
 class SeedFollow(BaseModel):

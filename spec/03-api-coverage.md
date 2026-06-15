@@ -1,10 +1,13 @@
 # API Coverage Matrix
 
-> **Implementation status (v0.1.0):** all **Full**, **Static**, and **Stub** rows
+> **Implementation status:** all **Full**, **Static**, and **Stub** rows
 > below are implemented and exercised by Mastodon.py-driven contract tests in
-> `tests/test_contract_core.py` and `tests/test_contract_extended.py`. **OOS** rows
-> are deliberately not routed (Mastodon.py gets a 404). The routers live in
-> `mastodon_mock/routers/` mirroring this document's section headings.
+> `tests/test_contract_core.py`, `tests/test_contract_extended.py`, and (for the
+> admin API) `tests/test_contract_admin.py`. **OOS** rows are deliberately not
+> routed (Mastodon.py gets a 404). The routers live in `mastodon_mock/routers/`
+> mirroring this document's section headings. The admin / moderation API
+> (`routers/admin.py`) is **in scope** as of the admin phase — see that section
+> below.
 
 Legend (see [00-overview.md](00-overview.md) for definitions):
 
@@ -37,19 +40,19 @@ to a concrete client call.
 |--------|------|------------------------|----------|
 | GET | `/api/v1/instance/` | `instance_v1()`, `instance()` fallback | **Static** — built from config (`mocked_version`, `domain`, `title`); `configuration.statuses.max_characters` etc. set to real Mastodon defaults |
 | GET | `/api/v2/instance/` | `instance_v2()`, `instance()` | **Static** — same data reshaped to `InstanceV2`, includes `api_versions` (see [05-versioning.md](05-versioning.md)) |
-| GET | `/api/v1/instance/activity` | `instance_activity()` | **Stub** — empty list (Mastodon.py treats `MastodonNotFoundError` as "disabled"; empty list is also valid and simpler) |
-| GET | `/api/v1/instance/peers` | `instance_peers()` | **Stub** — empty list |
+| GET | `/api/v1/instance/activity` | `instance_activity()` | **Full** — 12 weeks of `{week, statuses, logins, registrations}` (string values) counted from local statuses/accounts |
+| GET | `/api/v1/instance/peers` | `instance_peers()` | **Full** — distinct domains of "remote" accounts |
 | GET | `/.well-known/nodeinfo` + nodeinfo doc | `instance_nodeinfo()` | **Static** — minimal 2.0 schema doc with `software.name="mastodon_mock"`, `software.version=mocked_version` |
 | GET | `/api/v1/instance/rules` | `instance_rules()` | **Static** — empty list by default, configurable via seed config |
 | GET | `/api/v1/instance/terms_of_service` | `instance_terms_of_service()` | **Stub** — `MastodonNotFoundError` (404) — matches instances with no ToS configured |
 | GET | `/api/v1/directory` | `instance_directory()` | **Full** — `order=active` (default) sorts by most recent status time, `order=new` by account `created_at`; `local` filters to local accounts |
-| GET | `/api/v1/custom_emojis` | `custom_emojis()` | **Stub** — empty list |
-| GET | `/api/v1/announcements` | `announcements()` | **Stub** — empty list |
+| GET | `/api/v1/custom_emojis` | `custom_emojis()` | **Static** — small fixed set in the `CustomEmoji` shape |
+| GET | `/api/v1/announcements` | `announcements()` | **Stub** — empty list (matches an instance with none configured) |
 | POST | `/api/v1/announcements/{id}/dismiss` | `announcement_dismiss()` | **OOS** (no announcements exist to dismiss) |
 | PUT/DELETE | `/api/v1/announcements/{id}/reactions/{reaction}` | `announcement_add_reaction()` / `announcement_remove_reaction()` | **OOS** |
 | GET | `/api/v1/instance/extended_description` | `instance_extended_description()` | **Static** — empty/placeholder HTML |
-| GET | `/api/v1/instance/translation_languages` | `instance_supported_translation_languages()` | **Stub** — empty dict |
-| GET | `/api/v1/instance/domain_blocks` | `instance_domain_blocks()` | **Stub** — empty list (most instances 404/disable this; empty list also acceptable) |
+| GET | `/api/v1/instance/translation_languages` | `instance_supported_translation_languages()` | **Static** — each supported source language → fixed target set (`{source: [targets...]}`) |
+| GET | `/api/v1/instance/domain_blocks` | `instance_domain_blocks()` | **Full** — derived from admin domain blocks; each entry has a sha256 `digest`, `severity`, `comment` |
 | GET | `/api/v1/instance/languages` | `instance_languages()` | **Static** — `["en"]` |
 
 ## `routers/accounts.py` — accounts (read)
@@ -67,7 +70,8 @@ to a concrete client call.
 | GET | `/api/v1/accounts/{id}/lists` | `account_lists()` | **Full** |
 | GET | `/api/v1/accounts/lookup` | `account_lookup()` | **Full** — exact `acct` match |
 | GET | `/api/v1/accounts/familiar_followers` | `account_familiar_followers()` | **Full** — intersection of followers |
-| GET | `/api/v1/accounts/{id}/featured_tags` | `account_featured_tags()` | **Stub** — empty list |
+| GET | `/api/v1/accounts/{id}/featured_tags` | `account_featured_tags()` | **Full** — the account's featured tags (`FeaturedTag` shape; usage counts derived) |
+| GET | `/api/v1/featured_tags` | `featured_tags()` | **Full** — the logged-in user's featured tags (see routers/tags.py) |
 
 ## `routers/accounts.py` — accounts (write) — **high priority**
 
@@ -134,8 +138,8 @@ to a concrete client call.
 | POST | `/api/v1/statuses/{id}/bookmark` | `status_bookmark()` | **Full** |
 | POST | `/api/v1/statuses/{id}/unbookmark` | `status_unbookmark()` | **Full** |
 | POST | `/api/v1/statuses/{id}/translate` | `status_translate()` | **Static** — returns the original `content` verbatim with `detected_source_language="en"`, `provider="mastodon_mock"` (good enough for callers that just check the shape) |
-| POST | `/api/v1/statuses/{id}/quotes/{qid}/revoke` | `status_quote_revoke()` | **OOS** |
-| PUT | `/api/v1/statuses/{id}/interaction_policy` | `status_update_quote_approval_policy()` | **OOS** |
+| POST | `/api/v1/statuses/{id}/quotes/{qid}/revoke` | `status_quote_revoke()` | **Full** — sets the quoting status's `quote.state` to `revoked` (which hides `quoted_status`); only the quoted status's author may revoke |
+| PUT | `/api/v1/statuses/{id}/interaction_policy` | `status_update_quote_approval_policy()` | **Full** — sets `quote_approval_policy` (`public`/`followers`/`nobody`); `private`/`direct` statuses are forced to `nobody`; author-only |
 
 ### Scheduled statuses
 
@@ -165,8 +169,8 @@ to a concrete client call.
 | GET | `/api/v1/notifications/unread_count` | `notifications_unread_count()` | **Full** |
 | POST | `/api/v1/notifications/clear` | `notifications_clear()` | **Full** — deletes all notifications for the user |
 | POST | `/api/v1/notifications/{id}/dismiss` (and bulk variant) | `notifications_dismiss()` | **Full** — sets `read=True` / deletes |
-| GET/PATCH | `/api/v2/notifications/policy` | `notifications_policy()`, `update_notifications_policy()` | **Stub** — returns a fixed "accept everything" policy; PATCH accepted and ignored |
-| `/api/v1/notifications/requests*` | `notification_request*()` | **Stub** — empty list / 404 |
+| GET/PATCH | `/api/v2/notifications/policy` | `notifications_policy()`, `update_notifications_policy()` | **Static** — fixed "accept everything" policy (incl. `for_bots`); PATCH accepted and ignored |
+| `/api/v1/notifications/requests*` | `notification_request*()` | **Full(ish)** — list is always empty (policy filters nothing); `requests/merged` returns `{merged: true}`; single fetch 404s; accept/dismiss (single + bulk) are no-ops |
 | GET | `/api/v2/notifications` | `grouped_notifications()` | **Full** — groups favourite/follow/reblog by target into `NotificationGroup`s; other types stay individual. Returns the `accounts`/`statuses`/`notification_groups` container with `Link` pagination. |
 | GET | `/api/v2/notifications/unread_count` | `unread_grouped_notifications_count()` | **Full** — counts unread *groups*, not rows |
 | GET | `/api/v2/notifications/{group_key}` | `grouped_notification()` | **Full** — single-group container; 404 if no members |
@@ -261,24 +265,114 @@ No remote-resolve (`resolve=True` webfinger) — always behaves as `resolve=Fals
 
 `make_poll()` is a pure client-side helper.
 
+## `routers/admin.py` — admin / moderation API — **in scope**
+
+> The admin API (`mastodon/admin.py`) is **in scope** as of this phase. Auth is
+> faked like the rest of the mock: any authenticated account may call these
+> endpoints — there is **no role/scope enforcement** (consistent with the "no real
+> security" non-goal in [00-overview.md](00-overview.md)). Accounts carry
+> moderation columns (`email`, `ip`, `role`, `confirmed`, `approved`, `disabled`,
+> `silenced`, `suspended`, `sensitized`, `locale`, `invite_request`) backing the
+> `AdminAccount` entity. Exercised by `tests/test_contract_admin.py`.
+
+### Accounts
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| GET | `/api/v2/admin/accounts` | `admin_accounts_v2()` | **Full** — filters `origin` (default `local`), `by_domain`, `username`, `display_name`, `email`, `ip`, `permissions=staff`, `status`; paginated |
+| GET | `/api/v1/admin/accounts` | `admin_accounts()` / `admin_accounts_v1()` | **Full** — v1 boolean-flag form (`remote`, `active`/`pending`/`disabled`/`silenced`/`suspended`, `staff`). NB: Mastodon.py types v1 as returning a single `AdminAccount`, so list elements arrive as raw dicts |
+| GET | `/api/v1/admin/accounts/{id}` | `admin_account()` | **Full** |
+| POST | `/api/v1/admin/accounts/{id}/enable` | `admin_account_enable()` | **Full** — clears `disabled` |
+| POST | `/api/v1/admin/accounts/{id}/approve` | `admin_account_approve()` | **Full** — sets `approved` |
+| POST | `/api/v1/admin/accounts/{id}/reject` | `admin_account_reject()` | **Full** — deletes account, returns its shape |
+| POST | `/api/v1/admin/accounts/{id}/unsilence` | `admin_account_unsilence()` | **Full** |
+| POST | `/api/v1/admin/accounts/{id}/unsuspend` | `admin_account_unsuspend()` | **Full** |
+| POST | `/api/v1/admin/accounts/{id}/unsensitive` | `admin_account_unsensitive()` | **Full** |
+| DELETE | `/api/v1/admin/accounts/{id}` | `admin_account_delete()` | **Full** |
+| POST | `/api/v1/admin/accounts/{id}/action` | `admin_account_moderate()` | **Full** — `type` ∈ {disable, silence, suspend, sensitive, none}; `report_id` closes the report |
+
+### Reports
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| POST | `/api/v1/reports` | `report()` | **Full** — creates a `reports` row (this is what populates the admin queue); returns the consumer-facing `Report` |
+| GET | `/api/v1/admin/reports` | `admin_reports()` | **Full** — `resolved` toggles resolved/unresolved queue; `account_id`/`target_account_id` filters; paginated |
+| GET | `/api/v1/admin/reports/{id}` | `admin_report()` | **Full** |
+| POST | `/api/v1/admin/reports/{id}/assign_to_self` | `admin_report_assign()` | **Full** |
+| POST | `/api/v1/admin/reports/{id}/unassign` | `admin_report_unassign()` | **Full** |
+| POST | `/api/v1/admin/reports/{id}/reopen` | `admin_report_reopen()` | **Full** |
+| POST | `/api/v1/admin/reports/{id}/resolve` | `admin_report_resolve()` | **Full** |
+
+### Domain blocks / allows / email & IP blocks
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| GET | `/api/v1/admin/domain_blocks[/{id}]` | `admin_domain_blocks()` | **Full** |
+| POST | `/api/v1/admin/domain_blocks` | `admin_create_domain_block()` | **Full** — `severity`, `reject_media`, `reject_reports`, comments, `obfuscate` |
+| PUT | `/api/v1/admin/domain_blocks/{id}` | `admin_update_domain_block()` | **Full** |
+| DELETE | `/api/v1/admin/domain_blocks/{id}` | `admin_delete_domain_block()` | **Full** |
+| GET | `/api/v1/admin/domain_allows[/{id}]` | `admin_domain_allows()` / `admin_domain_allow()` | **Full** |
+| POST | `/api/v1/admin/domain_allows` | `admin_create_domain_allow()` | **Full** — idempotent on `domain` |
+| DELETE | `/api/v1/admin/domain_allows/{id}` | `admin_delete_domain_allow()` | **Full** |
+| GET | `/api/v1/admin/email_domain_blocks[/{id}]` | `admin_email_domain_blocks()` / `admin_email_domain_block()` | **Full** |
+| POST | `/api/v1/admin/email_domain_blocks` | `admin_create_email_domain_block()` | **Full** |
+| DELETE | `/api/v1/admin/email_domain_blocks/{id}` | `admin_delete_email_domain_block()` | **Full** |
+| GET | `/api/v1/admin/canonical_email_blocks[/{id}]` | `admin_canonical_email_blocks()` / `admin_canonical_email_block()` | **Full** |
+| POST | `/api/v1/admin/canonical_email_blocks/test` | `admin_test_canonical_email_block()` | **Full** — canonicalizes (lowercase, strip dots + `+suffix`) then SHA256-matches |
+| POST | `/api/v1/admin/canonical_email_blocks` | `admin_create_canonical_email_block()` | **Full** — by `email` or `canonical_email_hash` |
+| DELETE | `/api/v1/admin/canonical_email_blocks/{id}` | `admin_delete_canonical_email_block()` | **Full** |
+| GET | `/api/v1/admin/ip_blocks[/{id}]` | `admin_ip_blocks()` / `admin_ip_block()` | **Full** |
+| POST | `/api/v1/admin/ip_blocks` | `admin_create_ip_block()` | **Full** — `severity`, `comment`, `expires_in` → `expires_at` |
+| PUT | `/api/v1/admin/ip_blocks/{id}` | `admin_update_ip_block()` | **Full** |
+| DELETE | `/api/v1/admin/ip_blocks/{id}` | `admin_delete_ip_block()` | **Full** |
+
+### Trends & statistics
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| GET | `/api/v1/admin/trends/tags` | `admin_trending_tags()` | **Stub** — empty list (trends are Stub instance-wide) |
+| GET | `/api/v1/admin/trends/statuses` | `admin_trending_statuses()` | **Stub** — empty list |
+| GET | `/api/v1/admin/trends/links` | `admin_trending_links()` | **Stub** — empty list |
+| POST | `/api/v1/admin/trends/{links,statuses,tags}/{id}/{approve,reject}` | `admin_approve_*` / `admin_reject_*` | **Static** — echo a minimal entity of the right shape |
+| POST | `/api/v1/admin/measures` | `admin_measures()` | **Static** — one zero-valued `AdminMeasure` per requested key (no real aggregation) |
+| POST | `/api/v1/admin/dimensions` | `admin_dimensions()` | **Static** — one empty `AdminDimension` per requested key |
+| POST | `/api/v1/admin/retention` | `admin_retention()` | **Static** — empty cohort list |
+
 ## Modules entirely **out of scope** for v1
 
 | Module | Reason |
 |--------|--------|
-| `mastodon/admin.py` | Admin API — explicitly OOS per [00-overview.md](00-overview.md) |
 | `mastodon/push.py` | WebPush/VAPID — irrelevant to write-then-read goal |
 | `mastodon/streaming.py`, `streaming_endpoints.py` | Streaming/WebSocket — OOS for v1 |
-| `mastodon/reports.py` (`/api/v1/reports`) | Moderation reports — niche; revisit if needed |
-| `mastodon/endorsements.py` (`/api/v1/endorsements`) | Covered indirectly via `relationships.endorsed`; the dedicated listing endpoint is **Stub** (empty list) initially |
-| `mastodon/suggestions.py` | Follow suggestions — **Stub** (empty list) |
-| `mastodon/trends.py` | Trending tags/statuses/links — **Stub** (empty lists) |
-| `mastodon/hashtags.py` (featured tags, followed tags) | **Stub** (empty lists); `tag_follow`/`tag_unfollow` **OOS** in v1 |
 
-These modules get **Stub** routes (returning empty lists/dicts) rather than 404s where
-Mastodon.py's higher-level flows (e.g. instance info gathering) might touch them in
-passing, to avoid spurious `MastodonNotFoundError`s breaking unrelated test setup. Pure
-feature-test endpoints that nothing else depends on are simply not routed (**OOS**,
-404).
+Hashtag follow + fetch live in `routers/tags.py` and are now **Full** (backed by a
+`followed_tags` table):
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| GET | `/api/v1/tags/{hashtag}` | `tag()` | **Full** — viewer-relative `following`/`featuring`, 7-day usage history |
+| POST | `/api/v1/tags/{hashtag}/follow` | `tag_follow()` | **Full** — idempotent; persists a `followed_tags` row |
+| POST | `/api/v1/tags/{hashtag}/unfollow` | `tag_unfollow()` | **Full** — idempotent |
+| POST | `/api/v1/featured_tags` | `featured_tag_create()` | **Full** — features a tag (persists a `featured_tags` row); returns `FeaturedTag` |
+| DELETE | `/api/v1/featured_tags/{id}` | `featured_tag_delete()` | **Full** — by row id; owner-only |
+| GET | `/api/v1/featured_tags/suggestions` | `featured_tag_suggestions()` | **Full** — the user's 10 most-used, not-yet-featured tags |
+| POST | `/api/v1/tags/{hashtag}/feature` | `tag_feature()` | **Full** — newer alias of create; idempotent; returns `Tag` with `featuring=True` |
+| POST | `/api/v1/tags/{hashtag}/unfeature` | `tag_unfeature()` | **Full** — newer alias of delete; idempotent |
+
+### Discovery surfaces (now data-derived, was Stub)
+
+These were originally Stub/empty; they now return realistic, correctly-shaped content
+derived from the mock's own local data (shapes captured from a live `mastodon.social`).
+They do not reproduce Mastodon's ranking algorithms, but satisfy callers that iterate them.
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| GET | `/api/v1/suggestions`, `/api/v2/suggestions` | `suggestions()` / `suggestions_v2()` | **Full** — local accounts the viewer doesn't follow (emitted in the v2 `Suggestion` shape) |
+| GET | `/api/v1/trends`, `/api/v1/trends/tags` | `trending_tags()` | **Full** — local hashtags ranked by status count, `Tag` shape with 7-day history |
+| GET | `/api/v1/trends/statuses` | `trending_statuses()` | **Full** — public local statuses ranked by favourites |
+| GET | `/api/v1/trends/links` | `trending_links()` | **Stub** — empty list (no preview-card synthesis) |
+| GET | `/api/v1/endorsements` | `endorsements()` | **Full** — accounts with `relationships.endorsed=True` |
+| GET | `/api/v1/followed_tags` | `followed_tags()` | **Full** — hashtags the viewer follows (backed by the `followed_tags` table; see routers/tags.py) |
 
 ## Notification generation (cross-cutting)
 

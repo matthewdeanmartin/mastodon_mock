@@ -8,12 +8,12 @@ method that hits each route) lives in the
 
 ## Coverage levels
 
-| Level | Meaning |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| **Full** | Real, persisted state. Writes are reflected in later reads. Safe to assert behaviour on. |
-| **Static** | Fixed-shape response, no persistence. The shape is correct; the values don't change. |
-| **Stub** | Minimal valid shape (usually an empty list/dict) so the client doesn't error. No behaviour. |
-| **OOS** | Out of scope — the route isn't implemented; the client gets a `404`. |
+| Level      | Meaning                                                                                     |
+|------------|---------------------------------------------------------------------------------------------|
+| **Full**   | Real, persisted state. Writes are reflected in later reads. Safe to assert behaviour on.    |
+| **Static** | Fixed-shape response, no persistence. The shape is correct; the values don't change.        |
+| **Stub**   | Minimal valid shape (usually an empty list/dict) so the client doesn't error. No behaviour. |
+| **OOS**    | Out of scope — the route isn't implemented; the client gets a `404`.                        |
 
 ## Fully stateful (assert freely)
 
@@ -34,6 +34,13 @@ relationships, notifications, and pagination you'd expect.
   `visibility`, `sensitive`, `spoiler_text`, `language`, `media_ids`, polls, quotes,
   `scheduled_at`, `idempotency_key`), edit, delete, reblog/unreblog, favourite/unfavourite,
   mute/unmute, pin/unpin, bookmark/unbookmark.
+- **Quotes (write)** — revoke a quote of your status (`status_quote_revoke`, which sets the
+  quoting status's `quote.state` to `revoked` and hides the quoted status) and update a
+  status's quote-approval policy (`status_update_quote_approval_policy`; private/direct
+  statuses are forced to `nobody`).
+- **Hashtags** — follow / unfollow and feature / unfeature a tag, list followed and
+  featured tags (all persisted), featured-tag suggestions, plus `tag()` fetch with
+  viewer-relative `following` / `featuring`.
 - **Scheduled statuses** — list, get, update, delete.
 - **Timelines** — home, public (with `local` / `remote` filters), hashtag, list. With
   `max_id` / `min_id` / `since_id` / `limit` paging and `Link` headers.
@@ -48,6 +55,14 @@ relationships, notifications, and pagination you'd expect.
 - **Conversations** — derived from `direct`-visibility statuses; mark-as-read.
 - **Preferences & markers** — read preferences; get/set markers.
 - **Polls** — fetch and vote (recomputes counts and `own_votes`).
+- **Reports** — `report()` files a moderation report against an account (this is what
+  populates the admin queue).
+- **Admin / moderation API** (`mastodon/admin.py`) — account listing & filtering (v1 + v2),
+  account moderation actions (enable / approve / reject / silence / suspend / sensitive /
+  delete) and `admin_account_moderate`, the report queue (list / fetch / assign / unassign /
+  resolve / reopen), and CRUD for domain blocks, domain allows, email-domain blocks,
+  canonical-email blocks, and IP blocks. **Auth is faked — there is no role enforcement** (any
+  authenticated account may call these), consistent with the "no real security" non-goal.
 
 ## Static (correct shape, fixed values)
 
@@ -59,17 +74,35 @@ The response is well-formed and stable, but nothing changes in response to your 
 - **Directory** — `/api/v1/directory` (sorts/filters real seeded accounts, but the listing
   itself is read-only).
 - **Status translation** — returns the original content verbatim with a fixed provider.
+- **Custom emojis** — a small, fixed set in the correct `CustomEmoji` shape.
+- **Translation languages** — each supported source language mapped to a fixed target set.
+- **Notification policy** — a fixed "accept everything" policy (PATCH accepted and ignored).
+
+## Discovery (data-derived, correct shape)
+
+These used to be empty stubs; they now return realistic, correctly-shaped content **derived
+from the mock's own data**, so callers that iterate them get something to work with. They are
+not full reproductions of Mastodon's ranking algorithms, but the shapes match a live server:
+
+- **Instance `activity`** — 12 weeks of `{week, statuses, logins, registrations}` counted
+  from your statuses/accounts.
+- **Instance `peers`** — the distinct domains of your seeded "remote" accounts.
+- **Instance `domain_blocks`** — derived from admin domain blocks (with a sha256 `digest`).
+- **Trends** — trending **tags** ranked by local hashtag usage; trending **statuses** ranked
+  by favourite count. Trending **links** is an empty list (no preview-card synthesis).
+- **Follow suggestions** (`suggestions_v2`) — local accounts you don't already follow.
+- **Endorsements** — the accounts you've endorsed (`relationships.endorsed`, i.e. pinned).
+- **Notification requests** — empty (the "accept everything" policy filters nothing), with
+  the full request family (`accept`/`dismiss`/`merged`) wired as no-ops.
 
 ## Stubs (empty/minimal, no behaviour)
 
 These exist so client flows that touch them in passing don't blow up, but they have no real
 data:
 
-- Instance: `activity`, `peers`, `custom_emojis`, `announcements`,
-  `translation_languages`, `domain_blocks`, `terms_of_service`.
-- Trends, follow suggestions, featured/followed tags, endorsements listing.
-- Notification policy (`/api/v2/notifications/policy`) and notification requests.
-- `filter_statuses_v2` (empty list), `timeline_link` (empty list).
+- Instance: `announcements` (empty), `terms_of_service` (`404`, as on a server with none set).
+- `filter_statuses_v2` (empty list), `timeline_link` (empty list), trending `links` (empty).
+- Admin trends / measures / dimensions / retention — correctly-shaped but zero/empty values.
 - `email_resend_confirmation` (accepts and does nothing).
 
 ## Out of scope (not routed — expect `404`)
@@ -77,12 +110,8 @@ data:
 Whole modules and a few endpoints are intentionally absent. Calling them raises
 `MastodonNotFoundError` / `MastodonAPIError`:
 
-- **Admin API** (`mastodon/admin.py`).
 - **WebPush / VAPID** (`mastodon/push.py`).
 - **Streaming / WebSocket** (`mastodon/streaming.py`).
-- **Moderation reports** (`/api/v1/reports`).
-- **Tag follow/unfollow.**
-- Quote revocation and quote-approval-policy endpoints.
 - Filter-status add/get/delete (the v2 `filter_statuses` *write* side).
 - Announcement dismiss/reactions (there are no announcements to act on).
 
@@ -99,5 +128,6 @@ Whole modules and a few endpoints are intentionally absent. Calling them raises
 - **Pagination is real.** List endpoints honour `max_id` / `min_id` / `since_id` / `limit`
   and emit a `Link` header, so Mastodon.py's `fetch_next` / `fetch_previous` work.
 
-When in doubt, the [coverage spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/03-api-coverage.md) lists every route and the
+When in doubt, the [coverage spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/03-api-coverage.md)
+lists every route and the
 Mastodon.py call that reaches it.

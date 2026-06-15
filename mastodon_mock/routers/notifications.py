@@ -122,13 +122,14 @@ def grouped_unread_count(
 # match the group handler with ``group_key="policy"``.
 @router.get("/api/v2/notifications/policy")
 def notifications_policy() -> dict[str, Any]:
-    """Stub: an "accept everything" policy."""
+    """An "accept everything" notification policy (shape per mastodon.social)."""
     return {
         "for_not_following": "accept",
         "for_not_followers": "accept",
         "for_new_accounts": "accept",
         "for_private_mentions": "accept",
         "for_limited_accounts": "accept",
+        "for_bots": "accept",
         "summary": {"pending_requests_count": 0, "pending_notifications_count": 0},
     }
 
@@ -220,9 +221,49 @@ def clear_notifications(db: DbSession, account: RequiredAccount) -> dict[str, An
 
 
 @router.get("/api/v1/notifications/requests")
-def notification_requests() -> list[Any]:
-    """Stub: empty notification requests."""
+def notification_requests(account: RequiredAccount) -> list[Any]:
+    """Empty list: the mock's policy accepts everything, so nothing is filtered.
+
+    See ``notifications_policy`` — with an "accept everything" policy there are no
+    pending requests from filtered senders.
+    """
     return []
+
+
+@router.get("/api/v1/notifications/requests/merged")
+def notification_requests_merged(account: RequiredAccount) -> dict[str, bool]:
+    """Whether accepted requests have merged — always True (no async jobs here)."""
+    return {"merged": True}
+
+
+@router.post("/api/v1/notifications/requests/accept", status_code=200)
+def accept_notification_requests(account: RequiredAccount) -> dict[str, Any]:
+    """Accept multiple notification requests (no-op: nothing is filtered)."""
+    return {}
+
+
+@router.post("/api/v1/notifications/requests/dismiss", status_code=200)
+def dismiss_notification_requests(account: RequiredAccount) -> dict[str, Any]:
+    """Dismiss multiple notification requests (no-op: nothing is filtered)."""
+    return {}
+
+
+@router.get("/api/v1/notifications/requests/{request_id}")
+def notification_request(request_id: str, account: RequiredAccount) -> dict[str, Any]:
+    """Fetch a single notification request — 404, since none ever exist."""
+    raise HTTPException(status_code=404, detail="Record not found")
+
+
+@router.post("/api/v1/notifications/requests/{request_id}/accept", status_code=200)
+def accept_notification_request(request_id: str, account: RequiredAccount) -> dict[str, Any]:
+    """Accept a single notification request (no-op)."""
+    return {}
+
+
+@router.post("/api/v1/notifications/requests/{request_id}/dismiss", status_code=200)
+def dismiss_notification_request(request_id: str, account: RequiredAccount) -> dict[str, Any]:
+    """Dismiss a single notification request (no-op)."""
+    return {}
 
 
 @router.get("/api/v1/notifications/{notification_id}")

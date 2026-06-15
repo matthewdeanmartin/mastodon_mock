@@ -44,6 +44,8 @@ def _ensure_account(session: Session, spec: SeedAccount) -> Account:
     existing = session.scalar(select(Account).where(Account.username == spec.username, Account.domain == spec.domain))
     if existing is not None:
         return existing
+    # Local accounts get a synthetic email for the admin API; remote accounts don't.
+    email = spec.email or (f"{spec.username}@local" if spec.domain is None else None)
     account = Account(
         username=spec.username,
         domain=spec.domain,
@@ -53,6 +55,8 @@ def _ensure_account(session: Session, spec: SeedAccount) -> Account:
         bot=spec.bot,
         created_at=utcnow(),
         fields=[],
+        email=email,
+        role=spec.role,
     )
     session.add(account)
     session.flush()

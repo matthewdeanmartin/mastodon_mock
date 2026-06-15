@@ -15,6 +15,7 @@ from mastodon_mock.db.seed import apply_seed_data
 from mastodon_mock.middleware import add_middleware
 from mastodon_mock.routers import (
     accounts,
+    admin,
     conversations,
     favourites_bookmarks,
     filters,
@@ -28,6 +29,7 @@ from mastodon_mock.routers import (
     relationships,
     search,
     statuses,
+    tags,
     timelines,
 )
 
@@ -67,6 +69,8 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
         polls,
         preferences,
         conversations,
+        admin,
+        tags,
     ):
         app.include_router(module.router)
 

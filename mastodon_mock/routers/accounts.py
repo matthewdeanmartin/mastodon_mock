@@ -20,6 +20,7 @@ from mastodon_mock.db.models import (
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.pagination import paginate
 from mastodon_mock.routers.helpers import PageQuery, array_query, set_link_header
+from mastodon_mock.routers.tags import featured_tags_for
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
 from mastodon_mock.serializers.relationships import serialize_relationship
@@ -311,9 +312,10 @@ def account_lists(account_id: str, db: DbSession, account: RequiredAccount) -> l
 
 
 @router.get("/api/v1/accounts/{account_id}/featured_tags")
-def account_featured_tags(account_id: str) -> list[Any]:
-    """Stub: empty featured tags list."""
-    return []
+def account_featured_tags(account_id: str, db: DbSession, config: Config) -> list[dict[str, Any]]:
+    """Featured tags for the given account (see routers/tags.py for the writes)."""
+    target = _get_account_or_404(db, account_id)
+    return featured_tags_for(db, config, target)
 
 
 # --- Writes ---

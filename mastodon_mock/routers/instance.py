@@ -2,21 +2,58 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import func, select
 
-from mastodon_mock.db.models import Account, Status
-from mastodon_mock.deps import Config, DbSession
+from mastodon_mock.db.models import (
+    Account,
+    AdminDomainBlock,
+    Favourite,
+    Relationship,
+    Status,
+    StatusTag,
+)
+from mastodon_mock.deps import Config, CurrentAccount, DbSession
 from mastodon_mock.serializers.accounts import serialize_account
+from mastodon_mock.serializers.discovery import (
+    serialize_activity_week,
+    serialize_instance_domain_block,
+    serialize_suggestion,
+    serialize_tag,
+)
 from mastodon_mock.serializers.instance import (
     serialize_instance_v1,
     serialize_instance_v2,
     serialize_nodeinfo,
 )
+from mastodon_mock.serializers.statuses import serialize_status
 
 router = APIRouter()
+
+# A small, fixed set of translation target languages, advertised for every
+# source language. Shaped like mastodon.social's (a dict of source → targets),
+# just much shorter.
+_TRANSLATION_TARGETS = ["en", "es", "fr", "de", "ja", "pt"]
+
+# Default custom emojis, returned in the real ``CustomEmoji`` shape. Configurable
+# behaviour is intentionally minimal — these exist so callers that iterate emoji
+# get a non-empty, correctly-shaped sample.
+def _default_custom_emojis(config: Config) -> list[dict[str, Any]]:
+    base = f"https://{config.domain}/custom_emojis"
+    return [
+        {
+            "shortcode": shortcode,
+            "url": f"{base}/{shortcode}.png",
+            "static_url": f"{base}/{shortcode}.png",
+            "visible_in_picker": True,
+            "category": "mock",
+            "featured": False,
+        }
+        for shortcode in ("mastodon", "blobcat")
+    ]
 
 
 @router.get("/api/v1/instance")
@@ -34,15 +71,52 @@ def instance_v2(db: DbSession, config: Config) -> dict[str, Any]:
 
 
 @router.get("/api/v1/instance/activity")
-def instance_activity() -> list[Any]:
-    """Stub: empty activity list."""
-    return []
+def instance_activity(db: DbSession) -> list[dict[str, str]]:
+    """Weekly activity for the past 12 weeks, derived from local statuses/accounts.
+
+    Shaped like ``mastodon.social`` (``{week, statuses, logins, registrations}``
+    with string values). Statuses/registrations are counted from the mock's own
+    rows per week; ``logins`` is approximated as the active-account count.
+    """
+    now = datetime.now(UTC)
+    # Week boundaries: most recent first, aligned to whole days like the real API.
+    this_week_end = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    out: list[dict[str, str]] = []
+    for i in range(12):
+        end = this_week_end - timedelta(weeks=i)
+        start = end - timedelta(weeks=1)
+        statuses = (
+            db.scalar(
+                select(func.count())
+                .select_from(Status)
+                .where(Status.created_at >= start, Status.created_at < end)
+            )
+            or 0
+        )
+        registrations = (
+            db.scalar(
+                select(func.count())
+                .select_from(Account)
+                .where(Account.created_at >= start, Account.created_at < end, Account.domain.is_(None))
+            )
+            or 0
+        )
+        logins = (
+            db.scalar(
+                select(func.count(func.distinct(Status.account_id)))
+                .where(Status.created_at >= start, Status.created_at < end)
+            )
+            or 0
+        )
+        out.append(serialize_activity_week(start, statuses, logins, registrations))
+    return out
 
 
 @router.get("/api/v1/instance/peers")
-def instance_peers() -> list[Any]:
-    """Stub: empty peer list."""
-    return []
+def instance_peers(db: DbSession) -> list[str]:
+    """The instance's known peers: the distinct domains of "remote" accounts."""
+    domains = db.scalars(select(Account.domain).where(Account.domain.is_not(None)).distinct()).all()
+    return sorted(d for d in domains if d)
 
 
 @router.get("/.well-known/nodeinfo")
@@ -107,14 +181,14 @@ def instance_directory(
 
 
 @router.get("/api/v1/custom_emojis")
-def custom_emojis() -> list[Any]:
-    """Stub: empty custom emoji list."""
-    return []
+def custom_emojis(config: Config) -> list[dict[str, Any]]:
+    """A small, correctly-shaped set of custom emojis."""
+    return _default_custom_emojis(config)
 
 
 @router.get("/api/v1/announcements")
 def announcements() -> list[Any]:
-    """Stub: empty announcements list."""
+    """Empty announcements list (matches an instance with none configured)."""
     return []
 
 
@@ -125,15 +199,20 @@ def instance_extended_description() -> dict[str, Any]:
 
 
 @router.get("/api/v1/instance/translation_languages")
-def instance_translation_languages() -> dict[str, Any]:
-    """Stub: empty translation language map."""
-    return {}
+def instance_translation_languages() -> dict[str, list[str]]:
+    """Map each supported source language to its translation targets.
+
+    Shaped like the real API (``{source: [targets...]}``); the mock advertises a
+    small fixed target set for each source.
+    """
+    return {src: [t for t in _TRANSLATION_TARGETS if t != src] for src in _TRANSLATION_TARGETS}
 
 
 @router.get("/api/v1/instance/domain_blocks")
-def instance_domain_blocks() -> list[Any]:
-    """Stub: empty domain block list."""
-    return []
+def instance_domain_blocks(db: DbSession) -> list[dict[str, Any]]:
+    """Public list of instance domain blocks, derived from admin domain blocks."""
+    blocks = db.scalars(select(AdminDomainBlock).order_by(AdminDomainBlock.domain)).all()
+    return [serialize_instance_domain_block(b.domain, b.severity, b.public_comment) for b in blocks]
 
 
 @router.get("/api/v1/instance/languages")
@@ -142,42 +221,105 @@ def instance_languages() -> list[str]:
     return ["en"]
 
 
-# --- Stubs for OOS-but-touched modules (suggestions/trends/endorsements/tags) ---
+# --- Discovery: suggestions / trends / endorsements / tags -------------------
+# These are derived from the mock's own local data so they return realistic,
+# correctly-shaped content rather than bare empty lists. See spec/03-api-coverage.md.
+
+
+def _suggestion_accounts(db: DbSession, config: Config, account: Account | None, limit: int) -> list[dict[str, Any]]:
+    """Serialized accounts to suggest: local, not self, not already followed."""
+    stmt = select(Account).where(Account.domain.is_(None))
+    if account is not None:
+        stmt = stmt.where(Account.id != account.id)
+        following = select(Relationship.target_account_id).where(
+            Relationship.source_account_id == account.id, Relationship.following.is_(True)
+        )
+        stmt = stmt.where(Account.id.not_in(following))
+    accounts = db.scalars(stmt.order_by(Account.id.desc()).limit(min(limit, 80))).all()
+    return [serialize_account(db, a, config) for a in accounts]
 
 
 @router.get("/api/v1/suggestions")
+def suggestions_v1(
+    db: DbSession,
+    config: Config,
+    account: CurrentAccount,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    """Follow suggestions (v1): bare accounts the viewer doesn't already follow."""
+    return _suggestion_accounts(db, config, account, limit)
+
+
 @router.get("/api/v2/suggestions")
-def suggestions() -> list[Any]:
-    """Stub: empty follow suggestions."""
-    return []
+def suggestions_v2(
+    db: DbSession,
+    config: Config,
+    account: CurrentAccount,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    """Follow suggestions (v2): each account wrapped in a ``Suggestion``."""
+    return [serialize_suggestion(acc) for acc in _suggestion_accounts(db, config, account, limit)]
+
+
+def _trending_tags(db: DbSession, config: Config, limit: int) -> list[dict[str, Any]]:
+    """Local hashtags ranked by how many statuses use them."""
+    rows = db.execute(
+        select(StatusTag.name, func.count().label("uses"))
+        .group_by(StatusTag.name)
+        .order_by(func.count().desc(), StatusTag.name)
+        .limit(limit)
+    ).all()
+    return [serialize_tag(name, config, uses_today=int(uses)) for name, uses in rows]
 
 
 @router.get("/api/v1/trends")
 @router.get("/api/v1/trends/tags")
-def trends_tags() -> list[Any]:
-    """Stub: empty trending tags."""
-    return []
+def trends_tags(db: DbSession, config: Config, limit: int = 10) -> list[dict[str, Any]]:
+    """Trending tags, derived from local hashtag usage."""
+    return _trending_tags(db, config, min(limit, 20))
 
 
 @router.get("/api/v1/trends/statuses")
-def trends_statuses() -> list[Any]:
-    """Stub: empty trending statuses."""
-    return []
+def trends_statuses(
+    db: DbSession,
+    config: Config,
+    account: CurrentAccount,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Trending statuses: the most-favourited public local statuses."""
+    fav_count = (
+        select(func.count())
+        .select_from(Favourite)
+        .where(Favourite.status_id == Status.id)
+        .scalar_subquery()
+    )
+    stmt = (
+        select(Status)
+        .where(Status.visibility.in_(["public", "unlisted"]), Status.reblog_of_id.is_(None))
+        .order_by(fav_count.desc(), Status.id.desc())
+        .limit(min(limit, 40))
+    )
+    statuses = db.scalars(stmt).all()
+    return [serialize_status(db, s, config, account) for s in statuses]
 
 
 @router.get("/api/v1/trends/links")
 def trends_links() -> list[Any]:
-    """Stub: empty trending links."""
+    """Trending links — empty (the mock does not synthesize preview cards)."""
     return []
 
 
 @router.get("/api/v1/endorsements")
-def endorsements() -> list[Any]:
-    """Stub: empty endorsements list."""
-    return []
+def endorsements(db: DbSession, config: Config, account: CurrentAccount) -> list[dict[str, Any]]:
+    """Accounts the viewer has endorsed (``relationships.endorsed``)."""
+    if account is None:
+        return []
+    accounts = db.scalars(
+        select(Account)
+        .join(Relationship, Relationship.target_account_id == Account.id)
+        .where(Relationship.source_account_id == account.id, Relationship.endorsed.is_(True))
+    ).all()
+    return [serialize_account(db, a, config) for a in accounts]
 
 
-@router.get("/api/v1/followed_tags")
-def followed_tags() -> list[Any]:
-    """Stub: empty followed tags."""
-    return []
+# `followed_tags`, `tag()`, and tag follow/unfollow live in routers/tags.py.

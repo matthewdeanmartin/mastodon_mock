@@ -60,7 +60,6 @@ A static mock can't reflect the post back. `mastodon_mock` can, because it has a
   Mastodon.py's `ratelimit_method` handling — TBD, see [03-api-coverage.md](03-api-coverage.md)).
 - **No streaming API** (`/api/v1/streaming/*`, websockets) — unless a follow-up phase
   decides Mastodon.py's streaming client is in scope. Not in v1.
-- **No admin API** (`mastodon/admin.py`) in v1.
 - **No push/WebPush** (`mastodon/push.py`) in v1 — VAPID/webpush crypto is irrelevant to
   the "write and read it back" goal.
 - **No media file processing.** Uploaded media is stored (or stubbed) but never

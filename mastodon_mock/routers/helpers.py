@@ -3,11 +3,36 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, Request, Response
 
 from mastodon_mock.pagination import Page, link_header
+
+
+async def read_body(request: Request) -> dict[str, Any]:
+    """Read request params from a JSON or form body (Mastodon.py uses both).
+
+    Repeated form keys (``name[]=a&name[]=b``) collapse to a list under ``name``.
+    Returns an empty dict for an empty/unparseable body.
+    """
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("application/json"):
+        try:
+            data = await request.json()
+        except Exception:
+            return {}
+        return dict(data) if isinstance(data, dict) else {}
+    out: dict[str, Any] = {}
+    try:
+        form = await request.form()
+    except Exception:
+        return out
+    for key in form:
+        bare = key[:-2] if key.endswith("[]") else key
+        values = form.getlist(key)
+        out[bare] = values if (len(values) > 1 or key.endswith("[]")) else values[0]
+    return out
 
 
 @dataclass

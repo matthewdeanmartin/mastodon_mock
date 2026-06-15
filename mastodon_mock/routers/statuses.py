@@ -28,7 +28,7 @@ from mastodon_mock.db.models import (
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.pagination import paginate
-from mastodon_mock.routers.helpers import PageQuery, array_query, set_link_header
+from mastodon_mock.routers.helpers import PageQuery, array_query, read_body, set_link_header
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.common import iso
 from mastodon_mock.serializers.instance import MAX_MEDIA_ATTACHMENTS, MAX_STATUS_CHARACTERS
@@ -248,6 +248,59 @@ def status_quotes(
     )
     set_link_header(request, response, page)
     return [serialize_status(db, s, config, viewer) for s in page.items]
+
+
+@router.post("/api/v1/statuses/{status_id}/quotes/{quoting_status_id}/revoke", status_code=200)
+def status_quote_revoke(
+    status_id: str,
+    quoting_status_id: str,
+    db: DbSession,
+    config: Config,
+    account: RequiredAccount,
+) -> dict[str, Any]:
+    """Revoke quote authorization for a status quoting one of your statuses.
+
+    ``status_id`` is the quoted status (must be owned by the caller);
+    ``quoting_status_id`` is the status doing the quoting. Returns the quoting
+    status with its quote ``state`` set to ``revoked``.
+    """
+    quoted = _get_status_or_404(db, status_id)
+    if quoted.account_id != account.id:
+        raise HTTPException(status_code=403, detail="This action is not allowed")
+    quoting = _get_status_or_404(db, quoting_status_id)
+    if quoting.quoted_status_id != quoted.id:
+        raise HTTPException(status_code=404, detail="Record not found")
+    quoting.quote_state = "revoked"
+    db.commit()
+    return serialize_status(db, quoting, config, account)
+
+
+@router.put("/api/v1/statuses/{status_id}/interaction_policy")
+async def status_update_quote_approval_policy(
+    status_id: str,
+    request: Request,
+    db: DbSession,
+    config: Config,
+    account: RequiredAccount,
+) -> Any:
+    """Update a status's quote-approval policy without a full edit.
+
+    ``quote_approval_policy`` is one of ``public`` / ``followers`` / ``nobody``.
+    Private/direct statuses are forced to ``nobody`` regardless of input.
+    """
+    status = _get_status_or_404(db, status_id)
+    if status.account_id != account.id:
+        raise HTTPException(status_code=403, detail="This action is not allowed")
+    body = await read_body(request)
+    policy = body.get("quote_approval_policy")
+    valid = {"public", "followers", "nobody"}
+    if policy not in valid:
+        return _validation_error(f"Invalid quote_approval_policy. Valid values are {sorted(valid)}")
+    if status.visibility in ("private", "direct"):
+        policy = "nobody"
+    status.quote_approval_policy = policy
+    db.commit()
+    return serialize_status(db, status, config, account)
 
 
 # --- Writes ---

@@ -125,5 +125,5 @@ def timeline_list(
 
 @router.get("/api/v1/timelines/link")
 def timeline_link() -> list[Any]:
-    """Stub: empty link timeline."""
+    """Empty list: the mock does not synthesize a trending-links timeline."""
     return []

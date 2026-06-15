@@ -163,7 +163,7 @@ def delete_filter_keyword_v2(keyword_id: str, db: DbSession, account: RequiredAc
 
 @router.get("/api/v2/filters/{filter_id}/statuses")
 def filter_statuses_v2(filter_id: str) -> list[Any]:
-    """Stub: empty filter-status list."""
+    """Empty list: the mock has no per-status filter overrides."""
     return []
 
 
