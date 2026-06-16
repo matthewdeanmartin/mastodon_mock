@@ -394,8 +394,7 @@ matching real Mastodon behavior.
 ## Status edits ("history")
 
 `status_update()` (PUT `/api/v1/statuses/{id}`) appends a `StatusEdit` record (computed,
-not necessarily its own table — can be derived by snapshotting `(content, spoiler_text,
-sensitive, media_attachments, poll, created_at=edited_at-ish)` into a JSON column
+not necessarily its own table — can be derived by snapshotting `(content, spoiler_text, sensitive, media_attachments, poll, created_at=edited_at-ish)` into a JSON column
 `statuses.edit_history: JSON` = `list[dict]`). `status_history()` returns
 `edit_history + [current state]` per the "N edits → N+1 history entries" rule in the
 Mastodon.py docstring.
@@ -408,10 +407,9 @@ Mastodon.py's `PaginatableList` relies on a `Link` response header
 
 1. Accept `max_id`, `min_id`, `since_id`, `limit` query params where the corresponding
    Mastodon.py method accepts them.
-2. Apply them as `id <`/`id >`/`id >` filters + `ORDER BY id DESC` + `LIMIT`.
-3. Set the `Link` header to `<self_url with max_id=<last id>>; rel="next"` (and `rel="prev"`
+1. Apply them as `id <`/`id >`/`id >` filters + `ORDER BY id DESC` + `LIMIT`.
+1. Set the `Link` header to `<self_url with max_id=<last id>>; rel="next"` (and `rel="prev"`
    with `min_id=<first id>`) when the result is non-empty and could plausibly have more
    pages — i.e. when `len(results) == limit` (or the configured default limit).
-4. A shared helper `mastodon_mock/pagination.py` (`paginate(query, max_id, min_id,
-   since_id, limit, default_limit=20) -> tuple[list[Row], LinkHeaderInfo]`) implements
+1. A shared helper `mastodon_mock/pagination.py` (`paginate(query, max_id, min_id, since_id, limit, default_limit=20) -> tuple[list[Row], LinkHeaderInfo]`) implements
    this once and is reused by every list endpoint.

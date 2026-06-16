@@ -119,8 +119,7 @@ DEFAULT_SEED = SeedConfig(
 )
 ```
 
-This means `mastodon_mock serve` with zero config + `Mastodon(access_token="mock_token",
-api_base_url="http://127.0.0.1:3000")` works immediately — useful for quick manual
+This means `mastodon_mock serve` with zero config + `Mastodon(access_token="mock_token", api_base_url="http://127.0.0.1:3000")` works immediately — useful for quick manual
 exploration with `curl`/`httpie` or a REPL.
 
 ## Multi-account follow/unfollow scenario (the user's motivating example)
@@ -169,7 +168,8 @@ Two supported patterns:
    fixture from [06-testing.md](06-testing.md) is function-scoped, so each test gets a
    brand-new `create_app()` → brand-new in-memory DB → re-applies seed config from
    scratch. Slight overhead (re-seeding, spinning up a thread) but total isolation.
-2. **Session-scoped server + per-test DB reset**: for larger suites where spinning up
+
+1. **Session-scoped server + per-test DB reset**: for larger suites where spinning up
    uvicorn per test is too slow, a session-scoped server can expose a mock-only
    endpoint:
 

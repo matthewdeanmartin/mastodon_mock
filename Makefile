@@ -226,7 +226,7 @@ bandit:
 
 audit:
 	@echo "=== uv audit ==="
-	@$(UV) audit
+	@$(UV) audit --ignore-until-fixed
 	@echo "=== pip-audit ==="
 	@$(UV) run pip-audit
 

@@ -77,13 +77,13 @@ and visible rather than locking up.
 For convenience the CLI exposes presets that scale the whole shape together, so a user
 doesn't have to hand-tune six numbers to "make it bigger":
 
-| preset   | accounts | followers/acct | statuses/acct | ≈ total status rows |
+| preset | accounts | followers/acct | statuses/acct | ≈ total status rows |
 |----------|---------:|---------------:|--------------:|--------------------:|
-| `tiny`   |       10 |              5 |            10 |                 100 |
-| `small`  |      100 |             20 |            50 |               5,000 |
-| `medium` |    1,000 |            100 |           100 |             100,000 |
-| `large`  |    5,000 |          1,000 |         1,000 |           5,000,000 |
-| `huge`   |   10,000 |          1,000 |         1,000 |          10,000,000 |
+| `tiny` | 10 | 5 | 10 | 100 |
+| `small` | 100 | 20 | 50 | 5,000 |
+| `medium` | 1,000 | 100 | 100 | 100,000 |
+| `large` | 5,000 | 1,000 | 1,000 | 5,000,000 |
+| `huge` | 10,000 | 1,000 | 1,000 | 10,000,000 |
 
 `large`/`huge` are the "find the failure point" sizes and are expected to be slow and
 possibly to exhaust memory on `:memory:` DBs — that's the point. The CLI prints a
@@ -116,12 +116,12 @@ The core generator. Phases, each timed:
 
 1. **accounts** — bulk-insert N account rows (synthetic username `user_{n}_{rand}`,
    token rows for the first `min(N, token_cap)` accounts so they're loginable).
-2. **follows** — for each account pick `followers_per_account` random distinct targets;
+1. **follows** — for each account pick `followers_per_account` random distinct targets;
    bulk-insert directed `relationships` rows with `following=True` (+ mirror
    `followed_by`). No locked-account logic (sample accounts are unlocked).
-3. **statuses** — bulk-insert `statuses_per_account` rows per account; a `reply_ratio`
+1. **statuses** — bulk-insert `statuses_per_account` rows per account; a `reply_ratio`
    fraction get `in_reply_to_id` pointing at a previously-generated status.
-4. **engagement** — bulk-insert favourites/bookmarks; optionally notifications.
+1. **engagement** — bulk-insert favourites/bookmarks; optionally notifications.
 
 Returns a `GenerationReport` (per-phase row counts + durations + total) so the CLI/UI
 and the benchmark harness can print/assert against it.
@@ -219,8 +219,10 @@ Two benchmark families:
 1. **Generation throughput** — `generate_sample_data` over `tiny/small/medium`,
    asserting `rows_per_second` stays above a floor and total time under a ceiling. These
    ceilings are the regression guard: a 2–3× slowdown fails the test.
-2. **Read-path latency under load** — generate a `medium` cohort once (module-scoped
+
+1. **Read-path latency under load** — generate a `medium` cohort once (module-scoped
    fixture), then time representative endpoints against it via `httpx.ASGITransport`:
+
    - `timeline_home` (worst case: join across follows + statuses + counts)
    - `account_statuses` for a heavy account
    - `notifications`
@@ -257,6 +259,7 @@ make gen-data-medium # mastodon_mock gen-data --preset medium --database ./perf.
 ## Phased implementation plan
 
 **Phase 1 — generator core + config + CLI (no UI).** ✅ start here.
+
 - `SampleDataConfig` + `PRESETS` in `config.py`; wire into `MastodonMockConfig`.
 - `db/sample_data.py`: `generate_sample_data`, `GenerationReport`, PRAGMA tuning, bulk
   inserts for accounts/tokens/follows/statuses.
@@ -265,17 +268,20 @@ make gen-data-medium # mastodon_mock gen-data --preset medium --database ./perf.
   loginable; FKs are valid (no orphan statuses/edges).
 
 **Phase 2 — engagement + mock endpoint + UI button.**
+
 - Favourites/bookmarks/notifications phases.
 - `POST /api/v1/_mock/sample_data` with server-side cap.
 - Angular: preset `<select>` + "Seed sample data" button on the login Dev panel; report
   toast; refresh dev users. `api.ts` method + `GenerationReport` model.
 
 **Phase 3 — benchmark harness + baselines.**
+
 - `tests/perf/` generation-throughput + read-latency benchmarks under `-m slow`.
 - `tests/perf/baselines.json` + ratio-based regression asserts.
 - `make perf` / `make perf-baseline` targets; document running them in this file.
 
 **Phase 4 — find & fix failure points (iterative).**
+
 - Run `large`/`huge` from the CLI; capture where it breaks (memory on `:memory:`, slow
   timeline joins, missing indexes, serializer N+1s).
 - Record findings + applied fixes in a "Findings" section below; turn each fixed

@@ -8,23 +8,23 @@ something static mocks (Mockoon, recorded fixtures) cannot do.
 Read [00-overview.md](00-overview.md) first for goals/non-goals, then the rest in order:
 
 1. [00-overview.md](00-overview.md) — purpose, goals, non-goals, document map
-2. [01-architecture.md](01-architecture.md) — FastAPI/SQLAlchemy/Alembic/SQLite,
+1. [01-architecture.md](01-architecture.md) — FastAPI/SQLAlchemy/Alembic/SQLite,
    package layout, config file format
-3. [02-data-model.md](02-data-model.md) — database schema
-4. [03-api-coverage.md](03-api-coverage.md) — endpoint-by-endpoint coverage matrix
+1. [02-data-model.md](02-data-model.md) — database schema
+1. [03-api-coverage.md](03-api-coverage.md) — endpoint-by-endpoint coverage matrix
    (Full / Static / Stub / Out-of-scope), keyed to Mastodon.py call sites
-5. [04-auth.md](04-auth.md) — fake OAuth, multi-account bearer tokens
-6. [05-versioning.md](05-versioning.md) — "current and current-1" Mastodon version
+1. [04-auth.md](04-auth.md) — fake OAuth, multi-account bearer tokens
+1. [05-versioning.md](05-versioning.md) — "current and current-1" Mastodon version
    awareness
-7. [06-testing.md](06-testing.md) — testing this mock, and using it for a dual
+1. [06-testing.md](06-testing.md) — testing this mock, and using it for a dual
    mock/real test suite in a consuming project
-8. [07-seeding-and-fixtures.md](07-seeding-and-fixtures.md) — seed config for
+1. [07-seeding-and-fixtures.md](07-seeding-and-fixtures.md) — seed config for
    multi-account scenarios
-9. [08-admin-ui.md](08-admin-ui.md) — **roadmap** for the dogfooding Angular admin
+1. [08-admin-ui.md](08-admin-ui.md) — **roadmap** for the dogfooding Angular admin
    panel / client UI served at `/_ui/`
-10. [09-sample-data-and-perf.md](09-sample-data-and-perf.md) — high-performance bulk
-    sample-data generator (CLI `gen-data` + `/_mock/sample_data` + UI button) and the
-    performance baseline / regression-guard harness
+1. [09-sample-data-and-perf.md](09-sample-data-and-perf.md) — high-performance bulk
+   sample-data generator (CLI `gen-data` + `/_mock/sample_data` + UI button) and the
+   performance baseline / regression-guard harness
 
 ## TL;DR for implementers
 

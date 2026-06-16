@@ -12,6 +12,7 @@ mock is local-only and stateful, the write surface is safe to exercise here.
 faithfully. Verified working:
 
 **Read / sync aggregation** (`SafariFedClient.fetch_sync_result`):
+
 - `account_verify_credentials`, `timeline_home`, `bookmarks`, `notifications`
   all return the shapes the client normalizes.
 - Hashtags render (`tags` populated from seeded `#…` text).
@@ -21,6 +22,7 @@ faithfully. Verified working:
   payload the client uses to produce its "Boosted by @…" prefix.
 
 **Write** (`send_post`, `favourite`, `reblog`, `bookmark`, `unbookmark`):
+
 - `status_post` with `visibility`, `in_reply_to_id`, and `spoiler_text` —
   replies thread, visibility is honored, CW renders.
 - `direct`/`private` visibility flow through and flag the post.
@@ -29,6 +31,7 @@ faithfully. Verified working:
   unbookmark (the stateful guarantee).
 
 **Media** (probed, works):
+
 - `POST /api/v2/media` accepts an upload and returns an id; posting with
   `media_ids[]` attaches it; the attachment serializes with `type` +
   `description`, which the client renders as `[IMAGE] <desc>`.

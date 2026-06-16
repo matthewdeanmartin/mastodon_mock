@@ -46,7 +46,7 @@ FastAPI (0.137) / Starlette (1.3) stack:
    serializes data directly to JSON bytes … which is faster and doesn't need a custom
    response class." Using it added ~250 warnings to the test run.
 
-2. **It's actually slower for our endpoints.** Our list endpoints return untyped
+1. **It's actually slower for our endpoints.** Our list endpoints return untyped
    `list[dict[str, Any]]`, not Pydantic models. Forcing `ORJSONResponse` makes FastAPI
    run `jsonable_encoder` over the payload and *then* re-encode with orjson, which loses
    to the framework's built-in path:
@@ -73,6 +73,7 @@ parse*, and the answer is **once**:
 - `MastodonMockConfig.load()` is called exactly once at app-factory time
   (`app.py::create_app`) and once per CLI invocation (`cli.py`). It is never on a
   request path.
+
 - A full parse of a realistic config costs ~30 µs:
 
   ```

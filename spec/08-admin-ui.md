@@ -68,7 +68,7 @@ The UI is two things in one app:
 | Framework | **Angular** (latest), TypeScript, npm |
 | Source location | `ui/` at repo root (sibling to `mastodon_mock/`); **not** inside the Python package |
 | Built artifacts | `mastodon_mock/_ui_dist/` (git-ignored; produced at build time) |
-| Served path | **`/_ui/`** (see "Why /_ui/" below) |
+| Served path | **`/_ui/`** (see "Why /\_ui/" below) |
 | Served by | The existing FastAPI app via `StaticFiles(..., html=True)` with SPA fallback |
 | Packaging | **Build-on-package**: a hatchling build hook runs `ng build` before the wheel is assembled; artifacts are not committed |
 | Auth (v1) | **Paste a seeded `access_token`** (matches how tests authenticate); full OAuth redirect flow is a later phase |

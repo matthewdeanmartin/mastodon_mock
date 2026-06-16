@@ -5,7 +5,7 @@ This is a work/handoff doc for the next contributor (human or bot). It captures
 backlog**. The normative specification is in `spec/00-` … `spec/07-`; this file is
 the "where we are now and what to do next" companion.
 
----
+______________________________________________________________________
 
 ## 1. Current state (as of v0.1.0)
 
@@ -87,7 +87,7 @@ order + xdist).
   dependency — `mastodon.py` is installed from PyPI (dev group). Keep the clone as
   a reference for re-running the endpoint-inventory greps when Mastodon.py updates.
 
----
+______________________________________________________________________
 
 ## 2. Deliberate simplifications / things to know before changing code
 
@@ -100,7 +100,7 @@ These are intentional per the spec — don't "fix" them without reason:
   `[tool.mastodon_mock.ratelimit] enabled = true` (P2, now built — per-token fixed
   window, see `mastodon_mock/middleware.py`).
 - **No real OAuth code flow.** `password` and `authorization_code` grants return
-  400. User tokens come from seed config or `/api/v1/_mock/login`.
+  400\. User tokens come from seed config or `/api/v1/_mock/login`.
 - **No federation / no media processing / no streaming / no admin / no push.**
 - **Reblogs are their own `statuses` row** with `reblog_of_id` set (matches
   Mastodon's nested `Status.reblog`).
@@ -111,7 +111,7 @@ These are intentional per the spec — don't "fix" them without reason:
   favourite/bookmark row id) for cursor consistency — slightly off from real
   Mastodon ordering but stable. See `routers/favourites_bookmarks.py`.
 
----
+______________________________________________________________________
 
 ## 3. Known gaps / sharp edges (candidate bugs to validate)
 
@@ -122,110 +122,107 @@ it diverges:
 1. **Scheduled-status publication.** Scheduled statuses are listed but never
    converted to real statuses when `scheduled_at` passes (spec allows leaving this
    as Stub). If a consuming suite asserts publication, implement lazy conversion.
-2. **`status_reply` mention threading.** `services.parse_mentions` resolves
+1. **`status_reply` mention threading.** `services.parse_mentions` resolves
    `@username` / `@username@domain` against local rows only. Replies that mention
    remote-looking accounts won't notify unless the row exists. Verify reply chains
-   + CW/visibility inheritance against real Mastodon.
-3. **`account_statuses(only_media=...)`** filters on `MediaAttachment.status_id IS
-   NOT NULL` globally in a subquery — re-read the query; confirm it scopes to the
+   - CW/visibility inheritance against real Mastodon.
+1. **`account_statuses(only_media=...)`** filters on `MediaAttachment.status_id IS NOT NULL` globally in a subquery — re-read the query; confirm it scopes to the
    account's own statuses correctly.
-4. **Poll expiry & `poll` notifications.** `polls.expired` is never set (no time
+1. **Poll expiry & `poll` notifications.** `polls.expired` is never set (no time
    driver); the `poll` notification type is unimplemented (spec marks it low
-   priority). 
-5. **Domain blocks vs `Relationship.domain_blocking`.** Domain blocks live in their
+   priority).
+1. **Domain blocks vs `Relationship.domain_blocking`.** Domain blocks live in their
    own table and are surfaced in the relationship serializer by a per-call lookup —
    verify `account_relationships` reflects a domain block correctly.
-6. **`Link` header pagination round-trips.** Unit-tested shape exists, but no test
+1. **`Link` header pagination round-trips.** Unit-tested shape exists, but no test
    drives Mastodon.py's `.fetch_next()` / `paginate=` across a real multi-page
    result. Add one (post 25 statuses, page through home timeline).
-7. **`update_credentials` field/avatar edge cases.** `fields_attributes[n][...]`
+1. **`update_credentials` field/avatar edge cases.** `fields_attributes[n][...]`
    parsing and avatar/header multipart upload are implemented but only lightly
    tested.
 
----
+______________________________________________________________________
 
 ## 4. Prioritized backlog for the next phase
 
 ### P0 — harden the "Full" surface (highest value)
 
 - [x] Add a **pagination round-trip** contract test (`Link` header → Mastodon.py
-      `.fetch_next()`), covering home timeline + notifications + account_statuses.
-      Done in `tests/test_contract_pagination.py` (3 tests, posts 25 items and
-      drains all pages; asserts no dupes + newest-first ordering).
+  `.fetch_next()`), covering home timeline + notifications + account_statuses.
+  Done in `tests/test_contract_pagination.py` (3 tests, posts 25 items and
+  drains all pages; asserts no dupes + newest-first ordering).
 - [x] Add contract tests for the gaps in §3 (items 2, 3, 5, 7) and fix any
-      divergence found. Done in `tests/test_contract_gaps.py` (6 tests). **No
-      divergence found** — the mock already handled reply/mention threading +
-      CW/visibility override (2), `only_media` account scoping (3), domain-block
-      relationship surfacing (5), and `fields_attributes`/avatar updates (7).
+  divergence found. Done in `tests/test_contract_gaps.py` (6 tests). **No
+  divergence found** — the mock already handled reply/mention threading +
+  CW/visibility override (2), `only_media` account scoping (3), domain-block
+  relationship surfacing (5), and `fields_attributes`/avatar updates (7).
 - [x] Add a **`mock_only/` test dir** + `@pytest.mark.mock_only` marker (per
-      `spec/06-testing.md` §2.4). `tests/mock_only/test_mock_endpoints.py` covers
-      `/api/v1/_mock/login` + `/api/v1/_mock/reset`. Marker registered in
-      pyproject. (No pre-existing `_mock/*` tests needed moving.)
+  `spec/06-testing.md` §2.4). `tests/mock_only/test_mock_endpoints.py` covers
+  `/api/v1/_mock/login` + `/api/v1/_mock/reset`. Marker registered in
+  pyproject. (No pre-existing `_mock/*` tests needed moving.)
 
 ### P0.5 — in-repo dual mock/real integration suite (NEW, done)
 
 - [x] `tests/integration/` runs the **same read-only tests against both the mock
-      and a live Mastodon**, driven over a real HTTP endpoint (never in-process).
-      The `mastodon_client` fixture is parametrized `["mock", "real"]`; `real` is
-      skipped unless `RUN_REAL_MASTODON_TESTS=1` and credentials resolve (env vars
-      `REAL_MASTODON_URL`/`REAL_MASTODON_TOKEN`, else `../mastodon_is_my_blog/.env`).
-      All real-backend ops are **read-only** (safe to point at a real account);
-      write round-trips (`test_integration_write_mock_only.py`) are `mock_only`.
-      The suite is auto-marked `integration` and **excluded from the default run**
-      (`addopts = "... -m 'not integration'"`); run it via `make test-integration`
-      or `make test-integration-real`. Validated green against mastodon.social
-      (v4.6.0-nightly) — the mock's read surface matches the real server.
+  and a live Mastodon**, driven over a real HTTP endpoint (never in-process).
+  The `mastodon_client` fixture is parametrized `["mock", "real"]`; `real` is
+  skipped unless `RUN_REAL_MASTODON_TESTS=1` and credentials resolve (env vars
+  `REAL_MASTODON_URL`/`REAL_MASTODON_TOKEN`, else `../mastodon_is_my_blog/.env`).
+  All real-backend ops are **read-only** (safe to point at a real account);
+  write round-trips (`test_integration_write_mock_only.py`) are `mock_only`.
+  The suite is auto-marked `integration` and **excluded from the default run**
+  (`addopts = "... -m 'not integration'"`); run it via `make test-integration`
+  or `make test-integration-real`. Validated green against mastodon.social
+  (v4.6.0-nightly) — the mock's read surface matches the real server.
 
 ### P1 — fill remaining Stub→Full where cheap
 
 - [x] `status_quotes` (4.5+). Added `statuses.quoted_status_id` (+ Alembic
-      migration `7cb2c44ee202`), `post_status` accepts `quoted_status_id`/`quote_id`,
-      the status serializer emits `quote = {state: "accepted", quoted_status: …}`,
-      and `GET /statuses/{id}/quotes` lists quoting statuses (paginated). Contract
-      tests in `tests/test_contract_quotes.py` (4).
+  migration `7cb2c44ee202`), `post_status` accepts `quoted_status_id`/`quote_id`,
+  the status serializer emits `quote = {state: "accepted", quoted_status: …}`,
+  and `GET /statuses/{id}/quotes` lists quoting statuses (paginated). Contract
+  tests in `tests/test_contract_quotes.py` (4).
 - [x] `scheduled_status` lazy publication (§3 item 1). `scheduled_at` within ~5 min
-      publishes immediately (returns a Status); due scheduled rows are converted to
-      real statuses when the scheduled list is read (`_publish_due_scheduled`).
-      Contract tests in `tests/test_contract_scheduled.py` (3).
+  publishes immediately (returns a Status); due scheduled rows are converted to
+  real statuses when the scheduled list is read (`_publish_due_scheduled`).
+  Contract tests in `tests/test_contract_scheduled.py` (3).
 - [x] `instance_directory` ordering. `order=active` (default) now sorts by the
-      account's most recent status time (then id); `order=new` by account
-      `created_at`. Contract tests in `tests/test_contract_directory.py` (2).
+  account's most recent status time (then id); `order=new` by account
+  `created_at`. Contract tests in `tests/test_contract_directory.py` (2).
 
 ### P2 — robustness / DX
 
 - [x] Added an optional **session-scoped server + `/api/v1/_mock/reset`** path
-      (spec/07 pattern 2). `tests/conftest.py` now exposes `fast_server` (one
-      uvicorn for the whole session, reset to seed state before each test) plus
-      `alice_fast`/`bob_fast`/`carol_fast` clients, alongside the existing
-      function-scoped `live_server`/`alice`/`bob`/`carol`. Isolation verified by
-      `tests/mock_only/test_fast_server.py`.
+  (spec/07 pattern 2). `tests/conftest.py` now exposes `fast_server` (one
+  uvicorn for the whole session, reset to seed state before each test) plus
+  `alice_fast`/`bob_fast`/`carol_fast` clients, alongside the existing
+  function-scoped `live_server`/`alice`/`bob`/`carol`. Isolation verified by
+  `tests/mock_only/test_fast_server.py`.
 - [x] Added an **Alembic vs `create_all` drift** test
-      (`tests/test_alembic_drift.py`): runs `alembic upgrade head` on a fresh file
-      DB and `compare_metadata` against `Base.metadata`; fails if they diverge
-      (SQLite-only constraint/index noise filtered). Runs in the default suite, so
-      a model change without a matching migration is caught in CI. Also added
-      `path_separator = os` to `alembic.ini` to silence a deprecation warning.
+  (`tests/test_alembic_drift.py`): runs `alembic upgrade head` on a fresh file
+  DB and `compare_metadata` against `Base.metadata`; fails if they diverge
+  (SQLite-only constraint/index noise filtered). Runs in the default suite, so
+  a model change without a matching migration is caught in CI. Also added
+  `path_separator = os` to `alembic.ini` to silence a deprecation warning.
 - [x] Implemented **`enforce_scopes`** and **`ratelimit`** opt-ins (both off by
-      default) as `mastodon_mock/middleware.py`, wired in `create_app`. Scopes:
-      coarse `read`/`write` by HTTP method (writes need `write`), 403 +
-      `{"error": "…outside the authorized scopes"}` on mismatch; auth/instance/
-      `_mock` paths exempt. Rate limit: per-token fixed window → `429` +
-      `X-RateLimit-Limit/Remaining/Reset`. Config: `[tool.mastodon_mock.auth]
-      enforce_scopes` and `[tool.mastodon_mock.ratelimit] enabled/limit/
-      window_seconds`. Tests in `tests/mock_only/test_scope_and_ratelimit.py`
-      (incl. Mastodon.py `ratelimit_method="throw"` → `MastodonRatelimitError`).
+  default) as `mastodon_mock/middleware.py`, wired in `create_app`. Scopes:
+  coarse `read`/`write` by HTTP method (writes need `write`), 403 +
+  `{"error": "…outside the authorized scopes"}` on mismatch; auth/instance/
+  `_mock` paths exempt. Rate limit: per-token fixed window → `429` +
+  `X-RateLimit-Limit/Remaining/Reset`. Config: `[tool.mastodon_mock.auth]     enforce_scopes` and `[tool.mastodon_mock.ratelimit] enabled/limit/     window_seconds`. Tests in `tests/mock_only/test_scope_and_ratelimit.py`
+  (incl. Mastodon.py `ratelimit_method="throw"` → `MastodonRatelimitError`).
 
 ### P3 — out-of-scope-for-v1 modules (only if a consumer demands them)
 
 - [x] **Grouped notifications** (`/api/v2/notifications*`, Mastodon 4.3+) — now
-      **Full**. `mastodon_mock/serializers/grouped_notifications.py` groups
-      favourite/follow/reblog by target; other types stay individual. Endpoints:
-      list container, `unread_count` (counts groups), single `{group_key}`,
-      `{group_key}/dismiss`, `{group_key}/accounts`. Note: the static `/policy`
-      routes were reordered ahead of the `/{group_key}` catch-all to avoid
-      shadowing. Tests: `tests/test_contract_grouped_notifications.py` (8) +
-      `tests/test_bughunt_grouped_notifications.py` (7) + a dual-backend shape
-      check in the integration suite.
+  **Full**. `mastodon_mock/serializers/grouped_notifications.py` groups
+  favourite/follow/reblog by target; other types stay individual. Endpoints:
+  list container, `unread_count` (counts groups), single `{group_key}`,
+  `{group_key}/dismiss`, `{group_key}/accounts`. Note: the static `/policy`
+  routes were reordered ahead of the `/{group_key}` catch-all to avoid
+  shadowing. Tests: `tests/test_contract_grouped_notifications.py` (8) +
+  `tests/test_bughunt_grouped_notifications.py` (7) + a dual-backend shape
+  check in the integration suite.
 
 Reports, push/WebPush, streaming, admin API remain OOS/Stub. Revisit per demand.
 
@@ -238,18 +235,18 @@ but several endpoints bound a plain `name` FastAPI `Query`, so the values were
 and `name[]`) and fixed:
 
 1. `GET /api/v1/notifications` `types`/`exclude_types` filter (pre-existing).
-2. `GET /api/v2/notifications*` `types`/`exclude_types` filter.
-3. `GET /api/v1/statuses?id[]=` bulk fetch (returned `[]`).
-4. `GET /api/v1/accounts?id[]=` bulk fetch (returned `[]`).
-5. `GET /api/v1/accounts/relationships?id[]=` (list form).
-6. `GET /api/v1/accounts/familiar_followers` — Mastodon.py sends ids in a **JSON
+1. `GET /api/v2/notifications*` `types`/`exclude_types` filter.
+1. `GET /api/v1/statuses?id[]=` bulk fetch (returned `[]`).
+1. `GET /api/v1/accounts?id[]=` bulk fetch (returned `[]`).
+1. `GET /api/v1/accounts/relationships?id[]=` (list form).
+1. `GET /api/v1/accounts/familiar_followers` — Mastodon.py sends ids in a **JSON
    body** (`use_json=True`); now read from query *or* body.
-7. `GET /api/v1/markers?timeline[]=` filter (returned all timelines).
+1. `GET /api/v1/markers?timeline[]=` filter (returned all timelines).
 
 Covered by `tests/test_bughunt_bulk_by_id.py` (6) and validated against the live
 server via `tests/integration/test_integration_readonly.py` (bulk statuses).
 
----
+______________________________________________________________________
 
 ## 5. How to work in this repo
 
@@ -275,7 +272,7 @@ uv run alembic revision --autogenerate -m "msg"      # after model changes
 - mypy is **strict**; `tests.*` relaxes untyped-def rules. Watch for `Any` leaking
   out of `request.app.state.*` and `form.get(...)` — annotate/coerce explicitly.
 
----
+______________________________________________________________________
 
 ## 6. Open questions for the maintainer
 

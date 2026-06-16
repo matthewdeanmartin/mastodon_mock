@@ -25,23 +25,23 @@ A static mock can't reflect the post back. `mastodon_mock` can, because it has a
 
 1. **Stateful**: writes are persisted and visible to subsequent reads, within a single
    server run (and optionally across runs if using a file-backed SQLite DB).
-2. **Multi-account**: the mock can hold many accounts simultaneously. A test can create
+1. **Multi-account**: the mock can hold many accounts simultaneously. A test can create
    account A and account B, have A follow B, post as B, and then read B's post in A's
    home timeline.
-3. **Mastodon.py-shaped**: the mock's job is to satisfy Mastodon.py's HTTP calls and
+1. **Mastodon.py-shaped**: the mock's job is to satisfy Mastodon.py's HTTP calls and
    response parsing — not to be a byte-perfect clone of `mastodon` (the real server).
    If Mastodon.py doesn't call an endpoint or doesn't read a field, we don't need to
    implement/return it.
-4. **Two test suites, one assertion set**: the project that consumes this mock should
+1. **Two test suites, one assertion set**: the project that consumes this mock should
    be able to run the *same* (or near-same) test bodies against `mastodon_mock` and
    against a real Mastodon instance, and have both pass. `mastodon_mock` is the fast,
    safe default; the real-server suite is opt-in / CI-gated.
-5. **Version-aware, narrowly**: Mastodon's API has evolved a lot (see
+1. **Version-aware, narrowly**: Mastodon's API has evolved a lot (see
    [`mastodon/return_types.py`](../Mastodon.py/mastodon/return_types.py) `_version`
    markers and `@api_version(created, last_changed)` decorators). We only need to track
    **current and current-1** major.minor lines (see [05-versioning.md](05-versioning.md)).
    We do not attempt to emulate Mastodon 1.x/2.x/3.x quirks.
-6. **Config-driven**: server behavior (DB backend, seed data, version string, etc.) is
+1. **Config-driven**: server behavior (DB backend, seed data, version string, etc.) is
    controlled by `.mastodon_mock.toml` or a `[tool.mastodon_mock]` table in
    `pyproject.toml` (see [01-architecture.md](01-architecture.md)).
 

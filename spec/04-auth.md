@@ -26,6 +26,7 @@ client_id, client_secret = Mastodon.create_app(
 → `POST /api/v1/apps` with `client_name`, `scopes`, `redirect_uris`, `website`.
 
 Mock behavior:
+
 - Insert a row into `oauth_apps` with random `client_id`/`client_secret` (e.g.
   `secrets.token_urlsafe(32)`).
 - Return `{"id": ..., "name": ..., "client_id": ..., "client_secret": ..., "redirect_uri": ..., "redirect_uris": [...], "vapid_key": "mock-vapid-key", "scopes": [...]}`.
@@ -148,8 +149,7 @@ just treat `account=None` as "no relationship/ownership context" (e.g.
 
 `oauth_tokens.scopes` is stored but **not enforced by default**. Mastodon.py sends
 `scope = " ".join(scopes)` and reads back `response["scope"]`; the mock just echoes
-whatever scopes the seed/app config declares (default: `["read", "write", "follow",
-"push"]`, i.e. `_DEFAULT_SCOPES`-equivalent).
+whatever scopes the seed/app config declares (default: `["read", "write", "follow", "push"]`, i.e. `_DEFAULT_SCOPES`-equivalent).
 
 To test scope-restricted behavior (e.g. a `read`-only token getting 403 on writes),
 set `config.auth.enforce_scopes = true` (`[tool.mastodon_mock.auth] enforce_scopes`).

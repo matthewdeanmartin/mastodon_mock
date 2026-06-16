@@ -2,16 +2,16 @@
 
 ## Stack
 
-| Concern          | Choice                                                                |
+| Concern | Choice |
 |------------------|------------------------------------------------------------------------|
-| HTTP framework   | **FastAPI** (ASGI, runs under `uvicorn`)                              |
-| ORM              | **SQLAlchemy** 2.x (declarative models, sync engine)                  |
-| Migrations       | **Alembic**                                                           |
-| Database         | **SQLite** — file-backed by default, optional **in-memory**          |
-| Validation       | Pydantic v2 (comes with FastAPI) for request/response shaping         |
-| Auth             | Fake OAuth — see [04-auth.md](04-auth.md)                             |
-| Config           | `.mastodon_mock.toml` or `[tool.mastodon_mock]` in `pyproject.toml`   |
-| Test runner      | `pytest` + `httpx.ASGITransport` for in-process requests, real `uvicorn` for out-of-process |
+| HTTP framework | **FastAPI** (ASGI, runs under `uvicorn`) |
+| ORM | **SQLAlchemy** 2.x (declarative models, sync engine) |
+| Migrations | **Alembic** |
+| Database | **SQLite** — file-backed by default, optional **in-memory** |
+| Validation | Pydantic v2 (comes with FastAPI) for request/response shaping |
+| Auth | Fake OAuth — see [04-auth.md](04-auth.md) |
+| Config | `.mastodon_mock.toml` or `[tool.mastodon_mock]` in `pyproject.toml` |
+| Test runner | `pytest` + `httpx.ASGITransport` for in-process requests, real `uvicorn` for out-of-process |
 
 ### Why sync SQLAlchemy + FastAPI
 
@@ -143,8 +143,7 @@ SQLite supports `:memory:` databases. Two caveats drive the design:
 
 1. **`:memory:` is connection-scoped.** Each new `sqlite3` connection gets its own
    empty database. SQLAlchemy's default pooling would hand out different connections
-   to different requests, each seeing an empty DB. **Fix**: when `database.path ==
-   ":memory:"`, the engine MUST be created with
+   to different requests, each seeing an empty DB. **Fix**: when `database.path == ":memory:"`, the engine MUST be created with
    `poolclass=StaticPool` and `connect_args={"check_same_thread": False}`, e.g.:
 
    ```python
@@ -161,7 +160,7 @@ SQLite supports `:memory:` databases. Two caveats drive the design:
    This keeps a single shared connection alive for the lifetime of the engine, so all
    requests see the same in-memory DB.
 
-2. **`check_same_thread=False`** is required in both file and memory modes because
+1. **`check_same_thread=False`** is required in both file and memory modes because
    FastAPI's sync endpoints run in a threadpool, and a given SQLAlchemy `Session` may
    be used from a different thread than the connection was created on. Since the mock
    is single-process/local-only, the usual cross-thread-sqlite caveats are acceptable.
@@ -200,7 +199,7 @@ Two supported locations, checked in this order:
 
 1. `./.mastodon_mock.toml` (project-local override, e.g. for a consuming project's test
    suite that wants its own seed data)
-2. `[tool.mastodon_mock]` table in `./pyproject.toml`
+1. `[tool.mastodon_mock]` table in `./pyproject.toml`
 
 CLI flags override file config; file config overrides built-in defaults.
 
@@ -261,8 +260,8 @@ mocked_version = "4.5.0"
 
 1. If `.mastodon_mock.toml` exists in CWD (or a path passed explicitly), load it as the
    *entire* document (top-level keys, no `[tool.mastodon_mock]` wrapper needed).
-2. Else, look for `pyproject.toml` in CWD and read `[tool.mastodon_mock]`.
-3. Else, use built-in defaults (in-memory SQLite, `mocked_version` = current pinned
+1. Else, look for `pyproject.toml` in CWD and read `[tool.mastodon_mock]`.
+1. Else, use built-in defaults (in-memory SQLite, `mocked_version` = current pinned
    version from [05-versioning.md](05-versioning.md), no seed accounts beyond a single
    default `testuser`).
 

@@ -12,7 +12,7 @@ Version detection (`retrieve_mastodon_version()`) works by:
 
 1. `GET /api/v1/instance/` → read `["version"]` → `parse_version_string()` →
    `mastodon_major/minor/patch`.
-2. `GET /api/v2/instance/` → read `["api_versions"]["mastodon"]` →
+1. `GET /api/v2/instance/` → read `["api_versions"]["mastodon"]` →
    `mastodon_api_version` (an integer, e.g. `2`). If `mastodon_major.minor >= 4.3` and
    this is absent, Mastodon.py emits a `UserWarning`.
 
@@ -37,6 +37,7 @@ mocked_version = "4.4.4"        # "current" — default
   and the previous stable Mastodon" runs the **mock twice** (two server instances /
   two pytest fixture parametrizations), once per `mocked_version`, NOT a single server
   that pretends to be two versions at once.
+
 - `mastodon_api_version` (the `api_versions.mastodon` integer) is derived from
   `mocked_version` via a small lookup table in `mastodon_mock/versioning.py`:
 
@@ -190,11 +191,11 @@ the reported strings) behave for both.
 This is a **manual maintenance task**, not automatic:
 
 1. Check the latest Mastodon stable release.
-2. Update `CURRENT_VERSION` (and shift the old `CURRENT_VERSION` into
+1. Update `CURRENT_VERSION` (and shift the old `CURRENT_VERSION` into
    `PREVIOUS_VERSION`) in `mastodon_mock/versioning.py`.
-3. Update `API_VERSION_BY_MASTODON_VERSION` if a new minor line is added.
-4. Re-run `tests/test_versions.py` and the consuming project's dual suite.
-5. Note the bump in `CHANGELOG.md`.
+1. Update `API_VERSION_BY_MASTODON_VERSION` if a new minor line is added.
+1. Re-run `tests/test_versions.py` and the consuming project's dual suite.
+1. Note the bump in `CHANGELOG.md`.
 
 No CI job auto-bumps this — Mastodon's release cadence is slow enough that a manual
 quarterly check is sufficient, and auto-bumping risks silently breaking the "current-1"

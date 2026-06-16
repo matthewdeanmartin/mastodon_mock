@@ -58,13 +58,13 @@ def test_s3():
 
 We have **none of these affordances**:
 
-| Affordance                       | moto | mastodon_mock (today) |
+| Affordance | moto | mastodon_mock (today) |
 | -------------------------------- | ---- | --------------------- |
-| Decorator (`@mock_...`)          | ✅   | ❌                    |
-| Context manager (`with mock_...`)| ✅   | ❌                    |
-| Pytest fixture (shipped)         | ✅   | ❌ (user hand-rolls)  |
-| Pytest plugin (auto-registered)  | ✅   | ❌                    |
-| Zero-boilerplate client wiring   | ✅   | ❌                    |
+| Decorator (`@mock_...`) | ✅ | ❌ |
+| Context manager (`with mock_...`)| ✅ | ❌ |
+| Pytest fixture (shipped) | ✅ | ❌ (user hand-rolls) |
+| Pytest plugin (auto-registered) | ✅ | ❌ |
+| Zero-boilerplate client wiring | ✅ | ❌ |
 
 Closing this gap is the highest-leverage usability work available: it turns "copy 30 lines
 and hope the readiness wait is right" into "import one thing."
@@ -81,14 +81,14 @@ which is just as ergonomic in practice.
 ## 2. Goals
 
 1. A consumer can get a running mock + a logged-in client in **one line**, no boilerplate.
-2. Three entry styles, matching moto, so it fits any test style:
+1. Three entry styles, matching moto, so it fits any test style:
    - **pytest fixtures** (shipped via an auto-registered plugin) — the primary path.
    - **context manager** — for non-pytest tests or fine-grained control.
    - **decorator** — for the moto muscle-memory crowd.
-3. Correct, race-free lifecycle: free-port allocation, readiness wait, guaranteed teardown,
+1. Correct, race-free lifecycle: free-port allocation, readiness wait, guaranteed teardown,
    xdist-safe.
-4. Sensible defaults (in-memory DB, a small known seed) with full override.
-5. Zero new hard dependencies for people who only run the *server*; the test sugar lives
+1. Sensible defaults (in-memory DB, a small known seed) with full override.
+1. Zero new hard dependencies for people who only run the *server*; the test sugar lives
    behind a `test` extra.
 
 ## 3. Proposed public API
@@ -135,12 +135,12 @@ def test_follow(mastodon_mock_server):          # MockServer, fresh per test, in
 
 Fixtures provided:
 
-| Fixture                  | Scope    | Yields                          | Notes                                              |
+| Fixture | Scope | Yields | Notes |
 | ------------------------ | -------- | ------------------------------- | -------------------------------------------------- |
-| `mastodon_mock_server`   | function | `MockServer` (started)          | Fresh in-memory DB + seed per test. Max isolation. |
-| `mastodon_mock_session`  | session  | `MockServer` (started)          | One server for the whole run.                      |
-| `mastodon_mock_reset`    | function | `MockServer`                    | The session server, `reset()`-ed before each test. |
-| `mastodon_mock_client`   | function | `Mastodon`                      | Logged in as the first seeded account.             |
+| `mastodon_mock_server` | function | `MockServer` (started) | Fresh in-memory DB + seed per test. Max isolation. |
+| `mastodon_mock_session` | session | `MockServer` (started) | One server for the whole run. |
+| `mastodon_mock_reset` | function | `MockServer` | The session server, `reset()`-ed before each test. |
+| `mastodon_mock_client` | function | `Mastodon` | Logged in as the first seeded account. |
 
 Seed/config customisation without writing a fixture, via a marker and/or an override hook:
 
@@ -211,8 +211,7 @@ without changing the signature, for tests that read a module-level base URL.
 - **Reuse `create_app`.** All three entry styles funnel into `MockServer`, which calls
   `create_app(config)` exactly as the existing in-repo `tests/conftest.py` does. No new
   server code paths.
-- **Default config**: `MastodonMockConfig(database=DatabaseConfig(path=":memory:"),
-  seed=DEFAULT_TEST_SEED)` where `DEFAULT_TEST_SEED` provides `alice`/`bob`/`carol`
+- **Default config**: `MastodonMockConfig(database=DatabaseConfig(path=":memory:"), seed=DEFAULT_TEST_SEED)` where `DEFAULT_TEST_SEED` provides `alice`/`bob`/`carol`
   (matching the in-repo fixtures) so examples "just work".
 - **Free port**: bind `("127.0.0.1", 0)`, read back the port, close, hand to uvicorn —
   or pass `port=0` to uvicorn and read `server.servers[0].sockets[0].getsockname()`. The
@@ -275,14 +274,14 @@ transition.
 
 - [ ] `mastodon_mock/testing/__init__.py` — exports `MockServer`, `mock_mastodon`.
 - [ ] `mastodon_mock/testing/server.py` — `MockServer` (lifecycle, `client`, `reset`,
-      context-manager protocol).
+  context-manager protocol).
 - [ ] `mastodon_mock/testing/sugar.py` — `mock_mastodon` dual-use context-manager/decorator.
 - [ ] `mastodon_mock/testing/plugin.py` — pytest fixtures + marker, registered via
-      `pytest11` entry point.
+  `pytest11` entry point.
 - [ ] `mastodon_mock/testing/seed.py` — `DEFAULT_TEST_SEED` (alice/bob/carol).
 - [ ] `pyproject.toml` — `test` extra + `pytest11` entry point; move `mastodon.py` to it.
 - [ ] Rewrite `tests/conftest.py` on top of `MockServer` (dogfood).
 - [ ] Docs: a "Zero-boilerplate fixtures" section in
-      [`docs/usage/writing-tests.md`](../docs/usage/writing-tests.md) and a mention on the
-      landing page.
+  [`docs/usage/writing-tests.md`](../docs/usage/writing-tests.md) and a mention on the
+  landing page.
 - [ ] Contract test that the shipped plugin's fixtures work in a subprocess `pytest` run.

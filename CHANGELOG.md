@@ -5,14 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 [Unreleased]
+
 ### Added
+
 - Added UI
 - Added bulk sample data generation
 
 ### Fixed
-- Improved performance 
+
+- Improved performance
 
 ## [0.0.1] - 2026-06-15
 
@@ -53,4 +55,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emojis and translation languages return correctly-shaped static data, the notification
   policy includes `for_bots`, and the notification-requests family is fully wired. Shapes
   were validated against a live `mastodon.social`.
-

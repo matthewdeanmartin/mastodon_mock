@@ -16,8 +16,8 @@ the latest release to receive security patches.
 
 | Version | Supported |
 |---------|-----------|
-| latest  | Yes       |
-| older   | No        |
+| latest | Yes |
+| older | No |
 
 ## Scope
 
@@ -54,7 +54,7 @@ You have two private reporting channels:
    [submit a confidential report](https://github.com/matthewdeanmartin/mastodon_mock/security/advisories/new)
    directly on GitHub. This is the preferred channel.
 
-2. **Email** — contact **`matthewdeanmartin@gmail.com`** if you prefer not to use GitHub.
+1. **Email** — contact **`matthewdeanmartin@gmail.com`** if you prefer not to use GitHub.
 
 When reporting, please include as much of the following as possible:
 
@@ -82,7 +82,7 @@ If you discover that a pinned transitive dependency has a known vulnerability yo
 
 1. **Override the dependency** — create a `requirements.txt` with the patched version pinned and install it
    alongside this tool.
-2. **Open an issue or pull request** — a PR that bumps the dependency and keeps all tests green is the fastest
+1. **Open an issue or pull request** — a PR that bumps the dependency and keeps all tests green is the fastest
    path to a fix.
 
 ## Running in Docker (isolation)

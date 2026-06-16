@@ -24,8 +24,7 @@ against a real server.
 **Fix:** `routers/statuses.py` now validates before persisting (empty text,
 over-length text, and >`max_media_attachments` media), returning a
 Mastodon-shaped 422. The length/media limits are pulled from the **same**
-constants the instance serializer advertises (`serializers/instance.py:
-MAX_STATUS_CHARACTERS`, `MAX_MEDIA_ATTACHMENTS`) so the advertised and enforced
+constants the instance serializer advertises (`serializers/instance.py: MAX_STATUS_CHARACTERS`, `MAX_MEDIA_ATTACHMENTS`) so the advertised and enforced
 limits can't drift. Regression coverage: `tests/test_contract_status_validation.py`.
 
 ## Noted, not changed (working as designed)

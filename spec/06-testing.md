@@ -3,7 +3,7 @@
 There are two distinct testing concerns:
 
 1. **Testing `mastodon_mock` itself** (this repo's `tests/`).
-2. **Using `mastodon_mock` as a dependency** in a *consuming* project's dual test
+1. **Using `mastodon_mock` as a dependency** in a *consuming* project's dual test
    suite (mock-backed + real-server-backed), which is the actual end goal stated in
    [00-overview.md](00-overview.md).
 
@@ -14,11 +14,13 @@ There are two distinct testing concerns:
 - **Unit tests** — serializers (`serializers/*.py`), pagination helper, ID generation,
   config loading (`.mastodon_mock.toml` vs `pyproject.toml` precedence), seed
   application idempotency. Pure Python, no HTTP, SQLite `:memory:` per test.
+
 - **Router/integration tests** — `httpx.ASGITransport(app=create_app(test_config))` +
   `httpx.Client(transport=..., base_url="http://mock")`. Fast, in-process, no real
   sockets. Used for most endpoint-shape and persistence assertions (does
   `POST /api/v1/statuses` followed by `GET /api/v1/timelines/home` show the new
   status?).
+
 - **Mastodon.py contract tests** — the real differentiator. These tests import
   `from mastodon import Mastodon` (the vendored `Mastodon.py/` package — pinned as a
   dependency, see "Dependency on Mastodon.py" below) and drive the mock **only**
@@ -70,8 +72,7 @@ note: "I cloned a repo to inside a repo"). For the spec's purposes:
     for re-running the endpoint-inventory greps in [03-api-coverage.md](03-api-coverage.md)
     when Mastodon.py updates) but install `mastodon.py` from PyPI for actual test runs.
 - **Recommendation**: (b). Add `mastodon.py` to `[dependency-groups] dev` via PyPI.
-  Keep `Mastodon.py/` un-tracked or as a reference checkout (it's already `??` in `git
-  status` — i.e., not yet committed; decide whether to `.gitignore` it or add as a
+  Keep `Mastodon.py/` un-tracked or as a reference checkout (it's already `??` in `git status` — i.e., not yet committed; decide whether to `.gitignore` it or add as a
   documented "reference copy, not a build dependency" — **out of scope for this spec,
   flag for the user**).
 
@@ -151,20 +152,20 @@ def test_post_and_read_back(mastodon_client):
    (`status.content`, `status.account.acct`, `rel.following`, etc.) hold for both mock
    and real. This is why [03-api-coverage.md](03-api-coverage.md) marks fields/endpoints
    Mastodon.py actually reads as **Full**, even when other fields are stubbed.
-2. **Determinism vs realism trade-off**: the mock should produce *plausible* values
+1. **Determinism vs realism trade-off**: the mock should produce *plausible* values
    (real-looking `created_at` timestamps, monotonic IDs, HTML-wrapped `content`) so
    tests that do basic shape assertions (`isinstance(status.created_at, datetime)`)
    pass identically against both backends.
-3. **Cleanup-sensitive tests** (delete/unfollow at the end) should work identically —
+1. **Cleanup-sensitive tests** (delete/unfollow at the end) should work identically —
    since the mock has no soft-delete-with-grace-period quirks, `status_delete`
    followed by `status(id)` should raise `MastodonNotFoundError` (404) on **both**
    backends.
-4. **Tests that are inherently mock-only** (e.g. asserting on `mastodon_mock`-specific
+1. **Tests that are inherently mock-only** (e.g. asserting on `mastodon_mock`-specific
    behavior like the `/api/v1/_mock/login` convenience endpoint from
    [04-auth.md](04-auth.md)) must be clearly separated — e.g. a
    `@pytest.mark.mock_only` marker, or living in a `tests/mock_only/` directory —
    so the "real" parametrization doesn't even attempt to collect them.
-5. **Rate limiting**: real Mastodon returns `429` + `X-RateLimit-*` headers under load.
+1. **Rate limiting**: real Mastodon returns `429` + `X-RateLimit-*` headers under load.
    The mock does **not** implement rate limiting by default (config
    `auth.permissive`/no rate limit). If the consuming suite specifically tests
    `ratelimit_method="throw"` handling, that's a `mock_only`-style test against a mock
