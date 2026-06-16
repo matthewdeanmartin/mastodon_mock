@@ -70,7 +70,10 @@ async def media_post(
 
     ext = Path(file.filename or "").suffix or ".bin"
     stored_name = f"{uuid.uuid4().hex}{ext}"
-    (media_dir / stored_name).write_bytes(await file.read())
+    try:
+        (media_dir / stored_name).write_bytes(await file.read())
+    finally:
+        await file.close()
 
     base = f"{request.url.scheme}://{request.url.netloc}"
     url = f"{base}/media/attachments/{stored_name}"

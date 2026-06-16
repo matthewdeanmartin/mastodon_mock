@@ -464,37 +464,37 @@ async def update_credentials(
     account: RequiredAccount,
 ) -> dict[str, Any]:
     """Update the authed account's profile fields and avatar/header."""
-    form = await request.form()
+    async with request.form() as form:
 
-    def _get(name: str) -> Any:
-        return form.get(name)
+        def get_value(name: str) -> Any:
+            return form.get(name)
 
-    if (v := _get("display_name")) is not None:
-        account.display_name = str(v)
-    if (v := _get("note")) is not None:
-        account.note = str(v)
-    if (v := _get("locked")) is not None:
-        account.locked = str(v).lower() in ("true", "1", "on")
-    if (v := _get("bot")) is not None:
-        account.bot = str(v).lower() in ("true", "1", "on")
-    if (v := _get("discoverable")) is not None:
-        account.discoverable = str(v).lower() in ("true", "1", "on")
-    if (v := _get("source[privacy]")) is not None:
-        account.default_privacy = str(v)
-    if (v := _get("source[sensitive]")) is not None:
-        account.default_sensitive = str(v).lower() in ("true", "1", "on")
-    if (v := _get("source[language]")) is not None:
-        account.default_language = str(v)
+        if (v := get_value("display_name")) is not None:
+            account.display_name = str(v)
+        if (v := get_value("note")) is not None:
+            account.note = str(v)
+        if (v := get_value("locked")) is not None:
+            account.locked = str(v).lower() in ("true", "1", "on")
+        if (v := get_value("bot")) is not None:
+            account.bot = str(v).lower() in ("true", "1", "on")
+        if (v := get_value("discoverable")) is not None:
+            account.discoverable = str(v).lower() in ("true", "1", "on")
+        if (v := get_value("source[privacy]")) is not None:
+            account.default_privacy = str(v)
+        if (v := get_value("source[sensitive]")) is not None:
+            account.default_sensitive = str(v).lower() in ("true", "1", "on")
+        if (v := get_value("source[language]")) is not None:
+            account.default_language = str(v)
 
-    fields = _collect_fields(form)
-    if fields is not None:
-        account.fields = fields
+        fields = _collect_fields(form)
+        if fields is not None:
+            account.fields = fields
 
-    await _store_upload(request, form.get("avatar"), account, "avatar")
-    await _store_upload(request, form.get("header"), account, "header")
+        await _store_upload(request, form.get("avatar"), account, "avatar")
+        await _store_upload(request, form.get("header"), account, "header")
 
-    db.commit()
-    return serialize_account(db, account, config, with_source=True)
+        db.commit()
+        return serialize_account(db, account, config, with_source=True)
 
 
 @router.delete("/api/v1/profile/avatar")
@@ -582,7 +582,10 @@ async def _store_upload(request: Request, upload: Any, account: Account, kind: s
     ext = Path(upload.filename or "").suffix or ".png"
     name = f"{kind}_{account.id}_{uuid.uuid4().hex}{ext}"
     dest = media_dir / name
-    dest.write_bytes(await upload.read())
+    try:
+        dest.write_bytes(await upload.read())
+    finally:
+        await upload.close()
     base = f"{request.url.scheme}://{request.url.netloc}"
     url = f"{base}/media/profile/{name}"
     if kind == "avatar":

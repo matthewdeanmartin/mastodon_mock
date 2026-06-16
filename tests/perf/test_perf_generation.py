@@ -19,9 +19,12 @@ pytestmark = pytest.mark.slow
 @pytest.mark.parametrize("preset", ["small", "medium"])
 def test_generation_throughput(preset: str, baselines: dict) -> None:
     engine = init_engine(DatabaseConfig(path=":memory:"))
-    Base.metadata.create_all(engine)
+    try:
+        Base.metadata.create_all(engine)
 
-    report = generate_sample_data(engine, PRESETS[preset].model_copy(update={"seed": 1}))
+        report = generate_sample_data(engine, PRESETS[preset].model_copy(update={"seed": 1}))
+    finally:
+        engine.dispose()
 
     floor = baselines["generate"][preset]["rows_per_second_min"]
     assert report.rows_per_second >= floor, (

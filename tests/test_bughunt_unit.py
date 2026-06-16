@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -14,7 +16,7 @@ from mastodon_mock.versioning import api_version_for, parse_version_string
 
 
 @pytest.fixture
-def db_session():
+def db_session() -> Iterator[Session]:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -22,11 +24,14 @@ def db_session():
     )
     Base.metadata.create_all(engine)
     session_factory = sessionmaker(bind=engine)
-    with session_factory() as session:
-        yield session
+    try:
+        with session_factory() as session:
+            yield session
+    finally:
+        engine.dispose()
 
 
-def test_parse_mentions(db_session: Session):
+def test_parse_mentions(db_session: Session) -> None:
     # Setup accounts
     alice = Account(username="alice", display_name="Alice")
     bob = Account(username="bob", display_name="Bob", domain="remote.test")
@@ -58,7 +63,7 @@ def test_parse_mentions(db_session: Session):
     assert len(mentions) == 0
 
 
-def test_parse_hashtags():
+def test_parse_hashtags() -> None:
     assert parse_hashtags("Hello #world") == ["world"]
     assert parse_hashtags("#First #second") == ["first", "second"]
     assert parse_hashtags("#MixedCase") == ["mixedcase"]
@@ -68,7 +73,7 @@ def test_parse_hashtags():
     assert parse_hashtags(" #tag") == ["tag"]
 
 
-def test_do_follow_locked(db_session: Session):
+def test_do_follow_locked(db_session: Session) -> None:
     alice = Account(username="alice")
     bob = Account(username="bob", locked=True)
     db_session.add_all([alice, bob])
@@ -85,7 +90,7 @@ def test_do_follow_locked(db_session: Session):
     assert rel.requested is False
 
 
-def test_do_follow_unlocked(db_session: Session):
+def test_do_follow_unlocked(db_session: Session) -> None:
     alice = Account(username="alice")
     bob = Account(username="bob", locked=False)
     db_session.add_all([alice, bob])
@@ -101,7 +106,7 @@ def test_do_follow_unlocked(db_session: Session):
     assert rel.following is False
 
 
-def test_validate_status_params():
+def test_validate_status_params() -> None:
     # Valid status
     assert _validate_status_params({"status": "Hello"}) is None
 
@@ -124,7 +129,7 @@ def test_validate_status_params():
     assert _validate_status_params({"status": "", "poll": {"options": ["a", "b"]}}) is None
 
 
-def test_create_status_from_params(db_session: Session):
+def test_create_status_from_params(db_session: Session) -> None:
     alice = Account(username="alice")
     bob = Account(username="bob")
     db_session.add_all([alice, bob])
@@ -155,7 +160,7 @@ def test_create_status_from_params(db_session: Session):
     assert notif.from_account_id == alice.id
 
 
-def test_paginate_basic(db_session: Session):
+def test_paginate_basic(db_session: Session) -> None:
     alice = Account(username="alice")
     db_session.add(alice)
     db_session.commit()
@@ -190,7 +195,7 @@ def test_paginate_basic(db_session: Session):
     assert page2.items[-1].text == "Status 0"
 
 
-def test_paginate_min_id(db_session: Session):
+def test_paginate_min_id(db_session: Session) -> None:
     alice = Account(username="alice")
     db_session.add(alice)
     db_session.commit()
@@ -221,7 +226,7 @@ def test_paginate_min_id(db_session: Session):
     assert page_newer.items[0].text == "Status 9"
 
 
-def test_link_header():
+def test_link_header() -> None:
     page = Page(items=[1, 2, 3], limit=3, first_id=100, last_id=90, has_more=True)
     header = link_header("http://test/api", page)
     assert "max_id=90" in header
@@ -235,7 +240,7 @@ def test_link_header():
     assert "min_id=100" in header
 
 
-def test_parse_version_string():
+def test_parse_version_string() -> None:
     assert parse_version_string("4.4.4") == (4, 4, 4)
     assert parse_version_string("4.4.0rc1") == (4, 4, 0)
     assert parse_version_string("4.5") == (4, 5, 0)
@@ -244,14 +249,14 @@ def test_parse_version_string():
     assert parse_version_string("invalid.version") == (0, 0, 0)
 
 
-def test_api_version_for():
+def test_api_version_for() -> None:
     assert api_version_for("4.4.4") == 2
     assert api_version_for("4.2.1") == 1
     assert api_version_for("4.0.0") == 1
     assert api_version_for("3.5.0") == 2  # default for unknown
 
 
-def test_next_id():
+def test_next_id() -> None:
     id1 = next_id()
     id2 = next_id()
     assert id2 > id1

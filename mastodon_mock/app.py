@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+import weakref
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -37,12 +38,22 @@ from mastodon_mock.routers import (
 from mastodon_mock.ui import mount_ui
 
 
+def dispose_app_resources(app: FastAPI) -> None:
+    """Dispose resources owned by a ``mastodon_mock`` app instance."""
+    if hasattr(app.state, "engine"):
+        app.state.engine.dispose()
+    finalizer = getattr(app.state, "resource_finalizer", None)
+    if finalizer is not None:
+        finalizer.detach()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Dispose of the engine on shutdown to clear connection pool."""
-    yield
-    if hasattr(app.state, "engine"):
-        app.state.engine.dispose()
+    try:
+        yield
+    finally:
+        dispose_app_resources(app)
 
 
 def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
@@ -61,6 +72,7 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
     app.state.media_path = media_path
+    app.state.resource_finalizer = weakref.finalize(app, engine.dispose)
 
     add_middleware(app, config)
 

@@ -8,6 +8,8 @@ tests assert both branches so they pass either way. See spec/08-admin-ui.md.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,9 +20,10 @@ UI_BUILT = (ui_dist_dir() / "index.html").is_file()
 
 
 @pytest.fixture()
-def client() -> TestClient:
+def client() -> Iterator[TestClient]:
     """A TestClient over a default in-memory app."""
-    return TestClient(create_app())
+    with TestClient(create_app()) as test_client:
+        yield test_client
 
 
 def test_root_identity_always_present(client: TestClient) -> None:

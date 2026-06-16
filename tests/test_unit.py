@@ -48,17 +48,20 @@ def test_config_defaults() -> None:
 
 def test_seed_idempotency() -> None:
     engine = init_engine(DatabaseConfig(path=":memory:"))
-    Base.metadata.create_all(engine)
-    seed = SeedConfig(accounts=[SeedAccount(username="dup", access_token="dup_token")])
+    try:
+        Base.metadata.create_all(engine)
+        seed = SeedConfig(accounts=[SeedAccount(username="dup", access_token="dup_token")])
 
-    apply_seed_data(engine, seed)
-    apply_seed_data(engine, seed)  # re-apply
+        apply_seed_data(engine, seed)
+        apply_seed_data(engine, seed)  # re-apply
 
-    factory = make_session_factory(engine)
-    with factory() as session:
-        account_count = session.scalar(select(func.count()).select_from(Account).where(Account.username == "dup"))
-        token_count = session.scalar(
-            select(func.count()).select_from(OAuthToken).where(OAuthToken.access_token == "dup_token")
-        )
+        factory = make_session_factory(engine)
+        with factory() as session:
+            account_count = session.scalar(select(func.count()).select_from(Account).where(Account.username == "dup"))
+            token_count = session.scalar(
+                select(func.count()).select_from(OAuthToken).where(OAuthToken.access_token == "dup_token")
+            )
+    finally:
+        engine.dispose()
     assert account_count == 1
     assert token_count == 1
