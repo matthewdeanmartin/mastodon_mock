@@ -10,7 +10,7 @@ from sqlalchemy import or_, select
 from mastodon_mock.db.models import Account, Status, StatusTag
 from mastodon_mock.deps import Config, CurrentAccount, DbSession
 from mastodon_mock.serializers.accounts import serialize_account
-from mastodon_mock.serializers.statuses import serialize_status
+from mastodon_mock.serializers.statuses import serialize_status_list
 
 router = APIRouter()
 
@@ -38,7 +38,7 @@ def _do_search(
     ).all()
 
     accounts_data = [serialize_account(db, a, config) for a in accounts]
-    statuses_data = [serialize_status(db, s, config, viewer) for s in statuses]
+    statuses_data = serialize_status_list(db, list(statuses), config, viewer)
     hashtags_data = [{"name": name, "url": f"https://{config.domain}/tags/{name}", "history": []} for name in tag_names]
     return accounts_data, statuses_data, hashtags_data
 

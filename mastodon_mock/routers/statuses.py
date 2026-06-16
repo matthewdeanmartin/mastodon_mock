@@ -36,6 +36,7 @@ from mastodon_mock.serializers.misc import serialize_scheduled_status
 from mastodon_mock.serializers.statuses import (
     serialize_status,
     serialize_status_edit,
+    serialize_status_list,
     serialize_status_source,
 )
 from mastodon_mock.services import add_notification, attach_mentions_and_tags
@@ -128,15 +129,15 @@ def statuses_many(
     viewer: CurrentAccount,
 ) -> list[dict[str, Any]]:
     """Fetch multiple statuses by ``id[]``."""
-    out = []
+    found: list[Status] = []
     for raw in array_query(request, "id"):
         try:
             s = db.get(Status, int(raw))
         except (ValueError, TypeError):
             s = None
         if s is not None:
-            out.append(serialize_status(db, s, config, viewer))
-    return out
+            found.append(s)
+    return serialize_status_list(db, found, config, viewer)
 
 
 @router.get("/api/v1/statuses/{status_id}")
@@ -171,8 +172,8 @@ def status_context(status_id: str, db: DbSession, config: Config, viewer: Curren
             frontier.append(child.id)
 
     return {
-        "ancestors": [serialize_status(db, s, config, viewer) for s in ancestors],
-        "descendants": [serialize_status(db, s, config, viewer) for s in descendants],
+        "ancestors": serialize_status_list(db, ancestors, config, viewer),
+        "descendants": serialize_status_list(db, descendants, config, viewer),
     }
 
 
@@ -247,7 +248,7 @@ def status_quotes(
         limit=params.limit,
     )
     set_link_header(request, response, page)
-    return [serialize_status(db, s, config, viewer) for s in page.items]
+    return serialize_status_list(db, list(page.items), config, viewer)
 
 
 @router.post("/api/v1/statuses/{status_id}/quotes/{quoting_status_id}/revoke", status_code=200)

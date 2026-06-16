@@ -7,7 +7,7 @@ project's dual mock/real suite excludes them with ``-m "not mock_only"``.
 
 from __future__ import annotations
 
-import httpx
+import httpx2 as httpx
 import pytest
 from mastodon import Mastodon
 

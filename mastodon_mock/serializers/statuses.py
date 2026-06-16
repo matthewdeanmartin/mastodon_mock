@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -26,6 +26,9 @@ from mastodon_mock.serializers.common import account_acct, iso, sid, status_url
 from mastodon_mock.serializers.media import serialize_media
 from mastodon_mock.serializers.polls import serialize_poll
 
+if TYPE_CHECKING:
+    from mastodon_mock.serializers.batch import BatchContext
+
 
 def _count(session: Session, model: Any, **filters: Any) -> int:
     """Count rows of ``model`` matching equality ``filters``."""
@@ -35,19 +38,10 @@ def _count(session: Session, model: Any, **filters: Any) -> int:
     return session.scalar(stmt) or 0
 
 
-def _serialize_mentions(session: Session, status_id: int, config: MastodonMockConfig) -> list[dict[str, Any]]:
-    """Serialize a status's mentions to ``StatusMention`` JSON."""
-    rows = (
-        session.execute(
-            select(Account)
-            .join(StatusMention, StatusMention.account_id == Account.id)
-            .where(StatusMention.status_id == status_id)
-        )
-        .scalars()
-        .all()
-    )
+def _mentions_from_ctx(accounts: list[Account], config: MastodonMockConfig) -> list[dict[str, Any]]:
+    """Format already-loaded mention accounts to ``StatusMention`` JSON."""
     out = []
-    for acc in rows:
+    for acc in accounts:
         acct = account_acct(acc.username, acc.domain)
         out.append(
             {
@@ -60,10 +54,46 @@ def _serialize_mentions(session: Session, status_id: int, config: MastodonMockCo
     return out
 
 
-def _serialize_tags(session: Session, status_id: int, config: MastodonMockConfig) -> list[dict[str, Any]]:
-    """Serialize a status's hashtags to ``Tag`` JSON."""
-    names = session.execute(select(StatusTag.name).where(StatusTag.status_id == status_id)).scalars().all()
+def _tags_from_names(names: list[str], config: MastodonMockConfig) -> list[dict[str, Any]]:
+    """Format already-loaded tag names to ``Tag`` JSON."""
     return [{"name": name, "url": f"https://{config.domain}/tags/{name}"} for name in names]
+
+
+def _serialize_mentions(session: Session, status_id: int, config: MastodonMockConfig) -> list[dict[str, Any]]:
+    """Serialize a status's mentions to ``StatusMention`` JSON (single-row path)."""
+    rows = (
+        session.execute(
+            select(Account)
+            .join(StatusMention, StatusMention.account_id == Account.id)
+            .where(StatusMention.status_id == status_id)
+        )
+        .scalars()
+        .all()
+    )
+    return _mentions_from_ctx(list(rows), config)
+
+
+def _serialize_tags(session: Session, status_id: int, config: MastodonMockConfig) -> list[dict[str, Any]]:
+    """Serialize a status's hashtags to ``Tag`` JSON (single-row path)."""
+    names = session.execute(select(StatusTag.name).where(StatusTag.status_id == status_id)).scalars().all()
+    return _tags_from_names(list(names), config)
+
+
+def serialize_status_list(
+    session: Session,
+    statuses: list[Status],
+    config: MastodonMockConfig,
+    viewer: Account | None,
+) -> list[dict[str, Any]]:
+    """Serialize a page of statuses with one batch of grouped queries (F1).
+
+    Use this anywhere a list of statuses is serialized (timelines, account statuses,
+    favourites/bookmarks, search, threads) instead of a per-row comprehension.
+    """
+    from mastodon_mock.serializers.batch import build_status_context
+
+    ctx = build_status_context(session, statuses, viewer)
+    return [serialize_status(session, s, config, viewer, ctx=ctx) for s in statuses]
 
 
 def serialize_status(
@@ -73,12 +103,22 @@ def serialize_status(
     viewer: Account | None,
     *,
     _depth: int = 0,
+    ctx: BatchContext | None = None,
 ) -> dict[str, Any]:
-    """Serialize a status, including viewer-relative flags and nested reblog."""
+    """Serialize a status, including viewer-relative flags and nested reblog.
+
+    When ``ctx`` is supplied (built by :func:`serialize_status_list`), all per-status
+    counts/flags/mentions/tags/media and the author's account aggregates come from
+    precomputed batch data instead of per-row queries (F1). Nested reblog/quote rows
+    aren't in the page's ``ctx`` and fall back to single-row querying, which is fine —
+    they're rare relative to the page body.
+    """
     account = status.account or session.get(Account, status.account_id)
     if account is None:
         raise RuntimeError(f"Account {status.account_id} not found for status {status.id}")
     acct = account_acct(account.username, account.domain)
+    # ctx describes only this page; nested reblog/quote rows query for themselves.
+    batched = ctx is not None
 
     reblog_data = None
     if status.reblog_of_id is not None and _depth == 0:
@@ -86,7 +126,13 @@ def serialize_status(
         if original is not None:
             reblog_data = serialize_status(session, original, config, viewer, _depth=_depth + 1)
 
-    media = session.execute(select(MediaAttachment).where(MediaAttachment.status_id == status.id)).scalars().all()
+    if batched:
+        assert ctx is not None
+        media = ctx.media.get(status.id, [])
+    else:
+        media = list(
+            session.execute(select(MediaAttachment).where(MediaAttachment.status_id == status.id)).scalars().all()
+        )
 
     poll_data = None
     if status.poll_id is not None:
@@ -114,7 +160,14 @@ def serialize_status(
             }
 
     favourited = reblogged = bookmarked = muted = pinned = False
-    if viewer is not None:
+    if viewer is not None and batched:
+        assert ctx is not None
+        favourited = status.id in ctx.favourited
+        bookmarked = status.id in ctx.bookmarked
+        muted = status.id in ctx.muted
+        pinned = status.id in ctx.pinned
+        reblogged = status.id in ctx.reblogged
+    elif viewer is not None:
         favourited = _count(session, Favourite, account_id=viewer.id, status_id=status.id) > 0
         bookmarked = _count(session, Bookmark, account_id=viewer.id, status_id=status.id) > 0
         muted = _count(session, StatusMute, account_id=viewer.id, status_id=status.id) > 0
@@ -128,20 +181,34 @@ def serialize_status(
             or 0
         ) > 0
 
+    if batched:
+        assert ctx is not None
+        reblogs_count = ctx.reblogs_count.get(status.id, 0)
+        favourites_count = ctx.favourites_count.get(status.id, 0)
+        replies_count = ctx.replies_count.get(status.id, 0)
+        mentions = _mentions_from_ctx(ctx.mentions.get(status.id, []), config)
+        tags = _tags_from_names(ctx.tags.get(status.id, []), config)
+    else:
+        reblogs_count = _count(session, Status, reblog_of_id=status.id)
+        favourites_count = _count(session, Favourite, status_id=status.id)
+        replies_count = _count(session, Status, in_reply_to_id=status.id)
+        mentions = _serialize_mentions(session, status.id, config)
+        tags = _serialize_tags(session, status.id, config)
+
     data: dict[str, Any] = {
         "id": sid(status.id),
         "uri": status.url or status_url(config.domain, acct, status.id),
         "url": status.url or status_url(config.domain, acct, status.id),
-        "account": serialize_account(session, account, config),
+        "account": serialize_account(session, account, config, ctx=ctx),
         "in_reply_to_id": sid(status.in_reply_to_id),
         "in_reply_to_account_id": sid(status.in_reply_to_account_id),
         "reblog": reblog_data,
         "content": status.content,
         "created_at": iso(status.created_at),
         "edited_at": iso(status.edited_at),
-        "reblogs_count": _count(session, Status, reblog_of_id=status.id),
-        "favourites_count": _count(session, Favourite, status_id=status.id),
-        "replies_count": _count(session, Status, in_reply_to_id=status.id),
+        "reblogs_count": reblogs_count,
+        "favourites_count": favourites_count,
+        "replies_count": replies_count,
         "reblogged": reblogged,
         "favourited": favourited,
         "bookmarked": bookmarked,
@@ -151,10 +218,10 @@ def serialize_status(
         "spoiler_text": status.spoiler_text,
         "visibility": status.visibility,
         "language": status.language,
-        "mentions": _serialize_mentions(session, status.id, config),
+        "mentions": mentions,
         "media_attachments": [serialize_media(m) for m in media],
         "emojis": [],
-        "tags": _serialize_tags(session, status.id, config),
+        "tags": tags,
         "card": None,
         "poll": poll_data,
         "application": application,

@@ -1088,6 +1088,19 @@ wheels = [
 ]
 
 [[package]]
+name = "httpcore2"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "h11" },
+    { name = "truststore" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7b/9b/2b1d1833a58236d1f6ee755e027a3917da0db59cc9708554cefc440ee8b6/httpcore2-2.4.0.tar.gz", hash = "sha256:3093a8ab8980d9f910b9cb4351df9186a0ad2350a6284a9107ac9a362a584422", size = 64618, upload-time = "2026-06-11T06:35:53.425Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7c/72/4fdf2306143a92a471fad9f3655aa542d43aa9188a7c9534e82c9aecf837/httpcore2-2.4.0-py3-none-any.whl", hash = "sha256:5218779da5d6e3c2013ac706121abfb3815d450e0613495c0de50264dce58242", size = 80151, upload-time = "2026-06-11T06:35:50.89Z" },
+]
+
+[[package]]
 name = "httpx"
 version = "0.28.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1105,6 +1118,21 @@ wheels = [
 [package.optional-dependencies]
 http2 = [
     { name = "h2" },
+]
+
+[[package]]
+name = "httpx2"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "httpcore2" },
+    { name = "idna" },
+    { name = "truststore" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fc/60/b43ced4ccf26e95b396dbf67051d3e5042b645917d4da0469dd82a3bdd4f/httpx2-2.4.0.tar.gz", hash = "sha256:32e0734b61eb0824b3f56a9e98d6d92d381a3ef12c0045aa917ee63df6c411ef", size = 81691, upload-time = "2026-06-11T06:35:54.538Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/45/82bc57c3d9c3314f663b67cc057f1c017a6450685dde513f4f8db5cf431f/httpx2-2.4.0-py3-none-any.whl", hash = "sha256:425acd99297829599decf6701386dd84db3542597d36d3e2e4def930ecd57fd9", size = 74941, upload-time = "2026-06-11T06:35:52.235Z" },
 ]
 
 [[package]]
@@ -1651,6 +1679,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "orjson" },
     { name = "pydantic" },
     { name = "python-multipart" },
     { name = "sqlalchemy" },
@@ -1659,7 +1688,7 @@ dependencies = [
 
 [package.optional-dependencies]
 test = [
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "mastodon-py" },
     { name = "uvicorn" },
 ]
@@ -1675,7 +1704,7 @@ dev = [
     { name = "gha-update" },
     { name = "git2md" },
     { name = "griffe" },
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "hypothesis" },
     { name = "import-linter" },
     { name = "interrogate" },
@@ -1719,8 +1748,9 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.13.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
-    { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27.0" },
+    { name = "httpx2", marker = "extra == 'test'", specifier = ">=2.4.0" },
     { name = "mastodon-py", marker = "extra == 'test'", specifier = ">=2.2.1" },
+    { name = "orjson", specifier = ">=3.10.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
@@ -1740,7 +1770,7 @@ dev = [
     { name = "gha-update", specifier = ">=0.1.0" },
     { name = "git2md", specifier = ">=0.1.0" },
     { name = "griffe", specifier = ">=1.0.0" },
-    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "httpx2", specifier = ">=2.4.0" },
     { name = "hypothesis", specifier = ">=6.100.0" },
     { name = "import-linter", specifier = ">=2.0" },
     { name = "interrogate", specifier = ">=1.5.0" },
@@ -3481,6 +3511,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/da/e4/6a4b4430fb78663d0b5159674789c55e3aca629d8a24fb303797e6eec402/troml_dev_status-0.6.1.tar.gz", hash = "sha256:7fded248064bb4741bb11a25c4e016899fae99421c5c3975c5353df805f76ea3", size = 62438, upload-time = "2026-03-27T01:03:58.381Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4a/99/b45ca5560050540486133c238000d61436f14b8759c29f76b8ce3b1b9153/troml_dev_status-0.6.1-py3-none-any.whl", hash = "sha256:6a5b8dde00515823137f5a604bb79c9d19cb233c6d02fa2de5999905133743ac", size = 76836, upload-time = "2026-03-27T01:03:57.106Z" },
+]
+
+[[package]]
+name = "truststore"
+version = "0.10.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/a3/1585216310e344e8102c22482f6060c7a6ea0322b63e026372e6dcefcfd6/truststore-0.10.4.tar.gz", hash = "sha256:9d91bd436463ad5e4ee4aba766628dd6cd7010cf3e2461756b3303710eebc301", size = 26169, upload-time = "2025-08-12T18:49:02.73Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/97/56608b2249fe206a67cd573bc93cd9896e1efb9e98bce9c163bcdc704b88/truststore-0.10.4-py3-none-any.whl", hash = "sha256:adaeaecf1cbb5f4de3b1959b42d41f6fab57b2b1666adb59e89cb0b53361d981", size = 18660, upload-time = "2025-08-12T18:49:01.46Z" },
 ]
 
 [[package]]

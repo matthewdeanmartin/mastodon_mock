@@ -221,7 +221,7 @@ Start the server once for the whole session and reset its state before each test
 mock-only reset endpoint. Much faster for large suites.
 
 ```python
-import httpx
+import httpx2 as httpx
 import pytest
 
 

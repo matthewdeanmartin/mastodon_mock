@@ -11,7 +11,7 @@ from mastodon_mock.db.models import Account, Relationship, Status, StatusTag, Us
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.pagination import paginate
 from mastodon_mock.routers.helpers import PageQuery, set_link_header
-from mastodon_mock.serializers.statuses import serialize_status
+from mastodon_mock.serializers.statuses import serialize_status_list
 
 router = APIRouter()
 
@@ -43,7 +43,7 @@ def timeline_home(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return [serialize_status(db, s, config, account) for s in page.items]
+    return serialize_status_list(db, list(page.items), config, account)
 
 
 @router.get("/api/v1/timelines/public")
@@ -72,7 +72,7 @@ def timeline_public(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return [serialize_status(db, s, config, viewer) for s in page.items]
+    return serialize_status_list(db, list(page.items), config, viewer)
 
 
 @router.get("/api/v1/timelines/tag/{hashtag}")
@@ -94,7 +94,7 @@ def timeline_hashtag(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return [serialize_status(db, s, config, viewer) for s in page.items]
+    return serialize_status_list(db, list(page.items), config, viewer)
 
 
 @router.get("/api/v1/timelines/list/{list_id}")
@@ -120,7 +120,7 @@ def timeline_list(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return [serialize_status(db, s, config, account) for s in page.items]
+    return serialize_status_list(db, list(page.items), config, account)
 
 
 @router.get("/api/v1/timelines/link")

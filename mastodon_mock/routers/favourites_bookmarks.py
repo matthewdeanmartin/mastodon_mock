@@ -11,7 +11,7 @@ from mastodon_mock.db.models import Bookmark, Favourite, Status
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
 from mastodon_mock.pagination import paginate
 from mastodon_mock.routers.helpers import PageQuery, set_link_header
-from mastodon_mock.serializers.statuses import serialize_status
+from mastodon_mock.serializers.statuses import serialize_status_list
 
 router = APIRouter()
 
@@ -31,7 +31,7 @@ def favourites(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return [serialize_status(db, s, config, account) for s in page.items]
+    return serialize_status_list(db, list(page.items), config, account)
 
 
 @router.get("/api/v1/bookmarks")
@@ -49,4 +49,4 @@ def bookmarks(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return [serialize_status(db, s, config, account) for s in page.items]
+    return serialize_status_list(db, list(page.items), config, account)

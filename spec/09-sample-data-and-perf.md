@@ -286,21 +286,32 @@ make gen-data-medium # mastodon_mock gen-data --preset medium --database ./perf.
 > Populated as Phase 4 uncovers and fixes ceilings. Each entry: symptom, root cause,
 > fix, and the baseline/assert that now guards it.
 
-### F1 — `timeline_home`/`timeline_public` serializer N+1 (open)
+### F1 — `timeline_home`/`timeline_public` serializer N+1 (resolved)
 
-- **Symptom:** under a `medium` cohort (1k accounts × 100 statuses, 100k status rows),
-  a 20-item `GET /api/v1/timelines/home` runs ~237ms median / ~379ms P95 over loopback;
+- **Symptom:** under a `medium` cohort (1k accounts x 100 statuses, 100k status rows),
+  a 20-item `GET /api/v1/timelines/home` ran ~237ms median / ~379ms P95 over loopback;
   `timeline_public` ~224ms median. The DB query that selects the 20 status rows is
-  cheap and indexed; the time is in serialization.
-- **Root cause:** `serializers/statuses.py::serialize_status` issues a separate query
+  cheap and indexed; the time was all in serialization.
+- **Root cause:** `serializers/statuses.py::serialize_status` issued a separate query
   per status for `reblogs_count`, `favourites_count`, `replies_count`, `favourited`,
-  `bookmarked`, `muted`, `pinned`, `reblogged`, mentions, and tags — and then calls
-  `serialize_account`, which itself counts followers/following/statuses. That's ~13+
-  round-trips × 20 statuses ≈ 260 queries per timeline request. Classic N+1.
-- **Guard in place now:** `tests/perf/test_perf_read_latency.py` pins P95 ceilings
-  (`timeline_home_p95_ms = 400`) so this can't silently get *worse*.
-- **Planned fix (next Phase-4 pass):** batch the per-page work — one grouped
-  `COUNT(... ) GROUP BY status_id` for each engagement table over the page's status IDs,
-  one `IN (...)` fetch for mentions/tags/media, and a cached/batched account serializer —
-  collapsing ~260 queries to a small constant. Then tighten the baseline ceilings to
-  lock in the win. Tracked separately so it doesn't block Phases 1–3.
+  `bookmarked`, `muted`, `pinned`, `reblogged`, mentions, tags, and media — and then
+  called `serialize_account`, which itself counts followers/following/statuses. That's
+  ~13+ round-trips x 20 statuses ≈ 260 queries per timeline request. Classic N+1.
+- **Fix:** new `serializers/batch.py::build_status_context` computes every per-status
+  and per-author aggregate for a whole page in a small **constant** number of grouped
+  queries (`COUNT(...) GROUP BY status_id` per engagement table; `IN (...)` fetches for
+  viewer flags, mentions, tags, media; grouped follower/following/status counts per
+  author). `serialize_status`/`serialize_account` gained an optional `ctx` param: when
+  present they read from the precomputed `BatchContext`, otherwise they keep the old
+  single-row query path (so single-status endpoints are unchanged). A new
+  `serialize_status_list(...)` builds the context once and is now used by every
+  list-of-statuses endpoint (home/public/tag/list timelines, `account_statuses`,
+  favourites, bookmarks, search, thread context, bulk-by-id, trends). ~260 queries → a
+  handful.
+- **Result (same harness, medium cohort, loopback):** `timeline_home` 237ms → **56ms
+  median** (~4.2x); `timeline_public` 224ms → **34ms** (~6.6x); `account_statuses`
+  ~300ms P95 → **34ms median / 40ms P95** (~9x). All 243 contract tests still pass,
+  confirming byte-identical serialized output.
+- **Guard:** baseline ceilings in `tests/perf/baselines.json` tightened to
+  `timeline_home_p95_ms = 150`, `account_statuses_p95_ms = 120` (down from 600), so a
+  regression back toward the N+1 now fails `tests/perf/test_perf_read_latency.py`.

@@ -13,7 +13,7 @@ import threading
 import time
 from collections.abc import Iterator
 
-import httpx
+import httpx2 as httpx
 import pytest
 import uvicorn
 from fastapi import FastAPI

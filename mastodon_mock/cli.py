@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 
+import orjson
 import uvicorn
 
 from mastodon_mock.__about__ import __version__
@@ -98,7 +98,7 @@ def _gen_data(args: argparse.Namespace) -> None:
     report = generate_sample_data(engine, cfg)
 
     if args.json:
-        print(json.dumps(report.to_dict(), indent=2))
+        print(orjson.dumps(report.to_dict(), option=orjson.OPT_INDENT_2).decode())
         return
     print(f"\nGenerated in {report.total_seconds:.2f}s ({report.rows_per_second:,.0f} rows/s):")
     print(f"  accounts:      {report.accounts:>10,}")

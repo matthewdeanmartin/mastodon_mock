@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -17,6 +17,9 @@ from mastodon_mock.serializers.common import (
     profile_url,
     sid,
 )
+
+if TYPE_CHECKING:
+    from mastodon_mock.serializers.batch import BatchContext
 
 
 def _followers_count(session: Session, account_id: int) -> int:
@@ -66,12 +69,30 @@ def serialize_account(
     config: MastodonMockConfig,
     *,
     with_source: bool = False,
+    ctx: BatchContext | None = None,
 ) -> dict[str, Any]:
-    """Serialize an account. Set ``with_source`` for ``verify_credentials``."""
+    """Serialize an account. Set ``with_source`` for ``verify_credentials``.
+
+    When ``ctx`` is supplied and covers this account, the follower/following/status
+    counts come from precomputed batch aggregates instead of per-row queries (F1).
+    """
     acct = account_acct(account.username, account.domain)
     url = profile_url(config.domain, acct)
     avatar = account.avatar_url or placeholder_avatar(config.domain)
     header = account.header_url or placeholder_header(config.domain)
+
+    batched = ctx is not None and account.id in ctx.accounts_loaded
+    if batched:
+        assert ctx is not None
+        followers = ctx.followers_count.get(account.id, 0)
+        following = ctx.following_count.get(account.id, 0)
+        statuses = ctx.statuses_count.get(account.id, 0)
+        last_status = ctx.last_status_at.get(account.id)
+    else:
+        followers = _followers_count(session, account.id)
+        following = _following_count(session, account.id)
+        statuses = _statuses_count(session, account.id)
+        last_status = _last_status_at(session, account.id)
 
     data: dict[str, Any] = {
         "id": sid(account.id),
@@ -90,10 +111,10 @@ def serialize_account(
         "avatar_static": avatar,
         "header": header,
         "header_static": header,
-        "followers_count": _followers_count(session, account.id),
-        "following_count": _following_count(session, account.id),
-        "statuses_count": _statuses_count(session, account.id),
-        "last_status_at": iso(_last_status_at(session, account.id)),
+        "followers_count": followers,
+        "following_count": following,
+        "statuses_count": statuses,
+        "last_status_at": iso(last_status),
         "emojis": [],
         "fields": account.fields or [],
         "indexable": account.indexable,

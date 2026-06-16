@@ -5,9 +5,9 @@
     "medium": { "rows_per_second_min": 30000 }
   },
   "read": {
-    "timeline_home_p95_ms": 600,
-    "account_statuses_p95_ms": 600,
-    "notifications_p95_ms": 400,
-    "status_detail_p95_ms": 300
+    "timeline_home_p95_ms": 150,
+    "account_statuses_p95_ms": 120,
+    "notifications_p95_ms": 150,
+    "status_detail_p95_ms": 150
   }
 }

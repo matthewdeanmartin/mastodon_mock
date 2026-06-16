@@ -29,7 +29,7 @@ from mastodon_mock.serializers.instance import (
     serialize_instance_v2,
     serialize_nodeinfo,
 )
-from mastodon_mock.serializers.statuses import serialize_status
+from mastodon_mock.serializers.statuses import serialize_status_list
 
 router = APIRouter()
 
@@ -295,7 +295,7 @@ def trends_statuses(
         .limit(min(limit, 40))
     )
     statuses = db.scalars(stmt).all()
-    return [serialize_status(db, s, config, account) for s in statuses]
+    return serialize_status_list(db, list(statuses), config, account)
 
 
 @router.get("/api/v1/trends/links")

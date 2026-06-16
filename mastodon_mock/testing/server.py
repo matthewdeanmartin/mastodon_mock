@@ -225,7 +225,7 @@ class MockServer:
 
     def reset(self) -> None:
         """Reset the server to seed state via ``POST /api/v1/_mock/reset``."""
-        import httpx  # lazy
+        import httpx2 as httpx  # lazy; httpx2 is the maintained successor
 
         resp = httpx.post(f"{self.base_url}/api/v1/_mock/reset")
         resp.raise_for_status()

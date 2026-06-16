@@ -70,7 +70,7 @@ State lives in the SQLite database for the lifetime of the server process. Two p
   reset endpoint before each test to drop everything back to the seed:
 
   ```python
-  import httpx
+  import httpx2 as httpx
   httpx.post(f"{server_url}/api/v1/_mock/reset")  # drops + recreates tables, re-seeds
   ```
 

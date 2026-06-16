@@ -24,7 +24,7 @@ from mastodon_mock.routers.tags import featured_tags_for
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
 from mastodon_mock.serializers.relationships import serialize_relationship
-from mastodon_mock.serializers.statuses import serialize_status
+from mastodon_mock.serializers.statuses import serialize_status_list
 from mastodon_mock.services import (
     do_follow,
     do_unfollow,
@@ -229,7 +229,7 @@ def account_statuses(
         limit=params.limit,
     )
     set_link_header(request, response, page)
-    return [serialize_status(db, s, config, viewer) for s in page.items]
+    return serialize_status_list(db, list(page.items), config, viewer)
 
 
 def _filter_account_statuses_visible_to(query: Any, viewer: Account | None) -> Any:

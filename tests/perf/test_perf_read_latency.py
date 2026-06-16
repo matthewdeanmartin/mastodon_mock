@@ -12,7 +12,7 @@ import statistics
 import time
 from collections.abc import Callable
 
-import httpx
+import httpx2 as httpx
 import pytest
 
 from tests.perf.conftest import PerfWorld

@@ -25,7 +25,9 @@ nav:
       - Writing Tests: usage/writing-tests.md
   - Reference:
       - What Is and Isn't Mocked: reference/coverage.md
-  - Contributing: extending/CONTRIBUTING.md
+  - Contributing:
+      - Guide: extending/CONTRIBUTING.md
+      - Performance Design: performance_design.md
   - Change Log: CHANGELOG.md
 validation:
   nav:
