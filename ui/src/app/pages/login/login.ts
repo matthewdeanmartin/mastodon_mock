@@ -23,6 +23,10 @@ export class Login implements OnInit {
   protected devUsers = signal<DevUser[]>([]);
   protected working = signal(false);
 
+  protected preset = signal('small');
+  protected seeding = signal(false);
+  protected seedMessage = signal<string | null>(null);
+
   ngOnInit(): void {
     this.refreshDevUsers();
   }
@@ -58,6 +62,26 @@ export class Login implements OnInit {
         this.refreshDevUsers();
       },
       error: () => this.working.set(false),
+    });
+  }
+
+  /** Bulk-generate a sample cohort, then refresh the dev-user list. */
+  seedSample(): void {
+    this.seeding.set(true);
+    this.seedMessage.set(null);
+    this.api.seedSampleData(this.preset()).subscribe({
+      next: ({ report }) => {
+        this.seeding.set(false);
+        this.seedMessage.set(
+          `Created ${report.accounts.toLocaleString()} accounts, ` +
+            `${report.statuses.toLocaleString()} statuses in ${report.total_seconds.toFixed(2)}s`,
+        );
+        this.refreshDevUsers();
+      },
+      error: (err) => {
+        this.seeding.set(false);
+        this.seedMessage.set(err?.error?.detail ?? 'Seeding failed.');
+      },
     });
   }
 

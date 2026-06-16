@@ -58,6 +58,12 @@ export interface Context {
   descendants: Status[];
 }
 
+export interface StatusSource {
+  id: string;
+  text: string;
+  spoiler_text: string;
+}
+
 export interface Relationship {
   id: string;
   following: boolean;
@@ -98,6 +104,19 @@ export interface DevUser {
   display_name: string;
   role: string;
   access_token: string;
+}
+
+/** Per-phase row counts + timings returned by the sample-data generator. */
+export interface GenerationReport {
+  accounts: number;
+  relationships: number;
+  statuses: number;
+  favourites: number;
+  bookmarks: number;
+  notifications: number;
+  total_rows: number;
+  total_seconds: number;
+  rows_per_second: number;
 }
 
 // --- Admin / moderation entities ---

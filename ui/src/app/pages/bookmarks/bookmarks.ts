@@ -27,4 +27,8 @@ export class Bookmarks implements OnInit {
   onChanged(index: number, updated: Status): void {
     this.statuses.update((list) => list.map((s, i) => (i === index ? updated : s)));
   }
+
+  onDeleted(removed: Status): void {
+    this.statuses.update((list) => list.filter((s) => s.id !== removed.id));
+  }
 }

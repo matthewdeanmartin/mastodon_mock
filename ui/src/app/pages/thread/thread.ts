@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../../api';
 import { Status } from '../../models';
 import { Compose } from '../../compose/compose';
@@ -13,6 +13,7 @@ import { StatusCard } from '../../status-card/status-card';
 export class Thread implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   protected status = signal<Status | null>(null);
   protected ancestors = signal<Status[]>([]);
@@ -42,5 +43,26 @@ export class Thread implements OnInit {
 
   onReply(status: Status): void {
     this.descendants.update((d) => [...d, status]);
+  }
+
+  onChanged(updated: Status): void {
+    this.status.set(updated);
+  }
+
+  onContextChanged(updated: Status): void {
+    const patch = (list: Status[]) => list.map((s) => (s.id === updated.id ? updated : s));
+    this.ancestors.update(patch);
+    this.descendants.update(patch);
+  }
+
+  onContextDeleted(removed: Status): void {
+    const drop = (list: Status[]) => list.filter((s) => s.id !== removed.id);
+    this.ancestors.update(drop);
+    this.descendants.update(drop);
+  }
+
+  /** The focused status was deleted: leave the thread. */
+  onFocusedDeleted(): void {
+    this.router.navigateByUrl('/home');
   }
 }

@@ -302,6 +302,55 @@ def mock_reset(request: Request) -> dict[str, Any]:
     return {"ok": True}
 
 
+# Server-side caps so a browser can't request a "large"/"huge" cohort that wedges the
+# single shared SQLite connection. The "medium" preset (~300k rows, ~3s) is allowed; the
+# CLI is uncapped. See spec/09-sample-data-and-perf.md.
+_SAMPLE_MAX_ACCOUNTS = 2000
+_SAMPLE_MAX_ROWS = 750_000
+
+
+@router.post("/api/v1/_mock/sample_data", status_code=200)
+async def mock_sample_data(request: Request) -> dict[str, Any]:
+    """Mock-only: bulk-generate a throwaway sample cohort into the running DB.
+
+    Body (all optional): a ``preset`` name and/or individual ``SampleDataConfig``
+    fields, merged over the server's configured default profile. Capped so a browser
+    can't request a runaway shape.
+    """
+    from mastodon_mock.config import PRESETS, SampleDataConfig
+    from mastodon_mock.db.sample_data import estimate_rows, generate_sample_data
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+
+    config = request.app.state.config
+    base = config.sample_data
+    preset = body.get("preset")
+    if preset is not None:
+        if preset not in PRESETS:
+            raise HTTPException(status_code=422, detail=f"Unknown preset {preset!r}")
+        base = PRESETS[preset]
+
+    data = base.model_dump()
+    fields = set(SampleDataConfig.model_fields)
+    data.update({k: v for k, v in body.items() if k in fields})
+    cfg = SampleDataConfig.model_validate(data)
+
+    if cfg.accounts > _SAMPLE_MAX_ACCOUNTS or estimate_rows(cfg) > _SAMPLE_MAX_ROWS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Shape too large for the browser endpoint (max {_SAMPLE_MAX_ACCOUNTS} accounts / "
+            f"~{_SAMPLE_MAX_ROWS:,} rows). Use the gen-data CLI for larger cohorts.",
+        )
+
+    report = generate_sample_data(request.app.state.engine, cfg)
+    return {"report": report.to_dict()}
+
+
 def _resolve_app(db: DbSession, client_id: Any) -> OAuthApp | None:
     """Look up an app by client_id, if provided."""
     if not client_id:

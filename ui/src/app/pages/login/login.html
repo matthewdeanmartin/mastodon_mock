@@ -30,6 +30,20 @@
           + Admin user
         </button>
       </div>
+
+      <div class="dev-gen">
+        <select [ngModel]="preset()" (ngModelChange)="preset.set($event)" [disabled]="seeding()">
+          <option value="tiny">tiny (~100 posts)</option>
+          <option value="small">small (~5k posts)</option>
+          <option value="medium">medium (~100k posts)</option>
+        </select>
+        <button class="btn btn-outline" [disabled]="seeding()" (click)="seedSample()">
+          {{ seeding() ? 'Seeding…' : 'Seed sample data' }}
+        </button>
+      </div>
+      @if (seedMessage()) {
+        <p class="muted small">{{ seedMessage() }}</p>
+      }
       @if (devUsers().length) {
         <ul class="dev-list">
           @for (u of devUsers(); track u.id) {

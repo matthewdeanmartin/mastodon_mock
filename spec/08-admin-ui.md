@@ -4,7 +4,8 @@
 > wheel, CI builds it, smoke-tested). The client covers login (paste-token + dev-login
 > helpers), timelines (home/public/local, hashtag, list), compose + reply,
 > boost/favourite/bookmark, threads, profiles, follow/unfollow, notifications, search
-> (accounts/statuses/hashtags), favourites, bookmarks, and lists — including **filing
+> (accounts/statuses/hashtags), favourites, bookmarks, and lists — including **editing
+> and deleting your own posts** (inline editor + delete, owner-only), **filing
 > reports** (from a profile or a status, via a category/comment dialog) and **list
 > management** (create/delete lists, add/remove an account to lists from their profile).
 > The **admin panel**

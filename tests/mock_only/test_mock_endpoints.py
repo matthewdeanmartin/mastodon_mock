@@ -32,6 +32,27 @@ def test_mock_login_unknown_account_404s(live_server: str) -> None:
     assert resp.status_code == 404
 
 
+def test_mock_sample_data_generates_a_cohort(live_server: str) -> None:
+    resp = httpx.post(f"{live_server}/api/v1/_mock/sample_data", json={"preset": "tiny"})
+    assert resp.status_code == 200
+    report = resp.json()["report"]
+    assert report["accounts"] == 10
+    assert report["statuses"] == 100
+    assert report["total_rows"] > 0
+
+    # A generated account is loginable via its issued token (listed by the dev endpoint).
+    users = httpx.get(f"{live_server}/api/v1/_mock/dev_users").json()
+    generated = [u for u in users if u["username"].startswith("gen_")]
+    assert generated
+    client = Mastodon(access_token=generated[0]["access_token"], api_base_url=live_server)
+    assert client.account_verify_credentials().username.startswith("gen_")
+
+
+def test_mock_sample_data_rejects_oversized_shape(live_server: str) -> None:
+    resp = httpx.post(f"{live_server}/api/v1/_mock/sample_data", json={"accounts": 50000})
+    assert resp.status_code == 422
+
+
 def test_mock_reset_restores_seed_state(live_server: str, alice: Mastodon) -> None:
     # Mutate state: post a status.
     posted = alice.status_post("this should disappear after reset")

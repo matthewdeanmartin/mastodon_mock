@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
-import { SearchResults } from '../../models';
+import { SearchResults, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 
 @Component({
@@ -31,5 +31,17 @@ export class Search {
       },
       error: () => this.searching.set(false),
     });
+  }
+
+  onChanged(updated: Status): void {
+    this.results.update((r) =>
+      r ? { ...r, statuses: r.statuses.map((s) => (s.id === updated.id ? updated : s)) } : r,
+    );
+  }
+
+  onDeleted(removed: Status): void {
+    this.results.update((r) =>
+      r ? { ...r, statuses: r.statuses.filter((s) => s.id !== removed.id) } : r,
+    );
   }
 }

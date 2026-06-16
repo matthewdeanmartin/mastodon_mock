@@ -64,6 +64,10 @@ export class Profile implements OnInit {
     this.statuses.update((list) => list.map((s, i) => (i === index ? updated : s)));
   }
 
+  onDeleted(removed: Status): void {
+    this.statuses.update((list) => list.filter((s) => s.id !== removed.id));
+  }
+
   onReported(): void {
     this.showReport.set(false);
     this.reportDone.set(true);

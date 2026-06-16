@@ -5,10 +5,12 @@ import {
   Account,
   Context,
   DevUser,
+  GenerationReport,
   MastodonNotification,
   Relationship,
   SearchResults,
   Status,
+  StatusSource,
   UserList,
 } from './models';
 
@@ -84,6 +86,18 @@ export class Api {
 
   deleteStatus(id: string): Observable<Status> {
     return this.http.delete<Status>(`/api/v1/statuses/${id}`);
+  }
+
+  getStatusSource(id: string): Observable<StatusSource> {
+    return this.http.get<StatusSource>(`/api/v1/statuses/${id}/source`);
+  }
+
+  editStatus(id: string, status: string, spoilerText?: string): Observable<Status> {
+    const body: Record<string, string> = { status };
+    if (spoilerText !== undefined) {
+      body['spoiler_text'] = spoilerText;
+    }
+    return this.http.put<Status>(`/api/v1/statuses/${id}`, body);
   }
 
   favourite(id: string): Observable<Status> {
@@ -189,6 +203,11 @@ export class Api {
 
   listDevUsers(): Observable<DevUser[]> {
     return this.http.get<DevUser[]>('/api/v1/_mock/dev_users');
+  }
+
+  /** Mock-only: bulk-generate a throwaway sample cohort using a named preset. */
+  seedSampleData(preset: string): Observable<{ report: GenerationReport }> {
+    return this.http.post<{ report: GenerationReport }>('/api/v1/_mock/sample_data', { preset });
   }
 
   private pageParams(maxId?: string): HttpParams {

@@ -139,7 +139,7 @@ default-groups = ["dev"]
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
-addopts = "-q --timeout=60 -m 'not integration'"
+addopts = "-q --timeout=60 -m 'not integration and not slow'"
 norecursedirs = ["vendor", "scripts", "dist", "build"]
 markers = [
     "slow: performance benchmarks (run with -m slow)",

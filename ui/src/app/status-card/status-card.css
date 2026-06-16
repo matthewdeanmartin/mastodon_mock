@@ -54,6 +54,25 @@
   word-wrap: break-word;
 }
 
+.editor {
+  margin-top: 4px;
+}
+
+.editor textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .content :is(p) {
   margin: 0 0 6px;
 }

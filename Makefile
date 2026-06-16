@@ -252,6 +252,19 @@ test-ci:
 test-integration:
 	@$(UV) run pytest -q tests/integration -m integration --timeout=60
 
+# ── Performance ──────────────────────────────────────────────────────────────
+# Benchmark suite (spec/09-sample-data-and-perf.md). Opt-in via the `slow` marker.
+
+perf:
+	@$(UV) run pytest -q tests/perf -m slow --timeout=300
+
+perf-baseline:
+	@echo "Re-run perf with PERF_UPDATE_BASELINE=1 and hand-edit tests/perf/baselines.json"
+	@$(UV) run pytest -q tests/perf -m slow --timeout=300 -rA
+
+gen-data-medium:
+	@$(UV) run mastodon_mock gen-data --preset medium --database ./perf.db --yes
+
 test-integration-real:
 	@RUN_REAL_MASTODON_TESTS=1 $(UV) run pytest -q tests/integration -m integration --timeout=60
 

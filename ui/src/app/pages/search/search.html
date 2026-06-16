@@ -33,7 +33,7 @@
   @if (r.statuses.length) {
     <div class="page-head">Posts</div>
     @for (s of r.statuses; track s.id) {
-      <app-status-card [status]="s" />
+      <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
     }
   }
 

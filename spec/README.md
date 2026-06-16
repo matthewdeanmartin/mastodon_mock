@@ -22,6 +22,9 @@ Read [00-overview.md](00-overview.md) first for goals/non-goals, then the rest i
    multi-account scenarios
 9. [08-admin-ui.md](08-admin-ui.md) — **roadmap** for the dogfooding Angular admin
    panel / client UI served at `/_ui/`
+10. [09-sample-data-and-perf.md](09-sample-data-and-perf.md) — high-performance bulk
+    sample-data generator (CLI `gen-data` + `/_mock/sample_data` + UI button) and the
+    performance baseline / regression-guard harness
 
 ## TL;DR for implementers
 

@@ -92,6 +92,39 @@ class SeedConfig(BaseModel):
     statuses: list[SeedStatus] = Field(default_factory=list)
 
 
+class SampleDataConfig(BaseModel):
+    """Shape of a bulk-generated, throwaway sample cohort.
+
+    Unlike :class:`SeedConfig` this is *not* applied at startup; it is the default
+    profile used by the ``gen-data`` CLI command and the ``/_mock/sample_data``
+    endpoint. See spec/09-sample-data-and-perf.md.
+    """
+
+    accounts: int = 100
+    followers_per_account: int = 20
+    statuses_per_account: int = 50
+    reply_ratio: float = 0.2
+    favourites_per_account: int = 10
+    bookmarks_per_account: int = 0
+    with_notifications: bool = False
+    seed: int | None = None
+    chunk_size: int = 5000
+
+
+# Named presets that scale the whole shape together. See spec/09-sample-data-and-perf.md.
+PRESETS: dict[str, SampleDataConfig] = {
+    "tiny": SampleDataConfig(accounts=10, followers_per_account=5, statuses_per_account=10),
+    "small": SampleDataConfig(accounts=100, followers_per_account=20, statuses_per_account=50),
+    "medium": SampleDataConfig(accounts=1000, followers_per_account=100, statuses_per_account=100),
+    "large": SampleDataConfig(
+        accounts=5000, followers_per_account=1000, statuses_per_account=1000, favourites_per_account=50
+    ),
+    "huge": SampleDataConfig(
+        accounts=10000, followers_per_account=1000, statuses_per_account=1000, favourites_per_account=50
+    ),
+}
+
+
 # mock seed token below is not a real credential
 DEFAULT_SEED = SeedConfig(
     accounts=[SeedAccount(username="testuser", display_name="Test User", access_token="mock_token")],  # nosec B106
@@ -112,6 +145,7 @@ class MastodonMockConfig(BaseModel):
     auth: AuthConfig = Field(default_factory=AuthConfig)
     ratelimit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     seed: SeedConfig = Field(default_factory=lambda: DEFAULT_SEED)
+    sample_data: SampleDataConfig = Field(default_factory=SampleDataConfig)
     rules: list[str] = Field(default_factory=list)
 
     @classmethod

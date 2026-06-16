@@ -2,12 +2,12 @@
   <p class="muted center">Loading…</p>
 } @else if (status(); as s) {
   @for (a of ancestors(); track a.id) {
-    <app-status-card [status]="a" />
+    <app-status-card [status]="a" (changed)="onContextChanged($event)" (deleted)="onContextDeleted($event)" />
   }
-  <app-status-card [status]="s" />
+  <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onFocusedDeleted()" />
   <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
   @for (d of descendants(); track d.id) {
-    <app-status-card [status]="d" />
+    <app-status-card [status]="d" (changed)="onContextChanged($event)" (deleted)="onContextDeleted($event)" />
   }
 } @else {
   <p class="muted center">Status not found.</p>

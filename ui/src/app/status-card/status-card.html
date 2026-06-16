@@ -12,12 +12,24 @@
       }}</a>
       <span class="acct muted">&#64;{{ display.account.acct }}</span>
     </div>
-    <a class="content-link" [routerLink]="['/statuses', display.id]">
-      @if (display.spoiler_text) {
-        <div class="spoiler">{{ display.spoiler_text }}</div>
-      }
-      <div class="content" [innerHTML]="display.content"></div>
-    </a>
+    @if (editing()) {
+      <div class="editor">
+        <textarea rows="3" [ngModel]="editText()" (ngModelChange)="editText.set($event)"></textarea>
+        <div class="editor-actions">
+          <button class="btn btn-outline" (click)="cancelEdit()">Cancel</button>
+          <button class="btn" [disabled]="!editText().trim() || saving()" (click)="saveEdit()">
+            {{ saving() ? 'Saving…' : 'Save' }}
+          </button>
+        </div>
+      </div>
+    } @else {
+      <a class="content-link" [routerLink]="['/statuses', display.id]">
+        @if (display.spoiler_text) {
+          <div class="spoiler">{{ display.spoiler_text }}</div>
+        }
+        <div class="content" [innerHTML]="display.content"></div>
+      </a>
+    }
     @if (display.media_attachments.length) {
       <div class="media">
         @for (m of display.media_attachments; track m.id) {
@@ -38,7 +50,10 @@
       <button class="action" [class.on]="display.bookmarked" (click)="toggleBookmark($event)" title="Bookmark">
         🔖
       </button>
-      @if (reported()) {
+      @if (isOwn()) {
+        <button class="action" (click)="startEdit($event)" title="Edit">✏️</button>
+        <button class="action" (click)="remove($event)" title="Delete">🗑️</button>
+      } @else if (reported()) {
         <span class="action reported" title="Reported">🚩 reported</span>
       } @else {
         <button class="action" (click)="openReport($event)" title="Report">🚩</button>

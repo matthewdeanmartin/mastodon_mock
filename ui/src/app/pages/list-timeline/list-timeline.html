@@ -6,6 +6,6 @@
   <p class="muted center">No statuses in this list yet.</p>
 } @else {
   @for (s of statuses(); track s.id; let i = $index) {
-    <app-status-card [status]="s" (changed)="onChanged(i, $event)" />
+    <app-status-card [status]="s" (changed)="onChanged(i, $event)" (deleted)="onDeleted($event)" />
   }
 }
