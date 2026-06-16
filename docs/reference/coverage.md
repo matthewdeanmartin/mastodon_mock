@@ -63,6 +63,8 @@ relationships, notifications, and pagination you'd expect.
   resolve / reopen), and CRUD for domain blocks, domain allows, email-domain blocks,
   canonical-email blocks, and IP blocks. **Auth is faked — there is no role enforcement** (any
   authenticated account may call these), consistent with the "no real security" non-goal.
+- **Mock-only development helpers** — reset the database to seed state, mint tokens for
+  seeded users, create/list dev users, and append capped sample-data cohorts.
 
 ## Static (correct shape, fixed values)
 
@@ -127,6 +129,8 @@ Whole modules and a few endpoints are intentionally absent. Calling them raises
   you seed them with a `domain`.
 - **Pagination is real.** List endpoints honour `max_id` / `min_id` / `since_id` / `limit`
   and emit a `Link` header, so Mastodon.py's `fetch_next` / `fetch_previous` work.
+- **The bundled UI is a client of the same API.** It is served at `/_ui/` when built and
+  uses the mock-only dev helpers plus regular Mastodon/admin endpoints.
 
 When in doubt, the [coverage spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/03-api-coverage.md)
 lists every route and the

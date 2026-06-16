@@ -132,6 +132,8 @@ HTTP response (JSON, with Link header for paginated lists)
 - **`db/seed.py`** — `apply_seed_data()`, idempotent (matches accounts on `username`), turns
   the seed config into rows including the fixed `oauth_tokens` rows that make pre-seeded
   access tokens work.
+- **`db/sample_data.py`** — fast, append-only bulk generation for throwaway local cohorts.
+  It pre-allocates IDs, inserts in chunks, and temporarily applies SQLite bulk-load PRAGMAs.
 - **`deps.py`** — FastAPI dependencies: `get_db()`, `get_current_token()`,
   `get_current_account()`, and the `RequiredAccount` dependency that raises `401` when a
   write endpoint has no authenticated user.
@@ -143,6 +145,8 @@ HTTP response (JSON, with Link header for paginated lists)
 - **`pagination.py`** — the shared `paginate(...)` helper that applies
   `max_id`/`min_id`/`since_id`/`limit` and produces the `Link` header that Mastodon.py's
   `PaginatableList` reads.
+- **`ui.py`** — mounts the built Angular single-page app at `/_ui/` when the bundle exists.
+  Missing UI assets do not stop the API server from starting.
 - **`ids.py`** — monotonic, stringified-int IDs (Mastodon IDs are strings of snowflake-ish
   integers).
 
@@ -194,6 +198,10 @@ several clients logged in as different accounts interacting with shared state.
 
 There is also a clearly-named **mock-only** shortcut, `POST /api/v1/_mock/login` with
 `{"username": "alice"}`, which mints a fresh user token for a seeded account.
+
+For interactive development, `POST /api/v1/_mock/dev_user` creates a new local user plus a
+token, and `GET /api/v1/_mock/dev_users` lists tokened local accounts for the UI login
+screen. These endpoints are intentionally mock-only.
 
 ### What the grant types do
 

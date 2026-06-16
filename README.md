@@ -5,12 +5,22 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/mastodon_mock.svg)](https://pypi.org/project/mastodon_mock/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/LICENSE)
 
-`mastodon_mock` is a stateful, in-process mock of the Mastodon REST API. It runs a real
-FastAPI server backed by a minimal in-memory (or on-disk) SQLite database, so client code
-— including [Mastodon.py](https://github.com/halcy/Mastodon.py) — can post statuses, follow
-accounts, build timelines, manage lists and filters, and exercise OAuth flows against a
-fast, deterministic, side-effect-free target. It is intended for testing and local
-development where talking to a live Mastodon instance is slow, flaky, or undesirable.
+`mastodon_mock` is a stateful, local Mastodon REST API for tests and development. It runs a
+real FastAPI server backed by in-memory or file-backed SQLite, so client code can post
+statuses, follow accounts, build timelines, manage lists and filters, file reports, and
+exercise OAuth/admin flows without touching a live instance.
+
+Use it when you want the confidence of real HTTP and persisted state, without flaky
+network tests, rate limits, public test posts, or hand-written response mocks.
+
+Highlights:
+
+- Real Mastodon-shaped HTTP API, tested against [Mastodon.py](https://github.com/halcy/Mastodon.py).
+- Fast disposable SQLite state, with deterministic seed data and reset support.
+- Pytest fixtures, a context manager, and decorator sugar for zero-boilerplate tests.
+- Bulk sample-data generation for demos, UI work, and performance checks.
+- Bundled web client and admin UI at `/_ui/` when the package includes the built frontend.
+- Admin/moderation endpoints for account actions, reports, domain blocks, email blocks, and IP blocks.
 
 ## Installation
 
@@ -32,54 +42,28 @@ Run the mock server:
 mastodon_mock serve --in-memory
 ```
 
-Useful flags:
-
-- `serve --config PATH` — load configuration from a `.mastodon_mock.toml` file.
-- `serve --host HOST --port PORT` — override the bind address.
-- `serve --in-memory` — force an ephemeral in-memory SQLite database.
-- `db upgrade` — run Alembic migrations to bring an on-disk database to head.
-
-Point a client at it (for example, with Mastodon.py):
+Point a client at it:
 
 ```python
 from mastodon import Mastodon
 
-client = Mastodon(access_token="alice_token", api_base_url="http://127.0.0.1:8000")
+client = Mastodon(access_token="mock_token", api_base_url="http://127.0.0.1:3000")
 client.status_post("hello from a mock!")
 ```
 
-See `mastodon_mock --help` for the full command reference.
+Open `http://127.0.0.1:3000/_ui/` for the bundled browser UI when it is available.
 
-## Admin panel / web UI
+For a populated local instance, generate a throwaway cohort into a SQLite file and point
+your config's `[database].path` at it:
 
-`mastodon_mock` ships an Angular single-page app — a classic single-column Mastodon
-client and admin panel — that drives its own REST API from the browser (dogfooding the
-feature surface). When the server is running, open it at:
-
-```
-http://127.0.0.1:8000/_ui/
+```bash
+mastodon_mock gen-data --preset small --database ./mastodon_mock.sqlite --yes
 ```
 
-Sign in by pasting a seeded `access_token` (e.g. `mock_token`, or whatever you
-configured under `[[tool.mastodon_mock.seed.accounts]]`) — or use the **Dev login**
-panel to generate a regular/admin user (and click any existing account) to autofill the
-token. The UI covers timelines (home/public/local, hashtag, list), posting/replies,
-boosts/favourites/bookmarks, threads, profiles, follows, notifications, search,
-favourites, bookmarks, and lists. Signing in as an admin (use the **+ Admin user**
-button) reveals an **Admin** section for account moderation, the report queue, and
-domain blocks. `GET /` advertises the UI via a `"ui": "/_ui/"` pointer when it is built.
+## Documentation
 
-The UI is prebuilt into the published wheel, so installed copies serve it with no extra
-steps. Working from a source checkout, build it once with `make ui` (requires Node 22+);
-the server runs fine without it and simply omits the `/_ui/` mount. See
-[spec/08-admin-ui.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/08-admin-ui.md)
-for the build/packaging details. `make ui-dev` runs the Angular dev server.
-
-## Configuration
-
-Configuration is resolved in this order: an explicit `--config` path (or
-`./.mastodon_mock.toml`), then a `[tool.mastodon_mock]` table in `./pyproject.toml`,
-then built-in defaults. See [https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/overview/README.md](docs/overview/README.md) for details.
+See the [documentation](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/index.md)
+for configuration, fixtures, endpoint coverage, data generation, and admin UI/API details.
 
 ## Contributing
 
@@ -87,9 +71,8 @@ See [CONTRIBUTING.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/ma
 
 ## License
 
-MIT — see [LICENSE](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/LICENSE).
+MIT. See [LICENSE](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/LICENSE).
 
 ## Changelog
 
-docs/overview/README.md
 See [CHANGELOG.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/CHANGELOG.md).

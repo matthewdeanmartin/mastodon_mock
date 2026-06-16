@@ -24,6 +24,10 @@ The mock implements the high-traffic surface of the Mastodon API, including:
   timelines, with cursor pagination and `Link` headers.
 - **Lists, filters (v1 + v2), notifications (incl. grouped), conversations, media, and
   instance metadata.**
+- **Admin and moderation** - reports, admin account filters/actions, domain allows/blocks,
+  email and IP blocks, plus shaped analytics/trends stubs.
+- **Local development helpers** - a bundled UI, dev-user token helpers, reset endpoint, and
+  bulk sample-data generation.
 
 ## How configuration is resolved
 
@@ -34,13 +38,16 @@ The mock implements the high-traffic surface of the Mastodon API, including:
 1. Built-in defaults (an in-memory database seeded with a single `testuser` account).
 
 Configuration controls the mocked Mastodon version, instance domain/title/description,
-database path, server bind address, rate-limit behaviour, and the seed data (accounts,
-follows) created on startup.
+database path, server bind address, rate-limit behaviour, startup seed data, and the
+default shape used by sample-data generation.
 
 ## Running
 
 ```bash
 mastodon_mock serve --in-memory
 ```
+
+Open `http://127.0.0.1:3000/_ui/` for the bundled browser UI when the package includes a
+built UI bundle.
 
 See the [top-level README](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/README.md) for installation and the full CLI reference.

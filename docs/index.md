@@ -5,9 +5,10 @@
 [FastAPI](https://fastapi.tiangolo.com/) server backed by a minimal in-memory (or on-disk)
 SQLite database, so client code — including
 [Mastodon.py](https://github.com/halcy/Mastodon.py) — can post statuses, follow accounts,
-build timelines, manage lists and filters, and exercise OAuth flows against a fast,
-deterministic, side-effect-free target. It is intended for testing and local development
-where talking to a live Mastodon instance is slow, flaky, or undesirable.
+build timelines, manage lists and filters, file reports, exercise admin moderation flows,
+and drive OAuth paths against a fast, deterministic, side-effect-free target. It is
+intended for testing and local development where talking to a live Mastodon instance is
+slow, flaky, or undesirable.
 
 ## Why it exists
 
@@ -43,6 +44,9 @@ def test_follow(mastodon_mock_server):          # a fresh mock per test
 See **[Writing Tests](usage/writing-tests.md)** for the fixtures, the `mock_mastodon`
 context manager / decorator, and seed customisation.
 
+For local development and demos, the bundled UI at `/_ui/` can create dev users, generate
+sample data, browse timelines, and exercise admin account/report/domain-block flows.
+
 ## Where to go next
 
 - **[Overview](overview/README.md)** — what the mock covers and how config is resolved.
@@ -52,6 +56,10 @@ context manager / decorator, and seed customisation.
 - **[Quick Start](usage/quickstart.md)** — run the server and talk to it.
 - **[Writing Tests](usage/writing-tests.md)** — pytest fixtures, examples, and the dual
   mock/real suite pattern.
+- **[Data Generation](usage/data-generation.md)** — seed config, bulk sample data, and
+  mock-only reset/sample endpoints.
+- **[Admin UI and API](usage/admin-ui.md)** — bundled UI, dev-login helpers, and moderation
+  endpoint support.
 - **[What Is and Isn't Mocked](reference/coverage.md)** — coverage levels per API area.
 - **[Contributing](extending/CONTRIBUTING.md)** — architecture and how to add an endpoint.
 

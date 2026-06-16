@@ -23,6 +23,8 @@ nav:
   - Usage:
       - Quick Start: usage/quickstart.md
       - Writing Tests: usage/writing-tests.md
+      - Data Generation: usage/data-generation.md
+      - Admin UI and API: usage/admin-ui.md
   - Reference:
       - What Is and Isn't Mocked: reference/coverage.md
   - Contributing:

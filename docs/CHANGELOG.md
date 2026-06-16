@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bundled Angular UI served at `/_ui/` when built, including timeline browsing, token-based
+  login, dev-user helpers, sample-data seeding, and admin account/report/domain-block views.
+- Bulk sample-data generation through `mastodon_mock gen-data` and
+  `POST /api/v1/_mock/sample_data`, with presets and JSON generation reports.
+- Admin / moderation API coverage for accounts, reports, domain blocks/allows,
+  email-domain blocks, canonical-email blocks, IP blocks, plus shaped admin
+  trends/measures/dimensions/retention responses.
 - Initial release of `mastodon_mock`, a stateful FastAPI + SQLite mock of the Mastodon
   REST API, driveable by real clients including Mastodon.py.
 - Auth & apps: app registration, `client_credentials` and `refresh_token` OAuth grants,
