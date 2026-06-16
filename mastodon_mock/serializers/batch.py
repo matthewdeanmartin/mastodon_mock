@@ -125,9 +125,7 @@ def _load_viewer_flags(session: Session, status_ids: list[int], viewer_id: int, 
     """favourited/bookmarked/muted/pinned/reblogged for the viewer, as sets."""
     ctx.favourited.update(
         session.scalars(
-            select(Favourite.status_id).where(
-                Favourite.account_id == viewer_id, Favourite.status_id.in_(status_ids)
-            )
+            select(Favourite.status_id).where(Favourite.account_id == viewer_id, Favourite.status_id.in_(status_ids))
         ).all()
     )
     ctx.bookmarked.update(
@@ -137,23 +135,17 @@ def _load_viewer_flags(session: Session, status_ids: list[int], viewer_id: int, 
     )
     ctx.muted.update(
         session.scalars(
-            select(StatusMute.status_id).where(
-                StatusMute.account_id == viewer_id, StatusMute.status_id.in_(status_ids)
-            )
+            select(StatusMute.status_id).where(StatusMute.account_id == viewer_id, StatusMute.status_id.in_(status_ids))
         ).all()
     )
     ctx.pinned.update(
-        session.scalars(
-            select(Pin.status_id).where(Pin.account_id == viewer_id, Pin.status_id.in_(status_ids))
-        ).all()
+        session.scalars(select(Pin.status_id).where(Pin.account_id == viewer_id, Pin.status_id.in_(status_ids))).all()
     )
     ctx.reblogged.update(
         [
             rid
             for rid in session.scalars(
-                select(Status.reblog_of_id).where(
-                    Status.account_id == viewer_id, Status.reblog_of_id.in_(status_ids)
-                )
+                select(Status.reblog_of_id).where(Status.account_id == viewer_id, Status.reblog_of_id.in_(status_ids))
             ).all()
             if rid is not None
         ]
@@ -181,9 +173,7 @@ def _load_tags(session: Session, status_ids: list[int], ctx: BatchContext) -> No
 
 def _load_media(session: Session, status_ids: list[int], ctx: BatchContext) -> None:
     """All media attachments per status."""
-    rows = session.scalars(
-        select(MediaAttachment).where(MediaAttachment.status_id.in_(status_ids))
-    ).all()
+    rows = session.scalars(select(MediaAttachment).where(MediaAttachment.status_id.in_(status_ids))).all()
     for media in rows:
         if media.status_id is not None:
             ctx.media.setdefault(media.status_id, []).append(media)

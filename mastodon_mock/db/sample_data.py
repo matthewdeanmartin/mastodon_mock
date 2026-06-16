@@ -55,12 +55,7 @@ class GenerationReport:
     def total_rows(self) -> int:
         """Total inserted rows across all phases."""
         return (
-            self.accounts
-            + self.relationships
-            + self.statuses
-            + self.favourites
-            + self.bookmarks
-            + self.notifications
+            self.accounts + self.relationships + self.statuses + self.favourites + self.bookmarks + self.notifications
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -116,9 +111,7 @@ def generate_sample_data(engine: Engine, cfg: SampleDataConfig) -> GenerationRep
 # --- phases -----------------------------------------------------------------------
 
 
-def _gen_accounts(
-    session: Session, cfg: SampleDataConfig, rng: random.Random, report: GenerationReport
-) -> list[int]:
+def _gen_accounts(session: Session, cfg: SampleDataConfig, rng: random.Random, report: GenerationReport) -> list[int]:
     """Bulk-insert accounts + a capped set of loginable tokens. Returns the new IDs."""
     t0 = time.perf_counter()
     now = utcnow()
@@ -332,9 +325,7 @@ def _gen_pairs(
 # --- helpers ----------------------------------------------------------------------
 
 
-def _rel_row(
-    source_id: int, target_id: int, *, following: bool = False, followed_by: bool = False
-) -> dict[str, Any]:
+def _rel_row(source_id: int, target_id: int, *, following: bool = False, followed_by: bool = False) -> dict[str, Any]:
     """Build a relationships insert row with the default flag set."""
     return {
         "id": next_id(),

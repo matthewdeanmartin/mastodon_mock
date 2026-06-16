@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from mastodon_mock.config import MastodonMockConfig, SeedConfig, SeedAccount
+
+from mastodon_mock.config import MastodonMockConfig, SeedAccount, SeedConfig
 from mastodon_mock.testing.server import MockServer
 from mastodon_mock.testing.sugar import mock_mastodon
 
@@ -30,7 +31,6 @@ def test_mock_server_resolve_token_no_accounts() -> None:
     server = MockServer(config=config)
     with pytest.raises(LookupError, match=r"No seeded account has an access_token to log in with."):
         server._resolve_token(None)
-
 
 
 def test_mock_server_resolve_token_missing_username() -> None:

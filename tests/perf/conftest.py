@@ -49,10 +49,7 @@ def perf_world() -> Iterator[PerfWorld]:
     with app.state.session_factory() as session:
         token = session.scalar(select(OAuthToken.access_token).order_by(OAuthToken.id))
         busy = session.execute(
-            select(Status.account_id, func.count())
-            .group_by(Status.account_id)
-            .order_by(func.count().desc())
-            .limit(1)
+            select(Status.account_id, func.count()).group_by(Status.account_id).order_by(func.count().desc()).limit(1)
         ).first()
         assert token and busy is not None
         busy_id = str(busy[0])
