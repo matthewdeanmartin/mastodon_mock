@@ -1,0 +1,43 @@
+@if (boostedBy) {
+  <div class="boost-label muted">🔁 {{ boostedBy }} boosted</div>
+}
+<article class="status">
+  <a class="avatar-link" [routerLink]="['/accounts', display.account.id]">
+    <img class="avatar" [src]="display.account.avatar" [alt]="display.account.username" />
+  </a>
+  <div class="body">
+    <div class="meta">
+      <a class="name" [routerLink]="['/accounts', display.account.id]">{{
+        display.account.display_name || display.account.username
+      }}</a>
+      <span class="acct muted">&#64;{{ display.account.acct }}</span>
+    </div>
+    <a class="content-link" [routerLink]="['/statuses', display.id]">
+      @if (display.spoiler_text) {
+        <div class="spoiler">{{ display.spoiler_text }}</div>
+      }
+      <div class="content" [innerHTML]="display.content"></div>
+    </a>
+    @if (display.media_attachments.length) {
+      <div class="media">
+        @for (m of display.media_attachments; track m.id) {
+          <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+        }
+      </div>
+    }
+    <div class="actions">
+      <button class="action" (click)="$event.stopPropagation()" title="Reply">
+        💬 <span>{{ display.replies_count }}</span>
+      </button>
+      <button class="action" [class.on]="display.reblogged" (click)="toggleReblog($event)" title="Boost">
+        🔁 <span>{{ display.reblogs_count }}</span>
+      </button>
+      <button class="action" [class.on]="display.favourited" (click)="toggleFavourite($event)" title="Favourite">
+        ⭐ <span>{{ display.favourites_count }}</span>
+      </button>
+      <button class="action" [class.on]="display.bookmarked" (click)="toggleBookmark($event)" title="Bookmark">
+        🔖
+      </button>
+    </div>
+  </div>
+</article>

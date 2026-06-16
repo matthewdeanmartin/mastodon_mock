@@ -1,0 +1,14 @@
+<div class="compose">
+  <textarea
+    [ngModel]="text()"
+    (ngModelChange)="text.set($event)"
+    [placeholder]="placeholder()"
+    rows="3"
+  ></textarea>
+  <div class="compose-actions">
+    <span class="muted">{{ text().length }}</span>
+    <button class="btn" [disabled]="!text().trim() || submitting()" (click)="submit()">
+      {{ inReplyToId() ? 'Reply' : 'Post' }}
+    </button>
+  </div>
+</div>

@@ -1,0 +1,19 @@
+.notif {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.who {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.what {
+  margin-left: 4px;
+}
+
+.excerpt {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}

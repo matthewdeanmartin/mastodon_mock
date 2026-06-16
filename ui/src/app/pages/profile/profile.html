@@ -1,0 +1,31 @@
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (account(); as a) {
+  <header class="profile-header">
+    <div class="header-banner" [style.background-image]="a.header ? 'url(' + a.header + ')' : ''"></div>
+    <div class="profile-top">
+      <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+      @if (!isSelf()) {
+        <button class="btn" [class.btn-outline]="relationship()?.following" (click)="toggleFollow()">
+          {{ relationship()?.following ? 'Following' : 'Follow' }}
+        </button>
+      }
+    </div>
+    <h2>{{ a.display_name || a.username }}</h2>
+    <div class="acct muted">&#64;{{ a.acct }}</div>
+    @if (a.note) {
+      <div class="note" [innerHTML]="a.note"></div>
+    }
+    <div class="stats muted">
+      <span><strong>{{ a.statuses_count }}</strong> posts</span>
+      <span><strong>{{ a.following_count }}</strong> following</span>
+      <span><strong>{{ a.followers_count }}</strong> followers</span>
+    </div>
+  </header>
+
+  @for (s of statuses(); track s.id; let i = $index) {
+    <app-status-card [status]="s" (changed)="onChanged(i, $event)" />
+  }
+} @else {
+  <p class="muted center">Account not found.</p>
+}

@@ -50,6 +50,27 @@ client.status_post("hello from a mock!")
 
 See `mastodon_mock --help` for the full command reference.
 
+## Admin panel / web UI
+
+`mastodon_mock` ships an Angular single-page app — a classic single-column Mastodon
+client and admin panel — that drives its own REST API from the browser (dogfooding the
+feature surface). When the server is running, open it at:
+
+```
+http://127.0.0.1:8000/_ui/
+```
+
+Sign in by pasting a seeded `access_token` (e.g. `mock_token`, or whatever you
+configured under `[[tool.mastodon_mock.seed.accounts]]`). The UI covers timelines,
+posting/replies, boosts/favourites/bookmarks, threads, profiles, follows, and
+notifications. `GET /` advertises the UI via a `"ui": "/_ui/"` pointer when it is built.
+
+The UI is prebuilt into the published wheel, so installed copies serve it with no extra
+steps. Working from a source checkout, build it once with `make ui` (requires Node 22+);
+the server runs fine without it and simply omits the `/_ui/` mount. See
+[spec/08-admin-ui.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/08-admin-ui.md)
+for the build/packaging details. `make ui-dev` runs the Angular dev server.
+
 ## Configuration
 
 Configuration is resolved in this order: an explicit `--config` path (or

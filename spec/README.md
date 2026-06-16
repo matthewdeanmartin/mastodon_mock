@@ -20,6 +20,8 @@ Read [00-overview.md](00-overview.md) first for goals/non-goals, then the rest i
    mock/real test suite in a consuming project
 8. [07-seeding-and-fixtures.md](07-seeding-and-fixtures.md) — seed config for
    multi-account scenarios
+9. [08-admin-ui.md](08-admin-ui.md) — **roadmap** for the dogfooding Angular admin
+   panel / client UI served at `/_ui/`
 
 ## TL;DR for implementers
 

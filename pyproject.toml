@@ -63,9 +63,21 @@ include = [
     "/README.md",
     "LICENSE",
 ]
+# The built Angular UI lives under a git-ignored directory; `artifacts` forces it into
+# the wheel anyway (plain `include` would skip VCS-ignored files). Produced by the build
+# hook below (or `make ui` locally). See spec/08-admin-ui.md.
+artifacts = [
+    "mastodon_mock/_ui_dist/**",
+]
+
+# Build the Angular UI before assembling the wheel, so the bundle in _ui_dist/ is
+# fresh and shipped. Requires Node + npm in the build environment. See hatch_build.py.
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["/README.md", "LICENSE", "/mastodon_mock", "/tests"]
+include = ["/README.md", "LICENSE", "/mastodon_mock", "/tests", "/ui", "/hatch_build.py"]
+exclude = ["mastodon_mock/_ui_dist", "ui/node_modules", "ui/.angular"]
 
 [dependency-groups]
 dev = [

@@ -32,6 +32,7 @@ from mastodon_mock.routers import (
     tags,
     timelines,
 )
+from mastodon_mock.ui import mount_ui
 
 
 def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
@@ -76,9 +77,14 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
 
     app.mount("/media", StaticFiles(directory=media_path), name="media")
 
+    ui_available = mount_ui(app)
+
     @app.get("/")
     def root() -> JSONResponse:
         """Trivial health/identity endpoint."""
-        return JSONResponse({"mastodon_mock": True, "version": config.mocked_version})
+        body: dict[str, object] = {"mastodon_mock": True, "version": config.mocked_version}
+        if ui_available:
+            body["ui"] = "/_ui/"
+        return JSONResponse(body)
 
     return app

@@ -1,0 +1,40 @@
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  background: var(--col-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  width: 360px;
+  max-width: 90vw;
+}
+
+h1 {
+  color: var(--accent);
+  margin: 0 0 4px;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 16px 0 8px;
+  font-size: 15px;
+}
+
+.error {
+  color: #e0245e;
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.btn {
+  width: 100%;
+  padding: 10px;
+}

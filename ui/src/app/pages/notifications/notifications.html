@@ -1,0 +1,17 @@
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!items().length) {
+  <p class="muted center">No notifications yet.</p>
+} @else {
+  @for (n of items(); track n.id) {
+    <div class="notif">
+      <a class="who" [routerLink]="['/accounts', n.account.id]">{{
+        n.account.display_name || n.account.username
+      }}</a>
+      <span class="what muted">{{ label(n.type) }}</span>
+      @if (n.status) {
+        <a class="excerpt" [routerLink]="['/statuses', n.status.id]" [innerHTML]="n.status.content"></a>
+      }
+    </div>
+  }
+}

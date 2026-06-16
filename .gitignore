@@ -75,3 +75,11 @@ mastodon_mock.db
 
 # Vendored reference copy of Mastodon.py (not a build dependency; installed from PyPI)
 /Mastodon.py/
+
+# Built Angular admin panel / client UI (generated; shipped in the wheel via build hook)
+mastodon_mock/_ui_dist/
+
+# Angular UI working directories
+ui/node_modules/
+ui/.angular/
+ui/dist/

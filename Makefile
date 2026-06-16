@@ -31,6 +31,7 @@ DOCS_CHANGELOG := docs/CHANGELOG.md
 	metadata metadata-check version-check dev-status \
 	gha-validate gha-pin gha-upgrade publish-gha \
 	prerelease publish-check publish \
+	ui ui-dev \
 	check check-ci \
 	help
 
@@ -317,6 +318,13 @@ publish-gha:
 	gh workflow run publish_to_pypi.yml --ref main
 
 # ── Release gates ─────────────────────────────────────────────────────────────
+
+ui:
+	@echo "Building Angular admin panel / client UI -> mastodon_mock/_ui_dist"
+	@cd ui && npm ci && npm run build
+
+ui-dev:
+	@cd ui && npm start
 
 publish-check:
 	@$(UV) build

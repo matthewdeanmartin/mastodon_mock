@@ -1,0 +1,51 @@
+.profile-header {
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-banner {
+  height: 150px;
+  margin: 0 -16px;
+  background: var(--border);
+  background-size: cover;
+  background-position: center;
+}
+
+.profile-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: -40px;
+}
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 9999px;
+  border: 4px solid var(--col-bg);
+  background: var(--border);
+  object-fit: cover;
+}
+
+h2 {
+  margin: 8px 0 0;
+}
+
+.acct {
+  font-size: 14px;
+}
+
+.note {
+  margin-top: 8px;
+}
+
+.stats {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.stats strong {
+  color: var(--text);
+}

@@ -1,0 +1,20 @@
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">mastodon_mock</span>
+    <nav>
+      <a routerLink="/home" routerLinkActive="active">Home</a>
+      <a routerLink="/public" routerLinkActive="active">Public</a>
+      <a routerLink="/notifications" routerLinkActive="active">Notifications</a>
+    </nav>
+    <div class="account">
+      @if (auth.account(); as acc) {
+        <a [routerLink]="['/accounts', acc.id]">{{ acc.display_name }}</a>
+      }
+      <button class="btn btn-outline" (click)="logout()">Log out</button>
+    </div>
+  </div>
+</header>
+
+<main class="column">
+  <router-outlet />
+</main>

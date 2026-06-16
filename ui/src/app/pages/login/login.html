@@ -1,0 +1,20 @@
+<div class="login-wrap">
+  <div class="login-card">
+    <h1>mastodon_mock</h1>
+    <p class="muted">Paste a seeded access token to sign in.</p>
+    <input
+      type="text"
+      [ngModel]="token()"
+      (ngModelChange)="token.set($event)"
+      (keyup.enter)="submit()"
+      placeholder="access token"
+      autofocus
+    />
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+    <button class="btn" [disabled]="!token().trim() || checking()" (click)="submit()">
+      {{ checking() ? 'Checking…' : 'Sign in' }}
+    </button>
+  </div>
+</div>
