@@ -29,4 +29,5 @@ __dependencies__ = [
     "alembic>=1.13.0",
     "pydantic>=2.0.0",
     "python-multipart>=0.0.9",
+    "orjson>=3.10.0",
 ]
