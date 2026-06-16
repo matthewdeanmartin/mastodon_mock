@@ -24,7 +24,7 @@ def test_default_server_and_client_fixtures_are_usable(pytester: pytest.Pytester
             assert account.acct == "alice"
         """)
 
-    result = pytester.runpytest("-q")
+    result = pytester.runpytest("-q", "-p", "no:sugar")
 
     result.assert_outcomes(passed=2)
 
@@ -58,7 +58,7 @@ def test_project_can_override_default_config_fixture(pytester: pytest.Pytester) 
             assert account.display_name == "Fixture User"
         """)
 
-    result = pytester.runpytest("-q")
+    result = pytester.runpytest("-q", "-p", "no:sugar")
 
     result.assert_outcomes(passed=1)
 
@@ -104,7 +104,7 @@ def test_marker_seed_takes_precedence_over_project_config_fixture(pytester: pyte
             assert account.display_name == "Marker User"
         """)
 
-    result = pytester.runpytest("-q")
+    result = pytester.runpytest("-q", "-p", "no:sugar")
 
     result.assert_outcomes(passed=1)
 
@@ -134,7 +134,7 @@ def test_marker_config_can_override_one_test_without_leaking(pytester: pytest.Py
             assert mastodon_mock_client.account_verify_credentials().username == "alice"
         """)
 
-    result = pytester.runpytest("-q")
+    result = pytester.runpytest("-q", "-p", "no:sugar")
 
     result.assert_outcomes(passed=2)
 
@@ -154,6 +154,6 @@ def test_session_reset_fixture_restores_seed_state_between_tests(pytester: pytes
             assert all(status.content != "<p>temporary session state</p>" for status in statuses)
         """)
 
-    result = pytester.runpytest("-q")
+    result = pytester.runpytest("-q", "-p", "no:sugar")
 
     result.assert_outcomes(passed=2)

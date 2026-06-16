@@ -118,7 +118,6 @@ def serialize_status(
         raise RuntimeError(f"Account {status.account_id} not found for status {status.id}")
     acct = account_acct(account.username, account.domain)
     # ctx describes only this page; nested reblog/quote rows query for themselves.
-    batched = ctx is not None
 
     reblog_data = None
     if status.reblog_of_id is not None and _depth == 0:
@@ -126,8 +125,7 @@ def serialize_status(
         if original is not None:
             reblog_data = serialize_status(session, original, config, viewer, _depth=_depth + 1)
 
-    if batched:
-        assert ctx is not None
+    if ctx is not None:
         media = ctx.media.get(status.id, [])
     else:
         media = list(
@@ -160,8 +158,7 @@ def serialize_status(
             }
 
     favourited = reblogged = bookmarked = muted = pinned = False
-    if viewer is not None and batched:
-        assert ctx is not None
+    if viewer is not None and ctx is not None:
         favourited = status.id in ctx.favourited
         bookmarked = status.id in ctx.bookmarked
         muted = status.id in ctx.muted
@@ -181,8 +178,7 @@ def serialize_status(
             or 0
         ) > 0
 
-    if batched:
-        assert ctx is not None
+    if ctx is not None:
         reblogs_count = ctx.reblogs_count.get(status.id, 0)
         favourites_count = ctx.favourites_count.get(status.id, 0)
         replies_count = ctx.replies_count.get(status.id, 0)

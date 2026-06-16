@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -35,6 +37,14 @@ from mastodon_mock.routers import (
 from mastodon_mock.ui import mount_ui
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Dispose of the engine on shutdown to clear connection pool."""
+    yield
+    if hasattr(app.state, "engine"):
+        app.state.engine.dispose()
+
+
 def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     """Create and configure the FastAPI app for the given config."""
     config = config or MastodonMockConfig.load()
@@ -46,7 +56,7 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     media_path = config.media_storage_path or tempfile.mkdtemp(prefix="mastodon_mock_media_")
     Path(media_path).mkdir(parents=True, exist_ok=True)
 
-    app = FastAPI(title="mastodon_mock", version=config.mocked_version)
+    app = FastAPI(title="mastodon_mock", version=config.mocked_version, lifespan=lifespan)
     app.state.config = config
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)

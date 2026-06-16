@@ -13,6 +13,7 @@ import secrets
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Any
 
 from sqlalchemy import Engine, insert
 from sqlalchemy.orm import Session
@@ -53,7 +54,14 @@ class GenerationReport:
     @property
     def total_rows(self) -> int:
         """Total inserted rows across all phases."""
-        return self.accounts + self.relationships + self.statuses + self.favourites + self.bookmarks + self.notifications
+        return (
+            self.accounts
+            + self.relationships
+            + self.statuses
+            + self.favourites
+            + self.bookmarks
+            + self.notifications
+        )
 
     def to_dict(self) -> dict[str, object]:
         """JSON-serializable view (used by the CLI ``--json`` and the mock endpoint)."""
@@ -88,7 +96,7 @@ def estimate_rows(cfg: SampleDataConfig) -> int:
 
 def generate_sample_data(engine: Engine, cfg: SampleDataConfig) -> GenerationReport:
     """Generate and bulk-insert one sample cohort. Appends; not idempotent."""
-    rng = random.Random(cfg.seed)
+    rng = random.Random(cfg.seed)  # nosec B311
     report = GenerationReport()
     start = time.perf_counter()
 
@@ -117,7 +125,7 @@ def _gen_accounts(
     suffix = secrets.token_hex(2)
     account_ids = [next_id() for _ in range(cfg.accounts)]
 
-    accounts = [
+    accounts: list[dict[str, Any]] = [
         {
             "id": aid,
             "username": f"gen_{suffix}_{i}",
@@ -324,7 +332,9 @@ def _gen_pairs(
 # --- helpers ----------------------------------------------------------------------
 
 
-def _rel_row(source_id: int, target_id: int, *, following: bool = False, followed_by: bool = False) -> dict[str, object]:
+def _rel_row(
+    source_id: int, target_id: int, *, following: bool = False, followed_by: bool = False
+) -> dict[str, Any]:
     """Build a relationships insert row with the default flag set."""
     return {
         "id": next_id(),
@@ -345,11 +355,11 @@ def _rel_row(source_id: int, target_id: int, *, following: bool = False, followe
     }
 
 
-def _bulk_insert(session: Session, model: type, rows: list[dict[str, object]], chunk_size: int) -> None:
+def _bulk_insert(session: Session, model: Any, rows: list[dict[str, Any]], chunk_size: int) -> None:
     """Insert ``rows`` in ``chunk_size`` batches via Core ``insert()``."""
     if not rows:
         return
-    table = model.__table__  # type: ignore[attr-defined]
+    table = model.__table__
     for i in range(0, len(rows), chunk_size):
         session.execute(insert(table), rows[i : i + chunk_size])
 

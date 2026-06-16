@@ -98,6 +98,7 @@ def _gen_data(args: argparse.Namespace) -> None:
     report = generate_sample_data(engine, cfg)
 
     if args.json:
+        # pylint: disable=no-member
         print(orjson.dumps(report.to_dict(), option=orjson.OPT_INDENT_2).decode())
         return
     print(f"\nGenerated in {report.total_seconds:.2f}s ({report.rows_per_second:,.0f} rows/s):")

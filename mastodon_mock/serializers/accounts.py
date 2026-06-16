@@ -81,9 +81,7 @@ def serialize_account(
     avatar = account.avatar_url or placeholder_avatar(config.domain)
     header = account.header_url or placeholder_header(config.domain)
 
-    batched = ctx is not None and account.id in ctx.accounts_loaded
-    if batched:
-        assert ctx is not None
+    if ctx is not None and account.id in ctx.accounts_loaded:
         followers = ctx.followers_count.get(account.id, 0)
         following = ctx.following_count.get(account.id, 0)
         statuses = ctx.statuses_count.get(account.id, 0)

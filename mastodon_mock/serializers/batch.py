@@ -11,6 +11,7 @@ querying per-row. See spec/09-sample-data-and-perf.md finding F1.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -55,7 +56,7 @@ class BatchContext:
     followers_count: dict[int, int] = field(default_factory=dict)
     following_count: dict[int, int] = field(default_factory=dict)
     statuses_count: dict[int, int] = field(default_factory=dict)
-    last_status_at: dict[int, object] = field(default_factory=dict)
+    last_status_at: dict[int, datetime | None] = field(default_factory=dict)
 
     # Flags so the serializers know whether a given account's aggregates were
     # precomputed (vs. an account not in this page, which must fall back to querying).
@@ -147,11 +148,15 @@ def _load_viewer_flags(session: Session, status_ids: list[int], viewer_id: int, 
         ).all()
     )
     ctx.reblogged.update(
-        session.scalars(
-            select(Status.reblog_of_id).where(
-                Status.account_id == viewer_id, Status.reblog_of_id.in_(status_ids)
-            )
-        ).all()
+        [
+            rid
+            for rid in session.scalars(
+                select(Status.reblog_of_id).where(
+                    Status.account_id == viewer_id, Status.reblog_of_id.in_(status_ids)
+                )
+            ).all()
+            if rid is not None
+        ]
     )
 
 
@@ -180,7 +185,8 @@ def _load_media(session: Session, status_ids: list[int], ctx: BatchContext) -> N
         select(MediaAttachment).where(MediaAttachment.status_id.in_(status_ids))
     ).all()
     for media in rows:
-        ctx.media.setdefault(media.status_id, []).append(media)
+        if media.status_id is not None:
+            ctx.media.setdefault(media.status_id, []).append(media)
 
 
 # --- account-level ---------------------------------------------------------------
