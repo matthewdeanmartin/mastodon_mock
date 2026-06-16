@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from '../api';
 import { Auth } from '../auth';
@@ -12,6 +12,12 @@ import { Auth } from '../auth';
 export class Shell implements OnInit {
   protected auth = inject(Auth);
   private api = inject(Api);
+
+  /** Whether the current account holds a staff role (drives the Admin nav link). */
+  protected isStaff = computed(() => {
+    const role = this.auth.account()?.role;
+    return !!role && role.name !== '';
+  });
 
   ngOnInit(): void {
     if (!this.auth.account()) {

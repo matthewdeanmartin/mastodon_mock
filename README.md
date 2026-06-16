@@ -61,9 +61,13 @@ http://127.0.0.1:8000/_ui/
 ```
 
 Sign in by pasting a seeded `access_token` (e.g. `mock_token`, or whatever you
-configured under `[[tool.mastodon_mock.seed.accounts]]`). The UI covers timelines,
-posting/replies, boosts/favourites/bookmarks, threads, profiles, follows, and
-notifications. `GET /` advertises the UI via a `"ui": "/_ui/"` pointer when it is built.
+configured under `[[tool.mastodon_mock.seed.accounts]]`) — or use the **Dev login**
+panel to generate a regular/admin user (and click any existing account) to autofill the
+token. The UI covers timelines (home/public/local, hashtag, list), posting/replies,
+boosts/favourites/bookmarks, threads, profiles, follows, notifications, search,
+favourites, bookmarks, and lists. Signing in as an admin (use the **+ Admin user**
+button) reveals an **Admin** section for account moderation, the report queue, and
+domain blocks. `GET /` advertises the UI via a `"ui": "/_ui/"` pointer when it is built.
 
 The UI is prebuilt into the published wheel, so installed copies serve it with no extra
 steps. Working from a source checkout, build it once with `make ui` (requires Node 22+);

@@ -1,7 +1,16 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Account, Context, MastodonNotification, Relationship, Status } from './models';
+import {
+  Account,
+  Context,
+  DevUser,
+  MastodonNotification,
+  Relationship,
+  SearchResults,
+  Status,
+  UserList,
+} from './models';
 
 /** Thin wrapper over the mastodon_mock REST API, served same-origin. */
 @Injectable({ providedIn: 'root' })
@@ -48,6 +57,12 @@ export class Api {
       params = params.set('local', 'true');
     }
     return this.http.get<Status[]>('/api/v1/timelines/public', { params });
+  }
+
+  tagTimeline(tag: string, maxId?: string): Observable<Status[]> {
+    return this.http.get<Status[]>(`/api/v1/timelines/tag/${encodeURIComponent(tag)}`, {
+      params: this.pageParams(maxId),
+    });
   }
 
   // --- statuses ---
@@ -98,6 +113,82 @@ export class Api {
   // --- notifications ---
   notifications(): Observable<MastodonNotification[]> {
     return this.http.get<MastodonNotification[]>('/api/v1/notifications');
+  }
+
+  // --- favourites / bookmarks ---
+  favourites(): Observable<Status[]> {
+    return this.http.get<Status[]>('/api/v1/favourites');
+  }
+
+  bookmarks(): Observable<Status[]> {
+    return this.http.get<Status[]>('/api/v1/bookmarks');
+  }
+
+  // --- search ---
+  search(q: string, type?: 'accounts' | 'statuses' | 'hashtags'): Observable<SearchResults> {
+    let params = new HttpParams().set('q', q);
+    if (type) {
+      params = params.set('type', type);
+    }
+    return this.http.get<SearchResults>('/api/v2/search', { params });
+  }
+
+  // --- lists ---
+  lists(): Observable<UserList[]> {
+    return this.http.get<UserList[]>('/api/v1/lists');
+  }
+
+  getList(id: string): Observable<UserList> {
+    return this.http.get<UserList>(`/api/v1/lists/${id}`);
+  }
+
+  listTimeline(id: string, maxId?: string): Observable<Status[]> {
+    return this.http.get<Status[]>(`/api/v1/timelines/list/${id}`, { params: this.pageParams(maxId) });
+  }
+
+  // create_list / update_list take form-encoded params, not JSON.
+  createList(title: string): Observable<UserList> {
+    const body = new HttpParams().set('title', title);
+    return this.http.post<UserList>('/api/v1/lists', body);
+  }
+
+  deleteList(id: string): Observable<unknown> {
+    return this.http.delete(`/api/v1/lists/${id}`);
+  }
+
+  listAccounts(id: string): Observable<Account[]> {
+    return this.http.get<Account[]>(`/api/v1/lists/${id}/accounts`);
+  }
+
+  addToList(id: string, accountId: string): Observable<unknown> {
+    return this.http.post(`/api/v1/lists/${id}/accounts`, { account_ids: [accountId] });
+  }
+
+  removeFromList(id: string, accountId: string): Observable<unknown> {
+    return this.http.request('delete', `/api/v1/lists/${id}/accounts`, {
+      body: { account_ids: [accountId] },
+    });
+  }
+
+  // --- reports ---
+  report(accountId: string, category: string, comment: string, statusIds?: string[]): Observable<unknown> {
+    const body: Record<string, unknown> = { account_id: accountId, category };
+    if (comment.trim()) {
+      body['comment'] = comment.trim();
+    }
+    if (statusIds?.length) {
+      body['status_ids'] = statusIds;
+    }
+    return this.http.post('/api/v1/reports', body);
+  }
+
+  // --- mock-only dev helpers (login screen) ---
+  createDevUser(admin: boolean): Observable<DevUser> {
+    return this.http.post<DevUser>('/api/v1/_mock/dev_user', { admin });
+  }
+
+  listDevUsers(): Observable<DevUser[]> {
+    return this.http.get<DevUser[]>('/api/v1/_mock/dev_users');
   }
 
   private pageParams(maxId?: string): HttpParams {

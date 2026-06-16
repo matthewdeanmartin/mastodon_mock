@@ -1,8 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
+import { DevUser } from '../../models';
 
 @Component({
   selector: 'app-login',
@@ -10,7 +11,7 @@ import { Auth } from '../../auth';
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
-export class Login {
+export class Login implements OnInit {
   private api = inject(Api);
   private auth = inject(Auth);
   private router = inject(Router);
@@ -18,6 +19,13 @@ export class Login {
   protected token = signal('');
   protected error = signal<string | null>(null);
   protected checking = signal(false);
+
+  protected devUsers = signal<DevUser[]>([]);
+  protected working = signal(false);
+
+  ngOnInit(): void {
+    this.refreshDevUsers();
+  }
 
   submit(): void {
     const value = this.token().trim();
@@ -39,5 +47,30 @@ export class Login {
         this.error.set('That token was rejected. Check it and try again.');
       },
     });
+  }
+
+  generate(admin: boolean): void {
+    this.working.set(true);
+    this.api.createDevUser(admin).subscribe({
+      next: (user) => {
+        this.working.set(false);
+        this.use(user);
+        this.refreshDevUsers();
+      },
+      error: () => this.working.set(false),
+    });
+  }
+
+  refreshDevUsers(): void {
+    this.api.listDevUsers().subscribe({
+      next: (users) => this.devUsers.set(users),
+      error: () => this.devUsers.set([]),
+    });
+  }
+
+  /** Autofill the token box from a dev user (does not auto-submit). */
+  use(user: DevUser): void {
+    this.token.set(user.access_token);
+    this.error.set(null);
   }
 }

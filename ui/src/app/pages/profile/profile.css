@@ -18,6 +18,22 @@
   margin-top: -40px;
 }
 
+.profile-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.report-done {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #e8f5fd;
+  border: 1px solid #b6e0fb;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
 .avatar {
   width: 80px;
   height: 80px;

@@ -1,0 +1,25 @@
+<div class="page-head">Lists</div>
+
+<div class="new-list">
+  <input
+    type="text"
+    [ngModel]="newTitle()"
+    (ngModelChange)="newTitle.set($event)"
+    (keyup.enter)="create()"
+    placeholder="New list name"
+  />
+  <button class="btn" [disabled]="!newTitle().trim()" (click)="create()">Create</button>
+</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!lists().length) {
+  <p class="muted center">You have no lists. Create one above, then add people from their profile.</p>
+} @else {
+  @for (l of lists(); track l.id) {
+    <a class="list-row" [routerLink]="['/lists', l.id]">
+      <span>{{ l.title }}</span>
+      <button class="del" (click)="remove(l, $event)" title="Delete list">✕</button>
+    </a>
+  }
+}

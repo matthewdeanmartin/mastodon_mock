@@ -1,10 +1,48 @@
 # Admin UI / Client (Dogfooding)
 
-> Status: **Phases 1–2 + 5 implemented** (Angular 21 SPA served at `/_ui/`, bundled into
-> the wheel, CI builds it, smoke-tested). Phases 3–4 (full feature/admin surface) are
-> ongoing — the client currently covers login, timelines (home/public/local), compose +
-> reply, boost/favourite/bookmark, threads, profiles, follow/unfollow, and
-> notifications.
+> Status: **Phases 1–5 implemented** (Angular 21 SPA served at `/_ui/`, bundled into the
+> wheel, CI builds it, smoke-tested). The client covers login (paste-token + dev-login
+> helpers), timelines (home/public/local, hashtag, list), compose + reply,
+> boost/favourite/bookmark, threads, profiles, follow/unfollow, notifications, search
+> (accounts/statuses/hashtags), favourites, bookmarks, and lists — including **filing
+> reports** (from a profile or a status, via a category/comment dialog) and **list
+> management** (create/delete lists, add/remove an account to lists from their profile).
+> The **admin panel**
+> (Phase 4) covers account moderation (silence/suspend/disable + undo, approve),
+> the report queue (assign/resolve/reopen), and domain blocks (list/create/delete),
+> gated behind a staff role.
+
+### Admin panel (Phase 4)
+
+The admin section lives under `/_ui/admin` and is gated by `adminGuard`, which allows
+only accounts whose `verify_credentials` `role` is staff (non-empty role name). To
+support that gate, `verify_credentials` now returns the account's `Role` entity in the
+`role` field for staff accounts (`null` for ordinary users), matching Mastodon's
+`CredentialAccount`. Generate an admin via the login screen's **+ Admin user** button.
+
+Sections (each driving `routers/admin.py`):
+
+- **Accounts** — `GET /api/v2/admin/accounts` filtered by status (active / pending /
+  silenced / suspended / disabled); actions via `POST .../action` (silence, suspend,
+  disable, sensitive) and the `enable` / `unsilence` / `unsuspend` / `approve` endpoints.
+- **Reports** — `GET /api/v1/admin/reports` (open vs. resolved), with `assign_to_self`,
+  `resolve`, and `reopen`.
+- **Domains** — `GET/POST/DELETE /api/v1/admin/domain_blocks`.
+
+### Dev login (mock-only)
+
+The login screen has a **Dev login** panel that calls two mock-only endpoints so a
+tester can get a working session in one click without hand-managing tokens:
+
+- `POST /api/v1/_mock/dev_user` — create a fresh local account (+ token). Body
+  `{"admin": bool, "username"?, "display_name"?}`; returns the account plus its
+  `access_token`. `admin: true` sets `role: "admin"` (the mock does not enforce roles;
+  the admin panel will use it to decide what to surface).
+- `GET /api/v1/_mock/dev_users` — list local accounts that have a token (most-recent
+  token per account), for the "click to autofill" list.
+
+Both live under the `/api/v1/_mock` prefix (already scope-exempt) and exist only to make
+the bundled UI pleasant to drive; they are not part of the emulated Mastodon surface.
 
 ## Why
 

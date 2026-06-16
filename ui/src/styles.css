@@ -96,9 +96,34 @@ textarea {
   font-weight: 600;
   color: var(--muted);
   border-bottom: 3px solid transparent;
+  text-align: center;
 }
 
 .tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+a.tab:hover {
+  text-decoration: none;
+}
+
+.page-head {
+  padding: 14px 16px;
+  font-weight: 800;
+  font-size: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.list-row {
+  display: block;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.list-row:hover {
+  background: var(--bg);
+  text-decoration: none;
 }

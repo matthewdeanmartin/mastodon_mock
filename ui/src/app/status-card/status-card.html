@@ -38,6 +38,21 @@
       <button class="action" [class.on]="display.bookmarked" (click)="toggleBookmark($event)" title="Bookmark">
         🔖
       </button>
+      @if (reported()) {
+        <span class="action reported" title="Reported">🚩 reported</span>
+      } @else {
+        <button class="action" (click)="openReport($event)" title="Report">🚩</button>
+      }
     </div>
   </div>
 </article>
+
+@if (showReport()) {
+  <app-report-dialog
+    [username]="display.account.username"
+    [accountId]="display.account.id"
+    [statusId]="display.id"
+    (closed)="showReport.set(false)"
+    (submitted)="onReported()"
+  />
+}

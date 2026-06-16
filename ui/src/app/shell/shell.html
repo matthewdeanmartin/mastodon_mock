@@ -5,6 +5,13 @@
       <a routerLink="/home" routerLinkActive="active">Home</a>
       <a routerLink="/public" routerLinkActive="active">Public</a>
       <a routerLink="/notifications" routerLinkActive="active">Notifications</a>
+      <a routerLink="/search" routerLinkActive="active">Search</a>
+      <a routerLink="/favourites" routerLinkActive="active">Favourites</a>
+      <a routerLink="/bookmarks" routerLinkActive="active">Bookmarks</a>
+      <a routerLink="/lists" routerLinkActive="active">Lists</a>
+      @if (isStaff()) {
+        <a routerLink="/admin" routerLinkActive="active" class="admin-link">Admin</a>
+      }
     </nav>
     <div class="account">
       @if (auth.account(); as acc) {

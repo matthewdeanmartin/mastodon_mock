@@ -1,0 +1,11 @@
+<div class="page-head">#{{ tag() }}</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!statuses().length) {
+  <p class="muted center">No statuses tagged #{{ tag() }}.</p>
+} @else {
+  @for (s of statuses(); track s.id; let i = $index) {
+    <app-status-card [status]="s" (changed)="onChanged(i, $event)" />
+  }
+}

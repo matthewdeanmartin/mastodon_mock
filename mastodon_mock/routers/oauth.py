@@ -208,6 +208,86 @@ async def mock_login(request: Request, db: DbSession) -> dict[str, Any]:
     return _token_response(token)
 
 
+@router.post("/api/v1/_mock/dev_user", status_code=200)
+async def mock_create_dev_user(request: Request, db: DbSession) -> dict[str, Any]:
+    """Mock-only: create a fresh local account (+ token) for the dev login UI.
+
+    Body (all optional): ``{"username": str, "display_name": str, "admin": bool}``.
+    When ``username`` is omitted a unique one is generated. ``admin`` sets the account
+    ``role`` to ``admin`` (the mock does not enforce roles, but the admin panel uses it
+    to decide what to show).
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    admin = bool(body.get("admin"))
+    prefix = "admin" if admin else "user"
+    username = (body.get("username") or "").strip() or f"{prefix}_{secrets.token_hex(3)}"
+
+    existing = db.query(Account).filter(Account.username == username, Account.domain.is_(None)).first()
+    if existing is not None:
+        raise HTTPException(status_code=422, detail=f"Username {username!r} already taken")
+
+    account = Account(
+        username=username,
+        display_name=(body.get("display_name") or "").strip() or username,
+        created_at=utcnow(),
+        fields=[],
+        email=f"{username}@local",
+        role="admin" if admin else "user",
+    )
+    db.add(account)
+    db.flush()
+    token = OAuthToken(
+        access_token=_token(),
+        account_id=account.id,
+        scopes=list(_DEFAULT_SCOPES),
+        created_at=utcnow(),
+    )
+    db.add(token)
+    db.commit()
+    return {
+        "id": sid(account.id),
+        "username": account.username,
+        "display_name": account.display_name,
+        "role": account.role,
+        "access_token": token.access_token,
+    }
+
+
+@router.get("/api/v1/_mock/dev_users")
+def mock_list_dev_users(db: DbSession) -> list[dict[str, Any]]:
+    """Mock-only: list local accounts that have a usable token, for the dev login UI.
+
+    Returns the most-recent token per account so a tester can click to autofill it.
+    """
+    rows = (
+        db.query(Account, OAuthToken)
+        .join(OAuthToken, OAuthToken.account_id == Account.id)
+        .filter(Account.domain.is_(None))
+        .order_by(OAuthToken.created_at.desc())
+        .all()
+    )
+    seen: set[int] = set()
+    out: list[dict[str, Any]] = []
+    for account, token in rows:
+        if account.id in seen:
+            continue
+        seen.add(account.id)
+        out.append(
+            {
+                "id": sid(account.id),
+                "username": account.username,
+                "display_name": account.display_name,
+                "role": account.role,
+                "access_token": token.access_token,
+            }
+        )
+    return out
+
+
 @router.post("/api/v1/_mock/reset", status_code=200)
 def mock_reset(request: Request) -> dict[str, Any]:
     """Mock-only: drop+recreate all tables and re-apply seed data."""

@@ -6,13 +6,20 @@
     <div class="profile-top">
       <img class="avatar" [src]="a.avatar" [alt]="a.username" />
       @if (!isSelf()) {
-        <button class="btn" [class.btn-outline]="relationship()?.following" (click)="toggleFollow()">
-          {{ relationship()?.following ? 'Following' : 'Follow' }}
-        </button>
+        <div class="profile-buttons">
+          <button class="btn btn-outline" (click)="showLists.set(true)">Lists</button>
+          <button class="btn btn-outline" (click)="showReport.set(true)">Report</button>
+          <button class="btn" [class.btn-outline]="relationship()?.following" (click)="toggleFollow()">
+            {{ relationship()?.following ? 'Following' : 'Follow' }}
+          </button>
+        </div>
       }
     </div>
     <h2>{{ a.display_name || a.username }}</h2>
     <div class="acct muted">&#64;{{ a.acct }}</div>
+    @if (reportDone()) {
+      <div class="report-done">Report submitted. Thanks — a moderator will review it.</div>
+    }
     @if (a.note) {
       <div class="note" [innerHTML]="a.note"></div>
     }
@@ -25,6 +32,18 @@
 
   @for (s of statuses(); track s.id; let i = $index) {
     <app-status-card [status]="s" (changed)="onChanged(i, $event)" />
+  }
+
+  @if (showReport()) {
+    <app-report-dialog
+      [username]="a.username"
+      [accountId]="a.id"
+      (closed)="showReport.set(false)"
+      (submitted)="onReported()"
+    />
+  }
+  @if (showLists()) {
+    <app-list-dialog [username]="a.username" [accountId]="a.id" (closed)="showLists.set(false)" />
   }
 } @else {
   <p class="muted center">Account not found.</p>

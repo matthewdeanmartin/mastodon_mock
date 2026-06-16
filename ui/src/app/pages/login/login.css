@@ -38,3 +38,85 @@ input {
   width: 100%;
   padding: 10px;
 }
+
+.dev {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.dev-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  padding: 0;
+}
+
+.dev-gen {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.dev-gen .btn {
+  width: auto;
+  flex: 1;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.dev-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.dev-user {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 8px 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dev-user:hover {
+  background: var(--bg);
+}
+
+.dev-name {
+  font-weight: 600;
+}
+
+.dev-acct {
+  font-size: 13px;
+  margin-left: auto;
+}
+
+.badge {
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+}
+
+.small {
+  font-size: 13px;
+}

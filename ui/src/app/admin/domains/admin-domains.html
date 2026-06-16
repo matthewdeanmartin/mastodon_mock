@@ -1,0 +1,34 @@
+<div class="add-block">
+  <input
+    type="text"
+    [ngModel]="newDomain()"
+    (ngModelChange)="newDomain.set($event)"
+    (keyup.enter)="add()"
+    placeholder="domain to block (e.g. spam.example)"
+  />
+  <select [ngModel]="severity()" (ngModelChange)="severity.set($event)">
+    <option value="silence">silence</option>
+    <option value="suspend">suspend</option>
+    <option value="noop">noop</option>
+  </select>
+  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">Block</button>
+</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!blocks().length) {
+  <p class="muted center">No domain blocks.</p>
+} @else {
+  @for (b of blocks(); track b.id) {
+    <div class="block-row">
+      <div>
+        <strong>{{ b.domain }}</strong>
+        <span class="sev">{{ b.severity }}</span>
+        @if (b.public_comment) {
+          <span class="muted small">{{ b.public_comment }}</span>
+        }
+      </div>
+      <button class="op warn" (click)="remove(b)">Remove</button>
+    </div>
+  }
+}

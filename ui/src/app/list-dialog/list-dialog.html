@@ -1,0 +1,39 @@
+<div class="overlay" (click)="closed.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <h3>Add &#64;{{ username() }} to lists</h3>
+
+    @if (loading()) {
+      <p class="muted">Loading…</p>
+    } @else {
+      @if (rows().length) {
+        <ul class="list-rows">
+          @for (row of rows(); track row.list.id) {
+            <li>
+              <label>
+                <input type="checkbox" [checked]="row.member" (change)="toggle(row)" />
+                {{ row.list.title }}
+              </label>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="muted small">You have no lists yet. Create one below.</p>
+      }
+
+      <div class="new-list">
+        <input
+          type="text"
+          [ngModel]="newTitle()"
+          (ngModelChange)="newTitle.set($event)"
+          (keyup.enter)="createAndAdd()"
+          placeholder="New list name"
+        />
+        <button class="btn" [disabled]="!newTitle().trim()" (click)="createAndAdd()">Create &amp; add</button>
+      </div>
+    }
+
+    <div class="dialog-actions">
+      <button class="btn btn-outline" (click)="closed.emit()">Done</button>
+    </div>
+  </div>
+</div>

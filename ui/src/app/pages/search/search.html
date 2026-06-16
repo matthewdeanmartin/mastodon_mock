@@ -1,0 +1,43 @@
+<div class="search-bar">
+  <input
+    type="text"
+    [ngModel]="query()"
+    (ngModelChange)="query.set($event)"
+    (keyup.enter)="run()"
+    placeholder="Search accounts, statuses, hashtags"
+  />
+  <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
+</div>
+
+@if (results(); as r) {
+  @if (r.accounts.length) {
+    <div class="page-head">People</div>
+    @for (a of r.accounts; track a.id) {
+      <a class="result-account" [routerLink]="['/accounts', a.id]">
+        <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+        <span>
+          <strong>{{ a.display_name || a.username }}</strong>
+          <span class="muted">&#64;{{ a.acct }}</span>
+        </span>
+      </a>
+    }
+  }
+
+  @if (r.hashtags.length) {
+    <div class="page-head">Hashtags</div>
+    @for (h of r.hashtags; track h.name) {
+      <a class="result-tag" [routerLink]="['/tags', h.name]">#{{ h.name }}</a>
+    }
+  }
+
+  @if (r.statuses.length) {
+    <div class="page-head">Posts</div>
+    @for (s of r.statuses; track s.id) {
+      <app-status-card [status]="s" />
+    }
+  }
+
+  @if (!r.accounts.length && !r.hashtags.length && !r.statuses.length) {
+    <p class="muted center">No results.</p>
+  }
+}

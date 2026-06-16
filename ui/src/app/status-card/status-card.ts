@@ -1,11 +1,12 @@
-import { Component, inject, input, output } from '@angular/core';
+import { Component, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { Status } from '../models';
+import { ReportDialog } from '../report-dialog/report-dialog';
 
 @Component({
   selector: 'app-status-card',
-  imports: [RouterLink],
+  imports: [RouterLink, ReportDialog],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
 })
@@ -14,6 +15,19 @@ export class StatusCard {
 
   readonly status = input.required<Status>();
   readonly changed = output<Status>();
+
+  protected showReport = signal(false);
+  protected reported = signal(false);
+
+  openReport(event: Event): void {
+    event.stopPropagation();
+    this.showReport.set(true);
+  }
+
+  onReported(): void {
+    this.showReport.set(false);
+    this.reported.set(true);
+  }
 
   /** The status to render: unwrap a boost to the original. */
   get display(): Status {

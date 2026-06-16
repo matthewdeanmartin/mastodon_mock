@@ -16,5 +16,37 @@
     <button class="btn" [disabled]="!token().trim() || checking()" (click)="submit()">
       {{ checking() ? 'Checking…' : 'Sign in' }}
     </button>
+
+    <div class="dev">
+      <div class="dev-head">
+        <span class="muted">Dev login</span>
+        <button class="link" (click)="refreshDevUsers()">refresh</button>
+      </div>
+      <div class="dev-gen">
+        <button class="btn btn-outline" [disabled]="working()" (click)="generate(false)">
+          + Regular user
+        </button>
+        <button class="btn btn-outline" [disabled]="working()" (click)="generate(true)">
+          + Admin user
+        </button>
+      </div>
+      @if (devUsers().length) {
+        <ul class="dev-list">
+          @for (u of devUsers(); track u.id) {
+            <li>
+              <button class="dev-user" (click)="use(u)" [title]="u.access_token">
+                <span class="dev-name">{{ u.display_name || u.username }}</span>
+                @if (u.role === 'admin') {
+                  <span class="badge">admin</span>
+                }
+                <span class="muted dev-acct">&#64;{{ u.username }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="muted small">No accounts with tokens yet — generate one above.</p>
+      }
+    </div>
   </div>
 </div>

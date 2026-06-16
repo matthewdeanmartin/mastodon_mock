@@ -122,6 +122,71 @@ def test_oauth_userinfo(live_server: str) -> None:
     assert resp.json()["preferred_username"] == "alice"
 
 
+def test_mock_dev_user_creates_usable_token(live_server: str) -> None:
+    resp = httpx.post(f"{live_server}/api/v1/_mock/dev_user", json={})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["role"] == "user"
+    assert body["username"].startswith("user_")
+
+    me = httpx.get(
+        f"{live_server}/api/v1/accounts/verify_credentials",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["username"] == body["username"]
+
+
+def test_mock_dev_user_admin_role_and_explicit_username(live_server: str) -> None:
+    resp = httpx.post(
+        f"{live_server}/api/v1/_mock/dev_user",
+        json={"admin": True, "username": "moderator1"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["role"] == "admin"
+    assert body["username"] == "moderator1"
+
+    # A second create with the same username is rejected.
+    dup = httpx.post(f"{live_server}/api/v1/_mock/dev_user", json={"username": "moderator1"})
+    assert dup.status_code == 422
+
+
+def test_mock_dev_users_lists_tokened_accounts(live_server: str) -> None:
+    created = httpx.post(f"{live_server}/api/v1/_mock/dev_user", json={}).json()
+
+    resp = httpx.get(f"{live_server}/api/v1/_mock/dev_users")
+    assert resp.status_code == 200
+    users = resp.json()
+    usernames = {u["username"] for u in users}
+    # The seeded accounts with tokens (alice/bob/carol) and the freshly created user.
+    assert "alice" in usernames
+    assert created["username"] in usernames
+    # Every listed user carries a usable token + role.
+    for user in users:
+        assert user["access_token"]
+        assert user["role"] in ("user", "admin")
+
+
+def test_verify_credentials_reports_role_for_staff(live_server: str) -> None:
+    admin = httpx.post(f"{live_server}/api/v1/_mock/dev_user", json={"admin": True}).json()
+    user = httpx.post(f"{live_server}/api/v1/_mock/dev_user", json={}).json()
+
+    admin_me = httpx.get(
+        f"{live_server}/api/v1/accounts/verify_credentials",
+        headers={"Authorization": f"Bearer {admin['access_token']}"},
+    ).json()
+    assert admin_me["role"] is not None
+    assert admin_me["role"]["name"] == "Admin"
+
+    # Ordinary users carry no elevated role.
+    user_me = httpx.get(
+        f"{live_server}/api/v1/accounts/verify_credentials",
+        headers={"Authorization": f"Bearer {user['access_token']}"},
+    ).json()
+    assert user_me["role"] is None
+
+
 def _app_token(base_url: str, client_id: str, client_secret: str) -> str:
     """Obtain an app-only token via the client_credentials grant."""
     resp = httpx.post(

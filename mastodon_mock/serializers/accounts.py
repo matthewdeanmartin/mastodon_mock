@@ -125,6 +125,25 @@ def serialize_account(
             "indexable": account.indexable,
             "hide_collections": account.hide_collections,
         }
-        data["role"] = None
+        data["role"] = _credential_role(account.role)
 
     return data
+
+
+# Coarse role → Role-entity mapping for CredentialAccount.role. Mirrors the admin
+# serializer's table but kept local to avoid an import cycle (admin imports this module).
+# Non-staff accounts have no elevated role, which Mastodon reports as null here.
+_STAFF_ROLE_IDS = {"moderator": "1", "admin": "3", "owner": "0"}
+
+
+def _credential_role(role: str) -> dict[str, Any] | None:
+    """The ``Role`` entity for ``verify_credentials``; ``None`` for ordinary users."""
+    if role not in _STAFF_ROLE_IDS:
+        return None
+    return {
+        "id": _STAFF_ROLE_IDS[role],
+        "name": role.capitalize(),
+        "permissions": "1048575" if role in ("admin", "owner") else "65536",
+        "color": "",
+        "highlighted": True,
+    }
