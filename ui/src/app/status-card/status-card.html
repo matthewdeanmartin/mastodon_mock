@@ -30,6 +30,18 @@
         <div class="content" [innerHTML]="display.content"></div>
       </a>
     }
+    @if (quotedStatus(); as q) {
+      <a class="quote-card" [routerLink]="['/statuses', q.id]" (click)="$event.stopPropagation()">
+        <div class="quote-meta">
+          <img class="quote-avatar" [src]="q.account.avatar" [alt]="q.account.username" />
+          <span class="quote-name">{{ q.account.display_name || q.account.username }}</span>
+          <span class="acct muted">&#64;{{ q.account.acct }}</span>
+        </div>
+        <div class="quote-content" [innerHTML]="q.content"></div>
+      </a>
+    } @else if (quoteUnavailable()) {
+      <div class="quote-card quote-unavailable muted">Quoted post is unavailable.</div>
+    }
     @if (display.media_attachments.length) {
       <div class="media">
         @for (m of display.media_attachments; track m.id) {

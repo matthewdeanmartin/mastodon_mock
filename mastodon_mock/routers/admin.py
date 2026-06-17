@@ -22,6 +22,7 @@ from mastodon_mock.db.models import (
     AdminDomainBlock,
     AdminEmailDomainBlock,
     AdminIpBlock,
+    Announcement,
     Report,
     Status,
     utcnow,
@@ -39,6 +40,7 @@ from mastodon_mock.serializers.admin import (
     serialize_admin_report,
     serialize_report,
 )
+from mastodon_mock.serializers.announcements import serialize_announcement
 from mastodon_mock.serializers.statuses import serialize_status
 
 router = APIRouter()
@@ -466,6 +468,73 @@ def admin_approve_trending_tag(tag_id: str, config: Config, account: RequiredAcc
 def admin_reject_trending_tag(tag_id: str, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Reject a trending tag (echo minimal Tag)."""
     return {"name": "", "url": f"https://{config.domain}/tags/"}
+
+
+# --- Announcements ------------------------------------------------------------
+# Mastodon exposes an admin-only announcement surface for staff to post, publish,
+# and remove instance announcements. The public read/dismiss/react side lives in
+# routers/instance.py; these are the management endpoints.
+
+
+@router.get("/api/v1/admin/announcements")
+def admin_list_announcements(db: DbSession, account: RequiredAccount) -> list[dict[str, Any]]:
+    """All announcements (published and drafts), newest first."""
+    rows = db.scalars(select(Announcement).order_by(Announcement.id.desc())).all()
+    return [serialize_announcement(a, account) for a in rows]
+
+
+@router.post("/api/v1/admin/announcements", status_code=200)
+async def admin_create_announcement(request: Request, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Create an announcement. ``text`` is required; ``published`` defaults to true."""
+    body = await read_body(request)
+    text = str(body.get("text") or body.get("content") or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Validation failed: Text can't be blank")
+    published = str(body.get("published", "true")).lower() not in {"false", "0", ""}
+    all_day = str(body.get("all_day", "false")).lower() in {"true", "1"}
+    now = utcnow()
+    announcement = Announcement(
+        content=text,
+        all_day=all_day,
+        published=published,
+        published_at=now,
+        updated_at=now,
+    )
+    db.add(announcement)
+    db.commit()
+    db.refresh(announcement)
+    return serialize_announcement(announcement, account)
+
+
+@router.delete("/api/v1/admin/announcements/{announcement_id}", status_code=200)
+def admin_delete_announcement(announcement_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Delete an announcement."""
+    announcement = _record_or_404(db, Announcement, announcement_id)
+    db.delete(announcement)
+    db.commit()
+    return {}
+
+
+@router.post("/api/v1/admin/announcements/{announcement_id}/publish", status_code=200)
+def admin_publish_announcement(announcement_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Publish a draft announcement (makes it visible on the public endpoint)."""
+    announcement = _record_or_404(db, Announcement, announcement_id)
+    announcement.published = True
+    announcement.updated_at = utcnow()
+    db.commit()
+    db.refresh(announcement)
+    return serialize_announcement(announcement, account)
+
+
+@router.post("/api/v1/admin/announcements/{announcement_id}/unpublish", status_code=200)
+def admin_unpublish_announcement(announcement_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Unpublish an announcement (hides it from the public endpoint)."""
+    announcement = _record_or_404(db, Announcement, announcement_id)
+    announcement.published = False
+    announcement.updated_at = utcnow()
+    db.commit()
+    db.refresh(announcement)
+    return serialize_announcement(announcement, account)
 
 
 # --- Domain blocks ------------------------------------------------------------

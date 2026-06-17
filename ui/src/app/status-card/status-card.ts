@@ -88,6 +88,15 @@ export class StatusCard {
     return s.reblog ? s.account.display_name : null;
   }
 
+  /** The quoted status to embed, if this status quotes a visible one. */
+  protected quotedStatus = computed<Status | null>(() => this.display.quote?.quoted_status ?? null);
+
+  /** True when a quote exists but the quoted status is hidden (e.g. revoked). */
+  protected quoteUnavailable = computed<boolean>(() => {
+    const q = this.display.quote;
+    return !!q && q.quoted_status === null;
+  });
+
   toggleFavourite(event: Event): void {
     event.stopPropagation();
     const s = this.display;

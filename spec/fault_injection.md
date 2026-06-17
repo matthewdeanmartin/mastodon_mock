@@ -40,13 +40,13 @@ A rule:
 
 ### Effect types
 
-| `type`       | Behaviour |
+| `type` | Behaviour |
 |--------------|------------------------------------------------------------------------------|
-| `status`     | Short-circuit with the given HTTP `status` and body (defaults to a Mastodon-shaped `{"error": ...}`). Use for `500`/`503`/`502`. |
-| `ratelimit`  | Convenience for `status` 429 with `X-RateLimit-*` + `Retry-After` headers populated, exactly like the opt-in rate-limiter, so `Mastodon.py`'s `ratelimit_method` engages. |
-| `latency`    | Sleep `delay_ms`, then process normally. For testing client read-timeouts. |
-| `malformed`  | Return `200` with a `Content-Type: application/json` body that is **not** valid JSON (a truncated object), so the client's parser raises. |
-| `timeout`    | Hold the connection open without responding (until the client times out or `delay_ms` elapses, whichever first). For testing connect/read timeouts. |
+| `status` | Short-circuit with the given HTTP `status` and body (defaults to a Mastodon-shaped `{"error": ...}`). Use for `500`/`503`/`502`. |
+| `ratelimit` | Convenience for `status` 429 with `X-RateLimit-*` + `Retry-After` headers populated, exactly like the opt-in rate-limiter, so `Mastodon.py`'s `ratelimit_method` engages. |
+| `latency` | Sleep `delay_ms`, then process normally. For testing client read-timeouts. |
+| `malformed` | Return `200` with a `Content-Type: application/json` body that is **not** valid JSON (a truncated object), so the client's parser raises. |
+| `timeout` | Hold the connection open without responding (until the client times out or `delay_ms` elapses, whichever first). For testing connect/read timeouts. |
 
 `delay_ms` may be combined with any `status`/`malformed` effect to delay it.
 
@@ -54,10 +54,10 @@ A rule:
 
 | Endpoint | Purpose |
 |------------------------------------------|------------------------------------------------------|
-| `POST   /api/v1/_mock/faults`            | Add a rule. Body = a rule (without `id`/`remaining`). Returns the stored rule with its `id`. |
-| `GET    /api/v1/_mock/faults`            | List active rules with their `remaining` counts. |
-| `DELETE /api/v1/_mock/faults/{id}`       | Remove one rule. |
-| `DELETE /api/v1/_mock/faults`            | Clear all rules. |
+| `POST   /api/v1/_mock/faults` | Add a rule. Body = a rule (without `id`/`remaining`). Returns the stored rule with its `id`. |
+| `GET    /api/v1/_mock/faults` | List active rules with their `remaining` counts. |
+| `DELETE /api/v1/_mock/faults/{id}` | Remove one rule. |
+| `DELETE /api/v1/_mock/faults` | Clear all rules. |
 
 Rules are evaluated in insertion order; the first match wins. A rule with `count` set
 decrements `remaining` on each fire and is dropped when it reaches zero. Mock-only paths

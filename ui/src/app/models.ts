@@ -34,6 +34,14 @@ export interface MediaAttachment {
   description: string | null;
 }
 
+/** A status's quote of another status (Mastodon `Quote` entity). */
+export interface Quote {
+  // pending | accepted | rejected | revoked | deleted | unauthorized
+  state: string;
+  // The quoted status, or null when it is not visible (e.g. revoked).
+  quoted_status: Status | null;
+}
+
 export interface Status {
   id: string;
   created_at: string;
@@ -43,6 +51,7 @@ export interface Status {
   url: string | null;
   account: Account;
   reblog: Status | null;
+  quote: Quote | null;
   in_reply_to_id: string | null;
   replies_count: number;
   reblogs_count: number;
@@ -86,6 +95,41 @@ export interface Hashtag {
   url: string;
 }
 
+export interface AnnouncementReaction {
+  name: string;
+  count: number;
+  me: boolean;
+  url: string | null;
+  static_url: string | null;
+}
+
+export interface Announcement {
+  id: string;
+  content: string;
+  // Present on the admin surface; undefined on the public read endpoint.
+  published?: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  all_day: boolean;
+  published_at: string | null;
+  updated_at: string | null;
+  read: boolean;
+  reactions: AnnouncementReaction[];
+}
+
+export interface TrendingTagHistory {
+  day: string;
+  uses: string;
+  accounts: string;
+}
+
+export interface TrendingTag {
+  id: string;
+  name: string;
+  url: string;
+  history: TrendingTagHistory[];
+}
+
 export interface SearchResults {
   accounts: Account[];
   statuses: Status[];
@@ -117,6 +161,27 @@ export interface GenerationReport {
   total_rows: number;
   total_seconds: number;
   rows_per_second: number;
+}
+
+export interface InstanceRule {
+  id: string;
+  text: string;
+  hint: string;
+}
+
+export interface TermsOfService {
+  effective_date: string | null;
+  effective: boolean;
+  content: string;
+  succeeded_by: string | null;
+}
+
+export interface CustomEmoji {
+  shortcode: string;
+  url: string;
+  static_url: string;
+  visible_in_picker: boolean;
+  category?: string;
 }
 
 // --- Admin / moderation entities ---

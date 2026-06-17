@@ -3,14 +3,18 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   Account,
+  Announcement,
   Context,
+  CustomEmoji,
   DevUser,
   GenerationReport,
+  InstanceRule,
   MastodonNotification,
   Relationship,
   SearchResults,
   Status,
   StatusSource,
+  TermsOfService,
   UserList,
 } from './models';
 
@@ -194,6 +198,37 @@ export class Api {
       body['status_ids'] = statusIds;
     }
     return this.http.post('/api/v1/reports', body);
+  }
+
+  // --- announcements ---
+  announcements(): Observable<Announcement[]> {
+    return this.http.get<Announcement[]>('/api/v1/announcements');
+  }
+
+  dismissAnnouncement(id: string): Observable<unknown> {
+    return this.http.post(`/api/v1/announcements/${id}/dismiss`, {});
+  }
+
+  addAnnouncementReaction(id: string, name: string): Observable<unknown> {
+    return this.http.put(`/api/v1/announcements/${id}/reactions/${encodeURIComponent(name)}`, {});
+  }
+
+  removeAnnouncementReaction(id: string, name: string): Observable<unknown> {
+    return this.http.delete(`/api/v1/announcements/${id}/reactions/${encodeURIComponent(name)}`);
+  }
+
+  // --- instance "about" info ---
+  instanceRules(): Observable<InstanceRule[]> {
+    return this.http.get<InstanceRule[]>('/api/v1/instance/rules');
+  }
+
+  // The endpoint 404s when no ToS is configured; callers treat that as "none".
+  termsOfService(): Observable<TermsOfService> {
+    return this.http.get<TermsOfService>('/api/v1/instance/terms_of_service');
+  }
+
+  customEmojis(): Observable<CustomEmoji[]> {
+    return this.http.get<CustomEmoji[]>('/api/v1/custom_emojis');
   }
 
   // --- mock-only dev helpers (login screen) ---

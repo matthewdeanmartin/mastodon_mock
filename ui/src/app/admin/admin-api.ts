@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AdminAccount, AdminReport, DomainBlock } from '../models';
+import { AdminAccount, AdminReport, Announcement, DomainBlock, Status, TrendingTag } from '../models';
 
 /** Wrapper over the /api/v1/admin/* moderation surface. */
 @Injectable({ providedIn: 'root' })
@@ -67,5 +67,35 @@ export class AdminApi {
 
   deleteDomainBlock(id: string): Observable<unknown> {
     return this.http.delete(`/api/v1/admin/domain_blocks/${id}`);
+  }
+
+  // --- announcements ---
+  announcements(): Observable<Announcement[]> {
+    return this.http.get<Announcement[]>('/api/v1/admin/announcements');
+  }
+
+  createAnnouncement(text: string, published: boolean): Observable<Announcement> {
+    return this.http.post<Announcement>('/api/v1/admin/announcements', { text, published });
+  }
+
+  deleteAnnouncement(id: string): Observable<unknown> {
+    return this.http.delete(`/api/v1/admin/announcements/${id}`);
+  }
+
+  publishAnnouncement(id: string): Observable<Announcement> {
+    return this.http.post<Announcement>(`/api/v1/admin/announcements/${id}/publish`, {});
+  }
+
+  unpublishAnnouncement(id: string): Observable<Announcement> {
+    return this.http.post<Announcement>(`/api/v1/admin/announcements/${id}/unpublish`, {});
+  }
+
+  // --- trends ---
+  trendingTags(): Observable<TrendingTag[]> {
+    return this.http.get<TrendingTag[]>('/api/v1/admin/trends/tags');
+  }
+
+  trendingStatuses(): Observable<Status[]> {
+    return this.http.get<Status[]>('/api/v1/admin/trends/statuses');
   }
 }

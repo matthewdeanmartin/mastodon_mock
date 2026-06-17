@@ -51,7 +51,18 @@ client = Mastodon(access_token="mock_token", api_base_url="http://127.0.0.1:3000
 client.status_post("hello from a mock!")
 ```
 
-Open `http://127.0.0.1:3000/_ui/` for the bundled browser UI when it is available.
+Open `http://127.0.0.1:3000/_ui/` for the bundled browser UI when it is available. The UI
+covers timelines, compose/reply, boost/favourite/bookmark, **quote posts**, threads,
+profiles, search, lists, an **About this server** page (instance rules, terms of service,
+custom emojis), an **announcements banner** (dismiss + emoji reactions), and an admin
+panel (accounts, reports, domains, **announcements**, **trends**).
+
+For a quick, good-looking demo with a small community already populated — multiple
+accounts, follows, a quote post, announcements, rules, and terms of service — run:
+
+```bash
+mastodon_mock serve --in-memory --demo
+```
 
 For a populated local instance, generate a throwaway cohort into a SQLite file and point
 your config's `[database].path` at it:

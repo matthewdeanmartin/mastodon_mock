@@ -25,13 +25,13 @@ from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
 from mastodon_mock.serializers.relationships import serialize_relationship
 from mastodon_mock.serializers.statuses import serialize_status_list
-from mastodon_mock.streaming_events import flush_stream_notifications
 from mastodon_mock.services import (
     do_follow,
     do_unfollow,
     find_relationship,
     get_or_create_relationship,
 )
+from mastodon_mock.streaming_events import flush_stream_notifications
 
 router = APIRouter()
 

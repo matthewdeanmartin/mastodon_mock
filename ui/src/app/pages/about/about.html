@@ -1,0 +1,44 @@
+<h1 class="page-title">About this server</h1>
+
+<section class="card">
+  <h2>Server rules</h2>
+  @if (!rules().length) {
+    <p class="muted">No rules configured.</p>
+  } @else {
+    <ol class="rules">
+      @for (r of rules(); track r.id) {
+        <li>
+          <span class="rule-text">{{ r.text }}</span>
+          @if (r.hint) {
+            <span class="muted small">{{ r.hint }}</span>
+          }
+        </li>
+      }
+    </ol>
+  }
+</section>
+
+<section class="card">
+  <h2>Terms of service</h2>
+  @if (tos(); as t) {
+    <div class="tos" [innerHTML]="t.content"></div>
+  } @else {
+    <p class="muted">No terms of service configured.</p>
+  }
+</section>
+
+<section class="card">
+  <h2>Custom emojis</h2>
+  @if (!emojis().length) {
+    <p class="muted">No custom emojis.</p>
+  } @else {
+    <div class="emoji-grid">
+      @for (e of emojis(); track e.shortcode) {
+        <div class="emoji" [title]="':' + e.shortcode + ':'">
+          <img [src]="e.url" [alt]="e.shortcode" />
+          <span class="shortcode">:{{ e.shortcode }}:</span>
+        </div>
+      }
+    </div>
+  }
+</section>

@@ -1,0 +1,28 @@
+<section class="trend-section">
+  <h2>Trending hashtags</h2>
+  @if (!tags().length) {
+    <p class="muted center">No trending tags.</p>
+  } @else {
+    <div class="tag-list">
+      @for (t of tags(); track t.id) {
+        <a class="tag-chip" [routerLink]="['/tags', t.name]">
+          <span class="tag-name">#{{ t.name }}</span>
+          <span class="tag-uses muted">{{ uses(t) }} uses</span>
+        </a>
+      }
+    </div>
+  }
+</section>
+
+<section class="trend-section">
+  <h2>Trending posts</h2>
+  @if (loading()) {
+    <p class="muted center">Loading…</p>
+  } @else if (!statuses().length) {
+    <p class="muted center">No trending posts.</p>
+  } @else {
+    @for (s of statuses(); track s.id) {
+      <app-status-card [status]="s" />
+    }
+  }
+</section>

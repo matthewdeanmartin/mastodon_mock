@@ -6,9 +6,16 @@ from pathlib import Path
 
 from sqlalchemy import func, select
 
-from mastodon_mock.config import DatabaseConfig, MastodonMockConfig, SeedAccount, SeedConfig
+from mastodon_mock.config import (
+    DatabaseConfig,
+    MastodonMockConfig,
+    SeedAccount,
+    SeedConfig,
+    SeedStatus,
+    demo_config,
+)
 from mastodon_mock.db.base import Base, init_engine, make_session_factory
-from mastodon_mock.db.models import Account, OAuthToken
+from mastodon_mock.db.models import Account, OAuthToken, Status
 from mastodon_mock.db.seed import apply_seed_data
 from mastodon_mock.versioning import api_version_for, parse_version_string
 
@@ -65,6 +72,47 @@ def test_seed_idempotency() -> None:
         engine.dispose()
     assert account_count == 1
     assert token_count == 1
+
+
+def test_seed_status_quote_resolves_ref() -> None:
+    engine = init_engine(DatabaseConfig(path=":memory:"))
+    try:
+        Base.metadata.create_all(engine)
+        seed = SeedConfig(
+            accounts=[
+                SeedAccount(username="poster", access_token="poster_token"),
+                SeedAccount(username="quoter", access_token="quoter_token"),
+            ],
+            statuses=[
+                SeedStatus(account="poster", text="Original thought.", ref="orig"),
+                SeedStatus(account="quoter", text="Love this.", quotes="orig"),
+            ],
+        )
+        apply_seed_data(engine, seed)
+
+        factory = make_session_factory(engine)
+        with factory() as session:
+            original = session.scalar(select(Status).where(Status.text == "Original thought."))
+            quoting = session.scalar(select(Status).where(Status.text == "Love this."))
+            assert original is not None and quoting is not None
+            assert quoting.quoted_status_id == original.id
+    finally:
+        engine.dispose()
+
+
+def test_demo_config_is_rich_and_keeps_defaults_unchanged() -> None:
+    demo = demo_config()
+    assert demo.rules  # rules surfaced on the About page
+    assert demo.terms_of_service  # ToS surfaced on the About page
+    assert len(demo.seed.accounts) > 1
+    assert any(s.quotes for s in demo.seed.statuses)  # a quote post for the demo
+    assert demo.seed.announcements  # announcements banner has content
+
+    # The library default config remains minimal (the test suite relies on this).
+    default = MastodonMockConfig()
+    assert default.rules == []
+    assert default.terms_of_service == ""
+    assert default.seed.accounts[0].username == "testuser"
 
 
 def test_pig_latin_word_consonant_cluster() -> None:

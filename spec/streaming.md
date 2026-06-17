@@ -38,15 +38,15 @@ base URL (e.g. `http://127.0.0.1:54321`). This is the single change that makes s
 
 | Endpoint | Channel | Auth | Events delivered |
 |--------------------------------------|-----------------------|----------|-----------------------------------------------|
-| `GET /api/v1/streaming/user`         | `user`                | required | home-timeline `update`, `delete`, `status_update`, `notification` for the authed account |
-| `GET /api/v1/streaming/public`       | `public`              | optional | every public `update` / `delete` / `status_update` |
-| `GET /api/v1/streaming/public/local` | `public:local`        | optional | public events from **local** (no-domain) accounts |
-| `GET /api/v1/streaming/public/remote`| `public:remote`       | optional | public events from accounts that have a `domain` |
-| `GET /api/v1/streaming/hashtag?tag=` | `hashtag`             | optional | public `update`s tagged with `tag` |
+| `GET /api/v1/streaming/user` | `user` | required | home-timeline `update`, `delete`, `status_update`, `notification` for the authed account |
+| `GET /api/v1/streaming/public` | `public` | optional | every public `update` / `delete` / `status_update` |
+| `GET /api/v1/streaming/public/local` | `public:local` | optional | public events from **local** (no-domain) accounts |
+| `GET /api/v1/streaming/public/remote`| `public:remote` | optional | public events from accounts that have a `domain` |
+| `GET /api/v1/streaming/hashtag?tag=` | `hashtag` | optional | public `update`s tagged with `tag` |
 | `GET /api/v1/streaming/hashtag/local?tag=` | `hashtag:local` | optional | as above, local only |
-| `GET /api/v1/streaming/list?list=`   | `list`                | required | `update`s from accounts on the given list |
-| `GET /api/v1/streaming/direct`       | `direct`              | required | `conversation` events for the authed account |
-| `GET /api/v1/streaming/health`       | —                     | none     | returns `OK` (text), for `stream_healthy()` |
+| `GET /api/v1/streaming/list?list=` | `list` | required | `update`s from accounts on the given list |
+| `GET /api/v1/streaming/direct` | `direct` | required | `conversation` events for the authed account |
+| `GET /api/v1/streaming/health` | — | none | returns `OK` (text), for `stream_healthy()` |
 
 All streams respond `200` with `Content-Type: text/event-stream` and stay open until the
 client disconnects.
@@ -74,10 +74,10 @@ process with one shared engine, an in-memory pub/sub is exact and synchronous:
 
 | Write path | Published event(s) |
 |-------------------------------------------|-------------------------------------------------|
-| `POST /api/v1/statuses` (immediate)       | `update` to `public`/`hashtag`/author-follower `user` channels; `conversation` to recipients for `direct` visibility |
-| `PUT /api/v1/statuses/{id}` (edit)        | `status_update` to the same channels |
-| `DELETE /api/v1/statuses/{id}`            | `delete` (id payload) to the same channels |
-| any `add_notification(...)` side effect   | `notification` to the recipient's `user` channel |
+| `POST /api/v1/statuses` (immediate) | `update` to `public`/`hashtag`/author-follower `user` channels; `conversation` to recipients for `direct` visibility |
+| `PUT /api/v1/statuses/{id}` (edit) | `status_update` to the same channels |
+| `DELETE /api/v1/statuses/{id}` | `delete` (id payload) to the same channels |
+| any `add_notification(...)` side effect | `notification` to the recipient's `user` channel |
 
 Visibility routing matches the REST timelines:
 

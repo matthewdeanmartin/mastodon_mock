@@ -343,8 +343,7 @@ No remote-resolve (`resolve=True` webfinger) — always behaves as `resolve=Fals
 `Mastodon.py` streams over HTTP Server-Sent-Events (not WebSocket), so these are
 served from `mastodon_mock/routers/streaming.py`. Events are generated as side
 effects of the same write paths as the REST API and routed by visibility. See
-[streaming.md](streaming.md). On by default; `[tool.mastodon_mock.streaming]
-enabled = false` makes the routes (except `health`) 404.
+[streaming.md](streaming.md). On by default; `[tool.mastodon_mock.streaming] enabled = false` makes the routes (except `health`) 404.
 
 | Method | Path | Mastodon.py caller(s) | Coverage |
 |--------|------|------------------------|----------|

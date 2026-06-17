@@ -102,11 +102,18 @@ class SeedFollow(BaseModel):
 
 
 class SeedStatus(BaseModel):
-    """A seeded status by account username."""
+    """A seeded status by account username.
+
+    ``ref`` is an optional stable handle so other seed rows can refer to this
+    status (e.g. as a quote target); it is not persisted. ``quotes`` names the
+    ``ref`` of an earlier seed status this one quotes.
+    """
 
     account: str
     text: str
     visibility: str = "public"
+    ref: str | None = None
+    quotes: str | None = None
 
 
 class SeedAnnouncement(BaseModel):
@@ -172,6 +179,106 @@ DEFAULT_SEED = SeedConfig(
 )
 
 
+# A richer, demo-only seed. Unlike DEFAULT_SEED (deliberately minimal so the test
+# suite starts from a clean, predictable slate) this populates a small community —
+# multiple accounts, follows, a thread, a quote post, and instance announcements —
+# so that every surfaced UI feature has something to show. Applied by
+# ``serve --demo`` via DEMO_CONFIG; not used by the test fixtures.
+# nosec B106 — the tokens below are mock credentials, not real secrets.
+DEMO_SEED = SeedConfig(  # nosec B106
+    accounts=[
+        SeedAccount(
+            username="ada",
+            display_name="Ada Lovelace",
+            note="First programmer. Posting about analytical engines.",
+            access_token="ada_token",  # nosec B106
+            email="ada@mock.local",
+            role="admin",
+        ),
+        SeedAccount(
+            username="grace",
+            display_name="Grace Hopper",
+            note="Compilers, nanoseconds, and debugging actual bugs.",
+            access_token="grace_token",  # nosec B106
+            email="grace@mock.local",
+        ),
+        SeedAccount(
+            username="alan",
+            display_name="Alan Turing",
+            note="Thinking about whether machines can think.",
+            access_token="alan_token",  # nosec B106
+            email="alan@mock.local",
+        ),
+        SeedAccount(
+            username="katherine",
+            display_name="Katherine Johnson",
+            note="Doing the math that gets us to orbit.",
+            access_token="katherine_token",  # nosec B106
+            email="katherine@mock.local",
+        ),
+    ],
+    follows=[
+        SeedFollow(follower="grace", following="ada"),
+        SeedFollow(follower="alan", following="ada"),
+        SeedFollow(follower="katherine", following="ada"),
+        SeedFollow(follower="ada", following="grace"),
+        SeedFollow(follower="alan", following="grace"),
+        SeedFollow(follower="ada", following="alan"),
+    ],
+    statuses=[
+        SeedStatus(
+            account="ada",
+            text="Just finished a new set of notes on the Analytical Engine. #computing",
+            ref="ada_notes",
+        ),
+        SeedStatus(
+            account="grace",
+            text="Reminder: it is easier to ask forgiveness than permission. #debugging",
+            ref="grace_quip",
+        ),
+        SeedStatus(
+            account="alan",
+            text="Brilliant work here — this is the foundation everything else builds on.",
+            quotes="ada_notes",
+        ),
+        SeedStatus(
+            account="katherine",
+            text="Running the numbers one more time before launch. #spaceflight",
+        ),
+        SeedStatus(
+            account="ada",
+            text="Couldn't agree more, Grace. Shipping beats perfect.",
+            quotes="grace_quip",
+        ),
+    ],
+    announcements=[
+        SeedAnnouncement(
+            content="<p>Welcome to the <strong>Mastodon Mock</strong> demo instance! "
+            "Explore timelines, quotes, lists, and the admin panel.</p>",
+        ),
+        SeedAnnouncement(
+            content="Scheduled maintenance window this weekend — expect brief downtime.",
+            all_day=True,
+        ),
+    ],
+)
+
+
+# Sensible instance rules + terms of service for the demo (the About page reads these).
+DEMO_RULES = [
+    "Be excellent to each other.",
+    "No harassment, hate speech, or spam.",
+    "Mark sensitive media as sensitive.",
+    "Credit original creators when you boost or quote.",
+]
+
+DEMO_TERMS_OF_SERVICE = (
+    "<p>This is a <strong>mock</strong> Mastodon instance for testing and demos. "
+    "No real data is stored and the server may be reset at any time.</p>"
+    "<p>By using it you agree to be reasonable, as one does.</p>"
+)
+
+
 class MastodonMockConfig(BaseModel):
     """Top-level configuration object."""
 
@@ -219,6 +326,20 @@ class MastodonMockConfig(BaseModel):
         if not data:
             return cls()
         return cls.model_validate(data)
+
+
+def demo_config(base: MastodonMockConfig | None = None) -> MastodonMockConfig:
+    """Return a config wired for a rich demo (seed, rules, terms of service).
+
+    Starts from ``base`` (or fresh defaults) and overlays the demo seed plus
+    instance rules and terms of service, so every surfaced UI feature has content
+    to show. Used by ``serve --demo``.
+    """
+    config = base.model_copy(deep=True) if base is not None else MastodonMockConfig()
+    config.seed = DEMO_SEED
+    config.rules = list(DEMO_RULES)
+    config.terms_of_service = DEMO_TERMS_OF_SERVICE
+    return config
 
 
 def _read_toml(path: Path) -> dict[str, Any]:

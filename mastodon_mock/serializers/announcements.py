@@ -44,6 +44,7 @@ def serialize_announcement(announcement: Announcement, viewer: Account | None) -
     return {
         "id": sid(announcement.id),
         "content": _render_content(announcement.content),
+        "published": announcement.published,
         "starts_at": iso(announcement.starts_at),
         "ends_at": iso(announcement.ends_at),
         "all_day": announcement.all_day,

@@ -29,6 +29,34 @@ Sections (each driving `routers/admin.py`):
 - **Reports** — `GET /api/v1/admin/reports` (open vs. resolved), with `assign_to_self`,
   `resolve`, and `reopen`.
 - **Domains** — `GET/POST/DELETE /api/v1/admin/domain_blocks`.
+- **Announcements** — `GET/POST/DELETE /api/v1/admin/announcements` plus
+  `POST .../{id}/publish` and `POST .../{id}/unpublish`. Staff can post an
+  announcement (as a draft or published), toggle its published state, and delete it.
+  Published announcements appear on the public `GET /api/v1/announcements` endpoint and
+  in the client's announcements banner.
+- **Trends** — read-only viewer over `GET /api/v1/admin/trends/tags` and
+  `GET /api/v1/admin/trends/statuses` (trending hashtags by usage; most-favourited
+  public statuses).
+
+### Client-facing surfaces beyond the admin panel
+
+The client also surfaces several read-mostly Mastodon features that were previously
+API-only:
+
+- **Quote posts** — `status-card` renders an embedded quoted status (and shows a
+  placeholder when a quote is revoked/unavailable).
+- **Announcements banner** — active announcements on the home page, with dismiss
+  (`POST .../dismiss`) and emoji reactions (`PUT/DELETE .../reactions/{name}`).
+- **About this server** (`/_ui/about`) — instance rules (`GET /api/v1/instance/rules`),
+  terms of service (`GET /api/v1/instance/terms_of_service`), and custom emojis
+  (`GET /api/v1/custom_emojis`).
+
+### Demoing well
+
+`serve --demo` (or `config.demo_config()`) overlays a richer seed — multiple accounts,
+follows, a thread, a quote post, instance announcements — plus default rules and terms
+of service, so every surfaced feature has content. The library default config stays
+minimal so the test suite starts from a clean slate.
 
 ### Dev login (mock-only)
 

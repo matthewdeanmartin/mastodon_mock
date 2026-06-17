@@ -10,7 +10,7 @@ import uvicorn
 
 from mastodon_mock.__about__ import __version__
 from mastodon_mock.app import create_app
-from mastodon_mock.config import PRESETS, MastodonMockConfig, SampleDataConfig
+from mastodon_mock.config import PRESETS, MastodonMockConfig, SampleDataConfig, demo_config
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -27,6 +27,11 @@ def main(argv: list[str] | None = None) -> None:
     serve.add_argument("--host", default=None, help="Host to bind (overrides config)")
     serve.add_argument("--port", type=int, default=None, help="Port to bind (overrides config)")
     serve.add_argument("--in-memory", action="store_true", help="Force in-memory SQLite")
+    serve.add_argument(
+        "--demo",
+        action="store_true",
+        help="Seed a rich demo community (accounts, follows, quotes, announcements, rules, ToS)",
+    )
 
     upgrade = sub.add_parser("db", help="Database commands")
     upgrade.add_argument("db_command", choices=["upgrade"], help="Database subcommand")
@@ -60,6 +65,8 @@ def main(argv: list[str] | None = None) -> None:
 def _serve(args: argparse.Namespace) -> None:
     """Run the uvicorn server with the resolved config."""
     config = MastodonMockConfig.load(args.config)
+    if getattr(args, "demo", False):
+        config = demo_config(config)
     if args.in_memory:
         config.database.path = ":memory:"
     host = args.host or config.server.host

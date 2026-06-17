@@ -68,6 +68,25 @@ def test_serve_builds_app_and_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> N
     assert run_calls["port"] == 9999
 
 
+def test_serve_demo_applies_rich_seed(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_create_app(config: Any) -> object:
+        captured["config"] = config
+        return object()
+
+    monkeypatch.setattr(cli, "create_app", fake_create_app)
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+
+    args = argparse.Namespace(config=None, host=None, port=None, in_memory=True, demo=True)
+    cli._serve(args)
+
+    config = captured["config"]
+    assert config.rules  # demo rules applied
+    assert config.terms_of_service  # demo ToS applied
+    assert len(config.seed.accounts) > 1  # demo community, not the minimal default
+
+
 def test_serve_in_memory_overrides_database_path(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 

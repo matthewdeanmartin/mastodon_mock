@@ -433,9 +433,7 @@ def delete_status(
 
 
 @router.post("/api/v1/statuses/{status_id}/reblog")
-def reblog(
-    request: Request, status_id: str, db: DbSession, config: Config, account: RequiredAccount
-) -> dict[str, Any]:
+def reblog(request: Request, status_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Boost a status (creates a reblog row + notifies the author)."""
     original = _get_status_or_404(db, status_id)
     existing = db.scalar(select(Status).where(Status.reblog_of_id == original.id, Status.account_id == account.id))

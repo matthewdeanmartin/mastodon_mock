@@ -17,19 +17,19 @@
 This is the **remaining** backlog (the items already implemented are listed
 separately at the bottom, not here).
 
-| Endpoint                           | Current      | Effort        | Worth it?                          |
+| Endpoint | Current | Effort | Worth it? |
 |------------------------------------|--------------|---------------|------------------------------------|
-| `GET /api/v1/timelines/link`       | Stub `[]`    | **Easy**      | Maybe — only if a test iterates it |
-| `GET /api/v1/trends/links`         | Stub `[]`    | **Medium**    | Low — needs preview-card synthesis |
-| `GET /api/v1/admin/trends/links`   | Stub `[]`    | Medium        | Low — same as public trending links |
-| `POST /api/v1/admin/measures`      | Static zeros | **Medium**    | Maybe — real counts are derivable  |
-| `POST /api/v1/admin/dimensions`    | Static empty | **Medium**    | Maybe                              |
-| `POST /api/v1/admin/retention`     | Static `[]`  | Hard          | No — needs cohort time-series      |
-| `POST /api/v1/emails/confirmations`| Stub 200     | n/a (correct) | No — already correct               |
-| Streaming (SSE)                    | **Full**     | done          | ✅ Implemented (2026-06-17)        |
-| WebPush / VAPID                    | OOS          | Hard          | No — explicit non-goal             |
+| `GET /api/v1/timelines/link` | Stub `[]` | **Easy** | Maybe — only if a test iterates it |
+| `GET /api/v1/trends/links` | Stub `[]` | **Medium** | Low — needs preview-card synthesis |
+| `GET /api/v1/admin/trends/links` | Stub `[]` | Medium | Low — same as public trending links |
+| `POST /api/v1/admin/measures` | Static zeros | **Medium** | Maybe — real counts are derivable |
+| `POST /api/v1/admin/dimensions` | Static empty | **Medium** | Maybe |
+| `POST /api/v1/admin/retention` | Static `[]` | Hard | No — needs cohort time-series |
+| `POST /api/v1/emails/confirmations`| Stub 200 | n/a (correct) | No — already correct |
+| Streaming (SSE) | **Full** | done | ✅ Implemented (2026-06-17) |
+| WebPush / VAPID | OOS | Hard | No — explicit non-goal |
 
----
+______________________________________________________________________
 
 ## 1. Cheap wins still on the table
 
@@ -43,7 +43,7 @@ The "trending links" timeline. Empty today. Could in principle return public
 statuses that contain a URL, but without preview-card synthesis (see §2) the
 result is thin. **Effort:** Easy to return *something*; **Worth it:** low.
 
----
+______________________________________________________________________
 
 ## 2. Genuinely hard / deliberately empty (don't bother for v1)
 
@@ -81,7 +81,7 @@ curves (`retention`).
 assertions. Promote `measures`/`dimensions` to real counts *only* if a test
 actually asserts on the numbers.
 
----
+______________________________________________________________________
 
 ## 3. Already correct (not actually gaps)
 
@@ -102,7 +102,7 @@ answer and should not be changed:
 - **`instance/extended_description` → empty content** — valid for an instance
   with none configured (and config-driven if you want it non-empty).
 
----
+______________________________________________________________________
 
 ## 4. Out of scope by design (won't implement)
 
@@ -116,10 +116,10 @@ Per [03-api-coverage.md](03-api-coverage.md) §"Modules entirely out of scope":
 1. The client registers a **subscription** with the browser's push service
    (Mozilla, Google FCM, Apple APNs) and hands Mastodon three things: an
    **endpoint URL**, a **p256dh** public key, and an **auth** secret.
-2. When something happens (mention, follow, …), Mastodon **encrypts** the payload
+1. When something happens (mention, follow, …), Mastodon **encrypts** the payload
    (RFC 8291: ECDH against the p256dh key + an HKDF-derived AES-GCM key) and POSTs
    the ciphertext to the endpoint URL.
-3. The push service relays it to the device, which decrypts and displays it.
+1. The push service relays it to the device, which decrypts and displays it.
 
 **VAPID** (RFC 8292) is the auth layer: Mastodon holds an ECDSA P-256 keypair and
 signs a JWT per push proving *this server* may push to *that subscription*. The
@@ -169,7 +169,7 @@ gap to close — for the reasons above (encrypted side-channel delivery with no
 browser push service in a test, and nothing it surfaces that `notifications()`
 doesn't already).
 
----
+______________________________________________________________________
 
 ## Recommended order of work, if you do the rest of the last mile
 
@@ -184,7 +184,7 @@ empties are honest, and filling them means re-creating a Mastodon subsystem with
 real data behind it. **Streaming, formerly on this list, is now implemented** (see
 below).
 
----
+______________________________________________________________________
 
 ## Already implemented (2026-06-16)
 
@@ -199,26 +199,26 @@ verbatim-echoed output.
    (`filter_statuses_v2`, `add_filter_status_v2`, `filter_status_v2`,
    `delete_filter_status_v2`, owner-scoped). `serialize_filter_v2` now includes
    the attached statuses. The v2 filters API is now **Full** across the board.
-2. **Admin trends** — `routers/instance.py` exposes shared `trending_tag_rows` /
+1. **Admin trends** — `routers/instance.py` exposes shared `trending_tag_rows` /
    `trending_status_rows`; `admin_trending_tags`/`admin_trending_statuses`
    (`routers/admin.py`) reuse them and reshape to the admin entity. Admin
    trending *links* stays Stub (no card synthesis).
-3. **Pig-Latin translation** — new `mastodon_mock/text.py`
+1. **Pig-Latin translation** — new `mastodon_mock/text.py`
    (`pig_latin_word`/`pig_latin_text`/`pig_latin_html`, HTML-tag/entity-safe);
    `status_translate` returns the pig-latinized content + spoiler text. It's a
    deterministic, obviously-fake transform, so `translated != original` (the old
    verbatim echo made round-trip translation tests meaningless).
-4. **Dummy preview cards** — `_preview_card` in `serializers/statuses.py`
+1. **Dummy preview cards** — `_preview_card` in `serializers/statuses.py`
    synthesizes a fixed-shape `PreviewCard` pointing at the first URL in a
    status's text (`provider_name="mastodon_mock"`); statuses with no link keep
    `card == None`, matching real Mastodon. No URL crawling.
-5. **Announcements** — new `announcements` / `announcement_dismissals` /
+1. **Announcements** — new `announcements` / `announcement_dismissals` /
    `announcement_reactions` tables + models (`db/models.py`), migration
    `b2d5f8a3c014`, `serialize_announcement` (`serializers/announcements.py`),
    config-seeded via `SeedConfig.announcements`, and the four handlers in
    `routers/instance.py` (list + dismiss + reaction add/remove). `read` and
    reaction `count`/`me` are viewer-relative and persisted per account.
-6. **Terms of service** — `config.terms_of_service` + `serialize_terms_of_service`;
+1. **Terms of service** — `config.terms_of_service` + `serialize_terms_of_service`;
    `instance_terms_of_service` returns the `TermsOfService` entity when set, else
    404 (matching an instance with none configured), exactly like `rules`.
 
@@ -261,7 +261,7 @@ client developer cannot get from any other local mock.
    - Config: `StreamingConfig` (`[tool.mastodon_mock.streaming]`, on by default;
      `enabled=false` 404s the routes). Test helper: `MockServer.stream(...)` →
      `StreamCollector` with `.next(event, timeout=)` / `.all()`.
-2. **Fault injection** — see [fault_injection.md](fault_injection.md). A mock-only
+1. **Fault injection** — see [fault_injection.md](fault_injection.md). A mock-only
    control plane so clients can test retry/back-off, `429`, `5xx`, malformed-JSON,
    and timeout handling.
    - `mastodon_mock/faults.py` — `FaultStore` (ordered rules, glob/regex path

@@ -31,10 +31,14 @@ def apply_seed_data(engine: Engine, seed: SeedConfig) -> None:
             if follower is not None and target is not None:
                 do_follow(session, follower, target)
 
+        # ``ref`` -> created Status, so a later seed status can quote an earlier one.
+        ref_to_status: dict[str, Status] = {}
         for status_spec in seed.statuses:
             author = username_to_account.get(status_spec.account)
             if author is not None:
-                _ensure_status(session, author, status_spec)
+                status = _ensure_status(session, author, status_spec, ref_to_status)
+                if status_spec.ref is not None:
+                    ref_to_status[status_spec.ref] = status
 
         for announcement_spec in seed.announcements:
             _ensure_announcement(session, announcement_spec)
@@ -80,11 +84,20 @@ def _ensure_token(session: Session, access_token: str, account_id: int) -> None:
         )
 
 
-def _ensure_status(session: Session, account: Account, spec: SeedStatus) -> None:
-    """Find-or-create a seed status matched on (account_id, text)."""
+def _ensure_status(
+    session: Session,
+    account: Account,
+    spec: SeedStatus,
+    ref_to_status: dict[str, Status],
+) -> Status:
+    """Find-or-create a seed status matched on (account_id, text).
+
+    When ``spec.quotes`` names a known ref, the new status quotes that status.
+    """
     existing = session.scalar(select(Status).where(Status.account_id == account.id, Status.text == spec.text))
     if existing is not None:
-        return
+        return existing
+    quoted = ref_to_status.get(spec.quotes) if spec.quotes is not None else None
     status = Status(
         account_id=account.id,
         content=f"<p>{spec.text}</p>",
@@ -92,10 +105,12 @@ def _ensure_status(session: Session, account: Account, spec: SeedStatus) -> None
         visibility=spec.visibility,
         created_at=utcnow(),
         edit_history=[],
+        quoted_status_id=quoted.id if quoted is not None else None,
     )
     session.add(status)
     session.flush()
     attach_mentions_and_tags(session, status.id, account.id, spec.text)
+    return status
 
 
 def _ensure_announcement(session: Session, spec: SeedAnnouncement) -> None:

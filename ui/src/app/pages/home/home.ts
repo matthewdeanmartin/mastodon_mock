@@ -3,10 +3,11 @@ import { Api } from '../../api';
 import { Status } from '../../models';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
+import { Announcements } from '../../announcements/announcements';
 
 @Component({
   selector: 'app-home',
-  imports: [Compose, StatusCard],
+  imports: [Compose, StatusCard, Announcements],
   templateUrl: './home.html',
 })
 export class Home implements OnInit {

@@ -1,0 +1,37 @@
+.trend-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.trend-section h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 12px;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.tag-chip:hover {
+  border-color: var(--accent);
+}
+
+.tag-name {
+  font-weight: 700;
+}
+
+.tag-uses {
+  font-size: 12px;
+}
