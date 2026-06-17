@@ -45,7 +45,7 @@ mastodon_mock = "mastodon_mock.testing.plugin"
 
 [project.urls]
 Repository = "https://github.com/matthewdeanmartin/mastodon_mock"
-Documentation = "https://mastodon_mock.readthedocs.io/en/latest/"
+Documentation = "https://mastodon-mock.readthedocs.io/en/latest/"
 Changelog = "https://github.com/matthewdeanmartin/mastodon_mock/blob/main/CHANGELOG.md"
 homepage = "https://github.com/matthewdeanmartin/mastodon_mock"
 issues = "https://github.com/matthewdeanmartin/mastodon_mock/issues/"

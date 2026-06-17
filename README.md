@@ -73,7 +73,7 @@ mastodon_mock gen-data --preset small --database ./mastodon_mock.sqlite --yes
 
 ## Documentation
 
-See the [documentation](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/index.md)
+See the [documentation](https://mastodon-mock.readthedocs.io/en/latest/)
 for configuration, fixtures, endpoint coverage, data generation, and admin UI/API details.
 
 ## Contributing
