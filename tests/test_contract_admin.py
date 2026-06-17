@@ -192,12 +192,29 @@ def test_admin_ip_block_crud(alice: Mastodon) -> None:
     assert all(b.id != block.id for b in alice.admin_ip_blocks())
 
 
-# --- Trends (stub) ------------------------------------------------------------
+# --- Trends -------------------------------------------------------------------
 
 
-def test_admin_trends_are_empty(alice: Mastodon) -> None:
-    assert alice.admin_trending_tags() == []
-    assert alice.admin_trending_statuses() == []
+def test_admin_trending_tags_derived_from_local_usage(alice: Mastodon) -> None:
+    # Seed a tagged status so there is a hashtag to trend on.
+    alice.status_post("loving the #mockfest today")
+    tags = alice.admin_trending_tags()
+    assert any(t.name == "mockfest" for t in tags)
+    # AdminTag shape carries the moderation flags.
+    trended = next(t for t in tags if t.name == "mockfest")
+    assert trended.requires_review is False
+    assert trended.trendable is True
+
+
+def test_admin_trending_statuses_ranked_by_favourites(alice: Mastodon, bob: Mastodon) -> None:
+    status = alice.status_post("a popular post")
+    bob.status_favourite(status.id)
+    statuses = alice.admin_trending_statuses()
+    assert any(s.id == status.id for s in statuses)
+
+
+def test_admin_trending_links_are_empty(alice: Mastodon) -> None:
+    # Links stay Stub: no preview-card synthesis for trends.
     assert alice.admin_trending_links() == []
 
 

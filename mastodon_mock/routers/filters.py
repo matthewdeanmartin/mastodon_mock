@@ -8,10 +8,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import select
 
-from mastodon_mock.db.models import Filter, FilterKeyword
+from mastodon_mock.db.models import Filter, FilterKeyword, FilterStatus
 from mastodon_mock.deps import DbSession, RequiredAccount
 from mastodon_mock.serializers.misc import (
     serialize_filter_keyword,
+    serialize_filter_status,
     serialize_filter_v1,
     serialize_filter_v2,
 )
@@ -162,9 +163,45 @@ def delete_filter_keyword_v2(keyword_id: str, db: DbSession, account: RequiredAc
 
 
 @router.get("/api/v2/filters/{filter_id}/statuses")
-def filter_statuses_v2(filter_id: str) -> list[Any]:
-    """Empty list: the mock has no per-status filter overrides."""
-    return []
+def filter_statuses_v2(filter_id: str, db: DbSession, account: RequiredAccount) -> list[dict[str, Any]]:
+    """List the statuses attached to a filter."""
+    filt = _filter_or_404(db, filter_id, account.id)
+    return [serialize_filter_status(s) for s in filt.status_filters]
+
+
+@router.post("/api/v2/filters/{filter_id}/statuses")
+async def add_filter_status_v2(
+    filter_id: str, request: Request, db: DbSession, account: RequiredAccount
+) -> dict[str, Any]:
+    """Attach a status to a filter."""
+    filt = _filter_or_404(db, filter_id, account.id)
+    params = await _params(request)
+    status_id = params.get("status_id")
+    if not status_id:
+        raise HTTPException(status_code=422, detail="Validation failed: Status can't be blank")
+    try:
+        status_id_int = int(status_id)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail="Validation failed: Status is invalid") from exc
+    fs = FilterStatus(filter_id=filt.id, status_id=status_id_int)
+    db.add(fs)
+    db.commit()
+    return serialize_filter_status(fs)
+
+
+@router.get("/api/v2/filters/statuses/{filter_status_id}")
+def filter_status_v2(filter_status_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Fetch a single filter-status row by its id."""
+    return serialize_filter_status(_filter_status_or_404(db, filter_status_id, account.id))
+
+
+@router.delete("/api/v2/filters/statuses/{filter_status_id}", status_code=200)
+def delete_filter_status_v2(filter_status_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Detach a status from a filter."""
+    fs = _filter_status_or_404(db, filter_status_id, account.id)
+    db.delete(fs)
+    db.commit()
+    return {}
 
 
 # --- v1 ---
@@ -263,3 +300,17 @@ def _filter_or_404(db: DbSession, filter_id: str, account_id: int) -> Filter:
     if filt is None or filt.account_id != account_id:
         raise HTTPException(status_code=404, detail="Record not found")
     return filt
+
+
+def _filter_status_or_404(db: DbSession, filter_status_id: str, account_id: int) -> FilterStatus:
+    """Fetch a filter-status row whose parent filter the account owns, or 404."""
+    try:
+        fs = db.get(FilterStatus, int(filter_status_id))
+    except (ValueError, TypeError):
+        fs = None
+    if fs is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    parent = db.get(Filter, fs.filter_id)
+    if parent is None or parent.account_id != account_id:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return fs

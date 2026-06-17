@@ -374,6 +374,7 @@ class Filter(Base):
     filter_action: Mapped[str] = mapped_column(String, default="warn")
 
     keywords: Mapped[list[FilterKeyword]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+    status_filters: Mapped[list[FilterStatus]] = relationship(cascade="all, delete-orphan", lazy="selectin")
 
 
 class FilterKeyword(Base):
@@ -385,6 +386,61 @@ class FilterKeyword(Base):
     filter_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("filters.id"), index=True)
     keyword: Mapped[str] = mapped_column(String, default="")
     whole_word: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class FilterStatus(Base):
+    """A specific status attached to a filter (``FilterStatus``)."""
+
+    __tablename__ = "filter_statuses"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    filter_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("filters.id"), index=True)
+    status_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("statuses.id"), index=True)
+
+
+class Announcement(Base):
+    """An instance announcement posted by staff.
+
+    Announcement bodies are seeded from config; per-user read (dismissed) state
+    and reactions live in their own tables so they can be set at runtime.
+    """
+
+    __tablename__ = "announcements"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    content: Mapped[str] = mapped_column(Text, default="")
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    all_day: Mapped[bool] = mapped_column(Boolean, default=False)
+    published: Mapped[bool] = mapped_column(Boolean, default=True)
+    published_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    dismissals: Mapped[list[AnnouncementDismissal]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+    reactions: Mapped[list[AnnouncementReaction]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+
+
+class AnnouncementDismissal(Base):
+    """Records that an account has dismissed (read) an announcement."""
+
+    __tablename__ = "announcement_dismissals"
+    __table_args__ = (UniqueConstraint("announcement_id", "account_id", name="uq_announcement_dismissal"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    announcement_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("announcements.id"), index=True)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+
+
+class AnnouncementReaction(Base):
+    """A single account's reaction (one emoji ``name``) to an announcement."""
+
+    __tablename__ = "announcement_reactions"
+    __table_args__ = (UniqueConstraint("announcement_id", "account_id", "name", name="uq_announcement_reaction"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    announcement_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("announcements.id"), index=True)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    name: Mapped[str] = mapped_column(String, default="")
 
 
 class ScheduledStatus(Base):

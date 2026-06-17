@@ -40,6 +40,7 @@ from mastodon_mock.serializers.statuses import (
     serialize_status_source,
 )
 from mastodon_mock.services import add_notification, attach_mentions_and_tags
+from mastodon_mock.text import pig_latin_html, pig_latin_text
 
 router = APIRouter()
 
@@ -76,7 +77,7 @@ def _validate_status_params(params: dict[str, Any]) -> JSONResponse | None:
         return _validation_error(f"Validation failed: Text is too long (maximum is {MAX_STATUS_CHARACTERS} characters)")
     if media_count > MAX_MEDIA_ATTACHMENTS:
         return _validation_error(
-            f"Validation failed: Media attachments count is too high " f"(maximum is {MAX_MEDIA_ATTACHMENTS})"
+            f"Validation failed: Media attachments count is too high (maximum is {MAX_MEDIA_ATTACHMENTS})"
         )
     return None
 
@@ -548,11 +549,18 @@ def unmute_status(status_id: str, db: DbSession, config: Config, account: Requir
 
 @router.post("/api/v1/statuses/{status_id}/translate")
 def translate(status_id: str, db: DbSession) -> dict[str, Any]:
-    """Static: echo content as the "translation"."""
+    """ "Translate" a status by pig-latinizing its text.
+
+    There is no real translation engine in the mock; instead we apply a
+    deterministic, visible transformation (Pig Latin) so that callers can assert
+    the translated text *differs* from the source — unlike the old verbatim echo,
+    where ``translated == original`` made round-trip tests meaningless. HTML tags
+    in ``content`` are preserved; only the visible words are transformed.
+    """
     status = _get_status_or_404(db, status_id)
     return {
-        "content": status.content,
-        "spoiler_text": status.spoiler_text,
+        "content": pig_latin_html(status.content),
+        "spoiler_text": pig_latin_text(status.spoiler_text or ""),
         "detected_source_language": "en",
         "provider": "mastodon_mock",
         "media_attachments": [],

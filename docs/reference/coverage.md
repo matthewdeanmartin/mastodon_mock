@@ -51,8 +51,14 @@ relationships, notifications, and pagination you'd expect.
 - **Search** — v1 and v2, over local accounts, status content, and hashtags.
 - **Lists** — full CRUD plus membership add/remove.
 - **Favourites & bookmarks** — list endpoints.
-- **Filters** — v1 and v2 CRUD, plus v2 keyword add/remove.
+- **Filters** — v1 and v2 CRUD, plus v2 keyword add/remove **and v2 status
+  attach/detach** (`filter_statuses`).
 - **Conversations** — derived from `direct`-visibility statuses; mark-as-read.
+- **Announcements** — listed from config-seeded announcements, with per-user
+  dismiss (`read`) and emoji reactions (`announcement_dismiss` /
+  `announcement_reaction_create` / `announcement_reaction_delete`).
+- **Terms of service** — `terms_of_service` returns the configured ToS, or `404`
+  when none is set (config-driven, like instance `rules`).
 - **Preferences & markers** — read preferences; get/set markers.
 - **Polls** — fetch and vote (recomputes counts and `own_votes`).
 - **Reports** — `report()` files a moderation report against an account (this is what
@@ -75,7 +81,11 @@ The response is well-formed and stable, but nothing changes in response to your 
 - **OAuth server metadata** — `/.well-known/oauth-authorization-server`, `/oauth/userinfo`.
 - **Directory** — `/api/v1/directory` (sorts/filters real seeded accounts, but the listing
   itself is read-only).
-- **Status translation** — returns the original content verbatim with a fixed provider.
+- **Status translation** — "translates" by pig-latinizing the text (HTML-safe), so
+  the result is deterministic and visibly differs from the source. No real engine.
+- **Preview cards** — a status whose text contains a link gets a fixed dummy
+  `PreviewCard` (pointing at that URL); link-free statuses have `card = null`. No
+  URL crawling.
 - **Custom emojis** — a small, fixed set in the correct `CustomEmoji` shape.
 - **Translation languages** — each supported source language mapped to a fixed target set.
 - **Notification policy** — a fixed "accept everything" policy (PATCH accepted and ignored).
@@ -91,7 +101,8 @@ not full reproductions of Mastodon's ranking algorithms, but the shapes match a 
 - **Instance `peers`** — the distinct domains of your seeded "remote" accounts.
 - **Instance `domain_blocks`** — derived from admin domain blocks (with a sha256 `digest`).
 - **Trends** — trending **tags** ranked by local hashtag usage; trending **statuses** ranked
-  by favourite count. Trending **links** is an empty list (no preview-card synthesis).
+  by favourite count (both also exposed on the **admin** trends endpoints). Trending
+  **links** is an empty list (no preview-card synthesis).
 - **Follow suggestions** (`suggestions_v2`) — local accounts you don't already follow.
 - **Endorsements** — the accounts you've endorsed (`relationships.endorsed`, i.e. pinned).
 - **Notification requests** — empty (the "accept everything" policy filters nothing), with
@@ -102,9 +113,8 @@ not full reproductions of Mastodon's ranking algorithms, but the shapes match a 
 These exist so client flows that touch them in passing don't blow up, but they have no real
 data:
 
-- Instance: `announcements` (empty), `terms_of_service` (`404`, as on a server with none set).
-- `filter_statuses_v2` (empty list), `timeline_link` (empty list), trending `links` (empty).
-- Admin trends / measures / dimensions / retention — correctly-shaped but zero/empty values.
+- `timeline_link` (empty list), trending `links` / `admin/trends/links` (empty).
+- Admin measures / dimensions / retention — correctly-shaped but zero/empty values.
 - `email_resend_confirmation` (accepts and does nothing).
 
 ## Out of scope (not routed — expect `404`)
@@ -114,7 +124,6 @@ Whole modules and a few endpoints are intentionally absent. Calling them raises
 
 - **WebPush / VAPID** (`mastodon/push.py`).
 - **Streaming / WebSocket** (`mastodon/streaming.py`).
-- Filter-status add/get/delete (the v2 `filter_statuses` *write* side).
 - Announcement dismiss/reactions (there are no announcements to act on).
 
 ## Cross-cutting behaviours worth knowing

@@ -8,6 +8,7 @@ defaults. See spec/01-architecture.md.
 from __future__ import annotations
 
 import tomllib
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -84,12 +85,28 @@ class SeedStatus(BaseModel):
     visibility: str = "public"
 
 
+class SeedAnnouncement(BaseModel):
+    """A seeded instance announcement.
+
+    ``content`` is the announcement body (rendered to HTML by wrapping in a
+    ``<p>`` if it isn't already markup). The optional time fields and ``all_day``
+    map straight onto the ``Announcement`` entity.
+    """
+
+    content: str
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    all_day: bool = False
+    published: bool = True
+
+
 class SeedConfig(BaseModel):
     """The collection of seed data."""
 
     accounts: list[SeedAccount] = Field(default_factory=list)
     follows: list[SeedFollow] = Field(default_factory=list)
     statuses: list[SeedStatus] = Field(default_factory=list)
+    announcements: list[SeedAnnouncement] = Field(default_factory=list)
 
 
 class SampleDataConfig(BaseModel):
@@ -147,6 +164,9 @@ class MastodonMockConfig(BaseModel):
     seed: SeedConfig = Field(default_factory=lambda: DEFAULT_SEED)
     sample_data: SampleDataConfig = Field(default_factory=SampleDataConfig)
     rules: list[str] = Field(default_factory=list)
+    # Instance terms of service (HTML or plain text). Empty → the ToS endpoint
+    # 404s, matching an instance with none configured.
+    terms_of_service: str = ""
 
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> MastodonMockConfig:

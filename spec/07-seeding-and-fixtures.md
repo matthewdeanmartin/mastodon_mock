@@ -43,6 +43,14 @@ following = "carol"
 account = "carol"
 text = "hello from a remote-looking account"
 visibility = "public"
+
+[[tool.mastodon_mock.seed.announcements]]
+content = "Scheduled maintenance this weekend."
+
+# Instance terms of service (HTML or plain text). Omit/leave empty and the ToS
+# endpoint 404s, matching an instance with none configured.
+[tool.mastodon_mock]
+terms_of_service = "<p>Be excellent to each other.</p>"
 ```
 
 ## `apply_seed_data(engine, seed_config)`
@@ -101,6 +109,9 @@ def apply_seed_data(engine: Engine, seed: SeedConfig) -> None:
   re-run. These get real `statuses` rows so they show up in timelines immediately —
   useful for "alice already has 3 posts" style fixtures without each test needing to
   post them.
+- **Seed announcements**: matched by `content` (idempotent on re-run). They get real
+  `announcements` rows so `announcements()` returns them; per-user dismiss (`read`)
+  and reactions are applied at runtime, not seeded.
 
 ## Default seed (zero-config mode)
 

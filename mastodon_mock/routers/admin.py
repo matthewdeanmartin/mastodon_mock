@@ -391,20 +391,33 @@ def admin_report_resolve(report_id: str, db: DbSession, config: Config, account:
 
 
 # --- Trends -------------------------------------------------------------------
-# Trending data is Stub (empty) per spec; the admin variants mirror that. The
-# approve/reject endpoints echo back a minimal entity so callers don't error.
+# Admin trending tags/statuses reuse the public, data-derived trends logic (see
+# routers/instance.py) and re-shape it for the admin API. Trending links stay
+# Stub (no preview-card synthesis). The approve/reject endpoints echo back a
+# minimal entity so callers don't error.
 
 
 @router.get("/api/v1/admin/trends/tags")
-def admin_trending_tags(db: DbSession, account: RequiredAccount) -> list[dict[str, Any]]:
-    """Admin trending tags — empty (trends are Stub)."""
-    return []
+def admin_trending_tags(
+    db: DbSession, config: Config, account: RequiredAccount, limit: int = 10
+) -> list[dict[str, Any]]:
+    """Admin trending tags — local hashtags ranked by usage, in the AdminTag shape."""
+    from mastodon_mock.routers.instance import trending_tag_rows
+
+    return [
+        {**tag, "requires_review": False, "trendable": True, "usable": True}
+        for tag in trending_tag_rows(db, config, min(limit, 20))
+    ]
 
 
 @router.get("/api/v1/admin/trends/statuses")
-def admin_trending_statuses(db: DbSession, account: RequiredAccount) -> list[dict[str, Any]]:
-    """Admin trending statuses — empty (trends are Stub)."""
-    return []
+def admin_trending_statuses(
+    db: DbSession, config: Config, account: RequiredAccount, limit: int = 20
+) -> list[dict[str, Any]]:
+    """Admin trending statuses — the most-favourited public local statuses."""
+    from mastodon_mock.routers.instance import trending_status_rows
+
+    return trending_status_rows(db, config, account, min(limit, 40))
 
 
 @router.get("/api/v1/admin/trends/links")

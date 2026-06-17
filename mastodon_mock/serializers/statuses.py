@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select
@@ -30,12 +31,47 @@ if TYPE_CHECKING:
     from mastodon_mock.serializers.batch import BatchContext
 
 
+_URL_RE = re.compile(r"https?://[^\s\"'<>]+")
+
+
 def _count(session: Session, model: Any, **filters: Any) -> int:
     """Count rows of ``model`` matching equality ``filters``."""
     stmt = select(func.count()).select_from(model)
     for key, value in filters.items():
         stmt = stmt.where(getattr(model, key) == value)
     return session.scalar(stmt) or 0
+
+
+def _preview_card(status: Status) -> dict[str, Any] | None:
+    """Synthesize a deterministic dummy ``PreviewCard`` for the first link, if any.
+
+    Real Mastodon builds cards by crawling the linked URL's OpenGraph tags; the
+    mock can't (and shouldn't) fetch external URLs in a test fixture. Instead, when
+    a status contains a link we return a fixed-shape, deterministic placeholder card
+    pointing at that URL, so callers that read ``status.card`` get a correctly-shaped,
+    non-``None`` object to assert on. Statuses with no link have ``card == None``,
+    matching real Mastodon.
+    """
+    match = _URL_RE.search(status.content or "")
+    if match is None:
+        return None
+    url = match.group(0)
+    return {
+        "url": url,
+        "title": "Example link",
+        "description": "A placeholder preview card synthesized by mastodon_mock.",
+        "type": "link",
+        "author_name": "",
+        "author_url": "",
+        "provider_name": "mastodon_mock",
+        "provider_url": "",
+        "html": "",
+        "width": 0,
+        "height": 0,
+        "image": None,
+        "embed_url": "",
+        "blurhash": None,
+    }
 
 
 def _mentions_from_ctx(accounts: list[Account], config: MastodonMockConfig) -> list[dict[str, Any]]:
@@ -218,7 +254,7 @@ def serialize_status(
         "media_attachments": [serialize_media(m) for m in media],
         "emojis": [],
         "tags": tags,
-        "card": None,
+        "card": _preview_card(status),
         "poll": poll_data,
         "application": application,
         "quote": quote_data,

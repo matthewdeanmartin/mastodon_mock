@@ -44,12 +44,12 @@ to a concrete client call.
 | GET | `/api/v1/instance/peers` | `instance_peers()` | **Full** — distinct domains of "remote" accounts |
 | GET | `/.well-known/nodeinfo` + nodeinfo doc | `instance_nodeinfo()` | **Static** — minimal 2.0 schema doc with `software.name="mastodon_mock"`, `software.version=mocked_version` |
 | GET | `/api/v1/instance/rules` | `instance_rules()` | **Static** — empty list by default, configurable via seed config |
-| GET | `/api/v1/instance/terms_of_service` | `instance_terms_of_service()` | **Stub** — `MastodonNotFoundError` (404) — matches instances with no ToS configured |
+| GET | `/api/v1/instance/terms_of_service` | `instance_terms_of_service()` | **Full(ish)** — returns the `TermsOfService` entity built from `config.terms_of_service`; 404s when that is empty (matches instances with no ToS configured) |
 | GET | `/api/v1/directory` | `instance_directory()` | **Full** — `order=active` (default) sorts by most recent status time, `order=new` by account `created_at`; `local` filters to local accounts |
 | GET | `/api/v1/custom_emojis` | `custom_emojis()` | **Static** — small fixed set in the `CustomEmoji` shape |
-| GET | `/api/v1/announcements` | `announcements()` | **Stub** — empty list (matches an instance with none configured) |
-| POST | `/api/v1/announcements/{id}/dismiss` | `announcement_dismiss()` | **OOS** (no announcements exist to dismiss) |
-| PUT/DELETE | `/api/v1/announcements/{id}/reactions/{reaction}` | `announcement_add_reaction()` / `announcement_remove_reaction()` | **OOS** |
+| GET | `/api/v1/announcements` | `announcements()` | **Full** — published announcements (seeded via `config.seed.announcements`) newest-first; `read` is viewer-relative (true once dismissed); reactions tallied per emoji |
+| POST | `/api/v1/announcements/{id}/dismiss` | `announcement_dismiss()` | **Full** — records a per-account dismissal (`announcement_dismissals`); idempotent |
+| PUT/DELETE | `/api/v1/announcements/{id}/reactions/{reaction}` | `announcement_reaction_create()` / `announcement_reaction_delete()` | **Full** — per-account reaction rows (`announcement_reactions`); idempotent; `count`/`me` derived |
 | GET | `/api/v1/instance/extended_description` | `instance_extended_description()` | **Static** — empty/placeholder HTML |
 | GET | `/api/v1/instance/translation_languages` | `instance_supported_translation_languages()` | **Static** — each supported source language → fixed target set (`{source: [targets...]}`) |
 | GET | `/api/v1/instance/domain_blocks` | `instance_domain_blocks()` | **Full** — derived from admin domain blocks; each entry has a sha256 `digest`, `severity`, `comment` |
@@ -115,7 +115,7 @@ to a concrete client call.
 | GET | `/api/v1/statuses/{id}/context` | `status_context()` | **Full** — walks `in_reply_to_id` chain for ancestors; children for descendants |
 | GET | `/api/v1/statuses/{id}/reblogged_by` | `status_reblogged_by()` | **Full** |
 | GET | `/api/v1/statuses/{id}/favourited_by` | `status_favourited_by()` | **Full** |
-| GET | `/api/v1/statuses/{id}/card` | `status_card()` (pre-3.0 fallback) | **Stub** — `status.card` is always `None`/absent; `status_card` on a 4.x mock will use the `Status.card` field path instead and this route is unused |
+| GET | `/api/v1/statuses/{id}/card` | `status_card()` (pre-3.0 fallback) | **Static** — `Status.card` is now a deterministic dummy `PreviewCard` whenever the status text contains a URL (pointing at the first link, `provider_name="mastodon_mock"`), else `None`. No URL crawling — the card values are fixed placeholders. The pre-3.0 route itself stays unused on a 4.x mock (the field path is used) |
 | GET | `/api/v1/statuses/{id}/history` | `status_history()` | **Full** — one entry per edit, see "Edits" below |
 | GET | `/api/v1/statuses/{id}/source` | `status_source()` | **Full** |
 | GET | `/api/v1/statuses/{id}/quotes` | `status_quotes()` | **Full** — paginated list of statuses quoting this one (4.5+). Quote posts via `quoted_status_id`; serializer emits `quote = {state: "accepted", quoted_status}`. |
@@ -137,7 +137,7 @@ to a concrete client call.
 | POST | `/api/v1/statuses/{id}/unpin` | `status_unpin()` | **Full** |
 | POST | `/api/v1/statuses/{id}/bookmark` | `status_bookmark()` | **Full** |
 | POST | `/api/v1/statuses/{id}/unbookmark` | `status_unbookmark()` | **Full** |
-| POST | `/api/v1/statuses/{id}/translate` | `status_translate()` | **Static** — returns the original `content` verbatim with `detected_source_language="en"`, `provider="mastodon_mock"` (good enough for callers that just check the shape) |
+| POST | `/api/v1/statuses/{id}/translate` | `status_translate()` | **Static** — "translates" by **pig-latinizing** the visible text (HTML tags/entities preserved), `detected_source_language="en"`, `provider="mastodon_mock"`. Deterministic and visibly different from the source, so round-trip tests can assert `translated != original` (no real translation engine) |
 | POST | `/api/v1/statuses/{id}/quotes/{qid}/revoke` | `status_quote_revoke()` | **Full** — sets the quoting status's `quote.state` to `revoked` (which hides `quoted_status`); only the quoted status's author may revoke |
 | PUT | `/api/v1/statuses/{id}/interaction_policy` | `status_update_quote_approval_policy()` | **Full** — sets `quote_approval_policy` (`public`/`followers`/`nobody`); `private`/`direct` statuses are forced to `nobody`; author-only |
 
@@ -235,9 +235,9 @@ No remote-resolve (`resolve=True` webfinger) — always behaves as `resolve=Fals
 | GET | `/api/v2/filters/{id}/keywords` | `filter_keywords_v2()` | **Full** |
 | POST | `/api/v2/filters/{id}/keywords` | `add_filter_keyword_v2()` | **Full** |
 | DELETE | `/api/v2/filters/keywords/{id}` | `delete_filter_keyword_v2()` | **Full** |
-| GET | `/api/v2/filters/{id}/statuses` | `filter_statuses_v2()` | **Stub** — empty list |
-| POST | `/api/v2/filters/{id}/statuses` | `add_filter_status_v2()` | **OOS** |
-| GET/DELETE | `/api/v2/filters/statuses/{id}` | `filter_status_v2()`/`delete_filter_status_v2()` | **OOS** |
+| GET | `/api/v2/filters/{id}/statuses` | `filter_statuses_v2()` | **Full** — lists `filter_statuses` rows for the filter (backed by a `filter_statuses` table) |
+| POST | `/api/v2/filters/{id}/statuses` | `add_filter_status_v2()` | **Full** — attaches a status to a filter; returns `FilterStatus` |
+| GET/DELETE | `/api/v2/filters/statuses/{id}` | `filter_status_v2()`/`delete_filter_status_v2()` | **Full** — by-row-id fetch/delete; owner-only (parent filter must belong to the caller) |
 
 `filters_apply()` is a pure client-side helper (no HTTP call) — nothing to implement.
 
@@ -330,9 +330,9 @@ No remote-resolve (`resolve=True` webfinger) — always behaves as `resolve=Fals
 
 | Method | Path | Mastodon.py caller(s) | Coverage |
 |--------|------|------------------------|----------|
-| GET | `/api/v1/admin/trends/tags` | `admin_trending_tags()` | **Stub** — empty list (trends are Stub instance-wide) |
-| GET | `/api/v1/admin/trends/statuses` | `admin_trending_statuses()` | **Stub** — empty list |
-| GET | `/api/v1/admin/trends/links` | `admin_trending_links()` | **Stub** — empty list |
+| GET | `/api/v1/admin/trends/tags` | `admin_trending_tags()` | **Full** — reuses the public trending-tags logic (`routers/instance.py:trending_tag_rows`), reshaped to `AdminTag` (`requires_review`/`trendable`/`usable` flags) |
+| GET | `/api/v1/admin/trends/statuses` | `admin_trending_statuses()` | **Full** — reuses the public trending-statuses logic (`trending_status_rows`): most-favourited public local statuses |
+| GET | `/api/v1/admin/trends/links` | `admin_trending_links()` | **Stub** — empty list (no preview-card synthesis, same as public trending links) |
 | POST | `/api/v1/admin/trends/{links,statuses,tags}/{id}/{approve,reject}` | `admin_approve_*` / `admin_reject_*` | **Static** — echo a minimal entity of the right shape |
 | POST | `/api/v1/admin/measures` | `admin_measures()` | **Static** — one zero-valued `AdminMeasure` per requested key (no real aggregation) |
 | POST | `/api/v1/admin/dimensions` | `admin_dimensions()` | **Static** — one empty `AdminDimension` per requested key |

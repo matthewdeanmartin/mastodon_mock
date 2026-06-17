@@ -19,7 +19,7 @@ def test_config_load_automatic_discovery_file(tmp_path: Path, monkeypatch: pytes
 def test_config_load_from_pyproject(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text("[tool.mastodon_mock]\n" 'domain = "pyproject.test"\n' 'title = "Pyproject Title"\n')
+    pyproject.write_text('[tool.mastodon_mock]\ndomain = "pyproject.test"\ntitle = "Pyproject Title"\n')
 
     config = MastodonMockConfig.load()
     assert config.domain == "pyproject.test"

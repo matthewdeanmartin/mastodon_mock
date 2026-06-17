@@ -65,3 +65,34 @@ def test_seed_idempotency() -> None:
         engine.dispose()
     assert account_count == 1
     assert token_count == 1
+
+
+def test_pig_latin_word_consonant_cluster() -> None:
+    from mastodon_mock.text import pig_latin_word
+
+    assert pig_latin_word("string") == "ingstray"
+    assert pig_latin_word("hello") == "ellohay"
+
+
+def test_pig_latin_word_vowel_start() -> None:
+    from mastodon_mock.text import pig_latin_word
+
+    assert pig_latin_word("apple") == "appleway"
+
+
+def test_pig_latin_word_preserves_case() -> None:
+    from mastodon_mock.text import pig_latin_word
+
+    assert pig_latin_word("Quick") == "Uickqay"
+    assert pig_latin_word("STRING") == "INGSTRAY"
+
+
+def test_pig_latin_html_preserves_tags_and_entities() -> None:
+    from mastodon_mock.text import pig_latin_html
+
+    out = pig_latin_html('<p>Hello <a href="http://x.com">world</a> &amp; more</p>')
+    # Tags, attributes and entities are untouched; only visible words transform.
+    assert '<a href="http://x.com">' in out
+    assert "&amp;" in out
+    assert "ellohay" in out.lower()
+    assert "orldway" in out.lower()

@@ -329,6 +329,40 @@ modeled with the same tables and a serializer that emits the v1 shape (`phrase`,
 | `keyword` | String | |
 | `whole_word` | Boolean | default `True` |
 
+### `filter_statuses`
+
+A specific status attached to a v2 filter (`FilterStatus`), mirroring
+`filter_keywords`.
+
+| column | type | notes |
+|-------------|------|-------|
+| `id` | BigInteger PK | |
+| `filter_id` | FK → `filters.id` | |
+| `status_id` | FK → `statuses.id` | |
+
+### `announcements` / `announcement_dismissals` / `announcement_reactions`
+
+Back the `Announcement` entity. Announcement bodies are seeded from config; the
+per-user **read** (dismissed) state and emoji reactions live in their own tables so
+they can be set at runtime.
+
+`announcements`:
+
+| column | type | notes |
+|----------------|------|-------|
+| `id` | BigInteger PK | |
+| `content` | Text | HTML body |
+| `starts_at` | DateTime, nullable | |
+| `ends_at` | DateTime, nullable | |
+| `all_day` | Boolean | |
+| `published` | Boolean | only published rows are listed |
+| `published_at` | DateTime | |
+| `updated_at` | DateTime | bumped on reaction change |
+
+`announcement_dismissals` — unique on `(announcement_id, account_id)`;
+`announcement_reactions` — unique on `(announcement_id, account_id, name)` where
+`name` is the emoji.
+
 ### `scheduled_statuses`
 
 | column | type | notes |

@@ -5,8 +5,8 @@ from __future__ import annotations
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from mastodon_mock.config import SeedAccount, SeedConfig, SeedStatus
-from mastodon_mock.db.models import Account, OAuthToken, Status, utcnow
+from mastodon_mock.config import SeedAccount, SeedAnnouncement, SeedConfig, SeedStatus
+from mastodon_mock.db.models import Account, Announcement, OAuthToken, Status, utcnow
 from mastodon_mock.services import attach_mentions_and_tags, do_follow
 
 _DEFAULT_SCOPES = ["read", "write", "follow", "push"]
@@ -35,6 +35,9 @@ def apply_seed_data(engine: Engine, seed: SeedConfig) -> None:
             author = username_to_account.get(status_spec.account)
             if author is not None:
                 _ensure_status(session, author, status_spec)
+
+        for announcement_spec in seed.announcements:
+            _ensure_announcement(session, announcement_spec)
 
         session.commit()
 
@@ -93,3 +96,22 @@ def _ensure_status(session: Session, account: Account, spec: SeedStatus) -> None
     session.add(status)
     session.flush()
     attach_mentions_and_tags(session, status.id, account.id, spec.text)
+
+
+def _ensure_announcement(session: Session, spec: SeedAnnouncement) -> None:
+    """Find-or-create a seed announcement matched on its content."""
+    existing = session.scalar(select(Announcement).where(Announcement.content == spec.content))
+    if existing is not None:
+        return
+    now = utcnow()
+    session.add(
+        Announcement(
+            content=spec.content,
+            starts_at=spec.starts_at,
+            ends_at=spec.ends_at,
+            all_day=spec.all_day,
+            published=spec.published,
+            published_at=now,
+            updated_at=now,
+        )
+    )

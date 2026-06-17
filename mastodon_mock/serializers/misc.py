@@ -45,7 +45,7 @@ def serialize_filter_v2(filt: Filter) -> dict[str, Any]:
         "expires_at": iso(filt.expires_at),
         "filter_action": filt.filter_action,
         "keywords": [serialize_filter_keyword(k) for k in filt.keywords],
-        "statuses": [],
+        "statuses": [serialize_filter_status(s) for s in filt.status_filters],
     }
 
 
@@ -55,6 +55,14 @@ def serialize_filter_keyword(keyword: Any) -> dict[str, Any]:
         "id": sid(keyword.id),
         "keyword": keyword.keyword,
         "whole_word": keyword.whole_word,
+    }
+
+
+def serialize_filter_status(filter_status: Any) -> dict[str, Any]:
+    """Serialize a ``FilterStatus`` (a status attached to a filter)."""
+    return {
+        "id": sid(filter_status.id),
+        "status_id": sid(filter_status.status_id),
     }
 
 

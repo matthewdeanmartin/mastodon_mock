@@ -218,7 +218,7 @@ class MockServer:
         for account in accounts:
             if account.username == username:
                 if not account.access_token:
-                    raise LookupError(f"Seeded account {username!r} has no access_token; " "it cannot be logged in as.")
+                    raise LookupError(f"Seeded account {username!r} has no access_token; it cannot be logged in as.")
                 return account.access_token
         seeded = ", ".join(a.username for a in accounts) or "<none>"
         raise LookupError(f"No seeded account named {username!r}. Seeded: {seeded}.")

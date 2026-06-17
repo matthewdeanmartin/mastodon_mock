@@ -146,3 +146,25 @@ def test_account_statuses_pagination(alice: Mastodon) -> None:
     assert len(statuses) == 3
     # Newest-first ordering
     assert statuses[0].id == posted[-1]
+
+
+def test_status_translate_pig_latin(alice: Mastodon) -> None:
+    status = alice.status_post("hello translated world")
+    translation = alice.status_translate(status.id)
+    # The "translation" is a deterministic Pig Latin transform, so it must differ
+    # from the source (the old mock echoed content verbatim, which was useless).
+    assert "ellohay" in translation.content.lower()
+    assert "hello" not in translation.content.lower()
+    assert translation.detected_source_language == "en"
+
+
+def test_status_card_dummy_on_link(alice: Mastodon) -> None:
+    status = alice.status_post("check this out https://example.com/article")
+    assert status.card is not None
+    assert status.card.url == "https://example.com/article"
+    assert status.card.provider_name == "mastodon_mock"
+
+
+def test_status_card_none_without_link(alice: Mastodon) -> None:
+    status = alice.status_post("no links here, just text")
+    assert status.card is None

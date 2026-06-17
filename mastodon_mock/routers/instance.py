@@ -11,13 +11,21 @@ from sqlalchemy import func, select
 from mastodon_mock.db.models import (
     Account,
     AdminDomainBlock,
+    Announcement,
+    AnnouncementDismissal,
+    AnnouncementReaction,
     Favourite,
     Relationship,
     Status,
     StatusTag,
+    utcnow,
 )
-from mastodon_mock.deps import Config, CurrentAccount, DbSession
+from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.serializers.accounts import serialize_account
+from mastodon_mock.serializers.announcements import (
+    serialize_announcement,
+    serialize_terms_of_service,
+)
 from mastodon_mock.serializers.discovery import (
     serialize_activity_week,
     serialize_instance_domain_block,
@@ -139,9 +147,16 @@ def instance_rules(config: Config) -> list[dict[str, Any]]:
 
 
 @router.get("/api/v1/instance/terms_of_service")
-def instance_terms_of_service() -> dict[str, Any]:
-    """Stub: 404 (no ToS configured)."""
-    raise HTTPException(status_code=404, detail="Not found")
+def instance_terms_of_service(config: Config) -> dict[str, Any]:
+    """Return the configured terms of service, or 404 if none is set.
+
+    Mirrors a real instance: with ``terms_of_service`` empty in config the
+    endpoint 404s (no ToS configured); set it and the ``TermsOfService`` entity
+    is returned.
+    """
+    if not config.terms_of_service:
+        raise HTTPException(status_code=404, detail="Not found")
+    return serialize_terms_of_service(config)
 
 
 @router.get("/api/v1/directory")
@@ -186,10 +201,84 @@ def custom_emojis(config: Config) -> list[dict[str, Any]]:
     return _default_custom_emojis(config)
 
 
+def _announcement_or_404(db: DbSession, announcement_id: str) -> Announcement:
+    """Fetch an announcement by id or raise 404."""
+    try:
+        announcement = db.get(Announcement, int(announcement_id))
+    except (ValueError, TypeError):
+        announcement = None
+    if announcement is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return announcement
+
+
 @router.get("/api/v1/announcements")
-def announcements() -> list[Any]:
-    """Empty announcements list (matches an instance with none configured)."""
-    return []
+def announcements(db: DbSession, viewer: CurrentAccount) -> list[dict[str, Any]]:
+    """Currently active (published) announcements, newest first.
+
+    ``read`` is viewer-relative; for an unauthenticated caller it is always
+    ``False`` (nothing dismissed).
+    """
+    rows = db.scalars(
+        select(Announcement).where(Announcement.published.is_(True)).order_by(Announcement.id.desc())
+    ).all()
+    return [serialize_announcement(a, viewer) for a in rows]
+
+
+@router.post("/api/v1/announcements/{announcement_id}/dismiss", status_code=200)
+def announcement_dismiss(announcement_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Mark an announcement as read for the logged-in user (idempotent)."""
+    announcement = _announcement_or_404(db, announcement_id)
+    existing = db.scalar(
+        select(AnnouncementDismissal).where(
+            AnnouncementDismissal.announcement_id == announcement.id,
+            AnnouncementDismissal.account_id == account.id,
+        )
+    )
+    if existing is None:
+        db.add(AnnouncementDismissal(announcement_id=announcement.id, account_id=account.id))
+        db.commit()
+    return {}
+
+
+@router.put("/api/v1/announcements/{announcement_id}/reactions/{reaction}", status_code=200)
+def announcement_add_reaction(
+    announcement_id: str, reaction: str, db: DbSession, account: RequiredAccount
+) -> dict[str, Any]:
+    """Add the logged-in user's reaction to an announcement (idempotent)."""
+    announcement = _announcement_or_404(db, announcement_id)
+    existing = db.scalar(
+        select(AnnouncementReaction).where(
+            AnnouncementReaction.announcement_id == announcement.id,
+            AnnouncementReaction.account_id == account.id,
+            AnnouncementReaction.name == reaction,
+        )
+    )
+    if existing is None:
+        db.add(AnnouncementReaction(announcement_id=announcement.id, account_id=account.id, name=reaction))
+        announcement.updated_at = utcnow()
+        db.commit()
+    return {}
+
+
+@router.delete("/api/v1/announcements/{announcement_id}/reactions/{reaction}", status_code=200)
+def announcement_remove_reaction(
+    announcement_id: str, reaction: str, db: DbSession, account: RequiredAccount
+) -> dict[str, Any]:
+    """Remove the logged-in user's reaction from an announcement (idempotent)."""
+    announcement = _announcement_or_404(db, announcement_id)
+    existing = db.scalar(
+        select(AnnouncementReaction).where(
+            AnnouncementReaction.announcement_id == announcement.id,
+            AnnouncementReaction.account_id == account.id,
+            AnnouncementReaction.name == reaction,
+        )
+    )
+    if existing is not None:
+        db.delete(existing)
+        announcement.updated_at = utcnow()
+        db.commit()
+    return {}
 
 
 @router.get("/api/v1/instance/extended_description")
@@ -261,8 +350,11 @@ def suggestions_v2(
     return [serialize_suggestion(acc) for acc in _suggestion_accounts(db, config, account, limit)]
 
 
-def _trending_tags(db: DbSession, config: Config, limit: int) -> list[dict[str, Any]]:
-    """Local hashtags ranked by how many statuses use them."""
+def trending_tag_rows(db: DbSession, config: Config, limit: int) -> list[dict[str, Any]]:
+    """Local hashtags ranked by how many statuses use them (``Tag`` shape).
+
+    Shared by the public ``/api/v1/trends/tags`` endpoint and the admin variant.
+    """
     rows = db.execute(
         select(StatusTag.name, func.count().label("uses"))
         .group_by(StatusTag.name)
@@ -272,11 +364,27 @@ def _trending_tags(db: DbSession, config: Config, limit: int) -> list[dict[str, 
     return [serialize_tag(name, config, uses_today=int(uses)) for name, uses in rows]
 
 
+def trending_status_rows(db: DbSession, config: Config, account: Account | None, limit: int) -> list[dict[str, Any]]:
+    """The most-favourited public local statuses (serialized).
+
+    Shared by the public ``/api/v1/trends/statuses`` endpoint and the admin variant.
+    """
+    fav_count = select(func.count()).select_from(Favourite).where(Favourite.status_id == Status.id).scalar_subquery()
+    stmt = (
+        select(Status)
+        .where(Status.visibility.in_(["public", "unlisted"]), Status.reblog_of_id.is_(None))
+        .order_by(fav_count.desc(), Status.id.desc())
+        .limit(limit)
+    )
+    statuses = db.scalars(stmt).all()
+    return serialize_status_list(db, list(statuses), config, account)
+
+
 @router.get("/api/v1/trends")
 @router.get("/api/v1/trends/tags")
 def trends_tags(db: DbSession, config: Config, limit: int = 10) -> list[dict[str, Any]]:
     """Trending tags, derived from local hashtag usage."""
-    return _trending_tags(db, config, min(limit, 20))
+    return trending_tag_rows(db, config, min(limit, 20))
 
 
 @router.get("/api/v1/trends/statuses")
@@ -287,15 +395,7 @@ def trends_statuses(
     limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Trending statuses: the most-favourited public local statuses."""
-    fav_count = select(func.count()).select_from(Favourite).where(Favourite.status_id == Status.id).scalar_subquery()
-    stmt = (
-        select(Status)
-        .where(Status.visibility.in_(["public", "unlisted"]), Status.reblog_of_id.is_(None))
-        .order_by(fav_count.desc(), Status.id.desc())
-        .limit(min(limit, 40))
-    )
-    statuses = db.scalars(stmt).all()
-    return serialize_status_list(db, list(statuses), config, account)
+    return trending_status_rows(db, config, account, min(limit, 40))
 
 
 @router.get("/api/v1/trends/links")
