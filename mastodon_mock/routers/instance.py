@@ -65,18 +65,34 @@ def _default_custom_emojis(config: Config) -> list[dict[str, Any]]:
     ]
 
 
+def _streaming_base(request: Request) -> str:
+    """The origin this request arrived on, e.g. ``http://127.0.0.1:54321``.
+
+    Mastodon.py only stays on this server if the advertised streaming URL shares the
+    client's ``api_base_url`` origin; otherwise it rewrites ``wss://host`` and connects
+    elsewhere. See spec/streaming.md "Streaming base URL".
+    """
+    return f"{request.url.scheme}://{request.url.netloc}"
+
+
 @router.get("/api/v1/instance")
 @router.get("/api/v1/instance/")
-def instance_v1(db: DbSession, config: Config) -> dict[str, Any]:
+def instance_v1(request: Request, db: DbSession, config: Config) -> dict[str, Any]:
     """Return v1 instance info."""
-    return serialize_instance_v1(db, config)
+    data = serialize_instance_v1(db, config)
+    if config.streaming.enabled:
+        data["urls"]["streaming_api"] = _streaming_base(request)
+    return data
 
 
 @router.get("/api/v2/instance")
 @router.get("/api/v2/instance/")
-def instance_v2(db: DbSession, config: Config) -> dict[str, Any]:
+def instance_v2(request: Request, db: DbSession, config: Config) -> dict[str, Any]:
     """Return v2 instance info."""
-    return serialize_instance_v2(db, config)
+    data = serialize_instance_v2(db, config)
+    if config.streaming.enabled:
+        data["configuration"]["urls"]["streaming"] = _streaming_base(request)
+    return data
 
 
 @router.get("/api/v1/instance/activity")

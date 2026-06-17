@@ -40,6 +40,11 @@ from mastodon_mock.serializers.statuses import (
     serialize_status_source,
 )
 from mastodon_mock.services import add_notification, attach_mentions_and_tags
+from mastodon_mock.streaming_events import (
+    emit_status_delete,
+    emit_status_event,
+    flush_stream_notifications,
+)
 from mastodon_mock.text import pig_latin_html, pig_latin_text
 
 router = APIRouter()
@@ -354,6 +359,8 @@ async def post_status(
         db.add(Idempotency(account_id=account.id, key=idempotency_key, status_id=status.id))
 
     db.commit()
+    emit_status_event(request.app, db, status, config, name="update")
+    flush_stream_notifications(request.app, db, config)
     return serialize_status(db, status, config, account)
 
 
@@ -393,11 +400,13 @@ async def update_status(
     status.edited_at = utcnow()
 
     db.commit()
+    emit_status_event(request.app, db, status, config, name="status_update")
     return serialize_status(db, status, config, account)
 
 
 @router.delete("/api/v1/statuses/{status_id}")
 def delete_status(
+    request: Request,
     status_id: str,
     db: DbSession,
     config: Config,
@@ -410,6 +419,10 @@ def delete_status(
     data = serialize_status(db, status, config, account)
     data["text"] = status.text
 
+    # Capture the delete event's channels *before* the row (and its tag/mention
+    # edges) are gone, but publish only after the commit succeeds.
+    emit_status_delete(request.app, db, status)
+
     if delete_media:
         for m in db.scalars(select(MediaAttachment).where(MediaAttachment.status_id == status.id)).all():
             db.delete(m)
@@ -420,7 +433,9 @@ def delete_status(
 
 
 @router.post("/api/v1/statuses/{status_id}/reblog")
-def reblog(status_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
+def reblog(
+    request: Request, status_id: str, db: DbSession, config: Config, account: RequiredAccount
+) -> dict[str, Any]:
     """Boost a status (creates a reblog row + notifies the author)."""
     original = _get_status_or_404(db, status_id)
     existing = db.scalar(select(Status).where(Status.reblog_of_id == original.id, Status.account_id == account.id))
@@ -442,6 +457,8 @@ def reblog(status_id: str, db: DbSession, config: Config, account: RequiredAccou
         db, recipient_id=original.account_id, from_account_id=account.id, type_="reblog", status_id=original.id
     )
     db.commit()
+    emit_status_event(request.app, db, reblog_row, config, name="update")
+    flush_stream_notifications(request.app, db, config)
     return serialize_status(db, reblog_row, config, account)
 
 
@@ -457,7 +474,9 @@ def unreblog(status_id: str, db: DbSession, config: Config, account: RequiredAcc
 
 
 @router.post("/api/v1/statuses/{status_id}/favourite")
-def favourite(status_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
+def favourite(
+    request: Request, status_id: str, db: DbSession, config: Config, account: RequiredAccount
+) -> dict[str, Any]:
     """Favourite a status (notifies the author)."""
     status = _get_status_or_404(db, status_id)
     exists = db.scalar(select(Favourite).where(Favourite.account_id == account.id, Favourite.status_id == status.id))
@@ -467,6 +486,7 @@ def favourite(status_id: str, db: DbSession, config: Config, account: RequiredAc
             db, recipient_id=status.account_id, from_account_id=account.id, type_="favourite", status_id=status.id
         )
     db.commit()
+    flush_stream_notifications(request.app, db, config)
     return serialize_status(db, status, config, account)
 
 

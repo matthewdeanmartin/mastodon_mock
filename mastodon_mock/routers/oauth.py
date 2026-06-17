@@ -299,6 +299,9 @@ def mock_reset(request: Request) -> dict[str, Any]:
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     apply_seed_data(engine, config.seed)
+    store = getattr(request.app.state, "fault_store", None)
+    if store is not None:
+        store.clear()
     return {"ok": True}
 
 
@@ -349,6 +352,56 @@ async def mock_sample_data(request: Request) -> dict[str, Any]:
 
     report = generate_sample_data(request.app.state.engine, cfg)
     return {"report": report.to_dict()}
+
+
+@router.post("/api/v1/_mock/faults", status_code=200)
+async def mock_add_fault(request: Request) -> dict[str, Any]:
+    """Mock-only: register a fault-injection rule. See spec/fault_injection.md."""
+    store = getattr(request.app.state, "fault_store", None)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Fault injection is not enabled")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail="Rule body must be an object")
+    try:
+        rule = store.add(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return rule.to_dict()
+
+
+@router.get("/api/v1/_mock/faults")
+def mock_list_faults(request: Request) -> list[dict[str, Any]]:
+    """Mock-only: list active fault rules with their remaining budgets."""
+    store = getattr(request.app.state, "fault_store", None)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Fault injection is not enabled")
+    return [rule.to_dict() for rule in store.list()]
+
+
+@router.delete("/api/v1/_mock/faults/{rule_id}", status_code=200)
+def mock_delete_fault(rule_id: str, request: Request) -> dict[str, Any]:
+    """Mock-only: remove one fault rule by id."""
+    store = getattr(request.app.state, "fault_store", None)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Fault injection is not enabled")
+    removed = store.remove(rule_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"No fault rule {rule_id!r}")
+    return {"ok": True}
+
+
+@router.delete("/api/v1/_mock/faults", status_code=200)
+def mock_clear_faults(request: Request) -> dict[str, Any]:
+    """Mock-only: clear all fault rules."""
+    store = getattr(request.app.state, "fault_store", None)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Fault injection is not enabled")
+    store.clear()
+    return {"ok": True}
 
 
 def _resolve_app(db: DbSession, client_id: Any) -> OAuthApp | None:

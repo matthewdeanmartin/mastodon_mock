@@ -25,6 +25,7 @@ from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
 from mastodon_mock.serializers.relationships import serialize_relationship
 from mastodon_mock.serializers.statuses import serialize_status_list
+from mastodon_mock.streaming_events import flush_stream_notifications
 from mastodon_mock.services import (
     do_follow,
     do_unfollow,
@@ -323,6 +324,7 @@ def account_featured_tags(account_id: str, db: DbSession, config: Config) -> lis
 
 @router.post("/api/v1/accounts/{account_id}/follow")
 def follow(
+    request: Request,
     account_id: str,
     db: DbSession,
     config: Config,
@@ -332,6 +334,7 @@ def follow(
     target = _get_account_or_404(db, account_id)
     rel = do_follow(db, account, target)
     db.commit()
+    flush_stream_notifications(request.app, db, config)
     return serialize_relationship(db, target.id, rel, source_id=account.id)
 
 

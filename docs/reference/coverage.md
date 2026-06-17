@@ -63,6 +63,11 @@ relationships, notifications, and pagination you'd expect.
 - **Polls** — fetch and vote (recomputes counts and `own_votes`).
 - **Reports** — `report()` files a moderation report against an account (this is what
   populates the admin queue).
+- **Streaming** (SSE) — `stream_user`, `stream_public` (+ `local`/`remote`),
+  `stream_hashtag` (+ `local`), `stream_list`, `stream_direct`, and `stream_healthy`.
+  Events (`update` / `status_update` / `delete` / `notification` / `conversation`) are
+  generated as side effects of the same write paths as the REST API, routed by
+  visibility. See [streaming spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/streaming.md).
 - **Admin / moderation API** (`mastodon/admin.py`) — account listing & filtering (v1 + v2),
   account moderation actions (enable / approve / reject / silence / suspend / sensitive /
   delete) and `admin_account_moderate`, the report queue (list / fetch / assign / unassign /
@@ -70,7 +75,10 @@ relationships, notifications, and pagination you'd expect.
   canonical-email blocks, and IP blocks. **Auth is faked — there is no role enforcement** (any
   authenticated account may call these), consistent with the "no real security" non-goal.
 - **Mock-only development helpers** — reset the database to seed state, mint tokens for
-  seeded users, create/list dev users, and append capped sample-data cohorts.
+  seeded users, create/list dev users, append capped sample-data cohorts, and a
+  **fault-injection control plane** (`/api/v1/_mock/faults`) for forcing `5xx`/`429`,
+  latency, malformed JSON, or timeouts on matching requests. See
+  [fault-injection spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/fault_injection.md).
 
 ## Static (correct shape, fixed values)
 
@@ -123,8 +131,8 @@ Whole modules and a few endpoints are intentionally absent. Calling them raises
 `MastodonNotFoundError` / `MastodonAPIError`:
 
 - **WebPush / VAPID** (`mastodon/push.py`).
-- **Streaming / WebSocket** (`mastodon/streaming.py`).
-- Announcement dismiss/reactions (there are no announcements to act on).
+- **WebSocket multiplexed stream.** Streaming is implemented over HTTP SSE (what
+  Mastodon.py uses); the browser-only WebSocket multiplex is not.
 
 ## Cross-cutting behaviours worth knowing
 

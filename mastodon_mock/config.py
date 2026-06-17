@@ -55,6 +55,30 @@ class RateLimitConfig(BaseModel):
     window_seconds: int = 300
 
 
+class StreamingConfig(BaseModel):
+    """Server-Sent-Events streaming behaviour. See spec/streaming.md.
+
+    Streaming is on by default. When ``enabled`` is false the
+    ``/api/v1/streaming/*`` routes (except ``health``) return ``404``, matching an
+    instance with streaming switched off.
+    """
+
+    enabled: bool = True
+    heartbeat_seconds: float = 15.0
+    queue_maxsize: int = 1000
+
+
+class FaultConfig(BaseModel):
+    """Mock-only fault-injection control plane. See spec/fault_injection.md.
+
+    The control plane is available by default but inert until a rule is added.
+    Set ``enabled = false`` to remove the ``/_mock/faults`` routes and the
+    middleware entirely.
+    """
+
+    enabled: bool = True
+
+
 class SeedAccount(BaseModel):
     """A single seeded account."""
 
@@ -161,6 +185,8 @@ class MastodonMockConfig(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
     ratelimit: RateLimitConfig = Field(default_factory=RateLimitConfig)
+    streaming: StreamingConfig = Field(default_factory=StreamingConfig)
+    faults: FaultConfig = Field(default_factory=FaultConfig)
     seed: SeedConfig = Field(default_factory=lambda: DEFAULT_SEED)
     sample_data: SampleDataConfig = Field(default_factory=SampleDataConfig)
     rules: list[str] = Field(default_factory=list)

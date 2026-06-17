@@ -25,6 +25,11 @@ Read [00-overview.md](00-overview.md) first for goals/non-goals, then the rest i
 1. [09-sample-data-and-perf.md](09-sample-data-and-perf.md) — high-performance bulk
    sample-data generator (CLI `gen-data` + `/_mock/sample_data` + UI button) and the
    performance baseline / regression-guard harness
+1. [streaming.md](streaming.md) — Server-Sent-Events streaming API (`stream_user` /
+   `stream_public` / `stream_hashtag` / `stream_list` / `stream_direct`), event routing,
+   and the streaming-base-URL rewrite
+1. [fault_injection.md](fault_injection.md) — mock-only fault-injection control plane
+   (`/_mock/faults`) for forcing errors, latency, malformed bodies, and timeouts
 
 ## TL;DR for implementers
 

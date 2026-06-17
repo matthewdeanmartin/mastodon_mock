@@ -338,12 +338,49 @@ No remote-resolve (`resolve=True` webfinger) — always behaves as `resolve=Fals
 | POST | `/api/v1/admin/dimensions` | `admin_dimensions()` | **Static** — one empty `AdminDimension` per requested key |
 | POST | `/api/v1/admin/retention` | `admin_retention()` | **Static** — empty cohort list |
 
+## Streaming (SSE)
+
+`Mastodon.py` streams over HTTP Server-Sent-Events (not WebSocket), so these are
+served from `mastodon_mock/routers/streaming.py`. Events are generated as side
+effects of the same write paths as the REST API and routed by visibility. See
+[streaming.md](streaming.md). On by default; `[tool.mastodon_mock.streaming]
+enabled = false` makes the routes (except `health`) 404.
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| GET | `/api/v1/streaming/user` | `stream_user()` | **Full** — home-timeline `update`/`status_update`/`delete` + `notification` for the authed account |
+| GET | `/api/v1/streaming/public` | `stream_public()` | **Full** — every public status event |
+| GET | `/api/v1/streaming/public/local` | `stream_public(local=True)` | **Full** — public events from local (no-domain) accounts |
+| GET | `/api/v1/streaming/public/remote` | `stream_public(remote=True)` | **Full** — public events from domained accounts |
+| GET | `/api/v1/streaming/hashtag` | `stream_hashtag()` | **Full** — public `update`s for the `tag` |
+| GET | `/api/v1/streaming/hashtag/local` | `stream_hashtag(local=True)` | **Full** — as above, local only |
+| GET | `/api/v1/streaming/list` | `stream_list()` | **Full** — `update`s from accounts on the given list |
+| GET | `/api/v1/streaming/direct` | `stream_direct()` | **Full** — `conversation` events for the authed account |
+| GET | `/api/v1/streaming/health` | `stream_healthy()` | **Full** — returns `OK` |
+
+The browser-only **WebSocket multiplexed stream** is OOS (Mastodon.py never uses
+it). No back-fill: a stream only delivers events that occur after it connects.
+
+## Mock-only fault injection
+
+A control plane (not part of the Mastodon API) for forcing endpoints to misbehave,
+so clients can test retry/back-off, `429`, `5xx`, malformed-JSON, and timeout
+handling. See [fault_injection.md](fault_injection.md). On by default;
+`[tool.mastodon_mock.faults] enabled = false` 404s the routes. Cleared by
+`/_mock/reset`; the `/_mock/*` control plane is never itself affected by a rule.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/v1/_mock/faults` | Add a rule (`status`/`ratelimit`/`latency`/`malformed`/`timeout`), optionally counted |
+| GET | `/api/v1/_mock/faults` | List active rules with remaining budgets |
+| DELETE | `/api/v1/_mock/faults/{id}` | Remove one rule |
+| DELETE | `/api/v1/_mock/faults` | Clear all rules |
+
 ## Modules entirely **out of scope** for v1
 
 | Module | Reason |
 |--------|--------|
 | `mastodon/push.py` | WebPush/VAPID — irrelevant to write-then-read goal |
-| `mastodon/streaming.py`, `streaming_endpoints.py` | Streaming/WebSocket — OOS for v1 |
 
 Hashtag follow + fetch live in `routers/tags.py` and are now **Full** (backed by a
 `followed_tags` table):

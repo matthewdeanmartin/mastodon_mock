@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from mastodon_mock.config import MastodonMockConfig
 from mastodon_mock.db.base import Base, init_engine, make_session_factory
 from mastodon_mock.db.seed import apply_seed_data
+from mastodon_mock.faults import FaultStore, add_fault_middleware
 from mastodon_mock.middleware import add_middleware
 from mastodon_mock.routers import (
     accounts,
@@ -32,9 +33,11 @@ from mastodon_mock.routers import (
     relationships,
     search,
     statuses,
+    streaming,
     tags,
     timelines,
 )
+from mastodon_mock.streaming import EventBus
 from mastodon_mock.ui import mount_ui
 
 
@@ -74,7 +77,16 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     app.state.media_path = media_path
     app.state.resource_finalizer = weakref.finalize(app, engine.dispose)
 
+    if config.streaming.enabled:
+        app.state.event_bus = EventBus(queue_maxsize=config.streaming.queue_maxsize)
+
     add_middleware(app, config)
+
+    # Added last so it wraps outermost: a fault short-circuits before scope/rate
+    # checks, and the request never reaches the router.
+    if config.faults.enabled:
+        app.state.fault_store = FaultStore()
+        add_fault_middleware(app)
 
     for module in (
         oauth,
@@ -94,6 +106,7 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
         conversations,
         admin,
         tags,
+        streaming,
     ):
         app.include_router(module.router)
 

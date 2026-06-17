@@ -50,19 +50,26 @@ def add_notification(
     from_account_id: int,
     type_: str,
     status_id: int | None = None,
-) -> None:
-    """Create a notification, skipping self-actions (which never notify)."""
+) -> Notification | None:
+    """Create a notification, skipping self-actions (which never notify).
+
+    Returns the created row (or ``None`` for a skipped self-action). The row is
+    also appended to a per-session buffer (``session.info["stream_notifications"]``)
+    so a router can stream it after commit via
+    :func:`mastodon_mock.streaming_events.flush_stream_notifications`.
+    """
     if recipient_id == from_account_id:
-        return
-    session.add(
-        Notification(
-            account_id=recipient_id,
-            from_account_id=from_account_id,
-            type=type_,
-            status_id=status_id,
-            created_at=utcnow(),
-        )
+        return None
+    notification = Notification(
+        account_id=recipient_id,
+        from_account_id=from_account_id,
+        type=type_,
+        status_id=status_id,
+        created_at=utcnow(),
     )
+    session.add(notification)
+    session.info.setdefault("stream_notifications", []).append(notification)
+    return notification
 
 
 def do_follow(session: Session, follower: Account, target: Account) -> Relationship:

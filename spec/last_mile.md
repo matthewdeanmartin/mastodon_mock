@@ -26,7 +26,8 @@ separately at the bottom, not here).
 | `POST /api/v1/admin/dimensions`    | Static empty | **Medium**    | Maybe                              |
 | `POST /api/v1/admin/retention`     | Static `[]`  | Hard          | No — needs cohort time-series      |
 | `POST /api/v1/emails/confirmations`| Stub 200     | n/a (correct) | No — already correct               |
-| WebPush / Streaming                | OOS          | Hard          | No — explicit non-goal             |
+| Streaming (SSE)                    | **Full**     | done          | ✅ Implemented (2026-06-17)        |
+| WebPush / VAPID                    | OOS          | Hard          | No — explicit non-goal             |
 
 ---
 
@@ -138,29 +139,35 @@ relevant Mastodon.py methods are `push_subscription`, `push_subscription_set`,
   alternate transport for the same data. (The subscription-CRUD half would be
   easy to persist, but it's pointless without the delivery half.)
 
-### Streaming / WebSocket (`mastodon/streaming.py`)
+### Streaming — now implemented (was OOS)
 
-Real-time clients (the web UI, official + third-party apps, firehose bots) *do*
-use streaming heavily in production — a `user` WebSocket for live notifications and
-timeline inserts, `public`/`hashtag` streams for firehose consumers. So it's not
-that *nobody* uses it. It's out of scope for two narrower reasons:
+> **Update (2026-06-17): streaming is no longer out of scope — it's Full.** This
+> subsection is kept for the historical reasoning; see
+> [streaming.md](streaming.md) and §"Already implemented (2026-06-17)" for what
+> shipped.
 
-- **It's opt-in in Mastodon.py.** Streaming lives in `mastodon/streaming.py`
-  (`StreamListener`, `stream_user()`, …) and is never touched by ordinary REST
-  calls. The contract tests that drive this mock don't reach it unless a test
-  explicitly constructs a stream listener — and a write-then-read suite has no
-  reason to.
-- **A request/response mock can't deliver deterministic live events.** The whole
-  value of streaming is *push*; asserting "I received a live event when X happened"
-  is awkward and racy in an automated test. Anything observable via streaming is
-  *already* observable via REST polling (`notifications()`, `timeline_home()`).
+The original reasoning for deferring streaming, and why it no longer holds:
 
-If a no-op stub is ever wanted (e.g. so a client can *connect* without erroring), a
-WebSocket route that accepts the connection and emits nothing — or replays a write
-back to the caller — would be enough; it would not need the real fan-out machinery.
+- *"It's opt-in in Mastodon.py / a write-then-read suite has no reason to reach
+  it."* True, but real-time clients (the web UI, official + third-party apps,
+  firehose bots) use streaming heavily, and they need a local target to test
+  reconnect/dedup/ordering logic against. That's a capability no other local mock
+  offers — which is exactly the niche this project fills.
+- *"A request/response mock can't deliver deterministic live events."* The mock is
+  a single process with one shared engine, so an **in-process pub/sub bus** fed by
+  the existing write paths delivers events deterministically and synchronously. The
+  `MockServer.stream(...)` helper makes "assert I got a live event when X happened"
+  a few lines, not a racy hand-roll.
+- *"Mastodon.py needs a WebSocket."* It doesn't — it streams over **HTTP SSE**, so
+  the mock hosts an SSE stream inside the existing FastAPI app. The browser-only
+  **WebSocket multiplex** remains OOS (Mastodon.py never uses it).
 
-Both this and WebPush intentionally 404 (or simply aren't routed). That is the
-contract, not a gap to close.
+### WebPush / VAPID stays OOS
+
+WebPush intentionally 404s (or simply isn't routed). That is the contract, not a
+gap to close — for the reasons above (encrypted side-channel delivery with no
+browser push service in a test, and nothing it surfaces that `notifications()`
+doesn't already).
 
 ---
 
@@ -172,9 +179,10 @@ arguably worth it:
 1. *(Optional, numbers only on demand)* **Admin measures/dimensions** (§2b) —
    real `COUNT`-based analytics, but only if a consumer asserts on the numbers.
 
-Everything else (trending links, retention, push, streaming) should stay as-is:
-the empties are honest, and filling them means re-creating a Mastodon subsystem
-with no real data behind it.
+Everything else (trending links, retention, WebPush) should stay as-is: the
+empties are honest, and filling them means re-creating a Mastodon subsystem with no
+real data behind it. **Streaming, formerly on this list, is now implemented** (see
+below).
 
 ---
 
@@ -222,5 +230,55 @@ Tests: `tests/test_contract_filters.py` (filter-status CRUD + 404 scoping),
 Alembic drift.
 
 **Deliberately left alone:** trending links / `admin/trends/links` (no OG
-crawling), `admin/{measures,dimensions,retention}` (real analytics), WebPush &
-streaming (see §4).
+crawling), `admin/{measures,dimensions,retention}` (real analytics), WebPush
+(see §4).
+
+## Already implemented (2026-06-17)
+
+Two larger features landed, each with its own spec. Both deliver capabilities a
+client developer cannot get from any other local mock.
+
+1. **Streaming (SSE)** — see [streaming.md](streaming.md). `Mastodon.py` streams
+   over HTTP Server-Sent-Events, so the mock hosts an SSE stream in the existing
+   FastAPI app rather than a WebSocket.
+   - `mastodon_mock/streaming.py` — a thread-safe, in-process pub/sub `EventBus`
+     (publishers run on the route threadpool, subscribers on the loop; delivery via
+     `loop.call_soon_threadsafe`) plus SSE encoding and channel-key helpers.
+   - `mastodon_mock/streaming_events.py` — maps write-path side effects to events
+     and routes them by visibility: `public` (+ `public:local`/`public:remote` by
+     author domain), each author-follower's `user` (home) channel, `hashtag`
+     (+ local), `list`, and `direct`→`conversation`; notifications go to the
+     recipient's `user` channel.
+   - `mastodon_mock/routers/streaming.py` — `stream_user` / `stream_public`
+     (+ `/local`, `/remote`) / `stream_hashtag` (+ `/local`) / `stream_list` /
+     `stream_direct` / `health`, each holding an SSE connection with a heartbeat.
+   - Publishes wired into `routers/statuses.py` (post/edit/delete/reblog/favourite)
+     and `routers/accounts.py` (follow); `services.add_notification` now buffers
+     created rows for `flush_stream_notifications`.
+   - **Streaming-base-URL fix:** `routers/instance.py` now advertises the streaming
+     URL as the live request origin (not `wss://{domain}`), so `Mastodon.py`'s
+     `__get_streaming_base()` falls through to `api_base_url` and stays on the mock.
+   - Config: `StreamingConfig` (`[tool.mastodon_mock.streaming]`, on by default;
+     `enabled=false` 404s the routes). Test helper: `MockServer.stream(...)` →
+     `StreamCollector` with `.next(event, timeout=)` / `.all()`.
+2. **Fault injection** — see [fault_injection.md](fault_injection.md). A mock-only
+   control plane so clients can test retry/back-off, `429`, `5xx`, malformed-JSON,
+   and timeout handling.
+   - `mastodon_mock/faults.py` — `FaultStore` (ordered rules, glob/regex path
+     matching, counted expiry) + middleware applying the first match
+     (`status`/`ratelimit`/`latency`/`malformed`/`timeout`); the `/_mock/*` control
+     plane is always exempt, and the middleware is added outermost so a fault
+     short-circuits before scope/rate checks.
+   - `/api/v1/_mock/faults` CRUD in `routers/oauth.py`; rules cleared by
+     `/_mock/reset`. Config: `FaultConfig` (`[tool.mastodon_mock.faults]`, on by
+     default; `enabled=false` 404s the routes). Test helper: `MockServer.fault(...)`
+     → `FaultHandle` (auto-clears on context exit).
+
+Tests: `tests/mock_only/test_streaming.py` (user/public/hashtag/delete/notification/
+direct streams, the base-URL rewrite, disabled→404, all driven through real
+`Mastodon.py`) and `tests/mock_only/test_faults.py` (status/ratelimit/malformed/
+latency/glob effects, count expiry, control-plane exemption, reset, disabled→404).
+Full suite green (301 passed); ruff + mypy clean on the new modules.
+
+**Still deliberately OOS:** WebPush / VAPID, and the browser-only WebSocket
+multiplexed stream (Mastodon.py uses SSE, not WebSocket).
