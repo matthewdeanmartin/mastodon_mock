@@ -98,19 +98,39 @@ maintained successor and an API-compatible drop-in for everything we touch (`Cli
 This is a deprecation/maintenance migration, not a throughput optimization — but it
 lives here because it's the same "which client library" question.
 
-### SQLite & SQLAlchemy — sync, and tuned only for bulk load
+### SQLite & SQLAlchemy — sync, with concurrency PRAGMAs on every connection
 
 The mock uses **sync** SQLAlchemy + SQLite by design (see
 [spec/01-architecture.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/01-architecture.md)).
 Per-request read performance was addressed where it mattered (see finding **F1** in
 spec/09: batched serialization collapsed a timeline-page N+1 from ~260 queries to a
-handful, ~4–9x faster reads). The bulk generator applies `PRAGMA synchronous=OFF` /
-`journal_mode` tuning *only* for the duration of a load
+handful, ~4–9x faster reads). The bulk generator applies aggressive `PRAGMA synchronous=OFF` / `journal_mode` tuning for the duration of a load
 (`db/sample_data.py::_bulk_load_pragmas`).
 
+Because `:memory:` is backed by a private **temp file** (so each threadpool request
+gets its own connection — see `db/base.py::init_engine`), the request path is genuinely
+concurrent: long-lived SSE streams read while ordinary requests write. SQLite's defaults
+serialize that badly — rollback journaling makes a writer block all readers, and
+`busy_timeout=0` makes a thread that hits a held lock fail immediately with
+`SQLITE_BUSY`. Under `pytest -n auto` that showed up as stalls and flaky stream
+timeouts. So `init_engine` installs a `connect`-event listener
+(`db/base.py::_tune_sqlite_connection`) that applies, to **every** pooled connection:
+
+| PRAGMA | Value | Why |
+|---|---|---|
+| `journal_mode` | `WAL` | Readers and the single writer run concurrently instead of blocking each other. |
+| `busy_timeout` | `5000` (ms) | A contended writer waits briefly rather than erroring out. |
+| `synchronous` | `NORMAL` | WAL-safe, far fewer fsyncs; durability across power loss is irrelevant for an ephemeral DB. |
+
+Measured effect: the full suite under `-n auto` dropped from ~1m20s to ~38s locally,
+and the intermittent streaming `TimeoutError` disappeared. The WAL `-wal`/`-shm`
+sidecar files are cleaned up alongside the temp DB on `engine.dispose()`
+(`db/base.py::_delete_on_dispose`), preserving the "leaves nothing behind" `:memory:`
+contract.
+
 We have **not** adopted an async driver (`aiosqlite`) or an alternative SQLite binding:
-the workload is single-connection and CPU/serialization-bound, not concurrency-bound,
-so async would add complexity without throughput.
+with WAL the workload is read-mostly with brief, well-coordinated writes, so async would
+add complexity without throughput.
 
 ## Native libraries we evaluated and declined
 
@@ -121,7 +141,7 @@ so async would add complexity without throughput.
 | `rtoml` | TOML parse | **Declined** | Config parsed once per process (~30 µs); a compiled dep for no measurable gain. |
 | `uvloop` | event loop | **Declined** | Not available on Windows (a primary dev/CI platform); benefit is for high-concurrency network servers, not a local test target. |
 | `httptools` | HTTP parser | **Declined** | Same rationale as uvloop — concurrency win we don't need; pure-Python `h11` is fine at this scale. |
-| `aiosqlite` / async SQLAlchemy | DB | **Declined** | Workload is single-connection, serialization-bound; async adds complexity, not speed. |
+| `aiosqlite` / async SQLAlchemy | DB | **Declined** | With WAL + `busy_timeout` the threadpool connections coordinate fine (see above); async adds complexity, not speed. |
 | `msgspec` | serialize/validate | **Declined** | Would mean replacing Pydantic/FastAPI's response handling wholesale; FastAPI already owns the fast path. |
 
 ## How to re-check these claims

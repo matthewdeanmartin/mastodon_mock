@@ -1,16 +1,25 @@
 ---
 version: 2
 updates:
-  # GitHub Actions — quarterly, security-only outside of that
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: quarterly
-    open-pull-requests-limit: 5
-    # Only auto-open PRs for security advisories between quarterly bumps.
-    # For routine version bumps we rely on `make gha-upgrade` run manually.
+      interval: cron
+      # 9 AM Eastern on the first Monday of Jan/Apr/Jul/Oct
+      cronjob: 0 9 1-7 1,4,7,10 1
+      timezone: America/New_York
+    open-pull-requests-limit: 2
+
+    # Stop Dependabot from rebasing/re-running PRs constantly after target-branch pushes.
+    rebase-strategy: disabled
+    cooldown:
+      default-days: 14
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 14
+    groups:
+      github-actions:
+        patterns: ['*']
     ignore:
       - dependency-name: '*'
         update-types: [version-update:semver-minor, version-update:semver-patch]
-    cooldown:
-      default-days: 7

@@ -168,8 +168,12 @@ a token lookup transiently saw nothing — reproducible only under `pytest -n au
 So `db/base.py` does **not** share a single connection. For `:memory:` it transparently
 backs the engine with a *private temp file* (unique per engine, deleted on dispose) and
 uses the default connection pool, so each threadpool request gets its **own** connection and
-SQLite's normal file locking coordinates them safely. The database is still ephemeral and
-isolated per app instance, preserving the `:memory:` contract for tests. (Shared-cache
+SQLite's file locking coordinates them safely. Those connections are configured for
+concurrency at connect time (`PRAGMA journal_mode=WAL`, `busy_timeout=5000`,
+`synchronous=NORMAL`) — SQLite's defaults serialize readers against the writer and fail
+fast on lock contention, which made parallel runs slow and flaky. The database is still
+ephemeral and isolated per app instance, preserving the `:memory:` contract for tests.
+(Shared-cache
 in-memory, `cache=shared`, was rejected: it trades the race for SQLite crashes under
 threaded load.)
 

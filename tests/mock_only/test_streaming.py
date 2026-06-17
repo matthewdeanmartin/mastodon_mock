@@ -8,8 +8,6 @@ all work end to end. Mock-only: a consuming dual suite excludes them, but the
 
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from mastodon_mock.config import DatabaseConfig, MastodonMockConfig, StreamingConfig
@@ -17,9 +15,6 @@ from mastodon_mock.testing import MockServer
 from mastodon_mock.testing.seed import DEFAULT_TEST_SEED
 
 pytestmark = pytest.mark.mock_only
-
-# Streams connect asynchronously; give the SSE connection a moment before writing.
-_CONNECT_GRACE = 0.6
 
 
 def test_stream_healthy(mastodon_mock_server: MockServer) -> None:
@@ -51,7 +46,6 @@ def test_user_stream_delivers_followed_post(mastodon_mock_server: MockServer) ->
     alice.account_follow(bob.me().id)
 
     with mastodon_mock_server.stream("user", username="alice") as events:
-        time.sleep(_CONNECT_GRACE)
         bob.status_post("live from bob!")
         payload = events.next("update", timeout=5)
         assert "live from bob" in payload["content"]
@@ -61,7 +55,6 @@ def test_public_stream(mastodon_mock_server: MockServer) -> None:
     """Public posts reach the public stream."""
     alice = mastodon_mock_server.client("alice")
     with mastodon_mock_server.stream("public") as events:
-        time.sleep(_CONNECT_GRACE)
         alice.status_post("public hello")
         payload = events.next("update", timeout=5)
         assert "public hello" in payload["content"]
@@ -71,7 +64,6 @@ def test_hashtag_stream(mastodon_mock_server: MockServer) -> None:
     """A tagged public post reaches the matching hashtag stream."""
     alice = mastodon_mock_server.client("alice")
     with mastodon_mock_server.stream("hashtag", tag="cats") as events:
-        time.sleep(_CONNECT_GRACE)
         alice.status_post("I love #cats")
         payload = events.next("update", timeout=5)
         assert "cats" in payload["content"]
@@ -81,7 +73,6 @@ def test_delete_event(mastodon_mock_server: MockServer) -> None:
     """Deleting a status emits a ``delete`` carrying the bare id."""
     alice = mastodon_mock_server.client("alice")
     with mastodon_mock_server.stream("public") as events:
-        time.sleep(_CONNECT_GRACE)
         post = alice.status_post("to be deleted")
         events.next("update", timeout=5)
         alice.status_delete(post["id"])
@@ -94,7 +85,6 @@ def test_notification_event(mastodon_mock_server: MockServer) -> None:
     alice = mastodon_mock_server.client("alice")
     bob = mastodon_mock_server.client("bob")
     with mastodon_mock_server.stream("user", username="bob") as events:
-        time.sleep(_CONNECT_GRACE)
         post = bob.status_post("notice me")
         events.next("update", timeout=5)
         alice.status_favourite(post["id"])
@@ -108,7 +98,6 @@ def test_direct_conversation_stream(mastodon_mock_server: MockServer) -> None:
     bob = mastodon_mock_server.client("bob")
     bob_acct = bob.me().acct
     with mastodon_mock_server.stream("direct", username="bob") as events:
-        time.sleep(_CONNECT_GRACE)
         alice.status_post(f"@{bob_acct} secret", visibility="direct")
         conv = events.next("conversation", timeout=5)
         assert "secret" in conv["last_status"]["content"]

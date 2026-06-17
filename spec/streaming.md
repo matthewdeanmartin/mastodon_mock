@@ -66,6 +66,24 @@ blank line.) A `delete` event's `data` is the bare status id string. Heartbeats 
 single line `:thump\n` emitted every `heartbeat_seconds` (default 15) so idle connections
 and proxies stay alive; Mastodon.py routes these to `handle_heartbeat()`.
 
+#### The `:connected` opener (readiness contract)
+
+The very first bytes a stream emits are a `:connected\n\n` comment, sent immediately
+after the handler registers its subscription on the bus (`routers/streaming.py::_stream`,
+`streaming.py::EventBus.subscribe`). Like any `:`-prefixed line it reaches Mastodon.py's
+`handle_heartbeat()`, but it carries a stronger guarantee: **once a client has seen
+`:connected`, its subscription is live and no subsequently published event can be
+silently dropped.**
+
+This matters because of the no-back-fill rule below. The bus only delivers to
+*registered* subscribers; `publish()` is a no-op when none exist yet
+(`streaming.py::EventBus.publish`). A client (or test) that writes before its own
+subscription is registered will lose that event with no error. The `:connected` opener is
+the signal that closes that race — wait for it before triggering events you expect to
+receive. **Do not remove or rename it** without updating the test helper that depends on
+it (`StreamCollector`, below); doing so silently reintroduces a flaky lost-event race
+under load.
+
 ## Event sources
 
 Events are published from the existing write paths via a small in-process **event bus**
@@ -118,7 +136,7 @@ def test_user_stream(mastodon_mock_server):
     alice.account_follow(bob.me().id)
 
     with mastodon_mock_server.stream("user", username="alice") as events:
-        bob.status_post("live!")
+        bob.status_post("live!")                    # safe: stream is already live
         evt = events.next("update", timeout=5)      # blocks until an update arrives
         assert "live!" in evt.content
 ```
@@ -128,6 +146,14 @@ a `StreamCollector` context manager backed by a real Mastodon.py `StreamListener
 `run_async=True`. `next(event_name, timeout=...)` pops the next matching parsed event;
 `events.all()` returns everything received so far. The collector closes the connection on
 exit.
+
+**`__enter__` blocks until the stream is confirmed live** — it waits for the server's
+`:connected` opener (via `handle_heartbeat`) before returning, so a write issued
+immediately after the `with` line is guaranteed to be seen. Tests therefore need **no**
+`sleep`-based connect grace; a fixed sleep is only a guess and flakes under parallel load
+(`pytest -n auto`). If the connection never establishes, `__enter__` raises
+`TimeoutError("stream did not connect within …")` rather than letting a later
+`next(...)` fail with a misleading "no event" timeout.
 
 ## Non-goals
 

@@ -23,6 +23,35 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
+def _tune_sqlite_connection(engine: Engine) -> None:
+    """Apply concurrency PRAGMAs to *every* pooled connection at connect time.
+
+    The temp-file backend gives each threadpool request its own connection, but the
+    SQLite defaults make those connections contend badly: rollback journaling means a
+    writer blocks all readers (and vice-versa), and ``busy_timeout`` defaults to 0, so
+    a thread that hits a held lock fails immediately with ``SQLITE_BUSY`` instead of
+    waiting. Under ``pytest -n auto`` (many threads, occasional writes during long-lived
+    SSE streams) that surfaces as stalls and flaky stream timeouts.
+
+    WAL lets readers and the single writer proceed concurrently; ``busy_timeout`` makes
+    contended writers wait briefly rather than error; ``synchronous=NORMAL`` is the
+    WAL-safe, low-fsync setting (the DB is ephemeral, so durability across power loss is
+    irrelevant). These are set per *connection* via the ``connect`` event — ``busy_timeout``
+    and ``synchronous`` are connection-scoped, while ``journal_mode=WAL`` is database-wide
+    and persists, so issuing it on each connection is cheap and idempotent.
+    """
+
+    @event.listens_for(engine, "connect")
+    def _set_pragmas(dbapi_conn: Any, _record: Any) -> None:
+        cursor = dbapi_conn.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode = WAL")
+            cursor.execute("PRAGMA busy_timeout = 5000")
+            cursor.execute("PRAGMA synchronous = NORMAL")
+        finally:
+            cursor.close()
+
+
 def init_engine(config: DatabaseConfig) -> Engine:
     """Create a SQLAlchemy engine for the given database config.
 
@@ -55,13 +84,16 @@ def init_engine(config: DatabaseConfig) -> Engine:
             echo=config.echo,
             connect_args={"check_same_thread": False},
         )
+        _tune_sqlite_connection(engine)
         _delete_on_dispose(engine, db_path)
         return engine
-    return create_engine(
+    engine = create_engine(
         f"sqlite:///{config.path}",
         echo=config.echo,
         connect_args={"check_same_thread": False},
     )
+    _tune_sqlite_connection(engine)
+    return engine
 
 
 def _delete_on_dispose(engine: Engine, db_path: str) -> None:

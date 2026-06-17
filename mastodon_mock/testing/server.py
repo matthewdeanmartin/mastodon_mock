@@ -314,6 +314,7 @@ class StreamCollector:
         self._handle: Any = None
         self._events: list[Any] = []
         self._cond = threading.Condition()
+        self._connected = False
         self._listener = self._make_listener()
 
     def _make_listener(self) -> Any:
@@ -329,12 +330,40 @@ class StreamCollector:
                     collector._events.append(_StreamEvent(name, data))
                     collector._cond.notify_all()
 
+            def handle_heartbeat(self) -> None:
+                # SSE comment lines (the server's ``:connected`` opener and ``:thump``
+                # keep-alives) arrive here. The first one proves the server-side
+                # ``subscribe()`` has run, so the subscription is live and no published
+                # event can be silently dropped. We use it as a readiness signal.
+                # pylint: disable=protected-access
+                with collector._cond:
+                    collector._connected = True
+                    collector._cond.notify_all()
+
         return _Listener()
 
     def __enter__(self) -> StreamCollector:
-        """Open the stream (async) and start collecting."""
+        """Open the stream (async) and block until it is confirmed live.
+
+        ``Mastodon.py`` opens the SSE connection on a background thread, and the
+        server only registers the subscription when its handler runs. Until then,
+        ``publish`` has no subscriber to deliver to and drops the event. We wait for
+        the server's ``:connected`` opener (surfaced via ``handle_heartbeat``) so a
+        post issued right after ``__enter__`` is guaranteed to reach this collector.
+        """
         self._handle = self._connect()
+        self._await_connected()
         return self
+
+    def _await_connected(self, *, timeout: float = 10.0) -> None:
+        """Block until the server confirms the stream is live, or raise."""
+        deadline = time.time() + timeout
+        with self._cond:
+            while not self._connected:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise TimeoutError(f"stream did not connect within {timeout:g}s")
+                self._cond.wait(timeout=remaining)
 
     def __exit__(self, *exc: object) -> None:
         """Close the stream."""

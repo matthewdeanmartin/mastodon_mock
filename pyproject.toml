@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [{ name = "Matthew Martin", email = "matthewdeanmartin@gmail.com" }]
 keywords = ["mastodon", "mock", "fastapi", "testing", "fediverse", "rest-api", "mastodon.py"]
 license = "MIT"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: FastAPI",
@@ -14,6 +14,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
