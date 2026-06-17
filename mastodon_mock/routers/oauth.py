@@ -8,7 +8,7 @@ are rejected (matching current Mastodon + the headless mock constraints).
 from __future__ import annotations
 
 import secrets
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
 
@@ -16,6 +16,9 @@ from mastodon_mock.db.models import Account, OAuthApp, OAuthToken, utcnow
 from mastodon_mock.deps import Config, CurrentToken, DbSession, RequiredAccount
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.common import account_acct, sid
+
+if TYPE_CHECKING:
+    from mastodon_mock.faults import FaultStore
 
 router = APIRouter()
 
@@ -357,7 +360,7 @@ async def mock_sample_data(request: Request) -> dict[str, Any]:
 @router.post("/api/v1/_mock/faults", status_code=200)
 async def mock_add_fault(request: Request) -> dict[str, Any]:
     """Mock-only: register a fault-injection rule. See spec/fault_injection.md."""
-    store = getattr(request.app.state, "fault_store", None)
+    store: FaultStore | None = getattr(request.app.state, "fault_store", None)
     if store is None:
         raise HTTPException(status_code=404, detail="Fault injection is not enabled")
     try:
@@ -376,7 +379,7 @@ async def mock_add_fault(request: Request) -> dict[str, Any]:
 @router.get("/api/v1/_mock/faults")
 def mock_list_faults(request: Request) -> list[dict[str, Any]]:
     """Mock-only: list active fault rules with their remaining budgets."""
-    store = getattr(request.app.state, "fault_store", None)
+    store: FaultStore | None = getattr(request.app.state, "fault_store", None)
     if store is None:
         raise HTTPException(status_code=404, detail="Fault injection is not enabled")
     return [rule.to_dict() for rule in store.list()]

@@ -142,28 +142,29 @@ tests. See [06-testing.md](06-testing.md).
 SQLite supports `:memory:` databases. Two caveats drive the design:
 
 1. **`:memory:` is connection-scoped.** Each new `sqlite3` connection gets its own
-   empty database. SQLAlchemy's default pooling would hand out different connections
-   to different requests, each seeing an empty DB. **Fix**: when `database.path == ":memory:"`, the engine MUST be created with
-   `poolclass=StaticPool` and `connect_args={"check_same_thread": False}`, e.g.:
+   empty database, so SQLAlchemy's default pooling would hand different requests
+   different (empty) DBs. The obvious fix — a single shared connection via
+   `poolclass=StaticPool` — has a subtle flaw: FastAPI runs sync endpoints in a
+   threadpool, and **one SQLite connection is not safe for concurrent use across
+   threads**. `check_same_thread=False` only silences the guard; it does not
+   serialize access. Two threads interleaving statements on the shared connection
+   (e.g. a long-lived SSE stream resolving its account while a write commits) can make
+   a query observe half-applied state and return wrong/empty rows — surfacing as
+   intermittent, load-dependent failures (a 401 when a token lookup transiently sees
+   nothing; only reproduced under `pytest -n auto`). Shared-cache in-memory
+   (`cache=shared`) trades the race for SQLite crashes under threaded load.
 
-   ```python
-   from sqlalchemy import create_engine
-   from sqlalchemy.pool import StaticPool
-
-   engine = create_engine(
-       "sqlite://",
-       connect_args={"check_same_thread": False},
-       poolclass=StaticPool,
-   )
-   ```
-
-   This keeps a single shared connection alive for the lifetime of the engine, so all
-   requests see the same in-memory DB.
+   **Fix**: when `database.path == ":memory:"`, back the engine with a *private
+   temp-file* SQLite database (unique per engine, deleted on `engine.dispose()`)
+   using the default connection pool. Each threadpool request gets its **own**
+   connection, and SQLite's normal file locking coordinates them safely. The DB stays
+   ephemeral and isolated per app instance, preserving the `:memory:` contract. See
+   `init_engine` in `mastodon_mock/db/base.py`.
 
 1. **`check_same_thread=False`** is required in both file and memory modes because
    FastAPI's sync endpoints run in a threadpool, and a given SQLAlchemy `Session` may
-   be used from a different thread than the connection was created on. Since the mock
-   is single-process/local-only, the usual cross-thread-sqlite caveats are acceptable.
+   be used from a different thread than the connection was created on. With the
+   temp-file backing, each thread holds its own connection, so this is safe.
 
 ### Config knob
 
@@ -174,8 +175,9 @@ path = ":memory:"          # or "./mastodon_mock.db" / "/abs/path/to.db"
 echo = false                # SQLAlchemy echo (SQL logging) for debugging
 ```
 
-- `path = ":memory:"` → `StaticPool`, ephemeral, perfect for pytest (each test session
-  gets a clean slate, or each test gets its own app instance for full isolation).
+- `path = ":memory:"` → private temp-file SQLite (deleted on dispose), ephemeral,
+  perfect for pytest (each test session gets a clean slate, or each test gets its own
+  app instance for full isolation) and safe under the request threadpool.
 - `path = "./mastodon_mock.db"` → normal file-backed SQLite, persists across server
   restarts (useful for manually poking at the mock with `curl`/Mastodon.py during
   development, or for longer-lived local dev servers).

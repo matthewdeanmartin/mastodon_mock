@@ -323,6 +323,8 @@ class StreamCollector:
 
         class _Listener(StreamListener):
             def on_any_event(self, name: str, data: Any = None, for_stream: Any = None) -> None:
+                # Accessing private members of StreamCollector from its internal listener
+                # pylint: disable=protected-access
                 with collector._cond:
                     collector._events.append(_StreamEvent(name, data))
                     collector._cond.notify_all()

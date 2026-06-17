@@ -175,7 +175,7 @@ PRESETS: dict[str, SampleDataConfig] = {
 
 # mock seed token below is not a real credential
 DEFAULT_SEED = SeedConfig(
-    accounts=[SeedAccount(username="testuser", display_name="Test User", access_token="mock_token")],  # nosec B106
+    accounts=[SeedAccount(username="testuser", display_name="Test User", access_token="mock_token")],  # nosec
 )
 
 
@@ -184,14 +184,14 @@ DEFAULT_SEED = SeedConfig(
 # multiple accounts, follows, a thread, a quote post, and instance announcements —
 # so that every surfaced UI feature has something to show. Applied by
 # ``serve --demo`` via DEMO_CONFIG; not used by the test fixtures.
-# nosec B106 — the tokens below are mock credentials, not real secrets.
-DEMO_SEED = SeedConfig(  # nosec B106
+# The tokens below are mock credentials, not real secrets.
+DEMO_SEED = SeedConfig(
     accounts=[
         SeedAccount(
             username="ada",
             display_name="Ada Lovelace",
             note="First programmer. Posting about analytical engines.",
-            access_token="ada_token",  # nosec B106
+            access_token="ada_token",  # nosec
             email="ada@mock.local",
             role="admin",
         ),
@@ -199,21 +199,21 @@ DEMO_SEED = SeedConfig(  # nosec B106
             username="grace",
             display_name="Grace Hopper",
             note="Compilers, nanoseconds, and debugging actual bugs.",
-            access_token="grace_token",  # nosec B106
+            access_token="grace_token",  # nosec
             email="grace@mock.local",
         ),
         SeedAccount(
             username="alan",
             display_name="Alan Turing",
             note="Thinking about whether machines can think.",
-            access_token="alan_token",  # nosec B106
+            access_token="alan_token",  # nosec
             email="alan@mock.local",
         ),
         SeedAccount(
             username="katherine",
             display_name="Katherine Johnson",
             note="Doing the math that gets us to orbit.",
-            access_token="katherine_token",  # nosec B106
+            access_token="katherine_token",  # nosec
             email="katherine@mock.local",
         ),
     ],

@@ -379,6 +379,45 @@ pytest -m "not mock_only"                # CI against a real server
 - **Rate limiting and scope enforcement are off by default.** Turn them on in config only
   for tests that specifically exercise them.
 - **`:memory:` state is gone when the server stops.** Use a file-backed `path` if you want
-  to inspect the database after a run.
+  to inspect the database after a run. (Under the hood, a `:memory:` server is backed by a
+  private temp file that is deleted on shutdown — see [Parallelism and SQLite](#parallelism-and-sqlite)
+  below — but it behaves like an in-memory database: ephemeral and isolated per server.)
 - **Stubs vs real behaviour.** Some endpoints return empty/fixed shapes. Check
   [What Is and Isn't Mocked](../reference/coverage.md) before asserting.
+
+## Parallelism and SQLite
+
+Running your suite in parallel with `pytest-xdist` (`pytest -n auto`) is fully supported,
+and is the main reason a few design choices look the way they do. There are two distinct
+kinds of parallelism, and the mock handles both:
+
+- **Across worker processes (`pytest-xdist`).** Each xdist worker is its own process with
+  its own server(s) and its own database, so workers can't see or corrupt each other's
+  state. Nothing special is required from you — just use the fixtures. Because
+  [`MockServer`](#the-mockserver-primitive) binds an OS-assigned free port (`port=0`),
+  there are no port collisions between workers either.
+
+- **Within one server (concurrent requests).** A single `MockServer` is a real threaded
+  `uvicorn`, and FastAPI runs sync endpoints in a threadpool — so two requests to the
+  *same* server can run on different threads at once. This matters whenever a test holds
+  a long-lived connection open while issuing other calls, the clearest example being
+  **streaming**: you open an SSE stream and then `status_post` on the same server, and
+  those two run concurrently.
+
+  This is where SQLite's threading model bites. A single SQLite connection is **not** safe
+  for concurrent use across threads, so the mock does *not* share one connection across the
+  threadpool. For an in-memory database (`path = ":memory:"`) it transparently uses a
+  private temp file instead of a true `sqlite://` memory DB, which lets each threadpool
+  request take its **own** connection while SQLite's normal file locking coordinates them
+  safely. The temp file is created per server and deleted when the server stops, so it still
+  behaves like an in-memory DB from your test's point of view — ephemeral, isolated, and
+  gone on shutdown.
+
+The upshot for you as a test author: **you don't have to do anything.** Parallel suites,
+shared-server-plus-`reset()`, and concurrent streaming tests all work without manual
+locking. If you ever swap in your own engine, keep this in mind — a naive
+`StaticPool`/single-shared-connection setup *will* produce intermittent, load-dependent
+failures (for example a spurious `401`, when an auth-token lookup briefly races with a
+concurrent write and sees nothing). See
+[How It Works → Database](../overview/how-it-works.md#database-file-vs-in-memory) for the
+contributor-level rationale.

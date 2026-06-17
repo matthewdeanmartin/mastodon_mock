@@ -124,9 +124,11 @@ HTTP response (JSON, with Link header for paginated lists)
 - **`config.py`** — Pydantic models for configuration plus `MastodonMockConfig.load()`,
   which resolves `.mastodon_mock.toml` → `[tool.mastodon_mock]` in `pyproject.toml` →
   built-in defaults.
-- **`db/base.py`** — declarative `Base`, engine creation (with `StaticPool` +
-  `check_same_thread=False` for in-memory SQLite so all threadpool requests share one
-  connection), and the session factory.
+- **`db/base.py`** — declarative `Base`, engine creation, and the session factory. For
+  in-memory SQLite (`path = ":memory:"`) it transparently backs the engine with a private
+  temp file (deleted on dispose) rather than a true `sqlite://` memory DB, so each
+  threadpool request gets its **own** connection instead of sharing one fragile connection.
+  See [Database: file vs in-memory](#database-file-vs-in-memory).
 - **`db/models.py`** — the ORM models. This is where persisted state is defined; changing
   it means writing an Alembic migration.
 - **`db/seed.py`** — `apply_seed_data()`, idempotent (matches accounts on `username`), turns
@@ -153,12 +155,29 @@ HTTP response (JSON, with Link header for paginated lists)
 ### Database: file vs in-memory
 
 In-memory SQLite (`path = ":memory:"`, the default) is connection-scoped — a naive pool
-would hand each request a different, empty database. `db/base.py` therefore uses
-`StaticPool` so a single connection is shared for the engine's lifetime, and
-`check_same_thread=False` because FastAPI runs sync endpoints in a threadpool. File-backed
-SQLite persists across restarts and is useful for poking at the mock with `curl` during
+would hand each request a different, empty database. The obvious fix is `StaticPool`, which
+shares **one** connection for the engine's lifetime. But that connection is then used by
+every request, and FastAPI runs sync endpoints in a **threadpool** — so two requests on
+different threads use the same connection at once. A single SQLite connection is not safe
+for concurrent cross-thread use; `check_same_thread=False` only silences the guard, it does
+not serialize access. Interleaved statements (classically: an SSE stream resolving its
+account while another request commits a write) can make a query observe half-applied state
+and return wrong/empty rows. That surfaced as an intermittent, load-dependent **`401`** when
+a token lookup transiently saw nothing — reproducible only under `pytest -n auto`.
+
+So `db/base.py` does **not** share a single connection. For `:memory:` it transparently
+backs the engine with a *private temp file* (unique per engine, deleted on dispose) and
+uses the default connection pool, so each threadpool request gets its **own** connection and
+SQLite's normal file locking coordinates them safely. The database is still ephemeral and
+isolated per app instance, preserving the `:memory:` contract for tests. (Shared-cache
+in-memory, `cache=shared`, was rejected: it trades the race for SQLite crashes under
+threaded load.)
+
+File-backed SQLite (`path = "./something.db"`) already gives each connection its own handle,
+persists across restarts, and is useful for poking at the mock with `curl` during
 development. See [the architecture spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/01-architecture.md) for the full
-rationale.
+rationale, and [Writing Tests → Parallelism and SQLite](../usage/writing-tests.md#parallelism-and-sqlite)
+for what this means when running suites in parallel.
 
 For how to add a new endpoint end-to-end, see [Contributing](../extending/CONTRIBUTING.md).
 

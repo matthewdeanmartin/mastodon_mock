@@ -122,6 +122,29 @@ Mock-only behaviour (e.g. `/api/v1/_mock/*`) lives under `tests/mock_only/` so i
 collected against a real backend. `tests/integration/` holds the dual mock/real suite,
 excluded from the default `pytest` run and gated behind `RUN_REAL_MASTODON_TESTS=1`.
 
+### Concurrency, the threadpool, and SQLite
+
+The contract tests run a real threaded `uvicorn`, and the CI test target runs the suite in
+parallel (`pytest -n auto --dist=loadfile`). Two consequences worth internalising before you
+touch the DB layer or add a long-lived-connection endpoint:
+
+- **A single server serves requests concurrently.** FastAPI runs sync endpoints in a
+  threadpool, so two requests to the same `MockServer` can execute on different threads at
+  once — most visibly when a streaming/SSE handler holds a connection open while another
+  request writes. Anything you add must tolerate that.
+- **Do not share one SQLite connection across the threadpool.** This is why `db/base.py`
+  backs `:memory:` with a private temp file and the default pool (one connection per thread)
+  rather than `StaticPool` (one shared connection). A shared connection with
+  `check_same_thread=False` *appears* to work and passes serial tests, but interleaved
+  statements corrupt results and produce intermittent, load-dependent failures (e.g. a
+  spurious `401` from a racing token lookup) that only show up under `-n auto`. If you change
+  engine/pool setup, re-read [How It Works → Database](../overview/how-it-works.md#database-file-vs-in-memory)
+  and verify with the parallel target, not just `pytest`.
+
+When adding a feature that holds a DB session open for a long time (streaming-style
+endpoints), prefer `async def` handlers that read what they need up front and release the
+session, rather than holding a connection for the lifetime of the response.
+
 A typical contract test:
 
 ```python

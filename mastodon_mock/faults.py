@@ -10,6 +10,7 @@ control plane.
 from __future__ import annotations
 
 import asyncio
+import builtins
 import fnmatch
 import itertools
 import re
@@ -108,7 +109,7 @@ class FaultStore:
         self._rules.append(rule)
         return rule
 
-    def list(self) -> list[FaultRule]:
+    def list(self) -> builtins.list[FaultRule]:
         """Current rules in evaluation order."""
         return list(self._rules)
 

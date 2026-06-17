@@ -69,7 +69,7 @@ def test_parse_hashtags() -> None:
     assert parse_hashtags("#MixedCase") == ["mixedcase"]
     assert parse_hashtags("Not a #tag!") == ["tag"]
     # Mastodon hashtags don't usually start mid-word
-    assert parse_hashtags("word#notatag") == []
+    assert not parse_hashtags("word#notatag")
     assert parse_hashtags(" #tag") == ["tag"]
 
 
@@ -229,6 +229,8 @@ def test_paginate_min_id(db_session: Session) -> None:
 def test_link_header() -> None:
     page = Page(items=[1, 2, 3], limit=3, first_id=100, last_id=90, has_more=True)
     header = link_header("http://test/api", page)
+    assert header is not None
+    # pylint: disable=unsupported-membership-test
     assert "max_id=90" in header
     assert 'rel="next"' in header
     assert "min_id=100" in header
@@ -236,6 +238,7 @@ def test_link_header() -> None:
 
     page_no_more = Page(items=[1, 2, 3], limit=3, first_id=100, last_id=90, has_more=False)
     header = link_header("http://test/api", page_no_more)
+    assert header is not None
     assert "max_id" not in header
     assert "min_id=100" in header
 

@@ -110,7 +110,7 @@ def test_demo_config_is_rich_and_keeps_defaults_unchanged() -> None:
 
     # The library default config remains minimal (the test suite relies on this).
     default = MastodonMockConfig()
-    assert default.rules == []
+    assert not default.rules
     assert default.terms_of_service == ""
     assert default.seed.accounts[0].username == "testuser"
 
