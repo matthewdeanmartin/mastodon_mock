@@ -78,6 +78,8 @@ rather than defining exact startup state.
 
 ## Next steps
 
+- [HTTPS and Real Mastodon Clients](https-and-real-clients.md) - connect Whalebird,
+  Fedistar, or another real Mastodon client (not just Mastodon.py) to the mock.
 - [How It Works](../overview/how-it-works.md) - the model, the request lifecycle, and auth.
 - [Writing Tests Against the Mock](writing-tests.md) - fixtures, examples, the dual-suite
   pattern.

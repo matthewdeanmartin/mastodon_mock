@@ -61,6 +61,8 @@ sample data, browse timelines, and exercise admin account/report/domain-block fl
 - **[Admin UI and API](usage/admin-ui.md)** — bundled UI, dev-login helpers, and moderation
   endpoint support.
 - **[What Is and Isn't Mocked](reference/coverage.md)** — coverage levels per API area.
+- **[Troubleshooting](troubleshooting.md)** — common connection issues with real
+  Mastodon clients (localhost/IPv6, cert trust, generic connection errors).
 - **[Contributing](extending/CONTRIBUTING.md)** — architecture and how to add an endpoint.
 
 ## Installation

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import base64
 import tempfile
 import weakref
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from mastodon_mock.config import MastodonMockConfig
@@ -39,6 +42,12 @@ from mastodon_mock.routers import (
 )
 from mastodon_mock.streaming import EventBus
 from mastodon_mock.ui import mount_ui
+
+# A 1x1 transparent PNG, served at the avatar/header placeholder URLs that
+# serializers/common.py builds for accounts with no custom image.
+_MISSING_IMAGE_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
 
 
 def dispose_app_resources(app: FastAPI) -> None:
@@ -80,6 +89,34 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     if config.streaming.enabled:
         app.state.event_bus = EventBus(queue_maxsize=config.streaming.queue_maxsize)
 
+    # Real Mastodon allows any origin (web clients like elk.zone/mastodeck run in the
+    # browser and call whatever instance the user points them at, so the API must be
+    # reachable cross-origin). Mirrors real instances' wide-open CORS, including the
+    # custom headers pagination/rate-limiting rely on (Link, X-RateLimit-*).
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+        expose_headers=[
+            "Link",
+            "Mastodon-Async-Refresh",
+            "X-RateLimit-Reset",
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-Request-Id",
+        ],
+    )
+
+    @app.middleware("http")
+    async def _set_server_header(request: Request, call_next: Any) -> Response:
+        """Set ``Server: Mastodon``, matching real instances — some clients use it
+        as a reachability/identity signal (alongside nodeinfo's ``software.name``).
+        """
+        response: Response = await call_next(request)
+        response.headers["Server"] = "Mastodon"
+        return response
+
     add_middleware(app, config)
 
     # Added last so it wraps outermost: a fault short-circuits before scope/rate
@@ -111,6 +148,17 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
         app.include_router(module.router)
 
     app.mount("/media", StaticFiles(directory=media_path), name="media")
+
+    @app.get("/avatars/original/missing.png")
+    @app.get("/headers/original/missing.png")
+    def missing_placeholder() -> Response:
+        """Serve the 1x1 placeholder image referenced by accounts with no avatar/header.
+
+        Real Mastodon ships actual stock images at these paths; serializers
+        (serializers/common.py) build URLs pointing here regardless, so without this
+        route every account without a custom avatar/header 404s on image load.
+        """
+        return Response(content=_MISSING_IMAGE_PNG, media_type="image/png")
 
     ui_available = mount_ui(app)
 

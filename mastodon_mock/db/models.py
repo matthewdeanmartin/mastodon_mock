@@ -6,7 +6,7 @@ responses (Mastodon ``IdType``). ID values come from ``mastodon_mock.ids.next_id
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
@@ -19,7 +19,7 @@ from mastodon_mock.ids import next_id
 
 def utcnow() -> datetime:
     """Return the current UTC time (timezone-aware)."""
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def _id() -> int:

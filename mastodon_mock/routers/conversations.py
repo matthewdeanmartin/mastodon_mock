@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 from sqlalchemy import or_, select
 
 from mastodon_mock.db.models import Account, ConversationRead, Status, StatusMention
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
+from mastodon_mock.pagination import DEFAULT_LIMIT, MAX_LIMIT, Page, link_header
+from mastodon_mock.routers.helpers import PageQuery
 from mastodon_mock.serializers.misc import serialize_conversation
 from mastodon_mock.serializers.statuses import serialize_status
 
@@ -22,8 +24,16 @@ def _conversation_id(participant_ids: frozenset[int]) -> str:
 
 @router.get("/api/v1/conversations")
 @router.get("/api/v1/conversations/")
-def conversations(db: DbSession, config: Config, account: RequiredAccount) -> list[dict[str, Any]]:
-    """List direct-message conversations grouped by participant set."""
+def conversations(
+    request: Request, response: Response, db: DbSession, config: Config, account: RequiredAccount, params: PageQuery
+) -> list[dict[str, Any]]:
+    """List direct-message conversations grouped by participant set, newest first.
+
+    Grouping happens before pagination: each conversation is represented by its
+    latest status, and ``max_id``/``min_id``/``since_id``/``limit`` page over that
+    per-conversation list (not the raw status rows) — otherwise a client paging
+    through results sees the same conversations repeated rather than advancing.
+    """
     # Direct statuses where the user is the author or a mentioned participant.
     mentioned_status_ids = select(StatusMention.status_id).where(StatusMention.account_id == account.id)
     statuses = db.scalars(
@@ -44,18 +54,51 @@ def conversations(db: DbSession, config: Config, account: RequiredAccount) -> li
         if key not in grouped:  # statuses are newest-first, so first seen is latest
             grouped[key] = status
 
+    # Conversations newest-first by their representative (latest) status id.
+    conversation_items = sorted(grouped.items(), key=lambda kv: kv[1].id, reverse=True)
+
+    max_id = int(params.max_id) if params.max_id is not None else None
+    min_id = int(params.min_id) if params.min_id is not None else None
+    since_id = int(params.since_id) if params.since_id is not None else None
+    if max_id is not None:
+        conversation_items = [(k, s) for k, s in conversation_items if s.id < max_id]
+    if since_id is not None:
+        conversation_items = [(k, s) for k, s in conversation_items if s.id > since_id]
+    using_min_id = min_id is not None
+    if min_id is not None:
+        conversation_items = [(k, s) for k, s in conversation_items if s.id > min_id]
+        conversation_items.reverse()  # oldest-first while slicing, restored below
+
+    limit = DEFAULT_LIMIT if params.limit is None else max(1, min(int(params.limit), MAX_LIMIT))
+    has_more = len(conversation_items) > limit
+    page_items = conversation_items[:limit]
+    if using_min_id:
+        page_items.reverse()
+
     read_ids = {
         r.conversation_id
         for r in db.scalars(select(ConversationRead).where(ConversationRead.account_id == account.id)).all()
     }
 
     out = []
-    for key, last_status in grouped.items():
+    for key, last_status in page_items:
         conv_id = _conversation_id(key)
         other_ids = [i for i in key if i != account.id]
         accounts = [acc for i in other_ids if (acc := db.get(Account, i)) is not None]
         last = serialize_status(db, last_status, config, account)
         out.append(serialize_conversation(db, conv_id, accounts, last, conv_id not in read_ids, config))
+
+    page = Page(
+        items=[s for _, s in page_items],
+        limit=limit,
+        first_id=page_items[0][1].id if page_items else None,
+        last_id=page_items[-1][1].id if page_items else None,
+        has_more=has_more,
+    )
+    base = f"{request.url.scheme}://{request.url.netloc}{request.url.path}"
+    header = link_header(base, page)
+    if header:
+        response.headers["Link"] = header
     return out
 
 

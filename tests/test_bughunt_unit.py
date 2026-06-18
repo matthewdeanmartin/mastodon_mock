@@ -112,14 +112,17 @@ def test_validate_status_params() -> None:
 
     # Empty status
     resp = _validate_status_params({"status": ""})
+    assert resp is not None
     assert resp.status_code == 422
 
     # Too long status
     resp = _validate_status_params({"status": "a" * (MAX_STATUS_CHARACTERS + 1)})
+    assert resp is not None
     assert resp.status_code == 422
 
     # Too many media attachments
     resp = _validate_status_params({"status": "hi", "media_ids": ["1", "2", "3", "4", "5"]})
+    assert resp is not None
     assert resp.status_code == 422
 
     # Valid media attachments

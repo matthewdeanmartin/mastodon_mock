@@ -13,6 +13,31 @@ from mastodon_mock.app import create_app
 from mastodon_mock.config import PRESETS, MastodonMockConfig, SampleDataConfig, demo_config
 
 
+def _silence_proactor_connection_reset() -> None:
+    """Swallow the benign ``ConnectionResetError`` logged by asyncio's Windows Proactor loop.
+
+    When a client (browser/Electron app) aborts a connection instead of closing it
+    cleanly — routine for SSE/streaming clients with short read timeouts —
+    ``ProactorBasePipeTransport._call_connection_lost`` logs a scary-looking
+    "Exception in callback" traceback for WinError 10054. It's not a server bug; Linux's
+    selector loop already ignores the equivalent. Only patched on win32.
+    """
+    if sys.platform != "win32":
+        return
+
+    from asyncio.proactor_events import _ProactorBasePipeTransport
+
+    original = _ProactorBasePipeTransport._call_connection_lost
+
+    def _quiet_call_connection_lost(self: object, exc: BaseException | None) -> None:
+        try:
+            original(self, exc)
+        except ConnectionResetError:
+            pass
+
+    _ProactorBasePipeTransport._call_connection_lost = _quiet_call_connection_lost
+
+
 def main(argv: list[str] | None = None) -> None:
     """Run the mastodon_mock CLI."""
     parser = argparse.ArgumentParser(
@@ -26,11 +51,25 @@ def main(argv: list[str] | None = None) -> None:
     serve.add_argument("--config", default=None, help="Path to a .mastodon_mock.toml config file")
     serve.add_argument("--host", default=None, help="Host to bind (overrides config)")
     serve.add_argument("--port", type=int, default=None, help="Port to bind (overrides config)")
+    serve.add_argument(
+        "--domain",
+        default=None,
+        help="Public domain used to build avatar/header/status URLs (overrides config and auto-derivation)",
+    )
     serve.add_argument("--in-memory", action="store_true", help="Force in-memory SQLite")
     serve.add_argument(
         "--demo",
         action="store_true",
         help="Seed a rich demo community (accounts, follows, quotes, announcements, rules, ToS)",
+    )
+    serve.add_argument("--ssl-keyfile", default=None, help="Path to a TLS private key (enables HTTPS)")
+    serve.add_argument("--ssl-certfile", default=None, help="Path to a TLS certificate (enables HTTPS)")
+    serve.add_argument("--ssl-keyfile-password", default=None, help="Password for an encrypted --ssl-keyfile")
+    serve.add_argument(
+        "--log-level",
+        default=None,
+        choices=["critical", "error", "warning", "info", "debug", "trace"],
+        help="Uvicorn log verbosity (default: info). Use 'debug' or 'trace' to see headers/bodies while debugging a client.",
     )
 
     upgrade = sub.add_parser("db", help="Database commands")
@@ -71,8 +110,31 @@ def _serve(args: argparse.Namespace) -> None:
         config.database.path = ":memory:"
     host = args.host or config.server.host
     port = args.port or config.server.port
+    if getattr(args, "domain", None):
+        # Explicit --domain always wins, e.g. a named cert + hosts-file entry
+        # (see scripts/gen_dev_cert.sh) for clients that reject bare IPs/localhost.
+        config.domain = args.domain
+    elif config.domain == MastodonMockConfig.model_fields["domain"].default:
+        # Unset by the user: derive a reachable domain from the actual bind address
+        # instead of the unresolvable "mock.local" default, so avatar/header
+        # placeholders and status permalinks (built from config.domain) are
+        # clickable/loadable rather than 404ing against a host that doesn't resolve.
+        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
+        config.domain = f"{display_host}:{port}"
     app = create_app(config)
-    uvicorn.run(app, host=host, port=port)
+    _silence_proactor_connection_reset()
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        # The app's own middleware sets "Server: Mastodon" to match a real instance;
+        # disable uvicorn's default "Server: uvicorn" so responses don't carry both.
+        server_header=False,
+        ssl_keyfile=getattr(args, "ssl_keyfile", None),
+        ssl_certfile=getattr(args, "ssl_certfile", None),
+        ssl_keyfile_password=getattr(args, "ssl_keyfile_password", None),
+        log_level=getattr(args, "log_level", None),
+    )
 
 
 def _gen_data(args: argparse.Namespace) -> None:

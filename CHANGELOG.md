@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- Support for python 3.10, 3.11, 3.12
+- Websockets support
+- More oauth login machinery
+
+### Fixed
+- Missing paging for some end points
+- More missing endpoints
+- Missing v1/v2 endpoints
+
 ## [0.2.0] - 2026-06-17
 ### Added
 - More endpoints, SSE style streaming.

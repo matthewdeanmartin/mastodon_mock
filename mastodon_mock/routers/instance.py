@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -66,13 +66,19 @@ def _default_custom_emojis(config: Config) -> list[dict[str, Any]]:
 
 
 def _streaming_base(request: Request) -> str:
-    """The origin this request arrived on, e.g. ``http://127.0.0.1:54321``.
+    """The ``ws``/``wss`` form of the origin this request arrived on.
 
-    Mastodon.py only stays on this server if the advertised streaming URL shares the
-    client's ``api_base_url`` origin; otherwise it rewrites ``wss://host`` and connects
-    elsewhere. See spec/streaming.md "Streaming base URL".
+    Real Mastodon advertises a ``wss://``/``ws://`` URL here, which browser/Electron
+    clients (Whalebird, Sengi, ...) use literally with the WebSocket API — a plain
+    ``https://`` URL makes ``new WebSocket(url)`` throw outright (wrong scheme).
+    Mastodon.py's own ``__get_streaming_base()`` already translates ``wss``/``ws``
+    back to ``https``/``http`` + the same netloc before connecting (see
+    ``Mastodon.py/mastodon/internals.py``), so it still lands on this same mock
+    instance — no special-casing needed on the mock's side. See spec/streaming.md
+    "Streaming base URL".
     """
-    return f"{request.url.scheme}://{request.url.netloc}"
+    ws_scheme = "wss" if request.url.scheme == "https" else "ws"
+    return f"{ws_scheme}://{request.url.netloc}"
 
 
 @router.get("/api/v1/instance")
@@ -103,7 +109,7 @@ def instance_activity(db: DbSession) -> list[dict[str, str]]:
     with string values). Statuses/registrations are counted from the mock's own
     rows per week; ``logins`` is approximated as the active-account count.
     """
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     # Week boundaries: most recent first, aligned to whole days like the real API.
     this_week_end = now.replace(hour=0, minute=0, second=0, microsecond=0)
     out: list[dict[str, str]] = []
@@ -141,6 +147,29 @@ def instance_peers(db: DbSession) -> list[str]:
     """The instance's known peers: the distinct domains of "remote" accounts."""
     domains = db.scalars(select(Account.domain).where(Account.domain.is_not(None)).distinct()).all()
     return sorted(d for d in domains if d)
+
+
+@router.get("/.well-known/webfinger")
+def webfinger(request: Request, db: DbSession, resource: str) -> dict[str, Any]:
+    """Resolve a local ``acct:user@domain`` resource.
+
+    Mastodon apps (Whalebird, Fedistar, etc.) hit this during the add-instance flow
+    to confirm an account/instance exists, even before any OAuth happens. Only local
+    accounts resolve — remote-account resolution is out of scope (see spec/00-overview.md).
+    """
+    username, _, _domain = resource.removeprefix("acct:").partition("@")
+    account = db.scalar(select(Account).where(Account.username == username, Account.domain.is_(None)))
+    if account is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    base = f"{request.url.scheme}://{request.url.netloc}"
+    return {
+        "subject": f"acct:{account.username}@{request.url.hostname}",
+        "aliases": [f"{base}/@{account.username}"],
+        "links": [
+            {"rel": "http://webfinger.net/rel/profile-page", "type": "text/html", "href": f"{base}/@{account.username}"},
+            {"rel": "self", "type": "application/activity+json", "href": f"{base}/users/{account.username}"},
+        ],
+    }
 
 
 @router.get("/.well-known/nodeinfo")
@@ -366,7 +395,7 @@ def suggestions_v2(
     return [serialize_suggestion(acc) for acc in _suggestion_accounts(db, config, account, limit)]
 
 
-def trending_tag_rows(db: DbSession, config: Config, limit: int) -> list[dict[str, Any]]:
+def trending_tag_rows(db: DbSession, config: Config, limit: int, offset: int = 0) -> list[dict[str, Any]]:
     """Local hashtags ranked by how many statuses use them (``Tag`` shape).
 
     Shared by the public ``/api/v1/trends/tags`` endpoint and the admin variant.
@@ -375,12 +404,15 @@ def trending_tag_rows(db: DbSession, config: Config, limit: int) -> list[dict[st
         select(StatusTag.name, func.count().label("uses"))
         .group_by(StatusTag.name)
         .order_by(func.count().desc(), StatusTag.name)
+        .offset(offset)
         .limit(limit)
     ).all()
     return [serialize_tag(name, config, uses_today=int(uses)) for name, uses in rows]
 
 
-def trending_status_rows(db: DbSession, config: Config, account: Account | None, limit: int) -> list[dict[str, Any]]:
+def trending_status_rows(
+    db: DbSession, config: Config, account: Account | None, limit: int, offset: int = 0
+) -> list[dict[str, Any]]:
     """The most-favourited public local statuses (serialized).
 
     Shared by the public ``/api/v1/trends/statuses`` endpoint and the admin variant.
@@ -390,6 +422,7 @@ def trending_status_rows(db: DbSession, config: Config, account: Account | None,
         select(Status)
         .where(Status.visibility.in_(["public", "unlisted"]), Status.reblog_of_id.is_(None))
         .order_by(fav_count.desc(), Status.id.desc())
+        .offset(offset)
         .limit(limit)
     )
     statuses = db.scalars(stmt).all()
@@ -398,9 +431,9 @@ def trending_status_rows(db: DbSession, config: Config, account: Account | None,
 
 @router.get("/api/v1/trends")
 @router.get("/api/v1/trends/tags")
-def trends_tags(db: DbSession, config: Config, limit: int = 10) -> list[dict[str, Any]]:
+def trends_tags(db: DbSession, config: Config, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
     """Trending tags, derived from local hashtag usage."""
-    return trending_tag_rows(db, config, min(limit, 20))
+    return trending_tag_rows(db, config, min(limit, 20), offset)
 
 
 @router.get("/api/v1/trends/statuses")
@@ -409,9 +442,10 @@ def trends_statuses(
     config: Config,
     account: CurrentAccount,
     limit: int = 20,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     """Trending statuses: the most-favourited public local statuses."""
-    return trending_status_rows(db, config, account, min(limit, 40))
+    return trending_status_rows(db, config, account, min(limit, 40), offset)
 
 
 @router.get("/api/v1/trends/links")

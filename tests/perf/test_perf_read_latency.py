@@ -11,6 +11,7 @@ from __future__ import annotations
 import statistics
 import time
 from collections.abc import Callable
+from typing import Any
 
 import httpx2 as httpx
 import pytest
@@ -43,14 +44,14 @@ def _p95_ms(client: httpx.Client, request: Callable[[httpx.Client], httpx.Respon
     return statistics.quantiles(samples, n=20)[-1] if len(samples) >= 2 else samples[0]
 
 
-def test_timeline_home_latency(perf_world: PerfWorld, baselines: dict) -> None:
+def test_timeline_home_latency(perf_world: PerfWorld, baselines: dict[str, Any]) -> None:
     with _client(perf_world) as client:
         p95 = _p95_ms(client, lambda c: c.get("/api/v1/timelines/home", params={"limit": 20}))
     ceiling = baselines["read"]["timeline_home_p95_ms"]
     assert p95 <= ceiling, f"timeline_home P95 {p95:.1f}ms exceeds ceiling {ceiling}ms"
 
 
-def test_account_statuses_latency(perf_world: PerfWorld, baselines: dict) -> None:
+def test_account_statuses_latency(perf_world: PerfWorld, baselines: dict[str, Any]) -> None:
     with _client(perf_world) as client:
         path = f"/api/v1/accounts/{perf_world.busy_account_id}/statuses"
         p95 = _p95_ms(client, lambda c: c.get(path, params={"limit": 20}))
@@ -58,7 +59,7 @@ def test_account_statuses_latency(perf_world: PerfWorld, baselines: dict) -> Non
     assert p95 <= ceiling, f"account_statuses P95 {p95:.1f}ms exceeds ceiling {ceiling}ms"
 
 
-def test_notifications_latency(perf_world: PerfWorld, baselines: dict) -> None:
+def test_notifications_latency(perf_world: PerfWorld, baselines: dict[str, Any]) -> None:
     with _client(perf_world) as client:
         p95 = _p95_ms(client, lambda c: c.get("/api/v1/notifications", params={"limit": 20}))
     ceiling = baselines["read"]["notifications_p95_ms"]

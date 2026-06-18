@@ -13,6 +13,7 @@ import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 import uvicorn
@@ -70,6 +71,7 @@ def perf_world() -> Iterator[PerfWorld]:
 
 
 @pytest.fixture(scope="session")
-def baselines() -> dict:
+def baselines() -> dict[str, Any]:
     """Load the committed perf baselines (ratios/ceilings)."""
-    return json.loads(BASELINES_PATH.read_text(encoding="utf-8"))
+    result: dict[str, Any] = json.loads(BASELINES_PATH.read_text(encoding="utf-8"))
+    return result

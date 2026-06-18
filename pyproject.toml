@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [{ name = "Matthew Martin", email = "matthewdeanmartin@gmail.com" }]
 keywords = ["mastodon", "mock", "fastapi", "testing", "fediverse", "rest-api", "mastodon.py"]
 license = "MIT"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: FastAPI",
@@ -22,12 +22,13 @@ classifiers = [
 ]
 dependencies = [
     "fastapi>=0.115.0",
-    "uvicorn>=0.30.0",
+    "uvicorn[standard]>=0.30.0",
     "sqlalchemy>=2.0.0",
     "alembic>=1.13.0",
     "pydantic>=2.0.0",
     "python-multipart>=0.0.9",
     "orjson>=3.10.0",
+    "tomli>=2.0.1; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
@@ -108,7 +109,7 @@ dev = [
     "pip-audit>=2.7.0",
     "tox>=4.0",
     "tox-uv>=1.0",
-    "gha-update>=0.1.0",
+    "gha-update>=0.1.0; python_version >= '3.12'",
     "pyyaml>=6.0",
     "yamlfix>=1.19.0",
     "interrogate>=1.5.0",

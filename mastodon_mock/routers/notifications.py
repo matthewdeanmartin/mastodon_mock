@@ -118,8 +118,11 @@ def grouped_unread_count(
 
 
 # NOTE: the static ``/policy`` routes must be declared *before* the
-# ``/{group_key}`` catch-all below, or ``GET /api/v2/notifications/policy`` would
-# match the group handler with ``group_key="policy"``.
+# ``/{notification_id}``/``/{group_key}`` catch-alls below (in either version), or
+# ``GET /api/v1|v2/notifications/policy`` would match the id/group handler with
+# ``notification_id="policy"``. Real Mastodon serves this endpoint at both v1 and v2
+# (confirmed against mastodon.social — both return 401, not 404, when unauthenticated).
+@router.get("/api/v1/notifications/policy")
 @router.get("/api/v2/notifications/policy")
 def notifications_policy() -> dict[str, Any]:
     """An "accept everything" notification policy (shape per mastodon.social)."""
@@ -134,6 +137,7 @@ def notifications_policy() -> dict[str, Any]:
     }
 
 
+@router.patch("/api/v1/notifications/policy")
 @router.patch("/api/v2/notifications/policy")
 async def update_notifications_policy(request: Request) -> dict[str, Any]:
     """Stub: accept and ignore policy updates."""

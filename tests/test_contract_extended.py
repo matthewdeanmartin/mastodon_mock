@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import io
-from datetime import UTC
+from datetime import timezone
 
 from mastodon import Mastodon
 
@@ -73,7 +73,7 @@ def test_lists(alice: Mastodon, bob: Mastodon) -> None:
 def test_scheduled_status(alice: Mastodon) -> None:
     from datetime import datetime, timedelta
 
-    when = datetime.now(UTC) + timedelta(hours=2)
+    when = datetime.now(timezone.utc) + timedelta(hours=2)
     scheduled = alice.status_post("later", scheduled_at=when)
     assert scheduled.id
 

@@ -23,9 +23,14 @@ def test_stream_healthy(mastodon_mock_server: MockServer) -> None:
 
 
 def test_instance_advertises_on_server_streaming_url(mastodon_mock_server: MockServer) -> None:
-    """Both instance endpoints advertise the streaming URL as this server's origin.
+    """Both instance endpoints advertise the streaming URL as this server's origin,
+    using the ``ws``/``wss`` scheme real Mastodon (and browser/Electron clients that
+    use it literally with the WebSocket API) uses.
 
-    If they pointed at ``wss://<domain>`` Mastodon.py would connect off-server.
+    Mastodon.py's own ``__get_streaming_base()`` translates ``ws``/``wss`` back to
+    ``http``/``https`` + the same netloc before connecting (see
+    ``Mastodon.py/mastodon/internals.py``), so it still stays on this server —
+    advertising a plain ``http``/``https`` URL here was an unnecessary workaround.
     Mastodon.py normalises v1→v2, surfacing the URL at
     ``configuration.urls.streaming``; the raw v1 JSON exposes ``urls.streaming_api``.
     """
@@ -33,10 +38,11 @@ def test_instance_advertises_on_server_streaming_url(mastodon_mock_server: MockS
 
     alice = mastodon_mock_server.client("alice")
     base = mastodon_mock_server.base_url
-    assert alice.instance_v2()["configuration"]["urls"]["streaming"] == base
+    expected_ws_base = base.replace("https://", "wss://").replace("http://", "ws://")
+    assert alice.instance_v2()["configuration"]["urls"]["streaming"] == expected_ws_base
 
     raw_v1 = httpx.get(f"{base}/api/v1/instance").json()
-    assert raw_v1["urls"]["streaming_api"] == base
+    assert raw_v1["urls"]["streaming_api"] == expected_ws_base
 
 
 def test_user_stream_delivers_followed_post(mastodon_mock_server: MockServer) -> None:

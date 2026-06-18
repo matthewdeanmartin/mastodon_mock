@@ -35,6 +35,13 @@ async def read_body(request: Request) -> dict[str, Any]:
     return out
 
 
+def truthy(value: Any) -> bool:
+    """Coerce a form string (``"true"``/``"on"``/``"1"``) or JSON bool to ``bool``."""
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ("true", "1", "on")
+
+
 @dataclass
 class PageParams:
     """Parsed pagination query params."""

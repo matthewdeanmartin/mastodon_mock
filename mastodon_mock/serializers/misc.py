@@ -82,8 +82,17 @@ def serialize_filter_v1(filt: Filter) -> dict[str, Any]:
 def serialize_scheduled_status(
     scheduled: ScheduledStatus,
 ) -> dict[str, Any]:
-    """Serialize a ``ScheduledStatus``."""
-    params = scheduled.params or {}
+    """Serialize a ``ScheduledStatus``.
+
+    Real Mastodon's documented ``ScheduledStatus.params`` shape uses the key
+    ``text`` for the post body. The mock stores the client-submitted params
+    verbatim (key ``status``, matching ``POST /api/v1/statuses``'s own field name),
+    so it's renamed here on the way out — otherwise a client reading ``params.text``
+    sees nothing and the scheduled/draft post appears to have an empty body.
+    """
+    params = dict(scheduled.params or {})
+    if "status" in params:
+        params["text"] = params.pop("status")
     return {
         "id": sid(scheduled.id),
         "scheduled_at": iso(scheduled.scheduled_at),

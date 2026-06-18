@@ -1,19 +1,23 @@
 """Apps & auth endpoints. See spec/04-auth.md.
 
 Security is faked: tokens are random strings mapped 1:1 to accounts. The
-``client_credentials`` grant always succeeds; ``password``/``authorization_code``
-are rejected (matching current Mastodon + the headless mock constraints).
+``client_credentials`` grant always succeeds; ``password`` is rejected (matching
+current Mastodon). ``authorization_code`` is supported via a bare-bones account
+picker at ``/oauth/authorize`` (see "Optional: permissive code flow" in spec/04-auth.md)
+for GUI clients (Whalebird, Fedistar) that do the full browser-redirect login.
 """
 
 from __future__ import annotations
 
 import secrets
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Any
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 
 from mastodon_mock.db.models import Account, OAuthApp, OAuthToken, utcnow
 from mastodon_mock.deps import Config, CurrentToken, DbSession, RequiredAccount
+from mastodon_mock.routers.helpers import read_body
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.common import account_acct, sid
 
@@ -30,22 +34,49 @@ def _token() -> str:
     return secrets.token_urlsafe(32)
 
 
+_AUTHORIZE_CODE_PREFIX = "mockcode_"
+
+
+def _encode_authorize_code(username: str) -> str:
+    """Build an opaque authorization code that round-trips the chosen username.
+
+    There's no server-side "pending authorization" table, so the code is
+    self-describing (mock-only shortcut — see spec/04-auth.md's "Optional: permissive
+    code flow" section).
+    """
+    return f"{_AUTHORIZE_CODE_PREFIX}{username}"
+
+
+def _decode_authorize_code(code: str) -> str | None:
+    """Recover the username from a code minted by ``_encode_authorize_code``."""
+    if not code.startswith(_AUTHORIZE_CODE_PREFIX):
+        return None
+    return code[len(_AUTHORIZE_CODE_PREFIX) :] or None
+
+
 @router.post("/api/v1/apps")
-def create_app(
-    db: DbSession,
-    client_name: Annotated[str, Form()],
-    redirect_uris: Annotated[str, Form()] = "urn:ietf:wg:oauth:2.0:oob",
-    scopes: Annotated[str, Form()] = "read",
-    website: Annotated[str | None, Form()] = None,
-) -> dict[str, Any]:
-    """Register an OAuth application."""
+async def create_app(request: Request, db: DbSession) -> dict[str, Any]:
+    """Register an OAuth application.
+
+    Accepts form or JSON bodies (see ``read_body``) — some clients (e.g. Whalebird)
+    POST this as JSON rather than the form-encoded body Mastodon.py sends, and
+    ``redirect_uris``/``scopes`` may arrive as either a string or a JSON array.
+    """
+    body = await read_body(request)
+    client_name = body.get("client_name")
+    if not client_name:
+        raise HTTPException(status_code=422, detail="Validation failed: Client name can't be blank")
+    redirect_uris = body.get("redirect_uris", "urn:ietf:wg:oauth:2.0:oob")
+    scopes = body.get("scopes", "read")
+    website = body.get("website")
+
     app = OAuthApp(
         client_id=_token(),
         client_secret=_token(),
         name=client_name,
         website=website,
-        redirect_uris=redirect_uris.split("\n"),
-        scopes=scopes.split(" "),
+        redirect_uris=redirect_uris if isinstance(redirect_uris, list) else str(redirect_uris).split("\n"),
+        scopes=scopes if isinstance(scopes, list) else str(scopes).split(" "),
     )
     db.add(app)
     db.commit()
@@ -64,8 +95,8 @@ def create_app(
 
 @router.post("/oauth/token")
 async def oauth_token(request: Request, db: DbSession) -> dict[str, Any]:
-    """Issue tokens. Only ``client_credentials`` and ``refresh_token`` succeed."""
-    form = await request.form()
+    """Issue tokens. Only ``client_credentials``, ``authorization_code``, and ``refresh_token`` succeed."""
+    form = await read_body(request)
     grant_type = form.get("grant_type")
 
     if grant_type == "client_credentials":
@@ -89,7 +120,79 @@ async def oauth_token(request: Request, db: DbSession) -> dict[str, Any]:
         db.commit()
         return _token_response(existing)
 
+    if grant_type == "authorization_code":
+        username = _decode_authorize_code(str(form.get("code", "")))
+        account = db.query(Account).filter(Account.username == username, Account.domain.is_(None)).first()
+        if username is None or account is None:
+            raise HTTPException(status_code=400, detail="invalid_grant")
+        app = _resolve_app(db, form.get("client_id"))
+        token = OAuthToken(
+            access_token=_token(),
+            app_id=app.id if app else None,
+            account_id=account.id,
+            scopes=app.scopes if app else list(_DEFAULT_SCOPES),
+            created_at=utcnow(),
+        )
+        db.add(token)
+        db.commit()
+        return _token_response(token)
+
     raise HTTPException(status_code=400, detail="unsupported_grant_type")
+
+
+@router.get("/oauth/authorize")
+def oauth_authorize_picker(request: Request, db: DbSession) -> Response:
+    """Render a bare-bones account picker for the authorization-code flow.
+
+    Real clients with a browser-redirect login (Whalebird, Fedistar) hit this with
+    ``response_type=code``. There's no session/login concept in the mock, so instead
+    of guessing an account, this renders a tiny HTML page listing local accounts;
+    picking one POSTs back here and issues the redirect with a code.
+    """
+    redirect_uri = request.query_params.get("redirect_uri", "urn:ietf:wg:oauth:2.0:oob")
+    client_id = request.query_params.get("client_id", "")
+    scope = request.query_params.get("scope", "read")
+    state = request.query_params.get("state", "")
+    accounts = db.query(Account).filter(Account.domain.is_(None)).order_by(Account.id).all()
+
+    options = "\n".join(
+        f'<li><button type="submit" name="username" value="{a.username}">'
+        f"{a.display_name or a.username} (@{a.username})</button></li>"
+        for a in accounts
+    )
+    html = f"""<!doctype html>
+<html><head><title>mastodon_mock: choose an account</title></head>
+<body>
+<h1>mastodon_mock</h1>
+<p>Authorize this app as:</p>
+<form method="post" action="/oauth/authorize">
+  <input type="hidden" name="redirect_uri" value="{redirect_uri}">
+  <input type="hidden" name="client_id" value="{client_id}">
+  <input type="hidden" name="scope" value="{scope}">
+  <input type="hidden" name="state" value="{state}">
+  <ul>{options}</ul>
+</form>
+</body></html>"""
+    return Response(content=html, media_type="text/html")
+
+
+@router.post("/oauth/authorize")
+async def oauth_authorize_submit(request: Request) -> Response:
+    """Issue a code for the chosen account and redirect (or display it for ``oob``)."""
+    form = await request.form()
+    username = str(form.get("username", ""))
+    redirect_uri = str(form.get("redirect_uri") or "urn:ietf:wg:oauth:2.0:oob")
+    state = form.get("state")
+    code = _encode_authorize_code(username)
+
+    if redirect_uri == "urn:ietf:wg:oauth:2.0:oob":
+        return Response(content=f"<!doctype html><html><body><p>Authorization code: {code}</p></body></html>", media_type="text/html")
+
+    separator = "&" if "?" in redirect_uri else "?"
+    target = f"{redirect_uri}{separator}code={code}"
+    if state:
+        target += f"&state={state}"
+    return RedirectResponse(url=target, status_code=302)
 
 
 @router.post("/oauth/revoke")

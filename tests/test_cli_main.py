@@ -58,7 +58,9 @@ def test_serve_builds_app_and_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> N
     sentinel_app = object()
 
     monkeypatch.setattr(cli, "create_app", lambda config: sentinel_app)
-    monkeypatch.setattr(uvicorn, "run", lambda app, host, port: run_calls.update(app=app, host=host, port=port))
+    monkeypatch.setattr(
+        uvicorn, "run", lambda app, host, port, **_kw: run_calls.update(app=app, host=host, port=port)
+    )
 
     args = argparse.Namespace(config=None, host="127.0.0.1", port=9999, in_memory=True)
     cli._serve(args)

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, overload
 
 from mastodon_mock.config import MastodonMockConfig, SeedConfig
 from mastodon_mock.testing.server import MockServer
@@ -76,6 +76,22 @@ class _MockMastodon:
         return cast(F, wrapper)
 
 
+@overload
+def mock_mastodon(func: F) -> F: ...
+
+
+@overload
+def mock_mastodon(
+    func: None = None,
+    *,
+    config: MastodonMockConfig | None = None,
+    seed: SeedConfig | None = None,
+    inject: bool = True,
+    inject_as: str = "mastodon_server",
+    **server_kwargs: Any,
+) -> _MockMastodon: ...
+
+
 def mock_mastodon(
     func: Callable[..., Any] | None = None,
     *,
@@ -84,7 +100,7 @@ def mock_mastodon(
     inject: bool = True,
     inject_as: str = "mastodon_server",
     **server_kwargs: Any,
-) -> Any:
+) -> _MockMastodon | Callable[..., Any]:
     """Start a mock Mastodon server as a context manager or decorator.
 
     As a context manager::

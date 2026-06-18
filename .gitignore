@@ -83,3 +83,6 @@ mastodon_mock/_ui_dist/
 ui/node_modules/
 ui/.angular/
 ui/dist/
+
+# Local self-signed TLS dev certs (see README for how to generate)
+.dev_certs/

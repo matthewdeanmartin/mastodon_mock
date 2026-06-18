@@ -7,6 +7,8 @@ fails. Run with ``pytest -m slow``.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from mastodon_mock.config import PRESETS, DatabaseConfig
@@ -17,7 +19,7 @@ pytestmark = pytest.mark.slow
 
 
 @pytest.mark.parametrize("preset", ["small", "medium"])
-def test_generation_throughput(preset: str, baselines: dict) -> None:
+def test_generation_throughput(preset: str, baselines: dict[str, Any]) -> None:
     engine = init_engine(DatabaseConfig(path=":memory:"))
     try:
         Base.metadata.create_all(engine)

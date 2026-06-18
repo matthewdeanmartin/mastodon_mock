@@ -7,7 +7,7 @@ defaults. See spec/01-architecture.md.
 
 from __future__ import annotations
 
-import tomllib
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +15,11 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from mastodon_mock.versioning import CURRENT_VERSION
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 class DatabaseConfig(BaseModel):
@@ -249,6 +254,21 @@ DEMO_SEED = SeedConfig(
             account="ada",
             text="Couldn't agree more, Grace. Shipping beats perfect.",
             quotes="grace_quip",
+        ),
+        SeedStatus(
+            account="grace",
+            text="@ada quick one — got a minute to look over the punch-card notes before the demo?",
+            visibility="direct",
+        ),
+        SeedStatus(
+            account="ada",
+            text="@grace yes, sending them over now. Thanks for the nudge!",
+            visibility="direct",
+        ),
+        SeedStatus(
+            account="alan",
+            text="@ada @katherine pulling together a quick standup doc for the three of us, one sec.",
+            visibility="direct",
         ),
     ],
     announcements=[

@@ -121,6 +121,19 @@ def sse_format(name: str, payload: Any) -> bytes:
     return f"event: {name}\ndata: {data}\n\n".encode()
 
 
+def ws_format(stream: str, name: str, payload: Any) -> str:
+    """Encode an event as a real-Mastodon WebSocket text frame.
+
+    Real Mastodon's multiplexed WS stream sends one JSON object per message:
+    ``{"stream": [...], "event": "...", "payload": "<json-encoded-string>"}`` — note
+    ``payload`` is itself a JSON *string*, double-encoded, matching what browser/
+    Electron clients (e.g. Whalebird) expect (distinct from the SSE wire format
+    Mastodon.py parses, where payload is the literal JSON body).
+    """
+    data = payload if isinstance(payload, str) else json.dumps(payload, separators=(",", ":"))
+    return json.dumps({"stream": [stream], "event": name, "payload": data}, separators=(",", ":"))
+
+
 # --- channel-key helpers (keep naming in one place) ---
 
 

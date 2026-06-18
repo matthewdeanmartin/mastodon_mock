@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import select
 
 from mastodon_mock.db.models import Account, UserList, UserListAccount
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
+from mastodon_mock.routers.helpers import read_body, truthy
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
 
@@ -23,14 +24,19 @@ def get_lists(db: DbSession, account: RequiredAccount) -> list[dict[str, Any]]:
 
 
 @router.post("/api/v1/lists")
-def create_list(
-    db: DbSession,
-    account: RequiredAccount,
-    title: Annotated[str, Form()],
-    replies_policy: Annotated[str, Form()] = "list",
-    exclusive: Annotated[bool, Form()] = False,
-) -> dict[str, Any]:
-    """Create a list."""
+async def create_list(request: Request, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Create a list.
+
+    Accepts form or JSON bodies (see ``read_body``) — some clients send this as
+    JSON rather than the form-encoded body Mastodon.py sends.
+    """
+    body = await read_body(request)
+    title = body.get("title")
+    if not title:
+        raise HTTPException(status_code=422, detail="Validation failed: Title can't be blank")
+    replies_policy = body.get("replies_policy", "list")
+    exclusive = truthy(body.get("exclusive", False))
+
     ul = UserList(account_id=account.id, title=title, replies_policy=replies_policy, exclusive=exclusive)
     db.add(ul)
     db.commit()
@@ -44,22 +50,16 @@ def get_list(list_id: str, db: DbSession, account: RequiredAccount) -> dict[str,
 
 
 @router.put("/api/v1/lists/{list_id}")
-def update_list(
-    list_id: str,
-    db: DbSession,
-    account: RequiredAccount,
-    title: Annotated[str | None, Form()] = None,
-    replies_policy: Annotated[str | None, Form()] = None,
-    exclusive: Annotated[bool | None, Form()] = None,
-) -> dict[str, Any]:
-    """Update a list."""
+async def update_list(list_id: str, request: Request, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Update a list. Accepts form or JSON bodies (see ``read_body``)."""
+    body = await read_body(request)
     ul = _list_or_404(db, list_id, account.id)
-    if title is not None:
-        ul.title = title
-    if replies_policy is not None:
-        ul.replies_policy = replies_policy
-    if exclusive is not None:
-        ul.exclusive = exclusive
+    if "title" in body:
+        ul.title = body["title"]
+    if "replies_policy" in body:
+        ul.replies_policy = body["replies_policy"]
+    if "exclusive" in body:
+        ul.exclusive = truthy(body["exclusive"])
     db.commit()
     return serialize_list(ul)
 

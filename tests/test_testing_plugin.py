@@ -92,7 +92,7 @@ def test_mock_mastodon_decorator_injects_server() -> None:
         captured["url"] = mastodon_server.base_url
         captured["user"] = mastodon_server.client("bob").account_verify_credentials().username
 
-    body()  # pylint: disable=no-value-for-parameter
+    body()  # type: ignore[call-arg]  # pylint: disable=no-value-for-parameter
     assert captured["url"].startswith("http://127.0.0.1:")
     assert captured["user"] == "bob"
 

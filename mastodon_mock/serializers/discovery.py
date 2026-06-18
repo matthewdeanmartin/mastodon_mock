@@ -9,7 +9,7 @@ correctly-shaped, deterministic value rather than a bare empty list.
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from mastodon_mock.config import MastodonMockConfig
@@ -21,7 +21,7 @@ def _tag_history(uses_today: int = 0) -> list[dict[str, str]]:
     Counts are strings, matching the real API. Only the current day is populated
     with ``uses_today`` (and one account); prior days are zeroed.
     """
-    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     history: list[dict[str, str]] = []
     for offset in range(7):
         day = today - timedelta(days=offset)

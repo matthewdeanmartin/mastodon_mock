@@ -20,19 +20,23 @@ client never uses it. The mock therefore implements **SSE only**; this is suffic
 the stated goal (driving Mastodon.py clients) and far simpler to host inside the existing
 FastAPI app.
 
-## Streaming base URL (the redirect trap)
+## Streaming base URL
 
 `Mastodon.py.__get_streaming_base()` reads `instance.urls.streaming_api` (v1) /
-`instance.configuration.urls.streaming` (v2). If that URL's netloc **differs** from
-`api_base_url`, the client rewrites `wss://host` → `https://host` and connects there
-instead. The mock runs everything on one port, so it must advertise the streaming URL as
-**the same origin the request came in on**, so that the client falls through to
-`api_base_url` and stays on the mock.
+`instance.configuration.urls.streaming` (v2). If that URL differs from `api_base_url`,
+the client parses its scheme: `wss://host` → `https://host`, `ws://host` → `http://host`
+(see `Mastodon.py/mastodon/internals.py`), then connects using that derived URL — landing
+back on the same host/port the mock is running on, as long as the advertised netloc
+matches. The mock runs everything on one port, so the instance router rewrites
+`urls.streaming_api` / `configuration.urls.streaming` to the live request's origin with a
+`ws`/`wss` scheme (e.g. `wss://127.0.0.1:54321` for an `https` request), matching what a
+real Mastodon instance advertises.
 
-Consequently the instance serializers no longer hard-code `wss://{domain}`; the instance
-router rewrites `urls.streaming_api` / `configuration.urls.streaming` to the live request
-base URL (e.g. `http://127.0.0.1:54321`). This is the single change that makes streaming
-"just work" through Mastodon.py with no client configuration.
+This also matters for browser/Electron clients (Whalebird, Sengi, ...) that use the
+advertised URL literally with the WebSocket API (`new WebSocket(url)`) rather than
+Mastodon.py's HTTP/SSE client — those reject a plain `https://`/`http://` URL outright
+(`SyntaxError: The URL's scheme must be either 'ws' or 'wss'`), so advertising the real
+`ws`/`wss` scheme is required for them, not just cosmetic.
 
 ## Endpoints
 

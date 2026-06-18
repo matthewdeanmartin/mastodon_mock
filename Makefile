@@ -12,6 +12,7 @@ GHA_WORKFLOWS := .github/workflows
 ABOUT_FILE := mastodon_mock/__about__.py
 CHANGELOG := CHANGELOG.md
 DOCS_CHANGELOG := docs/CHANGELOG.md
+MOCK_DOMAIN := mock.local
 
 .PHONY: \
 	sync \
@@ -26,7 +27,7 @@ DOCS_CHANGELOG := docs/CHANGELOG.md
 	dead-code vulture deadcode \
 	explore refurb crosshair deptry import-linter \
 	security bandit audit \
-	smoke test test-ci tox \
+	smoke dev-cert dev-cert-named serve-https serve-https-verbose serve-https-443 serve-https-443-named test test-ci tox \
 	typecheck typecheck-mypy typecheck-ty typecheck-pyrefly \
 	metadata metadata-check version-check dev-status \
 	gha-validate gha-pin gha-upgrade publish-gha \
@@ -50,6 +51,12 @@ help:
 	@echo "  test-ci                Run pytest -n auto (parallel, for CI)"
 	@echo "  tox                    Run tests across py310-py313 via tox-uv"
 	@echo "  smoke                  CLI smoke checks (--help, --version)"
+	@echo "  dev-cert               Generate a self-signed localhost TLS cert into .dev_certs/"
+	@echo "  dev-cert-named         Same, plus MOCK_DOMAIN (default mock.local) in the SAN list"
+	@echo "  serve-https            Run the demo server over HTTPS on :3443 (for Whalebird etc.)"
+	@echo "  serve-https-verbose    Same, with uvicorn's trace log level (debugging a client)"
+	@echo "  serve-https-443        Same, but on :443 (no port in the URL); needs admin/root"
+	@echo "  serve-https-443-named  :443 + MOCK_DOMAIN; needs the hosts-file mapping too"
 	@echo ""
 	@echo "  typecheck              Run mypy strict + ty + pyrefly"
 	@echo "  security               Run bandit + uv audit + pip-audit"
@@ -234,6 +241,42 @@ audit:
 
 smoke:
 	@$(UV) run bash scripts/basic_checks.sh
+
+dev-cert:
+	@bash scripts/gen_dev_cert.sh
+
+# A cert covering a named domain (MOCK_DOMAIN, default "mock.local") instead of just
+# localhost/127.0.0.1/::1 — for clients that reject bare IPs/localhost outright. You
+# must separately map the domain to 127.0.0.1 in your hosts file; this only issues
+# the cert. Override the name with `make dev-cert-named MOCK_DOMAIN=example.local`.
+dev-cert-named:
+	@bash scripts/gen_dev_cert.sh .dev_certs "$(MOCK_DOMAIN)"
+
+serve-https: dev-cert
+	@$(UV) run mastodon_mock serve --in-memory --demo --port 3443 \
+		--ssl-keyfile .dev_certs/localhost-key.pem --ssl-certfile .dev_certs/localhost-cert.pem
+
+# Same as serve-https but at uvicorn's most verbose log level — useful for seeing the
+# exact headers/requests a misbehaving client sends (e.g. diagnosing a 4xx with no
+# other clue). Output is noisy; prefer plain serve-https for normal use.
+serve-https-verbose: dev-cert
+	@$(UV) run mastodon_mock serve --in-memory --demo --port 3443 --log-level trace \
+		--ssl-keyfile .dev_certs/localhost-key.pem --ssl-certfile .dev_certs/localhost-cert.pem
+
+# Binding :443 lets a client that strips non-standard ports from a typed domain
+# (e.g. tuba-windows-portable) still reach the mock without a port in the URL.
+# Ports below 1024 usually need elevation: on Windows, run this from an Administrator
+# shell; on Linux/macOS, prefix with sudo or grant the interpreter CAP_NET_BIND_SERVICE.
+serve-https-443: dev-cert
+	@$(UV) run mastodon_mock serve --in-memory --demo --port 443 \
+		--ssl-keyfile .dev_certs/localhost-key.pem --ssl-certfile .dev_certs/localhost-cert.pem
+
+# Named-domain + port 443 combined: for clients needing both a real hostname and no
+# port in the URL. Requires the hosts-file mapping from dev-cert-named, plus the same
+# elevation caveat as serve-https-443.
+serve-https-443-named: dev-cert-named
+	@$(UV) run mastodon_mock serve --in-memory --demo --port 443 --domain "$(MOCK_DOMAIN)" \
+		--ssl-keyfile .dev_certs/localhost-key.pem --ssl-certfile .dev_certs/localhost-cert.pem
 
 test:
 	@$(UV) run pytest -q -p no:sugar \

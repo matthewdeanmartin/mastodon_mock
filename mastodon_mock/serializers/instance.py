@@ -104,7 +104,7 @@ def serialize_nodeinfo(session: Session, config: MastodonMockConfig) -> dict[str
     user_count, status_count = _counts(session)
     return {
         "version": "2.0",
-        "software": {"name": "mastodon_mock", "version": config.mocked_version},
+        "software": {"name": "mastodon", "version": config.mocked_version},
         "protocols": ["activitypub"],
         "services": {"outbound": [], "inbound": []},
         "usage": {"users": {"total": user_count}, "localPosts": status_count},

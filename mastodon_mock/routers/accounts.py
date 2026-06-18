@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Form, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from sqlalchemy import and_, or_, select
 
 from mastodon_mock.db.models import (
@@ -19,7 +19,7 @@ from mastodon_mock.db.models import (
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.pagination import paginate
-from mastodon_mock.routers.helpers import PageQuery, array_query, set_link_header
+from mastodon_mock.routers.helpers import PageQuery, array_query, read_body, set_link_header, truthy
 from mastodon_mock.routers.tags import featured_tags_for
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
@@ -392,15 +392,13 @@ def unblock(account_id: str, db: DbSession, account: RequiredAccount) -> dict[st
 
 
 @router.post("/api/v1/accounts/{account_id}/mute")
-def mute(
-    account_id: str,
-    db: DbSession,
-    account: RequiredAccount,
-    notifications: Annotated[bool, Form()] = True,
-    duration: Annotated[int, Form()] = 0,
-) -> dict[str, Any]:
-    """Mute an account, optionally with a timed expiry."""
+async def mute(account_id: str, request: Request, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Mute an account, optionally with a timed expiry. Accepts form or JSON bodies."""
     from datetime import timedelta
+
+    body = await read_body(request)
+    notifications = truthy(body.get("notifications", True))
+    duration = int(body.get("duration") or 0)
 
     target = _get_account_or_404(db, account_id)
     rel = get_or_create_relationship(db, account.id, target.id)
@@ -445,13 +443,10 @@ def unendorse(account_id: str, db: DbSession, account: RequiredAccount) -> dict[
 
 
 @router.post("/api/v1/accounts/{account_id}/note")
-def account_note(
-    account_id: str,
-    db: DbSession,
-    account: RequiredAccount,
-    comment: Annotated[str, Form()] = "",
-) -> dict[str, Any]:
-    """Set a private note about an account."""
+async def account_note(account_id: str, request: Request, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Set a private note about an account. Accepts form or JSON bodies."""
+    body = await read_body(request)
+    comment = body.get("comment", "")
     target = _get_account_or_404(db, account_id)
     rel = get_or_create_relationship(db, account.id, target.id)
     rel.note = comment

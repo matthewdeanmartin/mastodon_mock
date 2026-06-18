@@ -53,7 +53,7 @@ def test_sugar_mock_mastodon_bare_decorator() -> None:
         assert isinstance(mastodon_server, MockServer)
         assert mastodon_server.started
 
-    my_test()  # pylint: disable=no-value-for-parameter
+    my_test()  # type: ignore[call-arg]  # pylint: disable=no-value-for-parameter
 
 
 def test_sugar_mock_mastodon_custom_inject_as() -> None:
@@ -61,7 +61,7 @@ def test_sugar_mock_mastodon_custom_inject_as() -> None:
     def my_test(custom_server):
         assert isinstance(custom_server, MockServer)
 
-    my_test()  # pylint: disable=no-value-for-parameter
+    my_test()  # type: ignore[call-arg]  # pylint: disable=no-value-for-parameter
 
 
 def test_sugar_mock_mastodon_no_inject() -> None:
