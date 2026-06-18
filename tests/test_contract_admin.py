@@ -7,7 +7,7 @@ may call admin endpoints (no role enforcement — see spec/00-overview.md non-go
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from mastodon import Mastodon

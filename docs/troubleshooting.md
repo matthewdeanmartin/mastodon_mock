@@ -35,6 +35,7 @@ dual-stack behavior, not a bug in the mock's request handling.
 
 - **Always type `127.0.0.1:3443` in the client**, not `localhost:3443`. This is the
   simplest fix and what `make serve-https`'s default bind already supports.
+
 - **Force `localhost` to resolve to IPv4** by adding an explicit entry to your hosts
   file (`C:\Windows\System32\drivers\etc\hosts` on Windows, `/etc/hosts` on
   macOS/Linux):
@@ -46,6 +47,7 @@ dual-stack behavior, not a bug in the mock's request handling.
   This is a one-time, system-wide change — it affects how *every* app on the machine
   resolves `localhost`, not just `mastodon_mock`. Use this if you'd rather fix it once
   than remember to type the literal IP.
+
 - **Bind explicitly to `::1`** if you specifically need the IPv6 loopback to work and
   don't need `127.0.0.1` at the same time:
 

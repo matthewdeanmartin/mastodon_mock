@@ -129,7 +129,7 @@ name:
    127.0.0.1 mock.local
    ```
 
-2. Generate a cert covering that name:
+1. Generate a cert covering that name:
 
    ```bash
    make dev-cert-named
@@ -141,7 +141,7 @@ name:
    automatically (rather than silently reusing a stale one). Override the name with
    `make dev-cert-named MOCK_DOMAIN=example.local` if you mapped something else.
 
-3. Serve with `--domain` set to match, and (if you also need a portless URL) on `:443`:
+1. Serve with `--domain` set to match, and (if you also need a portless URL) on `:443`:
 
    ```bash
    make serve-https-443-named
