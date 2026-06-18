@@ -8,7 +8,7 @@ keywords = ["mastodon", "mock", "fastapi", "testing", "fediverse", "rest-api", "
 license = "MIT"
 requires-python = ">=3.10"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Framework :: FastAPI",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
