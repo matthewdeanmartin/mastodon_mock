@@ -186,7 +186,10 @@ async def oauth_authorize_submit(request: Request) -> Response:
     code = _encode_authorize_code(username)
 
     if redirect_uri == "urn:ietf:wg:oauth:2.0:oob":
-        return Response(content=f"<!doctype html><html><body><p>Authorization code: {code}</p></body></html>", media_type="text/html")
+        return Response(
+            content=f"<!doctype html><html><body><p>Authorization code: {code}</p></body></html>",
+            media_type="text/html",
+        )
 
     separator = "&" if "?" in redirect_uri else "?"
     target = f"{redirect_uri}{separator}code={code}"

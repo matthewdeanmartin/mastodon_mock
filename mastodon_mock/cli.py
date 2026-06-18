@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 
 import orjson
@@ -27,15 +28,14 @@ def _silence_proactor_connection_reset() -> None:
 
     from asyncio.proactor_events import _ProactorBasePipeTransport
 
-    original = _ProactorBasePipeTransport._call_connection_lost
+    # pylint: disable=protected-access
+    original = _ProactorBasePipeTransport._call_connection_lost  # type: ignore[attr-defined]
 
     def _quiet_call_connection_lost(self: object, exc: BaseException | None) -> None:
-        try:
+        with contextlib.suppress(ConnectionResetError):
             original(self, exc)
-        except ConnectionResetError:
-            pass
 
-    _ProactorBasePipeTransport._call_connection_lost = _quiet_call_connection_lost
+    _ProactorBasePipeTransport._call_connection_lost = _quiet_call_connection_lost  # type: ignore[attr-defined]
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -69,7 +69,10 @@ def main(argv: list[str] | None = None) -> None:
         "--log-level",
         default=None,
         choices=["critical", "error", "warning", "info", "debug", "trace"],
-        help="Uvicorn log verbosity (default: info). Use 'debug' or 'trace' to see headers/bodies while debugging a client.",
+        help=(
+            "Uvicorn log verbosity (default: info). "
+            "Use 'debug' or 'trace' to see headers/bodies while debugging a client."
+        ),
     )
 
     upgrade = sub.add_parser("db", help="Database commands")
@@ -114,12 +117,12 @@ def _serve(args: argparse.Namespace) -> None:
         # Explicit --domain always wins, e.g. a named cert + hosts-file entry
         # (see scripts/gen_dev_cert.sh) for clients that reject bare IPs/localhost.
         config.domain = args.domain
-    elif config.domain == MastodonMockConfig.model_fields["domain"].default:
+    elif config.domain == MastodonMockConfig.model_fields["domain"].default:  # pylint: disable=unsubscriptable-object
         # Unset by the user: derive a reachable domain from the actual bind address
         # instead of the unresolvable "mock.local" default, so avatar/header
         # placeholders and status permalinks (built from config.domain) are
         # clickable/loadable rather than 404ing against a host that doesn't resolve.
-        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
+        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host  # nosec B104
         config.domain = f"{display_host}:{port}"
     app = create_app(config)
     _silence_proactor_connection_reset()

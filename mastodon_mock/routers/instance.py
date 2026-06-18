@@ -166,7 +166,11 @@ def webfinger(request: Request, db: DbSession, resource: str) -> dict[str, Any]:
         "subject": f"acct:{account.username}@{request.url.hostname}",
         "aliases": [f"{base}/@{account.username}"],
         "links": [
-            {"rel": "http://webfinger.net/rel/profile-page", "type": "text/html", "href": f"{base}/@{account.username}"},
+            {
+                "rel": "http://webfinger.net/rel/profile-page",
+                "type": "text/html",
+                "href": f"{base}/@{account.username}",
+            },
             {"rel": "self", "type": "application/activity+json", "href": f"{base}/users/{account.username}"},
         ],
     }
