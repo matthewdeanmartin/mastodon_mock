@@ -14,7 +14,7 @@ __all__ = [
 ]
 
 __title__ = "mastodon_mock"
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __description__ = "Stateful in-memory/SQLite mock of the Mastodon REST API for testing Mastodon clients"
 __readme__ = "README.md"
 __credits__ = [{"name": "Matthew Martin", "email": "matthewdeanmartin@gmail.com"}]

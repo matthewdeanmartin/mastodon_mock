@@ -1,46 +1,35 @@
 # Changelog
-
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
+## [0.3.0] - 2026-06-18
 ### Added
-
 - Support for python 3.10, 3.11, 3.12
 - Websockets support
 - More oauth login machinery
 
 ### Fixed
-
 - Missing paging for some end points
 - More missing endpoints
 - Missing v1/v2 endpoints
 
 ## [0.2.0] - 2026-06-17
-
 ### Added
-
 - More endpoints, SSE style streaming.
 - More features visible via UI
 
 ## [0.1.0] - 2026-06-16
-
 ### Added
-
 - Added UI
 - Added bulk sample data generation
 
 ### Fixed
-
 - Improved performance
 
 ## [0.0.1] - 2026-06-15
-
 ### Added
-
 - Initial release of `mastodon_mock`, a stateful FastAPI + SQLite mock of the Mastodon REST API, driveable by real clients including Mastodon.py.
 - Auth & apps: app registration, `client_credentials` and `refresh_token` OAuth grants, token revocation, self-service account creation, and OAuth server metadata.
 - Accounts: profiles, `verify_credentials`, relationships, follow/unfollow, mute/block, and account search.
