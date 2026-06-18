@@ -29,13 +29,13 @@ def _silence_proactor_connection_reset() -> None:
     from asyncio.proactor_events import _ProactorBasePipeTransport
 
     # pylint: disable=protected-access
-    original = _ProactorBasePipeTransport._call_connection_lost  # type: ignore[attr-defined]
+    original = _ProactorBasePipeTransport._call_connection_lost
 
     def _quiet_call_connection_lost(self: object, exc: BaseException | None) -> None:
         with contextlib.suppress(ConnectionResetError):
             original(self, exc)
 
-    _ProactorBasePipeTransport._call_connection_lost = _quiet_call_connection_lost  # type: ignore[attr-defined]
+    _ProactorBasePipeTransport._call_connection_lost = _quiet_call_connection_lost
 
 
 def main(argv: list[str] | None = None) -> None:
