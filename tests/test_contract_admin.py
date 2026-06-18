@@ -7,7 +7,7 @@ may call admin endpoints (no role enforcement — see spec/00-overview.md non-go
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from mastodon import Mastodon
@@ -222,8 +222,8 @@ def test_admin_trending_links_are_empty(alice: Mastodon) -> None:
 
 
 def test_admin_measures_shape(alice: Mastodon) -> None:
-    start = datetime.now(UTC) - timedelta(days=5)
-    end = datetime.now(UTC)
+    start = datetime.now(timezone.utc) - timedelta(days=5)
+    end = datetime.now(timezone.utc)
     measures = alice.admin_measures(start, end, active_users=True, new_users=True)
     keys = {m.key for m in measures}
     assert keys == {"active_users", "new_users"}
@@ -231,13 +231,13 @@ def test_admin_measures_shape(alice: Mastodon) -> None:
 
 
 def test_admin_dimensions_shape(alice: Mastodon) -> None:
-    start = datetime.now(UTC) - timedelta(days=5)
-    end = datetime.now(UTC)
+    start = datetime.now(timezone.utc) - timedelta(days=5)
+    end = datetime.now(timezone.utc)
     dims = alice.admin_dimensions(start, end, languages=True)
     assert {d.key for d in dims} == {"languages"}
 
 
 def test_admin_retention_shape(alice: Mastodon) -> None:
-    start = datetime.now(UTC) - timedelta(days=5)
-    end = datetime.now(UTC)
+    start = datetime.now(timezone.utc) - timedelta(days=5)
+    end = datetime.now(timezone.utc)
     assert alice.admin_retention(start, end) == []

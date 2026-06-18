@@ -282,3 +282,11 @@ permissive = false
 username = "testuser"
 display_name = "Test User"
 access_token = "mock_token"
+
+[tool.pyrefly]
+project-includes = [
+    "mastodon_mock",
+    "tests",
+]
+python-version = "3.10.0"
+preset = "legacy"
