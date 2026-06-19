@@ -1,4 +1,16 @@
-<div class="page-head">#{{ tag() }}</div>
+<div class="page-head tag-head">
+  <span>#{{ tag() }}</span>
+  @if (tagInfo(); as info) {
+    <span class="tag-actions">
+      <button class="btn btn-sm" [class.btn-outline]="info.following" (click)="toggleFollow()">
+        {{ info.following ? 'Following' : 'Follow' }}
+      </button>
+      <button class="btn btn-sm" [class.btn-outline]="!info.featuring" (click)="toggleFeature()">
+        {{ info.featuring ? 'Featured' : 'Feature' }}
+      </button>
+    </span>
+  }
+</div>
 
 @if (loading()) {
   <p class="muted center">Loading…</p>

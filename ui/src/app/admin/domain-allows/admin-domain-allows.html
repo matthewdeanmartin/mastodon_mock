@@ -1,0 +1,23 @@
+<div class="add-block">
+  <input
+    type="text"
+    [ngModel]="newDomain()"
+    (ngModelChange)="newDomain.set($event)"
+    (keyup.enter)="add()"
+    placeholder="domain to allow (e.g. friendly.example)"
+  />
+  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">Allow</button>
+</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!allows().length) {
+  <p class="muted center">No allowed domains.</p>
+} @else {
+  @for (a of allows(); track a.id) {
+    <div class="block-row">
+      <strong>{{ a.domain }}</strong>
+      <button class="op warn" (click)="remove(a)">Remove</button>
+    </div>
+  }
+}

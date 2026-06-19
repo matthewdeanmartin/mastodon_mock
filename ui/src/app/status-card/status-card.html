@@ -11,6 +11,10 @@
         display.account.display_name || display.account.username
       }}</a>
       <span class="acct muted">&#64;{{ display.account.acct }}</span>
+      @if (display.pinned) {
+        <span class="badge" title="Pinned">📌</span>
+      }
+      <span class="badge muted" title="Visibility">{{ display.visibility }}</span>
     </div>
     @if (editing()) {
       <div class="editor">
@@ -24,12 +28,59 @@
       </div>
     } @else {
       <a class="content-link" [routerLink]="['/statuses', display.id]">
-        @if (display.spoiler_text) {
-          <div class="spoiler">{{ display.spoiler_text }}</div>
+        @if (translation(); as t) {
+          @if (t.spoiler_text) {
+            <div class="spoiler">{{ t.spoiler_text }}</div>
+          }
+          <div class="content" [innerHTML]="t.content"></div>
+        } @else {
+          @if (display.spoiler_text) {
+            <div class="spoiler">{{ display.spoiler_text }}</div>
+          }
+          <div class="content" [innerHTML]="display.content"></div>
         }
-        <div class="content" [innerHTML]="display.content"></div>
       </a>
+      @if (translation()) {
+        <div class="translation-note muted small">
+          Translated via {{ translation()!.provider }}
+        </div>
+      }
     }
+
+    @if (poll(); as p) {
+      <div class="poll" (click)="$event.stopPropagation()">
+        @for (opt of p.options; track $index) {
+          @if (pollClosed()) {
+            <div class="poll-result" [class.own]="p.own_votes.includes($index)">
+              <div class="poll-bar" [style.width.%]="pollPercent(opt)"></div>
+              <span class="poll-label">{{ opt.title }}</span>
+              <span class="poll-pct muted">{{ pollPercent(opt) }}% · {{ opt.votes_count }}</span>
+            </div>
+          } @else {
+            <label class="poll-choice">
+              <input
+                [type]="p.multiple ? 'checkbox' : 'radio'"
+                [checked]="pollSelection().includes($index)"
+                (change)="toggleChoice($index)"
+              />
+              {{ opt.title }}
+            </label>
+          }
+        }
+        <div class="poll-footer muted small">
+          <span>{{ p.votes_count }} votes</span>
+          @if (p.expired) {
+            <span>· Closed</span>
+          }
+          @if (!pollClosed()) {
+            <button class="btn btn-sm" [disabled]="!pollSelection().length" (click)="submitVote($event)">
+              Vote
+            </button>
+          }
+        </div>
+      </div>
+    }
+
     @if (quotedStatus(); as q) {
       <a class="quote-card" [routerLink]="['/statuses', q.id]" (click)="$event.stopPropagation()">
         <div class="quote-meta">
@@ -39,6 +90,11 @@
         </div>
         <div class="quote-content" [innerHTML]="q.content"></div>
       </a>
+      @if (canRevokeQuote()) {
+        <button class="btn btn-outline btn-sm revoke-btn" (click)="revokeQuote($event)">
+          Revoke quote permission
+        </button>
+      }
     } @else if (quoteUnavailable()) {
       <div class="quote-card quote-unavailable muted">Quoted post is unavailable.</div>
     }
@@ -54,15 +110,54 @@
         💬 <span>{{ display.replies_count }}</span>
       </button>
       <button class="action" [class.on]="display.reblogged" (click)="toggleReblog($event)" title="Boost">
-        🔁 <span>{{ display.reblogs_count }}</span>
+        🔁
+      </button>
+      <button class="action count-link" (click)="openAccountList('reblogged_by', $event)" title="Boosted by">
+        {{ display.reblogs_count }}
       </button>
       <button class="action" [class.on]="display.favourited" (click)="toggleFavourite($event)" title="Favourite">
-        ⭐ <span>{{ display.favourites_count }}</span>
+        ⭐
+      </button>
+      <button class="action count-link" (click)="openAccountList('favourited_by', $event)" title="Favourited by">
+        {{ display.favourites_count }}
       </button>
       <button class="action" [class.on]="display.bookmarked" (click)="toggleBookmark($event)" title="Bookmark">
         🔖
       </button>
+      <button
+        class="action"
+        [class.on]="!!translation()"
+        [disabled]="translating()"
+        (click)="toggleTranslate($event)"
+        title="Translate"
+      >
+        🌐
+      </button>
+      @if (display.edited_at) {
+        <button class="action" (click)="openHistory($event)" title="Edit history">🕘</button>
+      }
       @if (isOwn()) {
+        <button class="action" [class.on]="display.pinned" (click)="togglePin($event)" title="Pin">📌</button>
+        <button class="action" [class.on]="display.muted" (click)="toggleMute($event)" title="Mute thread">
+          🔕
+        </button>
+        <div class="policy-wrap">
+          <button class="action" (click)="togglePolicyMenu($event)" title="Who can quote">💬🔒</button>
+          @if (showPolicyMenu()) {
+            <div class="policy-menu" (click)="$event.stopPropagation()">
+              <div class="policy-title muted small">Who can quote</div>
+              @for (p of quotePolicies; track p) {
+                <button
+                  class="policy-option"
+                  [class.active]="display.quote_approval_policy === p"
+                  (click)="setPolicy(p)"
+                >
+                  {{ p }}
+                </button>
+              }
+            </div>
+          }
+        </div>
         <button class="action" (click)="startEdit($event)" title="Edit">✏️</button>
         <button class="action" (click)="remove($event)" title="Delete">🗑️</button>
       } @else if (reported()) {
@@ -82,4 +177,16 @@
     (closed)="showReport.set(false)"
     (submitted)="onReported()"
   />
+}
+
+@if (accountListMode(); as mode) {
+  <app-account-list-dialog
+    [statusId]="display.id"
+    [mode]="mode"
+    (closed)="accountListMode.set(null)"
+  />
+}
+
+@if (showHistory()) {
+  <app-history-dialog [statusId]="display.id" (closed)="showHistory.set(false)" />
 }

@@ -5,10 +5,12 @@
       <a routerLink="/home" routerLinkActive="active">Home</a>
       <a routerLink="/public" routerLinkActive="active">Public</a>
       <a routerLink="/notifications" routerLinkActive="active">Notifications</a>
+      <a routerLink="/conversations" routerLinkActive="active">Messages</a>
       <a routerLink="/search" routerLinkActive="active">Search</a>
       <a routerLink="/favourites" routerLinkActive="active">Favourites</a>
       <a routerLink="/bookmarks" routerLinkActive="active">Bookmarks</a>
       <a routerLink="/lists" routerLinkActive="active">Lists</a>
+      <a routerLink="/tags" routerLinkActive="active">Tags</a>
       <a routerLink="/about" routerLinkActive="active">About</a>
       @if (isStaff()) {
         <a routerLink="/admin" routerLinkActive="active" class="admin-link">Admin</a>
@@ -18,6 +20,7 @@
       @if (auth.account(); as acc) {
         <a [routerLink]="['/accounts', acc.id]">{{ acc.display_name }}</a>
       }
+      <a routerLink="/settings" routerLinkActive="active">Settings</a>
       <button class="btn btn-outline" (click)="logout()">Log out</button>
     </div>
   </div>

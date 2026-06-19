@@ -21,7 +21,9 @@
       <div class="actions">
         @if (status() === 'pending') {
           <button class="op" (click)="approve(a)">Approve</button>
+          <button class="op warn" (click)="reject(a)">Reject</button>
         }
+        <button class="op" (click)="unsensitive(a)">Unsensitive</button>
         @if (a.silenced) {
           <button class="op" (click)="unsilence(a)">Unsilence</button>
         } @else {
@@ -37,6 +39,7 @@
         } @else {
           <button class="op warn" (click)="moderate(a, 'disable')">Disable</button>
         }
+        <button class="op warn" (click)="remove(a)">Delete</button>
       </div>
     </div>
   }

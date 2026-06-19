@@ -145,8 +145,10 @@
 
 .actions {
   display: flex;
-  gap: 40px;
+  flex-wrap: wrap;
+  gap: 14px;
   margin-top: 8px;
+  align-items: center;
 }
 
 .action {
@@ -158,6 +160,7 @@
   align-items: center;
   gap: 6px;
   padding: 2px;
+  cursor: pointer;
 }
 
 .action:hover {
@@ -166,4 +169,140 @@
 
 .action.on {
   color: var(--accent);
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.count-link {
+  margin-left: -10px;
+}
+
+.count-link:hover {
+  text-decoration: underline;
+}
+
+.badge {
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.translation-note {
+  margin-top: 2px;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.revoke-btn {
+  margin-top: 6px;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 0.85em;
+}
+
+/* --- poll --- */
+.poll {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.poll-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.poll-result {
+  position: relative;
+  padding: 6px 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--border);
+}
+
+.poll-bar {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  z-index: 0;
+}
+
+.poll-result.own .poll-bar {
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.poll-label,
+.poll-pct {
+  position: relative;
+  z-index: 1;
+}
+
+.poll-pct {
+  margin-left: auto;
+}
+
+.poll-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+/* --- interaction policy menu --- */
+.policy-wrap {
+  position: relative;
+}
+
+.policy-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 50;
+  background: var(--col-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 140px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.policy-title {
+  margin-bottom: 6px;
+}
+
+.policy-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-transform: capitalize;
+  color: var(--text);
+}
+
+.policy-option:hover {
+  background: var(--border);
+}
+
+.policy-option.active {
+  color: var(--accent);
+  font-weight: 600;
 }

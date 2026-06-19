@@ -1,0 +1,32 @@
+<div class="overlay" (click)="closed.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <h3>Edit history</h3>
+
+    @if (loading()) {
+      <p class="muted small">Loading…</p>
+    } @else if (!edits().length) {
+      <p class="muted small">No history.</p>
+    } @else {
+      <ol class="history">
+        @for (e of edits(); track $index) {
+          <li class="snapshot">
+            <div class="snapshot-meta muted small">
+              {{ $index === edits().length - 1 ? 'Current' : 'Version ' + ($index + 1) }}
+              @if (e.created_at) {
+                · {{ e.created_at }}
+              }
+            </div>
+            @if (e.spoiler_text) {
+              <div class="spoiler">{{ e.spoiler_text }}</div>
+            }
+            <div class="content" [innerHTML]="e.content"></div>
+          </li>
+        }
+      </ol>
+    }
+
+    <div class="dialog-actions">
+      <button class="btn btn-outline" (click)="closed.emit()">Close</button>
+    </div>
+  </div>
+</div>

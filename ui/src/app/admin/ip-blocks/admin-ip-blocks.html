@@ -1,0 +1,40 @@
+<div class="add-block">
+  <input
+    type="text"
+    [ngModel]="newIp()"
+    (ngModelChange)="newIp.set($event)"
+    placeholder="IP or CIDR (e.g. 203.0.113.0/24)"
+  />
+  <select [ngModel]="severity()" (ngModelChange)="severity.set($event)">
+    @for (s of severities; track s) {
+      <option [value]="s">{{ s }}</option>
+    }
+  </select>
+  <input
+    type="text"
+    [ngModel]="comment()"
+    (ngModelChange)="comment.set($event)"
+    (keyup.enter)="add()"
+    placeholder="comment (optional)"
+  />
+  <button class="btn" [disabled]="!newIp().trim() || submitting()" (click)="add()">Block</button>
+</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!blocks().length) {
+  <p class="muted center">No IP blocks.</p>
+} @else {
+  @for (b of blocks(); track b.id) {
+    <div class="block-row">
+      <div>
+        <span class="mono">{{ b.ip }}</span>
+        <span class="sev">{{ b.severity }}</span>
+        @if (b.comment) {
+          <span class="muted small">{{ b.comment }}</span>
+        }
+      </div>
+      <button class="op warn" (click)="remove(b)">Remove</button>
+    </div>
+  }
+}

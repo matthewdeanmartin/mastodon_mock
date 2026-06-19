@@ -1,0 +1,29 @@
+<div class="overlay" (click)="closed.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <h3>{{ title }}</h3>
+
+    @if (loading()) {
+      <p class="muted small">Loading…</p>
+    } @else if (!accounts().length) {
+      <p class="muted small">Nobody yet.</p>
+    } @else {
+      <ul class="account-list">
+        @for (a of accounts(); track a.id) {
+          <li>
+            <a class="account-row" [routerLink]="['/accounts', a.id]" (click)="closed.emit()">
+              <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+              <span class="names">
+                <span class="name">{{ a.display_name || a.username }}</span>
+                <span class="acct muted">&#64;{{ a.acct }}</span>
+              </span>
+            </a>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="dialog-actions">
+      <button class="btn btn-outline" (click)="closed.emit()">Close</button>
+    </div>
+  </div>
+</div>

@@ -1,14 +1,126 @@
 <div class="compose">
+  @if (cwOpen()) {
+    <input
+      class="cw-input"
+      type="text"
+      [ngModel]="spoilerText()"
+      (ngModelChange)="spoilerText.set($event)"
+      placeholder="Content warning"
+    />
+  }
+
   <textarea
     [ngModel]="text()"
     (ngModelChange)="text.set($event)"
     [placeholder]="placeholder()"
     rows="3"
   ></textarea>
+
+  @if (media().length) {
+    <div class="media-previews">
+      @for (m of media(); track m.media.id; let i = $index) {
+        <div class="media-preview">
+          <img [src]="m.media.preview_url || m.media.url" [alt]="m.description" />
+          <input
+            type="text"
+            class="alt-input"
+            [ngModel]="m.description"
+            (ngModelChange)="setMediaDescription(i, $event)"
+            placeholder="Describe for the visually impaired"
+          />
+          <button class="btn btn-outline btn-sm" (click)="removeMedia(i)" title="Remove">✕</button>
+        </div>
+      }
+    </div>
+  }
+
+  @if (pollOpen()) {
+    <div class="poll-builder">
+      @for (opt of pollOptions(); track $index; let i = $index) {
+        <div class="poll-option-row">
+          <input
+            type="text"
+            [ngModel]="opt"
+            (ngModelChange)="setPollOption(i, $event)"
+            [placeholder]="'Choice ' + (i + 1)"
+          />
+          @if (pollOptions().length > 2) {
+            <button class="btn btn-outline btn-sm" (click)="removePollOption(i)" title="Remove choice">✕</button>
+          }
+        </div>
+      }
+      <div class="poll-controls">
+        @if (pollOptions().length < 4) {
+          <button class="btn btn-outline btn-sm" (click)="addPollOption()">+ Add choice</button>
+        }
+        <label class="poll-multiple">
+          <input
+            type="checkbox"
+            [ngModel]="pollMultiple()"
+            (ngModelChange)="pollMultiple.set($event)"
+          />
+          Allow multiple
+        </label>
+        <select [ngModel]="pollExpiresIn()" (ngModelChange)="pollExpiresIn.set(+$event)">
+          @for (e of pollExpiry; track e.seconds) {
+            <option [value]="e.seconds">{{ e.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+  }
+
   <div class="compose-actions">
+    <div class="compose-tools">
+      <select
+        class="visibility-select"
+        [ngModel]="visibility()"
+        (ngModelChange)="visibility.set($event)"
+        title="Visibility"
+      >
+        @for (v of visibilities; track v) {
+          <option [value]="v">{{ v }}</option>
+        }
+      </select>
+
+      <label class="tool-btn" [class.disabled]="!canAttachMedia()" title="Attach media">
+        📎
+        <input
+          type="file"
+          multiple
+          hidden
+          [disabled]="!canAttachMedia()"
+          (change)="onFilesSelected($event)"
+        />
+      </label>
+
+      <button
+        class="tool-btn"
+        [class.on]="pollOpen()"
+        [disabled]="!canAddPoll()"
+        (click)="togglePoll()"
+        title="Add poll"
+      >
+        📊
+      </button>
+
+      <button class="tool-btn" [class.on]="cwOpen()" (click)="toggleCw()" title="Content warning">
+        CW
+      </button>
+
+      <label class="tool-btn sensitive-toggle" title="Mark media sensitive">
+        <input
+          type="checkbox"
+          [ngModel]="sensitive()"
+          (ngModelChange)="sensitive.set($event)"
+        />
+        ⚠️
+      </label>
+    </div>
+
     <span class="muted">{{ text().length }}</span>
-    <button class="btn" [disabled]="!text().trim() || submitting()" (click)="submit()">
-      {{ inReplyToId() ? 'Reply' : 'Post' }}
+    <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
+      {{ uploading() ? 'Uploading…' : inReplyToId() ? 'Reply' : 'Post' }}
     </button>
   </div>
 </div>

@@ -5,10 +5,20 @@
   } @else {
     <div class="tag-list">
       @for (t of tags(); track t.id) {
-        <a class="tag-chip" [routerLink]="['/tags', t.name]">
-          <span class="tag-name">#{{ t.name }}</span>
-          <span class="tag-uses muted">{{ uses(t) }} uses</span>
-        </a>
+        <div class="tag-chip">
+          <a class="tag-chip-link" [routerLink]="['/tags', t.name]">
+            <span class="tag-name">#{{ t.name }}</span>
+            <span class="tag-uses muted">{{ uses(t) }} uses</span>
+          </a>
+          @if (moderated()['tag-' + t.id]; as state) {
+            <span class="moderated muted">{{ state }}</span>
+          } @else {
+            <span class="trend-actions">
+              <button class="op" (click)="approveTag(t)">Approve</button>
+              <button class="op warn" (click)="rejectTag(t)">Reject</button>
+            </span>
+          }
+        </div>
       }
     </div>
   }
@@ -22,7 +32,17 @@
     <p class="muted center">No trending posts.</p>
   } @else {
     @for (s of statuses(); track s.id) {
-      <app-status-card [status]="s" />
+      <div class="trend-status">
+        <app-status-card [status]="s" />
+        <div class="trend-status-actions">
+          @if (moderated()['status-' + s.id]; as state) {
+            <span class="moderated muted">{{ state }}</span>
+          } @else {
+            <button class="op" (click)="approveStatus(s)">Approve</button>
+            <button class="op warn" (click)="rejectStatus(s)">Reject</button>
+          }
+        </div>
+      </div>
     }
   }
 </section>

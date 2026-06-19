@@ -7,6 +7,22 @@ export interface Role {
   highlighted: boolean;
 }
 
+/** A key/value profile metadata field ("Website", "Pronouns", …). */
+export interface AccountField {
+  name: string;
+  value: string;
+  verified_at?: string | null;
+}
+
+/** Editable defaults returned in `source` on verify_credentials. */
+export interface AccountSource {
+  privacy: string;
+  sensitive: boolean;
+  language: string | null;
+  note: string;
+  fields: AccountField[];
+}
+
 export interface Account {
   id: string;
   username: string;
@@ -22,8 +38,10 @@ export interface Account {
   statuses_count: number;
   bot: boolean;
   locked: boolean;
+  fields: AccountField[];
   // Present on verify_credentials (CredentialAccount): the current user's role, or null.
   role?: Role | null;
+  source?: AccountSource;
 }
 
 export interface MediaAttachment {
@@ -32,6 +50,24 @@ export interface MediaAttachment {
   url: string;
   preview_url: string;
   description: string | null;
+}
+
+export interface PollOption {
+  title: string;
+  votes_count: number;
+}
+
+export interface Poll {
+  id: string;
+  expires_at: string | null;
+  expired: boolean;
+  multiple: boolean;
+  votes_count: number;
+  voters_count: number;
+  options: PollOption[];
+  voted: boolean;
+  own_votes: number[];
+  // hide_totals is not serialized by the mock; totals are always returned.
 }
 
 /** A status's quote of another status (Mastodon `Quote` entity). */
@@ -45,6 +81,7 @@ export interface Quote {
 export interface Status {
   id: string;
   created_at: string;
+  edited_at: string | null;
   content: string;
   spoiler_text: string;
   visibility: string;
@@ -59,18 +96,59 @@ export interface Status {
   favourited: boolean;
   reblogged: boolean;
   bookmarked: boolean;
+  muted: boolean;
+  pinned: boolean;
+  sensitive: boolean;
+  poll: Poll | null;
+  quote_approval_policy: string | null;
   media_attachments: MediaAttachment[];
 }
 
-export interface Context {
-  ancestors: Status[];
-  descendants: Status[];
+/** A single edit-history snapshot (`GET /api/v1/statuses/{id}/history`). */
+export interface StatusEdit {
+  content: string;
+  spoiler_text: string;
+  sensitive: boolean;
+  created_at: string;
+  account: Account;
+  media_attachments: MediaAttachment[];
+  poll: Poll | null;
 }
 
 export interface StatusSource {
   id: string;
   text: string;
   spoiler_text: string;
+}
+
+/** Result of `POST /api/v1/statuses/{id}/translate`. */
+export interface Translation {
+  content: string;
+  spoiler_text: string;
+  detected_source_language: string;
+  provider: string;
+}
+
+/** Options accepted by the composer's status-create path. */
+export interface ComposeOptions {
+  inReplyToId?: string;
+  visibility?: string;
+  spoilerText?: string;
+  sensitive?: boolean;
+  mediaIds?: string[];
+  poll?: PollDraft;
+}
+
+/** A poll being composed (UI-side), serialized to `poll[...]` params. */
+export interface PollDraft {
+  options: string[];
+  expiresIn: number;
+  multiple: boolean;
+}
+
+export interface Context {
+  ancestors: Status[];
+  descendants: Status[];
 }
 
 export interface Relationship {
@@ -221,4 +299,69 @@ export interface DomainBlock {
   reject_reports: boolean;
   public_comment: string | null;
   created_at: string;
+}
+
+export interface DomainAllow {
+  id: string;
+  domain: string;
+  created_at: string;
+}
+
+export interface EmailDomainBlock {
+  id: string;
+  domain: string;
+  created_at: string;
+}
+
+export interface CanonicalEmailBlock {
+  id: string;
+  canonical_email_hash: string;
+}
+
+export interface IpBlock {
+  id: string;
+  ip: string;
+  severity: string;
+  comment: string;
+  created_at: string;
+  expires_at: string | null;
+}
+
+/** A single zero/empty admin measure (admin/measures). */
+export interface AdminMeasure {
+  key: string;
+  unit: string | null;
+  total: string;
+  human_value: string;
+  previous_total: string;
+  data: { date: string; value: string }[];
+}
+
+// --- Conversations (DMs) ---
+
+export interface Conversation {
+  id: string;
+  unread: boolean;
+  accounts: Account[];
+  last_status: Status | null;
+}
+
+// --- Tags ---
+
+/** Full Mastodon `Tag` entity (richer than the search `Hashtag`). */
+export interface Tag {
+  id: string;
+  name: string;
+  url: string;
+  following: boolean;
+  featuring: boolean;
+  history: TrendingTagHistory[];
+}
+
+export interface FeaturedTag {
+  id: string;
+  name: string;
+  url: string;
+  statuses_count: number;
+  last_status_at: string | null;
 }

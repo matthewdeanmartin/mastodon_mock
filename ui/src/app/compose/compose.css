@@ -11,10 +11,121 @@ textarea {
   resize: vertical;
 }
 
+.cw-input,
+.alt-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
 .compose-actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 12px;
   margin-top: 8px;
+}
+
+.compose-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 8px;
+  background: none;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.tool-btn.on {
+  border-color: var(--accent, #1d9bf0);
+  color: var(--accent, #1d9bf0);
+}
+
+.tool-btn.disabled,
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.visibility-select {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 8px;
+  text-transform: capitalize;
+}
+
+.media-previews {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.media-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.media-preview img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.media-preview .alt-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.poll-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.poll-option-row {
+  display: flex;
+  gap: 6px;
+}
+
+.poll-option-row input[type='text'] {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.poll-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.poll-multiple {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 0.85em;
 }

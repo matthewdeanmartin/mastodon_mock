@@ -26,11 +26,26 @@ def client() -> Iterator[TestClient]:
         yield test_client
 
 
-def test_root_identity_always_present(client: TestClient) -> None:
-    """``GET /`` is always the JSON identity blob, UI or not."""
-    body = client.get("/").json()
+def test_root_identity_for_api_clients(client: TestClient) -> None:
+    """``GET /`` is the JSON identity blob for API clients (Accept: */* or json)."""
+    body = client.get("/").json()  # TestClient defaults to Accept: */*
     assert body["mastodon_mock"] is True
     assert "version" in body
+    # An explicit JSON Accept must also get JSON, even when the UI is built.
+    body = client.get("/", headers={"Accept": "application/json"}).json()
+    assert body["mastodon_mock"] is True
+
+
+@pytest.mark.skipif(not UI_BUILT, reason="UI not built (run `make ui`)")
+def test_root_redirects_browsers_to_ui(client: TestClient) -> None:
+    """A browser (Accept: text/html) hitting ``/`` is sent into the SPA at ``/_ui/``."""
+    resp = client.get(
+        "/",
+        headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (307, 308)
+    assert resp.headers["location"] == "/_ui/"
 
 
 def test_root_advertises_ui_only_when_built(client: TestClient) -> None:

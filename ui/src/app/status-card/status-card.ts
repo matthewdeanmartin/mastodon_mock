@@ -1,14 +1,18 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
 import { Api } from '../api';
 import { Auth } from '../auth';
-import { Status } from '../models';
+import { HistoryDialog } from '../history-dialog/history-dialog';
+import { Poll, Status, Translation } from '../models';
 import { ReportDialog } from '../report-dialog/report-dialog';
+
+const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
 
 @Component({
   selector: 'app-status-card',
-  imports: [RouterLink, ReportDialog, FormsModule],
+  imports: [RouterLink, ReportDialog, AccountListDialog, HistoryDialog, FormsModule],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
 })
@@ -21,6 +25,8 @@ export class StatusCard {
   /** Emitted when the user deletes this status, so containers can drop it. */
   readonly deleted = output<Status>();
 
+  protected readonly quotePolicies = QUOTE_POLICIES;
+
   protected showReport = signal(false);
   protected reported = signal(false);
 
@@ -28,8 +34,26 @@ export class StatusCard {
   protected editText = signal('');
   protected saving = signal(false);
 
+  // Translation: held locally; null means "showing original".
+  protected translation = signal<Translation | null>(null);
+  protected translating = signal(false);
+
+  // Poll voting state (selected option positions before submitting).
+  protected pollSelection = signal<number[]>([]);
+
+  // Dialogs.
+  protected accountListMode = signal<AccountListMode | null>(null);
+  protected showHistory = signal(false);
+  protected showPolicyMenu = signal(false);
+
   /** Whether the logged-in user owns the displayed status (can edit/delete). */
   protected isOwn = computed(() => this.display.account.id === this.auth.account()?.id);
+
+  /** True when this status quotes one of the viewer's own statuses (revocable). */
+  protected canRevokeQuote = computed(() => {
+    const q = this.display.quote?.quoted_status;
+    return !!q && q.account.id === this.auth.account()?.id && this.display.quote?.state === 'accepted';
+  });
 
   openReport(event: Event): void {
     event.stopPropagation();
@@ -116,5 +140,111 @@ export class StatusCard {
     const s = this.display;
     const call = s.bookmarked ? this.api.unbookmark(s.id) : this.api.bookmark(s.id);
     call.subscribe((updated) => this.changed.emit(updated));
+  }
+
+  togglePin(event: Event): void {
+    event.stopPropagation();
+    const s = this.display;
+    const call = s.pinned ? this.api.unpin(s.id) : this.api.pin(s.id);
+    call.subscribe((updated) => this.changed.emit(updated));
+  }
+
+  toggleMute(event: Event): void {
+    event.stopPropagation();
+    const s = this.display;
+    const call = s.muted ? this.api.unmuteStatus(s.id) : this.api.muteStatus(s.id);
+    call.subscribe((updated) => this.changed.emit(updated));
+  }
+
+  // --- translation ---
+  toggleTranslate(event: Event): void {
+    event.stopPropagation();
+    if (this.translation()) {
+      this.translation.set(null);
+      return;
+    }
+    this.translating.set(true);
+    this.api.translate(this.display.id).subscribe({
+      next: (t) => {
+        this.translation.set(t);
+        this.translating.set(false);
+      },
+      error: () => this.translating.set(false),
+    });
+  }
+
+  // --- polls ---
+  protected poll = computed<Poll | null>(() => this.display.poll);
+
+  protected pollClosed = computed<boolean>(() => {
+    const p = this.poll();
+    return !p || p.expired || p.voted;
+  });
+
+  pollPercent(option: { votes_count: number }): number {
+    const total = this.poll()?.votes_count ?? 0;
+    return total === 0 ? 0 : Math.round((option.votes_count / total) * 100);
+  }
+
+  toggleChoice(position: number): void {
+    const p = this.poll();
+    if (!p) {
+      return;
+    }
+    if (p.multiple) {
+      this.pollSelection.update((sel) =>
+        sel.includes(position) ? sel.filter((x) => x !== position) : [...sel, position],
+      );
+    } else {
+      this.pollSelection.set([position]);
+    }
+  }
+
+  submitVote(event: Event): void {
+    event.stopPropagation();
+    const p = this.poll();
+    if (!p || !this.pollSelection().length) {
+      return;
+    }
+    this.api.votePoll(p.id, this.pollSelection()).subscribe((updated) => {
+      // Reflect the updated poll back onto the status for re-render.
+      this.changed.emit({ ...this.display, poll: updated });
+      this.pollSelection.set([]);
+    });
+  }
+
+  // --- favourited/reblogged-by dialogs ---
+  openAccountList(mode: AccountListMode, event: Event): void {
+    event.stopPropagation();
+    this.accountListMode.set(mode);
+  }
+
+  // --- edit history ---
+  openHistory(event: Event): void {
+    event.stopPropagation();
+    this.showHistory.set(true);
+  }
+
+  // --- interaction policy / quote revoke ---
+  togglePolicyMenu(event: Event): void {
+    event.stopPropagation();
+    this.showPolicyMenu.update((v) => !v);
+  }
+
+  setPolicy(policy: string): void {
+    this.api.setInteractionPolicy(this.display.id, policy).subscribe((updated) => {
+      this.changed.emit(updated);
+      this.showPolicyMenu.set(false);
+    });
+  }
+
+  revokeQuote(event: Event): void {
+    event.stopPropagation();
+    const quoted = this.display.quote?.quoted_status;
+    if (!quoted) {
+      return;
+    }
+    // The viewer owns the quoted status; revoke this status's quote of it.
+    this.api.revokeQuote(quoted.id, this.display.id).subscribe((updated) => this.changed.emit(updated));
   }
 }

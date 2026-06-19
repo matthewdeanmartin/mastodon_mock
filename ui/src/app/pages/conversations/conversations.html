@@ -1,0 +1,56 @@
+<div class="page-head">Direct messages</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else {
+  <div class="conv-layout">
+    <aside class="conv-list">
+      @if (!conversations().length) {
+        <p class="muted center small">No conversations yet. Post with visibility "direct".</p>
+      }
+      @for (c of conversations(); track c.id) {
+        <button
+          class="conv-row"
+          [class.active]="c.id === selectedId()"
+          [class.unread]="c.unread"
+          (click)="select(c)"
+        >
+          <div class="conv-title">
+            {{ title(c) }}
+            @if (c.unread) {
+              <span class="unread-dot" title="Unread">●</span>
+            }
+          </div>
+          @if (c.last_status) {
+            <div class="conv-preview muted" [innerHTML]="c.last_status.content"></div>
+          }
+        </button>
+      }
+    </aside>
+
+    <section class="conv-thread">
+      @if (selected(); as conv) {
+        <div class="thread-head">
+          <span>{{ title(conv) }}</span>
+          @if (!conv.unread) {
+            <span class="muted small">read</span>
+          } @else {
+            <button class="btn btn-outline btn-sm" (click)="markRead(conv)">Mark read</button>
+          }
+        </div>
+        @if (conv.last_status) {
+          <app-status-card [status]="conv.last_status" />
+        }
+        <app-compose
+          [inReplyToId]="replyToId()"
+          [initialText]="replyMentions()"
+          initialVisibility="direct"
+          placeholder="Reply privately…"
+          (posted)="onReplyPosted($event)"
+        />
+      } @else {
+        <p class="muted center">Select a conversation.</p>
+      }
+    </section>
+  </div>
+}

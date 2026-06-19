@@ -1,0 +1,23 @@
+<div class="add-block">
+  <input
+    type="text"
+    [ngModel]="newDomain()"
+    (ngModelChange)="newDomain.set($event)"
+    (keyup.enter)="add()"
+    placeholder="email domain to block (e.g. mailinator.com)"
+  />
+  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">Block</button>
+</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!blocks().length) {
+  <p class="muted center">No email domain blocks.</p>
+} @else {
+  @for (b of blocks(); track b.id) {
+    <div class="block-row">
+      <strong>{{ b.domain }}</strong>
+      <button class="op warn" (click)="remove(b)">Remove</button>
+    </div>
+  }
+}

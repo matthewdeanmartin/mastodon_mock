@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from mastodon_mock.config import MastodonMockConfig
@@ -163,11 +163,40 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     ui_available = mount_ui(app)
 
     @app.get("/")
-    def root() -> JSONResponse:
-        """Trivial health/identity endpoint."""
+    def root(request: Request) -> Response:
+        """Root: serve the admin UI to browsers, the identity doc to API clients.
+
+        Real Mastodon serves its web UI at ``/``; API clients hit ``/api/...`` and
+        never depend on what ``/`` returns. So we content-negotiate: a browser
+        (``Accept: text/html``) is redirected into the SPA at ``/_ui/`` — whose
+        own ``index.html`` carries the correct ``<base href>`` — while anything
+        else (curl, bots, ``Accept: application/json`` or ``*/*``) gets the JSON
+        identity doc as before. A browser hard-refresh on ``/`` therefore lands
+        back in the app instead of a wall of JSON.
+        """
+        accept = request.headers.get("accept", "")
+        if ui_available and _prefers_html(accept):
+            return RedirectResponse(url="/_ui/")
         body: dict[str, object] = {"mastodon_mock": True, "version": config.mocked_version}
         if ui_available:
             body["ui"] = "/_ui/"
         return JSONResponse(body)
 
     return app
+
+
+def _prefers_html(accept: str) -> bool:
+    """Whether an ``Accept`` header prefers HTML over JSON.
+
+    Browsers send ``text/html,application/xhtml+xml,...`` with ``text/html``
+    ahead of (or without) any JSON type; API clients send ``application/json``
+    or an unset/``*/*`` accept. We treat HTML as preferred only when ``text/html``
+    appears and is not out-ranked by an explicit ``application/json``.
+    """
+    lowered = accept.lower()
+    if "text/html" not in lowered:
+        return False
+    # If the client explicitly asks for JSON before HTML, honour that.
+    html_pos = lowered.index("text/html")
+    json_pos = lowered.find("application/json")
+    return json_pos == -1 or html_pos < json_pos

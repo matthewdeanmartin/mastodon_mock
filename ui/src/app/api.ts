@@ -4,17 +4,25 @@ import { Observable } from 'rxjs';
 import {
   Account,
   Announcement,
+  ComposeOptions,
   Context,
+  Conversation,
   CustomEmoji,
   DevUser,
+  FeaturedTag,
   GenerationReport,
   InstanceRule,
   MastodonNotification,
+  MediaAttachment,
+  Poll,
   Relationship,
   SearchResults,
   Status,
+  StatusEdit,
   StatusSource,
+  Tag,
   TermsOfService,
+  Translation,
   UserList,
 } from './models';
 
@@ -80,12 +88,52 @@ export class Api {
     return this.http.get<Context>(`/api/v1/statuses/${id}/context`);
   }
 
-  postStatus(status: string, inReplyToId?: string): Observable<Status> {
-    const body: Record<string, string> = { status };
-    if (inReplyToId) {
-      body['in_reply_to_id'] = inReplyToId;
+  postStatus(status: string, options: ComposeOptions = {}): Observable<Status> {
+    // The backend accepts JSON for statuses, including a nested poll object and a
+    // media_ids array, so a plain JSON body suffices (no `key[]` form encoding).
+    const body: Record<string, unknown> = { status };
+    if (options.inReplyToId) {
+      body['in_reply_to_id'] = options.inReplyToId;
+    }
+    if (options.visibility) {
+      body['visibility'] = options.visibility;
+    }
+    if (options.spoilerText) {
+      body['spoiler_text'] = options.spoilerText;
+    }
+    if (options.sensitive) {
+      body['sensitive'] = true;
+    }
+    if (options.mediaIds?.length) {
+      body['media_ids'] = options.mediaIds;
+    }
+    if (options.poll) {
+      body['poll'] = {
+        options: options.poll.options,
+        expires_in: options.poll.expiresIn,
+        multiple: options.poll.multiple,
+      };
     }
     return this.http.post<Status>('/api/v1/statuses', body);
+  }
+
+  // --- media ---
+  uploadMedia(file: File, description?: string): Observable<MediaAttachment> {
+    const form = new FormData();
+    form.append('file', file);
+    if (description?.trim()) {
+      form.append('description', description.trim());
+    }
+    return this.http.post<MediaAttachment>('/api/v2/media', form);
+  }
+
+  updateMedia(id: string, description: string): Observable<MediaAttachment> {
+    return this.http.put<MediaAttachment>(`/api/v1/media/${id}`, { description });
+  }
+
+  // --- polls ---
+  votePoll(pollId: string, choices: number[]): Observable<Poll> {
+    return this.http.post<Poll>(`/api/v1/polls/${pollId}/votes`, { choices });
   }
 
   deleteStatus(id: string): Observable<Status> {
@@ -126,6 +174,48 @@ export class Api {
 
   unbookmark(id: string): Observable<Status> {
     return this.http.post<Status>(`/api/v1/statuses/${id}/unbookmark`, {});
+  }
+
+  pin(id: string): Observable<Status> {
+    return this.http.post<Status>(`/api/v1/statuses/${id}/pin`, {});
+  }
+
+  unpin(id: string): Observable<Status> {
+    return this.http.post<Status>(`/api/v1/statuses/${id}/unpin`, {});
+  }
+
+  muteStatus(id: string): Observable<Status> {
+    return this.http.post<Status>(`/api/v1/statuses/${id}/mute`, {});
+  }
+
+  unmuteStatus(id: string): Observable<Status> {
+    return this.http.post<Status>(`/api/v1/statuses/${id}/unmute`, {});
+  }
+
+  translate(id: string): Observable<Translation> {
+    return this.http.post<Translation>(`/api/v1/statuses/${id}/translate`, {});
+  }
+
+  statusHistory(id: string): Observable<StatusEdit[]> {
+    return this.http.get<StatusEdit[]>(`/api/v1/statuses/${id}/history`);
+  }
+
+  favouritedBy(id: string): Observable<Account[]> {
+    return this.http.get<Account[]>(`/api/v1/statuses/${id}/favourited_by`);
+  }
+
+  rebloggedBy(id: string): Observable<Account[]> {
+    return this.http.get<Account[]>(`/api/v1/statuses/${id}/reblogged_by`);
+  }
+
+  setInteractionPolicy(id: string, policy: string): Observable<Status> {
+    return this.http.put<Status>(`/api/v1/statuses/${id}/interaction_policy`, {
+      quote_approval_policy: policy,
+    });
+  }
+
+  revokeQuote(quotedId: string, quotingId: string): Observable<Status> {
+    return this.http.post<Status>(`/api/v1/statuses/${quotedId}/quotes/${quotingId}/revoke`, {});
   }
 
   // --- notifications ---
@@ -215,6 +305,77 @@ export class Api {
 
   removeAnnouncementReaction(id: string, name: string): Observable<unknown> {
     return this.http.delete(`/api/v1/announcements/${id}/reactions/${encodeURIComponent(name)}`);
+  }
+
+  // --- conversations (DMs) ---
+  conversations(maxId?: string): Observable<Conversation[]> {
+    return this.http.get<Conversation[]>('/api/v1/conversations', { params: this.pageParams(maxId) });
+  }
+
+  markConversationRead(id: string): Observable<Conversation> {
+    return this.http.post<Conversation>(`/api/v1/conversations/${id}/read`, {});
+  }
+
+  // --- profile / settings ---
+  updateCredentials(form: FormData): Observable<Account> {
+    return this.http.patch<Account>('/api/v1/accounts/update_credentials', form);
+  }
+
+  mutes(): Observable<Account[]> {
+    return this.http.get<Account[]>('/api/v1/mutes');
+  }
+
+  blocks(): Observable<Account[]> {
+    return this.http.get<Account[]>('/api/v1/blocks');
+  }
+
+  unmuteAccount(id: string): Observable<Relationship> {
+    return this.http.post<Relationship>(`/api/v1/accounts/${id}/unmute`, {});
+  }
+
+  unblockAccount(id: string): Observable<Relationship> {
+    return this.http.post<Relationship>(`/api/v1/accounts/${id}/unblock`, {});
+  }
+
+  followRequests(): Observable<Account[]> {
+    return this.http.get<Account[]>('/api/v1/follow_requests');
+  }
+
+  authorizeFollowRequest(id: string): Observable<Relationship> {
+    return this.http.post<Relationship>(`/api/v1/follow_requests/${id}/authorize`, {});
+  }
+
+  rejectFollowRequest(id: string): Observable<Relationship> {
+    return this.http.post<Relationship>(`/api/v1/follow_requests/${id}/reject`, {});
+  }
+
+  // --- tags ---
+  getTag(name: string): Observable<Tag> {
+    return this.http.get<Tag>(`/api/v1/tags/${encodeURIComponent(name)}`);
+  }
+
+  followTag(name: string): Observable<Tag> {
+    return this.http.post<Tag>(`/api/v1/tags/${encodeURIComponent(name)}/follow`, {});
+  }
+
+  unfollowTag(name: string): Observable<Tag> {
+    return this.http.post<Tag>(`/api/v1/tags/${encodeURIComponent(name)}/unfollow`, {});
+  }
+
+  featureTag(name: string): Observable<Tag> {
+    return this.http.post<Tag>(`/api/v1/tags/${encodeURIComponent(name)}/feature`, {});
+  }
+
+  unfeatureTag(name: string): Observable<Tag> {
+    return this.http.post<Tag>(`/api/v1/tags/${encodeURIComponent(name)}/unfeature`, {});
+  }
+
+  followedTags(): Observable<Tag[]> {
+    return this.http.get<Tag[]>('/api/v1/followed_tags');
+  }
+
+  featuredTags(): Observable<FeaturedTag[]> {
+    return this.http.get<FeaturedTag[]>('/api/v1/featured_tags');
   }
 
   // --- instance "about" info ---

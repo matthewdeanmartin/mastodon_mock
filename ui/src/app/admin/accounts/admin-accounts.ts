@@ -64,4 +64,22 @@ export class AdminAccounts implements OnInit {
   approve(a: AdminAccount): void {
     this.api.approve(a.id).subscribe(() => this.load());
   }
+
+  reject(a: AdminAccount): void {
+    if (!confirm(`Reject and delete the pending registration for @${a.username}?`)) {
+      return;
+    }
+    this.api.reject(a.id).subscribe(() => this.load());
+  }
+
+  unsensitive(a: AdminAccount): void {
+    this.api.unsensitive(a.id).subscribe(() => this.load());
+  }
+
+  remove(a: AdminAccount): void {
+    if (!confirm(`Permanently delete @${a.username}? This cannot be undone.`)) {
+      return;
+    }
+    this.api.deleteAccount(a.id).subscribe(() => this.load());
+  }
 }
