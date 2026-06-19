@@ -17,9 +17,16 @@ from mastodon_mock.serializers.statuses import serialize_status
 router = APIRouter()
 
 
-def _conversation_id(participant_ids: frozenset[int]) -> str:
-    """Build a stable conversation id from a participant set."""
-    return "-".join(str(i) for i in sorted(participant_ids))
+def _conversation_id(last_status_id: int) -> str:
+    """Derive the conversation id from its latest status.
+
+    Real Mastodon conversation ids are plain numeric snowflake ids, sortable
+    as integers — clients (e.g. mastui) rely on ``int(conversation_id)`` to
+    track the newest conversation. A composite id (e.g. participant ids
+    joined with ``-``) breaks that contract, so this mirrors the latest
+    status id instead, which is already a real numeric id.
+    """
+    return str(last_status_id)
 
 
 @router.get("/api/v1/conversations")
@@ -82,7 +89,7 @@ def conversations(
 
     out = []
     for key, last_status in page_items:
-        conv_id = _conversation_id(key)
+        conv_id = _conversation_id(last_status.id)
         other_ids = [i for i in key if i != account.id]
         accounts = [acc for i in other_ids if (acc := db.get(Account, i)) is not None]
         last = serialize_status(db, last_status, config, account)

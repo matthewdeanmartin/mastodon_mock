@@ -71,6 +71,49 @@ Tail the server log while reproducing and look for the next request after the
 successful one — a `404`, `422`, or another connection-reset immediately after a
 `200` is usually the real failure, not the first request that succeeded.
 
+## `mastui` won't trust the dev cert, even though other clients do
+
+**Symptom**: other Mastodon clients (Whalebird, Fedistar, real browsers) happily trust
+the self-signed dev cert in `.dev_certs/` — via the system cert store or by honoring
+OpenSSL env vars like `SSL_CERT_DIR`/`SSL_CERT_FILE` — but `mastui` fails TLS
+verification against `mastodon_mock`, and setting `SSL_CERT_DIR=./.dev_certs/ mastui`
+has no effect.
+
+**Cause**: `mastui` talks to the API through the `mastodon.py` library on top of
+`requests`. `requests` does its own certificate verification via `certifi`'s bundled
+CA file and never consults OpenSSL-level env vars like `SSL_CERT_DIR` or
+`SSL_CERT_FILE`, and it doesn't use the OS/system certificate store either — those only
+affect things that link against OpenSSL directly (or read the store explicitly), which
+`requests` does not.
+
+In the installed version of `mastui` (as of this writing), there is also no way to
+point verification at a custom CA bundle: `Config.ssl_verify` defaults to `True`
+(verify against `certifi`'s bundled CA list) and gets reset to that default on every
+profile load (`Mastui.__init__`'s `ssl_verify` argument overwrites `config.ssl_verify`
+each time), so even editing the config value directly doesn't stick. The only
+verification-related option `mastui` exposes is the `--no-ssl-verify` CLI flag, which
+is a plain on/off switch — there's no `--ssl-cert-bundle <path>` equivalent.
+
+**Workaround**: run `mastui` with `--no-ssl-verify` when pointing it at
+`mastodon_mock`'s self-signed dev cert:
+
+```bash
+mastui --no-ssl-verify
+```
+
+This disables TLS verification entirely for the session rather than trusting just the
+dev CA — acceptable for talking to a local mock server, but don't use it against a
+real instance over an untrusted network.
+
+**Caveats**:
+
+- This patch lives in the pipx venv's installed copy of `mastui`, not in this repo —
+  it will be silently lost on `pipx upgrade mastui` or a reinstall.
+- The cert directory is `.dev_certs` (underscore), not `dev-certs` (hyphen) — a likely
+  source of confusion if `SSL_CERT_DIR=./dev-certs` was tried and silently did nothing.
+- A more durable fix would be upstreaming an env var (e.g. `REQUESTS_CA_BUNDLE`) or a
+  config option into `mastui` itself, rather than patching the installed venv.
+
 ## `ConnectionResetError [WinError 10054]` spam in the server log
 
 This is benign asyncio/Windows noise from a client aborting a connection instead of
