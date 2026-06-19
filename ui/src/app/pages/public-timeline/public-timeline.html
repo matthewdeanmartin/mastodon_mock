@@ -1,6 +1,9 @@
 <div class="tabs">
   <button class="tab" [class.active]="!local()" (click)="setLocal(false)">All</button>
   <button class="tab" [class.active]="local()" (click)="setLocal(true)">Local</button>
+  <button class="btn btn-outline live-toggle" [class.active]="live()" (click)="toggleLive()">
+    {{ live() ? '● Live' : 'Go live' }}
+  </button>
 </div>
 
 @if (loading()) {

@@ -193,6 +193,7 @@ def admin_account_reject(account_id: str, db: DbSession, config: Config, account
     """Reject (and delete) a pending account; returns the now-deleted account."""
     target = _record_or_404(db, Account, account_id)
     data = serialize_admin_account(db, target, config)
+    _delete_account_statuses(db, target.id)
     db.delete(target)
     db.commit()
     return data
@@ -232,9 +233,22 @@ def admin_account_delete(account_id: str, db: DbSession, config: Config, account
     """Delete a local account; returns its (pre-delete) admin shape."""
     target = _record_or_404(db, Account, account_id)
     data = serialize_admin_account(db, target, config)
+    _delete_account_statuses(db, target.id)
     db.delete(target)
     db.commit()
     return data
+
+
+def _delete_account_statuses(db: Session, account_id: int) -> None:
+    """Delete all of an account's statuses before the account itself.
+
+    Real Mastodon removes a deleted/rejected user's content along with the
+    account. Without this, statuses are left with a dangling ``account_id``,
+    and any later read of one crashes ``serialize_status`` (it requires the
+    author to resolve).
+    """
+    for status in db.scalars(select(Status).where(Status.account_id == account_id)).all():
+        db.delete(status)
 
 
 @router.post("/api/v1/admin/accounts/{account_id}/action", status_code=200)

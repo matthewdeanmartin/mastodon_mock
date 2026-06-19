@@ -62,5 +62,30 @@
         <p class="muted small">No accounts with tokens yet — generate one above.</p>
       }
     </div>
+
+    <div class="dev">
+      <div class="dev-head">
+        <span class="muted">Full OAuth flow</span>
+        <button class="link" (click)="toggleOAuth()">{{ showOAuth() ? 'hide' : 'show' }}</button>
+      </div>
+      @if (showOAuth()) {
+        <p class="muted small">
+          Registers an app, then redirects through the server's account-picker at
+          <code>/oauth/authorize</code> and exchanges the code at <code>/oauth/token</code>.
+        </p>
+        <input
+          type="text"
+          [ngModel]="appName()"
+          (ngModelChange)="appName.set($event)"
+          placeholder="app name"
+        />
+        @if (oauthError()) {
+          <p class="error">{{ oauthError() }}</p>
+        }
+        <button class="btn btn-outline" [disabled]="oauthWorking()" (click)="startOAuth()">
+          {{ oauthWorking() ? 'Working…' : 'Authorize via OAuth' }}
+        </button>
+      }
+    </div>
   </div>
 </div>

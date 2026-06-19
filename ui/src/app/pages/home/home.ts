@@ -1,23 +1,51 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Status } from '../../models';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
 import { Announcements } from '../../announcements/announcements';
+import { Streaming } from '../../streaming';
 
 @Component({
   selector: 'app-home',
   imports: [Compose, StatusCard, Announcements],
   templateUrl: './home.html',
 })
-export class Home implements OnInit {
+export class Home implements OnInit, OnDestroy {
   private api = inject(Api);
+  private streaming = inject(Streaming);
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
+  protected live = signal(false);
+
+  private liveSub: Subscription | null = null;
 
   ngOnInit(): void {
     this.load();
+  }
+
+  ngOnDestroy(): void {
+    this.liveSub?.unsubscribe();
+  }
+
+  toggleLive(): void {
+    if (this.live()) {
+      this.liveSub?.unsubscribe();
+      this.liveSub = null;
+      this.live.set(false);
+      return;
+    }
+    this.live.set(true);
+    this.liveSub = this.streaming.open({ stream: 'user' }).subscribe(({ event, payload }) => {
+      if (event === 'update') {
+        this.statuses.update((list) => [payload as Status, ...list]);
+      } else if (event === 'delete') {
+        const id = payload as string;
+        this.statuses.update((list) => list.filter((s) => s.id !== id));
+      }
+    });
   }
 
   load(): void {

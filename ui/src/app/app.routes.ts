@@ -11,49 +11,120 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'home' },
       { path: 'home', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
-      { path: 'public', loadComponent: () => import('./pages/public-timeline/public-timeline').then((m) => m.PublicTimeline) },
-      { path: 'notifications', loadComponent: () => import('./pages/notifications/notifications').then((m) => m.Notifications) },
-      { path: 'conversations', loadComponent: () => import('./pages/conversations/conversations').then((m) => m.Conversations) },
-      { path: 'settings', loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings) },
-      { path: 'tags', loadComponent: () => import('./pages/followed-tags/followed-tags').then((m) => m.FollowedTags) },
-      { path: 'search', loadComponent: () => import('./pages/search/search').then((m) => m.Search) },
-      { path: 'favourites', loadComponent: () => import('./pages/favourites/favourites').then((m) => m.Favourites) },
-      { path: 'bookmarks', loadComponent: () => import('./pages/bookmarks/bookmarks').then((m) => m.Bookmarks) },
+      {
+        path: 'public',
+        loadComponent: () =>
+          import('./pages/public-timeline/public-timeline').then((m) => m.PublicTimeline),
+      },
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./pages/notifications/notifications').then((m) => m.Notifications),
+      },
+      {
+        path: 'conversations',
+        loadComponent: () =>
+          import('./pages/conversations/conversations').then((m) => m.Conversations),
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings),
+      },
+      {
+        path: 'dev/faults',
+        loadComponent: () =>
+          import('./pages/fault-injection/fault-injection').then((m) => m.FaultInjection),
+      },
+      {
+        path: 'tags',
+        loadComponent: () =>
+          import('./pages/followed-tags/followed-tags').then((m) => m.FollowedTags),
+      },
+      {
+        path: 'search',
+        loadComponent: () => import('./pages/search/search').then((m) => m.Search),
+      },
+      {
+        path: 'favourites',
+        loadComponent: () => import('./pages/favourites/favourites').then((m) => m.Favourites),
+      },
+      {
+        path: 'bookmarks',
+        loadComponent: () => import('./pages/bookmarks/bookmarks').then((m) => m.Bookmarks),
+      },
       { path: 'lists', loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists) },
       { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
-      { path: 'lists/:id', loadComponent: () => import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline) },
+      {
+        path: 'lists/:id',
+        loadComponent: () =>
+          import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),
+      },
       { path: 'tags/:tag', loadComponent: () => import('./pages/tag/tag').then((m) => m.Tag) },
-      { path: 'statuses/:id', loadComponent: () => import('./pages/thread/thread').then((m) => m.Thread) },
-      { path: 'accounts/:id', loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile) },
+      {
+        path: 'statuses/:id',
+        loadComponent: () => import('./pages/thread/thread').then((m) => m.Thread),
+      },
+      {
+        path: 'accounts/:id',
+        loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
+      },
       {
         path: 'admin',
         canActivate: [adminGuard],
         loadComponent: () => import('./admin/admin-shell/admin-shell').then((m) => m.AdminShell),
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'accounts' },
-          { path: 'accounts', loadComponent: () => import('./admin/accounts/admin-accounts').then((m) => m.AdminAccounts) },
-          { path: 'reports', loadComponent: () => import('./admin/reports/admin-reports').then((m) => m.AdminReports) },
-          { path: 'domains', loadComponent: () => import('./admin/domains/admin-domains').then((m) => m.AdminDomains) },
+          {
+            path: 'accounts',
+            loadComponent: () =>
+              import('./admin/accounts/admin-accounts').then((m) => m.AdminAccounts),
+          },
+          {
+            path: 'reports',
+            loadComponent: () =>
+              import('./admin/reports/admin-reports').then((m) => m.AdminReports),
+          },
+          {
+            path: 'domains',
+            loadComponent: () =>
+              import('./admin/domains/admin-domains').then((m) => m.AdminDomains),
+          },
           {
             path: 'domain-allows',
-            loadComponent: () => import('./admin/domain-allows/admin-domain-allows').then((m) => m.AdminDomainAllows),
+            loadComponent: () =>
+              import('./admin/domain-allows/admin-domain-allows').then((m) => m.AdminDomainAllows),
           },
           {
             path: 'email-blocks',
-            loadComponent: () => import('./admin/email-blocks/admin-email-blocks').then((m) => m.AdminEmailBlocks),
+            loadComponent: () =>
+              import('./admin/email-blocks/admin-email-blocks').then((m) => m.AdminEmailBlocks),
           },
           {
             path: 'canonical-blocks',
             loadComponent: () =>
-              import('./admin/canonical-blocks/admin-canonical-blocks').then((m) => m.AdminCanonicalBlocks),
+              import('./admin/canonical-blocks/admin-canonical-blocks').then(
+                (m) => m.AdminCanonicalBlocks,
+              ),
           },
-          { path: 'ip-blocks', loadComponent: () => import('./admin/ip-blocks/admin-ip-blocks').then((m) => m.AdminIpBlocks) },
+          {
+            path: 'ip-blocks',
+            loadComponent: () =>
+              import('./admin/ip-blocks/admin-ip-blocks').then((m) => m.AdminIpBlocks),
+          },
           {
             path: 'announcements',
-            loadComponent: () => import('./admin/announcements/admin-announcements').then((m) => m.AdminAnnouncements),
+            loadComponent: () =>
+              import('./admin/announcements/admin-announcements').then((m) => m.AdminAnnouncements),
           },
-          { path: 'trends', loadComponent: () => import('./admin/trends/admin-trends').then((m) => m.AdminTrends) },
-          { path: 'metrics', loadComponent: () => import('./admin/metrics/admin-metrics').then((m) => m.AdminMetrics) },
+          {
+            path: 'trends',
+            loadComponent: () => import('./admin/trends/admin-trends').then((m) => m.AdminTrends),
+          },
+          {
+            path: 'metrics',
+            loadComponent: () =>
+              import('./admin/metrics/admin-metrics').then((m) => m.AdminMetrics),
+          },
         ],
       },
     ],

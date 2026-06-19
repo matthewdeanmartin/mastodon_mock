@@ -1,0 +1,129 @@
+<h1>Fault injection</h1>
+<p class="muted">
+  Inject rate-limits, latency, timeouts, or malformed JSON into matching requests.
+  <code>/api/v1/_mock/*</code> paths are never affected.
+</p>
+
+<div class="rule-form">
+  <h2>Add a rule</h2>
+  <div class="row">
+    <label>
+      Method
+      <input
+        type="text"
+        [ngModel]="method()"
+        (ngModelChange)="method.set($event)"
+        placeholder="POST (any if blank)"
+      />
+    </label>
+    <label>
+      Path (exact or glob with *)
+      <input
+        type="text"
+        [ngModel]="path()"
+        (ngModelChange)="path.set($event)"
+        placeholder="/api/v1/statuses"
+      />
+    </label>
+  </div>
+  <div class="row">
+    <label class="grow">
+      Path regex (alternative to glob)
+      <input
+        type="text"
+        [ngModel]="pathRegex()"
+        (ngModelChange)="pathRegex.set($event)"
+        placeholder="^/api/v1/statuses/\d+$"
+      />
+    </label>
+  </div>
+  <div class="row">
+    <label>
+      Effect
+      <select [ngModel]="effectType()" (ngModelChange)="effectType.set($event)">
+        <option value="status">status</option>
+        <option value="ratelimit">ratelimit</option>
+        <option value="latency">latency</option>
+        <option value="timeout">timeout</option>
+        <option value="malformed">malformed</option>
+      </select>
+    </label>
+    @if (needsStatus()) {
+      <label>
+        HTTP status
+        <input type="number" [ngModel]="status()" (ngModelChange)="status.set($event)" />
+      </label>
+    }
+    @if (needsDelay()) {
+      <label>
+        Delay (ms)
+        <input type="number" [ngModel]="delayMs()" (ngModelChange)="delayMs.set($event)" />
+      </label>
+    }
+    <label>
+      Fire count (blank = forever)
+      <input
+        type="number"
+        [ngModel]="count()"
+        (ngModelChange)="count.set($event)"
+        placeholder="∞"
+      />
+    </label>
+  </div>
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+  <button class="btn" [disabled]="adding()" (click)="addRule()">
+    {{ adding() ? 'Adding…' : 'Add rule' }}
+  </button>
+</div>
+
+<div class="rule-list">
+  <div class="rule-list-head">
+    <h2>Active rules</h2>
+    @if (rules().length) {
+      <button class="link" (click)="clearAll()">clear all</button>
+    }
+  </div>
+  @if (loading()) {
+    <p class="muted center">Loading…</p>
+  } @else if (!rules().length) {
+    <p class="muted center">No fault rules active.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>id</th>
+          <th>match</th>
+          <th>effect</th>
+          <th>remaining</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of rules(); track r.id) {
+          <tr>
+            <td>{{ r.id }}</td>
+            <td>
+              {{ r.match.methods?.join(',') || 'any' }}
+              {{ r.match.path || r.match.path_regex || '*' }}
+            </td>
+            <td>
+              {{ r.effect.type }}
+              @if (r.effect.status) {
+                ({{ r.effect.status }})
+              }
+              @if (r.effect.delay_ms) {
+                {{ r.effect.delay_ms }}ms
+              }
+            </td>
+            <td>{{ r.remaining ?? '∞' }}</td>
+            <td>
+              <button class="link" (click)="remove(r.id)">remove</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

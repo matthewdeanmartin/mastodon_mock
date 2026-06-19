@@ -1,9 +1,17 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { DevUser } from '../../models';
+
+const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
+
+interface StoredApp {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}
 
 @Component({
   selector: 'app-login',
@@ -15,6 +23,7 @@ export class Login implements OnInit {
   private api = inject(Api);
   private auth = inject(Auth);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   protected token = signal('');
   protected error = signal<string | null>(null);
@@ -27,8 +36,82 @@ export class Login implements OnInit {
   protected seeding = signal(false);
   protected seedMessage = signal<string | null>(null);
 
+  protected showOAuth = signal(false);
+  protected appName = signal('mastodon_mock UI');
+  protected oauthWorking = signal(false);
+  protected oauthError = signal<string | null>(null);
+
   ngOnInit(): void {
     this.refreshDevUsers();
+    this.handleOAuthCallback();
+  }
+
+  /** If we just came back from /oauth/authorize with a ?code=, exchange it for a token. */
+  private handleOAuthCallback(): void {
+    const code = this.route.snapshot.queryParamMap.get('code');
+    if (!code) {
+      return;
+    }
+    const raw = sessionStorage.getItem(OAUTH_APP_KEY);
+    if (!raw) {
+      return;
+    }
+    const app: StoredApp = JSON.parse(raw);
+    this.showOAuth.set(true);
+    this.oauthWorking.set(true);
+    this.api
+      .exchangeCode({
+        clientId: app.clientId,
+        clientSecret: app.clientSecret,
+        redirectUri: app.redirectUri,
+        code,
+      })
+      .subscribe({
+        next: (tok) => {
+          this.oauthWorking.set(false);
+          sessionStorage.removeItem(OAUTH_APP_KEY);
+          this.router.navigate([], { queryParams: {} });
+          this.use({ access_token: tok.access_token } as DevUser);
+          this.submit();
+        },
+        error: () => {
+          this.oauthWorking.set(false);
+          this.oauthError.set('Code exchange failed.');
+        },
+      });
+  }
+
+  toggleOAuth(): void {
+    this.showOAuth.update((v) => !v);
+  }
+
+  /** Register a throwaway app, then redirect through the server's account-picker. */
+  startOAuth(): void {
+    this.oauthError.set(null);
+    this.oauthWorking.set(true);
+    // Resolve against <base href> (the app may be served from a sub-path like /_ui/).
+    const redirectUri = new URL('login', document.baseURI).toString();
+    this.api.registerApp(this.appName(), redirectUri).subscribe({
+      next: (app) => {
+        const stored: StoredApp = {
+          clientId: app.client_id,
+          clientSecret: app.client_secret,
+          redirectUri,
+        };
+        sessionStorage.setItem(OAUTH_APP_KEY, JSON.stringify(stored));
+        const params = new URLSearchParams({
+          client_id: app.client_id,
+          redirect_uri: redirectUri,
+          response_type: 'code',
+          scope: app.scopes.join(' '),
+        });
+        window.location.href = `/oauth/authorize?${params.toString()}`;
+      },
+      error: () => {
+        this.oauthWorking.set(false);
+        this.oauthError.set('Could not register the app.');
+      },
+    });
   }
 
   submit(): void {

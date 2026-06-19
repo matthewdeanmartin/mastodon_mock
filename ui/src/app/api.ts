@@ -9,11 +9,15 @@ import {
   Conversation,
   CustomEmoji,
   DevUser,
+  FaultRule,
+  FaultRuleDraft,
   FeaturedTag,
   GenerationReport,
   InstanceRule,
   MastodonNotification,
   MediaAttachment,
+  OAuthApp,
+  OAuthTokenResponse,
   Poll,
   Relationship,
   SearchResults,
@@ -251,7 +255,9 @@ export class Api {
   }
 
   listTimeline(id: string, maxId?: string): Observable<Status[]> {
-    return this.http.get<Status[]>(`/api/v1/timelines/list/${id}`, { params: this.pageParams(maxId) });
+    return this.http.get<Status[]>(`/api/v1/timelines/list/${id}`, {
+      params: this.pageParams(maxId),
+    });
   }
 
   // create_list / update_list take form-encoded params, not JSON.
@@ -279,7 +285,12 @@ export class Api {
   }
 
   // --- reports ---
-  report(accountId: string, category: string, comment: string, statusIds?: string[]): Observable<unknown> {
+  report(
+    accountId: string,
+    category: string,
+    comment: string,
+    statusIds?: string[],
+  ): Observable<unknown> {
     const body: Record<string, unknown> = { account_id: accountId, category };
     if (comment.trim()) {
       body['comment'] = comment.trim();
@@ -309,7 +320,9 @@ export class Api {
 
   // --- conversations (DMs) ---
   conversations(maxId?: string): Observable<Conversation[]> {
-    return this.http.get<Conversation[]>('/api/v1/conversations', { params: this.pageParams(maxId) });
+    return this.http.get<Conversation[]>('/api/v1/conversations', {
+      params: this.pageParams(maxId),
+    });
   }
 
   markConversationRead(id: string): Observable<Conversation> {
@@ -404,6 +417,51 @@ export class Api {
   /** Mock-only: bulk-generate a throwaway sample cohort using a named preset. */
   seedSampleData(preset: string): Observable<{ report: GenerationReport }> {
     return this.http.post<{ report: GenerationReport }>('/api/v1/_mock/sample_data', { preset });
+  }
+
+  // --- full OAuth flow (alternative to dev-login) ---
+  registerApp(
+    clientName: string,
+    redirectUri: string,
+    scopes = 'read write follow',
+  ): Observable<OAuthApp> {
+    return this.http.post<OAuthApp>('/api/v1/apps', {
+      client_name: clientName,
+      redirect_uris: redirectUri,
+      scopes,
+    });
+  }
+
+  exchangeCode(params: {
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
+    code: string;
+  }): Observable<OAuthTokenResponse> {
+    const body = new HttpParams()
+      .set('grant_type', 'authorization_code')
+      .set('client_id', params.clientId)
+      .set('client_secret', params.clientSecret)
+      .set('redirect_uri', params.redirectUri)
+      .set('code', params.code);
+    return this.http.post<OAuthTokenResponse>('/oauth/token', body);
+  }
+
+  // --- mock-only fault injection control plane ---
+  listFaults(): Observable<FaultRule[]> {
+    return this.http.get<FaultRule[]>('/api/v1/_mock/faults');
+  }
+
+  addFault(rule: FaultRuleDraft): Observable<FaultRule> {
+    return this.http.post<FaultRule>('/api/v1/_mock/faults', rule);
+  }
+
+  deleteFault(id: string): Observable<unknown> {
+    return this.http.delete(`/api/v1/_mock/faults/${id}`);
+  }
+
+  clearFaults(): Observable<unknown> {
+    return this.http.delete('/api/v1/_mock/faults');
   }
 
   private pageParams(maxId?: string): HttpParams {

@@ -365,3 +365,68 @@ export interface FeaturedTag {
   statuses_count: number;
   last_status_at: string | null;
 }
+
+// --- Fault injection (mock-only control plane) ---
+
+export interface FaultMatch {
+  methods: string[] | null;
+  path: string | null;
+  path_regex: string | null;
+}
+
+export type FaultEffectType = 'status' | 'ratelimit' | 'latency' | 'malformed' | 'timeout';
+
+export interface FaultEffect {
+  type: FaultEffectType;
+  status: number;
+  body: unknown;
+  headers: Record<string, string>;
+  delay_ms: number;
+  truncate: boolean;
+}
+
+export interface FaultRule {
+  id: string;
+  match: FaultMatch;
+  effect: FaultEffect;
+  remaining: number | null;
+}
+
+/** Shape POSTed to create a fault rule (mirrors FaultStore.add's input). */
+export interface FaultRuleDraft {
+  match: {
+    methods?: string[];
+    path?: string;
+    path_regex?: string;
+  };
+  effect: {
+    type: FaultEffectType;
+    status?: number;
+    body?: unknown;
+    headers?: Record<string, string>;
+    delay_ms?: number;
+    truncate?: boolean;
+  };
+  count?: number;
+}
+
+// --- OAuth (full authorization-code flow) ---
+
+export interface OAuthApp {
+  id: string;
+  name: string;
+  website: string | null;
+  redirect_uri: string;
+  redirect_uris: string[];
+  client_id: string;
+  client_secret: string;
+  vapid_key: string;
+  scopes: string[];
+}
+
+export interface OAuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  scope: string;
+  created_at: number;
+}

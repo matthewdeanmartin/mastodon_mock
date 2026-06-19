@@ -78,6 +78,19 @@ def test_admin_account_delete(alice: Mastodon, bob: Mastodon) -> None:
         alice.admin_account(bob_id)
 
 
+def test_admin_account_delete_removes_their_statuses(alice: Mastodon, bob: Mastodon) -> None:
+    # A deleted account's statuses must not survive as orphans: real Mastodon takes
+    # the user's content down with them, and serialize_status requires the author
+    # to resolve, so a dangling account_id previously crashed any later read (500).
+    bob_id = bob.account_verify_credentials().id
+    post = bob.status_post("orphan me")
+
+    alice.admin_account_delete(bob_id)
+
+    with pytest.raises(MastodonNotFoundError):
+        alice.status(post.id)
+
+
 # --- Reports ------------------------------------------------------------------
 
 
