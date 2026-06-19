@@ -1,7 +1,36 @@
 <div class="login-wrap">
   <div class="login-card">
     <h1>mastodon_mock</h1>
-    <p class="muted">Paste a seeded access token to sign in.</p>
+
+    <div class="dev">
+      <div class="dev-head">
+        <span class="muted">Server</span>
+      </div>
+      <div class="dev-gen">
+        @for (preset of serverPresets; track preset.baseUrl) {
+          <button
+            class="btn btn-outline"
+            [class.active]="server.baseUrl() === preset.baseUrl"
+            (click)="selectServer(preset.baseUrl)"
+          >
+            {{ preset.label }}
+          </button>
+        }
+      </div>
+      <div class="dev-gen">
+        <input
+          type="text"
+          [ngModel]="customServer()"
+          (ngModelChange)="customServer.set($event)"
+          (keyup.enter)="useCustomServer()"
+          placeholder="https://your.instance"
+        />
+        <button class="btn btn-outline" (click)="useCustomServer()">Use</button>
+      </div>
+      <p class="muted small">Talking to <code>{{ server.baseUrl() || 'this server' }}</code></p>
+    </div>
+
+    <p class="muted">Paste an access token to sign in.</p>
     <input
       type="text"
       [ngModel]="token()"
@@ -17,51 +46,57 @@
       {{ checking() ? 'Checking…' : 'Sign in' }}
     </button>
 
-    <div class="dev">
-      <div class="dev-head">
-        <span class="muted">Dev login</span>
-        <button class="link" (click)="refreshDevUsers()">refresh</button>
-      </div>
-      <div class="dev-gen">
-        <button class="btn btn-outline" [disabled]="working()" (click)="generate(false)">
-          + Regular user
-        </button>
-        <button class="btn btn-outline" [disabled]="working()" (click)="generate(true)">
-          + Admin user
-        </button>
-      </div>
+    @if (server.isMock) {
+      <div class="dev">
+        <div class="dev-head">
+          <span class="muted">Dev login</span>
+          <button class="link" (click)="refreshDevUsers()">refresh</button>
+        </div>
+        <div class="dev-gen">
+          <button class="btn btn-outline" [disabled]="working()" (click)="generate(false)">
+            + Regular user
+          </button>
+          <button class="btn btn-outline" [disabled]="working()" (click)="generate(true)">
+            + Admin user
+          </button>
+        </div>
 
-      <div class="dev-gen">
-        <select [ngModel]="preset()" (ngModelChange)="preset.set($event)" [disabled]="seeding()">
-          <option value="tiny">tiny (~100 posts)</option>
-          <option value="small">small (~5k posts)</option>
-          <option value="medium">medium (~100k posts)</option>
-        </select>
-        <button class="btn btn-outline" [disabled]="seeding()" (click)="seedSample()">
-          {{ seeding() ? 'Seeding…' : 'Seed sample data' }}
-        </button>
+        <div class="dev-gen">
+          <select
+            [ngModel]="preset()"
+            (ngModelChange)="preset.set($event)"
+            [disabled]="seeding()"
+          >
+            <option value="tiny">tiny (~100 posts)</option>
+            <option value="small">small (~5k posts)</option>
+            <option value="medium">medium (~100k posts)</option>
+          </select>
+          <button class="btn btn-outline" [disabled]="seeding()" (click)="seedSample()">
+            {{ seeding() ? 'Seeding…' : 'Seed sample data' }}
+          </button>
+        </div>
+        @if (seedMessage()) {
+          <p class="muted small">{{ seedMessage() }}</p>
+        }
+        @if (devUsers().length) {
+          <ul class="dev-list">
+            @for (u of devUsers(); track u.id) {
+              <li>
+                <button class="dev-user" (click)="use(u)" [title]="u.access_token">
+                  <span class="dev-name">{{ u.display_name || u.username }}</span>
+                  @if (u.role === 'admin') {
+                    <span class="badge">admin</span>
+                  }
+                  <span class="muted dev-acct">&#64;{{ u.username }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="muted small">No accounts with tokens yet — generate one above.</p>
+        }
       </div>
-      @if (seedMessage()) {
-        <p class="muted small">{{ seedMessage() }}</p>
-      }
-      @if (devUsers().length) {
-        <ul class="dev-list">
-          @for (u of devUsers(); track u.id) {
-            <li>
-              <button class="dev-user" (click)="use(u)" [title]="u.access_token">
-                <span class="dev-name">{{ u.display_name || u.username }}</span>
-                @if (u.role === 'admin') {
-                  <span class="badge">admin</span>
-                }
-                <span class="muted dev-acct">&#64;{{ u.username }}</span>
-              </button>
-            </li>
-          }
-        </ul>
-      } @else {
-        <p class="muted small">No accounts with tokens yet — generate one above.</p>
-      }
-    </div>
+    }
 
     <div class="dev">
       <div class="dev-head">
@@ -70,8 +105,10 @@
       </div>
       @if (showOAuth()) {
         <p class="muted small">
-          Registers an app, then redirects through the server's account-picker at
-          <code>/oauth/authorize</code> and exchanges the code at <code>/oauth/token</code>.
+          Registers an app, then redirects through
+          <code>{{ server.baseUrl() || 'this server' }}/oauth/authorize</code>
+          and exchanges the code at <code>/oauth/token</code>. On a real instance you'll see its
+          actual login/consent page.
         </p>
         <input
           type="text"

@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { DevUser } from '../../models';
+import { Server, SERVER_PRESETS } from '../../server';
 
 const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
 
@@ -24,6 +25,10 @@ export class Login implements OnInit {
   private auth = inject(Auth);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  protected server = inject(Server);
+
+  protected serverPresets = SERVER_PRESETS;
+  protected customServer = signal('');
 
   protected token = signal('');
   protected error = signal<string | null>(null);
@@ -42,8 +47,19 @@ export class Login implements OnInit {
   protected oauthError = signal<string | null>(null);
 
   ngOnInit(): void {
+    this.customServer.set(this.server.isMock ? '' : this.server.baseUrl());
     this.refreshDevUsers();
     this.handleOAuthCallback();
+  }
+
+  selectServer(baseUrl: string): void {
+    this.server.setBaseUrl(baseUrl);
+    this.customServer.set(baseUrl);
+    this.refreshDevUsers();
+  }
+
+  useCustomServer(): void {
+    this.selectServer(this.customServer());
   }
 
   /** If we just came back from /oauth/authorize with a ?code=, exchange it for a token. */
@@ -105,7 +121,10 @@ export class Login implements OnInit {
           response_type: 'code',
           scope: app.scopes.join(' '),
         });
-        window.location.href = `/oauth/authorize?${params.toString()}`;
+        // The instance itself handles this redirect in the user's browser, so it works
+        // even when redirectUri points back at an unreachable local dev server.
+        const authorizeBase = this.server.baseUrl() || window.location.origin;
+        window.location.href = `${authorizeBase}/oauth/authorize?${params.toString()}`;
       },
       error: () => {
         this.oauthWorking.set(false);
