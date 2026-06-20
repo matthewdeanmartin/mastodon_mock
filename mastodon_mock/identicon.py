@@ -10,9 +10,21 @@ from __future__ import annotations
 import hashlib
 
 _PALETTE = [
-    "#6b5b95", "#feb236", "#d64161", "#ff7b25", "#45b8ac",
-    "#5b9aa0", "#d6cbd3", "#eca1a6", "#bdcebe", "#9cc4c3",
-    "#e9d2a3", "#a8e6cf", "#dcedc1", "#ffaaa5", "#ff8b94",
+    "#6b5b95",
+    "#feb236",
+    "#d64161",
+    "#ff7b25",
+    "#45b8ac",
+    "#5b9aa0",
+    "#d6cbd3",
+    "#eca1a6",
+    "#bdcebe",
+    "#9cc4c3",
+    "#e9d2a3",
+    "#a8e6cf",
+    "#dcedc1",
+    "#ffaaa5",
+    "#ff8b94",
 ]
 
 

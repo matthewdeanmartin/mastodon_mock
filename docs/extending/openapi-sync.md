@@ -121,8 +121,8 @@ three sections, each keyed by `(METHOD, normalized_path)` with a short reason:
 The contract tests enforce three invariants:
 
 1. **No surprise endpoints** — every mock-only op must be in `MOCK_ONLY`.
-2. **No silent gaps** — every truth-only op must be in `TRUTH_ONLY`.
-3. **No stale entries** — an allow-list entry that no longer matches real drift fails the
+1. **No silent gaps** — every truth-only op must be in `TRUTH_ONLY`.
+1. **No stale entries** — an allow-list entry that no longer matches real drift fails the
    tests, so the lists can't rot.
 
 ## Task playbooks
@@ -133,7 +133,7 @@ The expected workflow for the bot/contributor filling in coverage:
 
 1. **Pick a target** from `spec/openapi_compare_report.md` → *Truth-only operations*, or
    from `TRUTH_ONLY` in the allow-list. Cross-reference `spec/03-api-coverage.md`.
-2. **Learn the real shape.** The mock has no live Mastodon to copy, so capture the real
+1. **Learn the real shape.** The mock has no live Mastodon to copy, so capture the real
    response — e.g. against `mastodon.social` or any public instance:
    ```bash
    curl -s https://mastodon.social/api/v1/instance/privacy_policy | jq .
@@ -141,18 +141,18 @@ The expected workflow for the bot/contributor filling in coverage:
    For authed endpoints, register an app and use a token (see Mastodon's API docs). Also
    read the operation's schema in `mastodon-openapi/dist/schema.json` — that's the
    contract you're implementing to.
-3. **Implement** the route in the appropriate `mastodon_mock/routers/*.py`, serializing
+1. **Implement** the route in the appropriate `mastodon_mock/routers/*.py`, serializing
    via `mastodon_mock/serializers/*` so the JSON matches the truth `components.schemas`.
-4. **Remove it from `TRUTH_ONLY`** in `tests/openapi/allowlist.py` and **lower
+1. **Remove it from `TRUTH_ONLY`** in `tests/openapi/allowlist.py` and **lower
    `MAX_TRUTH_ONLY`** by the number you implemented.
-5. **Regenerate & verify:**
+1. **Regenerate & verify:**
    ```bash
    make compare-openapi
    uv run pytest tests/test_openapi_contract.py
    CONTRACT_STRICT=1 uv run pytest -m contract tests/test_openapi_fuzz.py \
        -k '<your-path-fragment>'   # confirm the new endpoint conforms
    ```
-6. Commit the route, the serializer, the allow-list edit, and the regenerated
+1. Commit the route, the serializer, the allow-list edit, and the regenerated
    `spec/openapi_compare_report.md` together.
 
 ### Fixing a response-shape gap (Phase 4 work)

@@ -28,7 +28,9 @@ def render_status_html(text: str) -> str:
     escaped = html.escape(text, quote=False)
 
     def _linkify(line: str) -> str:
-        return _URL_RE.sub(lambda m: f'<a href="{m.group(1)}" rel="nofollow noopener" target="_blank">{m.group(1)}</a>', line)
+        return _URL_RE.sub(
+            lambda m: f'<a href="{m.group(1)}" rel="nofollow noopener" target="_blank">{m.group(1)}</a>', line
+        )
 
     def _emphasize(line: str) -> str:
         line = _CODE_RE.sub(r"<code>\1</code>", line)

@@ -49,9 +49,7 @@ def test_compare_specs_classifies_drift() -> None:
 
 
 def test_required_query_param_mismatch_detected() -> None:
-    truth = _spec(
-        {"/x": {"get": {"parameters": [{"name": "q", "in": "query", "required": True}]}}}
-    )
+    truth = _spec({"/x": {"get": {"parameters": [{"name": "q", "in": "query", "required": True}]}}})
     mock = _spec({"/x": {"get": {"parameters": []}}})
     report = oc.compare_specs(truth, mock)
     assert len(report.param_diffs) == 1

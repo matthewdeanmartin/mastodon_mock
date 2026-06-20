@@ -132,15 +132,8 @@ def serialize_status_list(
     # into the same context (so their own engagement counts/flags/mentions/tags/media and
     # their authors' aggregates are all batched) and pass ``ctx`` down to the nested calls,
     # instead of letting each nested row fall back to the per-row query path (F2).
-    nested_ids = {
-        nid
-        for s in statuses
-        for nid in (s.reblog_of_id, s.quoted_status_id)
-        if nid is not None
-    }
-    nested = (
-        list(session.scalars(select(Status).where(Status.id.in_(nested_ids))).all()) if nested_ids else []
-    )
+    nested_ids = {nid for s in statuses for nid in (s.reblog_of_id, s.quoted_status_id) if nid is not None}
+    nested = list(session.scalars(select(Status).where(Status.id.in_(nested_ids))).all()) if nested_ids else []
     ctx = build_status_context(session, statuses + nested, viewer)
     return [serialize_status(session, s, config, viewer, ctx=ctx) for s in statuses]
 
