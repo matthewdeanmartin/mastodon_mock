@@ -53,6 +53,20 @@ def test_db_command_dispatches_to_db(monkeypatch: pytest.MonkeyPatch) -> None:
     assert captured["args"].db_command == "upgrade"
 
 
+def test_gen_data_api_switch_dispatches_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_gen_data(args: argparse.Namespace) -> None:
+        captured["args"] = args
+
+    monkeypatch.setattr(cli, "_gen_data", fake_gen_data)
+    cli.main(["gen-data", "--api", "http://127.0.0.1:3000", "--preset", "tiny", "--yes"])
+
+    args = captured["args"]
+    assert args.api == "http://127.0.0.1:3000"
+    assert args.preset == "tiny"
+
+
 def test_serve_builds_app_and_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> None:
     run_calls: dict[str, Any] = {}
     sentinel_app = object()

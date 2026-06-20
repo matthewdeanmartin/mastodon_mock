@@ -8,10 +8,12 @@ import pytest
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
+from mastodon_mock.api_sample_data import generate_sample_data_via_api
 from mastodon_mock.config import PRESETS, DatabaseConfig, SampleDataConfig
 from mastodon_mock.db.base import Base, init_engine
 from mastodon_mock.db.models import Account, Bookmark, Favourite, OAuthToken, Relationship, Status
 from mastodon_mock.db.sample_data import estimate_rows, generate_sample_data
+from mastodon_mock.testing import MockServer
 
 
 @pytest.fixture()
@@ -111,3 +113,26 @@ def test_estimate_rows_is_in_the_ballpark(engine: Engine) -> None:
     # estimate is an upper bound on relationships and total rows.
     assert report.total_rows <= est
     assert report.total_rows > est * 0.5
+
+
+def test_api_generation_exercises_live_write_endpoints() -> None:
+    cfg = SampleDataConfig(
+        accounts=3,
+        followers_per_account=1,
+        statuses_per_account=2,
+        favourites_per_account=1,
+        bookmarks_per_account=1,
+        reply_ratio=1.0,
+        seed=42,
+    )
+
+    with MockServer() as server:
+        report = generate_sample_data_via_api(server.base_url, cfg)
+
+    assert report.accounts == 3
+    assert report.relationships >= 3
+    assert report.statuses == 6
+    assert report.favourites == 3
+    assert report.bookmarks == 3
+    assert report.notifications >= 3
+    assert report.total_seconds > 0

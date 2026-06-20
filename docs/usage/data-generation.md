@@ -75,10 +75,23 @@ Useful flags:
 | `--favourites-per-account N` | Override favourite edges per account. |
 | `--seed N` | Make the generated graph reproducible. |
 | `--database PATH` | Write into this SQLite file. |
+| `--api URL` | Create the cohort through a running server's HTTP API. |
 | `--json` | Print the generation report as JSON. |
 
 The CLI refuses to write to `:memory:` unless you pass `--in-memory`, because an in-memory
 database disappears as soon as the command exits.
+
+To dogfood the server's own write paths, point `gen-data` at a running instance:
+
+```bash
+mastodon_mock gen-data --preset tiny --api http://127.0.0.1:3000 --yes
+```
+
+API mode creates accounts with the mock-only development-user endpoint, then uses normal
+Mastodon endpoints for posts and replies, follows, favourites, and bookmarks. Follow and
+favourite notifications are created naturally as API side effects. Because every generated
+account must perform authenticated requests, all accounts receive a development token in
+this mode. `--api` cannot be combined with `--database` or `--in-memory`.
 
 ## Config Defaults
 

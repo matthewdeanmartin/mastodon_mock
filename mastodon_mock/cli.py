@@ -89,6 +89,12 @@ def main(argv: list[str] | None = None) -> None:
     gen.add_argument("--seed", type=int, default=None, help="RNG seed for a reproducible cohort")
     gen.add_argument("--database", default=None, help="SQLite path to write into (overrides config)")
     gen.add_argument("--in-memory", action="store_true", help="Use an in-memory DB (only useful for a quick benchmark)")
+    gen.add_argument(
+        "--api",
+        metavar="URL",
+        default=None,
+        help="Generate through a running server's HTTP API instead of writing directly to SQLite",
+    )
     gen.add_argument("--yes", action="store_true", help="Skip the confirmation prompt for large shapes")
     gen.add_argument("--json", action="store_true", help="Emit the generation report as JSON")
 
@@ -166,32 +172,43 @@ def _serve(args: argparse.Namespace) -> None:
 
 def _gen_data(args: argparse.Namespace) -> None:
     """Generate a sample cohort into the configured database."""
-    from mastodon_mock.db.base import Base, init_engine
     from mastodon_mock.db.sample_data import estimate_rows, generate_sample_data
 
     config = MastodonMockConfig.load(args.config)
     cfg = _build_sample_config(args, config.sample_data)
+
+    if args.api is not None and (args.in_memory or args.database is not None):
+        print("--api cannot be combined with --database or --in-memory.")
+        sys.exit(2)
 
     if args.in_memory:
         config.database.path = ":memory:"
     elif args.database is not None:
         config.database.path = args.database
 
-    if config.database.path == ":memory:" and not args.in_memory:
+    if args.api is None and config.database.path == ":memory:" and not args.in_memory:
         print("Refusing to write into an in-memory DB (it vanishes on exit). Use --in-memory or --database.")
         sys.exit(2)
 
     rows = estimate_rows(cfg)
-    print(f"Target: {cfg.accounts} accounts, ~{rows:,} total rows -> {config.database.path}")
+    target = f"HTTP API at {args.api}" if args.api is not None else config.database.path
+    print(f"Target: {cfg.accounts} accounts, ~{rows:,} total rows -> {target}")
     if rows > 250_000 and not args.yes:
         reply = input("This is a large shape and may be slow. Continue? [y/N] ").strip().lower()
         if reply not in ("y", "yes"):
             print("Aborted.")
             return
 
-    engine = init_engine(config.database)
-    Base.metadata.create_all(engine, checkfirst=True)
-    report = generate_sample_data(engine, cfg)
+    if args.api is not None:
+        from mastodon_mock.api_sample_data import generate_sample_data_via_api
+
+        report = generate_sample_data_via_api(args.api, cfg)
+    else:
+        from mastodon_mock.db.base import Base, init_engine
+
+        engine = init_engine(config.database)
+        Base.metadata.create_all(engine, checkfirst=True)
+        report = generate_sample_data(engine, cfg)
 
     if args.json:
         # pylint: disable=no-member

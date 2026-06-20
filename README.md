@@ -115,10 +115,10 @@ domain for avatar/header/status URLs).
   - Integration tests via Angular client
 - Unit tests using mastodon-py
 - Hand tested with half a dozen clients
-- Bundled with a client written specifically to test the mock server
+- Bundled with an Angular client written specifically to test the mock server
 - Schema compared with the reverse engineered OpenAPI schema
 - Tested against five of my own Mastodon projects
-
+- Test data generation uses mastodon-mock
 
 ## Tested on...
 
