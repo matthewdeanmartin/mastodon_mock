@@ -111,6 +111,7 @@ domain for avatar/header/status URLs).
 ## Why I think this works
 
 - 100s of unit tests
+  - Ordinary pytests
   - Integration tests via live server
   - Integration tests via Angular client
 - Unit tests using mastodon-py

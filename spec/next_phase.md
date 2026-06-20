@@ -1,5 +1,9 @@
 # Next Phase — Handoff Document
 
+> Historical handoff document. Counts and OOS claims below describe an earlier project
+> state. Use [`../last_last_mile.md`](../last_last_mile.md) for the current audited
+> backlog and `03-api-coverage.md` for the route matrix.
+
 This is a work/handoff doc for the next contributor (human or bot). It captures
 **what exists, what was deliberately left out, known gaps, and a prioritized
 backlog**. The normative specification is in `spec/00-` … `spec/07-`; this file is

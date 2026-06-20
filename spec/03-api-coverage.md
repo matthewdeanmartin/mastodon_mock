@@ -1,13 +1,11 @@
 # API Coverage Matrix
 
-> **Implementation status:** all **Full**, **Static**, and **Stub** rows
-> below are implemented and exercised by Mastodon.py-driven contract tests in
-> `tests/test_contract_core.py`, `tests/test_contract_extended.py`, and (for the
-> admin API) `tests/test_contract_admin.py`. **OOS** rows are deliberately not
-> routed (Mastodon.py gets a 404). The routers live in `mastodon_mock/routers/`
-> mirroring this document's section headings. The admin / moderation API
-> (`routers/admin.py`) is **in scope** as of the admin phase — see that section
-> below.
+> **Implementation status:** every operation in the pinned Mastodon 4.6 OpenAPI
+> schema is routed, but routed does not always mean stateful. The matrix below
+> distinguishes **Full**, **Static**, and **Stub** behavior. Contract coverage is
+> spread across `tests/test_contract_*.py`, `tests/mock_only/`, and the opt-in
+> OpenAPI fuzz suite. The routers live in `mastodon_mock/routers/`, roughly
+> mirroring this document's section headings.
 
 Legend (see [00-overview.md](00-overview.md) for definitions):
 
@@ -45,6 +43,8 @@ to a concrete client call.
 | GET | `/.well-known/nodeinfo` + nodeinfo doc | `instance_nodeinfo()` | **Static** — minimal 2.0 schema doc with `software.name="mastodon_mock"`, `software.version=mocked_version` |
 | GET | `/api/v1/instance/rules` | `instance_rules()` | **Static** — empty list by default, configurable via seed config |
 | GET | `/api/v1/instance/terms_of_service` | `instance_terms_of_service()` | **Full(ish)** — returns the `TermsOfService` entity built from `config.terms_of_service`; 404s when that is empty (matches instances with no ToS configured) |
+| GET | `/api/v1/instance/terms_of_service/{date}` | no Mastodon.py caller | **Static** — returns the current configured ToS for any revision date; no revision history |
+| GET | `/api/v1/instance/privacy_policy` | no Mastodon.py caller | **Static** — configured policy or 404 when unset |
 | GET | `/api/v1/directory` | `instance_directory()` | **Full** — `order=active` (default) sorts by most recent status time, `order=new` by account `created_at`; `local` filters to local accounts |
 | GET | `/api/v1/custom_emojis` | `custom_emojis()` | **Static** — small fixed set in the `CustomEmoji` shape |
 | GET | `/api/v1/announcements` | `announcements()` | **Full** — published announcements (seeded via `config.seed.announcements`) newest-first; `read` is viewer-relative (true once dismissed); reactions tallied per emoji |
@@ -72,6 +72,7 @@ to a concrete client call.
 | GET | `/api/v1/accounts/familiar_followers` | `account_familiar_followers()` | **Full** — intersection of followers |
 | GET | `/api/v1/accounts/{id}/featured_tags` | `account_featured_tags()` | **Full** — the account's featured tags (`FeaturedTag` shape; usage counts derived) |
 | GET | `/api/v1/featured_tags` | `featured_tags()` | **Full** — the logged-in user's featured tags (see routers/tags.py) |
+| GET | `/api/v1/accounts/{id}/identity_proofs` | no Mastodon.py caller | **Stub** — empty list |
 
 ## `routers/accounts.py` — accounts (write) — **high priority**
 
@@ -92,6 +93,7 @@ to a concrete client call.
 | POST | `/api/v1/accounts/{id}/note` | `account_note_set()` | **Full** — sets `relationships.note` |
 | DELETE | `/api/v1/profile/avatar` | `account_delete_avatar()` | **Full** — clears `avatar_url` |
 | DELETE | `/api/v1/profile/header` | `account_delete_header()` | **Full** — clears `header_url` |
+| GET/PATCH | `/api/v1/profile` | no Mastodon.py caller | **Full** — credential-account fetch/update, sharing the `update_credentials` state |
 
 ## `routers/relationships.py` — mutes/blocks/follow requests/domain blocks
 
@@ -158,6 +160,7 @@ to a concrete client call.
 | GET | `/api/v1/timelines/public` | `timeline()`/`timeline_public()`/`timeline_local()` (via `local=True`) | **Full** — all `public`/`unlisted` statuses; `local=True` filters to accounts with `domain IS NULL`; `remote=True` filters to `domain IS NOT NULL` |
 | GET | `/api/v1/timelines/tag/{hashtag}` | `timeline_hashtag()` | **Full** — join through `status_tags` |
 | GET | `/api/v1/timelines/list/{id}` | `timeline_list()` | **Full** — statuses from accounts in the given `user_lists` |
+| GET | `/api/v1/timelines/direct` | no Mastodon.py caller | **Full** — direct statuses visible to the authenticated account |
 | GET | `/api/v1/timelines/link` | `timeline_link()` | **Stub** — empty list (trending-links timeline; low priority) |
 
 ## `routers/notifications.py`
@@ -170,7 +173,7 @@ to a concrete client call.
 | POST | `/api/v1/notifications/clear` | `notifications_clear()` | **Full** — deletes all notifications for the user |
 | POST | `/api/v1/notifications/{id}/dismiss` (and bulk variant) | `notifications_dismiss()` | **Full** — sets `read=True` / deletes |
 | GET/PATCH | `/api/v2/notifications/policy` | `notifications_policy()`, `update_notifications_policy()` | **Static** — fixed "accept everything" policy (incl. `for_bots`); PATCH accepted and ignored |
-| `/api/v1/notifications/requests*` | `notification_request*()` | **Full(ish)** — list is always empty (policy filters nothing); `requests/merged` returns `{merged: true}`; single fetch 404s; accept/dismiss (single + bulk) are no-ops |
+| `/api/v1/notifications/requests*` | `notification_request*()` | **Stub** — list is always empty; `requests/merged` returns `{merged: true}`; single fetch 404s; accept/dismiss (single + bulk) are no-ops |
 | GET | `/api/v2/notifications` | `grouped_notifications()` | **Full** — groups favourite/follow/reblog by target into `NotificationGroup`s; other types stay individual. Returns the `accounts`/`statuses`/`notification_groups` container with `Link` pagination. |
 | GET | `/api/v2/notifications/unread_count` | `unread_grouped_notifications_count()` | **Full** — counts unread *groups*, not rows |
 | GET | `/api/v2/notifications/{group_key}` | `grouped_notification()` | **Full** — single-group container; 404 if no members |
@@ -184,6 +187,7 @@ to a concrete client call.
 | GET | `/api/v1/media/{id}` | `media()` | **Full** |
 | POST | `/api/v2/media` (and `/api/v1/media` fallback) | `media_post()` | **Full** — stores uploaded bytes under `media_storage_path`, infers `type` from mime, generates placeholder `blurhash`, returns `MediaAttachment` with `status_id=None` |
 | PUT | `/api/v1/media/{id}` | `media_update()` | **Full** — updates `description`/`focus`/`thumbnail` metadata |
+| DELETE | `/api/v1/media/{id}` | no Mastodon.py caller | **Full** — deletes the attachment row and stored file |
 
 Uploaded media bytes are served back at `/media/{id}/{filename}` (a `StaticFiles`-style
 route) so `url`/`preview_url` resolve to a working local URL.
@@ -247,6 +251,7 @@ No remote-resolve (`resolve=True` webfinger) — always behaves as `resolve=Fals
 |--------|------|------------------------|----------|
 | GET | `/api/v1/conversations/` | `conversations()` | **Full** — derived from `direct`-visibility statuses grouped by participant set |
 | POST | `/api/v1/conversations/{id}/read` | `conversations_read()` | **Full** |
+| DELETE | `/api/v1/conversations/{id}` | no Mastodon.py caller | **Full** — hides the conversation for the authenticated account |
 
 ## `routers/preferences.py`
 
@@ -264,6 +269,33 @@ No remote-resolve (`resolve=True` webfinger) — always behaves as `resolve=Fals
 | POST | `/api/v1/polls/{id}/votes` | `poll_vote()` | **Full** — inserts `poll_votes`; recomputes `votes_count`/`voters_count`/`own_votes` |
 
 `make_poll()` is a pure client-side helper.
+
+## `routers/push.py`
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| GET | `/api/v1/push/subscription` | `push_subscription()` | **Full (subscription state)** — fetches the OAuth token's persisted subscription |
+| POST | `/api/v1/push/subscription` | `push_subscription_set()` | **Full (subscription state)** — creates/replaces one subscription per OAuth token |
+| PUT | `/api/v1/push/subscription` | `push_subscription_update()` | **Full (subscription state)** — persists alert and policy changes |
+| DELETE | `/api/v1/push/subscription` | `push_subscription_delete()` | **Full (subscription state)** — deletes the subscription |
+
+Encrypted WebPush delivery is **OOS**: client encryption keys are not retained, the
+returned server key is synthetic, and notification events are not VAPID-signed,
+encrypted, or sent to the subscription endpoint.
+
+## `routers/misc.py` — routed OpenAPI compatibility surface
+
+These operations closed the reconstructed 4.6 OpenAPI path/method backlog. They are not
+all stateful fakes.
+
+| Method | Path | Mastodon.py caller(s) | Coverage |
+|--------|------|------------------------|----------|
+| GET | `/api/oembed` | no Mastodon.py caller | **Static** — minimal link response; does not resolve the referenced status |
+| `/api/v1/collections*` | no Mastodon.py caller | **Stub** — create/read/item routes are null, empty, 404, or no-op; no collection persistence |
+| `/api/v1/{account_id}/collections` | no Mastodon.py caller | **Stub** — empty |
+| `/api/v1/{account_id}/in_collections` | no Mastodon.py caller | **Stub** — empty |
+| `/api/v1/annual_reports*` | no Mastodon.py caller | **Stub** — empty/ineligible; generate/read are no-ops |
+| GET | `/api/v1_alpha/async_refreshes/{id}` | no Mastodon.py caller | **Static** — every id is immediately `finished` |
 
 ## `routers/admin.py` — admin / moderation API — **in scope**
 
@@ -338,11 +370,12 @@ No remote-resolve (`resolve=True` webfinger) — always behaves as `resolve=Fals
 | POST | `/api/v1/admin/dimensions` | `admin_dimensions()` | **Static** — one empty `AdminDimension` per requested key |
 | POST | `/api/v1/admin/retention` | `admin_retention()` | **Static** — empty cohort list |
 
-## Streaming (SSE)
+## Streaming (SSE and legacy WebSocket)
 
-`Mastodon.py` streams over HTTP Server-Sent-Events (not WebSocket), so these are
-served from `mastodon_mock/routers/streaming.py`. Events are generated as side
-effects of the same write paths as the REST API and routed by visibility. See
+`Mastodon.py` streams over HTTP Server-Sent-Events. The mock also implements the legacy
+WebSocket multiplex transport used by browser/Electron clients. These are served from
+`mastodon_mock/routers/streaming.py`. Events are generated as side effects of the same
+write paths as the REST API and routed by visibility. See
 [streaming.md](streaming.md). On by default; `[tool.mastodon_mock.streaming] enabled = false` makes the routes (except `health`) 404.
 
 | Method | Path | Mastodon.py caller(s) | Coverage |
@@ -356,9 +389,10 @@ effects of the same write paths as the REST API and routed by visibility. See
 | GET | `/api/v1/streaming/list` | `stream_list()` | **Full** — `update`s from accounts on the given list |
 | GET | `/api/v1/streaming/direct` | `stream_direct()` | **Full** — `conversation` events for the authed account |
 | GET | `/api/v1/streaming/health` | `stream_healthy()` | **Full** — returns `OK` |
+| GET / WebSocket | `/api/v1/streaming?stream=...` | legacy/browser clients | **Full (supported channels)** — SSE or WebSocket transport over the same in-process event bus |
 
-The browser-only **WebSocket multiplexed stream** is OOS (Mastodon.py never uses
-it). No back-fill: a stream only delivers events that occur after it connects.
+No back-fill: a stream only delivers events that occur after it connects. The mock does
+not emit every upstream event family (notably `filters_changed` and announcement events).
 
 ## Mock-only fault injection
 
@@ -375,11 +409,12 @@ handling. See [fault_injection.md](fault_injection.md). On by default;
 | DELETE | `/api/v1/_mock/faults/{id}` | Remove one rule |
 | DELETE | `/api/v1/_mock/faults` | Clear all rules |
 
-## Modules entirely **out of scope** for v1
+## Behavior entirely **out of scope**
 
-| Module | Reason |
+| Behavior | Reason |
 |--------|--------|
-| `mastodon/push.py` | WebPush/VAPID — irrelevant to write-then-read goal |
+| Encrypted WebPush delivery / VAPID | Subscription CRUD is testable and implemented; external encrypted delivery is second-tier transport/security work |
+| Federation / ActivityPub delivery | Outside the single-instance stateful-fake goal |
 
 Hashtag follow + fetch live in `routers/tags.py` and are now **Full** (backed by a
 `followed_tags` table):
@@ -404,6 +439,7 @@ They do not reproduce Mastodon's ranking algorithms, but satisfy callers that it
 | Method | Path | Mastodon.py caller(s) | Coverage |
 |--------|------|------------------------|----------|
 | GET | `/api/v1/suggestions`, `/api/v2/suggestions` | `suggestions()` / `suggestions_v2()` | **Full** — local accounts the viewer doesn't follow (emitted in the v2 `Suggestion` shape) |
+| DELETE | `/api/v1/suggestions/{id}` | no Mastodon.py caller | **Stub** — accepts dismissal but does not persist it, so the suggestion can reappear |
 | GET | `/api/v1/trends`, `/api/v1/trends/tags` | `trending_tags()` | **Full** — local hashtags ranked by status count, `Tag` shape with 7-day history |
 | GET | `/api/v1/trends/statuses` | `trending_statuses()` | **Full** — public local statuses ranked by favourites |
 | GET | `/api/v1/trends/links` | `trending_links()` | **Stub** — empty list (no preview-card synthesis) |

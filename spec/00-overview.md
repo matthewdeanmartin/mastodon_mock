@@ -52,16 +52,15 @@ A static mock can't reflect the post back. `mastodon_mock` can, because it has a
   cross-instance propagation. `mastodon_mock` is a single, closed "instance". Remote
   accounts/statuses can exist as **local rows that merely look remote** (e.g.
   `acct = "bob@otherserver.example"`), seeded directly into the DB — never fetched live.
-- **No real security.** OAuth, bearer tokens, and scopes are *modeled* (so Mastodon.py's
-  client code paths work and multi-account auth works) but not *enforced* in any way
-  that matters outside this mock. Tokens are random strings mapped 1:1 to seeded
-  accounts. There is no password hashing, no real client-secret validation, no
-  rate-limiting (or only token-bucket theater if a test specifically wants to exercise
-  Mastodon.py's `ratelimit_method` handling — TBD, see [03-api-coverage.md](03-api-coverage.md)).
-- **No streaming API** (`/api/v1/streaming/*`, websockets) — unless a follow-up phase
-  decides Mastodon.py's streaming client is in scope. Not in v1.
-- **No push/WebPush** (`mastodon/push.py`) in v1 — VAPID/webpush crypto is irrelevant to
-  the "write and read it back" goal.
+- **No production security.** OAuth, bearer tokens, and scopes are modeled so client
+  paths and multi-account auth work. Optional coarse scope and rate-limit enforcement
+  exists for client testing, but there is no password hashing, real client-secret
+  security, or admin-role enforcement.
+- **Streaming is local and in-process.** SSE and the legacy WebSocket multiplex endpoint
+  are implemented, but there is no cross-process bus, replay, or federation-backed
+  delivery.
+- **No encrypted WebPush delivery.** Push subscription CRUD is persisted, but VAPID
+  signing, RFC WebPush encryption, and outbound delivery are not implemented.
 - **No media file processing.** Uploaded media is stored (or stubbed) but never
   transcoded/thumbnailed; `media_attachment.url` points to whatever was uploaded (or a
   placeholder) and `MediaAttachment.type` is inferred from the declared mime type.
@@ -85,9 +84,8 @@ as one of:
 - **Out of scope** — not implemented; calling it returns 501 (or is simply not routed,
   producing Mastodon.py's `MastodonNotFoundError`).
 
-All access from test code MUST go through Mastodon.py (`from mastodon import Mastodon`),
-never raw `httpx`/`requests` calls to the mock — this keeps the "if Mastodon.py supports
-it" contract honest and ensures the dual test-suite goal is achievable.
+Use Mastodon.py whenever it exposes the operation. Raw HTTP is appropriate for upstream
+operations that Mastodon.py does not expose and for mock-only control-plane tests.
 
 ## Document map
 

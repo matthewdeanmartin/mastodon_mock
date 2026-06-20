@@ -1,5 +1,9 @@
 # The Last Mile: Endpoints That Are Empty / Stubbed
 
+> Historical planning document. It predates the OpenAPI-backlog closure, persisted push
+> subscriptions, and WebSocket streaming. The current audited backlog and phased plan is
+> [`../last_last_mile.md`](../last_last_mile.md).
+
 > Companion to [03-api-coverage.md](03-api-coverage.md). That document is the
 > authoritative route-by-route matrix. This one zooms in on the rows that are
 > **Stub** (empty list / minimal shape, no behaviour), **Static** (fixed values),

@@ -161,7 +161,9 @@ immediately after the `with` line is guaranteed to be seen. Tests therefore need
 
 ## Non-goals
 
-- **No WebSocket / multiplexed stream.** Mastodon.py doesn't use it; out of scope.
+- **No additional WebSocket protocol families.** The legacy multiplex endpoint at
+  `/api/v1/streaming?stream=...` is implemented over WebSocket for browser/Electron
+  clients, using the same in-process bus as SSE.
 - **No `filters_changed` / `announcement*` stream events.** Wired as no-ops; can be added
   if a client needs them.
 - **No back-fill.** A stream only delivers events that occur **after** it connects, like a

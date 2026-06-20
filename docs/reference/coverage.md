@@ -11,7 +11,7 @@ method that hits each route) lives in the
 | Level | Meaning |
 |------------|---------------------------------------------------------------------------------------------|
 | **Full** | Real, persisted state. Writes are reflected in later reads. Safe to assert behaviour on. |
-| **Static** | Fixed-shape response, no persistence. The shape is correct; the values don't change. |
+| **Static** | Fixed response, no persistence. Intended for shape/client-flow compatibility; strict schema conformance may still have gaps. |
 | **Stub** | Minimal valid shape (usually an empty list/dict) so the client doesn't error. No behaviour. |
 | **OOS** | Out of scope — the route isn't implemented; the client gets a `404`. |
 
@@ -63,11 +63,14 @@ relationships, notifications, and pagination you'd expect.
 - **Polls** — fetch and vote (recomputes counts and `own_votes`).
 - **Reports** — `report()` files a moderation report against an account (this is what
   populates the admin queue).
+- **Push subscription CRUD** — create/fetch/update/delete one persisted subscription per
+  OAuth token. This models subscription state only; encrypted delivery is not implemented.
 - **Streaming** (SSE) — `stream_user`, `stream_public` (+ `local`/`remote`),
   `stream_hashtag` (+ `local`), `stream_list`, `stream_direct`, and `stream_healthy`.
   Events (`update` / `status_update` / `delete` / `notification` / `conversation`) are
   generated as side effects of the same write paths as the REST API, routed by
-  visibility. See [streaming spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/streaming.md).
+  visibility. The legacy WebSocket multiplex endpoint is also implemented. See
+  [streaming spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/streaming.md).
 - **Admin / moderation API** (`mastodon/admin.py`) — account listing & filtering (v1 + v2),
   account moderation actions (enable / approve / reject / silence / suspend / sensitive /
   delete) and `admin_account_moderate`, the report queue (list / fetch / assign / unassign /
@@ -124,15 +127,20 @@ data:
 - `timeline_link` (empty list), trending `links` / `admin/trends/links` (empty).
 - Admin measures / dimensions / retention — correctly-shaped but zero/empty values.
 - `email_resend_confirmation` (accepts and does nothing).
+- Mastodon 4.6 collections, annual reports, and async refresh status — routed for
+  operation compatibility, but fixed/empty/no-op rather than stateful.
+- Account identity proofs (empty), suggestion dismissal (no-op), and notification
+  policy updates/requests (fixed accept-all policy, no queue).
 
-## Out of scope (not routed — expect `404`)
+## Out-of-scope behavior behind routed endpoints
 
-Whole modules and a few endpoints are intentionally absent. Calling them raises
-`MastodonNotFoundError` / `MastodonAPIError`:
+No operation in the pinned Mastodon 4.6 OpenAPI schema is currently truth-only. The
+remaining out-of-scope pieces are behavior behind routed endpoints:
 
-- **WebPush / VAPID** (`mastodon/push.py`).
-- **WebSocket multiplexed stream.** Streaming is implemented over HTTP SSE (what
-  Mastodon.py uses); the browser-only WebSocket multiplex is not.
+- **Encrypted WebPush delivery / VAPID signing.** Subscription CRUD is stateful, but
+  notification payloads are not encrypted, signed, or sent.
+- **Federation / ActivityPub delivery** and remote account resolution.
+- **Cross-process streaming** and stream replay.
 
 ## Cross-cutting behaviours worth knowing
 
@@ -146,6 +154,9 @@ Whole modules and a few endpoints are intentionally absent. Calling them raises
   you seed them with a `domain`.
 - **Pagination is real.** List endpoints honour `max_id` / `min_id` / `since_id` / `limit`
   and emit a `Link` header, so Mastodon.py's `fetch_next` / `fetch_previous` work.
+- **CRUD does not always imply enforcement.** Filters are persisted but are not applied
+  to returned statuses; admin moderation flags mostly affect admin views rather than
+  normal posting/timeline behavior.
 - **The bundled UI is a client of the same API.** It is served at `/_ui/` when built and
   uses the mock-only dev helpers plus regular Mastodon/admin endpoints.
 

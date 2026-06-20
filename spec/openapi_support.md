@@ -1,9 +1,9 @@
 # OpenAPI Support — Spec & Contract Comparison
 
-Status: **Phases 1, 2, 3 & 5 implemented** (see checkboxes). Phase 4 (response-shape
-conformance) is the remaining roadmap item, and is deliberately deferred until the
-unimplemented-endpoint backlog (`TRUTH_ONLY` in the allow-list) shrinks — the detection
-machinery for it (strict-mode fuzzing) is in place, see Phase 3.
+Status: **Phases 1, 2, 3 & 5 implemented** (see checkboxes). The operation backlog is
+now empty, so Phase 4 (response-shape conformance) is the active remaining roadmap item.
+Operation parity must not be read as behavioral parity: several routed 4.6 families are
+still static/no-op fakes. See `../last_last_mile.md`.
 
 ## Motivation
 
@@ -34,7 +34,7 @@ generated traffic.
 
 ## Background findings (reconnaissance)
 
-A normalized path comparison (path params collapsed to `{}`) of the two specs:
+A normalized path comparison (path params collapsed to `{}`) originally found:
 
 | metric                         | count |
 |--------------------------------|-------|
@@ -52,6 +52,11 @@ A normalized path comparison (path params collapsed to `{}`) of the two specs:
   `/api/oembed`, `/api/v1/annual_reports`, `/api/v1/collections/*`,
   `DELETE /api/v1/push/subscription`). This list *is* a coverage backlog and should be
   reconcilable against `spec/03-api-coverage.md`.
+
+Current result (2026-06-20): **210 shared operations, 0 truth-only operations, and
+0 required-parameter mismatches**. Some former truth-only operations were closed with
+static or no-op handlers, so the behavior backlog is tracked separately in
+`../last_last_mile.md`.
 
 Known structural mismatches that a naive comparison must handle:
 
@@ -145,6 +150,11 @@ schemas (`Status`, `Account`, `Notification`, …), independent of fuzzing.
   the response body against the resolved truth schema.
 - [ ] Optionally backfill `response_model`s on the FastAPI handlers so the mock's *own*
   published OpenAPI becomes richer (and self-documenting in `/docs`).
+
+Strict-mode reconnaissance is currently red. Representative failures include
+FastAPI `{"detail": ...}` error bodies instead of Mastodon `{"error": ...}`, default
+422 validation shapes, missing required v1 instance configuration fields, and accepting
+unknown query parameters that the reconstructed schema rejects.
 
 ## Phase 5 — Automation & drift alerting ✅
 

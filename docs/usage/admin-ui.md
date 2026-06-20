@@ -80,18 +80,26 @@ These routes persist state and are safe to assert against in tests:
 | Email domain blocks | list, fetch, create, and delete under `/api/v1/admin/email_domain_blocks`. |
 | Canonical email blocks | list, fetch, test, create, and delete under `/api/v1/admin/canonical_email_blocks`. |
 | IP blocks | list, fetch, create, update, and delete under `/api/v1/admin/ip_blocks`. |
+| Announcements | list drafts/published announcements, create, publish, unpublish, and delete. |
 
 Account listing supports the common filters used by Mastodon.py, including local/remote
 origin, domain, username, display name, email, IP, staff permissions, and moderation status.
 
-## Shaped Admin Stubs
+## Derived and Shaped Admin Surfaces
 
-These routes exist so clients can call them without crashing, but they do not compute real
-moderation analytics:
+Admin trending tags and statuses are derived from local hashtag usage and favourite
+counts. They are deterministic fixture rankings, not Mastodon's production ranking
+algorithm.
 
-- admin trends return empty lists, while approve/reject routes echo minimal valid shapes;
+These routes remain shallow:
+
+- admin trending links return an empty list;
+- trend approve/reject routes do not persist review decisions;
 - admin measures return zero-valued measures for requested keys;
 - admin dimensions return empty data arrays for requested keys;
 - admin retention returns an empty list.
+
+Moderation flags and block-list records persist, but most do not yet affect ordinary
+login, posting, timeline, signup, or discovery behavior.
 
 See [What Is and Isn't Mocked](../reference/coverage.md) for the full coverage summary.
