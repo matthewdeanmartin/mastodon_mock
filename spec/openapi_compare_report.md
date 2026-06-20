@@ -8,11 +8,11 @@ regenerate with `make compare-openapi`. See `spec/openapi_support.md`.
 
 | metric | count |
 | --- | --- |
-| shared operations | 176 |
+| shared operations | 210 |
 | mock-only (unexpected) | 13 |
 | mock-only (allow-listed) | 75 |
-| truth-only (unimplemented) | 34 |
-| required-param mismatches | 2 |
+| truth-only (unimplemented) | 0 |
+| required-param mismatches | 0 |
 
 ## Mock-only operations (not in upstream, not allow-listed)
 
@@ -32,45 +32,11 @@ regenerate with `make compare-openapi`. See `spec/openapi_support.md`.
 
 ## Truth-only operations (upstream endpoints the mock does not implement)
 
-- `DELETE /api/v1/collections/{}`
-- `DELETE /api/v1/collections/{}/items/{}`
-- `DELETE /api/v1/conversations/{}`
-- `DELETE /api/v1/media/{}`
-- `DELETE /api/v1/push/subscription`
-- `DELETE /api/v1/suggestions/{}`
-- `GET    /api/oembed`
-- `GET    /api/v1/accounts/{}/endorsements`
-- `GET    /api/v1/accounts/{}/identity_proofs`
-- `GET    /api/v1/annual_reports`
-- `GET    /api/v1/annual_reports/{}`
-- `GET    /api/v1/annual_reports/{}/state`
-- `GET    /api/v1/collections/{}`
-- `GET    /api/v1/instance/privacy_policy`
-- `GET    /api/v1/instance/terms_of_service/{}`
-- `GET    /api/v1/profile`
-- `GET    /api/v1/push/subscription`
-- `GET    /api/v1/streaming/user/notification`
-- `GET    /api/v1/timelines/direct`
-- `GET    /api/v1/{}/collections`
-- `GET    /api/v1/{}/in_collections`
-- `GET    /api/v1_alpha/async_refreshes/{}`
-- `GET    /api/v2/filters/keywords/{}`
-- `GET    /health`
-- `PATCH  /api/v1/collections/{}`
-- `PATCH  /api/v1/profile`
-- `POST   /api/v1/annual_reports/{}/generate`
-- `POST   /api/v1/annual_reports/{}/read`
-- `POST   /api/v1/collections`
-- `POST   /api/v1/collections/{}/items`
-- `POST   /api/v1/collections/{}/items/{}/revoke`
-- `POST   /api/v1/push/subscription`
-- `PUT    /api/v1/push/subscription`
-- `PUT    /api/v2/filters/keywords/{}`
+_none_
 
 ## Required-param mismatches on shared operations
 
-- `GET    /api/v1/timelines/link — missing in mock: ['url']`
-- `GET    /oauth/authorize — missing in mock: ['client_id', 'redirect_uri', 'response_type']`
+_none_
 
 ## Allow-listed mock-only operations (control plane / admin / UI)
 

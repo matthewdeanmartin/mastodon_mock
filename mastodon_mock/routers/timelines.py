@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
-from mastodon_mock.db.models import Account, Relationship, Status, StatusTag, UserList, UserListAccount
+from mastodon_mock.db.models import Account, Relationship, Status, StatusMention, StatusTag, UserList, UserListAccount
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.pagination import paginate
 from mastodon_mock.routers.helpers import PageQuery, set_link_header
@@ -123,7 +123,29 @@ def timeline_list(
     return serialize_status_list(db, list(page.items), config, account)
 
 
+@router.get("/api/v1/timelines/direct")
+def timeline_direct(
+    request: Request,
+    response: Response,
+    db: DbSession,
+    config: Config,
+    account: RequiredAccount,
+    params: PageQuery,
+) -> list[dict[str, Any]]:
+    """Direct-message statuses involving the authed account, newest first."""
+    mentioned_status_ids = select(StatusMention.status_id).where(StatusMention.account_id == account.id)
+    query = select(Status).where(
+        Status.visibility == "direct",
+        or_(Status.account_id == account.id, Status.id.in_(mentioned_status_ids)),
+    )
+    page = paginate(
+        db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
+    )
+    set_link_header(request, response, page)
+    return serialize_status_list(db, list(page.items), config, account)
+
+
 @router.get("/api/v1/timelines/link")
-def timeline_link() -> list[Any]:
+def timeline_link(url: str) -> list[Any]:
     """Empty list: the mock does not synthesize a trending-links timeline."""
     return []

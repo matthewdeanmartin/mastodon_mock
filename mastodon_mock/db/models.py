@@ -494,6 +494,19 @@ class ConversationRead(Base):
     __table_args__ = (UniqueConstraint("account_id", "conversation_id", name="uq_conversation_read"),)
 
 
+class PushSubscription(Base):
+    """A Web Push subscription for an OAuth token (one per token, per Mastodon semantics)."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    token_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("oauth_tokens.id"), unique=True, index=True)
+    endpoint: Mapped[str] = mapped_column(String)
+    server_key: Mapped[str] = mapped_column(String, default="")
+    alerts: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    policy: Mapped[str] = mapped_column(String, default="all")
+
+
 # --- Admin / moderation (see spec/03-api-coverage.md "admin") -----------------
 
 

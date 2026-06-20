@@ -30,10 +30,12 @@ from mastodon_mock.routers import (
     instance,
     lists,
     media,
+    misc,
     notifications,
     oauth,
     polls,
     preferences,
+    push,
     relationships,
     search,
     statuses,
@@ -141,10 +143,12 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
         filters,
         polls,
         preferences,
+        push,
         conversations,
         admin,
         tags,
         streaming,
+        misc,
     ):
         app.include_router(module.router)
 
@@ -171,6 +175,11 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
         return Response(content=header_svg(seed), media_type="image/svg+xml")
 
     ui_available = mount_ui(app)
+
+    @app.get("/health")
+    def health() -> Response:
+        """Liveness probe, matching real Mastodon's bare-text ``/health``."""
+        return Response(content="OK", media_type="text/plain")
 
     @app.get("/")
     def root() -> Response:

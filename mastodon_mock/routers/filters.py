@@ -149,6 +149,27 @@ async def add_filter_keyword_v2(
     return serialize_filter_keyword(kw)
 
 
+@router.get("/api/v2/filters/keywords/{keyword_id}")
+def filter_keyword_v2(keyword_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Fetch a single filter keyword by its own id."""
+    return serialize_filter_keyword(_filter_keyword_or_404(db, keyword_id, account.id))
+
+
+@router.put("/api/v2/filters/keywords/{keyword_id}")
+async def update_filter_keyword_v2(
+    keyword_id: str, request: Request, db: DbSession, account: RequiredAccount
+) -> dict[str, Any]:
+    """Update a filter keyword's text/whole_word flag."""
+    kw = _filter_keyword_or_404(db, keyword_id, account.id)
+    params = await _params(request)
+    if "keyword" in params:
+        kw.keyword = str(params["keyword"])
+    if "whole_word" in params:
+        kw.whole_word = str(params["whole_word"]).lower() in ("true", "1", "on")
+    db.commit()
+    return serialize_filter_keyword(kw)
+
+
 @router.delete("/api/v2/filters/keywords/{keyword_id}", status_code=200)
 def delete_filter_keyword_v2(keyword_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Delete a filter keyword."""
@@ -300,6 +321,18 @@ def _filter_or_404(db: DbSession, filter_id: str, account_id: int) -> Filter:
     if filt is None or filt.account_id != account_id:
         raise HTTPException(status_code=404, detail="Record not found")
     return filt
+
+
+def _filter_keyword_or_404(db: DbSession, keyword_id: str, account_id: int) -> FilterKeyword:
+    """Fetch a filter keyword whose parent filter is owned by the account, or raise 404."""
+    try:
+        kw = db.get(FilterKeyword, int(keyword_id))
+    except (ValueError, TypeError):
+        kw = None
+    if kw is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    _filter_or_404(db, str(kw.filter_id), account_id)
+    return kw
 
 
 def _filter_status_or_404(db: DbSession, filter_status_id: str, account_id: int) -> FilterStatus:

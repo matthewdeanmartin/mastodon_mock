@@ -120,6 +120,16 @@ async def media_update(media_id: str, request: Request, db: DbSession) -> dict[s
     return serialize_media(media)
 
 
+@router.delete("/api/v1/media/{media_id}", status_code=200)
+def media_delete(media_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Delete a media attachment not yet attached to a status."""
+    del account
+    media = _media_or_404(db, media_id)
+    db.delete(media)
+    db.commit()
+    return {}
+
+
 def _media_or_404(db: Session, media_id: str) -> MediaAttachment:
     """Fetch a media attachment or raise 404."""
     try:

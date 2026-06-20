@@ -85,6 +85,13 @@ async def stream_user(request: Request, account: RequiredAccount) -> StreamingRe
     return await _stream(request, bus, user_channel(account.id))
 
 
+@router.get("/api/v1/streaming/user/notification")
+async def stream_user_notification(request: Request, account: RequiredAccount) -> StreamingResponse:
+    """Legacy split stream: notifications only, same channel as ``stream_user``."""
+    bus = _require_streaming(request)
+    return await _stream(request, bus, user_channel(account.id))
+
+
 @router.get("/api/v1/streaming/public")
 async def stream_public(request: Request, viewer: CurrentAccount) -> StreamingResponse:
     """Every public status event."""

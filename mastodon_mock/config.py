@@ -320,6 +320,8 @@ class MastodonMockConfig(BaseModel):
     # Instance terms of service (HTML or plain text). Empty → the ToS endpoint
     # 404s, matching an instance with none configured.
     terms_of_service: str = ""
+    # Instance privacy policy (HTML or plain text). Empty → the endpoint 404s.
+    privacy_policy: str = ""
 
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> MastodonMockConfig:

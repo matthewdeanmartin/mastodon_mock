@@ -122,3 +122,26 @@ def read_conversation(conversation_id: str, db: DbSession, account: RequiredAcco
         db.add(ConversationRead(account_id=account.id, conversation_id=conversation_id))
     db.commit()
     return {"id": conversation_id, "unread": False, "accounts": [], "last_status": None}
+
+
+@router.delete("/api/v1/conversations/{conversation_id}", status_code=200)
+def delete_conversation(conversation_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Delete a conversation (its representative latest status, plus the read marker)."""
+    try:
+        status_id = int(conversation_id)
+    except (ValueError, TypeError):
+        status_id = None
+    if status_id is not None:
+        status = db.get(Status, status_id)
+        if status is not None:
+            db.delete(status)
+    exists = db.scalar(
+        select(ConversationRead).where(
+            ConversationRead.account_id == account.id,
+            ConversationRead.conversation_id == conversation_id,
+        )
+    )
+    if exists is not None:
+        db.delete(exists)
+    db.commit()
+    return {}

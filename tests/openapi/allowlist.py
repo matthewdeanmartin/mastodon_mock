@@ -46,45 +46,11 @@ MOCK_ONLY: dict[tuple[str, str], str] = {
 }
 
 # Real Mastodon operations the mock does not implement yet (coverage backlog).
-TRUTH_ONLY: dict[tuple[str, str], str] = {
-    ("GET", "/api/oembed"): "oEmbed endpoint",
-    ("GET", "/health"): "health check endpoint",
-    ("GET", "/api/v1/profile"): "profile read",
-    ("PATCH", "/api/v1/profile"): "profile update",
-    ("DELETE", "/api/v1/media/{}"): "media deletion",
-    ("DELETE", "/api/v1/conversations/{}"): "conversation deletion",
-    ("DELETE", "/api/v1/suggestions/{}"): "follow-suggestion dismissal",
-    ("GET", "/api/v1/accounts/{}/endorsements"): "account endorsements list",
-    ("GET", "/api/v1/accounts/{}/identity_proofs"): "deprecated identity proofs",
-    ("GET", "/api/v1/timelines/direct"): "deprecated direct timeline",
-    ("GET", "/api/v1/streaming/user/notification"): "notification-only streaming channel",
-    ("GET", "/api/v1/instance/privacy_policy"): "instance privacy policy",
-    ("GET", "/api/v1/instance/terms_of_service/{}"): "instance terms of service (dated)",
-    ("GET", "/api/v1_alpha/async_refreshes/{}"): "alpha async-refresh polling",
-    ("GET", "/api/v2/filters/keywords/{}"): "v2 filter keyword read",
-    ("PUT", "/api/v2/filters/keywords/{}"): "v2 filter keyword update",
-    # Web Push subscriptions (whole surface).
-    ("GET", "/api/v1/push/subscription"): "web push subscription read",
-    ("POST", "/api/v1/push/subscription"): "web push subscription create",
-    ("PUT", "/api/v1/push/subscription"): "web push subscription update",
-    ("DELETE", "/api/v1/push/subscription"): "web push subscription delete",
-    # Annual reports ("#Wrapstodon").
-    ("GET", "/api/v1/annual_reports"): "annual reports index",
-    ("GET", "/api/v1/annual_reports/{}"): "annual report read",
-    ("GET", "/api/v1/annual_reports/{}/state"): "annual report state",
-    ("POST", "/api/v1/annual_reports/{}/generate"): "annual report generate",
-    ("POST", "/api/v1/annual_reports/{}/read"): "annual report mark read",
-    # Collections (whole surface).
-    ("GET", "/api/v1/collections/{}"): "collection read",
-    ("POST", "/api/v1/collections"): "collection create",
-    ("PATCH", "/api/v1/collections/{}"): "collection update",
-    ("DELETE", "/api/v1/collections/{}"): "collection delete",
-    ("POST", "/api/v1/collections/{}/items"): "collection add item",
-    ("DELETE", "/api/v1/collections/{}/items/{}"): "collection remove item",
-    ("POST", "/api/v1/collections/{}/items/{}/revoke"): "collection revoke item",
-    ("GET", "/api/v1/{}/collections"): "account collections",
-    ("GET", "/api/v1/{}/in_collections"): "account in-collections",
-}
+# Empty: the full truth-only backlog from spec/openapi_compare_report.md has been
+# implemented (push subscriptions, profile, filters keywords v2, collections,
+# annual reports, async refreshes, oembed, identity_proofs, etc. — see
+# spec/03-api-coverage.md for what each became (Full/Static/Stub)).
+TRUTH_ONLY: dict[tuple[str, str], str] = {}
 
 # Coverage ratchet: the unimplemented backlog can only shrink. Lower this when you
 # implement an endpoint and remove its TRUTH_ONLY entry.
@@ -92,13 +58,4 @@ MAX_TRUTH_ONLY = len(TRUTH_ONLY)
 
 # Shared operations whose *required* query params legitimately differ from upstream.
 # Value is a short reason. These are reviewed exceptions to the param-conformance check.
-PARAM_MISMATCH_ALLOW: dict[tuple[str, str], str] = {
-    ("GET", "/api/v1/timelines/link"): (
-        "mock returns an empty trending-links timeline and does not require the upstream "
-        "'url' query param"
-    ),
-    ("GET", "/oauth/authorize"): (
-        "mock's authorize endpoint is lenient about client_id/redirect_uri/response_type "
-        "to ease test-client flows"
-    ),
-}
+PARAM_MISMATCH_ALLOW: dict[tuple[str, str], str] = {}

@@ -141,7 +141,15 @@ async def oauth_token(request: Request, db: DbSession) -> dict[str, Any]:
 
 
 @router.get("/oauth/authorize")
-def oauth_authorize_picker(request: Request, db: DbSession) -> Response:
+def oauth_authorize_picker(
+    request: Request,
+    db: DbSession,
+    client_id: str,
+    redirect_uri: str,
+    response_type: str,
+    scope: str = "read",
+    state: str = "",
+) -> Response:
     """Render a bare-bones account picker for the authorization-code flow.
 
     Real clients with a browser-redirect login (Whalebird, Fedistar) hit this with
@@ -149,10 +157,7 @@ def oauth_authorize_picker(request: Request, db: DbSession) -> Response:
     of guessing an account, this renders a tiny HTML page listing local accounts;
     picking one POSTs back here and issues the redirect with a code.
     """
-    redirect_uri = request.query_params.get("redirect_uri", "urn:ietf:wg:oauth:2.0:oob")
-    client_id = request.query_params.get("client_id", "")
-    scope = request.query_params.get("scope", "read")
-    state = request.query_params.get("state", "")
+    del response_type
     accounts = db.query(Account).filter(Account.domain.is_(None)).order_by(Account.id).all()
 
     options = "\n".join(

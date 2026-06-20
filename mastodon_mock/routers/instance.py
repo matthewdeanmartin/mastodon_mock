@@ -209,6 +209,27 @@ def instance_terms_of_service(config: Config) -> dict[str, Any]:
     return serialize_terms_of_service(config)
 
 
+@router.get("/api/v1/instance/terms_of_service/{date}")
+def instance_terms_of_service_revision(date: str, config: Config) -> dict[str, Any]:
+    """Return a historical revision of the terms of service.
+
+    The mock keeps no revision history, so any ``date`` resolves to the single
+    currently-configured ``TermsOfService`` (404 if none is set).
+    """
+    del date
+    if not config.terms_of_service:
+        raise HTTPException(status_code=404, detail="Not found")
+    return serialize_terms_of_service(config)
+
+
+@router.get("/api/v1/instance/privacy_policy")
+def instance_privacy_policy(config: Config) -> dict[str, Any]:
+    """Return the configured privacy policy, or 404 if none is set."""
+    if not config.privacy_policy:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"updated_at": None, "content": config.privacy_policy}
+
+
 @router.get("/api/v1/directory")
 def instance_directory(
     db: DbSession,
@@ -398,6 +419,13 @@ def suggestions_v2(
 ) -> list[dict[str, Any]]:
     """Follow suggestions (v2): each account wrapped in a ``Suggestion``."""
     return [serialize_suggestion(acc) for acc in _suggestion_accounts(db, config, account, limit)]
+
+
+@router.delete("/api/v1/suggestions/{account_id}", status_code=200)
+def suggestion_delete(account_id: str, account: RequiredAccount) -> dict[str, Any]:
+    """Dismiss a follow suggestion. Suggestions are derived, not stored, so this is a no-op accept."""
+    del account_id, account
+    return {}
 
 
 def trending_tag_rows(db: DbSession, config: Config, limit: int, offset: int = 0) -> list[dict[str, Any]]:

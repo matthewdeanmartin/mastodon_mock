@@ -319,6 +319,25 @@ def account_featured_tags(account_id: str, db: DbSession, config: Config) -> lis
     return featured_tags_for(db, config, target)
 
 
+@router.get("/api/v1/accounts/{account_id}/endorsements")
+def account_endorsements(account_id: str, db: DbSession, config: Config) -> list[dict[str, Any]]:
+    """Accounts that the given account is currently featuring on their profile."""
+    target = _get_account_or_404(db, account_id)
+    accounts = db.scalars(
+        select(Account)
+        .join(Relationship, Relationship.target_account_id == Account.id)
+        .where(Relationship.source_account_id == target.id, Relationship.endorsed.is_(True))
+    ).all()
+    return [serialize_account(db, a, config) for a in accounts]
+
+
+@router.get("/api/v1/accounts/{account_id}/identity_proofs")
+def account_identity_proofs(account_id: str, db: DbSession) -> list[Any]:
+    """Deprecated since Mastodon 3.5.0; always returns an empty array."""
+    _get_account_or_404(db, account_id)
+    return []
+
+
 # --- Writes ---
 
 
@@ -493,6 +512,23 @@ async def update_credentials(
 
         db.commit()
         return serialize_account(db, account, config, with_source=True)
+
+
+@router.get("/api/v1/profile")
+def get_profile(db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
+    """Fetch the authed account's own profile (same shape as ``update_credentials``)."""
+    return serialize_account(db, account, config, with_source=True)
+
+
+@router.patch("/api/v1/profile")
+async def patch_profile(
+    request: Request,
+    db: DbSession,
+    config: Config,
+    account: RequiredAccount,
+) -> dict[str, Any]:
+    """Update the authed account's profile. Newer alias of ``update_credentials``."""
+    return await update_credentials(request, db, config, account)
 
 
 @router.delete("/api/v1/profile/avatar")
