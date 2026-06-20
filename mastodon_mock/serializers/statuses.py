@@ -128,7 +128,21 @@ def serialize_status_list(
     """
     from mastodon_mock.serializers.batch import build_status_context
 
-    ctx = build_status_context(session, statuses, viewer)
+    # Reblog/quote targets are serialized inline (depth 1) by serialize_status; pull
+    # their authors into the same context so those nested rows read aggregates from the
+    # batch and share the per-page account memo instead of falling back to per-row
+    # queries. The nested statuses' own engagement counts are still single-row (rare
+    # relative to the page body), but their authors are the expensive part.
+    nested_ids = {
+        nid
+        for s in statuses
+        for nid in (s.reblog_of_id, s.quoted_status_id)
+        if nid is not None
+    }
+    nested = (
+        list(session.scalars(select(Status).where(Status.id.in_(nested_ids))).all()) if nested_ids else []
+    )
+    ctx = build_status_context(session, statuses + nested, viewer)
     return [serialize_status(session, s, config, viewer, ctx=ctx) for s in statuses]
 
 
@@ -145,21 +159,20 @@ def serialize_status(
 
     When ``ctx`` is supplied (built by :func:`serialize_status_list`), all per-status
     counts/flags/mentions/tags/media and the author's account aggregates come from
-    precomputed batch data instead of per-row queries (F1). Nested reblog/quote rows
-    aren't in the page's ``ctx`` and fall back to single-row querying, which is fine —
-    they're rare relative to the page body.
+    precomputed batch data instead of per-row queries (F1). ``serialize_status_list``
+    folds each page row's reblog/quote *target* into the same ``ctx``, so those nested
+    rows read from the batch too rather than re-querying per row (F2).
     """
     account = status.account or session.get(Account, status.account_id)
     if account is None:
         raise RuntimeError(f"Account {status.account_id} not found for status {status.id}")
     acct = account_acct(account.username, account.domain)
-    # ctx describes only this page; nested reblog/quote rows query for themselves.
 
     reblog_data = None
     if status.reblog_of_id is not None and _depth == 0:
         original = session.get(Status, status.reblog_of_id)
         if original is not None:
-            reblog_data = serialize_status(session, original, config, viewer, _depth=_depth + 1)
+            reblog_data = serialize_status(session, original, config, viewer, _depth=_depth + 1, ctx=ctx)
 
     if ctx is not None:
         media = ctx.media.get(status.id, [])
@@ -189,7 +202,7 @@ def serialize_status(
             quote_data = {
                 "state": status.quote_state,
                 "quoted_status": (
-                    None if revoked else serialize_status(session, quoted, config, viewer, _depth=_depth + 1)
+                    None if revoked else serialize_status(session, quoted, config, viewer, _depth=_depth + 1, ctx=ctx)
                 ),
             }
 

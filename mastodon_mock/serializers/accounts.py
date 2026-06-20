@@ -74,8 +74,17 @@ def serialize_account(
     """Serialize an account. Set ``with_source`` for ``verify_credentials``.
 
     When ``ctx`` is supplied and covers this account, the follower/following/status
-    counts come from precomputed batch aggregates instead of per-row queries (F1).
+    counts come from precomputed batch aggregates instead of per-row queries (F1),
+    and the finished dict is memoized per page so a recurring author (e.g. every row
+    of an ``account_statuses`` page) is serialized only once.
     """
+    # The cached dict is the base Account shape; the ``with_source`` variant adds
+    # fields and an extra query and is never serialized in a list, so skip the memo.
+    if ctx is not None and not with_source:
+        cached = ctx.account_json.get(account.id)
+        if cached is not None:
+            return cached
+
     acct = account_acct(account.username, account.domain)
     url = profile_url(config.domain, acct)
     avatar = account.avatar_url or placeholder_avatar(config.domain, acct)
@@ -145,6 +154,11 @@ def serialize_account(
             "hide_collections": account.hide_collections,
         }
         data["role"] = _credential_role(account.role)
+        # with_source variant is request-specific; never memoized.
+        return data
+
+    if ctx is not None:
+        ctx.account_json[account.id] = data
 
     return data
 

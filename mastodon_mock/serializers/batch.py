@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -61,6 +62,12 @@ class BatchContext:
     # Flags so the serializers know whether a given account's aggregates were
     # precomputed (vs. an account not in this page, which must fall back to querying).
     accounts_loaded: set[int] = field(default_factory=set)
+
+    # Memo of already-serialized account dicts, keyed by account id. An account's
+    # serialized JSON is a pure function of (account row, config, ctx) — all stable
+    # within one page — so authors that recur across a page (every row of an
+    # account_statuses page; repeated authors in a home timeline) are serialized once.
+    account_json: dict[int, dict[str, Any]] = field(default_factory=dict)
 
 
 def build_status_context(
