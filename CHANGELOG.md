@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Hardened pagination/limit handling against malformed query params (found by the new OpenAPI fuzzing): a non-numeric `max_id`/`min_id`/`since_id` no longer raises `ValueError` → HTTP 500 (the cursor is ignored, matching Mastodon), and an out-of-range `limit`/`offset` no longer overflows SQLite's 64-bit INTEGER → HTTP 500 (it's clamped). Affects timelines, search, trends, suggestions, conversations, account search, and the directory. New shared helpers `clamp_limit` / `clamp_offset` / `coerce_cursor` in `pagination.py`.
 - Fixed layout of UI.
+- Small perf improvements.
 
 ## [0.4.0] - 2026-06-19
 ### Fixed
