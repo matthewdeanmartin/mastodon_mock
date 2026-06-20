@@ -128,11 +128,10 @@ def serialize_status_list(
     """
     from mastodon_mock.serializers.batch import build_status_context
 
-    # Reblog/quote targets are serialized inline (depth 1) by serialize_status; pull
-    # their authors into the same context so those nested rows read aggregates from the
-    # batch and share the per-page account memo instead of falling back to per-row
-    # queries. The nested statuses' own engagement counts are still single-row (rare
-    # relative to the page body), but their authors are the expensive part.
+    # Reblog/quote targets are serialized inline (depth 1) by serialize_status. Fold them
+    # into the same context (so their own engagement counts/flags/mentions/tags/media and
+    # their authors' aggregates are all batched) and pass ``ctx`` down to the nested calls,
+    # instead of letting each nested row fall back to the per-row query path (F2).
     nested_ids = {
         nid
         for s in statuses

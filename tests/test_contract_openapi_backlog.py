@@ -38,7 +38,7 @@ def test_push_subscription_round_trip(alice: Mastodon) -> None:
 
 
 def test_filter_keyword_v2_get_and_put(alice: Mastodon) -> None:
-    filt = alice.create_filter("test filter", ["home"])
+    filt = alice.create_filter_v2(title="test filter", context=["home"], filter_action="warn")
     kw = alice.add_filter_keyword_v2(filt, "spoiler", whole_word=True)
 
     fetched = requests.get(

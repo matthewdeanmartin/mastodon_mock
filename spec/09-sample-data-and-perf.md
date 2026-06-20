@@ -321,3 +321,31 @@ make gen-data-medium # mastodon_mock gen-data --preset medium --database ./perf.
 - **Guard:** baseline ceilings in `tests/perf/baselines.json` tightened to
   `timeline_home_p95_ms = 150`, `account_statuses_p95_ms = 120` (down from 600), so a
   regression back toward the N+1 now fails `tests/perf/test_perf_read_latency.py`.
+
+### F2 — nested reblog/quote serializer N+1 + per-page account memo (resolved)
+
+- **Symptom:** F1 batched the *page body* but each row's reblog/quote **target** still
+  went through the single-row query path. A 20-item `timeline_home` page made entirely of
+  reblogs (real home timelines are reblog-heavy) issued ~320 queries — the N+1 was simply
+  pushed down one level. The existing perf read-latency benchmark never caught this
+  because `db/sample_data.py` generates **no reblogs**, so the medium cohort's home
+  timeline has none.
+- **Root cause:** `serialize_status` recursed into the reblog/quote target with
+  `ctx=None`, so the nested status re-queried its own counts/flags/mentions/tags/media and
+  its author's follower/following/status aggregates (~16 queries × 20 rows). Separately,
+  `serialize_account` rebuilt an identical dict for every occurrence of a recurring author
+  (all 20 rows of an `account_statuses` page share one author).
+- **Fix:** `serialize_status_list` now collects each page row's `reblog_of_id`/
+  `quoted_status_id` targets, fetches them in one `IN (...)` query, and folds them into the
+  **same** `build_status_context` call (so their own status-level aggregates *and* their
+  authors' account aggregates are batched). The nested `serialize_status` calls now receive
+  that `ctx`. `BatchContext` also gained an `account_json` memo: `serialize_account` caches
+  its finished dict per `account.id` (base shape only; the `with_source` variant is
+  request-specific and never listed), so a recurring author is serialized once per page.
+- **Result:** a 20-reblog page went from **320 → 16 queries** (~20×), byte-identical
+  output (every nested reblog payload still present). The account memo is CPU/allocation
+  only — F1 already eliminated its queries — but removes 19 redundant dict builds on a
+  single-author `account_statuses` page.
+- **Guard (recommended, not yet wired):** the perf suite can't see this until the sample
+  generator emits reblogs. Suggest adding a `reblog_ratio` to `SampleDataConfig` and a
+  `timeline_home`-with-reblogs latency assertion so F2 can't silently regress.
