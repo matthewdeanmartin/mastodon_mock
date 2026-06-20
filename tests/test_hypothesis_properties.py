@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import string
 
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
 from mastodon_mock.content_format import render_status_html
