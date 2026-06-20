@@ -12,13 +12,14 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from mastodon_mock.config import MastodonMockConfig
 from mastodon_mock.db.base import Base, init_engine, make_session_factory
 from mastodon_mock.db.seed import apply_seed_data
 from mastodon_mock.faults import FaultStore, add_fault_middleware
+from mastodon_mock.identicon import avatar_svg, header_svg
 from mastodon_mock.middleware import add_middleware
 from mastodon_mock.routers import (
     accounts,
@@ -152,51 +153,44 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     @app.get("/avatars/original/missing.png")
     @app.get("/headers/original/missing.png")
     def missing_placeholder() -> Response:
-        """Serve the 1x1 placeholder image referenced by accounts with no avatar/header.
+        """Serve the 1x1 placeholder image, kept for any URL built before this account existed.
 
-        Real Mastodon ships actual stock images at these paths; serializers
-        (serializers/common.py) build URLs pointing here regardless, so without this
-        route every account without a custom avatar/header 404s on image load.
+        Real Mastodon ships actual stock images at these paths; older serializer output or
+        cached clients may still reference this path, so it stays available as a fallback.
         """
         return Response(content=_MISSING_IMAGE_PNG, media_type="image/png")
+
+    @app.get("/avatars/generated/{seed}.svg")
+    def generated_avatar(seed: str) -> Response:
+        """Serve a deterministic per-account SVG identicon (see serializers/common.py)."""
+        return Response(content=avatar_svg(seed), media_type="image/svg+xml")
+
+    @app.get("/headers/generated/{seed}.svg")
+    def generated_header(seed: str) -> Response:
+        """Serve a deterministic per-account SVG header banner (see serializers/common.py)."""
+        return Response(content=header_svg(seed), media_type="image/svg+xml")
 
     ui_available = mount_ui(app)
 
     @app.get("/")
-    def root(request: Request) -> Response:
-        """Root: serve the admin UI to browsers, the identity doc to API clients.
+    def root() -> Response:
+        """Root: serve HTML, same as real Mastodon instances (e.g. mastodon.social).
 
-        Real Mastodon serves its web UI at ``/``; API clients hit ``/api/...`` and
-        never depend on what ``/`` returns. So we content-negotiate: a browser
-        (``Accept: text/html``) is redirected into the SPA at ``/_ui/`` — whose
-        own ``index.html`` carries the correct ``<base href>`` — while anything
-        else (curl, bots, ``Accept: application/json`` or ``*/*``) gets the JSON
-        identity doc as before. A browser hard-refresh on ``/`` therefore lands
-        back in the app instead of a wall of JSON.
+        The JSON identity blob previously served here isn't part of the real
+        Mastodon API contract — API clients hit ``/api/...`` and never depend on
+        what ``/`` returns. So ``/`` always behaves like a browser landing page:
+        redirect into the SPA at ``/_ui/`` when it's built, otherwise serve a
+        minimal HTML stub.
         """
-        accept = request.headers.get("accept", "")
-        if ui_available and _prefers_html(accept):
-            return RedirectResponse(url="/_ui/")
-        body: dict[str, object] = {"mastodon_mock": True, "version": config.mocked_version}
         if ui_available:
-            body["ui"] = "/_ui/"
-        return JSONResponse(body)
+            return RedirectResponse(url="/_ui/")
+        return Response(content=_NO_UI_HTML, media_type="text/html")
 
     return app
 
 
-def _prefers_html(accept: str) -> bool:
-    """Whether an ``Accept`` header prefers HTML over JSON.
-
-    Browsers send ``text/html,application/xhtml+xml,...`` with ``text/html``
-    ahead of (or without) any JSON type; API clients send ``application/json``
-    or an unset/``*/*`` accept. We treat HTML as preferred only when ``text/html``
-    appears and is not out-ranked by an explicit ``application/json``.
-    """
-    lowered = accept.lower()
-    if "text/html" not in lowered:
-        return False
-    # If the client explicitly asks for JSON before HTML, honour that.
-    html_pos = lowered.index("text/html")
-    json_pos = lowered.find("application/json")
-    return json_pos == -1 or html_pos < json_pos
+_NO_UI_HTML = (
+    "<!doctype html><html><head><title>mastodon_mock</title></head>"
+    "<body><h1>mastodon_mock</h1><p>Admin UI not built. Run <code>make ui</code>.</p>"
+    "</body></html>"
+)

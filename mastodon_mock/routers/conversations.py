@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 
 from mastodon_mock.db.models import Account, ConversationRead, Status, StatusMention
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
-from mastodon_mock.pagination import DEFAULT_LIMIT, MAX_LIMIT, Page, link_header
+from mastodon_mock.pagination import Page, clamp_limit, coerce_cursor, link_header
 from mastodon_mock.routers.helpers import PageQuery
 from mastodon_mock.serializers.misc import serialize_conversation
 from mastodon_mock.serializers.statuses import serialize_status
@@ -64,9 +64,9 @@ def conversations(
     # Conversations newest-first by their representative (latest) status id.
     conversation_items = sorted(grouped.items(), key=lambda kv: kv[1].id, reverse=True)
 
-    max_id = int(params.max_id) if params.max_id is not None else None
-    min_id = int(params.min_id) if params.min_id is not None else None
-    since_id = int(params.since_id) if params.since_id is not None else None
+    max_id = coerce_cursor(params.max_id)
+    min_id = coerce_cursor(params.min_id)
+    since_id = coerce_cursor(params.since_id)
     if max_id is not None:
         conversation_items = [(k, s) for k, s in conversation_items if s.id < max_id]
     if since_id is not None:
@@ -76,7 +76,7 @@ def conversations(
         conversation_items = [(k, s) for k, s in conversation_items if s.id > min_id]
         conversation_items.reverse()  # oldest-first while slicing, restored below
 
-    limit = DEFAULT_LIMIT if params.limit is None else max(1, min(int(params.limit), MAX_LIMIT))
+    limit = clamp_limit(params.limit)
     has_more = len(conversation_items) > limit
     page_items = conversation_items[:limit]
     if using_min_id:

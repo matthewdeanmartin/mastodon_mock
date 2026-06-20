@@ -19,6 +19,65 @@ DEFAULT_LIMIT = 20
 MAX_LIMIT = 40
 
 
+# SQLite stores INTEGERs as signed 64-bit; comparing a column against a Python int
+# outside this range raises OverflowError at execute time. IDs never reach these bounds,
+# so clamping an out-of-range cursor to the bound is equivalent to (and safer than) the
+# unclamped comparison.
+_SQLITE_INT_MIN = -(2**63)
+_SQLITE_INT_MAX = 2**63 - 1
+
+
+def clamp_limit(value: int | str | None, *, default: int = DEFAULT_LIMIT, maximum: int = MAX_LIMIT) -> int:
+    """Clamp a client-supplied ``limit`` to ``[1, maximum]``, falling back to ``default``
+    for missing/garbage values.
+
+    Used by endpoints that pass ``limit`` straight to ``.limit(...)``: an unbounded value
+    (e.g. a fuzzed ``limit=10**40``) otherwise overflows SQLite's 64-bit INTEGER and 500s.
+    """
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(parsed, maximum))
+
+
+def clamp_offset(value: int | str | None) -> int:
+    """Clamp a client-supplied ``offset`` to ``[0, 2**63-1]`` (SQLite's INTEGER ceiling).
+
+    Like ``clamp_limit``, this stops a fuzzed/huge ``offset`` from overflowing SQLite when
+    passed to ``.offset(...)``. A negative offset is treated as 0.
+    """
+    if value is None:
+        return 0
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(parsed, _SQLITE_INT_MAX))
+
+
+def coerce_cursor(value: str | int | None) -> int | None:
+    """Parse a cursor query param to an int, ignoring non-numeric junk and clamping to
+    SQLite's 64-bit integer range.
+
+    Mastodon ignores an unparsable ``max_id``/``min_id``/``since_id`` rather than
+    erroring, so a client (or a fuzzer) sending garbage gets an unfiltered page, not a
+    500. ``int(...)`` directly on the raw query string would raise ``ValueError`` on junk
+    and the subsequent comparison would raise ``OverflowError`` on a huge-but-valid int.
+
+    Public so endpoints that page in-memory (e.g. conversations) can share the guard.
+    """
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return max(_SQLITE_INT_MIN, min(parsed, _SQLITE_INT_MAX))
+
+
 @dataclass
 class Page:
     """Result of a paginated query: the rows plus first/last ids for the Link header."""
@@ -47,16 +106,23 @@ def paginate(
     keep them adjacent), matching Mastodon semantics; ``since_id`` selects rows
     above the cursor but keeps the newest-first ordering.
     """
-    eff_limit = default_limit if limit is None else max(1, min(int(limit), MAX_LIMIT))
+    try:
+        eff_limit = default_limit if limit is None else max(1, min(int(limit), MAX_LIMIT))
+    except (TypeError, ValueError):
+        eff_limit = default_limit
 
-    if max_id is not None:
-        query = query.where(id_column < int(max_id))
-    if since_id is not None:
-        query = query.where(id_column > int(since_id))
+    max_id_i = coerce_cursor(max_id)
+    since_id_i = coerce_cursor(since_id)
+    min_id_i = coerce_cursor(min_id)
 
-    using_min_id = min_id is not None
-    if min_id is not None:
-        query = query.where(id_column > int(min_id))
+    if max_id_i is not None:
+        query = query.where(id_column < max_id_i)
+    if since_id_i is not None:
+        query = query.where(id_column > since_id_i)
+
+    using_min_id = min_id_i is not None
+    if min_id_i is not None:
+        query = query.where(id_column > min_id_i)
         query = query.order_by(asc(id_column))
     else:
         query = query.order_by(desc(id_column))

@@ -35,14 +35,14 @@ def status_url(config_domain: str, acct: str, status_id: int) -> str:
     return f"https://{config_domain}/@{acct}/{status_id}"
 
 
-def placeholder_avatar(config_domain: str) -> str:
-    """Return a placeholder avatar URL."""
-    return f"https://{config_domain}/avatars/original/missing.png"
+def placeholder_avatar(config_domain: str, seed: str) -> str:
+    """Return a deterministic per-account identicon avatar URL, keyed by ``seed`` (the acct)."""
+    return f"https://{config_domain}/avatars/generated/{seed}.svg"
 
 
-def placeholder_header(config_domain: str) -> str:
-    """Return a placeholder header URL."""
-    return f"https://{config_domain}/headers/original/missing.png"
+def placeholder_header(config_domain: str, seed: str) -> str:
+    """Return a deterministic per-account identicon header URL, keyed by ``seed`` (the acct)."""
+    return f"https://{config_domain}/headers/generated/{seed}.svg"
 
 
 def drop_nulls(data: dict[str, Any]) -> dict[str, Any]:

@@ -33,6 +33,7 @@ MOCK_DOMAIN := mock.local
 	gha-validate gha-pin gha-upgrade publish-gha \
 	prerelease publish-check publish \
 	ui ui-dev \
+	compare-openapi openapi-fuzz \
 	check check-ci \
 	help
 
@@ -371,6 +372,18 @@ ui:
 
 ui-dev:
 	@cd ui && npm start
+
+compare-openapi:
+	@echo "Comparing mock OpenAPI against upstream Mastodon schema -> spec/openapi_compare_report.md"
+	@$(UV) run mastodon_mock compare-openapi --format markdown --out spec/openapi_compare_report.md
+	@$(UV) run mastodon_mock compare-openapi --format text
+
+# OpenAPI contract fuzzing (Phase 3). Needs the `contract` extra; opt-in.
+#   make openapi-fuzz             -> "mock never 500s" on the shared GET surface
+#   CONTRACT_STRICT=1 make openapi-fuzz  -> full schema conformance (finds shape gaps)
+openapi-fuzz:
+	@$(UV) sync --extra contract
+	@$(UV) run pytest -m contract tests/test_openapi_fuzz.py
 
 publish-check:
 	@$(UV) build

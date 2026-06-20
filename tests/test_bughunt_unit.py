@@ -198,6 +198,41 @@ def test_paginate_basic(db_session: Session) -> None:
     assert page2.items[-1].text == "Status 0"
 
 
+def test_paginate_ignores_garbage_cursors(db_session: Session) -> None:
+    """Non-numeric max_id/min_id/since_id/limit must be ignored, not 500.
+
+    Regression for the crash surfaced by OpenAPI fuzzing: ``int(since_id)`` on a
+    fuzzed/garbage query string raised ValueError. Real Mastodon ignores unparsable
+    cursors and returns an unfiltered page. See tests/test_openapi_fuzz.py.
+    """
+    alice = Account(username="alice")
+    db_session.add(alice)
+    db_session.commit()
+    for i in range(5):
+        db_session.add(Status(account_id=alice.id, content=f"S{i}", text=f"S{i}"))
+    db_session.commit()
+
+    query = select(Status).where(Status.account_id == alice.id)
+
+    # Garbage in every cursor + a non-numeric limit -> default, unfiltered page.
+    page = paginate(
+        db_session,
+        query,
+        Status.id,
+        max_id="\x00garbage",
+        min_id="not-an-int",
+        since_id="💥",
+        limit="nope",  # type: ignore[arg-type]
+    )
+    assert len(page.items) == 5
+    assert page.limit == 20  # fell back to the default
+
+    # A huge-but-valid int would overflow SQLite's 64-bit INTEGER on comparison; it must
+    # be clamped, not raised. max_id far above any real id -> all rows still returned.
+    page = paginate(db_session, query, Status.id, max_id="9" * 40)
+    assert len(page.items) == 5
+
+
 def test_paginate_min_id(db_session: Session) -> None:
     alice = Account(username="alice")
     db_session.add(alice)

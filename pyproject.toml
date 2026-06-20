@@ -41,6 +41,14 @@ test = [
     "httpx2>=2.4.0",
 ]
 
+# OpenAPI contract fuzzing (Phase 3 of spec/openapi_support.md). Heavy and opt-in:
+# kept out of the `test` extra so the normal suite stays fast, and the contract
+# tests are marked `contract` (deselected by default). Run with:
+#   uv sync --extra contract && uv run pytest -m contract
+contract = [
+    "schemathesis>=4.0.0",
+]
+
 [project.entry-points.pytest11]
 mastodon_mock = "mastodon_mock.testing.plugin"
 
@@ -142,13 +150,14 @@ default-groups = ["dev"]
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
-addopts = "-q --timeout=60 -m 'not integration and not slow'"
+addopts = "-q --timeout=60 -m 'not integration and not slow and not contract'"
 norecursedirs = ["vendor", "scripts", "dist", "build"]
 markers = [
     "slow: performance benchmarks (run with -m slow)",
     "integration: integration tests (run with -m integration)",
     "mock_only: tests that exercise mastodon_mock-specific behavior and must not run against a real server",
     "real_server: dual-backend tests that also run against a live Mastodon when RUN_REAL_MASTODON_TESTS=1",
+    "contract: OpenAPI contract fuzzing via schemathesis (needs the `contract` extra; run with -m contract)",
 ]
 junit_family = "xunit1"
 

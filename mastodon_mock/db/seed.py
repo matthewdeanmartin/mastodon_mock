@@ -6,6 +6,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from mastodon_mock.config import SeedAccount, SeedAnnouncement, SeedConfig, SeedStatus
+from mastodon_mock.content_format import render_status_html
 from mastodon_mock.db.models import Account, Announcement, OAuthToken, Status, utcnow
 from mastodon_mock.services import attach_mentions_and_tags, do_follow
 
@@ -100,7 +101,7 @@ def _ensure_status(
     quoted = ref_to_status.get(spec.quotes) if spec.quotes is not None else None
     status = Status(
         account_id=account.id,
-        content=f"<p>{spec.text}</p>",
+        content=render_status_html(spec.text),
         text=spec.text,
         visibility=spec.visibility,
         created_at=utcnow(),

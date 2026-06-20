@@ -9,6 +9,7 @@ from sqlalchemy import or_, select
 
 from mastodon_mock.db.models import Account, Status, StatusTag
 from mastodon_mock.deps import Config, CurrentAccount, DbSession
+from mastodon_mock.pagination import clamp_limit
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.statuses import serialize_status_list
 
@@ -19,6 +20,9 @@ def _do_search(
     db: DbSession, config: Config, viewer: Account | None, q: str, limit: int
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Run a local search and return (accounts, statuses, hashtags)."""
+    # Clamp the client-supplied limit: Mastodon caps search results, and an unbounded
+    # value would overflow SQLite's INTEGER when passed to .limit(). See pagination.
+    limit = clamp_limit(limit)
     term = q.strip()
     like = f"%{term.lstrip('@#')}%"
 

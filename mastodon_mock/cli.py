@@ -92,6 +92,28 @@ def main(argv: list[str] | None = None) -> None:
     gen.add_argument("--yes", action="store_true", help="Skip the confirmation prompt for large shapes")
     gen.add_argument("--json", action="store_true", help="Emit the generation report as JSON")
 
+    cmp = sub.add_parser(
+        "compare-openapi",
+        help="Diff the mock's OpenAPI contract against the upstream Mastodon schema",
+    )
+    cmp.add_argument(
+        "--truth",
+        default="mastodon-openapi/dist/schema.json",
+        help="Path to the ground-truth Mastodon OpenAPI schema",
+    )
+    cmp.add_argument(
+        "--mock",
+        default=None,
+        help="Path to a mock OpenAPI schema (default: generate from the live app in-process)",
+    )
+    cmp.add_argument("--format", choices=["text", "json", "markdown"], default="text")
+    cmp.add_argument("--out", default=None, help="Write the report to this path instead of stdout")
+    cmp.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero when unexpected drift is found (mock-only/truth-only/param mismatch)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "serve":
@@ -100,6 +122,8 @@ def main(argv: list[str] | None = None) -> None:
         _db(args)
     elif args.command == "gen-data":
         _gen_data(args)
+    elif args.command == "compare-openapi":
+        _compare_openapi(args)
     else:
         parser.print_help()
 
@@ -196,6 +220,31 @@ def _build_sample_config(args: argparse.Namespace, default: SampleDataConfig) ->
     data = base.model_dump()
     data.update({k: v for k, v in overrides.items() if v is not None})
     return SampleDataConfig.model_validate(data)
+
+
+def _compare_openapi(args: argparse.Namespace) -> None:
+    """Diff the mock's OpenAPI contract against the upstream Mastodon schema."""
+    from mastodon_mock import openapi_compare as oc
+
+    truth = oc.load_spec(args.truth)
+    # When --mock isn't given, generate from the live app so the report reflects
+    # exactly what's served rather than a possibly-stale on-disk snapshot.
+    mock = oc.load_spec(args.mock) if args.mock is not None else create_app().openapi()
+
+    report = oc.compare_specs(truth, mock)
+    renderer = {"text": oc.render_text, "json": oc.render_json, "markdown": oc.render_markdown}[args.format]
+    output = renderer(report)
+
+    if args.out:
+        from pathlib import Path
+
+        Path(args.out).write_text(output, encoding="utf-8")
+        print(f"Wrote {args.format} report to {args.out}")
+    else:
+        print(output, end="")
+
+    if args.strict and report.has_unexpected_drift:
+        sys.exit(1)
 
 
 def _db(args: argparse.Namespace) -> None:

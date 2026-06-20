@@ -21,6 +21,7 @@ from mastodon_mock.db.models import (
     utcnow,
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
+from mastodon_mock.pagination import clamp_limit, clamp_offset
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.announcements import (
     serialize_announcement,
@@ -240,7 +241,7 @@ def instance_directory(
         activity = func.coalesce(last_status_at, Account.created_at)
         query = query.order_by(activity.desc(), Account.id.desc())
 
-    query = query.offset(offset).limit(min(limit, 80))
+    query = query.offset(clamp_offset(offset)).limit(clamp_limit(limit, maximum=80))
     return [serialize_account(db, acc, config) for acc in query.all()]
 
 
@@ -373,7 +374,7 @@ def _suggestion_accounts(db: DbSession, config: Config, account: Account | None,
             Relationship.source_account_id == account.id, Relationship.following.is_(True)
         )
         stmt = stmt.where(Account.id.not_in(following))
-    accounts = db.scalars(stmt.order_by(Account.id.desc()).limit(min(limit, 80))).all()
+    accounts = db.scalars(stmt.order_by(Account.id.desc()).limit(clamp_limit(limit, maximum=80))).all()
     return [serialize_account(db, a, config) for a in accounts]
 
 
@@ -408,8 +409,8 @@ def trending_tag_rows(db: DbSession, config: Config, limit: int, offset: int = 0
         select(StatusTag.name, func.count().label("uses"))
         .group_by(StatusTag.name)
         .order_by(func.count().desc(), StatusTag.name)
-        .offset(offset)
-        .limit(limit)
+        .offset(clamp_offset(offset))
+        .limit(clamp_limit(limit))
     ).all()
     return [serialize_tag(name, config, uses_today=int(uses)) for name, uses in rows]
 
@@ -426,8 +427,8 @@ def trending_status_rows(
         select(Status)
         .where(Status.visibility.in_(["public", "unlisted"]), Status.reblog_of_id.is_(None))
         .order_by(fav_count.desc(), Status.id.desc())
-        .offset(offset)
-        .limit(limit)
+        .offset(clamp_offset(offset))
+        .limit(clamp_limit(limit))
     )
     statuses = db.scalars(stmt).all()
     return serialize_status_list(db, list(statuses), config, account)

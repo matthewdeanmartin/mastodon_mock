@@ -82,6 +82,12 @@ the mock to support it statefully.
 1. **Update coverage docs** — add a row to [the coverage spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/03-api-coverage.md)
    and, if it shifts the summary, [the coverage reference](../reference/coverage.md).
 
+1. **Reconcile the OpenAPI contract** — if you implemented a previously-missing real
+   endpoint, remove it from the backlog in `tests/openapi/allowlist.py` and regenerate the
+   report with `make compare-openapi`. The full workflow (including verifying the new
+   endpoint against the real Mastodon schema with Schemathesis) is in
+   [OpenAPI Sync & Contract Tasks](openapi-sync.md).
+
 ### Conventions
 
 - IDs are stringified integers; use `ids.py` for new monotonic IDs and accept `str` path

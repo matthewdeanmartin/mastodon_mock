@@ -18,7 +18,7 @@ from mastodon_mock.db.models import (
     utcnow,
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
-from mastodon_mock.pagination import paginate
+from mastodon_mock.pagination import clamp_limit, clamp_offset, paginate
 from mastodon_mock.routers.helpers import PageQuery, array_query, read_body, set_link_header, truthy
 from mastodon_mock.routers.tags import featured_tags_for
 from mastodon_mock.serializers.accounts import serialize_account
@@ -540,7 +540,7 @@ def _search_accounts(
                 )
             )
         )
-    query = query.order_by(Account.id).offset(offset).limit(min(limit, 80))
+    query = query.order_by(Account.id).offset(clamp_offset(offset)).limit(clamp_limit(limit, maximum=80))
     return [serialize_account(db, a, config) for a in db.scalars(query).all()]
 
 

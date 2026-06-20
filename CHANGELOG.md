@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- OpenAPI contract comparison: `mastodon_mock compare-openapi` (and `make compare-openapi`) diffs the mock's published OpenAPI against the upstream Mastodon schema (`mastodon-openapi/dist/schema.json`), writing `spec/openapi_compare_report.md`. A reviewed allow-list (`tests/openapi/allowlist.py`) plus `tests/test_openapi_contract.py` turns this into a CI guard rail against contract drift. An "API Docs" link in the UI's More menu surfaces the always-served Swagger UI at `/docs`. See `spec/openapi_support.md` (Phases 1 & 2).
+- OpenAPI contract fuzzing (opt-in): `make openapi-fuzz` (or `uv run pytest -m contract`) drives [Schemathesis](https://schemathesis.readthedocs.io/) at the running mock using the upstream schema as the oracle. Default mode guarantees the mock never 500s on the shared read-only surface; `CONTRACT_STRICT=1` additionally checks full response-shape conformance (the gap finder for Phase 4). Lives behind a `contract` extra/marker so the default suite stays fast. See `spec/openapi_support.md` (Phase 3).
+- Automated drift detection: a weekly + per-PR `openapi-drift` GitHub Actions workflow clones the (untracked) upstream schema generator, runs the comparison, enforces the contract tests, and uploads the report. New contributor guide [`docs/extending/openapi-sync.md`](docs/extending/openapi-sync.md) documents the whole OpenAPI sync workflow. See `spec/openapi_support.md` (Phase 5).
+
+### Fixed
+- Hardened pagination/limit handling against malformed query params (found by the new OpenAPI fuzzing): a non-numeric `max_id`/`min_id`/`since_id` no longer raises `ValueError` → HTTP 500 (the cursor is ignored, matching Mastodon), and an out-of-range `limit`/`offset` no longer overflows SQLite's 64-bit INTEGER → HTTP 500 (it's clamped). Affects timelines, search, trends, suggestions, conversations, account search, and the directory. New shared helpers `clamp_limit` / `clamp_offset` / `coerce_cursor` in `pagination.py`.
+- Fixed layout of UI.
+
 ## [0.4.0] - 2026-06-19
 ### Fixed
 - Conversation IDs were a hyphen-joined composite of participant account IDs instead of a real numeric status ID, breaking clients (e.g. mastui) that parse conversation IDs as integers.

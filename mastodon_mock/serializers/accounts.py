@@ -78,8 +78,8 @@ def serialize_account(
     """
     acct = account_acct(account.username, account.domain)
     url = profile_url(config.domain, acct)
-    avatar = account.avatar_url or placeholder_avatar(config.domain)
-    header = account.header_url or placeholder_header(config.domain)
+    avatar = account.avatar_url or placeholder_avatar(config.domain, acct)
+    header = account.header_url or placeholder_header(config.domain, acct)
 
     if ctx is not None and account.id in ctx.accounts_loaded:
         followers = ctx.followers_count.get(account.id, 0)

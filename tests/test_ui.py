@@ -2,8 +2,8 @@
 
 The UI is built into ``mastodon_mock/_ui_dist`` by the Angular build (``make ui`` or the
 packaging hook). When it has not been built (e.g. a fresh checkout in CI before the UI
-step runs), the ``/_ui/`` mount is skipped and ``GET /`` omits its ``ui`` pointer. These
-tests assert both branches so they pass either way. See spec/08-admin-ui.md.
+step runs), ``GET /`` falls back to a minimal HTML stub instead of redirecting into the
+SPA. These tests assert both branches so they pass either way. See spec/08-admin-ui.md.
 """
 
 from __future__ import annotations
@@ -26,34 +26,24 @@ def client() -> Iterator[TestClient]:
         yield test_client
 
 
-def test_root_identity_for_api_clients(client: TestClient) -> None:
-    """``GET /`` is the JSON identity blob for API clients (Accept: */* or json)."""
-    body = client.get("/").json()  # TestClient defaults to Accept: */*
-    assert body["mastodon_mock"] is True
-    assert "version" in body
-    # An explicit JSON Accept must also get JSON, even when the UI is built.
-    body = client.get("/", headers={"Accept": "application/json"}).json()
-    assert body["mastodon_mock"] is True
-
-
 @pytest.mark.skipif(not UI_BUILT, reason="UI not built (run `make ui`)")
-def test_root_redirects_browsers_to_ui(client: TestClient) -> None:
-    """A browser (Accept: text/html) hitting ``/`` is sent into the SPA at ``/_ui/``."""
-    resp = client.get(
-        "/",
-        headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
-        follow_redirects=False,
-    )
+def test_root_redirects_to_ui(client: TestClient) -> None:
+    """``GET /`` always behaves like a browser landing page: redirect into the SPA.
+
+    Real Mastodon serves HTML at ``/``, not a JSON identity blob, so we match that
+    regardless of the client's Accept header (TestClient defaults to ``*/*``).
+    """
+    resp = client.get("/", follow_redirects=False)
     assert resp.status_code in (307, 308)
     assert resp.headers["location"] == "/_ui/"
 
 
-def test_root_advertises_ui_only_when_built(client: TestClient) -> None:
-    """The ``ui`` pointer on ``GET /`` reflects whether the bundle was built."""
-    body = client.get("/").json()
-    assert ("ui" in body) == UI_BUILT
-    if UI_BUILT:
-        assert body["ui"] == "/_ui/"
+@pytest.mark.skipif(UI_BUILT, reason="only exercises the no-UI fallback")
+def test_root_html_stub_when_ui_not_built(client: TestClient) -> None:
+    """When the SPA hasn't been built, ``GET /`` still serves HTML, not JSON."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
 
 
 @pytest.mark.skipif(not UI_BUILT, reason="UI not built (run `make ui`)")

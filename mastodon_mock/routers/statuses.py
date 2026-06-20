@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
+from mastodon_mock.content_format import render_status_html
 from mastodon_mock.db.models import (
     Account,
     Bookmark,
@@ -392,7 +393,7 @@ async def update_status(
     text = params.get("status")
     if text is not None:
         status.text = str(text)
-        status.content = f"<p>{text}</p>"
+        status.content = render_status_html(str(text))
     if (v := params.get("spoiler_text")) is not None:
         status.spoiler_text = str(v)
     if (v := params.get("sensitive")) is not None:
@@ -655,7 +656,7 @@ def _create_status_from_params(db: DbSession, account: Account, params: dict[str
 
     status = Status(
         account_id=account.id,
-        content=f"<p>{text}</p>",
+        content=render_status_html(text),
         text=text,
         visibility=visibility,
         sensitive=_to_bool(params.get("sensitive")),
