@@ -84,6 +84,17 @@ class FaultConfig(BaseModel):
     enabled: bool = True
 
 
+class ModerationConfig(BaseModel):
+    """How strongly persisted moderation state affects the public fake."""
+
+    # Current Mastodon behavior is the default target. Disable this only for
+    # older test suites that treated moderation flags as admin-display metadata.
+    enforce_actions: bool = True
+    # Mastodon's domain allow list matters only in allow-list federation mode.
+    # The mock has no federation mode, so this remains an explicit opt-in.
+    enforce_domain_allows: bool = False
+
+
 class SeedAccount(BaseModel):
     """A single seeded account."""
 
@@ -314,6 +325,7 @@ class MastodonMockConfig(BaseModel):
     ratelimit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     streaming: StreamingConfig = Field(default_factory=StreamingConfig)
     faults: FaultConfig = Field(default_factory=FaultConfig)
+    moderation: ModerationConfig = Field(default_factory=ModerationConfig)
     seed: SeedConfig = Field(default_factory=lambda: DEFAULT_SEED)
     sample_data: SampleDataConfig = Field(default_factory=SampleDataConfig)
     rules: list[str] = Field(default_factory=list)

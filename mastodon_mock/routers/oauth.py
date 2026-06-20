@@ -275,6 +275,11 @@ async def create_account(request: Request, db: DbSession, token: CurrentToken) -
         raise HTTPException(status_code=422, detail="Validation failed")
     if not agreement:
         raise HTTPException(status_code=422, detail="agreement must be accepted")
+    from mastodon_mock.moderation import signup_block_reason
+
+    blocked = signup_block_reason(db, str(email), request.client.host if request.client else None)
+    if blocked is not None:
+        raise HTTPException(status_code=422, detail=blocked)
 
     existing = db.query(Account).filter(Account.username == username, Account.domain.is_(None)).first()
     if existing is not None:
@@ -311,6 +316,10 @@ async def mock_login(request: Request, db: DbSession) -> dict[str, Any]:
     account = db.query(Account).filter(Account.username == username, Account.domain.is_(None)).first()
     if account is None:
         raise HTTPException(status_code=404, detail="Unknown account")
+    from mastodon_mock.moderation import account_is_active
+
+    if not account_is_active(account):
+        raise HTTPException(status_code=403, detail="Your login is currently disabled")
     token = OAuthToken(
         access_token=_token(),
         account_id=account.id,

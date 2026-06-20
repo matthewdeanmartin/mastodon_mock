@@ -108,7 +108,7 @@ def test_parse_version_string_edge_cases(raw: str, expected: tuple[int, int, int
     assert parse_version_string(raw) == expected
 
 
-@pytest.mark.parametrize(("raw", "expected"), [("4.3.99", 2), ("4.0", 1), ("5.0.0", 2), ("nonsense", 2)])
+@pytest.mark.parametrize(("raw", "expected"), [("4.3.99", 2), ("4.0", 1), ("5.0.0", 10), ("nonsense", 2)])
 def test_api_version_for_known_and_unknown_lines(raw: str, expected: int) -> None:
     assert api_version_for(raw) == expected
 

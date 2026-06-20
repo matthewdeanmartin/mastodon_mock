@@ -27,8 +27,8 @@ task (not automatically):
 
 ```toml
 [tool.mastodon_mock]
-mocked_version = "4.4.4"        # "current" — default
-# mocked_version = "4.3.9"      # "current - 1" — set this to test against the older line
+mocked_version = "4.6.0"        # current mastodon.social-compatible target
+# mocked_version = "4.5.7"      # best-effort current-1 compatibility target
 ```
 
 - `mocked_version` is a single value per running server instance — there is **one**
@@ -44,7 +44,9 @@ mocked_version = "4.4.4"        # "current" — default
   ```python
   # mastodon_mock/versioning.py
   API_VERSION_BY_MASTODON_VERSION = {
-      (4, 4): 2,
+      (4, 6): 10,
+      (4, 5): 7,
+      (4, 4): 3,
       (4, 3): 2,
       (4, 2): 1,
       (4, 1): 1,
@@ -94,7 +96,7 @@ mocked_version = "4.4.4"        # "current" — default
   "short_description": "A local mock Mastodon instance for testing.",
   "description": "A local mock Mastodon instance for testing.",
   "email": "admin@mock.local",
-  "version": "4.4.4",
+  "version": "4.6.0",
   "urls": {"streaming_api": "wss://mock.local"},
   "stats": {"user_count": 0, "status_count": 0, "domain_count": 1},
   "thumbnail": null,
@@ -136,7 +138,7 @@ Adds/renames per `InstanceV2`:
 {
   "domain": "mock.local",
   "title": "Mastodon Mock",
-  "version": "4.4.4",
+  "version": "4.6.0",
   "source_url": "https://github.com/matthewdeanmartin/mastodon_mock",
   "description": "A local mock Mastodon instance for testing.",
   "usage": {"users": {"active_month": 0}},
@@ -147,7 +149,7 @@ Adds/renames per `InstanceV2`:
   "contact": {"email": "admin@mock.local", "account": null},
   "rules": [],
   "icon": [],
-  "api_versions": {"mastodon": 2}
+  "api_versions": {"mastodon": 10}
 }
 ```
 
@@ -159,7 +161,7 @@ Adds/renames per `InstanceV2`:
 ```json
 {
   "version": "2.0",
-  "software": {"name": "mastodon_mock", "version": "4.4.4"},
+  "software": {"name": "mastodon", "version": "4.6.0"},
   "protocols": ["activitypub"],
   "usage": {"users": {"total": 0}, "localPosts": 0},
   "openRegistrations": true
@@ -175,7 +177,7 @@ nodeinfo-reported version sees the same value as `/api/v1/instance`.
 # tests/conftest.py (in the *consuming* project)
 import pytest
 
-@pytest.fixture(params=["4.4.4", "4.3.9"])
+@pytest.fixture(params=["4.6.0", "4.5.7"])
 def mock_server(request, tmp_path):
     config = MastodonMockConfig(mocked_version=request.param, database=DatabaseConfig(path=":memory:"), ...)
     # spin up app with this config, yield base_url

@@ -95,6 +95,10 @@ def account_lookup(db: DbSession, config: Config, acct: str) -> dict[str, Any]:
     found = db.scalar(stmt)
     if found is None:
         raise HTTPException(status_code=404, detail="Record not found")
+    from mastodon_mock.moderation import account_is_discoverable
+
+    if not account_is_discoverable(db, found, config):
+        raise HTTPException(status_code=404, detail="Record not found")
     return serialize_account(db, found, config)
 
 
@@ -224,7 +228,7 @@ def account_statuses(
         limit=params.limit,
     )
     set_link_header(request, response, page)
-    return serialize_status_list(db, list(page.items), config, viewer)
+    return serialize_status_list(db, list(page.items), config, viewer, filter_context="account")
 
 
 def _filter_account_statuses_visible_to(query: Any, viewer: Account | None) -> Any:
@@ -571,7 +575,13 @@ def _search_accounts(
             )
         )
     query = query.order_by(Account.id).offset(clamp_offset(offset)).limit(clamp_limit(limit, maximum=80))
-    return [serialize_account(db, a, config) for a in db.scalars(query).all()]
+    from mastodon_mock.moderation import account_is_discoverable
+
+    return [
+        serialize_account(db, candidate, config)
+        for candidate in db.scalars(query).all()
+        if account_is_discoverable(db, candidate, config, viewer)
+    ]
 
 
 def _collect_fields(form: Any) -> list[dict[str, Any]] | None:

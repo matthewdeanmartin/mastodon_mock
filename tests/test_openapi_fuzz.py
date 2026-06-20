@@ -63,6 +63,17 @@ QUARANTINE: dict[tuple[str, str], str] = {
     # Populate as real fuzzing surfaces divergence the mock can't currently match.
 }
 
+# Cross-cutting strict-mode failures observed across many operations. These are
+# categories rather than quarantined operations: keeping them explicit prevents
+# "strict is red" from becoming an untracked blob while allowing each category
+# to be ratcheted down independently.
+STRICT_GAP_CATEGORIES: dict[str, str] = {
+    "error-envelope": 'FastAPI emits {"detail": ...}; Mastodon schemas require {"error": ...}.',
+    "validation-envelope": "FastAPI's default 422 body differs from Mastodon's field-error schema.",
+    "instance-required-fields": "Some required 4.6 instance configuration fields are absent.",
+    "unknown-query-parameters": "FastAPI accepts unknown query parameters rejected by strict schema checks.",
+}
+
 
 def _is_fuzzable(op: tuple[str, str]) -> bool:
     _method, path = op

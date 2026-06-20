@@ -120,6 +120,8 @@ def serialize_status_list(
     statuses: list[Status],
     config: MastodonMockConfig,
     viewer: Account | None,
+    *,
+    filter_context: str | None = None,
 ) -> list[dict[str, Any]]:
     """Serialize a page of statuses with one batch of grouped queries (F1).
 
@@ -135,7 +137,24 @@ def serialize_status_list(
     nested_ids = {nid for s in statuses for nid in (s.reblog_of_id, s.quoted_status_id) if nid is not None}
     nested = list(session.scalars(select(Status).where(Status.id.in_(nested_ids))).all()) if nested_ids else []
     ctx = build_status_context(session, statuses + nested, viewer)
-    return [serialize_status(session, s, config, viewer, ctx=ctx) for s in statuses]
+    out: list[dict[str, Any]] = []
+    from mastodon_mock.moderation import account_is_discoverable
+
+    for status in statuses:
+        author = status.account or session.get(Account, status.account_id)
+        if author is None or not account_is_discoverable(session, author, config, viewer):
+            continue
+        out.append(
+            serialize_status(
+                session,
+                status,
+                config,
+                viewer,
+                ctx=ctx,
+                filter_context=filter_context,
+            )
+        )
+    return out
 
 
 def serialize_status(
@@ -146,6 +165,7 @@ def serialize_status(
     *,
     _depth: int = 0,
     ctx: BatchContext | None = None,
+    filter_context: str | None = None,
 ) -> dict[str, Any]:
     """Serialize a status, including viewer-relative flags and nested reblog.
 
@@ -164,7 +184,15 @@ def serialize_status(
     if status.reblog_of_id is not None and _depth == 0:
         original = session.get(Status, status.reblog_of_id)
         if original is not None:
-            reblog_data = serialize_status(session, original, config, viewer, _depth=_depth + 1, ctx=ctx)
+            reblog_data = serialize_status(
+                session,
+                original,
+                config,
+                viewer,
+                _depth=_depth + 1,
+                ctx=ctx,
+                filter_context=filter_context,
+            )
 
     if ctx is not None:
         media = ctx.media.get(status.id, [])
@@ -194,7 +222,17 @@ def serialize_status(
             quote_data = {
                 "state": status.quote_state,
                 "quoted_status": (
-                    None if revoked else serialize_status(session, quoted, config, viewer, _depth=_depth + 1, ctx=ctx)
+                    None
+                    if revoked
+                    else serialize_status(
+                        session,
+                        quoted,
+                        config,
+                        viewer,
+                        _depth=_depth + 1,
+                        ctx=ctx,
+                        filter_context=filter_context,
+                    )
                 ),
             }
 
@@ -251,7 +289,7 @@ def serialize_status(
         "bookmarked": bookmarked,
         "muted": muted,
         "pinned": pinned,
-        "sensitive": status.sensitive,
+        "sensitive": status.sensitive or account.sensitized,
         "spoiler_text": status.spoiler_text,
         "visibility": status.visibility,
         "language": status.language,
@@ -266,6 +304,10 @@ def serialize_status(
         "quote_approval_policy": status.quote_approval_policy,
         "filtered": [],
     }
+    if filter_context is not None:
+        from mastodon_mock.content_filters import matches_for_status
+
+        data["filtered"] = [match.result for match in matches_for_status(session, status, viewer, filter_context)]
     return data
 
 

@@ -70,10 +70,16 @@ CurrentAccount = Annotated["Account | None", Depends(get_current_account)]
 
 def require_account(
     account: CurrentAccount,
+    config: Config,
 ) -> Account:
     """Require an authenticated account, raising 401 otherwise."""
     if account is None:
         raise HTTPException(status_code=401, detail="This method requires an authenticated user")
+    if config.moderation.enforce_actions:
+        from mastodon_mock.moderation import account_is_active
+
+        if not account_is_active(account):
+            raise HTTPException(status_code=403, detail="Your login is currently disabled")
     return account
 
 

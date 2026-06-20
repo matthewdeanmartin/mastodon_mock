@@ -18,6 +18,8 @@ from mastodon_mock.db.models import (
     Relationship,
     Status,
     StatusTag,
+    SuggestionDismissal,
+    TrendReview,
     utcnow,
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
@@ -234,6 +236,7 @@ def instance_privacy_policy(config: Config) -> dict[str, Any]:
 def instance_directory(
     db: DbSession,
     config: Config,
+    account: CurrentAccount,
     offset: int = 0,
     limit: int = 40,
     order: str = "active",
@@ -263,7 +266,13 @@ def instance_directory(
         query = query.order_by(activity.desc(), Account.id.desc())
 
     query = query.offset(clamp_offset(offset)).limit(clamp_limit(limit, maximum=80))
-    return [serialize_account(db, acc, config) for acc in query.all()]
+    from mastodon_mock.moderation import account_is_discoverable
+
+    return [
+        serialize_account(db, candidate, config)
+        for candidate in query.all()
+        if account_is_discoverable(db, candidate, config, account)
+    ]
 
 
 @router.get("/api/v1/custom_emojis")
@@ -289,7 +298,13 @@ def announcements(db: DbSession, viewer: CurrentAccount) -> list[dict[str, Any]]
     ``False`` (nothing dismissed).
     """
     rows = db.scalars(
-        select(Announcement).where(Announcement.published.is_(True)).order_by(Announcement.id.desc())
+        select(Announcement)
+        .where(
+            Announcement.published.is_(True),
+            (Announcement.starts_at.is_(None) | (Announcement.starts_at <= utcnow())),
+            (Announcement.ends_at.is_(None) | (Announcement.ends_at >= utcnow())),
+        )
+        .order_by(Announcement.id.desc())
     ).all()
     return [serialize_announcement(a, viewer) for a in rows]
 
@@ -393,8 +408,16 @@ def _suggestion_accounts(db: DbSession, config: Config, account: Account | None,
             Relationship.source_account_id == account.id, Relationship.following.is_(True)
         )
         stmt = stmt.where(Account.id.not_in(following))
+        dismissed = select(SuggestionDismissal.target_account_id).where(SuggestionDismissal.account_id == account.id)
+        stmt = stmt.where(Account.id.not_in(dismissed))
     accounts = db.scalars(stmt.order_by(Account.id.desc()).limit(clamp_limit(limit, maximum=80))).all()
-    return [serialize_account(db, a, config) for a in accounts]
+    from mastodon_mock.moderation import account_is_discoverable
+
+    return [
+        serialize_account(db, candidate, config)
+        for candidate in accounts
+        if account_is_discoverable(db, candidate, config, account)
+    ]
 
 
 @router.get("/api/v1/suggestions")
@@ -420,13 +443,31 @@ def suggestions_v2(
 
 
 @router.delete("/api/v1/suggestions/{account_id}", status_code=200)
-def suggestion_delete(account_id: str, account: RequiredAccount) -> dict[str, Any]:
-    """Dismiss a follow suggestion. Suggestions are derived, not stored, so this is a no-op accept."""
-    del account_id, account
+def suggestion_delete(account_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
+    """Persistently dismiss a follow suggestion."""
+    target_id = parse_db_id(account_id)
+    if target_id is None or db.get(Account, target_id) is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    existing = db.scalar(
+        select(SuggestionDismissal).where(
+            SuggestionDismissal.account_id == account.id,
+            SuggestionDismissal.target_account_id == target_id,
+        )
+    )
+    if existing is None:
+        db.add(SuggestionDismissal(account_id=account.id, target_account_id=target_id))
+        db.commit()
     return {}
 
 
-def trending_tag_rows(db: DbSession, config: Config, limit: int, offset: int = 0) -> list[dict[str, Any]]:
+def trending_tag_rows(
+    db: DbSession,
+    config: Config,
+    limit: int,
+    offset: int = 0,
+    *,
+    include_rejected: bool = False,
+) -> list[dict[str, Any]]:
     """Local hashtags ranked by how many statuses use them (``Tag`` shape).
 
     Shared by the public ``/api/v1/trends/tags`` endpoint and the admin variant.
@@ -438,11 +479,27 @@ def trending_tag_rows(db: DbSession, config: Config, limit: int, offset: int = 0
         .offset(clamp_offset(offset))
         .limit(clamp_limit(limit))
     ).all()
-    return [serialize_tag(name, config, uses_today=int(uses)) for name, uses in rows]
+    rejected = {
+        review.key
+        for review in db.scalars(
+            select(TrendReview).where(TrendReview.kind == "tag", TrendReview.approved.is_(False))
+        ).all()
+    }
+    return [
+        serialize_tag(name, config, uses_today=int(uses))
+        for name, uses in rows
+        if include_rejected or name not in rejected
+    ]
 
 
 def trending_status_rows(
-    db: DbSession, config: Config, account: Account | None, limit: int, offset: int = 0
+    db: DbSession,
+    config: Config,
+    account: Account | None,
+    limit: int,
+    offset: int = 0,
+    *,
+    include_rejected: bool = False,
 ) -> list[dict[str, Any]]:
     """The most-favourited public local statuses (serialized).
 
@@ -456,7 +513,18 @@ def trending_status_rows(
         .offset(clamp_offset(offset))
         .limit(clamp_limit(limit))
     )
-    statuses = db.scalars(stmt).all()
+    statuses = list(db.scalars(stmt).all())
+    if not include_rejected:
+        rejected = {
+            review.key
+            for review in db.scalars(
+                select(TrendReview).where(
+                    TrendReview.kind == "status",
+                    TrendReview.approved.is_(False),
+                )
+            ).all()
+        }
+        statuses = [status for status in statuses if str(status.id) not in rejected]
     return serialize_status_list(db, list(statuses), config, account)
 
 

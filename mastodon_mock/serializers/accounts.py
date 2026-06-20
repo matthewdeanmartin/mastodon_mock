@@ -129,8 +129,8 @@ def serialize_account(
         "noindex": None,
         "roles": [],
         "moved": None,
-        "suspended": None,
-        "limited": None,
+        "suspended": account.suspended or None,
+        "limited": account.silenced or None,
     }
 
     if with_source:

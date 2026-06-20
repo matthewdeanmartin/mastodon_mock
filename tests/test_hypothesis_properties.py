@@ -197,7 +197,21 @@ def test_render_status_html_never_lets_angle_brackets_through_raw(text: str) -> 
     # The function escapes first; user-typed "<" / ">" must never appear in the
     # output except as part of the small set of tags this renderer itself emits.
     rendered = render_status_html(text)
-    allowed_tags = {"<p>", "</p>", "<br />", "<a ", "</a>", "<strong>", "</strong>", "<em>", "</em>", "<code>", "</code>", "<del>", "</del>"}
+    allowed_tags = {
+        "<p>",
+        "</p>",
+        "<br />",
+        "<a ",
+        "</a>",
+        "<strong>",
+        "</strong>",
+        "<em>",
+        "</em>",
+        "<code>",
+        "</code>",
+        "<del>",
+        "</del>",
+    }
     remainder = rendered
     for tag in allowed_tags:
         remainder = remainder.replace(tag, "")

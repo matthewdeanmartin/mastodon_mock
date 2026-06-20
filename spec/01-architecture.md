@@ -214,7 +214,7 @@ CLI flags override file config; file config overrides built-in defaults.
 #  - /api/v2/instance "api_versions" field
 #  - exposed so Mastodon.py's retrieve_mastodon_version() and
 #    @api_version(...) checks behave like talking to this version.
-mocked_version = "4.5.0"     # "current". current-1 also testable, see 05-versioning.md
+mocked_version = "4.6.0"     # current mastodon.social target; 4.5.7 is current-1
 domain = "mock.local"
 title = "Mastodon Mock"
 
@@ -231,6 +231,13 @@ port = 3000
 # If true, any bearer token is accepted and mapped to the *first* seeded account.
 # Useful for quick read-only smoke tests. Default false.
 permissive = false
+
+[tool.mastodon_mock.moderation]
+# Current Mastodon behavior is the default. Set false only for older suites that
+# treated moderation flags as admin-display metadata.
+enforce_actions = true
+# The mock has no federation allow-list mode, so domain allows are opt-in.
+enforce_domain_allows = false
 
 [[tool.mastodon_mock.seed.accounts]]
 username = "alice"
@@ -254,7 +261,7 @@ Equivalently, under `pyproject.toml`:
 
 ```toml
 [tool.mastodon_mock]
-mocked_version = "4.5.0"
+mocked_version = "4.6.0"
 # ... same shape as above, just nested under [tool.mastodon_mock.*]
 ```
 

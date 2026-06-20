@@ -2,6 +2,25 @@
 
 Audit date: 2026-06-20
 
+> Implementation update: Phases 0, 1, and 2 were completed on 2026-06-20.
+> The remaining roadmap begins at Phase 3.
+
+The three inventories now live in separate artifacts:
+
+- operation coverage: `openapi_compare_report.md`;
+- response-shape gaps: strict-fuzz categories and `openapi_support.md`;
+- stateful/derived/static/no-op behavior: `03-api-coverage.md` and the public coverage page.
+
+Implemented in Phases 0–2:
+
+- Mastodon 4.6.0 / API version 10 is the default target; 4.5.7 is current-1.
+- Filters populate viewer-relative `Status.filtered` results across all five contexts.
+- Quote approval, suggestion dismissal, notification policy, and notification requests
+  are stateful.
+- Account moderation affects authentication, timelines, discovery, and forced-sensitive
+  serialization; signup blocks, report-domain controls, trend review, admin filtering,
+  and announcement scheduling are observable.
+
 This is the implementation backlog after comparing the current routers, models,
 tests, public documentation, older `spec/*` planning documents, and the reconstructed
 Mastodon 4.6.0 OpenAPI schema.
@@ -34,15 +53,14 @@ measurements:
   including the global FastAPI `{"detail": ...}` error envelope, FastAPI validation
   errors, missing required v1 instance fields, and acceptance of unknown query
   parameters.
-- The mock advertises Mastodon 4.4.4 while the reconstructed truth schema is 4.6.0.
-  Newer 4.6 routes are present, but version-line compatibility has not been established
-  as a coherent contract.
+- The mock now advertises Mastodon 4.6.0 / API version 10. Mastodon 4.5.7 remains the
+  explicit previous-version compatibility target.
 - The generated comparison report calls 13 operations “unexpected” because the CLI's
   coarse prefix ignore-list is separate from the contract test's reviewed per-operation
   `MOCK_ONLY` allow-list. The tests accept those operations, so the report wording is
   misleading.
 
-## Current gap inventory
+## Original audit inventory
 
 ### Stateful CRUD that is not yet stateful behavior
 
@@ -120,7 +138,7 @@ measurements:
 
 ## Phased plan
 
-### Phase 0 — make coverage honest and measurable
+### Phase 0 — make coverage honest and measurable ✅
 
 Goal: stop treating “route exists” as “stateful fake.”
 
@@ -138,7 +156,7 @@ Goal: stop treating “route exists” as “stateful fake.”
 Done when the coverage page cannot call operation parity “full coverage” without also
 showing behavior quality.
 
-### Phase 1 — close high-value user-facing semantic gaps
+### Phase 1 — close high-value user-facing semantic gaps ✅
 
 Goal: make existing state affect normal reads and writes.
 
@@ -152,7 +170,7 @@ Goal: make existing state affect normal reads and writes.
 This is the highest-value phase because it improves the already-strong user-facing fake
 instead of adding obscure endpoints.
 
-### Phase 2 — make admin actions have observable consequences
+### Phase 2 — make admin actions have observable consequences ✅
 
 Goal: turn admin CRUD from a control-panel database into moderation behavior.
 

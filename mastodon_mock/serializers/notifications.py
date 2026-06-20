@@ -17,6 +17,8 @@ def serialize_notification(
     notification: Notification,
     config: MastodonMockConfig,
     viewer: Account | None,
+    *,
+    filter_context: str | None = None,
 ) -> dict[str, Any]:
     """Serialize a notification, embedding actor account and (optional) status."""
     from mastodon_mock.serializers.statuses import serialize_status
@@ -26,7 +28,7 @@ def serialize_notification(
     if notification.status_id is not None:
         status = session.get(Status, notification.status_id)
         if status is not None:
-            status_data = serialize_status(session, status, config, viewer)
+            status_data = serialize_status(session, status, config, viewer, filter_context=filter_context)
 
     return {
         "id": sid(notification.id),

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -50,6 +50,20 @@ def _parse_dt(value: Any) -> datetime | None:
         return None
 
 
+def _expiry(params: dict[str, Any]) -> datetime | None:
+    """Resolve Mastodon's ``expires_in`` seconds or an explicit timestamp."""
+    explicit = params.get("expires_at") or params.get("expires_in_at")
+    if explicit:
+        return _parse_dt(explicit)
+    expires_in = params.get("expires_in")
+    if expires_in in (None, ""):
+        return None
+    try:
+        return datetime.now(timezone.utc) + timedelta(seconds=int(str(expires_in)))
+    except (TypeError, ValueError):
+        return None
+
+
 def _context(params: dict[str, Any]) -> list[str]:
     """Extract the context list from params.
 
@@ -84,7 +98,7 @@ async def create_filter_v2(request: Request, db: DbSession, account: RequiredAcc
         account_id=account.id,
         title=str(params.get("title") or ""),
         context=_context(params),
-        expires_at=_parse_dt(params.get("expires_in_at") or params.get("expires_at")),
+        expires_at=_expiry(params),
         filter_action=str(params.get("filter_action") or "warn"),
     )
     db.add(filt)
@@ -111,8 +125,8 @@ async def update_filter_v2(filter_id: str, request: Request, db: DbSession, acco
         filt.context = _context(params)
     if "filter_action" in params:
         filt.filter_action = str(params["filter_action"])
-    if "expires_at" in params or "expires_in_at" in params:
-        filt.expires_at = _parse_dt(params.get("expires_at") or params.get("expires_in_at"))
+    if {"expires_at", "expires_in_at", "expires_in"} & params.keys():
+        filt.expires_at = _expiry(params)
     db.commit()
     return serialize_filter_v2(filt)
 
@@ -242,7 +256,7 @@ async def create_filter_v1(request: Request, db: DbSession, account: RequiredAcc
         account_id=account.id,
         title=phrase,
         context=_context(params),
-        expires_at=_parse_dt(params.get("expires_at")),
+        expires_at=_expiry(params),
         filter_action="hide" if str(params.get("irreversible", "")).lower() in ("true", "1", "on") else "warn",
     )
     db.add(filt)
@@ -277,8 +291,8 @@ async def update_filter_v1(filter_id: str, request: Request, db: DbSession, acco
         filt.context = _context(params)
     if "irreversible" in params:
         filt.filter_action = "hide" if str(params["irreversible"]).lower() in ("true", "1", "on") else "warn"
-    if "expires_at" in params:
-        filt.expires_at = _parse_dt(params["expires_at"])
+    if {"expires_at", "expires_in"} & params.keys():
+        filt.expires_at = _expiry(params)
     db.commit()
     return serialize_filter_v1(filt)
 

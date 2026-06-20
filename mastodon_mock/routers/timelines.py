@@ -43,7 +43,7 @@ def timeline_home(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return serialize_status_list(db, list(page.items), config, account)
+    return serialize_status_list(db, list(page.items), config, account, filter_context="home")
 
 
 @router.get("/api/v1/timelines/public")
@@ -72,7 +72,7 @@ def timeline_public(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return serialize_status_list(db, list(page.items), config, viewer)
+    return serialize_status_list(db, list(page.items), config, viewer, filter_context="public")
 
 
 @router.get("/api/v1/timelines/tag/{hashtag}")
@@ -94,7 +94,7 @@ def timeline_hashtag(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return serialize_status_list(db, list(page.items), config, viewer)
+    return serialize_status_list(db, list(page.items), config, viewer, filter_context="public")
 
 
 @router.get("/api/v1/timelines/list/{list_id}")
@@ -118,7 +118,7 @@ def timeline_list(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return serialize_status_list(db, list(page.items), config, account)
+    return serialize_status_list(db, list(page.items), config, account, filter_context="home")
 
 
 @router.get("/api/v1/timelines/direct")
@@ -140,7 +140,7 @@ def timeline_direct(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
     set_link_header(request, response, page)
-    return serialize_status_list(db, list(page.items), config, account)
+    return serialize_status_list(db, list(page.items), config, account, filter_context="home")
 
 
 @router.get("/api/v1/timelines/link")

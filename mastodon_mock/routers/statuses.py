@@ -40,7 +40,7 @@ from mastodon_mock.serializers.statuses import (
     serialize_status_list,
     serialize_status_source,
 )
-from mastodon_mock.services import add_notification, attach_mentions_and_tags
+from mastodon_mock.services import add_notification, attach_mentions_and_tags, find_relationship
 from mastodon_mock.streaming_events import (
     emit_status_delete,
     emit_status_event,
@@ -140,14 +140,14 @@ def statuses_many(
         s = db.get(Status, pid) if pid is not None else None
         if s is not None:
             found.append(s)
-    return serialize_status_list(db, found, config, viewer)
+    return serialize_status_list(db, found, config, viewer, filter_context="thread")
 
 
 @router.get("/api/v1/statuses/{status_id}")
 def get_status(status_id: str, db: DbSession, config: Config, viewer: CurrentAccount) -> dict[str, Any]:
     """Fetch a single status."""
     status = _get_status_or_404(db, status_id)
-    return serialize_status(db, status, config, viewer)
+    return serialize_status(db, status, config, viewer, filter_context="thread")
 
 
 @router.get("/api/v1/statuses/{status_id}/context")
@@ -175,8 +175,8 @@ def status_context(status_id: str, db: DbSession, config: Config, viewer: Curren
             frontier.append(child.id)
 
     return {
-        "ancestors": serialize_status_list(db, ancestors, config, viewer),
-        "descendants": serialize_status_list(db, descendants, config, viewer),
+        "ancestors": serialize_status_list(db, ancestors, config, viewer, filter_context="thread"),
+        "descendants": serialize_status_list(db, descendants, config, viewer, filter_context="thread"),
     }
 
 
@@ -251,7 +251,7 @@ def status_quotes(
         limit=params.limit,
     )
     set_link_header(request, response, page)
-    return serialize_status_list(db, list(page.items), config, viewer)
+    return serialize_status_list(db, list(page.items), config, viewer, filter_context="thread")
 
 
 @router.post("/api/v1/statuses/{status_id}/quotes/{quoting_status_id}/revoke", status_code=200)
@@ -394,6 +394,10 @@ async def update_status(
         status.spoiler_text = str(v)
     if (v := params.get("sensitive")) is not None:
         status.sensitive = _to_bool(v)
+    if (v := params.get("quote_approval_policy")) is not None:
+        if str(v) not in {"public", "followers", "nobody"}:
+            raise HTTPException(status_code=422, detail="Invalid quote approval policy")
+        status.quote_approval_policy = "nobody" if status.visibility in {"private", "direct"} else str(v)
     status.edited_at = utcnow()
 
     db.commit()
@@ -647,8 +651,12 @@ def _create_status_from_params(db: DbSession, account: Account, params: dict[str
     # Standard Mastodon 4.5+ uses ``quoted_status_id``; accept ``quote_id`` too
     # (the fedibird extension Mastodon.py also sends). Only set if it resolves.
     quoted_status_id = _to_int(params.get("quoted_status_id") or params.get("quote_id"))
-    if quoted_status_id is not None and db.get(Status, quoted_status_id) is None:
-        quoted_status_id = None
+    if quoted_status_id is not None:
+        quoted = db.get(Status, quoted_status_id)
+        if quoted is None:
+            quoted_status_id = None
+        else:
+            _require_quote_permission(db, account, quoted)
 
     status = Status(
         account_id=account.id,
@@ -661,6 +669,9 @@ def _create_status_from_params(db: DbSession, account: Account, params: dict[str
         in_reply_to_id=in_reply_to_id,
         in_reply_to_account_id=in_reply_to_account_id,
         quoted_status_id=quoted_status_id,
+        quote_approval_policy=(
+            "nobody" if visibility in {"private", "direct"} else str(params.get("quote_approval_policy") or "public")
+        ),
         application_id=None,
         created_at=utcnow(),
         edit_history=[],
@@ -679,6 +690,22 @@ def _create_status_from_params(db: DbSession, account: Account, params: dict[str
         add_notification(db, recipient_id=m.id, from_account_id=account.id, type_="mention", status_id=status.id)
 
     return status
+
+
+def _require_quote_permission(db: DbSession, account: Account, quoted: Status) -> None:
+    """Raise 422 when the quoted status's policy does not allow ``account``."""
+    if quoted.account_id == account.id:
+        return
+    policy = quoted.quote_approval_policy
+    if quoted.visibility in {"private", "direct"}:
+        policy = "nobody"
+    if policy == "public":
+        return
+    if policy == "followers":
+        relationship = find_relationship(db, account.id, quoted.account_id)
+        if relationship is not None and relationship.following:
+            return
+    raise HTTPException(status_code=422, detail="Validation failed: This status may not be quoted")
 
 
 def _publish_due_scheduled(db: DbSession, account: Account) -> None:

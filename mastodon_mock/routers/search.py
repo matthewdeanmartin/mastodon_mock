@@ -41,8 +41,14 @@ def _do_search(
         .limit(limit)
     ).all()
 
-    accounts_data = [serialize_account(db, a, config) for a in accounts]
-    statuses_data = serialize_status_list(db, list(statuses), config, viewer)
+    from mastodon_mock.moderation import account_is_discoverable
+
+    accounts_data = [
+        serialize_account(db, account, config)
+        for account in accounts
+        if account_is_discoverable(db, account, config, viewer)
+    ]
+    statuses_data = serialize_status_list(db, list(statuses), config, viewer, filter_context="public")
     hashtags_data = [{"name": name, "url": f"https://{config.domain}/tags/{name}", "history": []} for name in tag_names]
     return accounts_data, statuses_data, hashtags_data
 

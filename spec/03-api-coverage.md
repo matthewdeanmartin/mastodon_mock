@@ -126,7 +126,7 @@ to a concrete client call.
 
 | Method | Path | Mastodon.py caller(s) | Coverage |
 |--------|------|------------------------|----------|
-| POST | `/api/v1/statuses` | `status_post()`, `toot()`, `status_reply()` | **Full** — creates `statuses` row; parses `@mentions` from text into `status_mentions`; parses `#hashtags` into `status_tags`; honors `in_reply_to_id`, `visibility`, `sensitive`, `spoiler_text`, `language`, `media_ids` (attaches existing `media_attachments`), `poll` (creates `polls`+`poll_options`), `quoted_status_id`/`quote_id` (sets `statuses.quoted_status_id` if it resolves; emitted as `quote`), `scheduled_at` (creates a `scheduled_statuses` row and returns `ScheduledStatus` only when ≥ ~5 min out, otherwise publishes immediately; due rows publish lazily on list read). Generates `mention` notifications for each mentioned account. `idempotency_key` honored via an in-memory/db dedup table keyed by `(account_id, idempotency_key)` within a short TTL. |
+| POST | `/api/v1/statuses` | `status_post()`, `toot()`, `status_reply()` | **Full** — creates `statuses` row; parses mentions/tags; honors replies, visibility, media, polls, scheduling, idempotency, quote policy, and enforces the quoted status's `public`/`followers`/`nobody` approval policy |
 | PUT | `/api/v1/statuses/{id}` | `status_update()` | **Full** — updates `content`/`text`/`spoiler_text`/`sensitive`/`media_ids`/poll; appends a `StatusEdit` snapshot to history; sets `edited_at` |
 | DELETE | `/api/v1/statuses/{id}` | `status_delete()` | **Full** — deletes row (or soft-delete flag); returns deleted status shape with `text` set. `delete_media=True` also deletes attached `media_attachments` |
 | POST | `/api/v1/statuses/{id}/reblog` | `status_reblog()` | **Full** — creates a new `statuses` row with `reblog_of_id` set; generates `reblog` notification for original author |
@@ -172,8 +172,8 @@ to a concrete client call.
 | GET | `/api/v1/notifications/unread_count` | `notifications_unread_count()` | **Full** |
 | POST | `/api/v1/notifications/clear` | `notifications_clear()` | **Full** — deletes all notifications for the user |
 | POST | `/api/v1/notifications/{id}/dismiss` (and bulk variant) | `notifications_dismiss()` | **Full** — sets `read=True` / deletes |
-| GET/PATCH | `/api/v2/notifications/policy` | `notifications_policy()`, `update_notifications_policy()` | **Static** — fixed "accept everything" policy (incl. `for_bots`); PATCH accepted and ignored |
-| `/api/v1/notifications/requests*` | `notification_request*()` | **Stub** — list is always empty; `requests/merged` returns `{merged: true}`; single fetch 404s; accept/dismiss (single + bulk) are no-ops |
+| GET/PATCH | `/api/v2/notifications/policy` | `notifications_policy()`, `update_notifications_policy()` | **Full** — per-account `accept`/`filter`/`drop` policy with pending request/notification summary |
+| `/api/v1/notifications/requests*` | `notification_request*()` | **Full** — groups filtered notifications by actor; accept merges into the main feed and allows future notifications, dismiss deletes pending notifications |
 | GET | `/api/v2/notifications` | `grouped_notifications()` | **Full** — groups favourite/follow/reblog by target into `NotificationGroup`s; other types stay individual. Returns the `accounts`/`statuses`/`notification_groups` container with `Link` pagination. |
 | GET | `/api/v2/notifications/unread_count` | `unread_grouped_notifications_count()` | **Full** — counts unread *groups*, not rows |
 | GET | `/api/v2/notifications/{group_key}` | `grouped_notification()` | **Full** — single-group container; 404 if no members |
@@ -438,8 +438,8 @@ They do not reproduce Mastodon's ranking algorithms, but satisfy callers that it
 
 | Method | Path | Mastodon.py caller(s) | Coverage |
 |--------|------|------------------------|----------|
-| GET | `/api/v1/suggestions`, `/api/v2/suggestions` | `suggestions()` / `suggestions_v2()` | **Full** — local accounts the viewer doesn't follow (emitted in the v2 `Suggestion` shape) |
-| DELETE | `/api/v1/suggestions/{id}` | no Mastodon.py caller | **Stub** — accepts dismissal but does not persist it, so the suggestion can reappear |
+| GET | `/api/v1/suggestions`, `/api/v2/suggestions` | `suggestions()` / `suggestions_v2()` | **Full** — local accounts the viewer doesn't follow and has not dismissed |
+| DELETE | `/api/v1/suggestions/{id}` | no Mastodon.py caller | **Full** — persists a viewer-specific dismissal |
 | GET | `/api/v1/trends`, `/api/v1/trends/tags` | `trending_tags()` | **Full** — local hashtags ranked by status count, `Tag` shape with 7-day history |
 | GET | `/api/v1/trends/statuses` | `trending_statuses()` | **Full** — public local statuses ranked by favourites |
 | GET | `/api/v1/trends/links` | `trending_links()` | **Stub** — empty list (no preview-card synthesis) |

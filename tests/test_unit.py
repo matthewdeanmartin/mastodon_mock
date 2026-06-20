@@ -27,9 +27,9 @@ def test_parse_version_string() -> None:
 
 
 def test_api_version_for() -> None:
-    assert api_version_for("4.4.4") == 2
+    assert api_version_for("4.4.4") == 3
     assert api_version_for("4.2.0") == 1
-    assert api_version_for("9.9.9") == 2  # unknown → newest
+    assert api_version_for("9.9.9") == 10  # future version → newest known API level
 
 
 def test_config_load_from_explicit_toml(tmp_path: Path) -> None:

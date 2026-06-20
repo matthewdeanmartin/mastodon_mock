@@ -109,7 +109,7 @@ currently serves a JSON identity blob at `GET /`
 contract. The UI therefore lives at **`/_ui/`**, and `GET /` gains a pointer:
 
 ```json
-{ "mastodon_mock": true, "version": "4.4.4", "ui": "/_ui/" }
+{ "mastodon_mock": true, "version": "4.6.0", "ui": "/_ui/" }
 ```
 
 ## Build & packaging contract (critical)

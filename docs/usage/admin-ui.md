@@ -99,7 +99,9 @@ These routes remain shallow:
 - admin dimensions return empty data arrays for requested keys;
 - admin retention returns an empty list.
 
-Moderation flags and block-list records persist, but most do not yet affect ordinary
-login, posting, timeline, signup, or discovery behavior.
+Moderation state also affects the regular API: suspended/disabled accounts cannot use
+authenticated writes, limited accounts are removed from public discovery unless followed,
+forced-sensitive accounts produce sensitive statuses, signup email/IP blocks are enforced,
+and rejected trends disappear from public trend results.
 
 See [What Is and Isn't Mocked](../reference/coverage.md) for the full coverage summary.

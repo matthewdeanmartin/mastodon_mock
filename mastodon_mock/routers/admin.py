@@ -7,12 +7,11 @@ the project's "no real security" non-goal in spec/00-overview.md.
 
 from __future__ import annotations
 
-import hashlib
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from mastodon_mock.db.models import (
@@ -25,11 +24,13 @@ from mastodon_mock.db.models import (
     Announcement,
     Report,
     Status,
+    TrendReview,
     utcnow,
 )
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
+from mastodon_mock.moderation import canonicalize_email
 from mastodon_mock.pagination import paginate, parse_db_id
-from mastodon_mock.routers.helpers import PageQuery, read_body, set_link_header
+from mastodon_mock.routers.helpers import PageQuery, read_body, set_link_header, truthy
 from mastodon_mock.serializers.admin import (
     serialize_admin_account,
     serialize_admin_canonical_email_block,
@@ -58,23 +59,24 @@ def _record_or_404(db: Session, model: Any, record_id: str) -> Any:
 # --- Accounts -----------------------------------------------------------------
 
 
-def _apply_account_status_filter(accounts: list[Account], status: str) -> list[Account]:
-    """Filter accounts by the AdminAccount moderation status string."""
-
-    def matches(account: Account) -> bool:
-        if status == "active":
-            return account.approved and not account.suspended and not account.disabled and not account.silenced
-        if status == "pending":
-            return not account.approved
-        if status == "disabled":
-            return account.disabled
-        if status == "silenced":
-            return account.silenced
-        if status == "suspended":
-            return account.suspended
-        return True
-
-    return [a for a in accounts if matches(a)]
+def _account_status_clause(status: str) -> Any:
+    """SQL equivalent of the admin account status filter, applied before pagination."""
+    if status == "active":
+        return and_(
+            Account.approved.is_(True),
+            Account.suspended.is_(False),
+            Account.disabled.is_(False),
+            Account.silenced.is_(False),
+        )
+    if status == "pending":
+        return Account.approved.is_(False)
+    if status == "disabled":
+        return Account.disabled.is_(True)
+    if status == "silenced":
+        return Account.silenced.is_(True)
+    if status == "suspended":
+        return Account.suspended.is_(True)
+    return True
 
 
 @router.get("/api/v2/admin/accounts")
@@ -110,12 +112,12 @@ def admin_accounts_v2(
     if qp.get("permissions") == "staff":
         stmt = stmt.where(Account.role.in_(["moderator", "admin", "owner"]))
 
+    stmt = stmt.where(_account_status_clause(qp.get("status") or "active"))
     result = paginate(
         db, stmt, Account.id, max_id=page.max_id, min_id=page.min_id, since_id=page.since_id, limit=page.limit
     )
-    items = _apply_account_status_filter(list(result.items), qp.get("status") or "active")
     set_link_header(request, response, result)
-    return [serialize_admin_account(db, a, config) for a in items]
+    return [serialize_admin_account(db, a, config) for a in result.items]
 
 
 @router.get("/api/v1/admin/accounts")
@@ -132,7 +134,7 @@ def admin_accounts_v1(
     stmt = select(Account)
 
     # v1 uses boolean flags (remote/local) rather than an `origin` string.
-    stmt = stmt.where(Account.domain.is_not(None) if qp.get("remote") else Account.domain.is_(None))
+    stmt = stmt.where(Account.domain.is_not(None) if truthy(qp.get("remote")) else Account.domain.is_(None))
 
     if qp.get("by_domain"):
         stmt = stmt.where(Account.domain == qp["by_domain"])
@@ -144,21 +146,21 @@ def admin_accounts_v1(
         stmt = stmt.where(Account.email == qp["email"])
     if qp.get("ip"):
         stmt = stmt.where(Account.ip == qp["ip"])
-    if qp.get("staff"):
+    if truthy(qp.get("staff")):
         stmt = stmt.where(Account.role.in_(["moderator", "admin", "owner"]))
 
     # v1 status is encoded as `active=true`/`pending=true`/etc.
     status = "active"
     for candidate in ("active", "pending", "disabled", "silenced", "suspended"):
-        if qp.get(candidate):
+        if truthy(qp.get(candidate)):
             status = candidate
 
+    stmt = stmt.where(_account_status_clause(status))
     result = paginate(
         db, stmt, Account.id, max_id=page.max_id, min_id=page.min_id, since_id=page.since_id, limit=page.limit
     )
-    items = _apply_account_status_filter(list(result.items), status)
     set_link_header(request, response, result)
-    return [serialize_admin_account(db, a, config) for a in items]
+    return [serialize_admin_account(db, a, config) for a in result.items]
 
 
 @router.get("/api/v1/admin/accounts/{account_id}")
@@ -298,13 +300,21 @@ async def create_report(request: Request, db: DbSession, config: Config, account
     target = _record_or_404(db, Account, str(target_id))
 
     category = body.get("category") or "other"
-    if category not in ("spam", "violation", "other"):
+    if category not in ("spam", "violation", "other", "legal"):
         raise HTTPException(status_code=422, detail="Validation failed: Invalid category")
+    from mastodon_mock.moderation import domain_rejects_reports
+
+    if domain_rejects_reports(db, target.domain):
+        raise HTTPException(status_code=422, detail="Reports to this domain are disabled")
 
     raw_status_ids = body.get("status_ids") or []
     if isinstance(raw_status_ids, (str, int)):
         raw_status_ids = [raw_status_ids]
     status_ids = [int(s) for s in raw_status_ids]
+    for status_id in status_ids:
+        reported_status = db.get(Status, status_id)
+        if reported_status is None or reported_status.account_id != target.id:
+            raise HTTPException(status_code=422, detail="Reported statuses must belong to the target account")
 
     raw_rule_ids = body.get("rule_ids") or []
     if isinstance(raw_rule_ids, (str, int)):
@@ -422,8 +432,14 @@ def admin_trending_tags(
     from mastodon_mock.routers.instance import trending_tag_rows
 
     return [
-        {**tag, "requires_review": False, "trendable": True, "usable": True}
-        for tag in trending_tag_rows(db, config, min(limit, 20))
+        {
+            **tag,
+            "id": tag["name"],
+            "requires_review": False,
+            "trendable": _trend_decision(db, "tag", str(tag["name"])) is not False,
+            "usable": True,
+        }
+        for tag in trending_tag_rows(db, config, min(limit, 20), include_rejected=True)
     ]
 
 
@@ -434,7 +450,7 @@ def admin_trending_statuses(
     """Admin trending statuses — the most-favourited public local statuses."""
     from mastodon_mock.routers.instance import trending_status_rows
 
-    return trending_status_rows(db, config, account, min(limit, 40))
+    return trending_status_rows(db, config, account, min(limit, 40), include_rejected=True)
 
 
 @router.get("/api/v1/admin/trends/links")
@@ -444,14 +460,16 @@ def admin_trending_links(db: DbSession, account: RequiredAccount) -> list[dict[s
 
 
 @router.post("/api/v1/admin/trends/links/{link_id}/approve")
-def admin_approve_trending_link(link_id: str, account: RequiredAccount) -> dict[str, Any]:
+def admin_approve_trending_link(link_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Approve a trending link (echo minimal PreviewCard)."""
+    _set_trend_decision(db, "link", link_id, True, account.id)
     return {"url": "", "title": "", "description": "", "type": "link"}
 
 
 @router.post("/api/v1/admin/trends/links/{link_id}/reject")
-def admin_reject_trending_link(link_id: str, account: RequiredAccount) -> dict[str, Any]:
+def admin_reject_trending_link(link_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Reject a trending link (echo minimal PreviewCard)."""
+    _set_trend_decision(db, "link", link_id, False, account.id)
     return {"url": "", "title": "", "description": "", "type": "link"}
 
 
@@ -461,6 +479,7 @@ def admin_approve_trending_status(
 ) -> dict[str, Any]:
     """Approve a trending status."""
     status = _record_or_404(db, Status, status_id)
+    _set_trend_decision(db, "status", str(status.id), True, account.id)
     return serialize_status(db, status, config, account)
 
 
@@ -470,19 +489,22 @@ def admin_reject_trending_status(
 ) -> dict[str, Any]:
     """Reject a trending status."""
     status = _record_or_404(db, Status, status_id)
+    _set_trend_decision(db, "status", str(status.id), False, account.id)
     return serialize_status(db, status, config, account)
 
 
 @router.post("/api/v1/admin/trends/tags/{tag_id}/approve")
-def admin_approve_trending_tag(tag_id: str, config: Config, account: RequiredAccount) -> dict[str, Any]:
+def admin_approve_trending_tag(tag_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Approve a trending tag (echo minimal Tag)."""
-    return {"name": "", "url": f"https://{config.domain}/tags/"}
+    _set_trend_decision(db, "tag", tag_id.lower(), True, account.id)
+    return {"name": tag_id, "url": f"https://{config.domain}/tags/{tag_id}"}
 
 
 @router.post("/api/v1/admin/trends/tags/{tag_id}/reject")
-def admin_reject_trending_tag(tag_id: str, config: Config, account: RequiredAccount) -> dict[str, Any]:
+def admin_reject_trending_tag(tag_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Reject a trending tag (echo minimal Tag)."""
-    return {"name": "", "url": f"https://{config.domain}/tags/"}
+    _set_trend_decision(db, "tag", tag_id.lower(), False, account.id)
+    return {"name": tag_id, "url": f"https://{config.domain}/tags/{tag_id}"}
 
 
 # --- Announcements ------------------------------------------------------------
@@ -512,6 +534,8 @@ async def admin_create_announcement(request: Request, db: DbSession, account: Re
         content=text,
         all_day=all_day,
         published=published,
+        starts_at=_parse_datetime(body.get("starts_at")),
+        ends_at=_parse_datetime(body.get("ends_at")),
         published_at=now,
         updated_at=now,
     )
@@ -753,14 +777,6 @@ def admin_delete_email_domain_block(block_id: str, db: DbSession, account: Requi
 # --- Canonical email blocks ---------------------------------------------------
 
 
-def _canonicalize_email(email: str) -> str:
-    """Canonicalize then SHA256-hash an email, per Mastodon's email_helper.rb."""
-    local, _, domain = email.strip().lower().partition("@")
-    local = local.split("+", 1)[0].replace(".", "")
-    canonical = f"{local}@{domain}"
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
 @router.get("/api/v1/admin/canonical_email_blocks/{block_id}")
 def admin_canonical_email_block(block_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Fetch a single canonical email block."""
@@ -799,7 +815,7 @@ async def admin_test_canonical_email_block(
     email = body.get("email")
     if not email:
         return []
-    digest = _canonicalize_email(email)
+    digest = canonicalize_email(email)
     matches = db.scalars(
         select(AdminCanonicalEmailBlock).where(AdminCanonicalEmailBlock.canonical_email_hash == digest)
     ).all()
@@ -817,7 +833,7 @@ async def admin_create_canonical_email_block(
         email = body.get("email")
         if not email:
             raise HTTPException(status_code=422, detail="Either 'email' or 'canonical_email_hash' must be provided.")
-        digest = _canonicalize_email(email)
+        digest = canonicalize_email(email)
     block = AdminCanonicalEmailBlock(canonical_email_hash=digest)
     db.add(block)
     db.commit()
@@ -957,6 +973,37 @@ async def admin_retention(request: Request, account: RequiredAccount) -> list[di
 # --- helpers ------------------------------------------------------------------
 
 
+def _trend_decision(db: Session, kind: str, key: str) -> bool | None:
+    """Return the persisted review decision, or ``None`` when unreviewed."""
+    review = db.scalar(select(TrendReview).where(TrendReview.kind == kind, TrendReview.key == key))
+    return review.approved if review is not None else None
+
+
+def _set_trend_decision(
+    db: Session,
+    kind: str,
+    key: str,
+    approved: bool,
+    account_id: int,
+) -> None:
+    """Create or update a moderator's trend decision."""
+    review = db.scalar(select(TrendReview).where(TrendReview.kind == kind, TrendReview.key == key))
+    if review is None:
+        review = TrendReview(
+            kind=kind,
+            key=key,
+            approved=approved,
+            updated_by_account_id=account_id,
+            updated_at=utcnow(),
+        )
+        db.add(review)
+    else:
+        review.approved = approved
+        review.updated_by_account_id = account_id
+        review.updated_at = utcnow()
+    db.commit()
+
+
 def _as_bool(value: Any) -> bool:
     """Coerce a form/JSON truthy value to bool."""
     if isinstance(value, bool):
@@ -973,4 +1020,13 @@ def _expires_at(expires_in: Any) -> Any:
     try:
         return utcnow() + timedelta(seconds=int(expires_in))
     except (ValueError, TypeError):
+        return None
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
         return None

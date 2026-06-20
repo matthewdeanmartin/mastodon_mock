@@ -335,8 +335,53 @@ class Notification(Base):
     type: Mapped[str] = mapped_column(String)
     from_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"))
     status_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=True)
+    request_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("notification_requests.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class NotificationPolicy(Base):
+    """Per-account filtering policy for incoming notifications."""
+
+    __tablename__ = "notification_policies"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), unique=True, index=True)
+    for_not_following: Mapped[str] = mapped_column(String, default="accept")
+    for_not_followers: Mapped[str] = mapped_column(String, default="accept")
+    for_new_accounts: Mapped[str] = mapped_column(String, default="accept")
+    for_private_mentions: Mapped[str] = mapped_column(String, default="accept")
+    for_limited_accounts: Mapped[str] = mapped_column(String, default="accept")
+
+
+class NotificationRequest(Base):
+    """Filtered notifications grouped by recipient and actor."""
+
+    __tablename__ = "notification_requests"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    from_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    __table_args__ = (UniqueConstraint("account_id", "from_account_id", name="uq_notification_request_accounts"),)
+
+
+class NotificationPolicyOverride(Base):
+    """Actor explicitly accepted from the notification-request queue."""
+
+    __tablename__ = "notification_policy_overrides"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    from_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+
+    __table_args__ = (
+        UniqueConstraint("account_id", "from_account_id", name="uq_notification_policy_override_accounts"),
+    )
 
 
 class UserList(Base):
@@ -494,6 +539,18 @@ class ConversationRead(Base):
     __table_args__ = (UniqueConstraint("account_id", "conversation_id", name="uq_conversation_read"),)
 
 
+class SuggestionDismissal(Base):
+    """A follow suggestion hidden by an account."""
+
+    __tablename__ = "suggestion_dismissals"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    target_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+
+    __table_args__ = (UniqueConstraint("account_id", "target_account_id", name="uq_suggestion_dismissal_accounts"),)
+
+
 class PushSubscription(Base):
     """A Web Push subscription for an OAuth token (one per token, per Mastodon semantics)."""
 
@@ -592,3 +649,18 @@ class AdminIpBlock(Base):
     comment: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class TrendReview(Base):
+    """Persisted moderator decision for a trend candidate."""
+
+    __tablename__ = "trend_reviews"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    kind: Mapped[str] = mapped_column(String, index=True)
+    key: Mapped[str] = mapped_column(String, index=True)
+    approved: Mapped[bool] = mapped_column(Boolean)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_by_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"))
+
+    __table_args__ = (UniqueConstraint("kind", "key", name="uq_trend_review_kind_key"),)

@@ -7,14 +7,16 @@ integer ``api_versions.mastodon`` value from the major.minor line.
 from __future__ import annotations
 
 # The newest Mastodon release the mock has been validated against.
-CURRENT_VERSION = "4.4.4"
+CURRENT_VERSION = "4.6.0"
 # The previous minor line, exercised in the test matrix.
-PREVIOUS_VERSION = "4.3.9"
+PREVIOUS_VERSION = "4.5.7"
 
 # api_versions.mastodon integer per major.minor line (Mastodon introduced API
 # versioning in 4.3). Update when bumping the pinned versions.
 API_VERSION_BY_MASTODON_VERSION: dict[tuple[int, int], int] = {
-    (4, 4): 2,
+    (4, 6): 10,
+    (4, 5): 4,
+    (4, 4): 3,
     (4, 3): 2,
     (4, 2): 1,
     (4, 1): 1,
@@ -47,4 +49,6 @@ def parse_version_string(version: str) -> tuple[int, int, int]:
 def api_version_for(mocked_version: str) -> int:
     """Return the integer ``api_versions.mastodon`` value for a version string."""
     major, minor, _ = parse_version_string(mocked_version)
+    if (major, minor) > (4, 6):
+        return 10
     return API_VERSION_BY_MASTODON_VERSION.get((major, minor), 2)

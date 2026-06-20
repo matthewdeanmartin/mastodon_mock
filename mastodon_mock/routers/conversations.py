@@ -92,7 +92,7 @@ def conversations(
         conv_id = _conversation_id(last_status.id)
         other_ids = [i for i in key if i != account.id]
         accounts = [acc for i in other_ids if (acc := db.get(Account, i)) is not None]
-        last = serialize_status(db, last_status, config, account)
+        last = serialize_status(db, last_status, config, account, filter_context="notifications")
         out.append(serialize_conversation(db, conv_id, accounts, last, conv_id not in read_ids, config))
 
     page = Page(

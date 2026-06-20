@@ -177,13 +177,13 @@ def render_text(report: ComparisonReport) -> str:
         f"mock:  {m.get('title', '?')} {m.get('version', '?')}",
         "",
         f"shared operations:        {len(report.common)}",
-        f"mock-only (unexpected):   {len(report.mock_only)}",
+        f"mock-only (operation-reviewed separately): {len(report.mock_only)}",
         f"mock-only (allow-listed): {len(report.mock_only_ignored)}",
         f"truth-only (unimplemented): {len(report.truth_only)}",
         f"required-param mismatches:  {len(report.param_diffs)}",
     ]
     if report.mock_only:
-        lines += ["", "## Mock-only operations (not in upstream, not allow-listed):"]
+        lines += ["", "## Mock-only operations requiring per-operation review:"]
         lines += [f"  + {_fmt_op(op)}" for op in sorted(report.mock_only)]
     if report.truth_only:
         lines += ["", "## Truth-only operations (upstream endpoints the mock lacks):"]
@@ -216,7 +216,7 @@ def render_markdown(report: ComparisonReport) -> str:
         "| metric | count |",
         "| --- | --- |",
         f"| shared operations | {len(report.common)} |",
-        f"| mock-only (unexpected) | {len(report.mock_only)} |",
+        f"| mock-only (operation-reviewed separately) | {len(report.mock_only)} |",
         f"| mock-only (allow-listed) | {len(report.mock_only_ignored)} |",
         f"| truth-only (unimplemented) | {len(report.truth_only)} |",
         f"| required-param mismatches | {len(report.param_diffs)} |",
@@ -230,7 +230,7 @@ def render_markdown(report: ComparisonReport) -> str:
             lines.append("_none_")
 
     section(
-        "Mock-only operations (not in upstream, not allow-listed)",
+        "Mock-only operations requiring per-operation review",
         [_fmt_op(op) for op in sorted(report.mock_only)],
     )
     section(

@@ -10,9 +10,10 @@ method that hits each route) lives in the
 
 | Level | Meaning |
 |------------|---------------------------------------------------------------------------------------------|
-| **Full** | Real, persisted state. Writes are reflected in later reads. Safe to assert behaviour on. |
-| **Static** | Fixed response, no persistence. Intended for shape/client-flow compatibility; strict schema conformance may still have gaps. |
-| **Stub** | Minimal valid shape (usually an empty list/dict) so the client doesn't error. No behaviour. |
+| **Stateful** | Persisted state affects later reads or writes. Safe to assert behavior on. |
+| **Derived** | Computed from mock state, but not a reproduction of Mastodon's ranking/analytics engine. |
+| **Static** | Fixed response, no persistence. Intended for shape/client-flow compatibility. |
+| **No-op** | Accepts the operation but deliberately records no behavior. |
 | **OOS** | Out of scope — the route isn't implemented; the client gets a `404`. |
 
 ## Fully stateful (assert freely)
@@ -34,7 +35,7 @@ relationships, notifications, and pagination you'd expect.
   `visibility`, `sensitive`, `spoiler_text`, `language`, `media_ids`, polls, quotes,
   `scheduled_at`, `idempotency_key`), edit, delete, reblog/unreblog, favourite/unfavourite,
   mute/unmute, pin/unpin, bookmark/unbookmark.
-- **Quotes (write)** — revoke a quote of your status (`status_quote_revoke`, which sets the
+- **Quotes (write)** — quote approval policy is enforced when creating a quote; revoke a quote of your status (`status_quote_revoke`, which sets the
   quoting status's `quote.state` to `revoked` and hides the quoted status) and update a
   status's quote-approval policy (`status_update_quote_approval_policy`; private/direct
   statuses are forced to `nobody`).
@@ -45,14 +46,16 @@ relationships, notifications, and pagination you'd expect.
 - **Timelines** — home, public (with `local` / `remote` filters), hashtag, list. With
   `max_id` / `min_id` / `since_id` / `limit` paging and `Link` headers.
 - **Notifications** — list (filterable by type/account), get, unread count, clear, dismiss;
-  and the full **grouped** notifications API (`/api/v2/notifications*`).
+  persisted per-account filtering policy, notification request groups with
+  accept/dismiss/merge behavior, and the full **grouped** notifications API
+  (`/api/v2/notifications*`).
 - **Media** — upload (bytes stored and served back), fetch, metadata update
   (`description` / `focus`).
 - **Search** — v1 and v2, over local accounts, status content, and hashtags.
 - **Lists** — full CRUD plus membership add/remove.
 - **Favourites & bookmarks** — list endpoints.
-- **Filters** — v1 and v2 CRUD, plus v2 keyword add/remove **and v2 status
-  attach/detach** (`filter_statuses`).
+- **Filters** — v1 and v2 CRUD, v2 keyword/status attach/detach, and viewer-relative
+  `Status.filtered` results in home/public/thread/account/notification contexts.
 - **Conversations** — derived from `direct`-visibility statuses; mark-as-read.
 - **Announcements** — listed from config-seeded announcements, with per-user
   dismiss (`read`) and emoji reactions (`announcement_dismiss` /
@@ -77,6 +80,10 @@ relationships, notifications, and pagination you'd expect.
   resolve / reopen), and CRUD for domain blocks, domain allows, email-domain blocks,
   canonical-email blocks, and IP blocks. **Auth is faked — there is no role enforcement** (any
   authenticated account may call these), consistent with the "no real security" non-goal.
+  Moderation flags have observable effects: suspended/disabled accounts cannot use
+  authenticated writes, limited accounts leave public discovery, forced-sensitive
+  accounts serialize sensitive statuses, signup blocks are enforced, and trend review
+  decisions affect public trends.
 - **Mock-only development helpers** — reset the database to seed state, mint tokens for
   seeded users, create/list dev users, append capped sample-data cohorts, and a
   **fault-injection control plane** (`/api/v1/_mock/faults`) for forcing `5xx`/`429`,
@@ -99,7 +106,6 @@ The response is well-formed and stable, but nothing changes in response to your 
   URL crawling.
 - **Custom emojis** — a small, fixed set in the correct `CustomEmoji` shape.
 - **Translation languages** — each supported source language mapped to a fixed target set.
-- **Notification policy** — a fixed "accept everything" policy (PATCH accepted and ignored).
 
 ## Discovery (data-derived, correct shape)
 
@@ -116,8 +122,8 @@ not full reproductions of Mastodon's ranking algorithms, but the shapes match a 
   **links** is an empty list (no preview-card synthesis).
 - **Follow suggestions** (`suggestions_v2`) — local accounts you don't already follow.
 - **Endorsements** — the accounts you've endorsed (`relationships.endorsed`, i.e. pinned).
-- **Notification requests** — empty (the "accept everything" policy filters nothing), with
-  the full request family (`accept`/`dismiss`/`merged`) wired as no-ops.
+- **Follow suggestions** — local accounts you don't already follow, minus persisted
+  dismissals.
 
 ## Stubs (empty/minimal, no behaviour)
 
@@ -129,8 +135,7 @@ data:
 - `email_resend_confirmation` (accepts and does nothing).
 - Mastodon 4.6 collections, annual reports, and async refresh status — routed for
   operation compatibility, but fixed/empty/no-op rather than stateful.
-- Account identity proofs (empty), suggestion dismissal (no-op), and notification
-  policy updates/requests (fixed accept-all policy, no queue).
+- Account identity proofs (empty).
 
 ## Out-of-scope behavior behind routed endpoints
 
@@ -154,9 +159,8 @@ remaining out-of-scope pieces are behavior behind routed endpoints:
   you seed them with a `domain`.
 - **Pagination is real.** List endpoints honour `max_id` / `min_id` / `since_id` / `limit`
   and emit a `Link` header, so Mastodon.py's `fetch_next` / `fetch_previous` work.
-- **CRUD does not always imply enforcement.** Filters are persisted but are not applied
-  to returned statuses; admin moderation flags mostly affect admin views rather than
-  normal posting/timeline behavior.
+- **Moderation enforcement is configurable.** It is enabled by default for 4.6-oriented
+  behavior; set `moderation.enforce_actions = false` for older permissive test suites.
 - **The bundled UI is a client of the same API.** It is served at `/_ui/` when built and
   uses the mock-only dev helpers plus regular Mastodon/admin endpoints.
 
