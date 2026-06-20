@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from mastodon_mock.db.models import Account, DomainBlock, Relationship
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
+from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.relationships import serialize_relationship
 from mastodon_mock.services import find_relationship, get_or_create_relationship
@@ -120,10 +121,8 @@ async def domain_unblock(request: Request, db: DbSession, account: RequiredAccou
 
 def _account_or_404(db: DbSession, account_id: str) -> Account:
     """Fetch an account or raise 404."""
-    try:
-        acc = db.get(Account, int(account_id))
-    except (ValueError, TypeError):
-        acc = None
+    pid = parse_db_id(account_id)
+    acc = db.get(Account, pid) if pid is not None else None
     if acc is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return acc

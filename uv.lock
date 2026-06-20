@@ -977,7 +977,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -2362,7 +2362,7 @@ wheels = [
 
 [[package]]
 name = "mastodon-mock"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
@@ -2428,6 +2428,7 @@ dev = [
     { name = "pyyaml" },
     { name = "refurb" },
     { name = "ruff" },
+    { name = "schemathesis" },
     { name = "tox" },
     { name = "tox-uv" },
     { name = "troml-dev-status" },
@@ -2496,6 +2497,7 @@ dev = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "refurb", specifier = ">=2.0.0" },
     { name = "ruff", specifier = ">=0.12.0" },
+    { name = "schemathesis", specifier = ">=4.0.0" },
     { name = "tox", specifier = ">=4.0" },
     { name = "tox-uv", specifier = ">=1.0" },
     { name = "troml-dev-status", specifier = ">=0.6.0" },

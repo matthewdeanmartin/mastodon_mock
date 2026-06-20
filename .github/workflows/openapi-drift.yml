@@ -52,12 +52,17 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
           node-version: '22'
-      # The upstream schema generator is a separate, untracked checkout. Vendor it fresh
-      # so the comparison runs against the current upstream contract. Pinned to a tag
-      # would be more reproducible; main gives us "latest upstream" for drift alerting.
+      # The upstream schema generator is a separate repo. The repo now vendors a snapshot
+      # at mastodon-openapi/dist/schema.json (committed), so we can't clone on top of it.
+      # Clone fresh into a temp dir and overwrite the vendored copy, so this drift check
+      # always compares against current upstream rather than the committed snapshot. Pinned
+      # to a tag would be more reproducible; main gives us "latest upstream" for alerting.
       - name: Vendor upstream Mastodon OpenAPI schema
         run: |
-          git clone --depth 1 https://github.com/abraham/mastodon-openapi.git mastodon-openapi
+          set -euo pipefail
+          git clone --depth 1 https://github.com/abraham/mastodon-openapi.git /tmp/upstream-openapi
+          mkdir -p mastodon-openapi/dist
+          cp /tmp/upstream-openapi/dist/schema.json mastodon-openapi/dist/schema.json
       - name: Sync dependencies
         run: uv sync --extra test
       - name: Generate drift report

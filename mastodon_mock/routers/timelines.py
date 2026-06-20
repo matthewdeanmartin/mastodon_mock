@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 
 from mastodon_mock.db.models import Account, Relationship, Status, StatusMention, StatusTag, UserList, UserListAccount
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
-from mastodon_mock.pagination import paginate
+from mastodon_mock.pagination import paginate, parse_db_id
 from mastodon_mock.routers.helpers import PageQuery, set_link_header
 from mastodon_mock.serializers.statuses import serialize_status_list
 
@@ -108,10 +108,8 @@ def timeline_list(
     params: PageQuery,
 ) -> list[dict[str, Any]]:
     """Statuses from accounts in the given list."""
-    try:
-        ul = db.get(UserList, int(list_id))
-    except (ValueError, TypeError):
-        ul = None
+    pid = parse_db_id(list_id)
+    ul = db.get(UserList, pid) if pid is not None else None
     if ul is None:
         raise HTTPException(status_code=404, detail="Record not found")
     member_ids = select(UserListAccount.account_id).where(UserListAccount.list_id == ul.id)

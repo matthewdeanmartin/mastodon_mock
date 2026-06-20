@@ -28,7 +28,7 @@ from mastodon_mock.db.models import (
     utcnow,
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
-from mastodon_mock.pagination import paginate
+from mastodon_mock.pagination import paginate, parse_db_id
 from mastodon_mock.routers.helpers import PageQuery, array_query, read_body, set_link_header
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.common import iso
@@ -90,10 +90,8 @@ def _validate_status_params(params: dict[str, Any]) -> JSONResponse | None:
 
 def _get_status_or_404(db: DbSession, status_id: str) -> Status:
     """Fetch a status by id or raise 404."""
-    try:
-        status = db.get(Status, int(status_id))
-    except (ValueError, TypeError):
-        status = None
+    pid = parse_db_id(status_id)
+    status = db.get(Status, pid) if pid is not None else None
     if status is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return status
@@ -138,10 +136,8 @@ def statuses_many(
     """Fetch multiple statuses by ``id[]``."""
     found: list[Status] = []
     for raw in array_query(request, "id"):
-        try:
-            s = db.get(Status, int(raw))
-        except (ValueError, TypeError):
-            s = None
+        pid = parse_db_id(raw)
+        s = db.get(Status, pid) if pid is not None else None
         if s is not None:
             found.append(s)
     return serialize_status_list(db, found, config, viewer)
@@ -706,10 +702,8 @@ def _publish_due_scheduled(db: DbSession, account: Account) -> None:
 
 def _get_scheduled_or_404(db: DbSession, scheduled_id: str) -> ScheduledStatus:
     """Fetch a scheduled status or raise 404."""
-    try:
-        sched = db.get(ScheduledStatus, int(scheduled_id))
-    except (ValueError, TypeError):
-        sched = None
+    pid = parse_db_id(scheduled_id)
+    sched = db.get(ScheduledStatus, pid) if pid is not None else None
     if sched is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return sched
@@ -753,13 +747,10 @@ def _create_poll(db: DbSession, status: Status, poll_params: dict[str, Any]) -> 
 
 
 def _to_int(value: Any) -> int | None:
-    """Best-effort int coercion."""
+    """Best-effort int coercion for a database id, rejecting out-of-range values."""
     if value is None or value == "":
         return None
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
+    return parse_db_id(value)
 
 
 def _to_bool(value: Any) -> bool:

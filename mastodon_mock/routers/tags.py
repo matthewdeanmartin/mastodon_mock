@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 
 from mastodon_mock.db.models import Account, FeaturedTag, FollowedTag, Status, StatusTag
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
+from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.serializers.common import account_acct, iso
 from mastodon_mock.serializers.discovery import serialize_featured_tag, serialize_tag
 
@@ -145,10 +146,8 @@ def featured_tag_create(
 @router.delete("/api/v1/featured_tags/{tag_id}", status_code=200)
 def featured_tag_delete(tag_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Remove one of the logged-in user's featured hashtags by its id."""
-    try:
-        row = db.get(FeaturedTag, int(tag_id))
-    except (ValueError, TypeError):
-        row = None
+    pid = parse_db_id(tag_id)
+    row = db.get(FeaturedTag, pid) if pid is not None else None
     if row is None or row.account_id != account.id:
         raise HTTPException(status_code=404, detail="Record not found")
     db.delete(row)

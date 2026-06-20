@@ -33,7 +33,7 @@ MOCK_DOMAIN := mock.local
 	gha-validate gha-pin gha-upgrade publish-gha \
 	prerelease publish-check publish \
 	ui ui-dev \
-	compare-openapi openapi-fuzz \
+	vendor-openapi compare-openapi openapi-fuzz \
 	check check-ci \
 	help
 
@@ -86,6 +86,10 @@ help:
 	@echo "  gha-pin                Pin GHA action refs to commit SHAs"
 	@echo "  gha-upgrade            Pin + validate (gha-pin then gha-validate)"
 	@echo "  publish-gha            Dispatch the GitHub Actions publish workflow"
+	@echo ""
+	@echo "  vendor-openapi         Re-vendor upstream schema into git (run by hand, then commit)"
+	@echo "  compare-openapi        Diff mock OpenAPI vs upstream -> spec report"
+	@echo "  openapi-fuzz           OpenAPI contract fuzzing (needs the contract extra)"
 	@echo ""
 	@echo "  check                  Full local quality gate"
 	@echo "  check-ci               CI quality gate (no formatting mutations)"
@@ -372,6 +376,26 @@ ui:
 
 ui-dev:
 	@cd ui && npm start
+
+# Re-vendor the upstream Mastodon OpenAPI schema into git. Run this by hand like a
+# formatter: it overwrites the tracked mastodon-openapi/dist/schema.json, then you review
+# the diff and commit it yourself. Not wired into CI or any quality gate. The contract
+# tests (tests/test_openapi_contract.py) compare against the committed snapshot.
+UPSTREAM_OPENAPI_REPO ?= https://github.com/abraham/mastodon-openapi.git
+vendor-openapi:
+	@echo "Re-vendoring upstream schema from $(UPSTREAM_OPENAPI_REPO) -> mastodon-openapi/dist/schema.json"
+	@tmp=$$(mktemp -d) ; \
+	git clone --depth 1 $(UPSTREAM_OPENAPI_REPO) "$$tmp" ; \
+	if [ ! -f "$$tmp/dist/schema.json" ]; then \
+		echo "ERROR: upstream schema not found at dist/schema.json — upstream layout may have changed" >&2 ; \
+		rm -rf "$$tmp" ; exit 1 ; \
+	fi ; \
+	mkdir -p mastodon-openapi/dist ; \
+	cp "$$tmp/dist/schema.json" mastodon-openapi/dist/schema.json ; \
+	rm -rf "$$tmp"
+	@git diff --quiet -- mastodon-openapi/dist/schema.json \
+		&& echo "No drift - vendored schema already current." \
+		|| echo "Schema updated. Review 'git diff mastodon-openapi/dist/schema.json', run the contract tests, and commit."
 
 compare-openapi:
 	@echo "Comparing mock OpenAPI against upstream Mastodon schema -> spec/openapi_compare_report.md"

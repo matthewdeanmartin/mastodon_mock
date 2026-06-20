@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from mastodon_mock.db.models import Filter, FilterKeyword, FilterStatus
 from mastodon_mock.deps import DbSession, RequiredAccount
+from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.serializers.misc import (
     serialize_filter_keyword,
     serialize_filter_status,
@@ -173,10 +174,8 @@ async def update_filter_keyword_v2(
 @router.delete("/api/v2/filters/keywords/{keyword_id}", status_code=200)
 def delete_filter_keyword_v2(keyword_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Delete a filter keyword."""
-    try:
-        kw = db.get(FilterKeyword, int(keyword_id))
-    except (ValueError, TypeError):
-        kw = None
+    pid = parse_db_id(keyword_id)
+    kw = db.get(FilterKeyword, pid) if pid is not None else None
     if kw is not None:
         db.delete(kw)
         db.commit()
@@ -200,10 +199,9 @@ async def add_filter_status_v2(
     status_id = params.get("status_id")
     if not status_id:
         raise HTTPException(status_code=422, detail="Validation failed: Status can't be blank")
-    try:
-        status_id_int = int(status_id)
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(status_code=422, detail="Validation failed: Status is invalid") from exc
+    status_id_int = parse_db_id(status_id)
+    if status_id_int is None:
+        raise HTTPException(status_code=422, detail="Validation failed: Status is invalid")
     fs = FilterStatus(filter_id=filt.id, status_id=status_id_int)
     db.add(fs)
     db.commit()
@@ -314,10 +312,8 @@ def _apply_keywords(db: DbSession, filt: Filter, params: dict[str, Any]) -> None
 
 def _filter_or_404(db: DbSession, filter_id: str, account_id: int) -> Filter:
     """Fetch a filter owned by the account or raise 404."""
-    try:
-        filt = db.get(Filter, int(filter_id))
-    except (ValueError, TypeError):
-        filt = None
+    pid = parse_db_id(filter_id)
+    filt = db.get(Filter, pid) if pid is not None else None
     if filt is None or filt.account_id != account_id:
         raise HTTPException(status_code=404, detail="Record not found")
     return filt
@@ -325,10 +321,8 @@ def _filter_or_404(db: DbSession, filter_id: str, account_id: int) -> Filter:
 
 def _filter_keyword_or_404(db: DbSession, keyword_id: str, account_id: int) -> FilterKeyword:
     """Fetch a filter keyword whose parent filter is owned by the account, or raise 404."""
-    try:
-        kw = db.get(FilterKeyword, int(keyword_id))
-    except (ValueError, TypeError):
-        kw = None
+    pid = parse_db_id(keyword_id)
+    kw = db.get(FilterKeyword, pid) if pid is not None else None
     if kw is None:
         raise HTTPException(status_code=404, detail="Record not found")
     _filter_or_404(db, str(kw.filter_id), account_id)
@@ -337,10 +331,8 @@ def _filter_keyword_or_404(db: DbSession, keyword_id: str, account_id: int) -> F
 
 def _filter_status_or_404(db: DbSession, filter_status_id: str, account_id: int) -> FilterStatus:
     """Fetch a filter-status row whose parent filter the account owns, or 404."""
-    try:
-        fs = db.get(FilterStatus, int(filter_status_id))
-    except (ValueError, TypeError):
-        fs = None
+    pid = parse_db_id(filter_status_id)
+    fs = db.get(FilterStatus, pid) if pid is not None else None
     if fs is None:
         raise HTTPException(status_code=404, detail="Record not found")
     parent = db.get(Filter, fs.filter_id)

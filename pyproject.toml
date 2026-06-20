@@ -14,6 +14,8 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -111,6 +113,10 @@ dev = [
     "pytest-timeout>=2.4.0",
     "hypothesis>=6.100.0",
     "mastodon.py>=2.2.1",
+    # OpenAPI contract fuzzing. Also published as the `contract` extra for end-users
+    # who want fuzzing without the full dev group; pinned here so any dev install runs
+    # the contract suite instead of skipping it.
+    "schemathesis>=4.0.0",
     "ruff>=0.12.0",
     "troml-dev-status>=0.6.0",
     "pre-commit>=4.0.0",

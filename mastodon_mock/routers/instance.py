@@ -21,7 +21,7 @@ from mastodon_mock.db.models import (
     utcnow,
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
-from mastodon_mock.pagination import clamp_limit, clamp_offset
+from mastodon_mock.pagination import clamp_limit, clamp_offset, parse_db_id
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.announcements import (
     serialize_announcement,
@@ -274,10 +274,8 @@ def custom_emojis(config: Config) -> list[dict[str, Any]]:
 
 def _announcement_or_404(db: DbSession, announcement_id: str) -> Announcement:
     """Fetch an announcement by id or raise 404."""
-    try:
-        announcement = db.get(Announcement, int(announcement_id))
-    except (ValueError, TypeError):
-        announcement = None
+    pid = parse_db_id(announcement_id)
+    announcement = db.get(Announcement, pid) if pid is not None else None
     if announcement is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return announcement

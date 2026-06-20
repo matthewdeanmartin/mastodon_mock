@@ -104,9 +104,21 @@ Point the client at `https://127.0.0.1:3443` (or `localhost`). Without mkcert in
 `gen-dev-cert.sh` falls back to an openssl self-signed cert, but expect Electron clients
 to refuse it outright rather than just warn.
 
-See [HTTPS and Real Mastodon Clients](docs/usage/https-and-real-clients.md) for the full
+See [HTTPS and Real Mastodon Clients](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/usage/https-and-real-clients.md) for the full
 walkthrough (mkcert setup, troubleshooting, and how `serve` derives a reachable
 domain for avatar/header/status URLs).
+
+## Why I think this works
+
+- 100s of unit tests
+  - Integration tests via live server
+  - Integration tests via Angular client
+- Unit tests using mastodon-py
+- Hand tested with half a dozen clients
+- Bundled with a client written specifically to test the mock server
+- Schema compared with the reverse engineered OpenAPI schema
+- Tested against five of my own Mastodon projects
+
 
 ## Tested on...
 

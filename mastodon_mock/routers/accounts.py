@@ -18,7 +18,7 @@ from mastodon_mock.db.models import (
     utcnow,
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
-from mastodon_mock.pagination import clamp_limit, clamp_offset, paginate
+from mastodon_mock.pagination import clamp_limit, clamp_offset, paginate, parse_db_id
 from mastodon_mock.routers.helpers import PageQuery, array_query, read_body, set_link_header, truthy
 from mastodon_mock.routers.tags import featured_tags_for
 from mastodon_mock.serializers.accounts import serialize_account
@@ -38,10 +38,8 @@ router = APIRouter()
 
 def _get_account_or_404(db: DbSession, account_id: str) -> Account:
     """Fetch an account by id or raise 404."""
-    try:
-        account = db.get(Account, int(account_id))
-    except (ValueError, TypeError):
-        account = None
+    pid = parse_db_id(account_id)
+    account = db.get(Account, pid) if pid is not None else None
     if account is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return account
@@ -65,9 +63,8 @@ def account_relationships(
     """Return relationships from the authed account to each requested account."""
     out = []
     for raw in array_query(request, "id"):
-        try:
-            target_id = int(raw)
-        except (ValueError, TypeError):
+        target_id = parse_db_id(raw)
+        if target_id is None:
             continue
         rel = find_relationship(db, account.id, target_id)
         out.append(serialize_relationship(db, target_id, rel, source_id=account.id))
@@ -138,9 +135,8 @@ async def account_familiar_followers(
     }
     out = []
     for raw in await _ids_from_query_or_json(request):
-        try:
-            target_id = int(raw)
-        except (ValueError, TypeError):
+        target_id = parse_db_id(raw)
+        if target_id is None:
             continue
         their_followers = {
             r.source_account_id
@@ -170,10 +166,8 @@ def accounts_many(
     """Fetch multiple accounts by ``id[]``."""
     out = []
     for raw in array_query(request, "id"):
-        try:
-            acc = db.get(Account, int(raw))
-        except (ValueError, TypeError):
-            acc = None
+        pid = parse_db_id(raw)
+        acc = db.get(Account, pid) if pid is not None else None
         if acc is not None:
             out.append(serialize_account(db, acc, config))
     return out

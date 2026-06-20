@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from mastodon_mock.db.models import Account, UserList, UserListAccount
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
+from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.routers.helpers import read_body, truthy
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
@@ -138,18 +139,13 @@ async def _account_ids(request: Request) -> list[str]:
 
 def _list_or_404(db: DbSession, list_id: str, account_id: int) -> UserList:
     """Fetch a list owned by the account or raise 404."""
-    try:
-        ul = db.get(UserList, int(list_id))
-    except (ValueError, TypeError):
-        ul = None
+    pid = parse_db_id(list_id)
+    ul = db.get(UserList, pid) if pid is not None else None
     if ul is None or ul.account_id != account_id:
         raise HTTPException(status_code=404, detail="Record not found")
     return ul
 
 
 def _to_int(value: Any) -> int | None:
-    """Best-effort int coercion."""
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
+    """Best-effort int coercion for a database id, rejecting out-of-range values."""
+    return parse_db_id(value)

@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 
 from mastodon_mock.db.models import Account, ConversationRead, Status, StatusMention
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
-from mastodon_mock.pagination import Page, clamp_limit, coerce_cursor, link_header
+from mastodon_mock.pagination import Page, clamp_limit, coerce_cursor, link_header, parse_db_id
 from mastodon_mock.routers.helpers import PageQuery
 from mastodon_mock.serializers.misc import serialize_conversation
 from mastodon_mock.serializers.statuses import serialize_status
@@ -127,10 +127,7 @@ def read_conversation(conversation_id: str, db: DbSession, account: RequiredAcco
 @router.delete("/api/v1/conversations/{conversation_id}", status_code=200)
 def delete_conversation(conversation_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Delete a conversation (its representative latest status, plus the read marker)."""
-    try:
-        status_id = int(conversation_id)
-    except (ValueError, TypeError):
-        status_id = None
+    status_id = parse_db_id(conversation_id)
     if status_id is not None:
         status = db.get(Status, status_id)
         if status is not None:

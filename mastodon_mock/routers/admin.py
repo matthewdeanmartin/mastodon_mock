@@ -28,7 +28,7 @@ from mastodon_mock.db.models import (
     utcnow,
 )
 from mastodon_mock.deps import Config, DbSession, RequiredAccount
-from mastodon_mock.pagination import paginate
+from mastodon_mock.pagination import paginate, parse_db_id
 from mastodon_mock.routers.helpers import PageQuery, read_body, set_link_header
 from mastodon_mock.serializers.admin import (
     serialize_admin_account,
@@ -48,10 +48,8 @@ router = APIRouter()
 
 def _record_or_404(db: Session, model: Any, record_id: str) -> Any:
     """Fetch a row by string id or raise a Mastodon-shaped 404."""
-    try:
-        row = db.get(model, int(record_id))
-    except (ValueError, TypeError):
-        row = None
+    pid = parse_db_id(record_id)
+    row = db.get(model, pid) if pid is not None else None
     if row is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return row
@@ -272,7 +270,8 @@ async def admin_account_moderate(
 
     report_id = body.get("report_id")
     if report_id:
-        report = db.get(Report, int(report_id))
+        pid = parse_db_id(report_id)
+        report = db.get(Report, pid) if pid is not None else None
         if report is not None:
             report.action_taken = True
             report.action_taken_at = utcnow()
@@ -344,9 +343,11 @@ def admin_reports(
     else:
         stmt = stmt.where(Report.action_taken.is_(False))
     if qp.get("account_id"):
-        stmt = stmt.where(Report.account_id == int(qp["account_id"]))
+        account_id_filter = parse_db_id(qp["account_id"])
+        stmt = stmt.where(Report.account_id == account_id_filter)
     if qp.get("target_account_id"):
-        stmt = stmt.where(Report.target_account_id == int(qp["target_account_id"]))
+        target_account_id_filter = parse_db_id(qp["target_account_id"])
+        stmt = stmt.where(Report.target_account_id == target_account_id_filter)
 
     result = paginate(
         db, stmt, Report.id, max_id=page.max_id, min_id=page.min_id, since_id=page.since_id, limit=page.limit

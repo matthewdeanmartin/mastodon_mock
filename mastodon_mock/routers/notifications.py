@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from mastodon_mock.db.models import Account, Notification
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
-from mastodon_mock.pagination import paginate
+from mastodon_mock.pagination import paginate, parse_db_id
 from mastodon_mock.routers.helpers import PageQuery, array_query, set_link_header
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.grouped_notifications import (
@@ -33,8 +33,10 @@ def _filtered_query(
         query = query.where(Notification.type.in_(types))
     if exclude_types:
         query = query.where(Notification.type.not_in(exclude_types))
-    if from_account_id and from_account_id.isdigit():
-        query = query.where(Notification.from_account_id == int(from_account_id))
+    if from_account_id:
+        from_id = parse_db_id(from_account_id)
+        if from_id is not None:
+            query = query.where(Notification.from_account_id == from_id)
     return query
 
 
@@ -288,10 +290,8 @@ def dismiss_notification(notification_id: str, db: DbSession, account: RequiredA
 
 def _notif_or_404(db: DbSession, notification_id: str, account_id: int) -> Notification:
     """Fetch a notification owned by the account or raise 404."""
-    try:
-        notif = db.get(Notification, int(notification_id))
-    except (ValueError, TypeError):
-        notif = None
+    pid = parse_db_id(notification_id)
+    notif = db.get(Notification, pid) if pid is not None else None
     if notif is None or notif.account_id != account_id:
         raise HTTPException(status_code=404, detail="Record not found")
     return notif

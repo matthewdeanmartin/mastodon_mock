@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from mastodon_mock.db.models import MediaAttachment, utcnow
 from mastodon_mock.deps import DbSession, RequiredAccount
+from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.serializers.media import serialize_media
 
 router = APIRouter()
@@ -132,10 +133,8 @@ def media_delete(media_id: str, db: DbSession, account: RequiredAccount) -> dict
 
 def _media_or_404(db: Session, media_id: str) -> MediaAttachment:
     """Fetch a media attachment or raise 404."""
-    try:
-        media = db.get(MediaAttachment, int(media_id))
-    except (ValueError, TypeError):
-        media = None
+    pid = parse_db_id(media_id)
+    media = db.get(MediaAttachment, pid) if pid is not None else None
     if media is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return media

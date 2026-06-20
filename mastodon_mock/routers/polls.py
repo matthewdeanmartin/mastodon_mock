@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from mastodon_mock.db.models import Poll, PollVote
 from mastodon_mock.deps import CurrentAccount, DbSession, RequiredAccount
+from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.serializers.polls import serialize_poll
 
 router = APIRouter()
@@ -65,10 +66,8 @@ async def _choices(request: Request) -> list[str]:
 
 def _poll_or_404(db: DbSession, poll_id: str) -> Poll:
     """Fetch a poll or raise 404."""
-    try:
-        poll = db.get(Poll, int(poll_id))
-    except (ValueError, TypeError):
-        poll = None
+    pid = parse_db_id(poll_id)
+    poll = db.get(Poll, pid) if pid is not None else None
     if poll is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return poll

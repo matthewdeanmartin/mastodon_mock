@@ -78,6 +78,26 @@ def coerce_cursor(value: str | int | None) -> int | None:
     return max(_SQLITE_INT_MIN, min(parsed, _SQLITE_INT_MAX))
 
 
+def parse_db_id(value: str | int | None) -> int | None:
+    """Parse a path/body id for a primary-key lookup (``db.get(Model, ...)``).
+
+    Unlike ``coerce_cursor``, out-of-range values are *rejected* (``None``) rather than
+    clamped to the boundary: clamping would make a too-large id alias the row at
+    ``2**63-1`` instead of correctly reporting "not found", and would still raise
+    ``OverflowError`` if passed to ``db.get`` unclamped. Non-numeric junk and out-of-range
+    ints both mean "no such row" to a caller that 404s on ``None``.
+    """
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    if not _SQLITE_INT_MIN <= parsed <= _SQLITE_INT_MAX:
+        return None
+    return parsed
+
+
 @dataclass
 class Page:
     """Result of a paginated query: the rows plus first/last ids for the Link header."""

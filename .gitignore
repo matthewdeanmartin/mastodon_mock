@@ -7,6 +7,11 @@ __pycache__/
 *.egg
 *.egg-info/
 dist/
+# but DO track the vendored upstream Mastodon OpenAPI schema (re-vendored by
+# .github/workflows/vendor-openapi-schema.yml). Without this the blanket dist/
+# rule above hides it and the contract tests silently skip.
+!mastodon-openapi/dist/
+!mastodon-openapi/dist/schema.json
 build/
 eggs/
 parts/
