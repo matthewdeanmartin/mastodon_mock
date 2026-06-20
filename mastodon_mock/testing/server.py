@@ -22,6 +22,7 @@ from mastodon_mock.config import (
     DatabaseConfig,
     MastodonMockConfig,
     SeedConfig,
+    StreamingConfig,
 )
 from mastodon_mock.testing.seed import DEFAULT_TEST_SEED
 
@@ -30,12 +31,20 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# requests/urllib3 streaming reads block in a background thread until the next
+# byte arrives; closing the connection from another thread (as StreamCollector's
+# __exit__ does) does not interrupt that blocking read on Windows. A short
+# heartbeat keeps that wait bounded so test teardown isn't paced by the 15s
+# production default (see spec/streaming.md).
+_TEST_HEARTBEAT_SECONDS = 0.2
+
 
 def _default_config(seed: SeedConfig | None = None) -> MastodonMockConfig:
     """The built-in default: an in-memory DB seeded with alice/bob/carol."""
     return MastodonMockConfig(
         database=DatabaseConfig(path=":memory:"),
         seed=seed if seed is not None else DEFAULT_TEST_SEED,
+        streaming=StreamingConfig(heartbeat_seconds=_TEST_HEARTBEAT_SECONDS),
     )
 
 
