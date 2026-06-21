@@ -14,6 +14,8 @@ interface StoredApp {
   redirectUri: string;
 }
 
+type Tab = 'signin' | 'mock' | 'init';
+
 @Component({
   selector: 'app-login',
   imports: [FormsModule],
@@ -27,20 +29,38 @@ export class Login implements OnInit {
   private route = inject(ActivatedRoute);
   protected server = inject(Server);
 
+  protected tab = signal<Tab>('signin');
+
   protected serverPresets = SERVER_PRESETS;
   protected customServer = signal('');
 
+  // --- Sign in (token) ---
   protected token = signal('');
   protected error = signal<string | null>(null);
   protected checking = signal(false);
 
+  // --- Register ---
+  protected showRegister = signal(false);
+  protected regUsername = signal('');
+  protected regEmail = signal('');
+  protected regPassword = signal('');
+  protected regAgree = signal(false);
+  protected regWorking = signal(false);
+  protected regError = signal<string | null>(null);
+  /** When set, registration succeeded; the user must click the verify link to proceed. */
+  protected pendingToken = signal<string | null>(null);
+  protected verifying = signal(false);
+
+  // --- Mock login (account stable) ---
   protected devUsers = signal<DevUser[]>([]);
   protected working = signal(false);
 
+  // --- Mock initialization (seed) ---
   protected preset = signal('small');
   protected seeding = signal(false);
   protected seedMessage = signal<string | null>(null);
 
+  // --- Full OAuth flow ---
   protected showOAuth = signal(false);
   protected appName = signal('mastodon_mock UI');
   protected oauthWorking = signal(false);
@@ -52,6 +72,10 @@ export class Login implements OnInit {
     this.handleOAuthCallback();
   }
 
+  selectTab(tab: Tab): void {
+    this.tab.set(tab);
+  }
+
   selectServer(baseUrl: string): void {
     this.server.setBaseUrl(baseUrl);
     this.customServer.set(baseUrl);
@@ -61,6 +85,186 @@ export class Login implements OnInit {
   useCustomServer(): void {
     this.selectServer(this.customServer());
   }
+
+  // ---------- Sign in with a pasted token ----------
+
+  submit(): void {
+    const value = this.token().trim();
+    if (!value) {
+      return;
+    }
+    this.error.set(null);
+    this.checking.set(true);
+    this.auth.setToken(value);
+    this.api.verifyCredentials().subscribe({
+      next: (acc) => {
+        this.auth.setAccount(acc);
+        this.checking.set(false);
+        this.router.navigateByUrl('/home');
+      },
+      error: () => {
+        this.auth.removeSession(value);
+        this.checking.set(false);
+        this.error.set('That token was rejected. Check it and try again.');
+      },
+    });
+  }
+
+  // ---------- Register (mastodon.social-style signup) ----------
+
+  toggleRegister(): void {
+    this.showRegister.update((v) => !v);
+    this.regError.set(null);
+  }
+
+  /** Register an app for a client_credentials token, then create the account. */
+  register(): void {
+    if (!this.regUsername().trim() || !this.regEmail().trim() || !this.regPassword()) {
+      this.regError.set('Username, email and password are required.');
+      return;
+    }
+    if (!this.regAgree()) {
+      this.regError.set('You must accept the server rules to sign up.');
+      return;
+    }
+    this.regError.set(null);
+    this.regWorking.set(true);
+    const redirectUri = 'urn:ietf:wg:oauth:2.0:oob';
+    this.api.registerApp('mastodon_mock signup', redirectUri).subscribe({
+      next: (app) => {
+        this.api.clientCredentialsToken(app.client_id, app.client_secret).subscribe({
+          next: (appTok) => {
+            this.api
+              .register(appTok.access_token, {
+                username: this.regUsername().trim(),
+                email: this.regEmail().trim(),
+                password: this.regPassword(),
+                agreement: true,
+              })
+              .subscribe({
+                next: (userTok) => {
+                  this.regWorking.set(false);
+                  // Don't sign in yet — wait for the (fake) email verification click.
+                  this.pendingToken.set(userTok.access_token);
+                },
+                error: (err) => {
+                  this.regWorking.set(false);
+                  this.regError.set(this.describeRegError(err));
+                },
+              });
+          },
+          error: () => {
+            this.regWorking.set(false);
+            this.regError.set('Could not obtain an app token.');
+          },
+        });
+      },
+      error: () => {
+        this.regWorking.set(false);
+        this.regError.set('Could not register the signup app.');
+      },
+    });
+  }
+
+  /** Exercise the confirmation endpoint, then sign the new account in. */
+  confirmAndEnter(): void {
+    const tok = this.pendingToken();
+    if (!tok) {
+      return;
+    }
+    this.verifying.set(true);
+    this.api.confirmEmail().subscribe({
+      next: () => this.enterWith(tok),
+      // The mock no-ops; even a failure shouldn't trap the new user.
+      error: () => this.enterWith(tok),
+    });
+  }
+
+  private enterWith(tok: string): void {
+    this.verifying.set(false);
+    this.pendingToken.set(null);
+    this.auth.setToken(tok);
+    this.api.verifyCredentials().subscribe({
+      next: (acc) => {
+        this.auth.setAccount(acc);
+        this.router.navigateByUrl('/home');
+      },
+      error: () => this.router.navigateByUrl('/home'),
+    });
+  }
+
+  private describeRegError(err: unknown): string {
+    const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
+    if (typeof detail === 'string') {
+      return detail;
+    }
+    return 'Sign-up failed — that username may be taken.';
+  }
+
+  // ---------- Mock login: dev users + account switching ----------
+
+  generate(admin: boolean): void {
+    this.working.set(true);
+    this.api.createDevUser(admin).subscribe({
+      next: (user) => {
+        this.working.set(false);
+        this.enterAsDevUser(user);
+        this.refreshDevUsers();
+      },
+      error: () => this.working.set(false),
+    });
+  }
+
+  /** One-click login as an existing dev user: mint a token and add it to the stable. */
+  loginAs(user: DevUser): void {
+    this.working.set(true);
+    this.error.set(null);
+    this.api.mockLogin(user.username).subscribe({
+      next: (tok) => {
+        this.working.set(false);
+        this.enterWith(tok.access_token);
+      },
+      error: () => {
+        this.working.set(false);
+        this.error.set(`Could not log in as @${user.username}.`);
+      },
+    });
+  }
+
+  /** A freshly-generated dev user already carries a token; use it directly. */
+  private enterAsDevUser(user: DevUser): void {
+    this.enterWith(user.access_token);
+  }
+
+  refreshDevUsers(): void {
+    this.api.listDevUsers().subscribe({
+      next: (users) => this.devUsers.set(users),
+      error: () => this.devUsers.set([]),
+    });
+  }
+
+  // ---------- Mock initialization: seed ----------
+
+  seedSample(): void {
+    this.seeding.set(true);
+    this.seedMessage.set(null);
+    this.api.seedSampleData(this.preset()).subscribe({
+      next: ({ report }) => {
+        this.seeding.set(false);
+        this.seedMessage.set(
+          `Created ${report.accounts.toLocaleString()} accounts, ` +
+            `${report.statuses.toLocaleString()} statuses in ${report.total_seconds.toFixed(2)}s`,
+        );
+        this.refreshDevUsers();
+      },
+      error: (err) => {
+        this.seeding.set(false);
+        this.seedMessage.set(err?.error?.detail ?? 'Seeding failed.');
+      },
+    });
+  }
+
+  // ---------- Full OAuth flow ----------
 
   /** If we just came back from /oauth/authorize with a ?code=, exchange it for a token. */
   private handleOAuthCallback(): void {
@@ -87,7 +291,7 @@ export class Login implements OnInit {
           this.oauthWorking.set(false);
           sessionStorage.removeItem(OAUTH_APP_KEY);
           this.router.navigate([], { queryParams: {} });
-          this.use({ access_token: tok.access_token } as DevUser);
+          this.token.set(tok.access_token);
           this.submit();
         },
         error: () => {
@@ -131,72 +335,5 @@ export class Login implements OnInit {
         this.oauthError.set('Could not register the app.');
       },
     });
-  }
-
-  submit(): void {
-    const value = this.token().trim();
-    if (!value) {
-      return;
-    }
-    this.error.set(null);
-    this.checking.set(true);
-    this.auth.setToken(value);
-    this.api.verifyCredentials().subscribe({
-      next: (acc) => {
-        this.auth.setAccount(acc);
-        this.checking.set(false);
-        this.router.navigateByUrl('/home');
-      },
-      error: () => {
-        this.auth.logout();
-        this.checking.set(false);
-        this.error.set('That token was rejected. Check it and try again.');
-      },
-    });
-  }
-
-  generate(admin: boolean): void {
-    this.working.set(true);
-    this.api.createDevUser(admin).subscribe({
-      next: (user) => {
-        this.working.set(false);
-        this.use(user);
-        this.refreshDevUsers();
-      },
-      error: () => this.working.set(false),
-    });
-  }
-
-  /** Bulk-generate a sample cohort, then refresh the dev-user list. */
-  seedSample(): void {
-    this.seeding.set(true);
-    this.seedMessage.set(null);
-    this.api.seedSampleData(this.preset()).subscribe({
-      next: ({ report }) => {
-        this.seeding.set(false);
-        this.seedMessage.set(
-          `Created ${report.accounts.toLocaleString()} accounts, ` +
-            `${report.statuses.toLocaleString()} statuses in ${report.total_seconds.toFixed(2)}s`,
-        );
-        this.refreshDevUsers();
-      },
-      error: (err) => {
-        this.seeding.set(false);
-        this.seedMessage.set(err?.error?.detail ?? 'Seeding failed.');
-      },
-    });
-  }
-
-  refreshDevUsers(): void {
-    this.api.listDevUsers().subscribe({
-      next: (users) => this.devUsers.set(users),
-      error: () => this.devUsers.set([]),
-    });
-  }
-
-  /** Autofill the token box from a dev user (does not auto-submit). */
-  use(user: DevUser): void {
-    this.token.set(user.access_token);
-    this.error.set(null);
   }
 }

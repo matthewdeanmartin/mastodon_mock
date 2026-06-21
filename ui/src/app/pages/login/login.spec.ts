@@ -175,20 +175,34 @@ describe('Login', () => {
     httpMock.expectNone('/api/v1/accounts/verify_credentials');
   });
 
-  it('use() autofills the token field from a dev user without auto-submitting', () => {
+  it('loginAs() mints a fresh token via _mock/login and signs in', () => {
     const fixture = setUp();
     fixture.detectChanges();
     httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
 
-    fixture.componentInstance.use({
+    fixture.componentInstance.loginAs({
       id: '1',
       username: 'alan',
       display_name: 'Alan Turing',
       role: 'user',
-      access_token: 'alan_token',
+      access_token: 'stale_token',
     });
 
-    expect((fixture.componentInstance as any).token()).toBe('alan_token');
-    httpMock.expectNone('/api/v1/accounts/verify_credentials');
+    const loginReq = httpMock.expectOne('/api/v1/_mock/login');
+    expect(loginReq.request.method).toBe('POST');
+    expect(loginReq.request.body).toEqual({ username: 'alan' });
+    loginReq.flush({
+      access_token: 'fresh_token',
+      token_type: 'Bearer',
+      scope: 'read write',
+      created_at: 0,
+    });
+
+    const verifyReq = httpMock.expectOne('/api/v1/accounts/verify_credentials');
+    verifyReq.flush({ id: '1', username: 'alan', display_name: 'Alan Turing' } as never);
+
+    expect(TestBed.inject(Auth).token()).toBe('fresh_token');
   });
 });

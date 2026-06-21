@@ -2,127 +2,224 @@
   <div class="login-card">
     <h1>mastodon_mock</h1>
 
-    <div class="dev">
-      <div class="dev-head">
-        <span class="muted">Server</span>
-      </div>
-      <div class="dev-gen">
-        @for (preset of serverPresets; track preset.baseUrl) {
-          <button
-            class="btn btn-outline"
-            [class.active]="server.baseUrl() === preset.baseUrl"
-            (click)="selectServer(preset.baseUrl)"
-          >
-            {{ preset.label }}
-          </button>
-        }
-      </div>
-      <div class="dev-gen">
-        <input
-          type="text"
-          [ngModel]="customServer()"
-          (ngModelChange)="customServer.set($event)"
-          (keyup.enter)="useCustomServer()"
-          placeholder="https://your.instance"
-        />
-        <button class="btn btn-outline" (click)="useCustomServer()">Use</button>
-      </div>
-      <p class="muted small">Talking to <code>{{ server.baseUrl() || 'this server' }}</code></p>
-    </div>
-
-    <p class="muted">Paste an access token to sign in.</p>
-    <input
-      type="text"
-      [ngModel]="token()"
-      (ngModelChange)="token.set($event)"
-      (keyup.enter)="submit()"
-      placeholder="access token"
-      autofocus
-    />
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
-    <button class="btn" [disabled]="!token().trim() || checking()" (click)="submit()">
-      {{ checking() ? 'Checking…' : 'Sign in' }}
-    </button>
-
-    @if (server.isMock) {
-      <div class="dev">
-        <div class="dev-head">
-          <span class="muted">Dev login</span>
-          <button class="link" (click)="refreshDevUsers()">refresh</button>
-        </div>
-        <div class="dev-gen">
-          <button class="btn btn-outline" [disabled]="working()" (click)="generate(false)">
-            + Regular user
-          </button>
-          <button class="btn btn-outline" [disabled]="working()" (click)="generate(true)">
-            + Admin user
-          </button>
-        </div>
-
-        <div class="dev-gen">
-          <select
-            [ngModel]="preset()"
-            (ngModelChange)="preset.set($event)"
-            [disabled]="seeding()"
-          >
-            <option value="tiny">tiny (~100 posts)</option>
-            <option value="small">small (~5k posts)</option>
-            <option value="medium">medium (~100k posts)</option>
-          </select>
-          <button class="btn btn-outline" [disabled]="seeding()" (click)="seedSample()">
-            {{ seeding() ? 'Seeding…' : 'Seed sample data' }}
-          </button>
-        </div>
-        @if (seedMessage()) {
-          <p class="muted small">{{ seedMessage() }}</p>
-        }
-        @if (devUsers().length) {
-          <ul class="dev-list">
-            @for (u of devUsers(); track u.id) {
-              <li>
-                <button class="dev-user" (click)="use(u)" [title]="u.access_token">
-                  <span class="dev-name">{{ u.display_name || u.username }}</span>
-                  @if (u.role === 'admin') {
-                    <span class="badge">admin</span>
-                  }
-                  <span class="muted dev-acct">&#64;{{ u.username }}</span>
-                </button>
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="muted small">No accounts with tokens yet — generate one above.</p>
-        }
-      </div>
-    }
-
-    <div class="dev">
-      <div class="dev-head">
-        <span class="muted">Full OAuth flow</span>
-        <button class="link" (click)="toggleOAuth()">{{ showOAuth() ? 'hide' : 'show' }}</button>
-      </div>
-      @if (showOAuth()) {
-        <p class="muted small">
-          Registers an app, then redirects through
-          <code>{{ server.baseUrl() || 'this server' }}/oauth/authorize</code>
-          and exchanges the code at <code>/oauth/token</code>. On a real instance you'll see its
-          actual login/consent page.
-        </p>
-        <input
-          type="text"
-          [ngModel]="appName()"
-          (ngModelChange)="appName.set($event)"
-          placeholder="app name"
-        />
-        @if (oauthError()) {
-          <p class="error">{{ oauthError() }}</p>
-        }
-        <button class="btn btn-outline" [disabled]="oauthWorking()" (click)="startOAuth()">
-          {{ oauthWorking() ? 'Working…' : 'Authorize via OAuth' }}
+    <div class="tabs" role="tablist">
+      <button
+        class="tab"
+        role="tab"
+        [class.active]="tab() === 'signin'"
+        [attr.aria-selected]="tab() === 'signin'"
+        (click)="selectTab('signin')"
+      >
+        Sign in / Register
+      </button>
+      @if (server.isMock) {
+        <button
+          class="tab"
+          role="tab"
+          [class.active]="tab() === 'mock'"
+          [attr.aria-selected]="tab() === 'mock'"
+          (click)="selectTab('mock')"
+        >
+          Mock Login
+        </button>
+        <button
+          class="tab"
+          role="tab"
+          [class.active]="tab() === 'init'"
+          [attr.aria-selected]="tab() === 'init'"
+          (click)="selectTab('init')"
+        >
+          Mock Init
         </button>
       }
     </div>
+
+    <!-- ====================== Sign in / Register ====================== -->
+    @if (tab() === 'signin') {
+      <div class="dev">
+        <div class="dev-head"><span class="muted">Instance</span></div>
+        <div class="dev-gen">
+          @for (preset of serverPresets; track preset.baseUrl) {
+            <button
+              class="btn btn-outline"
+              [class.active]="server.baseUrl() === preset.baseUrl"
+              (click)="selectServer(preset.baseUrl)"
+            >
+              {{ preset.label }}
+            </button>
+          }
+        </div>
+        <div class="dev-gen">
+          <input
+            type="text"
+            [ngModel]="customServer()"
+            (ngModelChange)="customServer.set($event)"
+            (keyup.enter)="useCustomServer()"
+            placeholder="https://another.instance"
+          />
+          <button class="btn btn-outline" (click)="useCustomServer()">Use</button>
+        </div>
+        <p class="muted small">Talking to <code>{{ server.baseUrl() || 'this server' }}</code></p>
+      </div>
+
+      @if (!showRegister()) {
+        <p class="muted">Paste an access token to sign in.</p>
+        <input
+          type="text"
+          [ngModel]="token()"
+          (ngModelChange)="token.set($event)"
+          (keyup.enter)="submit()"
+          placeholder="access token"
+          autofocus
+        />
+        @if (error()) {
+          <p class="error">{{ error() }}</p>
+        }
+        <button class="btn" [disabled]="!token().trim() || checking()" (click)="submit()">
+          {{ checking() ? 'Checking…' : 'Sign in' }}
+        </button>
+        <p class="muted small switch-line">
+          No account? <button class="link" (click)="toggleRegister()">Create one</button>
+        </p>
+      } @else {
+        @if (pendingToken()) {
+          <p class="muted">
+            Almost there! We sent a confirmation email to
+            <code>{{ regEmail() }}</code>. Click the link to verify your address.
+          </p>
+          <button class="btn verify-link" [disabled]="verifying()" (click)="confirmAndEnter()">
+            {{ verifying() ? 'Verifying…' : '✉ Verify email & continue' }}
+          </button>
+          <p class="muted small">
+            (This mock doesn't really send mail — clicking just exercises
+            <code>/api/v1/emails/confirmations</code> and signs you in.)
+          </p>
+        } @else {
+          <p class="muted">Create an account on <code>{{ server.baseUrl() || 'this server' }}</code>.</p>
+          <input
+            type="text"
+            [ngModel]="regUsername()"
+            (ngModelChange)="regUsername.set($event)"
+            placeholder="username"
+            autofocus
+          />
+          <input
+            type="email"
+            [ngModel]="regEmail()"
+            (ngModelChange)="regEmail.set($event)"
+            placeholder="email"
+          />
+          <input
+            type="password"
+            [ngModel]="regPassword()"
+            (ngModelChange)="regPassword.set($event)"
+            placeholder="password"
+          />
+          <label class="agree">
+            <input
+              type="checkbox"
+              [ngModel]="regAgree()"
+              (ngModelChange)="regAgree.set($event)"
+            />
+            <span>I agree to the server rules</span>
+          </label>
+          @if (regError()) {
+            <p class="error">{{ regError() }}</p>
+          }
+          <button class="btn" [disabled]="regWorking()" (click)="register()">
+            {{ regWorking() ? 'Creating…' : 'Sign up' }}
+          </button>
+          <p class="muted small switch-line">
+            Have a token? <button class="link" (click)="toggleRegister()">Sign in instead</button>
+          </p>
+        }
+      }
+
+      <div class="dev">
+        <div class="dev-head">
+          <span class="muted">Full OAuth flow</span>
+          <button class="link" (click)="toggleOAuth()">{{ showOAuth() ? 'hide' : 'show' }}</button>
+        </div>
+        @if (showOAuth()) {
+          <p class="muted small">
+            Registers an app, then redirects through
+            <code>{{ server.baseUrl() || 'this server' }}/oauth/authorize</code>
+            and exchanges the code at <code>/oauth/token</code>. On a real instance you'll see its
+            actual login/consent page.
+          </p>
+          <input
+            type="text"
+            [ngModel]="appName()"
+            (ngModelChange)="appName.set($event)"
+            placeholder="app name"
+          />
+          @if (oauthError()) {
+            <p class="error">{{ oauthError() }}</p>
+          }
+          <button class="btn btn-outline" [disabled]="oauthWorking()" (click)="startOAuth()">
+            {{ oauthWorking() ? 'Working…' : 'Authorize via OAuth' }}
+          </button>
+        }
+      </div>
+    }
+
+    <!-- ====================== Mock Login ====================== -->
+    @if (tab() === 'mock' && server.isMock) {
+      <p class="muted">
+        One-click sign-in as any local account — Twitter-style. Switch between them anytime from the
+        avatar menu in the header.
+      </p>
+      <div class="dev-gen">
+        <button class="btn btn-outline" [disabled]="working()" (click)="generate(false)">
+          + Regular user
+        </button>
+        <button class="btn btn-outline" [disabled]="working()" (click)="generate(true)">
+          + Admin user
+        </button>
+        <button class="link refresh" (click)="refreshDevUsers()">refresh</button>
+      </div>
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+      @if (devUsers().length) {
+        <ul class="dev-list">
+          @for (u of devUsers(); track u.id) {
+            <li>
+              <button class="dev-user" [disabled]="working()" (click)="loginAs(u)" [title]="'Log in as @' + u.username">
+                <span class="dev-name">{{ u.display_name || u.username }}</span>
+                @if (u.role === 'admin') {
+                  <span class="badge">admin</span>
+                }
+                <span class="muted dev-acct">&#64;{{ u.username }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="muted small">No accounts yet — generate one above or seed sample data.</p>
+      }
+    }
+
+    <!-- ====================== Mock Initialization ====================== -->
+    @if (tab() === 'init' && server.isMock) {
+      <p class="muted">Bulk-generate a throwaway cohort of accounts, statuses and relationships.</p>
+      <div class="dev-gen">
+        <select [ngModel]="preset()" (ngModelChange)="preset.set($event)" [disabled]="seeding()">
+          <option value="tiny">tiny (~100 posts)</option>
+          <option value="small">small (~5k posts)</option>
+          <option value="medium">medium (~100k posts)</option>
+        </select>
+        <button class="btn btn-outline" [disabled]="seeding()" (click)="seedSample()">
+          {{ seeding() ? 'Seeding…' : 'Seed sample data' }}
+        </button>
+      </div>
+      @if (seedMessage()) {
+        <p class="muted small">{{ seedMessage() }}</p>
+      }
+      <p class="muted small">
+        After seeding, head to <button class="link" (click)="selectTab('mock')">Mock Login</button>
+        to sign in as one of the new accounts.
+      </p>
+    }
   </div>
 </div>

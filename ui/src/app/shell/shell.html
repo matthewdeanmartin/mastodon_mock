@@ -67,12 +67,47 @@
       </details>
 
       @if (auth.account(); as acc) {
-        <a class="account-pill" [routerLink]="['/accounts', acc.id]" [attr.aria-label]="'View profile for ' + acc.display_name">
-          <img [src]="acc.avatar_static || acc.avatar" alt="" />
-          <span>{{ acc.display_name }}</span>
-        </a>
+        <details class="account-menu">
+          <summary class="account-pill" [attr.aria-label]="'Account menu for ' + acc.display_name">
+            <img [src]="acc.avatar_static || acc.avatar" alt="" />
+            <span>{{ acc.display_name }}</span>
+            <svg class="caret" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
+          <div class="menu-panel account-panel">
+            <a [routerLink]="['/accounts', acc.id]" class="menu-current">
+              <img [src]="acc.avatar_static || acc.avatar" alt="" />
+              <span class="menu-current-name">
+                {{ acc.display_name }}
+                <small class="muted">&#64;{{ acc.username }}</small>
+              </span>
+            </a>
+
+            @if (auth.otherSessions().length) {
+              <div class="menu-divider"></div>
+              <p class="menu-label">Switch account</p>
+              @for (s of auth.otherSessions(); track s.token) {
+                <button type="button" class="switch-row" (click)="switchTo(s)">
+                  <img [src]="s.account?.avatar_static || s.account?.avatar || ''" alt="" />
+                  <span class="switch-name">
+                    {{ s.account?.display_name || 'Saved account' }}
+                    @if (s.account?.username) {
+                      <small class="muted">&#64;{{ s.account?.username }}</small>
+                    }
+                  </span>
+                </button>
+              }
+            }
+
+            <div class="menu-divider"></div>
+            <button type="button" class="menu-action" (click)="addAccount()">+ Add an account</button>
+            <button type="button" class="menu-action danger" (click)="logout()">Log out</button>
+          </div>
+        </details>
+      } @else {
+        <button class="logout-button" type="button" (click)="logout()">Log out</button>
       }
-      <button class="logout-button" type="button" (click)="logout()">Log out</button>
     </div>
   </div>
 </header>

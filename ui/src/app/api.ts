@@ -419,6 +419,45 @@ export class Api {
     return this.http.post<{ report: GenerationReport }>('/api/v1/_mock/sample_data', { preset });
   }
 
+  /** Mock-only: mint a fresh user token for an existing local account (no password). */
+  mockLogin(username: string): Observable<OAuthTokenResponse> {
+    return this.http.post<OAuthTokenResponse>('/api/v1/_mock/login', { username });
+  }
+
+  /**
+   * Self-service signup. Needs an app token (client_credentials) so the call is
+   * authenticated the way a real client would be; returns the new account's token.
+   */
+  register(
+    appToken: string,
+    body: { username: string; email: string; password: string; agreement: boolean },
+  ): Observable<OAuthTokenResponse> {
+    const form = new HttpParams()
+      .set('username', body.username)
+      .set('email', body.email)
+      .set('password', body.password)
+      .set('agreement', String(body.agreement));
+    // Bypass the global interceptor's active token: registration uses the app token.
+    return this.http.post<OAuthTokenResponse>('/api/v1/accounts', form, {
+      headers: { Authorization: `Bearer ${appToken}` },
+    });
+  }
+
+  /** Acquire an app-scoped token via the client_credentials grant. */
+  clientCredentialsToken(clientId: string, clientSecret: string): Observable<OAuthTokenResponse> {
+    const body = new HttpParams()
+      .set('grant_type', 'client_credentials')
+      .set('client_id', clientId)
+      .set('client_secret', clientSecret)
+      .set('scope', 'read write follow');
+    return this.http.post<OAuthTokenResponse>('/oauth/token', body);
+  }
+
+  /** Exercise the email-confirmation endpoint (the mock accepts and no-ops). */
+  confirmEmail(): Observable<unknown> {
+    return this.http.post('/api/v1/emails/confirmations', {});
+  }
+
   // --- full OAuth flow (alternative to dev-login) ---
   registerApp(
     clientName: string,

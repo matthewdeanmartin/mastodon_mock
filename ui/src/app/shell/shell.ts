@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnInit } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from '../api';
-import { Auth } from '../auth';
+import { Auth, Session } from '../auth';
 
 @Component({
   selector: 'app-shell',
@@ -23,13 +23,38 @@ export class Shell implements OnInit {
     if (!this.auth.account()) {
       this.api.verifyCredentials().subscribe({
         next: (acc) => this.auth.setAccount(acc),
-        error: () => this.auth.logout(),
+        error: () => {
+          // Token was rejected: drop it (falling back to another saved account if any).
+          this.auth.logout();
+          if (!this.auth.isAuthenticated) {
+            location.assign('login');
+          }
+        },
       });
     }
   }
 
+  /** Switch to a saved account, then re-verify it (refreshes the role/snapshot). */
+  switchTo(session: Session): void {
+    if (session.token === this.auth.token()) {
+      return;
+    }
+    this.auth.switchTo(session.token);
+    this.api.verifyCredentials().subscribe({
+      next: (acc) => this.auth.setAccount(acc),
+      error: () => this.auth.removeSession(session.token),
+    });
+  }
+
+  addAccount(): void {
+    location.assign('login');
+  }
+
+  /** Sign out of just the active account; fall back to another if one remains. */
   logout(): void {
     this.auth.logout();
-    location.assign('login');
+    if (!this.auth.isAuthenticated) {
+      location.assign('login');
+    }
   }
 }
