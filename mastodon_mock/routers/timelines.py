@@ -13,7 +13,7 @@ from mastodon_mock.pagination import paginate, parse_db_id
 from mastodon_mock.routers.helpers import PageQuery, set_link_header
 from mastodon_mock.serializers.statuses import serialize_status_list
 
-router = APIRouter()
+router = APIRouter(tags=["timelines"])
 
 _PUBLIC_VISIBILITIES = ("public",)
 

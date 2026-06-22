@@ -14,7 +14,7 @@ from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.relationships import serialize_relationship
 from mastodon_mock.services import find_relationship, get_or_create_relationship
 
-router = APIRouter()
+router = APIRouter(tags=["relationships"])
 
 
 @router.get("/api/v1/mutes")

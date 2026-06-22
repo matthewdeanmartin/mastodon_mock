@@ -33,7 +33,7 @@ from mastodon_mock.services import (
 )
 from mastodon_mock.streaming_events import flush_stream_notifications
 
-router = APIRouter()
+router = APIRouter(tags=["accounts"])
 
 
 def _get_account_or_404(db: DbSession, account_id: str) -> Account:

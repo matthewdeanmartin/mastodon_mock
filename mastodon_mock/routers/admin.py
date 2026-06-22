@@ -44,7 +44,7 @@ from mastodon_mock.serializers.admin import (
 from mastodon_mock.serializers.announcements import serialize_announcement
 from mastodon_mock.serializers.statuses import serialize_status
 
-router = APIRouter()
+router = APIRouter(tags=["admin"])
 
 
 def _record_or_404(db: Session, model: Any, record_id: str) -> Any:

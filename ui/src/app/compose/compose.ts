@@ -31,6 +31,8 @@ export class Compose {
   private api = inject(Api);
 
   readonly inReplyToId = input<string | undefined>(undefined);
+  /** When set, the composed status quotes this status id. */
+  readonly quotedStatusId = input<string | undefined>(undefined);
   readonly placeholder = input('What is happening?');
   /** Optional pre-seeded body (e.g. @mentions for a direct reply). */
   readonly initialText = input('');
@@ -148,6 +150,7 @@ export class Compose {
 
     const options: ComposeOptions = {
       inReplyToId: this.inReplyToId(),
+      quotedStatusId: this.quotedStatusId(),
       visibility: this.visibility(),
     };
     if (this.cwOpen() && this.spoilerText().trim()) {

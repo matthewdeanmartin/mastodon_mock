@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import httpx2 as httpx
 from mastodon import Mastodon
 
@@ -84,6 +86,61 @@ def test_signup_requires_agreement(live_server: str) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 422
+
+
+def test_authorization_code_grant_issues_user_token(live_server: str) -> None:
+    client_id, client_secret = Mastodon.create_app("authz-app", api_base_url=live_server)
+    # The picker mints an opaque ``mockcode_<username>`` code for any local account.
+    code = _authorize_code(live_server, client_id, "alice")
+
+    resp = httpx.post(
+        f"{live_server}/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "code": code,
+            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+        },
+    )
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    me = Mastodon(access_token=token, api_base_url=live_server).account_verify_credentials()
+    assert me.username == "alice"
+
+
+def test_authorization_code_grant_rejects_disabled_account(live_server: str) -> None:
+    # Create a fresh user, mint a code for it, then disable it via the admin action.
+    created = httpx.post(f"{live_server}/api/v1/_mock/dev_user", json={}).json()
+    username = created["username"]
+
+    client_id, client_secret = Mastodon.create_app("disabled-app", api_base_url=live_server)
+    code = _authorize_code(live_server, client_id, username)
+
+    admin = httpx.post(f"{live_server}/api/v1/_mock/dev_user", json={"admin": True}).json()
+    target_id = httpx.get(
+        f"{live_server}/api/v1/accounts/verify_credentials",
+        headers={"Authorization": f"Bearer {created['access_token']}"},
+    ).json()["id"]
+    disable = httpx.post(
+        f"{live_server}/api/v1/admin/accounts/{target_id}/action",
+        json={"type": "disable"},
+        headers={"Authorization": f"Bearer {admin['access_token']}"},
+    )
+    assert disable.status_code == 200
+
+    # The code is still well-formed, but the account can no longer authenticate.
+    resp = httpx.post(
+        f"{live_server}/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "code": code,
+            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+        },
+    )
+    assert resp.status_code == 403
 
 
 def test_unsupported_grant_type_rejected(live_server: str) -> None:
@@ -185,6 +242,27 @@ def test_verify_credentials_reports_role_for_staff(live_server: str) -> None:
         headers={"Authorization": f"Bearer {user['access_token']}"},
     ).json()
     assert user_me["role"] is None
+
+
+def _authorize_code(base_url: str, client_id: str, username: str) -> str:
+    """Drive the account-picker to mint an authorization code for ``username``.
+
+    Uses the ``oob`` redirect so the code comes back in the HTML body rather than a
+    302 redirect we'd have to follow.
+    """
+    resp = httpx.post(
+        f"{base_url}/oauth/authorize",
+        data={
+            "username": username,
+            "client_id": client_id,
+            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+            "scope": "read write",
+        },
+    )
+    resp.raise_for_status()
+    match = re.search(r"Authorization code: (\S+)</p>", resp.text)
+    assert match, f"no code in authorize response: {resp.text!r}"
+    return match.group(1)
 
 
 def _app_token(base_url: str, client_id: str, client_secret: str) -> str:

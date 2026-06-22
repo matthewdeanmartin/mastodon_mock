@@ -24,7 +24,7 @@ from mastodon_mock.serializers.common import account_acct, sid
 if TYPE_CHECKING:
     from mastodon_mock.faults import FaultStore
 
-router = APIRouter()
+router = APIRouter(tags=["oauth"])
 
 _DEFAULT_SCOPES = ["read", "write", "follow", "push"]
 
@@ -125,6 +125,10 @@ async def oauth_token(request: Request, db: DbSession) -> dict[str, Any]:
         account = db.query(Account).filter(Account.username == username, Account.domain.is_(None)).first()
         if username is None or account is None:
             raise HTTPException(status_code=400, detail="invalid_grant")
+        from mastodon_mock.moderation import account_is_active
+
+        if not account_is_active(account):
+            raise HTTPException(status_code=403, detail="Your login is currently disabled")
         app = _resolve_app(db, form.get("client_id"))
         token = OAuthToken(
             access_token=_token(),

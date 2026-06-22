@@ -132,6 +132,8 @@ export interface Translation {
 /** Options accepted by the composer's status-create path. */
 export interface ComposeOptions {
   inReplyToId?: string;
+  /** Quote another status (Mastodon 4.5+ `quoted_status_id`). */
+  quotedStatusId?: string;
   visibility?: string;
   spoilerText?: string;
   sensitive?: boolean;
@@ -252,6 +254,26 @@ export interface TermsOfService {
   effective: boolean;
   content: string;
   succeeded_by: string | null;
+}
+
+/** Subset of `GET /api/v2/instance` the explore page renders. */
+export interface InstanceInfo {
+  domain: string;
+  title: string;
+  description: string;
+  version: string;
+  usage: { users: { active_month: number } };
+  thumbnail: { url: string | null };
+  contact: { email: string; account: Account | null };
+  rules: InstanceRule[];
+}
+
+/** A trending preview card (`GET /api/v1/trends/links`). */
+export interface TrendLink {
+  url: string;
+  title: string;
+  description: string;
+  provider_name: string;
 }
 
 export interface CustomEmoji {

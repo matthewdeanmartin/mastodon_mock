@@ -14,7 +14,7 @@ from mastodon_mock.routers.helpers import PageQuery
 from mastodon_mock.serializers.misc import serialize_conversation
 from mastodon_mock.serializers.statuses import serialize_status
 
-router = APIRouter()
+router = APIRouter(tags=["conversations"])
 
 
 def _conversation_id(last_status_id: int) -> str:

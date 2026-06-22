@@ -48,7 +48,7 @@ from mastodon_mock.streaming_events import (
 )
 from mastodon_mock.text import pig_latin_html, pig_latin_text
 
-router = APIRouter()
+router = APIRouter(tags=["statuses"])
 
 # Mastodon publishes immediately (rather than scheduling) when scheduled_at is
 # within this window of "now". Match its documented ~5 minute minimum lead time.

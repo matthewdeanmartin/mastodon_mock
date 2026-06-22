@@ -27,6 +27,7 @@ from mastodon_mock.db.models import (
     OAuthToken,
     Relationship,
     Status,
+    StatusTag,
     utcnow,
 )
 from mastodon_mock.ids import next_id
@@ -35,6 +36,26 @@ _DEFAULT_SCOPES = ["read", "write", "follow", "push"]
 # Cap on how many generated accounts get a loginable token, so the dev-user list and
 # token table don't blow up for huge cohorts.
 _TOKEN_CAP = 200
+
+# A small, Zipf-ish hashtag vocabulary so trends/tags ranks meaningfully. Earlier
+# entries are weighted more heavily, giving the "Trending" surface a realistic head.
+_HASHTAGS = [
+    "sample",
+    "mastodon",
+    "fediverse",
+    "introduction",
+    "caturday",
+    "photography",
+    "art",
+    "music",
+    "coding",
+    "opensource",
+    "news",
+    "books",
+    "gardening",
+    "coffee",
+    "science",
+]
 
 
 @dataclass
@@ -81,7 +102,9 @@ def estimate_rows(cfg: SampleDataConfig) -> int:
     rows = n  # accounts
     rows += min(n, _TOKEN_CAP)  # tokens
     rows += n * followers * 2  # relationships (directed + mirror)
-    rows += n * cfg.statuses_per_account  # statuses
+    statuses = n * cfg.statuses_per_account
+    rows += statuses  # statuses
+    rows += statuses * 2  # status_tags (up to 2 hashtags per status)
     rows += n * cfg.favourites_per_account
     rows += n * cfg.bookmarks_per_account
     if cfg.with_notifications:
@@ -212,6 +235,7 @@ def _gen_statuses(
     now = utcnow()
     status_ids: list[int] = []
     rows: list[dict[str, object]] = []
+    tag_rows: list[dict[str, object]] = []
     per = cfg.statuses_per_account
 
     for account_id in account_ids:
@@ -220,7 +244,11 @@ def _gen_statuses(
             reply_to = None
             if status_ids and rng.random() < cfg.reply_ratio:
                 reply_to = rng.choice(status_ids)
-            text_body = f"Generated post {j} from account {account_id} #sample"
+            tags = _pick_hashtags(rng)
+            tag_text = " ".join(f"#{t}" for t in tags)
+            text_body = f"Generated post {j} from account {account_id} {tag_text}"
+            for name in tags:
+                tag_rows.append({"id": next_id(), "status_id": sid, "name": name})
             rows.append(
                 {
                     "id": sid,
@@ -243,6 +271,7 @@ def _gen_statuses(
                 rows = []
     if rows:
         _bulk_insert(session, Status, rows, cfg.chunk_size)
+    _bulk_insert(session, StatusTag, tag_rows, cfg.chunk_size)
 
     report.statuses = len(status_ids)
     report.phase_seconds["statuses"] = time.perf_counter() - t0
@@ -323,6 +352,23 @@ def _gen_pairs(
 
 
 # --- helpers ----------------------------------------------------------------------
+
+
+def _pick_hashtags(rng: random.Random) -> list[str]:
+    """Pick 1–2 distinct hashtags, biased toward the front of ``_HASHTAGS``.
+
+    The triangular weighting gives a few tags much higher usage than the long tail, so
+    ``trends/tags`` has a believable ranked head rather than a uniform list.
+    """
+    count = rng.choice((1, 1, 2))  # mostly one tag, sometimes two
+    picked: list[str] = []
+    while len(picked) < count:
+        # int(triangular(0, n, 0)) skews toward 0 (the most "popular" tags).
+        idx = min(int(rng.triangular(0, len(_HASHTAGS), 0)), len(_HASHTAGS) - 1)
+        name = _HASHTAGS[idx]
+        if name not in picked:
+            picked.append(name)
+    return picked
 
 
 def _rel_row(source_id: int, target_id: int, *, following: bool = False, followed_by: bool = False) -> dict[str, Any]:

@@ -25,7 +25,7 @@ from mastodon_mock.serializers.grouped_notifications import (
 )
 from mastodon_mock.serializers.notifications import serialize_notification
 
-router = APIRouter()
+router = APIRouter(tags=["notifications"])
 
 
 def _filtered_query(

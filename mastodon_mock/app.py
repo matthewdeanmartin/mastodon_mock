@@ -53,6 +53,33 @@ _MISSING_IMAGE_PNG = base64.b64decode(
 )
 
 
+# Tag order + descriptions for the Swagger/ReDoc docs. Order mirrors router
+# registration in create_app(); FastAPI renders tags in this order and lists any
+# untagged operations (the app-level routes below) under "default" at the end.
+OPENAPI_TAGS = [
+    {"name": "oauth", "description": "App registration, authorization, and token endpoints."},
+    {"name": "instance", "description": "Instance metadata, rules, and node info."},
+    {"name": "accounts", "description": "Accounts, profiles, and the current user (`verify_credentials`)."},
+    {"name": "statuses", "description": "Create, read, edit, and delete statuses; favourite/boost/pin."},
+    {"name": "timelines", "description": "Home, public, hashtag, and list timelines."},
+    {"name": "relationships", "description": "Follow, block, mute, and follow-request management."},
+    {"name": "notifications", "description": "Notification list, dismissal, and clearing."},
+    {"name": "media", "description": "Media attachment upload and metadata."},
+    {"name": "search", "description": "Search across accounts, statuses, and hashtags."},
+    {"name": "lists", "description": "User-defined lists and their membership."},
+    {"name": "favourites & bookmarks", "description": "Favourited and bookmarked statuses."},
+    {"name": "filters", "description": "Keyword/status filters."},
+    {"name": "polls", "description": "Poll details and voting."},
+    {"name": "preferences", "description": "User preferences."},
+    {"name": "push", "description": "Web Push subscription management."},
+    {"name": "conversations", "description": "Direct-message conversations."},
+    {"name": "admin", "description": "Admin/moderation endpoints."},
+    {"name": "tags", "description": "Hashtag follow/feature endpoints."},
+    {"name": "streaming", "description": "Streaming API (server-sent events / websocket)."},
+    {"name": "misc", "description": "Static-shape stubs for rarely-used upstream endpoints."},
+]
+
+
 def dispose_app_resources(app: FastAPI) -> None:
     """Dispose resources owned by a ``mastodon_mock`` app instance."""
     if hasattr(app.state, "engine"):
@@ -82,7 +109,25 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
     media_path = config.media_storage_path or tempfile.mkdtemp(prefix="mastodon_mock_media_")
     Path(media_path).mkdir(parents=True, exist_ok=True)
 
-    app = FastAPI(title="mastodon_mock", version=config.mocked_version, lifespan=lifespan)
+    app = FastAPI(
+        title="mastodon_mock",
+        version=config.mocked_version,
+        summary="Stateful mock of the Mastodon REST API.",
+        description=(
+            "A stateful in-memory/SQLite mock of the [Mastodon](https://docs.joinmastodon.org/api/) "
+            "REST API, for testing Mastodon clients (e.g. Mastodon.py) without a real instance.\n\n"
+            "Endpoints are grouped by Mastodon API area. The reported instance version is "
+            f"`{config.mocked_version}`."
+        ),
+        contact={
+            "name": "Matthew Martin",
+            "url": "https://github.com/matthewdeanmartin/mastodon_mock",
+            "email": "matthewdeanmartin@gmail.com",
+        },
+        license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
+        openapi_tags=OPENAPI_TAGS,
+        lifespan=lifespan,
+    )
     app.state.config = config
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)

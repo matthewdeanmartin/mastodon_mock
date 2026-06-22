@@ -12,7 +12,7 @@ from mastodon_mock.deps import CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.serializers.polls import serialize_poll
 
-router = APIRouter()
+router = APIRouter(tags=["polls"])
 
 
 @router.get("/api/v1/polls/{poll_id}")

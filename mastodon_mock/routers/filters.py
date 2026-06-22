@@ -18,7 +18,7 @@ from mastodon_mock.serializers.misc import (
     serialize_filter_v2,
 )
 
-router = APIRouter()
+router = APIRouter(tags=["filters"])
 
 
 async def _params(request: Request) -> dict[str, Any]:

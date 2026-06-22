@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from mastodon_mock.db.models import OAuthToken, PushSubscription
 from mastodon_mock.deps import CurrentToken, DbSession
 
-router = APIRouter()
+router = APIRouter(tags=["push"])
 
 _ALERT_KEYS = (
     "follow",

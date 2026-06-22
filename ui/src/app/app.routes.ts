@@ -5,6 +5,10 @@ import { adminGuard } from './admin/admin.guard';
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
   {
+    path: 'explore',
+    loadComponent: () => import('./pages/explore/explore').then((m) => m.Explore),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () => import('./shell/shell').then((m) => m.Shell),

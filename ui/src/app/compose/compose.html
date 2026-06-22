@@ -120,7 +120,7 @@
 
     <span class="muted">{{ text().length }}</span>
     <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
-      {{ uploading() ? 'Uploading…' : inReplyToId() ? 'Reply' : 'Post' }}
+      {{ uploading() ? 'Uploading…' : inReplyToId() ? 'Reply' : quotedStatusId() ? 'Quote' : 'Post' }}
     </button>
   </div>
 </div>

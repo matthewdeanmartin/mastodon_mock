@@ -14,7 +14,7 @@ from mastodon_mock.routers.helpers import read_body, truthy
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.misc import serialize_list
 
-router = APIRouter()
+router = APIRouter(tags=["lists"])
 
 
 @router.get("/api/v1/lists")

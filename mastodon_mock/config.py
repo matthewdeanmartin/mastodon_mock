@@ -318,6 +318,12 @@ class MastodonMockConfig(BaseModel):
     title: str = "Mastodon Mock"
     email: str = "admin@mock.local"
     description: str = "A local mock Mastodon instance for testing."
+    # Instance registration policy, reported in instance metadata (v1 + v2).
+    registrations_enabled: bool = True
+    registration_approval_required: bool = False
+    # Whether the instance advertises a translation service. Off by default
+    # (the mock has no translator); set true to report translation as available.
+    translation_enabled: bool = False
     media_storage_path: str | None = None
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)

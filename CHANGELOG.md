@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Fixed
+- OAuth `authorization_code` token exchange now rejects disabled/suspended accounts with 403 (previously only `/api/v1/_mock/login` enforced this).
+
 ## [0.6.0] - 2026-06-20
 ### Added
 - Seed data for more data types

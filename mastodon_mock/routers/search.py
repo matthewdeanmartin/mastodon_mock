@@ -13,7 +13,7 @@ from mastodon_mock.pagination import clamp_limit
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.statuses import serialize_status_list
 
-router = APIRouter()
+router = APIRouter(tags=["search"])
 
 
 def _do_search(

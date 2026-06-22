@@ -13,7 +13,9 @@ import {
   FaultRuleDraft,
   FeaturedTag,
   GenerationReport,
+  InstanceInfo,
   InstanceRule,
+  TrendLink,
   MastodonNotification,
   MediaAttachment,
   OAuthApp,
@@ -98,6 +100,9 @@ export class Api {
     const body: Record<string, unknown> = { status };
     if (options.inReplyToId) {
       body['in_reply_to_id'] = options.inReplyToId;
+    }
+    if (options.quotedStatusId) {
+      body['quoted_status_id'] = options.quotedStatusId;
     }
     if (options.visibility) {
       body['visibility'] = options.visibility;
@@ -389,6 +394,23 @@ export class Api {
 
   featuredTags(): Observable<FeaturedTag[]> {
     return this.http.get<FeaturedTag[]>('/api/v1/featured_tags');
+  }
+
+  // --- explore / discovery (anonymous-friendly) ---
+  instanceInfo(): Observable<InstanceInfo> {
+    return this.http.get<InstanceInfo>('/api/v2/instance');
+  }
+
+  trendingStatuses(): Observable<Status[]> {
+    return this.http.get<Status[]>('/api/v1/trends/statuses');
+  }
+
+  trendingTags(): Observable<Tag[]> {
+    return this.http.get<Tag[]>('/api/v1/trends/tags');
+  }
+
+  trendingLinks(): Observable<TrendLink[]> {
+    return this.http.get<TrendLink[]>('/api/v1/trends/links');
   }
 
   // --- instance "about" info ---

@@ -14,7 +14,7 @@ from mastodon_mock.deps import DbSession, RequiredAccount
 from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.serializers.media import serialize_media
 
-router = APIRouter()
+router = APIRouter(tags=["media"])
 
 _MIME_TO_TYPE = {
     "image": "image",

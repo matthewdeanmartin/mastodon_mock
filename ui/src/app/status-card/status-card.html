@@ -106,11 +106,14 @@
       </div>
     }
     <div class="actions">
-      <button class="action" (click)="$event.stopPropagation()" title="Reply">
+      <button class="action" [class.on]="replying()" (click)="toggleReply($event)" title="Reply">
         💬 <span>{{ display.replies_count }}</span>
       </button>
       <button class="action" [class.on]="display.reblogged" (click)="toggleReblog($event)" title="Boost">
         🔁
+      </button>
+      <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
+        ❝
       </button>
       <button class="action count-link" (click)="openAccountList('reblogged_by', $event)" title="Boosted by">
         {{ display.reblogs_count }}
@@ -166,6 +169,26 @@
         <button class="action" (click)="openReport($event)" title="Report">🚩</button>
       }
     </div>
+
+    @if (replying()) {
+      <div class="inline-compose" (click)="$event.stopPropagation()">
+        <app-compose
+          [inReplyToId]="display.id"
+          placeholder="Post your reply"
+          (posted)="onReplied($event)"
+        />
+      </div>
+    }
+
+    @if (quoting()) {
+      <div class="inline-compose" (click)="$event.stopPropagation()">
+        <app-compose
+          [quotedStatusId]="display.id"
+          placeholder="Add a comment"
+          (posted)="onQuoted($event)"
+        />
+      </div>
+    }
   </div>
 </article>
 

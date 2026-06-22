@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
 import { Api } from '../api';
 import { Auth } from '../auth';
+import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Poll, Status, Translation } from '../models';
 import { ReportDialog } from '../report-dialog/report-dialog';
@@ -12,7 +13,7 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
 
 @Component({
   selector: 'app-status-card',
-  imports: [RouterLink, ReportDialog, AccountListDialog, HistoryDialog, FormsModule],
+  imports: [RouterLink, ReportDialog, AccountListDialog, HistoryDialog, FormsModule, Compose],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
 })
@@ -24,6 +25,12 @@ export class StatusCard {
   readonly changed = output<Status>();
   /** Emitted when the user deletes this status, so containers can drop it. */
   readonly deleted = output<Status>();
+  /** Emitted with the newly-created reply when the user replies inline. */
+  readonly replied = output<Status>();
+
+  // Inline composers (reply / quote), shown beneath the status when toggled.
+  protected replying = signal(false);
+  protected quoting = signal(false);
 
   protected readonly quotePolicies = QUOTE_POLICIES;
 
@@ -120,6 +127,32 @@ export class StatusCard {
     const q = this.display.quote;
     return !!q && q.quoted_status === null;
   });
+
+  // --- inline reply / quote ---
+  toggleReply(event: Event): void {
+    event.stopPropagation();
+    this.quoting.set(false);
+    this.replying.update((v) => !v);
+  }
+
+  toggleQuote(event: Event): void {
+    event.stopPropagation();
+    this.replying.set(false);
+    this.quoting.update((v) => !v);
+  }
+
+  /** A reply was posted: bump the local count and bubble it up to the container. */
+  onReplied(reply: Status): void {
+    this.replying.set(false);
+    this.changed.emit({ ...this.display, replies_count: this.display.replies_count + 1 });
+    this.replied.emit(reply);
+  }
+
+  /** A quote post was created: surface it to the container like a reply. */
+  onQuoted(quote: Status): void {
+    this.quoting.set(false);
+    this.replied.emit(quote);
+  }
 
   toggleFavourite(event: Event): void {
     event.stopPropagation();

@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException
 
 from mastodon_mock.deps import RequiredAccount
 
-router = APIRouter()
+router = APIRouter(tags=["misc"])
 
 
 # --- oEmbed --------------------------------------------------------------

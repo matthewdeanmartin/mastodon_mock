@@ -18,7 +18,7 @@ from mastodon_mock.pagination import parse_db_id
 from mastodon_mock.serializers.common import account_acct, iso
 from mastodon_mock.serializers.discovery import serialize_featured_tag, serialize_tag
 
-router = APIRouter()
+router = APIRouter(tags=["tags"])
 
 
 def _uses_today(db: DbSession, name: str) -> int:

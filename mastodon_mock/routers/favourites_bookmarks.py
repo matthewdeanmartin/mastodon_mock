@@ -13,7 +13,7 @@ from mastodon_mock.pagination import paginate
 from mastodon_mock.routers.helpers import PageQuery, set_link_header
 from mastodon_mock.serializers.statuses import serialize_status_list
 
-router = APIRouter()
+router = APIRouter(tags=["favourites & bookmarks"])
 
 
 @router.get("/api/v1/favourites")

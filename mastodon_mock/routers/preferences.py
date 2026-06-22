@@ -12,7 +12,7 @@ from mastodon_mock.deps import DbSession, RequiredAccount
 from mastodon_mock.routers.helpers import array_query
 from mastodon_mock.serializers.misc import serialize_marker, serialize_preferences
 
-router = APIRouter()
+router = APIRouter(tags=["preferences"])
 
 
 @router.get("/api/v1/preferences")

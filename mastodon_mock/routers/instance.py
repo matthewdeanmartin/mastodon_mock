@@ -42,7 +42,7 @@ from mastodon_mock.serializers.instance import (
 )
 from mastodon_mock.serializers.statuses import serialize_status_list
 
-router = APIRouter()
+router = APIRouter(tags=["instance"])
 
 # A small, fixed set of translation target languages, advertised for every
 # source language. Shaped like mastodon.social's (a dict of source → targets),

@@ -32,7 +32,7 @@ from mastodon_mock.streaming import (
     ws_format,
 )
 
-router = APIRouter()
+router = APIRouter(tags=["streaming"])
 
 
 def _require_streaming(request: Request) -> EventBus:
