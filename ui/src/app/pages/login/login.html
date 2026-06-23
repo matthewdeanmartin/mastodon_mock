@@ -69,106 +69,98 @@
 
       @if (needsInstance()) {
         <p class="muted">Choose an instance above to sign in.</p>
-      } @else if (!showRegister()) {
-        <p class="muted">Paste an access token to sign in.</p>
-        <input
-          type="text"
-          [ngModel]="token()"
-          (ngModelChange)="token.set($event)"
-          (keyup.enter)="submit()"
-          placeholder="access token"
-          autofocus
-        />
-        @if (error()) {
-          <p class="error">{{ error() }}</p>
-        }
-        <button class="btn" [disabled]="!token().trim() || checking()" (click)="submit()">
-          {{ checking() ? 'Checking…' : 'Sign in' }}
-        </button>
-        <p class="muted small switch-line">
-          No account? <button class="link" (click)="toggleRegister()">Create one</button>
-        </p>
       } @else {
-        @if (pendingToken()) {
-          <p class="muted">
-            Almost there! We sent a confirmation email to
-            <code>{{ regEmail() }}</code
-            >. Click the link to verify your address.
-          </p>
-          <button class="btn verify-link" [disabled]="verifying()" (click)="confirmAndEnter()">
-            {{ verifying() ? 'Verifying…' : '✉ Verify email & continue' }}
-          </button>
-          <p class="muted small">
-            (This mock doesn't really send mail — clicking just exercises
-            <code>/api/v1/emails/confirmations</code> and signs you in.)
-          </p>
-        } @else {
-          <p class="muted">
-            Create an account on <code>{{ server.baseUrl() || 'this server' }}</code
-            >.
-          </p>
-          <input
-            type="text"
-            [ngModel]="regUsername()"
-            (ngModelChange)="regUsername.set($event)"
-            placeholder="username"
-            autofocus
-          />
-          <input
-            type="email"
-            [ngModel]="regEmail()"
-            (ngModelChange)="regEmail.set($event)"
-            placeholder="email"
-          />
-          <input
-            type="password"
-            [ngModel]="regPassword()"
-            (ngModelChange)="regPassword.set($event)"
-            placeholder="password"
-          />
-          <label class="agree">
-            <input type="checkbox" [ngModel]="regAgree()" (ngModelChange)="regAgree.set($event)" />
-            <span>I agree to the server rules</span>
-          </label>
-          @if (regError()) {
-            <p class="error">{{ regError() }}</p>
-          }
-          <button class="btn" [disabled]="regWorking()" (click)="register()">
-            {{ regWorking() ? 'Creating…' : 'Sign up' }}
-          </button>
-          <p class="muted small switch-line">
-            Have a token? <button class="link" (click)="toggleRegister()">Sign in instead</button>
-          </p>
+        <!-- ---------- Primary: OAuth sign-in ---------- -->
+        <p class="muted">
+          Sign in on <code>{{ server.baseUrl() || 'this server' }}</code> — you'll be sent to its
+          own login &amp; consent page, then redirected back here.
+        </p>
+        @if (oauthError()) {
+          <p class="error">{{ oauthError() }}</p>
         }
-      }
+        <button class="btn" [disabled]="oauthWorking()" (click)="startOAuth()">
+          {{ oauthWorking() ? 'Redirecting…' : 'Sign in with ' + (server.baseUrl() || 'this server') }}
+        </button>
 
-      @if (!needsInstance()) {
+        <!-- ---------- Secondary: access token ---------- -->
         <div class="dev">
           <div class="dev-head">
-            <span class="muted">Full OAuth flow</span>
-            <button class="link" (click)="toggleOAuth()">
-              {{ showOAuth() ? 'hide' : 'show' }}
+            <span class="muted">Use an access token</span>
+            <button class="link" (click)="toggleToken()">
+              {{ showToken() ? 'hide' : 'show' }}
             </button>
           </div>
-          @if (showOAuth()) {
-            <p class="muted small">
-              Registers an app, then redirects through
-              <code>{{ server.baseUrl() || 'this server' }}/oauth/authorize</code>
-              and exchanges the code at <code>/oauth/token</code>. On a real instance you'll see its
-              actual login/consent page.
-            </p>
-            <input
-              type="text"
-              [ngModel]="appName()"
-              (ngModelChange)="appName.set($event)"
-              placeholder="app name"
-            />
-            @if (oauthError()) {
-              <p class="error">{{ oauthError() }}</p>
+          @if (showToken()) {
+            @if (!showRegister()) {
+              <p class="muted small">Already have an access token for this instance? Paste it here.</p>
+              <input
+                type="text"
+                [ngModel]="token()"
+                (ngModelChange)="token.set($event)"
+                (keyup.enter)="submit()"
+                placeholder="access token"
+              />
+              @if (error()) {
+                <p class="error">{{ error() }}</p>
+              }
+              <button class="btn btn-outline" [disabled]="!token().trim() || checking()" (click)="submit()">
+                {{ checking() ? 'Checking…' : 'Sign in with token' }}
+              </button>
+              <p class="muted small switch-line">
+                No account? <button class="link" (click)="toggleRegister()">Create one</button>
+              </p>
+            } @else {
+              @if (pendingToken()) {
+                <p class="muted small">
+                  Almost there! We sent a confirmation email to
+                  <code>{{ regEmail() }}</code
+                  >. Click the link to verify your address.
+                </p>
+                <button class="btn verify-link" [disabled]="verifying()" (click)="confirmAndEnter()">
+                  {{ verifying() ? 'Verifying…' : '✉ Verify email & continue' }}
+                </button>
+                <p class="muted small">
+                  (This mock doesn't really send mail — clicking just exercises
+                  <code>/api/v1/emails/confirmations</code> and signs you in.)
+                </p>
+              } @else {
+                <p class="muted small">
+                  Create an account on <code>{{ server.baseUrl() || 'this server' }}</code
+                  >.
+                </p>
+                <input
+                  type="text"
+                  [ngModel]="regUsername()"
+                  (ngModelChange)="regUsername.set($event)"
+                  placeholder="username"
+                />
+                <input
+                  type="email"
+                  [ngModel]="regEmail()"
+                  (ngModelChange)="regEmail.set($event)"
+                  placeholder="email"
+                />
+                <input
+                  type="password"
+                  [ngModel]="regPassword()"
+                  (ngModelChange)="regPassword.set($event)"
+                  placeholder="password"
+                />
+                <label class="agree">
+                  <input type="checkbox" [ngModel]="regAgree()" (ngModelChange)="regAgree.set($event)" />
+                  <span>I agree to the server rules</span>
+                </label>
+                @if (regError()) {
+                  <p class="error">{{ regError() }}</p>
+                }
+                <button class="btn btn-outline" [disabled]="regWorking()" (click)="register()">
+                  {{ regWorking() ? 'Creating…' : 'Sign up' }}
+                </button>
+                <p class="muted small switch-line">
+                  Have a token? <button class="link" (click)="toggleRegister()">Sign in instead</button>
+                </p>
+              }
             }
-            <button class="btn btn-outline" [disabled]="oauthWorking()" (click)="startOAuth()">
-              {{ oauthWorking() ? 'Working…' : 'Authorize via OAuth' }}
-            </button>
           }
         </div>
       }

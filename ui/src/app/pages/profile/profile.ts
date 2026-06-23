@@ -60,6 +60,16 @@ export class Profile implements OnInit {
     call.subscribe((updated) => this.relationship.set(updated));
   }
 
+  toggleBlock(): void {
+    const acc = this.account();
+    const rel = this.relationship();
+    if (!acc) {
+      return;
+    }
+    const call = rel?.blocking ? this.api.unblockAccount(acc.id) : this.api.block(acc.id);
+    call.subscribe((updated) => this.relationship.set(updated));
+  }
+
   onChanged(index: number, updated: Status): void {
     this.statuses.update((list) => list.map((s, i) => (i === index ? updated : s)));
   }

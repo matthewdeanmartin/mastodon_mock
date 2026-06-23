@@ -48,6 +48,8 @@ export class Login implements OnInit {
   protected needsInstance = computed(() => !this.server.allowsThisServer && !this.server.baseUrl());
 
   // --- Sign in (token) ---
+  /** OAuth is the primary flow; the pasted-token form is tucked behind this toggle. */
+  protected showToken = signal(false);
   protected token = signal('');
   protected error = signal<string | null>(null);
   protected checking = signal(false);
@@ -73,15 +75,18 @@ export class Login implements OnInit {
   protected seeding = signal(false);
   protected seedMessage = signal<string | null>(null);
 
-  // --- Full OAuth flow ---
-  protected showOAuth = signal(false);
+  // --- Full OAuth flow (primary sign-in) ---
   protected appName = signal('mastodon_mock UI');
   protected oauthWorking = signal(false);
   protected oauthError = signal<string | null>(null);
 
   ngOnInit(): void {
     this.customServer.set(this.server.isMock ? '' : this.server.baseUrl());
-    this.refreshDevUsers();
+    // The dev-user stable is mock-server-only. In Mocking Bird the MockApi is a stub that
+    // throws, so only poll it when the mock tooling is actually present.
+    if (this.mockTooling && this.server.isMock) {
+      this.refreshDevUsers();
+    }
     this.handleOAuthCallback();
   }
 
@@ -92,7 +97,11 @@ export class Login implements OnInit {
   selectServer(baseUrl: string): void {
     this.server.setBaseUrl(baseUrl);
     this.customServer.set(baseUrl);
-    this.refreshDevUsers();
+    // Dev users only exist on the local mock; skip the call (and its throwing stub) when
+    // we've switched to a real instance or this is the Mocking Bird build.
+    if (this.mockTooling && this.server.isMock) {
+      this.refreshDevUsers();
+    }
   }
 
   useCustomServer(): void {
@@ -124,6 +133,10 @@ export class Login implements OnInit {
   }
 
   // ---------- Register (mastodon.social-style signup) ----------
+
+  toggleToken(): void {
+    this.showToken.update((v) => !v);
+  }
 
   toggleRegister(): void {
     this.showRegister.update((v) => !v);
@@ -290,7 +303,6 @@ export class Login implements OnInit {
       return;
     }
     const app: StoredApp = JSON.parse(raw);
-    this.showOAuth.set(true);
     this.oauthWorking.set(true);
     this.api
       .exchangeCode({
@@ -312,10 +324,6 @@ export class Login implements OnInit {
           this.oauthError.set('Code exchange failed.');
         },
       });
-  }
-
-  toggleOAuth(): void {
-    this.showOAuth.update((v) => !v);
   }
 
   /** Register a throwaway app, then redirect through the server's account-picker. */

@@ -347,6 +347,10 @@ export class Api {
     return this.http.post<Relationship>(`/api/v1/accounts/${id}/unmute`, {});
   }
 
+  block(id: string): Observable<Relationship> {
+    return this.http.post<Relationship>(`/api/v1/accounts/${id}/block`, {});
+  }
+
   unblockAccount(id: string): Observable<Relationship> {
     return this.http.post<Relationship>(`/api/v1/accounts/${id}/unblock`, {});
   }
