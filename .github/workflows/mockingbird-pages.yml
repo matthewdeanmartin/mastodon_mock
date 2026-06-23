@@ -38,12 +38,15 @@ jobs:
         id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5.0.0
       - name: Build Mocking Bird
-        # base_path already includes a trailing slash (e.g. "/mastodon_mock/").
+        # configure-pages emits base_path WITHOUT a trailing slash (e.g.
+        # "/mastodon_mock"). Angular's <base href> must end in "/" or the browser
+        # resolves assets against the parent dir (e.g. /main.js instead of
+        # /mastodon_mock/main.js), so we append one here if missing.
         # Pass it via env (not direct ${{ }} interpolation into the shell) to avoid any
         # template-injection surface.
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
-        run: make mockingbird MOCKINGBIRD_BASE_HREF="$BASE_PATH"
+        run: make mockingbird MOCKINGBIRD_BASE_HREF="${BASE_PATH%/}/"
       - name: Add SPA 404 fallback
         # GitHub Pages serves 404.html for unknown paths; mirroring index.html lets the
         # Angular router handle deep links (e.g. /accounts/123) on reload.
