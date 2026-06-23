@@ -293,6 +293,7 @@ def test_api_version_for_always_returns_known_int(components: list[int]) -> None
     assert isinstance(result, int)
     assert result >= 1
 
+
 # This is a flaky test
 # @settings(max_examples=25)
 # @given(version_component, version_component)

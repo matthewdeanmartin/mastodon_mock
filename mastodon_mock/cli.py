@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import os
 import sys
 
 import orjson
@@ -49,8 +50,8 @@ def main(argv: list[str] | None = None) -> None:
 
     serve = sub.add_parser("serve", help="Run the mock HTTP server")
     serve.add_argument("--config", default=None, help="Path to a .mastodon_mock.toml config file")
-    serve.add_argument("--host", default=None, help="Host to bind (overrides config)")
-    serve.add_argument("--port", type=int, default=None, help="Port to bind (overrides config)")
+    serve.add_argument("--host", default=None, help="Host to bind (overrides $HOST and config)")
+    serve.add_argument("--port", type=int, default=None, help="Port to bind (overrides $PORT and config)")
     serve.add_argument(
         "--domain",
         default=None,
@@ -134,6 +135,18 @@ def main(argv: list[str] | None = None) -> None:
         parser.print_help()
 
 
+def _env_port() -> int | None:
+    """Read a port from ``$PORT`` (set by most PaaS hosts). Ignore a blank/invalid value."""
+    raw = os.environ.get("PORT", "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        print(f"Ignoring non-integer $PORT={raw!r}.", file=sys.stderr)
+        return None
+
+
 def _serve(args: argparse.Namespace) -> None:
     """Run the uvicorn server with the resolved config."""
     config = MastodonMockConfig.load(args.config)
@@ -141,8 +154,11 @@ def _serve(args: argparse.Namespace) -> None:
         config = demo_config(config)
     if args.in_memory:
         config.database.path = ":memory:"
-    host = args.host or config.server.host
-    port = args.port or config.server.port
+    # Bind precedence: explicit --host/--port flag > $HOST/$PORT env > config default.
+    # The env fallback lets PaaS hosts (Render/Railway/Koyeb/...) that inject $PORT run
+    # `mastodon_mock serve` with no extra flags. See spec/publish.md, Track 2.
+    host = args.host or os.environ.get("HOST") or config.server.host
+    port = args.port or _env_port() or config.server.port
     if getattr(args, "domain", None):
         # Explicit --domain always wins, e.g. a named cert + hosts-file entry
         # (see scripts/gen_dev_cert.sh) for clients that reject bare IPs/localhost.

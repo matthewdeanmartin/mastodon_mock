@@ -1,0 +1,27 @@
+# Render Blueprint for mastodon_mock.
+# https://render.com/docs/blueprint-spec
+#
+# Usage: put this file at the repo root as `render.yaml` (or point a Render Blueprint at
+# this path), then "New + > Blueprint" in the Render dashboard. Render builds the image
+# from the repository Dockerfile, injects $PORT, and the CLI binds it automatically.
+#
+# Free tier note: the disk below is optional. Without it the SQLite DB is ephemeral and
+# resets on every deploy/restart. With it, data persists across deploys.
+
+services:
+  - type: web
+    name: mastodon-mock
+    runtime: docker
+    plan: free
+    # Build the image from source (the Dockerfile compiles the UI + builds a wheel).
+    dockerfilePath: ./Dockerfile
+    # Render sets $PORT; the default CMD is `serve --host 0.0.0.0`, which reads it.
+    # Override here to use a persistent database on the mounted disk.
+    dockerCommand: mastodon_mock serve --host 0.0.0.0 --database /data/mock.sqlite
+    healthCheckPath: /api/v2/instance
+    autoDeploy: false
+    # Optional: drop this `disk:` block to run fully ephemeral (no persistence).
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

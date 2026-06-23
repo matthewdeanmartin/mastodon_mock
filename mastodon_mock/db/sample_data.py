@@ -355,7 +355,7 @@ def _gen_pairs(
 
 
 def _pick_hashtags(rng: random.Random) -> list[str]:
-    """Pick 1–2 distinct hashtags, biased toward the front of ``_HASHTAGS``.
+    """Pick 1-2 distinct hashtags, biased toward the front of ``_HASHTAGS``.
 
     The triangular weighting gives a few tags much higher usage than the long tail, so
     ``trends/tags`` has a believable ranked head rather than a uniform list.

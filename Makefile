@@ -14,6 +14,15 @@ CHANGELOG := CHANGELOG.md
 DOCS_CHANGELOG := docs/CHANGELOG.md
 MOCK_DOMAIN := mock.local
 
+# xdist worker count for `test-ci`. Each worker runs its own threaded uvicorn
+# server alongside the test process, so `-n auto` (== logical CPUs) oversubscribes
+# the machine ~2x: on a many-core box the server event loops get starved and a
+# request's response headers never arrive in time, surfacing as spurious
+# `httpx2.ReadTimeout` failures (flaky, order-dependent). Capping at half the
+# logical CPUs (floor 2) keeps the suite parallel without oversubscription.
+# Override with `make test-ci TEST_WORKERS=N`.
+TEST_WORKERS ?= $(shell python -c "import os;print(max(2,(os.cpu_count() or 2)//2))")
+
 .PHONY: \
 	sync \
 	pre-commit-install \
@@ -32,7 +41,7 @@ MOCK_DOMAIN := mock.local
 	metadata metadata-check version-check dev-status \
 	gha-validate gha-pin gha-upgrade publish-gha \
 	prerelease publish-check publish \
-	ui ui-dev \
+	ui ui-dev mockingbird \
 	vendor-openapi compare-openapi openapi-fuzz \
 	check check-ci \
 	help
@@ -49,7 +58,7 @@ help:
 	@echo "  spell                  Spell-check code, docs, and README"
 	@echo ""
 	@echo "  test                   Run pytest suite with coverage"
-	@echo "  test-ci                Run pytest -n auto (parallel, for CI)"
+	@echo "  test-ci                Run pytest in parallel (-n $(TEST_WORKERS); override TEST_WORKERS=N)"
 	@echo "  tox                    Run tests across py310-py313 via tox-uv"
 	@echo "  smoke                  CLI smoke checks (--help, --version)"
 	@echo "  dev-cert               Generate a self-signed localhost TLS cert into .dev_certs/"
@@ -291,7 +300,7 @@ test:
 		--timeout=60
 
 test-ci:
-	@$(UV) run pytest -q -p no:sugar -n auto --dist=loadfile \
+	@$(UV) run pytest -q -p no:sugar -n $(TEST_WORKERS) --dist=loadfile \
 		--cov=$(PACKAGE) \
 		--cov-report=xml \
 		--junitxml=junit.xml \
@@ -376,6 +385,15 @@ ui:
 
 ui-dev:
 	@cd ui && npm start
+
+# Build the standalone "Mocking Bird" static client (no mock-server tooling).
+# Output: ui/dist-mockingbird/browser — a pure static site for any Mastodon instance.
+# Override the base href for sub-path hosting (e.g. GitHub project Pages):
+#   make mockingbird MOCKINGBIRD_BASE_HREF=/mastodon_mock/
+MOCKINGBIRD_BASE_HREF ?= /
+mockingbird:
+	@echo "Building Mocking Bird static client -> ui/dist-mockingbird (base-href=$(MOCKINGBIRD_BASE_HREF))"
+	@cd ui && npm ci && npm run build -- --configuration mockingbird --base-href $(MOCKINGBIRD_BASE_HREF)
 
 # Re-vendor the upstream Mastodon OpenAPI schema into git. Run this by hand like a
 # formatter: it overwrites the tracked mastodon-openapi/dist/schema.json, then you review

@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { adminGuard } from './admin/admin.guard';
+// Mock-only routes; file-replaced with an empty list in the Mocking Bird build.
+import { mockOnlyChildren } from './mock-routes';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
@@ -34,11 +36,7 @@ export const routes: Routes = [
         path: 'settings',
         loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings),
       },
-      {
-        path: 'dev/faults',
-        loadComponent: () =>
-          import('./pages/fault-injection/fault-injection').then((m) => m.FaultInjection),
-      },
+      ...mockOnlyChildren,
       {
         path: 'tags',
         loadComponent: () =>

@@ -1,0 +1,31 @@
+# Railway service config for mastodon_mock.
+# https://docs.railway.com/reference/config-as-code
+#
+# Two ways to deploy:
+#
+# A) From a prebuilt image (recommended, no build step):
+#    - Create a service from a Docker image and set it to
+#      `ghcr.io/matthewdeanmartin/mastodon_mock:latest` in the service settings
+#      (Railway sets the image via the dashboard / `railway` CLI, not this file).
+#    - Commit this file at the repo root as `railway.toml` for the deploy settings below.
+#
+# B) From source: Railway's Nixpacks/Dockerfile detection will build the repo Dockerfile.
+#    Keep the [build] block below.
+#
+# Railway injects $PORT; the CLI reads it, so the start command binds 0.0.0.0:$PORT.
+# The filesystem is ephemeral unless you attach a volume (see the note at the bottom).
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "mastodon_mock serve --host 0.0.0.0"
+healthcheckPath = "/api/v2/instance"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Persistence: attach a volume in the Railway dashboard (e.g. mount path /data), then
+# change startCommand to:
+#   mastodon_mock serve --host 0.0.0.0 --database /data/mock.sqlite

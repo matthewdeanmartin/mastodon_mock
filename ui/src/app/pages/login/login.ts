@@ -1,10 +1,12 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../../api';
+import { MockApi } from '../../mock-api';
 import { Auth } from '../../auth';
 import { DevUser } from '../../models';
 import { Server, SERVER_PRESETS } from '../../server';
+import { environment } from '../../../environments/environment';
 
 const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
 
@@ -24,6 +26,7 @@ type Tab = 'signin' | 'mock' | 'init';
 })
 export class Login implements OnInit {
   private api = inject(Api);
+  private mockApi = inject(MockApi);
   private auth = inject(Auth);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -31,8 +34,18 @@ export class Login implements OnInit {
 
   protected tab = signal<Tab>('signin');
 
+  /** Build flavor: brand text and whether mock-only login tabs are shown. */
+  protected brand = environment.brand;
+  protected mockTooling = environment.mockTooling;
+
   protected serverPresets = SERVER_PRESETS;
   protected customServer = signal('');
+
+  /**
+   * Mocking Bird has no "this server"; until the user picks an instance, every API call
+   * would hit the static host. Gate the sign-in forms on a chosen instance.
+   */
+  protected needsInstance = computed(() => !this.server.allowsThisServer && !this.server.baseUrl());
 
   // --- Sign in (token) ---
   protected token = signal('');
@@ -205,7 +218,7 @@ export class Login implements OnInit {
 
   generate(admin: boolean): void {
     this.working.set(true);
-    this.api.createDevUser(admin).subscribe({
+    this.mockApi.createDevUser(admin).subscribe({
       next: (user) => {
         this.working.set(false);
         this.enterAsDevUser(user);
@@ -219,7 +232,7 @@ export class Login implements OnInit {
   loginAs(user: DevUser): void {
     this.working.set(true);
     this.error.set(null);
-    this.api.mockLogin(user.username).subscribe({
+    this.mockApi.mockLogin(user.username).subscribe({
       next: (tok) => {
         this.working.set(false);
         this.enterWith(tok.access_token);
@@ -237,7 +250,7 @@ export class Login implements OnInit {
   }
 
   refreshDevUsers(): void {
-    this.api.listDevUsers().subscribe({
+    this.mockApi.listDevUsers().subscribe({
       next: (users) => this.devUsers.set(users),
       error: () => this.devUsers.set([]),
     });
@@ -248,7 +261,7 @@ export class Login implements OnInit {
   seedSample(): void {
     this.seeding.set(true);
     this.seedMessage.set(null);
-    this.api.seedSampleData(this.preset()).subscribe({
+    this.mockApi.seedSampleData(this.preset()).subscribe({
       next: ({ report }) => {
         this.seeding.set(false);
         this.seedMessage.set(

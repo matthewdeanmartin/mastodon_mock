@@ -1,0 +1,89 @@
+---
+name: Publish image (GHCR)
+# Build the Docker image from source, smoke-test it, and push to the GitHub Container
+# Registry on each release. See spec/publish.md, Track 3.
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to publish (e.g. 1.2.3); omit to push :edge only
+        required: false
+permissions:
+  contents: read
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+jobs:
+  publish:
+    name: Build, smoke-test, and push
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up QEMU
+        # Enables building the linux/arm64 variant on an amd64 runner.
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392  # v3.6.0
+      - name: Set up Buildx
+        # We deliberately don't use a GHA build cache (no cache-to/cache-from below), so
+        # there are no shared runtime artifacts to poison; the heuristic flag is moot here.
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435  # v3.11.1  # zizmor: ignore[cache-poisoning]
+      - name: Log in to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772  # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804  # v5.7.0
+        with:
+          images: ${{ env.IMAGE }}
+          # On a release, tag full/minor/major semver + latest. On manual dispatch with a
+          # tag input, do the same; otherwise just :edge. Always include the commit SHA.
+          tags: |
+            type=semver,pattern={{version}},value=${{ github.event.release.tag_name || inputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ github.event.release.tag_name || inputs.tag }}
+            type=semver,pattern={{major}},value=${{ github.event.release.tag_name || inputs.tag }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' && inputs.tag == '' }}
+            type=sha
+      - name: Build amd64 image and load for smoke test
+        # Build a single-arch image first and load it into the local daemon so we can run
+        # it before publishing anything. (Multi-arch images can't be `--load`ed.)
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83  # v6.18.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: ${{ env.IMAGE }}:smoke
+      - name: Smoke-test the image
+        run: |
+          set -euo pipefail
+          docker run --rm "${IMAGE}:smoke" --version
+          docker run -d --name smoke -e PORT=8000 -p 8000:8000 "${IMAGE}:smoke" \
+            serve --host 0.0.0.0 --in-memory
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v2/instance || true)
+            [ "$code" = "200" ] && break
+            sleep 0.5
+          done
+          test "$code" = "200" || { echo "instance endpoint not healthy ($code)"; docker logs smoke; exit 1; }
+          ui=$(curl -s -o /dev/null -w '%{http_code}' -L http://127.0.0.1:8000/_ui/)
+          test "$ui" = "200" || { echo "bundled UI not served ($ui)"; docker logs smoke; exit 1; }
+          echo "Smoke test passed: API=$code UI=$ui"
+          docker stop smoke
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83  # v6.18.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

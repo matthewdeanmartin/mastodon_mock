@@ -2,6 +2,7 @@
 
 # Compiled output
 /dist
+/dist-mockingbird
 /tmp
 /out-tsc
 /bazel-out

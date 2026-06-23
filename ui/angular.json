@@ -73,6 +73,37 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "mockingbird": {
+              "outputPath": "dist-mockingbird",
+              "baseHref": "/",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.mockingbird.ts"
+                },
+                {
+                  "replace": "src/app/mock-routes.ts",
+                  "with": "src/app/mock-routes.mockingbird.ts"
+                },
+                {
+                  "replace": "src/app/mock-api.ts",
+                  "with": "src/app/mock-api.mockingbird.ts"
+                }
+              ],
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "6kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
             }
           },
           "defaultConfiguration": "production"
@@ -85,6 +116,9 @@
             },
             "development": {
               "buildTarget": "ui:build:development"
+            },
+            "mockingbird": {
+              "buildTarget": "ui:build:mockingbird"
             }
           },
           "defaultConfiguration": "development"

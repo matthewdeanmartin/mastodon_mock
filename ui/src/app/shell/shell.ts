@@ -2,6 +2,7 @@ import { Component, computed, inject, OnInit } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from '../api';
 import { Auth, Session } from '../auth';
+import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-shell',
@@ -12,6 +13,10 @@ import { Auth, Session } from '../auth';
 export class Shell implements OnInit {
   protected auth = inject(Auth);
   private api = inject(Api);
+
+  /** Build flavor: drives the brand and whether mock-only nav links are shown. */
+  protected brand = environment.brand;
+  protected mockTooling = environment.mockTooling;
 
   /** Whether the current account holds a staff role (drives the Admin nav link). */
   protected isStaff = computed(() => {

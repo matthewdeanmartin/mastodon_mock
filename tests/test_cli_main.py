@@ -82,6 +82,50 @@ def test_serve_builds_app_and_runs_uvicorn(monkeypatch: pytest.MonkeyPatch) -> N
     assert run_calls["port"] == 9999
 
 
+def test_serve_uses_port_and_host_env_when_flags_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A PaaS-injected $PORT/$HOST is honored when no --port/--host flag is given."""
+    run_calls: dict[str, Any] = {}
+
+    monkeypatch.setattr(cli, "create_app", lambda config: object())
+    monkeypatch.setattr(uvicorn, "run", lambda app, host, port, **_kw: run_calls.update(host=host, port=port))
+    monkeypatch.setenv("PORT", "8080")
+    monkeypatch.setenv("HOST", "0.0.0.0")
+
+    args = argparse.Namespace(config=None, host=None, port=None, in_memory=True)
+    cli._serve(args)
+
+    assert run_calls["host"] == "0.0.0.0"
+    assert run_calls["port"] == 8080
+
+
+def test_serve_flag_beats_env_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit --port wins over $PORT."""
+    run_calls: dict[str, Any] = {}
+
+    monkeypatch.setattr(cli, "create_app", lambda config: object())
+    monkeypatch.setattr(uvicorn, "run", lambda app, host, port, **_kw: run_calls.update(port=port))
+    monkeypatch.setenv("PORT", "8080")
+
+    args = argparse.Namespace(config=None, host=None, port=1234, in_memory=True)
+    cli._serve(args)
+
+    assert run_calls["port"] == 1234
+
+
+def test_serve_ignores_blank_and_invalid_port_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A blank or non-integer $PORT falls back to the config default (3000), not a crash."""
+    run_calls: dict[str, Any] = {}
+
+    monkeypatch.setattr(cli, "create_app", lambda config: object())
+    monkeypatch.setattr(uvicorn, "run", lambda app, host, port, **_kw: run_calls.update(port=port))
+    monkeypatch.setenv("PORT", "not-a-number")
+
+    args = argparse.Namespace(config=None, host=None, port=None, in_memory=True)
+    cli._serve(args)
+
+    assert run_calls["port"] == 3000
+
+
 def test_serve_demo_applies_rich_seed(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 

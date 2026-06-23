@@ -51,9 +51,7 @@ def _contact_account(session: Session, config: MastodonMockConfig) -> dict[str, 
     *someone*, matching real Mastodon (which always has a contact account set).
     """
     for role in _CONTACT_ROLE_PRIORITY:
-        account = session.scalars(
-            select(Account).where(Account.role == role).order_by(Account.id).limit(1)
-        ).first()
+        account = session.scalars(select(Account).where(Account.role == role).order_by(Account.id).limit(1)).first()
         if account is not None:
             return serialize_account(session, account, config)
 

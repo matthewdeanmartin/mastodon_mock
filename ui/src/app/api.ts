@@ -8,11 +8,7 @@ import {
   Context,
   Conversation,
   CustomEmoji,
-  DevUser,
-  FaultRule,
-  FaultRuleDraft,
   FeaturedTag,
-  GenerationReport,
   InstanceInfo,
   InstanceRule,
   TrendLink,
@@ -427,25 +423,6 @@ export class Api {
     return this.http.get<CustomEmoji[]>('/api/v1/custom_emojis');
   }
 
-  // --- mock-only dev helpers (login screen) ---
-  createDevUser(admin: boolean): Observable<DevUser> {
-    return this.http.post<DevUser>('/api/v1/_mock/dev_user', { admin });
-  }
-
-  listDevUsers(): Observable<DevUser[]> {
-    return this.http.get<DevUser[]>('/api/v1/_mock/dev_users');
-  }
-
-  /** Mock-only: bulk-generate a throwaway sample cohort using a named preset. */
-  seedSampleData(preset: string): Observable<{ report: GenerationReport }> {
-    return this.http.post<{ report: GenerationReport }>('/api/v1/_mock/sample_data', { preset });
-  }
-
-  /** Mock-only: mint a fresh user token for an existing local account (no password). */
-  mockLogin(username: string): Observable<OAuthTokenResponse> {
-    return this.http.post<OAuthTokenResponse>('/api/v1/_mock/login', { username });
-  }
-
   /**
    * Self-service signup. Needs an app token (client_credentials) so the call is
    * authenticated the way a real client would be; returns the new account's token.
@@ -506,23 +483,6 @@ export class Api {
       .set('redirect_uri', params.redirectUri)
       .set('code', params.code);
     return this.http.post<OAuthTokenResponse>('/oauth/token', body);
-  }
-
-  // --- mock-only fault injection control plane ---
-  listFaults(): Observable<FaultRule[]> {
-    return this.http.get<FaultRule[]>('/api/v1/_mock/faults');
-  }
-
-  addFault(rule: FaultRuleDraft): Observable<FaultRule> {
-    return this.http.post<FaultRule>('/api/v1/_mock/faults', rule);
-  }
-
-  deleteFault(id: string): Observable<unknown> {
-    return this.http.delete(`/api/v1/_mock/faults/${id}`);
-  }
-
-  clearFaults(): Observable<unknown> {
-    return this.http.delete('/api/v1/_mock/faults');
   }
 
   private pageParams(maxId?: string): HttpParams {

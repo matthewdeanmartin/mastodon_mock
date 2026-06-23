@@ -1,8 +1,8 @@
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" routerLink="/home" aria-label="mastodon_mock home">
-      <span class="brand-mark" aria-hidden="true">m</span>
-      <span class="brand-name">mastodon_mock</span>
+    <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
+      <span class="brand-mark" aria-hidden="true">{{ brand.charAt(0).toLowerCase() }}</span>
+      <span class="brand-name">{{ brand }}</span>
     </a>
 
     <nav class="primary-nav" aria-label="Primary navigation">
@@ -59,8 +59,10 @@
           <a routerLink="/about">About</a>
           <div class="menu-divider"></div>
           <a routerLink="/settings">Settings</a>
-          <a routerLink="/dev/faults">Faults</a>
-          <a href="/docs" target="_blank" rel="noopener">API Docs ↗</a>
+          @if (mockTooling) {
+            <a routerLink="/dev/faults">Faults</a>
+            <a href="/docs" target="_blank" rel="noopener">API Docs ↗</a>
+          }
           @if (isStaff()) {
             <a routerLink="/admin" class="admin-link">Admin</a>
           }
@@ -102,7 +104,9 @@
             }
 
             <div class="menu-divider"></div>
-            <button type="button" class="menu-action" (click)="addAccount()">+ Add an account</button>
+            <button type="button" class="menu-action" (click)="addAccount()">
+              + Add an account
+            </button>
             <button type="button" class="menu-action danger" (click)="logout()">Log out</button>
           </div>
         </details>

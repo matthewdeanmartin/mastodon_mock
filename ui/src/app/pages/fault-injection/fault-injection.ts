@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api } from '../../api';
+import { MockApi } from '../../mock-api';
 import { FaultEffectType, FaultRule, FaultRuleDraft } from '../../models';
 
 @Component({
@@ -10,7 +10,7 @@ import { FaultEffectType, FaultRule, FaultRuleDraft } from '../../models';
   styleUrl: './fault-injection.css',
 })
 export class FaultInjection implements OnInit {
-  private api = inject(Api);
+  private api = inject(MockApi);
 
   protected rules = signal<FaultRule[]>([]);
   protected loading = signal(true);

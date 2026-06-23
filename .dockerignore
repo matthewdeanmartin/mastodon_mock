@@ -1,0 +1,41 @@
+# Keep the Docker build context small and reproducible. The image builds the wheel from
+# source (see Dockerfile stage 1), so only source + build config need to be sent.
+
+# VCS / CI
+.git
+.github
+.gitlab-ci.yml
+.bitrab-ci-scripts
+
+# Python caches / envs / build artifacts
+.venv
+.tox
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.hypothesis
+__pycache__
+*.pyc
+dist
+build
+htmlcov
+*.egg-info
+
+# Node — let the in-image `npm ci` produce a clean install rather than copying the host's
+node_modules
+ui/node_modules
+ui/.angular
+ui/dist
+ui/dist-mockingbird
+mastodon_mock/_ui_dist
+
+# Local dev / editor / docs site
+.idea
+.vscode
+.dev_certs
+site
+docs
+
+# OS noise
+.DS_Store
+Thumbs.db

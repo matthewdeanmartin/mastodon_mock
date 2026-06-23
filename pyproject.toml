@@ -157,7 +157,22 @@ default-groups = ["dev"]
 minversion = "6.0"
 testpaths = ["tests"]
 addopts = "-q --timeout=60 -m 'not integration and not slow and not contract'"
-norecursedirs = ["vendor", "scripts", "dist", "build"]
+# Setting norecursedirs *replaces* pytest's defaults rather than extending them,
+# so the leading entries restore the built-in ignores (notably ``.*``, which keeps
+# Hypothesis's ``.hypothesis`` dir from being collected — otherwise it warns 20x).
+norecursedirs = [
+    "*.egg",
+    ".*",
+    "_darcs",
+    "build",
+    "CVS",
+    "dist",
+    "node_modules",
+    "venv",
+    "{arch}",
+    "vendor",
+    "scripts",
+]
 markers = [
     "slow: performance benchmarks (run with -m slow)",
     "integration: integration tests (run with -m integration)",
@@ -166,6 +181,19 @@ markers = [
     "contract: OpenAPI contract fuzzing via schemathesis (needs the `contract` extra; run with -m contract)",
 ]
 junit_family = "xunit1"
+# Silence noise from dependencies we don't control. Each entry is scoped to a
+# specific message+module so our own warnings still surface. Revisit when the
+# upstream packages drop the deprecated usage.
+filterwarnings = [
+    # uvicorn still imports the deprecated websockets.legacy / WebSocketServerProtocol.
+    "ignore:websockets\\.legacy is deprecated:DeprecationWarning",
+    "ignore:websockets\\.server\\.WebSocketServerProtocol is deprecated:DeprecationWarning",
+    # FastAPI 0.138 + pydantic 2.13: FastAPI sets ``alias`` on auto-generated
+    # request field models (e.g. the ``authorization`` header / ``filter_id`` path
+    # param) in a way pydantic 2.13 flags. Not our Field definitions (we set no
+    # aliases); nothing to fix on our side until FastAPI updates.
+    "ignore::pydantic.warnings.UnsupportedFieldAttributeWarning",
+]
 
 [tool.black]
 line-length = 120

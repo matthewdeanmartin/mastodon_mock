@@ -26,6 +26,7 @@ nav:
       - Writing Tests: usage/writing-tests.md
       - Data Generation: usage/data-generation.md
       - Admin UI and API: usage/admin-ui.md
+      - Deploying and Publishing: usage/deploying.md
   - Reference:
       - What Is and Isn't Mocked: reference/coverage.md
   - Troubleshooting: troubleshooting.md
