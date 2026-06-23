@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from '../api';
 import { Auth, Session } from '../auth';
@@ -24,6 +24,22 @@ export class Shell implements OnInit {
     return !!role && role.name !== '';
   });
 
+  /** Transient, non-blocking message (e.g. a failed account switch). null = hidden. */
+  protected toast = signal<string | null>(null);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private showToast(message: string): void {
+    this.toast.set(message);
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
+    this.toastTimer = setTimeout(() => this.toast.set(null), 6000);
+  }
+
+  dismissToast(): void {
+    this.toast.set(null);
+  }
+
   ngOnInit(): void {
     if (!this.auth.account()) {
       this.api.verifyCredentials().subscribe({
@@ -41,13 +57,24 @@ export class Shell implements OnInit {
 
   /** Switch to a saved account, then re-verify it (refreshes the role/snapshot). */
   switchTo(session: Session): void {
-    if (session.token === this.auth.token()) {
+    const previous = this.auth.token();
+    if (session.token === previous) {
       return;
     }
     this.auth.switchTo(session.token);
     this.api.verifyCredentials().subscribe({
       next: (acc) => this.auth.setAccount(acc),
-      error: () => this.auth.removeSession(session.token),
+      error: () => {
+        // The token was rejected by its instance. Don't silently delete the account —
+        // revert to where we were and tell the user (non-blocking toast).
+        const name = session.account?.display_name || session.account?.username || 'that account';
+        if (previous) {
+          this.auth.switchTo(previous);
+        }
+        this.showToast(
+          `Couldn't switch to ${name} — its session may have expired. Sign in again to refresh it.`,
+        );
+      },
     });
   }
 

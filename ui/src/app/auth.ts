@@ -1,5 +1,6 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Account } from './models';
+import { Server } from './server';
 
 const TOKEN_KEY = 'mastodon_mock_token';
 const SESSIONS_KEY = 'mastodon_mock_sessions';
@@ -7,6 +8,13 @@ const SESSIONS_KEY = 'mastodon_mock_sessions';
 /** A saved login: a token plus a snapshot of the account it belongs to. */
 export interface Session {
   token: string;
+  /**
+   * Instance this token belongs to (base URL, e.g. "https://mastodon.social"; "" means
+   * "this server"). A token is only valid against its own instance, so switching accounts
+   * must restore this server first — otherwise verify_credentials hits the wrong host and
+   * 401s. May be undefined for sessions saved before this field existed.
+   */
+  server?: string;
   /** Account snapshot for the switcher UI (avatar, name). Refreshed on verify. */
   account: Account | null;
 }
@@ -28,6 +36,8 @@ function loadSessions(): Session[] {
  */
 @Injectable({ providedIn: 'root' })
 export class Auth {
+  private server = inject(Server);
+
   readonly token = signal<string | null>(localStorage.getItem(TOKEN_KEY));
   readonly account = signal<Account | null>(null);
 
@@ -35,20 +45,26 @@ export class Auth {
   readonly sessions = signal<Session[]>(loadSessions());
 
   /** Saved sessions other than the active one (for the "switch to" menu). */
-  readonly otherSessions = computed(() =>
-    this.sessions().filter((s) => s.token !== this.token()),
-  );
+  readonly otherSessions = computed(() => this.sessions().filter((s) => s.token !== this.token()));
 
   get isAuthenticated(): boolean {
     return this.token() !== null;
   }
 
-  /** Make ``token`` active, adding it to the saved stable if it's new. */
+  /**
+   * Make ``token`` active, adding it to the saved stable if it's new. Captures the
+   * currently-selected instance so the session can be restored to the right host later.
+   */
   setToken(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
     this.token.set(token);
-    if (!this.sessions().some((s) => s.token === token)) {
-      this.persistSessions([...this.sessions(), { token, account: null }]);
+    const server = this.server.baseUrl();
+    const existing = this.sessions().find((s) => s.token === token);
+    if (!existing) {
+      this.persistSessions([...this.sessions(), { token, server, account: null }]);
+    } else if (existing.server === undefined) {
+      // Backfill the server for a legacy session created before this field existed.
+      this.persistSessions(this.sessions().map((s) => (s.token === token ? { ...s, server } : s)));
     }
   }
 
@@ -57,17 +73,21 @@ export class Auth {
     this.account.set(account);
     const token = this.token();
     if (account && token) {
-      this.persistSessions(
-        this.sessions().map((s) => (s.token === token ? { ...s, account } : s)),
-      );
+      this.persistSessions(this.sessions().map((s) => (s.token === token ? { ...s, account } : s)));
     }
   }
 
-  /** Switch to a previously-saved session. Returns false if unknown. */
+  /**
+   * Switch to a previously-saved session. Restores that session's instance first so API
+   * calls target the host the token is valid for. Returns false if unknown.
+   */
   switchTo(token: string): boolean {
     const session = this.sessions().find((s) => s.token === token);
     if (!session) {
       return false;
+    }
+    if (session.server !== undefined) {
+      this.server.setBaseUrl(session.server);
     }
     localStorage.setItem(TOKEN_KEY, token);
     this.token.set(token);

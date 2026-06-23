@@ -120,3 +120,12 @@
 <main class="column">
   <router-outlet />
 </main>
+
+@if (toast(); as message) {
+  <div class="toast" role="alert">
+    <span>{{ message }}</span>
+    <button type="button" class="toast-close" aria-label="Dismiss" (click)="dismissToast()">
+      &times;
+    </button>
+  </div>
+}
