@@ -93,12 +93,14 @@ def _ensure_status(
 ) -> Status:
     """Find-or-create a seed status matched on (account_id, text).
 
-    When ``spec.quotes`` names a known ref, the new status quotes that status.
+    When ``spec.quotes`` names a known ref, the new status quotes that status;
+    when ``spec.reply_to`` names a known ref, it replies to that status.
     """
     existing = session.scalar(select(Status).where(Status.account_id == account.id, Status.text == spec.text))
     if existing is not None:
         return existing
     quoted = ref_to_status.get(spec.quotes) if spec.quotes is not None else None
+    parent = ref_to_status.get(spec.reply_to) if spec.reply_to is not None else None
     status = Status(
         account_id=account.id,
         content=render_status_html(spec.text),
@@ -107,6 +109,7 @@ def _ensure_status(
         created_at=utcnow(),
         edit_history=[],
         quoted_status_id=quoted.id if quoted is not None else None,
+        in_reply_to_id=parent.id if parent is not None else None,
     )
     session.add(status)
     session.flush()

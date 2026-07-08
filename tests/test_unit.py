@@ -100,6 +100,42 @@ def test_seed_status_quote_resolves_ref() -> None:
         engine.dispose()
 
 
+def test_seed_status_reply_to_resolves_ref() -> None:
+    engine = init_engine(DatabaseConfig(path=":memory:"))
+    try:
+        Base.metadata.create_all(engine)
+        seed = SeedConfig(
+            accounts=[SeedAccount(username="poster", access_token="poster_token")],
+            statuses=[
+                SeedStatus(account="poster", text="Root of the storm.", ref="root"),
+                SeedStatus(account="poster", text="Self-reply.", ref="r1", reply_to="root"),
+            ],
+        )
+        apply_seed_data(engine, seed)
+
+        factory = make_session_factory(engine)
+        with factory() as session:
+            root = session.scalar(select(Status).where(Status.text == "Root of the storm."))
+            reply = session.scalar(select(Status).where(Status.text == "Self-reply."))
+            assert root is not None and reply is not None
+            assert reply.in_reply_to_id == root.id
+    finally:
+        engine.dispose()
+
+
+def test_demo_seed_has_a_self_reply_storm() -> None:
+    """The demo blog only renders a storm when a demo author self-replies."""
+    from mastodon_mock.config import DEMO_SEED
+
+    by_ref = {s.ref: s for s in DEMO_SEED.statuses if s.ref}
+    self_replies = [
+        s
+        for s in DEMO_SEED.statuses
+        if s.reply_to and (parent := by_ref.get(s.reply_to)) and parent.account == s.account
+    ]
+    assert len(self_replies) >= 3  # root + 3-4 self-replies makes a storm
+
+
 def test_demo_config_is_rich_and_keeps_defaults_unchanged() -> None:
     demo = demo_config()
     assert demo.rules  # rules surfaced on the About page

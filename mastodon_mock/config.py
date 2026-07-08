@@ -121,8 +121,10 @@ class SeedStatus(BaseModel):
     """A seeded status by account username.
 
     ``ref`` is an optional stable handle so other seed rows can refer to this
-    status (e.g. as a quote target); it is not persisted. ``quotes`` names the
-    ``ref`` of an earlier seed status this one quotes.
+    status (e.g. as a quote or reply target); it is not persisted. ``quotes``
+    names the ``ref`` of an earlier seed status this one quotes; ``reply_to``
+    names the ``ref`` of an earlier seed status this one replies to (a
+    self-reply chain by one author is a "storm").
     """
 
     account: str
@@ -130,6 +132,7 @@ class SeedStatus(BaseModel):
     visibility: str = "public"
     ref: str | None = None
     quotes: str | None = None
+    reply_to: str | None = None
 
 
 class SeedAnnouncement(BaseModel):
@@ -246,6 +249,57 @@ DEMO_SEED = SeedConfig(
             account="ada",
             text="Just finished a new set of notes on the Analytical Engine. #computing",
             ref="ada_notes",
+        ),
+        # A storm-shaped thread by @ada (root + self-replies): the demo tenant
+        # connects @ada's identity, so this is what makes the demo blog actually
+        # render a storm (self-reply chain by one author). See remaining_work §3.4.
+        SeedStatus(
+            account="ada",
+            text=(
+                "A thread on why the Analytical Engine matters — not as a "
+                "calculator, but as a machine that manipulates symbols. 🧵 #computing"
+            ),
+            ref="ada_storm_root",
+        ),
+        SeedStatus(
+            account="ada",
+            text=(
+                "1/ Babbage's Difference Engine tabulated polynomials. The "
+                "Analytical Engine is different in kind: it has a 'store' (memory) "
+                "and a 'mill' (a processor). Sound familiar?"
+            ),
+            ref="ada_storm_1",
+            reply_to="ada_storm_root",
+        ),
+        SeedStatus(
+            account="ada",
+            text=(
+                "2/ The leap is that its punched cards can encode *operations*, "
+                "not just numbers. It can branch and loop. That means it can do "
+                "more than arithmetic — it can reason over symbols of any kind."
+            ),
+            ref="ada_storm_2",
+            reply_to="ada_storm_1",
+        ),
+        SeedStatus(
+            account="ada",
+            text=(
+                "3/ So it could, in principle, compose music, or make graphics, "
+                "if we could only express the rules as operations. The Engine "
+                "weaves algebraic patterns just as the Jacquard loom weaves flowers."
+            ),
+            ref="ada_storm_3",
+            reply_to="ada_storm_2",
+        ),
+        SeedStatus(
+            account="ada",
+            text=(
+                "4/ It will not *originate* anything — it does whatever we know "
+                "how to order it to perform. But that is exactly the point: the "
+                "limits are our imagination, not the machine's. /end #computing"
+            ),
+            ref="ada_storm_4",
+            reply_to="ada_storm_3",
         ),
         SeedStatus(
             account="grace",
