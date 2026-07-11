@@ -29,7 +29,7 @@ jobs:
           persist-credentials: false
       - name: Set up QEMU
         # Enables building the linux/arm64 variant on an amd64 runner.
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392  # v3.6.0
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4.1.0
       - name: Set up Buildx
         # We deliberately don't use a GHA build cache (no cache-to/cache-from below), so
         # there are no shared runtime artifacts to poison; the heuristic flag is moot here.
@@ -42,7 +42,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Derive tags
         id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804  # v5.7.0
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9  # v6.1.0
         with:
           images: ${{ env.IMAGE }}
           # On a release, tag full/minor/major semver + latest. On manual dispatch with a
@@ -57,7 +57,7 @@ jobs:
       - name: Build amd64 image and load for smoke test
         # Build a single-arch image first and load it into the local daemon so we can run
         # it before publishing anything. (Multi-arch images can't be `--load`ed.)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83  # v6.18.0
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
         with:
           context: .
           platforms: linux/amd64
@@ -80,7 +80,7 @@ jobs:
           echo "Smoke test passed: API=$code UI=$ui"
           docker stop smoke
       - name: Build and push multi-arch image
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83  # v6.18.0
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64
