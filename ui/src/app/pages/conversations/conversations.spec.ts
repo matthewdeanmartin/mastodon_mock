@@ -21,16 +21,50 @@ function internals(fixture: ComponentFixture<Conversations>): ConversationsInter
 }
 
 function makeAccount(id: string, acct = `user${id}`, display_name = `User ${id}`) {
-  return { id, username: acct, acct, display_name, note: '', url: '', avatar: '', avatar_static: '', header: '', followers_count: 0, following_count: 0, statuses_count: 0, bot: false, locked: false, fields: [] };
+  return {
+    id,
+    username: acct,
+    acct,
+    display_name,
+    note: '',
+    url: '',
+    avatar: '',
+    avatar_static: '',
+    header: '',
+    followers_count: 0,
+    following_count: 0,
+    statuses_count: 0,
+    bot: false,
+    locked: false,
+    fields: [],
+  };
 }
 
 function makeStatus(id: string): Status {
   return {
-    id, created_at: '2026-01-01T00:00:00Z', edited_at: null, content: `<p>${id}</p>`,
-    spoiler_text: '', visibility: 'direct', url: null, account: makeAccount('1') as never,
-    reblog: null, quote: null, in_reply_to_id: null, replies_count: 0, reblogs_count: 0,
-    favourites_count: 0, favourited: false, reblogged: false, bookmarked: false, muted: false,
-    pinned: false, sensitive: false, poll: null, quote_approval_policy: null, media_attachments: [],
+    id,
+    created_at: '2026-01-01T00:00:00Z',
+    edited_at: null,
+    content: `<p>${id}</p>`,
+    spoiler_text: '',
+    visibility: 'direct',
+    url: null,
+    account: makeAccount('1') as never,
+    reblog: null,
+    quote: null,
+    in_reply_to_id: null,
+    replies_count: 0,
+    reblogs_count: 0,
+    favourites_count: 0,
+    favourited: false,
+    reblogged: false,
+    bookmarked: false,
+    muted: false,
+    pinned: false,
+    sensitive: false,
+    poll: null,
+    quote_approval_policy: null,
+    media_attachments: [],
   };
 }
 

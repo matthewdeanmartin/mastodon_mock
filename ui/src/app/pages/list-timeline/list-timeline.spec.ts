@@ -20,12 +20,29 @@ function internals(fixture: ComponentFixture<ListTimeline>): ListTimelineInterna
 
 function makeStatus(id: string): Status {
   return {
-    id, created_at: '2026-01-01T00:00:00Z', edited_at: null, content: `<p>${id}</p>`,
-    spoiler_text: '', visibility: 'public', url: null,
+    id,
+    created_at: '2026-01-01T00:00:00Z',
+    edited_at: null,
+    content: `<p>${id}</p>`,
+    spoiler_text: '',
+    visibility: 'public',
+    url: null,
     account: { id: '1', username: 'user', acct: 'user', display_name: 'User' } as never,
-    reblog: null, quote: null, in_reply_to_id: null, replies_count: 0, reblogs_count: 0,
-    favourites_count: 0, favourited: false, reblogged: false, bookmarked: false, muted: false,
-    pinned: false, sensitive: false, poll: null, quote_approval_policy: null, media_attachments: [],
+    reblog: null,
+    quote: null,
+    in_reply_to_id: null,
+    replies_count: 0,
+    reblogs_count: 0,
+    favourites_count: 0,
+    favourited: false,
+    reblogged: false,
+    bookmarked: false,
+    muted: false,
+    pinned: false,
+    sensitive: false,
+    poll: null,
+    quote_approval_policy: null,
+    media_attachments: [],
   };
 }
 
@@ -94,7 +111,9 @@ describe('ListTimeline', () => {
   it('onChanged: replaces the status at the given index', () => {
     const fixture = setUpWithList('5');
     httpMock.expectOne('/api/v1/lists/5').flush(makeList('5', 'Test'));
-    httpMock.expectOne((r) => r.url === '/api/v1/timelines/list/5').flush([makeStatus('a'), makeStatus('b')]);
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/timelines/list/5')
+      .flush([makeStatus('a'), makeStatus('b')]);
 
     const updated = { ...makeStatus('a'), favourited: true };
     fixture.componentInstance.onChanged(0, updated);
@@ -108,10 +127,16 @@ describe('ListTimeline', () => {
   it('onDeleted: removes the status with the matching id', () => {
     const fixture = setUpWithList('7');
     httpMock.expectOne('/api/v1/lists/7').flush(makeList('7', 'Filtered'));
-    httpMock.expectOne((r) => r.url === '/api/v1/timelines/list/7').flush([makeStatus('x'), makeStatus('y'), makeStatus('z')]);
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/timelines/list/7')
+      .flush([makeStatus('x'), makeStatus('y'), makeStatus('z')]);
 
     fixture.componentInstance.onDeleted(makeStatus('y'));
 
-    expect(internals(fixture).statuses().map((s) => s.id)).toEqual(['x', 'z']);
+    expect(
+      internals(fixture)
+        .statuses()
+        .map((s) => s.id),
+    ).toEqual(['x', 'z']);
   });
 });

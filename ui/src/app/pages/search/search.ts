@@ -17,6 +17,7 @@ export class Search {
   protected query = signal('');
   protected results = signal<SearchResults | null>(null);
   protected searching = signal(false);
+  protected type = signal<'accounts' | 'statuses' | 'hashtags'>('accounts');
 
   run(): void {
     const q = this.query().trim();
@@ -24,7 +25,7 @@ export class Search {
       return;
     }
     this.searching.set(true);
-    this.api.search(q).subscribe({
+    this.api.search(q, this.type()).subscribe({
       next: (r) => {
         this.results.set(r);
         this.searching.set(false);

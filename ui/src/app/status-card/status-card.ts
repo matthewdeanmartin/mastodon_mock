@@ -8,12 +8,21 @@ import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Poll, Status, Translation } from '../models';
 import { ReportDialog } from '../report-dialog/report-dialog';
+import { HumanTimePipe } from '../human-time.pipe';
 
 const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
 
 @Component({
   selector: 'app-status-card',
-  imports: [RouterLink, ReportDialog, AccountListDialog, HistoryDialog, FormsModule, Compose],
+  imports: [
+    RouterLink,
+    ReportDialog,
+    AccountListDialog,
+    HistoryDialog,
+    FormsModule,
+    Compose,
+    HumanTimePipe,
+  ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
 })

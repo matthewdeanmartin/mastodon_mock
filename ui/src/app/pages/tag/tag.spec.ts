@@ -21,19 +21,41 @@ function internals(fixture: ComponentFixture<Tag>): TagInternals {
 
 function makeStatus(id: string): Status {
   return {
-    id, created_at: '2026-01-01T00:00:00Z', edited_at: null, content: `<p>${id}</p>`,
-    spoiler_text: '', visibility: 'public', url: null,
+    id,
+    created_at: '2026-01-01T00:00:00Z',
+    edited_at: null,
+    content: `<p>${id}</p>`,
+    spoiler_text: '',
+    visibility: 'public',
+    url: null,
     account: { id: '1', username: 'user', acct: 'user', display_name: 'User' } as never,
-    reblog: null, quote: null, in_reply_to_id: null, replies_count: 0, reblogs_count: 0,
-    favourites_count: 0, favourited: false, reblogged: false, bookmarked: false, muted: false,
-    pinned: false, sensitive: false, poll: null, quote_approval_policy: null, media_attachments: [],
+    reblog: null,
+    quote: null,
+    in_reply_to_id: null,
+    replies_count: 0,
+    reblogs_count: 0,
+    favourites_count: 0,
+    favourited: false,
+    reblogged: false,
+    bookmarked: false,
+    muted: false,
+    pinned: false,
+    sensitive: false,
+    poll: null,
+    quote_approval_policy: null,
+    media_attachments: [],
   };
 }
 
 function makeTagEntity(name: string, overrides: Partial<TagEntity> = {}): TagEntity {
   return {
-    id: name, name, url: `https://example.com/tags/${name}`,
-    following: false, featuring: false, history: [], ...overrides,
+    id: name,
+    name,
+    url: `https://example.com/tags/${name}`,
+    following: false,
+    featuring: false,
+    history: [],
+    ...overrides,
   };
 }
 
@@ -66,7 +88,9 @@ describe('Tag (timeline)', () => {
     const fixture = setUpWithTag('cats');
 
     httpMock.expectOne('/api/v1/tags/cats').flush(makeTagEntity('cats'));
-    httpMock.expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/cats')).flush([makeStatus('1')]);
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/cats'))
+      .flush([makeStatus('1')]);
 
     expect(internals(fixture).tag()).toBe('cats');
     expect(internals(fixture).tagInfo()?.name).toBe('cats');
@@ -165,7 +189,9 @@ describe('Tag (timeline)', () => {
   it('onChanged: updates the status at the given index', () => {
     const fixture = setUpWithTag('news');
     httpMock.expectOne('/api/v1/tags/news').flush(makeTagEntity('news'));
-    httpMock.expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/news')).flush([makeStatus('1'), makeStatus('2')]);
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/news'))
+      .flush([makeStatus('1'), makeStatus('2')]);
 
     const updated = { ...makeStatus('1'), favourited: true };
     fixture.componentInstance.onChanged(0, updated);
@@ -177,9 +203,15 @@ describe('Tag (timeline)', () => {
   it('onDeleted: removes the status by id', () => {
     const fixture = setUpWithTag('tech');
     httpMock.expectOne('/api/v1/tags/tech').flush(makeTagEntity('tech'));
-    httpMock.expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/tech')).flush([makeStatus('1'), makeStatus('2')]);
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/tech'))
+      .flush([makeStatus('1'), makeStatus('2')]);
 
     fixture.componentInstance.onDeleted(makeStatus('1'));
-    expect(internals(fixture).statuses().map((s) => s.id)).toEqual(['2']);
+    expect(
+      internals(fixture)
+        .statuses()
+        .map((s) => s.id),
+    ).toEqual(['2']);
   });
 });

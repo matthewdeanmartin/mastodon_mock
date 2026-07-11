@@ -6,6 +6,7 @@ import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
 import { Announcements } from '../../announcements/announcements';
 import { Streaming } from '../../streaming';
+import { HomeTimelineFeed } from '../../home-timeline-feed';
 
 @Component({
   selector: 'app-home',
@@ -15,6 +16,7 @@ import { Streaming } from '../../streaming';
 export class Home implements OnInit, OnDestroy {
   private api = inject(Api);
   private streaming = inject(Streaming);
+  private homeTimelineFeed = inject(HomeTimelineFeed);
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
@@ -53,6 +55,7 @@ export class Home implements OnInit, OnDestroy {
     this.api.homeTimeline().subscribe({
       next: (s) => {
         this.statuses.set(s);
+        this.homeTimelineFeed.publish(s);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -65,7 +68,10 @@ export class Home implements OnInit, OnDestroy {
     if (!maxId) {
       return;
     }
-    this.api.homeTimeline(maxId).subscribe((more) => this.statuses.update((s) => [...s, ...more]));
+    this.api.homeTimeline(maxId).subscribe((more) => {
+      this.statuses.update((s) => [...s, ...more]);
+      this.homeTimelineFeed.publish(more);
+    });
   }
 
   onPosted(status: Status): void {

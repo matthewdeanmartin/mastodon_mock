@@ -4,6 +4,9 @@
     @if (statusId()) {
       <p class="muted small">Reporting a specific post.</p>
     }
+    <p class="muted small">
+      Please review this carefully. Reports cannot be undone after they are sent.
+    </p>
 
     <label class="field">
       Category
@@ -27,7 +30,7 @@
     <div class="dialog-actions">
       <button class="btn btn-outline" (click)="closed.emit()">Cancel</button>
       <button class="btn warn" [disabled]="submitting()" (click)="submit()">
-        {{ submitting() ? 'Sending…' : 'Submit report' }}
+        {{ submitting() ? 'Sending…' : 'Confirm report' }}
       </button>
     </div>
   </div>

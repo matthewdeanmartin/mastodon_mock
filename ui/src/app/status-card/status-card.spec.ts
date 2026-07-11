@@ -183,7 +183,9 @@ describe('StatusCard', () => {
 
     // Open edit mode.
     f.componentInstance.startEdit(fakeEvent());
-    httpMock.expectOne('/api/v1/statuses/1/source').flush({ id: '1', text: 'old', spoiler_text: '' });
+    httpMock
+      .expectOne('/api/v1/statuses/1/source')
+      .flush({ id: '1', text: 'old', spoiler_text: '' });
 
     internals(f).editText.set('new content');
     f.componentInstance.saveEdit();
@@ -218,7 +220,9 @@ describe('StatusCard', () => {
     internals(f).editText.set('edited');
     f.componentInstance.saveEdit();
 
-    httpMock.expectOne('/api/v1/statuses/1').flush('', { status: 422, statusText: 'Unprocessable' });
+    httpMock
+      .expectOne('/api/v1/statuses/1')
+      .flush('', { status: 422, statusText: 'Unprocessable' });
 
     expect(internals(f).saving()).toBe(false);
   });
@@ -417,7 +421,9 @@ describe('StatusCard', () => {
   it('toggleTranslate: clears translating flag on HTTP error', () => {
     const f = setUp(makeStatus({ id: '11' }));
     f.componentInstance.toggleTranslate(fakeEvent());
-    httpMock.expectOne('/api/v1/statuses/11/translate').flush('', { status: 503, statusText: 'Unavailable' });
+    httpMock
+      .expectOne('/api/v1/statuses/11/translate')
+      .flush('', { status: 503, statusText: 'Unavailable' });
     expect(internals(f).translating()).toBe(false);
   });
 
@@ -465,7 +471,10 @@ describe('StatusCard', () => {
           multiple: false,
           votes_count: 0,
           voters_count: 0,
-          options: [{ title: 'A', votes_count: 0 }, { title: 'B', votes_count: 0 }],
+          options: [
+            { title: 'A', votes_count: 0 },
+            { title: 'B', votes_count: 0 },
+          ],
           voted: false,
           own_votes: [],
         },

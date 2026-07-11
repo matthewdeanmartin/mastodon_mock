@@ -39,9 +39,21 @@ function internals(fixture: ComponentFixture<Settings>): SettingsInternals {
 
 function makeAccount(id: string, display_name = `User ${id}`): Account {
   return {
-    id, username: `user${id}`, acct: `user${id}`, display_name, note: '', url: '',
-    avatar: '', avatar_static: '', header: '', followers_count: 0, following_count: 0,
-    statuses_count: 0, bot: false, locked: false, fields: [],
+    id,
+    username: `user${id}`,
+    acct: `user${id}`,
+    display_name,
+    note: '',
+    url: '',
+    avatar: '',
+    avatar_static: '',
+    header: '',
+    followers_count: 0,
+    following_count: 0,
+    statuses_count: 0,
+    bot: false,
+    locked: false,
+    fields: [],
   };
 }
 
@@ -53,7 +65,13 @@ function makeCredentials(overrides: Partial<Account> = {}): Account {
     locked: false,
     bot: false,
     fields: [{ name: 'Website', value: 'https://alice.example' }],
-    source: { privacy: 'public', sensitive: false, language: null, note: 'Hi plain', fields: [{ name: 'Website', value: 'https://alice.example' }] },
+    source: {
+      privacy: 'public',
+      sensitive: false,
+      language: null,
+      note: 'Hi plain',
+      fields: [{ name: 'Website', value: 'https://alice.example' }],
+    },
     ...overrides,
   };
 }
@@ -91,7 +109,17 @@ describe('Settings', () => {
   });
 
   it('seeds note from source.note when available', () => {
-    const fixture = setUp(makeCredentials({ source: { privacy: 'public', sensitive: false, language: null, note: 'Source note', fields: [] } }));
+    const fixture = setUp(
+      makeCredentials({
+        source: {
+          privacy: 'public',
+          sensitive: false,
+          language: null,
+          note: 'Source note',
+          fields: [],
+        },
+      }),
+    );
     expect(internals(fixture).note()).toBe('Source note');
   });
 
@@ -110,7 +138,9 @@ describe('Settings', () => {
   });
 
   it('provides an empty field row when no fields exist', () => {
-    const acct = makeCredentials({ source: { privacy: 'public', sensitive: false, language: null, note: '', fields: [] } });
+    const acct = makeCredentials({
+      source: { privacy: 'public', sensitive: false, language: null, note: '', fields: [] },
+    });
     const fixture = setUp(acct);
     // Should provide one empty row.
     expect(internals(fixture).fields()).toEqual([{ name: '', value: '' }]);
@@ -173,7 +203,10 @@ describe('Settings', () => {
 
   it('setField: updates name/value at the correct index', () => {
     const fixture = setUp();
-    internals(fixture).fields.set([{ name: 'A', value: '1' }, { name: 'B', value: '2' }]);
+    internals(fixture).fields.set([
+      { name: 'A', value: '1' },
+      { name: 'B', value: '2' },
+    ]);
     internals(fixture).setField(0, 'value', 'updated');
     expect(internals(fixture).fields()[0].value).toBe('updated');
     expect(internals(fixture).fields()[1].value).toBe('2'); // unchanged
@@ -190,8 +223,10 @@ describe('Settings', () => {
   it('addField: does nothing when 4 fields already exist', () => {
     const fixture = setUp();
     internals(fixture).fields.set([
-      { name: 'A', value: '1' }, { name: 'B', value: '2' },
-      { name: 'C', value: '3' }, { name: 'D', value: '4' },
+      { name: 'A', value: '1' },
+      { name: 'B', value: '2' },
+      { name: 'C', value: '3' },
+      { name: 'D', value: '4' },
     ]);
     internals(fixture).addField();
     expect(internals(fixture).fields()).toHaveLength(4);
@@ -199,9 +234,17 @@ describe('Settings', () => {
 
   it('removeField: removes the field at the given index', () => {
     const fixture = setUp();
-    internals(fixture).fields.set([{ name: 'A', value: '1' }, { name: 'B', value: '2' }, { name: 'C', value: '3' }]);
+    internals(fixture).fields.set([
+      { name: 'A', value: '1' },
+      { name: 'B', value: '2' },
+      { name: 'C', value: '3' },
+    ]);
     internals(fixture).removeField(1);
-    expect(internals(fixture).fields().map((f) => f.name)).toEqual(['A', 'C']);
+    expect(
+      internals(fixture)
+        .fields()
+        .map((f) => f.name),
+    ).toEqual(['A', 'C']);
   });
 
   // ---------------------------------------------------------------- saveProfile
@@ -229,7 +272,9 @@ describe('Settings', () => {
   it('saveProfile: clears saving on HTTP error', () => {
     const fixture = setUp();
     internals(fixture).saveProfile();
-    httpMock.expectOne('/api/v1/accounts/update_credentials').flush('', { status: 422, statusText: 'Unprocessable' });
+    httpMock
+      .expectOne('/api/v1/accounts/update_credentials')
+      .flush('', { status: 422, statusText: 'Unprocessable' });
     expect(internals(fixture).saving()).toBe(false);
   });
 
@@ -245,7 +290,11 @@ describe('Settings', () => {
     expect(req.request.method).toBe('POST');
     req.flush({});
 
-    expect(internals(fixture).mutes().map((a) => a.id)).toEqual(['3']);
+    expect(
+      internals(fixture)
+        .mutes()
+        .map((a) => a.id),
+    ).toEqual(['3']);
   });
 
   it('unblock: POSTs and removes the account from blocks list', () => {
@@ -269,7 +318,11 @@ describe('Settings', () => {
     const req = httpMock.expectOne('/api/v1/follow_requests/6/authorize');
     req.flush({});
 
-    expect(internals(fixture).requests().map((a) => a.id)).toEqual(['7']);
+    expect(
+      internals(fixture)
+        .requests()
+        .map((a) => a.id),
+    ).toEqual(['7']);
   });
 
   it('reject: POSTs and removes from follow requests', () => {

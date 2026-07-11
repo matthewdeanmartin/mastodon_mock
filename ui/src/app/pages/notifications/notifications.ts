@@ -4,10 +4,11 @@ import { Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { MastodonNotification } from '../../models';
 import { Streaming } from '../../streaming';
+import { Compose } from '../../compose/compose';
 
 @Component({
   selector: 'app-notifications',
-  imports: [RouterLink],
+  imports: [RouterLink, Compose],
   templateUrl: './notifications.html',
   styleUrl: './notifications.css',
 })

@@ -107,7 +107,9 @@ describe('Search', () => {
     internals(fixture).query.set('cats');
     internals(fixture).run();
 
-    const req = httpMock.expectOne((r) => r.url === '/api/v2/search' && r.params.get('q') === 'cats');
+    const req = httpMock.expectOne(
+      (r) => r.url === '/api/v2/search' && r.params.get('q') === 'cats',
+    );
     req.flush(makeResults([s1]));
 
     expect(internals(fixture).searching()).toBe(false);

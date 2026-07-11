@@ -92,7 +92,11 @@ describe('Announcements', () => {
     const fixture = setUp([a1, a2]);
     fixture.componentInstance.dismiss(a1);
 
-    expect(internals(fixture).announcements().map((x) => x.id)).toEqual(['2']);
+    expect(
+      internals(fixture)
+        .announcements()
+        .map((x) => x.id),
+    ).toEqual(['2']);
     httpMock.expectOne('/api/v1/announcements/1/dismiss').flush({});
   });
 
@@ -117,7 +121,9 @@ describe('Announcements', () => {
 
     httpMock.expectOne((r) => r.url.startsWith('/api/v1/announcements/10/reactions/')).flush({});
 
-    const reaction = internals(fixture).announcements()[0].reactions.find((r) => r.name === '🎉');
+    const reaction = internals(fixture)
+      .announcements()[0]
+      .reactions.find((r) => r.name === '🎉');
     expect(reaction).toMatchObject({ count: 4, me: true });
   });
 
@@ -131,7 +137,9 @@ describe('Announcements', () => {
     // Should DELETE / remove the reaction.
     httpMock.expectOne((r) => r.url.startsWith('/api/v1/announcements/10/reactions/')).flush({});
 
-    const reaction = internals(fixture).announcements()[0].reactions.find((r) => r.name === '❤️');
+    const reaction = internals(fixture)
+      .announcements()[0]
+      .reactions.find((r) => r.name === '❤️');
     expect(reaction).toMatchObject({ count: 1, me: false });
   });
 
@@ -155,7 +163,9 @@ describe('Announcements', () => {
     httpMock.expectOne((r) => r.url.startsWith('/api/v1/announcements/1/reactions/')).flush({});
 
     // a2 should be unchanged.
-    const a2Updated = internals(fixture).announcements().find((x) => x.id === '2')!;
+    const a2Updated = internals(fixture)
+      .announcements()
+      .find((x) => x.id === '2')!;
     expect(a2Updated.reactions[0]).toMatchObject({ count: 5, me: true });
   });
 });

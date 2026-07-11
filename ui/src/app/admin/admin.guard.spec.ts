@@ -58,9 +58,7 @@ describe('adminGuard', () => {
     auth.setToken('admin-token');
     auth.setAccount(makeAccount('admin'));
 
-    const result = await TestBed.runInInjectionContext(() =>
-      adminGuard({} as any, {} as any),
-    );
+    const result = await TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any));
 
     expect(result).toBe(true);
   });
@@ -69,9 +67,7 @@ describe('adminGuard', () => {
     auth.setToken('user-token');
     auth.setAccount(makeAccount(''));
 
-    const result = await TestBed.runInInjectionContext(() =>
-      adminGuard({} as any, {} as any),
-    );
+    const result = await TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any));
 
     expect(result).toBeInstanceOf(UrlTree);
     expect((result as UrlTree).toString()).toBe('/home');

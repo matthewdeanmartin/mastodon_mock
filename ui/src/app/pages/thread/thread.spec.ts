@@ -21,12 +21,29 @@ function internals(fixture: ComponentFixture<Thread>): ThreadInternals {
 
 function makeStatus(id: string): Status {
   return {
-    id, created_at: '2026-01-01T00:00:00Z', edited_at: null, content: `<p>${id}</p>`,
-    spoiler_text: '', visibility: 'public', url: null,
+    id,
+    created_at: '2026-01-01T00:00:00Z',
+    edited_at: null,
+    content: `<p>${id}</p>`,
+    spoiler_text: '',
+    visibility: 'public',
+    url: null,
     account: { id: '1', username: 'user', acct: 'user', display_name: 'User' } as never,
-    reblog: null, quote: null, in_reply_to_id: null, replies_count: 0, reblogs_count: 0,
-    favourites_count: 0, favourited: false, reblogged: false, bookmarked: false, muted: false,
-    pinned: false, sensitive: false, poll: null, quote_approval_policy: null, media_attachments: [],
+    reblog: null,
+    quote: null,
+    in_reply_to_id: null,
+    replies_count: 0,
+    reblogs_count: 0,
+    favourites_count: 0,
+    favourited: false,
+    reblogged: false,
+    bookmarked: false,
+    muted: false,
+    pinned: false,
+    sensitive: false,
+    poll: null,
+    quote_approval_policy: null,
+    media_attachments: [],
   };
 }
 
@@ -63,13 +80,21 @@ describe('Thread', () => {
     const fixture = setUpWithId('100');
 
     httpMock.expectOne('/api/v1/statuses/100').flush(makeStatus('100'));
-    httpMock.expectOne('/api/v1/statuses/100/context').flush(
-      makeContext([makeStatus('parent')], [makeStatus('child1'), makeStatus('child2')]),
-    );
+    httpMock
+      .expectOne('/api/v1/statuses/100/context')
+      .flush(makeContext([makeStatus('parent')], [makeStatus('child1'), makeStatus('child2')]));
 
     expect(internals(fixture).status()?.id).toBe('100');
-    expect(internals(fixture).ancestors().map((s) => s.id)).toEqual(['parent']);
-    expect(internals(fixture).descendants().map((s) => s.id)).toEqual(['child1', 'child2']);
+    expect(
+      internals(fixture)
+        .ancestors()
+        .map((s) => s.id),
+    ).toEqual(['parent']);
+    expect(
+      internals(fixture)
+        .descendants()
+        .map((s) => s.id),
+    ).toEqual(['child1', 'child2']);
     expect(internals(fixture).loading()).toBe(false);
   });
 
@@ -90,7 +115,11 @@ describe('Thread', () => {
 
     fixture.componentInstance.onReply(makeStatus('new-reply'));
 
-    expect(internals(fixture).descendants().map((s) => s.id)).toEqual(['d1', 'new-reply']);
+    expect(
+      internals(fixture)
+        .descendants()
+        .map((s) => s.id),
+    ).toEqual(['d1', 'new-reply']);
   });
 
   // ---------------------------------------------------------------- onChanged
@@ -133,8 +162,16 @@ describe('Thread', () => {
 
     fixture.componentInstance.onContextDeleted(makeStatus('d1'));
 
-    expect(internals(fixture).ancestors().map((s) => s.id)).toEqual(['a1']);
-    expect(internals(fixture).descendants().map((s) => s.id)).toEqual(['d2']);
+    expect(
+      internals(fixture)
+        .ancestors()
+        .map((s) => s.id),
+    ).toEqual(['a1']);
+    expect(
+      internals(fixture)
+        .descendants()
+        .map((s) => s.id),
+    ).toEqual(['d2']);
   });
 
   // ---------------------------------------------------------------- onFocusedDeleted

@@ -11,17 +11,27 @@
 } @else {
   @for (n of items(); track n.id) {
     <div class="notif">
-      <a class="who" [routerLink]="['/accounts', n.account.id]">{{
-        n.account.display_name || n.account.username
-      }}</a>
-      <span class="what muted">{{ label(n.type) }}</span>
-      @if (n.status) {
-        <a
-          class="excerpt"
-          [routerLink]="['/statuses', n.status.id]"
-          [innerHTML]="n.status.content"
-        ></a>
-      }
+      <a [routerLink]="['/accounts', n.account.id]">
+        <img class="notif-avatar" [src]="n.account.avatar" [alt]="n.account.username" />
+      </a>
+      <div class="notif-body">
+        <a class="who" [routerLink]="['/accounts', n.account.id]">{{
+          n.account.display_name || n.account.username
+        }}</a>
+        <span class="what muted">{{ label(n.type) }}</span>
+        @if (n.status) {
+          <a
+            class="excerpt"
+            [routerLink]="['/statuses', n.status.id]"
+            [innerHTML]="n.status.content"
+          ></a>
+          @if (n.type === 'mention') {
+            <div class="mention-reply">
+              <app-compose [inReplyToId]="n.status.id" placeholder="Post your reply" />
+            </div>
+          }
+        }
+      </div>
     </div>
   }
 }

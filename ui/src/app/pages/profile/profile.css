@@ -25,6 +25,48 @@
   justify-content: flex-end;
 }
 
+.account-danger-menu {
+  position: relative;
+}
+
+.account-danger-menu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.account-danger-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.account-danger-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  min-width: 170px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+}
+
+.account-danger-panel button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #e0245e;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-danger-panel button:hover {
+  background: var(--border);
+}
+
 /* Blocked state: turn the (outline) Block button into a clear danger affordance. */
 .btn-danger {
   color: #e0245e;
@@ -70,4 +112,33 @@ h2 {
 
 .stats strong {
   color: var(--text);
+}
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(0 0 0 / 45%);
+}
+
+.confirm-dialog {
+  width: min(420px, 100%);
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--col-bg);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 25%);
+}
+
+.confirm-dialog h3 {
+  margin-top: 0;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
 }

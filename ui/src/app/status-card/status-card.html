@@ -11,6 +11,13 @@
         display.account.display_name || display.account.username
       }}</a>
       <span class="acct muted">&#64;{{ display.account.acct }}</span>
+      <a
+        class="post-time muted"
+        [routerLink]="['/statuses', display.id]"
+        [title]="display.created_at"
+      >
+        · {{ display.created_at | humanTime }}
+      </a>
       @if (display.pinned) {
         <span class="badge" title="Pinned">📌</span>
       }
@@ -200,7 +207,12 @@
       } @else if (reported()) {
         <span class="action reported" title="Reported">🚩 reported</span>
       } @else {
-        <button class="action" (click)="openReport($event)" title="Report">🚩</button>
+        <details class="danger-menu" (click)="$event.stopPropagation()">
+          <summary class="action" aria-label="More post actions">•••</summary>
+          <div class="danger-menu-panel">
+            <button type="button" (click)="openReport($event)">Report post</button>
+          </div>
+        </details>
       }
     </div>
 

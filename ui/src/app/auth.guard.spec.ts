@@ -17,9 +17,7 @@ describe('authGuard', () => {
     const auth = TestBed.inject(Auth);
     auth.setToken('test-token');
 
-    const result = TestBed.runInInjectionContext(() =>
-      authGuard({} as any, {} as any),
-    );
+    const result = TestBed.runInInjectionContext(() => authGuard({} as any, {} as any));
 
     expect(result).toBe(true);
   });
@@ -29,9 +27,7 @@ describe('authGuard', () => {
     const auth = TestBed.inject(Auth);
     auth.logoutAll();
 
-    const result = TestBed.runInInjectionContext(() =>
-      authGuard({} as any, {} as any),
-    );
+    const result = TestBed.runInInjectionContext(() => authGuard({} as any, {} as any));
 
     expect(result).toBeInstanceOf(UrlTree);
     expect((result as UrlTree).toString()).toBe('/login');

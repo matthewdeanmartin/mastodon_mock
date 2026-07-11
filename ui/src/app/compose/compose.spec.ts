@@ -222,7 +222,11 @@ describe('Compose', () => {
       { media: { id: '2' }, description: '' },
     ]);
     internals(f).removeMedia(0);
-    expect(internals(f).media().map((m) => m.media.id)).toEqual(['2']);
+    expect(
+      internals(f)
+        .media()
+        .map((m) => m.media.id),
+    ).toEqual(['2']);
   });
 
   // ---------------------------------------------------------------- submit()

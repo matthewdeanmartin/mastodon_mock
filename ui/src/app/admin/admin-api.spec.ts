@@ -184,7 +184,15 @@ describe('AdminApi (HTTP isolated)', () => {
     const req = httpMock.expectOne('/api/v1/admin/domain_blocks');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ domain: 'evil.example', severity: 'suspend' });
-    req.flush({ id: '1', domain: 'evil.example', severity: 'suspend', reject_media: false, reject_reports: false, public_comment: null, created_at: '' });
+    req.flush({
+      id: '1',
+      domain: 'evil.example',
+      severity: 'suspend',
+      reject_media: false,
+      reject_reports: false,
+      public_comment: null,
+      created_at: '',
+    });
     expect(block!.domain).toBe('evil.example');
   });
 
@@ -323,8 +331,19 @@ describe('AdminApi (HTTP isolated)', () => {
     api.createIpBlock('1.2.3.4', 'sign_up_block', 'bad actor').subscribe();
     const req = httpMock.expectOne('/api/v1/admin/ip_blocks');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ ip: '1.2.3.4', severity: 'sign_up_block', comment: 'bad actor' });
-    req.flush({ id: '1', ip: '1.2.3.4', severity: 'sign_up_block', comment: 'bad actor', created_at: '', expires_at: null });
+    expect(req.request.body).toEqual({
+      ip: '1.2.3.4',
+      severity: 'sign_up_block',
+      comment: 'bad actor',
+    });
+    req.flush({
+      id: '1',
+      ip: '1.2.3.4',
+      severity: 'sign_up_block',
+      comment: 'bad actor',
+      created_at: '',
+      expires_at: null,
+    });
   });
 
   it('deleteIpBlock: DELETEs /api/v1/admin/ip_blocks/:id', () => {

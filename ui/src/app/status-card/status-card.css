@@ -312,3 +312,43 @@
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
+
+.danger-menu {
+  position: relative;
+}
+
+.danger-menu summary {
+  list-style: none;
+}
+
+.danger-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.danger-menu-panel {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  z-index: 50;
+  min-width: 140px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+}
+
+.danger-menu-panel button {
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #e0245e;
+  text-align: left;
+  cursor: pointer;
+}
+
+.danger-menu-panel button:hover {
+  background: var(--border);
+}

@@ -1,5 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from '../api';
 import { Auth, Session } from '../auth';
 import { environment } from '../../environments/environment';
@@ -15,6 +15,7 @@ import { RightRail } from './right-rail/right-rail';
 export class Shell implements OnInit {
   protected auth = inject(Auth);
   private api = inject(Api);
+  private router = inject(Router);
 
   /** Build flavor: drives the brand and whether mock-only nav links are shown. */
   protected brand = environment.brand;
@@ -65,7 +66,10 @@ export class Shell implements OnInit {
     }
     this.auth.switchTo(session.token);
     this.api.verifyCredentials().subscribe({
-      next: (acc) => this.auth.setAccount(acc),
+      next: (acc) => {
+        this.auth.setAccount(acc);
+        this.reloadCurrentRoute();
+      },
       error: () => {
         // The token was rejected by its instance. Don't silently delete the account —
         // revert to where we were and tell the user (non-blocking toast).
@@ -77,6 +81,19 @@ export class Shell implements OnInit {
           `Couldn't switch to ${name} — its session may have expired. Sign in again to refresh it.`,
         );
       },
+    });
+  }
+
+  /** Recreate the active routed page so every account-scoped request runs with the new token. */
+  private reloadCurrentRoute(): void {
+    // The bare root is only a transient bootstrap URL; there is no account page to refresh yet.
+    if (!this.router.url || this.router.url === '/' || this.router.url.startsWith('/explore')) {
+      return;
+    }
+    const shouldReuseRoute = this.router.routeReuseStrategy.shouldReuseRoute;
+    this.router.routeReuseStrategy.shouldReuseRoute = () => false;
+    void this.router.navigateByUrl(this.router.url, { replaceUrl: true }).finally(() => {
+      this.router.routeReuseStrategy.shouldReuseRoute = shouldReuseRoute;
     });
   }
 

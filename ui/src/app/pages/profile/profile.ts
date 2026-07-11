@@ -26,6 +26,7 @@ export class Profile implements OnInit {
   protected showReport = signal(false);
   protected showLists = signal(false);
   protected reportDone = signal(false);
+  protected showBlockConfirm = signal(false);
 
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
 
@@ -68,6 +69,19 @@ export class Profile implements OnInit {
     }
     const call = rel?.blocking ? this.api.unblockAccount(acc.id) : this.api.block(acc.id);
     call.subscribe((updated) => this.relationship.set(updated));
+  }
+
+  requestBlock(): void {
+    if (this.relationship()?.blocking) {
+      this.toggleBlock();
+      return;
+    }
+    this.showBlockConfirm.set(true);
+  }
+
+  confirmBlock(): void {
+    this.showBlockConfirm.set(false);
+    this.toggleBlock();
   }
 
   onChanged(index: number, updated: Status): void {

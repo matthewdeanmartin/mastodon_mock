@@ -39,12 +39,29 @@ function makeInstanceInfo(): InstanceInfo {
 
 function makeStatus(id: string): Status {
   return {
-    id, created_at: '2026-01-01T00:00:00Z', edited_at: null, content: `<p>Trending ${id}</p>`,
-    spoiler_text: '', visibility: 'public', url: null,
+    id,
+    created_at: '2026-01-01T00:00:00Z',
+    edited_at: null,
+    content: `<p>Trending ${id}</p>`,
+    spoiler_text: '',
+    visibility: 'public',
+    url: null,
     account: { id: '1', username: 'user', acct: 'user', display_name: 'User' } as never,
-    reblog: null, quote: null, in_reply_to_id: null, replies_count: 0, reblogs_count: 0,
-    favourites_count: 0, favourited: false, reblogged: false, bookmarked: false, muted: false,
-    pinned: false, sensitive: false, poll: null, quote_approval_policy: null, media_attachments: [],
+    reblog: null,
+    quote: null,
+    in_reply_to_id: null,
+    replies_count: 0,
+    reblogs_count: 0,
+    favourites_count: 0,
+    favourited: false,
+    reblogged: false,
+    bookmarked: false,
+    muted: false,
+    pinned: false,
+    sensitive: false,
+    poll: null,
+    quote_approval_policy: null,
+    media_attachments: [],
   };
 }
 
@@ -104,7 +121,9 @@ describe('Explore', () => {
     fixture.detectChanges();
 
     httpMock.expectOne('/api/v2/instance').flush(makeInstanceInfo());
-    httpMock.expectOne('/api/v1/trends/statuses').flush('', { status: 503, statusText: 'Unavailable' });
+    httpMock
+      .expectOne('/api/v1/trends/statuses')
+      .flush('', { status: 503, statusText: 'Unavailable' });
     httpMock.expectOne('/api/v1/trends/tags').flush([]);
 
     expect(internals(fixture).loadingPosts()).toBe(false);

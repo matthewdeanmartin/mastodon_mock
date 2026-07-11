@@ -4,8 +4,19 @@
     [ngModel]="query()"
     (ngModelChange)="query.set($event)"
     (keyup.enter)="run()"
-    placeholder="Search accounts, statuses, hashtags"
+    [placeholder]="
+      type() === 'accounts'
+        ? 'Search accounts'
+        : type() === 'statuses'
+          ? 'Search posts'
+          : 'Search hashtags'
+    "
   />
+  <select [ngModel]="type()" (ngModelChange)="type.set($event)" aria-label="Search for">
+    <option value="accounts">Accounts</option>
+    <option value="statuses">Posts</option>
+    <option value="hashtags">Hashtags</option>
+  </select>
   <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
 </div>
 
