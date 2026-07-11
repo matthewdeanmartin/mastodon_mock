@@ -1,0 +1,39 @@
+@if (trends().length) {
+  <section class="card">
+    <h2 class="card-title">Trends for you</h2>
+    @for (tag of trends().slice(0, 10); track tag.name) {
+      <a class="trend" [routerLink]="['/tags', tag.name]">
+        <span class="trend-name">#{{ tag.name }}</span>
+        @if (uses(tag); as count) {
+          <span class="trend-count muted">{{ count }} posts</span>
+        }
+      </a>
+    }
+  </section>
+}
+
+<section class="card">
+  <h2 class="card-title">Discover</h2>
+  <a class="rail-link" routerLink="/public">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+    </svg>
+    <span>Public timeline</span>
+  </a>
+  <a class="rail-link" routerLink="/explore">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15.5 8.5-2 5-5 2 2-5z" />
+    </svg>
+    <span>Explore</span>
+  </a>
+
+  @if (instance(); as info) {
+    <div class="server-info">
+      <p class="server-title">{{ info.title }}</p>
+      <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
+      <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
+    </div>
+  }
+</section>

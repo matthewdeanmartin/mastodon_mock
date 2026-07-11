@@ -12,13 +12,6 @@
         </svg>
         <span>Home</span>
       </a>
-      <a routerLink="/public" routerLinkActive="active">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-        </svg>
-        <span>Public</span>
-      </a>
       <a routerLink="/notifications" routerLinkActive="active">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5" />
@@ -38,6 +31,18 @@
         </svg>
         <span>Search</span>
       </a>
+      <a routerLink="/lists" routerLinkActive="active">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+        </svg>
+        <span>Lists</span>
+      </a>
+      <a routerLink="/tags" routerLinkActive="active">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9.5 4 7 20M17 4l-2.5 16M4.5 9h16M3.5 15h16" />
+        </svg>
+        <span>Tags</span>
+      </a>
     </nav>
 
     <div class="header-actions">
@@ -51,11 +56,8 @@
           <span>More</span>
         </summary>
         <div class="menu-panel">
-          <a routerLink="/explore">Explore</a>
           <a routerLink="/favourites">Favourites</a>
           <a routerLink="/bookmarks">Bookmarks</a>
-          <a routerLink="/lists">Lists</a>
-          <a routerLink="/tags">Tags</a>
           <a routerLink="/about">About</a>
           <div class="menu-divider"></div>
           <a routerLink="/settings">Settings</a>
@@ -117,9 +119,17 @@
   </div>
 </header>
 
-<main class="column">
-  <router-outlet />
-</main>
+<div class="layout">
+  <aside class="rail rail-left">
+    <app-left-rail />
+  </aside>
+  <main class="column">
+    <router-outlet />
+  </main>
+  <aside class="rail rail-right">
+    <app-right-rail />
+  </aside>
+</div>
 
 @if (toast(); as message) {
   <div class="toast" role="alert">

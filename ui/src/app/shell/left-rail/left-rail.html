@@ -1,0 +1,55 @@
+@if (auth.account(); as acc) {
+  <section class="card profile-card">
+    <a class="banner" [routerLink]="['/accounts', acc.id]" [attr.aria-label]="acc.display_name">
+      @if (acc.header) {
+        <img [src]="acc.header" alt="" />
+      }
+    </a>
+    <div class="profile-body">
+      <a class="profile-avatar" [routerLink]="['/accounts', acc.id]">
+        <img [src]="acc.avatar_static || acc.avatar" alt="" />
+      </a>
+      <a class="profile-name" [routerLink]="['/accounts', acc.id]">{{ acc.display_name }}</a>
+      <span class="profile-handle muted">&#64;{{ acc.username }}</span>
+      <div class="profile-stats">
+        <a [routerLink]="['/accounts', acc.id]">
+          <span class="stat-label">Posts</span>
+          <span class="stat-value">{{ acc.statuses_count }}</span>
+        </a>
+        <a [routerLink]="['/accounts', acc.id]">
+          <span class="stat-label">Following</span>
+          <span class="stat-value">{{ acc.following_count }}</span>
+        </a>
+        <a [routerLink]="['/accounts', acc.id]">
+          <span class="stat-label">Followers</span>
+          <span class="stat-value">{{ acc.followers_count }}</span>
+        </a>
+      </div>
+    </div>
+  </section>
+}
+
+@if (suggestions().length) {
+  <section class="card">
+    <h2 class="card-title">Who to follow</h2>
+    @for (account of suggestions().slice(0, 5); track account.id) {
+      <div class="suggestion">
+        <a class="suggestion-avatar" [routerLink]="['/accounts', account.id]">
+          <img [src]="account.avatar_static || account.avatar" alt="" />
+        </a>
+        <a class="suggestion-name" [routerLink]="['/accounts', account.id]">
+          <span class="suggestion-display">{{ account.display_name || account.username }}</span>
+          <span class="muted">&#64;{{ account.acct }}</span>
+        </a>
+        @if (followed().has(account.id)) {
+          <button type="button" class="btn follow-btn" disabled>Following</button>
+        } @else {
+          <button type="button" class="btn btn-outline follow-btn" (click)="follow(account)">
+            Follow
+          </button>
+        }
+      </div>
+    }
+    <p class="card-hint muted">Boosted by people across the network</p>
+  </section>
+}

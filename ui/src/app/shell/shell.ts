@@ -3,10 +3,12 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from '../api';
 import { Auth, Session } from '../auth';
 import { environment } from '../../environments/environment';
+import { LeftRail } from './left-rail/left-rail';
+import { RightRail } from './right-rail/right-rail';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LeftRail, RightRail],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
