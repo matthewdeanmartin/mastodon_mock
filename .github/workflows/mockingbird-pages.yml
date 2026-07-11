@@ -19,6 +19,8 @@ jobs:
     name: Build Mocking Bird
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      CUSTOM_DOMAIN: mawkingbird.com
     permissions:
       contents: read
     steps:
@@ -32,25 +34,18 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: ui/package-lock.json
-      - name: Configure Pages
-        # Emits the base path this site is served from, e.g. /mastodon_mock/ for
-        # project Pages, so the Angular base href matches.
-        id: pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5.0.0
       - name: Build Mocking Bird
-        # configure-pages emits base_path WITHOUT a trailing slash (e.g.
-        # "/mastodon_mock"). Angular's <base href> must end in "/" or the browser
-        # resolves assets against the parent dir (e.g. /main.js instead of
-        # /mastodon_mock/main.js), so we append one here if missing.
-        # Pass it via env (not direct ${{ }} interpolation into the shell) to avoid any
-        # template-injection surface.
-        env:
-          BASE_PATH: ${{ steps.pages.outputs.base_path }}
-        run: make mockingbird MOCKINGBIRD_BASE_HREF="${BASE_PATH%/}/"
+        # The custom domain serves the site from the origin root, not a repository
+        # sub-path, so build the Angular app with a root base href.
+        run: make mockingbird MOCKINGBIRD_BASE_HREF=/
       - name: Add SPA 404 fallback
         # GitHub Pages serves 404.html for unknown paths; mirroring index.html lets the
         # Angular router handle deep links (e.g. /accounts/123) on reload.
         run: cp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
+      - name: Add custom domain
+        # Publish a CNAME alongside the artifact so Pages binds the deployment to the
+        # production custom domain.
+        run: printf '%s' "$CUSTOM_DOMAIN" > ui/dist-mockingbird/browser/CNAME
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3.0.1
         with:

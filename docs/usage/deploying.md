@@ -106,8 +106,7 @@ make mockingbird
 # Output: ui/dist-mockingbird/browser — host these static files anywhere.
 ```
 
-For sub-path hosting (e.g. GitHub project Pages served from `/mastodon_mock/`), override
-the base href:
+For sub-path hosting, override the base href:
 
 ```bash
 make mockingbird MOCKINGBIRD_BASE_HREF=/mastodon_mock/
@@ -121,7 +120,8 @@ GitHub Pages on every push that touches `ui/`. To enable it once:
 1. Repository **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 1. Push a change under `ui/` (or run the workflow manually).
 
-The workflow sets the base href from the Pages base path automatically and adds a
+The workflow now targets the custom domain [`mawkingbird.com`](https://mawkingbird.com/),
+builds with `base href=/`, writes a `CNAME` file into the published artifact, and adds a
 `404.html` SPA fallback so deep links resolve on reload.
 
 ### How the two builds differ

@@ -46,7 +46,8 @@ The three tracks are independent and can ship in any order:
 
 > Status: implemented. Build with `make mockingbird` (override the base href via
 > `MOCKINGBIRD_BASE_HREF=/sub-path/`). CI deploys to GitHub Pages via
-> `.github/workflows/mockingbird-pages.yml`.
+> `.github/workflows/mockingbird-pages.yml`, currently targeting the custom domain
+> `https://mawkingbird.com/`.
 >
 > How it works in code:
 > - **Build seam:** `ui/src/environments/environment.ts` (mock-embedded, `mockTooling:
