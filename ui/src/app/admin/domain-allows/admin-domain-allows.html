@@ -6,7 +6,9 @@
     (keyup.enter)="add()"
     placeholder="domain to allow (e.g. friendly.example)"
   />
-  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">Allow</button>
+  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">
+    Allow
+  </button>
 </div>
 
 @if (loading()) {

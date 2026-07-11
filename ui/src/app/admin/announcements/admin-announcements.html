@@ -10,7 +10,9 @@
       <input type="checkbox" [ngModel]="publishNow()" (ngModelChange)="publishNow.set($event)" />
       Publish immediately
     </label>
-    <button class="btn" [disabled]="!newText().trim() || submitting()" (click)="create()">Create</button>
+    <button class="btn" [disabled]="!newText().trim() || submitting()" (click)="create()">
+      Create
+    </button>
   </div>
 </div>
 
@@ -22,7 +24,9 @@
   @for (a of announcements(); track a.id) {
     <div class="announcement-row" [class.draft]="!a.published">
       <div class="ann-body">
-        <span class="badge" [class.published]="a.published">{{ a.published ? 'Published' : 'Draft' }}</span>
+        <span class="badge" [class.published]="a.published">{{
+          a.published ? 'Published' : 'Draft'
+        }}</span>
         <div class="ann-content" [innerHTML]="a.content"></div>
         @if (a.reactions.length) {
           <div class="ann-reactions muted small">
@@ -33,7 +37,9 @@
         }
       </div>
       <div class="ann-ops">
-        <button class="op" (click)="togglePublished(a)">{{ a.published ? 'Unpublish' : 'Publish' }}</button>
+        <button class="op" (click)="togglePublished(a)">
+          {{ a.published ? 'Unpublish' : 'Publish' }}
+        </button>
         <button class="op warn" (click)="remove(a)">Delete</button>
       </div>
     </div>

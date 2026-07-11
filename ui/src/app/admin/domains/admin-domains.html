@@ -11,7 +11,9 @@
     <option value="suspend">suspend</option>
     <option value="noop">noop</option>
   </select>
-  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">Block</button>
+  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">
+    Block
+  </button>
 </div>
 
 @if (loading()) {

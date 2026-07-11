@@ -15,7 +15,9 @@
         @if (r.target_account) {
           <span>
             against
-            <a [routerLink]="['/accounts', r.target_account.id]"><strong>{{ r.target_account.username }}</strong></a>
+            <a [routerLink]="['/accounts', r.target_account.id]"
+              ><strong>{{ r.target_account.username }}</strong></a
+            >
           </span>
         }
         @if (r.account) {

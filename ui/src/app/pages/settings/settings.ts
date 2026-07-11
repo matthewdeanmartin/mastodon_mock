@@ -57,7 +57,10 @@ export class Settings implements OnInit {
       this.note.set(acc.source?.note ?? acc.note ?? '');
       this.locked.set(acc.locked);
       this.bot.set(acc.bot);
-      const fields = (acc.source?.fields ?? acc.fields ?? []).map((f) => ({ name: f.name, value: f.value }));
+      const fields = (acc.source?.fields ?? acc.fields ?? []).map((f) => ({
+        name: f.name,
+        value: f.value,
+      }));
       // Always offer one empty row to add a new field.
       this.fields.set(fields.length ? fields : [{ name: '', value: '' }]);
     });

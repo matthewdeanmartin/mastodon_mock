@@ -109,9 +109,7 @@ export class Compose {
   }
 
   setMediaDescription(index: number, description: string): void {
-    this.media.update((list) =>
-      list.map((m, i) => (i === index ? { ...m, description } : m)),
-    );
+    this.media.update((list) => list.map((m, i) => (i === index ? { ...m, description } : m)));
   }
 
   removeMedia(index: number): void {
@@ -163,7 +161,9 @@ export class Compose {
       options.mediaIds = this.media().map((m) => m.media.id);
     }
     if (this.pollOpen()) {
-      const pollOpts = this.pollOptions().map((o) => o.trim()).filter(Boolean);
+      const pollOpts = this.pollOptions()
+        .map((o) => o.trim())
+        .filter(Boolean);
       if (pollOpts.length >= 2) {
         options.poll = {
           options: pollOpts,

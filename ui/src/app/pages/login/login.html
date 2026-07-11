@@ -79,7 +79,9 @@
           <p class="error">{{ oauthError() }}</p>
         }
         <button class="btn" [disabled]="oauthWorking()" (click)="startOAuth()">
-          {{ oauthWorking() ? 'Redirecting…' : 'Sign in with ' + (server.baseUrl() || 'this server') }}
+          {{
+            oauthWorking() ? 'Redirecting…' : 'Sign in with ' + (server.baseUrl() || 'this server')
+          }}
         </button>
 
         <!-- ---------- Secondary: access token ---------- -->
@@ -92,7 +94,9 @@
           </div>
           @if (showToken()) {
             @if (!showRegister()) {
-              <p class="muted small">Already have an access token for this instance? Paste it here.</p>
+              <p class="muted small">
+                Already have an access token for this instance? Paste it here.
+              </p>
               <input
                 type="text"
                 [ngModel]="token()"
@@ -103,7 +107,11 @@
               @if (error()) {
                 <p class="error">{{ error() }}</p>
               }
-              <button class="btn btn-outline" [disabled]="!token().trim() || checking()" (click)="submit()">
+              <button
+                class="btn btn-outline"
+                [disabled]="!token().trim() || checking()"
+                (click)="submit()"
+              >
                 {{ checking() ? 'Checking…' : 'Sign in with token' }}
               </button>
               <p class="muted small switch-line">
@@ -116,7 +124,11 @@
                   <code>{{ regEmail() }}</code
                   >. Click the link to verify your address.
                 </p>
-                <button class="btn verify-link" [disabled]="verifying()" (click)="confirmAndEnter()">
+                <button
+                  class="btn verify-link"
+                  [disabled]="verifying()"
+                  (click)="confirmAndEnter()"
+                >
                   {{ verifying() ? 'Verifying…' : '✉ Verify email & continue' }}
                 </button>
                 <p class="muted small">
@@ -147,7 +159,11 @@
                   placeholder="password"
                 />
                 <label class="agree">
-                  <input type="checkbox" [ngModel]="regAgree()" (ngModelChange)="regAgree.set($event)" />
+                  <input
+                    type="checkbox"
+                    [ngModel]="regAgree()"
+                    (ngModelChange)="regAgree.set($event)"
+                  />
                   <span>I agree to the server rules</span>
                 </label>
                 @if (regError()) {
@@ -157,7 +173,8 @@
                   {{ regWorking() ? 'Creating…' : 'Sign up' }}
                 </button>
                 <p class="muted small switch-line">
-                  Have a token? <button class="link" (click)="toggleRegister()">Sign in instead</button>
+                  Have a token?
+                  <button class="link" (click)="toggleRegister()">Sign in instead</button>
                 </p>
               }
             }

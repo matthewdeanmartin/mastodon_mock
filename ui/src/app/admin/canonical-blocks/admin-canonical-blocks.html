@@ -17,7 +17,9 @@
     (keyup.enter)="test()"
     placeholder="test an email against existing blocks"
   />
-  <button class="btn btn-outline" [disabled]="!testEmail().trim()" (click)="test()">Test match</button>
+  <button class="btn btn-outline" [disabled]="!testEmail().trim()" (click)="test()">
+    Test match
+  </button>
 </div>
 @if (testResult(); as result) {
   <div class="test-result">

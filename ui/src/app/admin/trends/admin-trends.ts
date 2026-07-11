@@ -50,10 +50,14 @@ export class AdminTrends implements OnInit {
   }
 
   approveStatus(status: Status): void {
-    this.api.approveTrendingStatus(status.id).subscribe(() => this.mark('status-' + status.id, 'approved'));
+    this.api
+      .approveTrendingStatus(status.id)
+      .subscribe(() => this.mark('status-' + status.id, 'approved'));
   }
 
   rejectStatus(status: Status): void {
-    this.api.rejectTrendingStatus(status.id).subscribe(() => this.mark('status-' + status.id, 'rejected'));
+    this.api
+      .rejectTrendingStatus(status.id)
+      .subscribe(() => this.mark('status-' + status.id, 'rejected'));
   }
 }

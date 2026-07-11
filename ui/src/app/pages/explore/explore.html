@@ -78,9 +78,15 @@
         @for (status of posts(); track status.id) {
           <article class="post">
             <div class="post-head">
-              <img class="avatar" [src]="status.account.avatar_static || status.account.avatar" alt="" />
+              <img
+                class="avatar"
+                [src]="status.account.avatar_static || status.account.avatar"
+                alt=""
+              />
               <div class="who">
-                <span class="name">{{ status.account.display_name || status.account.username }}</span>
+                <span class="name">{{
+                  status.account.display_name || status.account.username
+                }}</span>
                 <span class="acct muted">&#64;{{ status.account.acct }}</span>
               </div>
             </div>

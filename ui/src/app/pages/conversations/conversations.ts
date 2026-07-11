@@ -19,8 +19,8 @@ export class Conversations implements OnInit {
   protected loading = signal(true);
   protected selectedId = signal<string | null>(null);
 
-  protected selected = computed(() =>
-    this.conversations().find((c) => c.id === this.selectedId()) ?? null,
+  protected selected = computed(
+    () => this.conversations().find((c) => c.id === this.selectedId()) ?? null,
   );
 
   /** Pre-seed a direct reply with @mentions of the other participants. */

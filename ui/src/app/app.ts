@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { environment } from '../environments/environment';
@@ -9,8 +9,10 @@ import { environment } from '../environments/environment';
   template: '<router-outlet />',
 })
 export class App {
-  constructor(title: Title) {
+  private readonly title = inject(Title);
+
+  constructor() {
     // Set the tab title from the build flavor (mastodon_mock vs Mocking Bird).
-    title.setTitle(environment.brand);
+    this.title.setTitle(environment.brand);
   }
 }

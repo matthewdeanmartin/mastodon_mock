@@ -5,8 +5,13 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:mockingbird": "ng build --configuration mockingbird",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "test:ci": "ng test --no-watch --coverage",
+    "lint": "ng lint ui --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,html,css,scss}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\""
   },
   "private": true,
   "packageManager": "npm@11.17.0",
@@ -24,9 +29,15 @@
     "@angular/build": "^21.2.7",
     "@angular/cli": "^21.2.7",
     "@angular/compiler-cli": "^21.2.0",
+    "@angular-eslint/builder": "^21.0.0",
+    "@eslint/js": "^10.0.1",
+    "@vitest/coverage-v8": "^4.1.9",
+    "angular-eslint": "^21.0.0",
+    "eslint": "^10.0.3",
     "jsdom": "^29.1.1",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^4.1.9"
   }
 }

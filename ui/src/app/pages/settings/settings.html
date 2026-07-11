@@ -1,26 +1,45 @@
 <div class="page-head">Settings</div>
 
 <div class="tabs">
-  <button class="tab" [class.active]="tab() === 'profile'" (click)="setTab('profile')">Profile</button>
+  <button class="tab" [class.active]="tab() === 'profile'" (click)="setTab('profile')">
+    Profile
+  </button>
   <button class="tab" [class.active]="tab() === 'mutes'" (click)="setTab('mutes')">Mutes</button>
   <button class="tab" [class.active]="tab() === 'blocks'" (click)="setTab('blocks')">Blocks</button>
-  <button class="tab" [class.active]="tab() === 'requests'" (click)="setTab('requests')">Follow requests</button>
+  <button class="tab" [class.active]="tab() === 'requests'" (click)="setTab('requests')">
+    Follow requests
+  </button>
 </div>
 
 @if (tab() === 'profile') {
   <form class="profile-form" (ngSubmit)="saveProfile()">
     <label class="field">
       Display name
-      <input type="text" [ngModel]="displayName()" (ngModelChange)="displayName.set($event)" name="display_name" />
+      <input
+        type="text"
+        [ngModel]="displayName()"
+        (ngModelChange)="displayName.set($event)"
+        name="display_name"
+      />
     </label>
 
     <label class="field">
       Bio
-      <textarea rows="3" [ngModel]="note()" (ngModelChange)="note.set($event)" name="note"></textarea>
+      <textarea
+        rows="3"
+        [ngModel]="note()"
+        (ngModelChange)="note.set($event)"
+        name="note"
+      ></textarea>
     </label>
 
     <label class="checkline">
-      <input type="checkbox" [ngModel]="locked()" (ngModelChange)="locked.set($event)" name="locked" />
+      <input
+        type="checkbox"
+        [ngModel]="locked()"
+        (ngModelChange)="locked.set($event)"
+        name="locked"
+      />
       Require follow approval (locked)
     </label>
 
@@ -51,7 +70,9 @@
         </div>
       }
       @if (fields().length < 4) {
-        <button type="button" class="btn btn-outline btn-sm" (click)="addField()">+ Add field</button>
+        <button type="button" class="btn btn-outline btn-sm" (click)="addField()">
+          + Add field
+        </button>
       }
     </div>
 

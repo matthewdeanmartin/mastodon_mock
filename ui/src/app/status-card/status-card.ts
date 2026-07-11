@@ -59,7 +59,9 @@ export class StatusCard {
   /** True when this status quotes one of the viewer's own statuses (revocable). */
   protected canRevokeQuote = computed(() => {
     const q = this.display.quote?.quoted_status;
-    return !!q && q.account.id === this.auth.account()?.id && this.display.quote?.state === 'accepted';
+    return (
+      !!q && q.account.id === this.auth.account()?.id && this.display.quote?.state === 'accepted'
+    );
   });
 
   openReport(event: Event): void {
@@ -278,6 +280,8 @@ export class StatusCard {
       return;
     }
     // The viewer owns the quoted status; revoke this status's quote of it.
-    this.api.revokeQuote(quoted.id, this.display.id).subscribe((updated) => this.changed.emit(updated));
+    this.api
+      .revokeQuote(quoted.id, this.display.id)
+      .subscribe((updated) => this.changed.emit(updated));
   }
 }

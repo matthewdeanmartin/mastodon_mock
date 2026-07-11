@@ -56,7 +56,9 @@ export class AdminAnnouncements implements OnInit {
   }
 
   togglePublished(a: Announcement): void {
-    const call = a.published ? this.api.unpublishAnnouncement(a.id) : this.api.publishAnnouncement(a.id);
+    const call = a.published
+      ? this.api.unpublishAnnouncement(a.id)
+      : this.api.publishAnnouncement(a.id);
     call.subscribe((u) => this.replace(u));
   }
 

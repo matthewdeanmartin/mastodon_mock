@@ -176,7 +176,9 @@ export class AdminApi {
 
   /** Canonicalize+hash an email and return any matching canonical blocks. */
   testCanonicalEmailBlock(email: string): Observable<CanonicalEmailBlock[]> {
-    return this.http.post<CanonicalEmailBlock[]>('/api/v1/admin/canonical_email_blocks/test', { email });
+    return this.http.post<CanonicalEmailBlock[]>('/api/v1/admin/canonical_email_blocks/test', {
+      email,
+    });
   }
 
   deleteCanonicalEmailBlock(id: string): Observable<unknown> {

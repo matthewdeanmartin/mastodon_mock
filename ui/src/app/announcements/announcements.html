@@ -11,7 +11,9 @@
       }
       <span class="picker">
         @for (e of quickReactions; track e) {
-          <button class="add-reaction" [title]="'React ' + e" (click)="toggleReaction(a, e)">{{ e }}</button>
+          <button class="add-reaction" [title]="'React ' + e" (click)="toggleReaction(a, e)">
+            {{ e }}
+          </button>
         }
       </span>
     </div>

@@ -6,7 +6,9 @@
     (keyup.enter)="add()"
     placeholder="email domain to block (e.g. mailinator.com)"
   />
-  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">Block</button>
+  <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">
+    Block
+  </button>
 </div>
 
 @if (loading()) {

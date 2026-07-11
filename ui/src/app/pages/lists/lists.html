@@ -14,7 +14,9 @@
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!lists().length) {
-  <p class="muted center">You have no lists. Create one above, then add people from their profile.</p>
+  <p class="muted center">
+    You have no lists. Create one above, then add people from their profile.
+  </p>
 } @else {
   @for (l of lists(); track l.id) {
     <a class="list-row" [routerLink]="['/lists', l.id]">

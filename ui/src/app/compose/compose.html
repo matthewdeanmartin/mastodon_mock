@@ -45,7 +45,13 @@
             [placeholder]="'Choice ' + (i + 1)"
           />
           @if (pollOptions().length > 2) {
-            <button class="btn btn-outline btn-sm" (click)="removePollOption(i)" title="Remove choice">✕</button>
+            <button
+              class="btn btn-outline btn-sm"
+              (click)="removePollOption(i)"
+              title="Remove choice"
+            >
+              ✕
+            </button>
           }
         </div>
       }
@@ -109,18 +115,16 @@
       </button>
 
       <label class="tool-btn sensitive-toggle" title="Mark media sensitive">
-        <input
-          type="checkbox"
-          [ngModel]="sensitive()"
-          (ngModelChange)="sensitive.set($event)"
-        />
+        <input type="checkbox" [ngModel]="sensitive()" (ngModelChange)="sensitive.set($event)" />
         ⚠️
       </label>
     </div>
 
     <span class="muted">{{ text().length }}</span>
     <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
-      {{ uploading() ? 'Uploading…' : inReplyToId() ? 'Reply' : quotedStatusId() ? 'Quote' : 'Post' }}
+      {{
+        uploading() ? 'Uploading…' : inReplyToId() ? 'Reply' : quotedStatusId() ? 'Quote' : 'Post'
+      }}
     </button>
   </div>
 </div>

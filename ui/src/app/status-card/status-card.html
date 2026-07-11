@@ -41,9 +41,7 @@
         }
       </a>
       @if (translation()) {
-        <div class="translation-note muted small">
-          Translated via {{ translation()!.provider }}
-        </div>
+        <div class="translation-note muted small">Translated via {{ translation()!.provider }}</div>
       }
     }
 
@@ -73,7 +71,11 @@
             <span>· Closed</span>
           }
           @if (!pollClosed()) {
-            <button class="btn btn-sm" [disabled]="!pollSelection().length" (click)="submitVote($event)">
+            <button
+              class="btn btn-sm"
+              [disabled]="!pollSelection().length"
+              (click)="submitVote($event)"
+            >
               Vote
             </button>
           }
@@ -109,22 +111,45 @@
       <button class="action" [class.on]="replying()" (click)="toggleReply($event)" title="Reply">
         💬 <span>{{ display.replies_count }}</span>
       </button>
-      <button class="action" [class.on]="display.reblogged" (click)="toggleReblog($event)" title="Boost">
+      <button
+        class="action"
+        [class.on]="display.reblogged"
+        (click)="toggleReblog($event)"
+        title="Boost"
+      >
         🔁
       </button>
       <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
         ❝
       </button>
-      <button class="action count-link" (click)="openAccountList('reblogged_by', $event)" title="Boosted by">
+      <button
+        class="action count-link"
+        (click)="openAccountList('reblogged_by', $event)"
+        title="Boosted by"
+      >
         {{ display.reblogs_count }}
       </button>
-      <button class="action" [class.on]="display.favourited" (click)="toggleFavourite($event)" title="Favourite">
+      <button
+        class="action"
+        [class.on]="display.favourited"
+        (click)="toggleFavourite($event)"
+        title="Favourite"
+      >
         ⭐
       </button>
-      <button class="action count-link" (click)="openAccountList('favourited_by', $event)" title="Favourited by">
+      <button
+        class="action count-link"
+        (click)="openAccountList('favourited_by', $event)"
+        title="Favourited by"
+      >
         {{ display.favourites_count }}
       </button>
-      <button class="action" [class.on]="display.bookmarked" (click)="toggleBookmark($event)" title="Bookmark">
+      <button
+        class="action"
+        [class.on]="display.bookmarked"
+        (click)="toggleBookmark($event)"
+        title="Bookmark"
+      >
         🔖
       </button>
       <button
@@ -140,12 +165,21 @@
         <button class="action" (click)="openHistory($event)" title="Edit history">🕘</button>
       }
       @if (isOwn()) {
-        <button class="action" [class.on]="display.pinned" (click)="togglePin($event)" title="Pin">📌</button>
-        <button class="action" [class.on]="display.muted" (click)="toggleMute($event)" title="Mute thread">
+        <button class="action" [class.on]="display.pinned" (click)="togglePin($event)" title="Pin">
+          📌
+        </button>
+        <button
+          class="action"
+          [class.on]="display.muted"
+          (click)="toggleMute($event)"
+          title="Mute thread"
+        >
           🔕
         </button>
         <div class="policy-wrap">
-          <button class="action" (click)="togglePolicyMenu($event)" title="Who can quote">💬🔒</button>
+          <button class="action" (click)="togglePolicyMenu($event)" title="Who can quote">
+            💬🔒
+          </button>
           @if (showPolicyMenu()) {
             <div class="policy-menu" (click)="$event.stopPropagation()">
               <div class="policy-title muted small">Who can quote</div>

@@ -28,7 +28,9 @@
           (keyup.enter)="createAndAdd()"
           placeholder="New list name"
         />
-        <button class="btn" [disabled]="!newTitle().trim()" (click)="createAndAdd()">Create &amp; add</button>
+        <button class="btn" [disabled]="!newTitle().trim()" (click)="createAndAdd()">
+          Create &amp; add
+        </button>
       </div>
     }
 

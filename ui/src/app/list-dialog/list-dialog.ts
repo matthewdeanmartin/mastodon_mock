@@ -43,7 +43,10 @@ export class ListDialog implements OnInit {
       forkJoin(
         lists.map((list) =>
           this.api.listAccounts(list.id).pipe(
-            map((accounts) => ({ list, member: accounts.some((a) => a.id === this.accountId()) })),
+            map((accounts) => ({
+              list,
+              member: accounts.some((a) => a.id === this.accountId()),
+            })),
           ),
         ),
       ).subscribe((rows) => {
