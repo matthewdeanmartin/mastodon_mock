@@ -29,7 +29,7 @@ jobs:
           persist-credentials: false
       - name: Set up QEMU
         # Enables building the linux/arm64 variant on an amd64 runner.
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392  # v3.6.0
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4.1.0
       - name: Set up Buildx
         # We deliberately don't use a GHA build cache (no cache-to/cache-from below), so
         # there are no shared runtime artifacts to poison; the heuristic flag is moot here.
