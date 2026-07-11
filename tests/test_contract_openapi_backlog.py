@@ -8,8 +8,10 @@ with plain ``requests`` instead.
 
 from __future__ import annotations
 
+import pytest
 import requests
 from mastodon import Mastodon
+from mastodon.errors import MastodonNotFoundError
 
 
 def test_push_subscription_round_trip(alice: Mastodon) -> None:
@@ -30,11 +32,8 @@ def test_push_subscription_round_trip(alice: Mastodon) -> None:
     assert updated.alerts.follow is False
 
     alice.push_subscription_delete()
-    try:
+    with pytest.raises(MastodonNotFoundError):
         alice.push_subscription()
-        assert False, "expected 404 after delete"
-    except Exception:
-        pass
 
 
 def test_filter_keyword_v2_get_and_put(alice: Mastodon) -> None:
@@ -102,11 +101,8 @@ def test_media_delete(alice: Mastodon) -> None:
         timeout=10,
     )
     assert resp.status_code == 200
-    try:
+    with pytest.raises(MastodonNotFoundError):
         alice.media(media)
-        assert False, "expected 404 after delete"
-    except Exception:
-        pass
 
 
 def test_suggestion_dismiss_accepts(alice: Mastodon, bob: Mastodon) -> None:

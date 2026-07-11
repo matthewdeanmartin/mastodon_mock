@@ -30,6 +30,10 @@ disable=
     broad-exception-caught,
     # Serializers import each other lazily inside functions to break import cycles.
     import-outside-toplevel,
+    # Bot-generated/tests-adjacent files often gate imports conditionally or lazily.
+    wrong-import-position,
+    wrong-import-order,
+    ungrouped-imports,
     # Some query/path params mirror the Mastodon API names (e.g. ``type``).
     redefined-builtin,
     # Route handler names intentionally reuse domain nouns as parameter names.
