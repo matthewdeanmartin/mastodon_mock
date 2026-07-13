@@ -367,8 +367,12 @@ def announcement_remove_reaction(
 
 @router.get("/api/v1/instance/extended_description")
 def instance_extended_description() -> dict[str, Any]:
-    """Static placeholder extended description."""
-    return {"updated_at": None, "content": ""}
+    """Static placeholder extended description.
+
+    ``updated_at`` must be a timestamp string per the ExtendedDescription schema;
+    a fixed epoch keeps the response deterministic.
+    """
+    return {"updated_at": "2022-11-03T04:29:56Z", "content": ""}
 
 
 @router.get("/api/v1/instance/translation_languages")

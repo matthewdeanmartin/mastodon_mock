@@ -78,3 +78,34 @@ jobs:
           name: openapi-drift-report
           path: openapi_compare_report.generated.md
           if-no-files-found: warn
+  # Strict response-shape conformance ratchet (spec/fable/roadmap.md 1.3). Runs
+  # against the *committed* schema snapshot (not fresh upstream) so it only fails
+  # on mock regressions, never on upstream churn — the drift job above owns that.
+  # Green as of Sprint 1; new failures mean a change broke a response shape and
+  # must be fixed or explicitly quarantined with a reviewed reason.
+  strict-fuzz:
+    name: Strict OpenAPI fuzz (ratchet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.14'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        with:
+          enable-cache: true
+      - name: Sync dependencies (contract extra)
+        run: uv sync --extra contract
+      - name: Run strict schema-conformance fuzz
+        env:
+          CONTRACT_STRICT: '1'
+          HYPOTHESIS_MAX_EXAMPLES: '1'
+        run: uv run pytest -m contract tests/test_openapi_fuzz.py -q

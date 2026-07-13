@@ -236,12 +236,14 @@ def test_verify_credentials_reports_role_for_staff(live_server: str) -> None:
     assert admin_me["role"] is not None
     assert admin_me["role"]["name"] == "Admin"
 
-    # Ordinary users carry no elevated role.
+    # Ordinary users get the default "everyone" role (id -99, no permissions),
+    # matching real Mastodon 4.x — the Role schema requires an object, not null.
     user_me = httpx.get(
         f"{live_server}/api/v1/accounts/verify_credentials",
         headers={"Authorization": f"Bearer {user['access_token']}"},
     ).json()
-    assert user_me["role"] is None
+    assert user_me["role"]["id"] == "-99"
+    assert user_me["role"]["permissions"] == "0"
 
 
 def _authorize_code(base_url: str, client_id: str, username: str) -> str:

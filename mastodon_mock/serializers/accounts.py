@@ -126,6 +126,7 @@ def serialize_account(
         "fields": account.fields or [],
         "indexable": account.indexable,
         "hide_collections": account.hide_collections,
+        "attribution_domains": [],
         "noindex": None,
         "roles": [],
         "moved": None,
@@ -165,14 +166,15 @@ def serialize_account(
 
 # Coarse role → Role-entity mapping for CredentialAccount.role. Mirrors the admin
 # serializer's table but kept local to avoid an import cycle (admin imports this module).
-# Non-staff accounts have no elevated role, which Mastodon reports as null here.
+# Ordinary users get the default "everyone" role (id -99), matching real
+# Mastodon 4.x — the Role schema requires an object here, not null.
 _STAFF_ROLE_IDS = {"moderator": "1", "admin": "3", "owner": "0"}
 
 
-def _credential_role(role: str) -> dict[str, Any] | None:
-    """The ``Role`` entity for ``verify_credentials``; ``None`` for ordinary users."""
+def _credential_role(role: str) -> dict[str, Any]:
+    """The ``Role`` entity for ``verify_credentials``."""
     if role not in _STAFF_ROLE_IDS:
-        return None
+        return {"id": "-99", "name": "", "permissions": "0", "color": "", "highlighted": False}
     return {
         "id": _STAFF_ROLE_IDS[role],
         "name": role.capitalize(),

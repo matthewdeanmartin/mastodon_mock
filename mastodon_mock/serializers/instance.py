@@ -35,6 +35,12 @@ _MEDIA_CONFIG = {
     "video_frame_rate_limit": 60,
     "video_matrix_limit": 2304000,
 }
+# configuration.accounts — required by both the V1Instance and Instance (v2)
+# schemas; values match real Mastodon defaults.
+_ACCOUNTS_CONFIG = {
+    "max_featured_tags": 10,
+    "max_pinned_statuses": 4,
+}
 _POLL_CONFIG = {
     "max_options": 4,
     "max_characters_per_option": 50,
@@ -86,6 +92,7 @@ def serialize_instance_v1(session: Session, config: MastodonMockConfig) -> dict[
         "approval_required": config.registration_approval_required,
         "invites_enabled": False,
         "configuration": {
+            "accounts": _ACCOUNTS_CONFIG,
             "statuses": _STATUS_CONFIG,
             "media_attachments": _MEDIA_CONFIG,
             "polls": _POLL_CONFIG,
@@ -105,9 +112,12 @@ def serialize_instance_v2(session: Session, config: MastodonMockConfig) -> dict[
         "source_url": "https://github.com/matthewdeanmartin/mastodon_mock",
         "description": config.description,
         "usage": {"users": {"active_month": user_count}},
-        "thumbnail": {"url": None},
+        # The Instance schema requires thumbnail.url to be a string; point at the
+        # deterministic generated header art the app actually serves.
+        "thumbnail": {"url": f"https://{config.domain}/headers/generated/instance.svg"},
         "languages": ["en"],
         "configuration": {
+            "accounts": _ACCOUNTS_CONFIG,
             "urls": {"streaming": f"wss://{config.domain}" if config.streaming.enabled else None},
             "statuses": _STATUS_CONFIG,
             "media_attachments": _MEDIA_CONFIG,

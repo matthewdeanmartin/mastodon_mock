@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from mastodon_mock.config import MastodonMockConfig
 from mastodon_mock.db.base import Base, init_engine, make_session_factory
 from mastodon_mock.db.seed import apply_seed_data
+from mastodon_mock.errors import install_error_handlers
 from mastodon_mock.faults import FaultStore, add_fault_middleware
 from mastodon_mock.identicon import avatar_svg, header_svg
 from mastodon_mock.middleware import add_middleware
@@ -128,6 +129,7 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
         openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,
     )
+    install_error_handlers(app)
     app.state.config = config
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)

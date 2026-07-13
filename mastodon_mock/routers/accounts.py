@@ -514,8 +514,22 @@ async def update_credentials(
 
 @router.get("/api/v1/profile")
 def get_profile(db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
-    """Fetch the authed account's own profile (same shape as ``update_credentials``)."""
-    return serialize_account(db, account, config, with_source=True)
+    """Fetch the authed account's own profile (same shape as ``update_credentials``).
+
+    The 4.6 Profile entity additionally requires a few flat editable fields the
+    CredentialAccount shape doesn't carry; overlay static defaults for those.
+    """
+    data = serialize_account(db, account, config, with_source=True)
+    data.update(
+        {
+            "avatar_description": "",
+            "header_description": "",
+            "show_featured": True,
+            "show_media": True,
+            "show_media_replies": True,
+        }
+    )
+    return data
 
 
 @router.patch("/api/v1/profile")

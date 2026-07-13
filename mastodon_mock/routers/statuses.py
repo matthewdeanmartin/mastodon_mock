@@ -29,7 +29,13 @@ from mastodon_mock.db.models import (
 )
 from mastodon_mock.deps import Config, CurrentAccount, DbSession, RequiredAccount
 from mastodon_mock.pagination import paginate, parse_db_id
-from mastodon_mock.routers.helpers import PageQuery, array_query, read_body, set_link_header
+from mastodon_mock.routers.helpers import (
+    PageQuery,
+    array_query,
+    read_body,
+    set_link_header,
+    validation_error as _validation_error,
+)
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.common import iso
 from mastodon_mock.serializers.instance import MAX_MEDIA_ATTACHMENTS, MAX_STATUS_CHARACTERS
@@ -53,11 +59,6 @@ router = APIRouter(tags=["statuses"])
 # Mastodon publishes immediately (rather than scheduling) when scheduled_at is
 # within this window of "now". Match its documented ~5 minute minimum lead time.
 SCHEDULE_THRESHOLD = timedelta(minutes=5)
-
-
-def _validation_error(message: str) -> JSONResponse:
-    """A Mastodon-shaped 422 (``{"error": ...}``), what Mastodon.py expects."""
-    return JSONResponse(status_code=422, content={"error": message})
 
 
 def _validate_status_params(params: dict[str, Any]) -> JSONResponse | None:

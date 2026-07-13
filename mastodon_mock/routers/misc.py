@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from mastodon_mock.deps import RequiredAccount
+from mastodon_mock.deps import Config, RequiredAccount
 
 router = APIRouter(tags=["misc"])
 
@@ -20,17 +20,27 @@ router = APIRouter(tags=["misc"])
 
 
 @router.get("/api/oembed")
-def oembed(url: str) -> dict[str, Any]:
-    """Minimal OEmbed response for a status URL."""
+def oembed(url: str, config: Config) -> dict[str, Any]:
+    """Minimal OEmbed response for a status URL.
+
+    ``author_url``/``provider_url`` must be valid URIs and ``width`` is required
+    (OEmbedResponse schema) — echoing the caller-supplied ``url`` would violate
+    the URI format whenever it isn't one.
+    """
+    del url
+    base = f"https://{config.domain}"
     return {
         "type": "link",
         "version": "1.0",
         "title": "mastodon_mock",
         "author_name": "",
-        "author_url": "",
+        "author_url": f"{base}/",
         "provider_name": "mastodon_mock",
-        "provider_url": url,
+        "provider_url": f"{base}/",
         "html": "",
+        "width": 400,
+        # The reconstructed OEmbedResponse schema types height as string|null.
+        "height": None,
         "cache_age": 86400,
     }
 

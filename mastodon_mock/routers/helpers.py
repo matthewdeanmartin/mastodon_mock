@@ -6,8 +6,19 @@ from dataclasses import dataclass
 from typing import Annotated, Any
 
 from fastapi import Depends, Request, Response
+from fastapi.responses import JSONResponse
 
 from mastodon_mock.pagination import Page, link_header
+
+
+def validation_error(message: str) -> JSONResponse:
+    """A Mastodon-shaped 422 (``{"error": ...}``), what Mastodon.py expects.
+
+    For errors detected after FastAPI binding (business rules), where raising
+    ``HTTPException`` would work too — this exists for handlers that return the
+    response directly.
+    """
+    return JSONResponse(status_code=422, content={"error": message})
 
 
 async def read_body(request: Request) -> dict[str, Any]:
