@@ -22,6 +22,9 @@ interface StatusCardInternals {
   pollSelection: WritableSignal<number[]>;
   showPolicyMenu: WritableSignal<boolean>;
   showHistory: WritableSignal<boolean>;
+  lightboxIndex: WritableSignal<number | null>;
+  openLightbox(index: number, event: Event): void;
+  onContentClick(event: MouseEvent): void;
 }
 
 function internals(fixture: ComponentFixture<StatusCard>): StatusCardInternals {
@@ -571,5 +574,108 @@ describe('StatusCard', () => {
     const f = setUp(makeStatus({ account: makeAccount('2') }));
     const comp = f.componentInstance as unknown as { isOwn: Signal<boolean> };
     expect(comp.isOwn()).toBe(false);
+  });
+
+  // ---------------------------------------------------------------- external links
+
+  function makeMedia(id: string) {
+    return {
+      id,
+      type: 'image',
+      url: `https://cdn.example/${id}.jpg`,
+      preview_url: `https://cdn.example/${id}-small.jpg`,
+      description: `image ${id}`,
+    };
+  }
+
+  /** Build a MouseEvent whose target is an <a href> inside rendered content. */
+  function clickOnAnchor(href: string): MouseEvent {
+    const anchor = document.createElement('a');
+    if (href) {
+      anchor.setAttribute('href', href);
+    }
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'target', { value: anchor });
+    return event;
+  }
+
+  it('onContentClick: opens http(s) links in a new tab and prevents in-app nav', () => {
+    const f = setUp();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    const event = clickOnAnchor('https://example.com/article');
+    const preventSpy = vi.spyOn(event, 'preventDefault');
+
+    internals(f).onContentClick(event);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://example.com/article',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    expect(preventSpy).toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('onContentClick: leaves in-app (relative / hashtag) links to the router', () => {
+    const f = setUp();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    const event = clickOnAnchor('/tags/spaceflight');
+    const preventSpy = vi.spyOn(event, 'preventDefault');
+
+    internals(f).onContentClick(event);
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(preventSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('onContentClick: ignores clicks that are not on a link', () => {
+    const f = setUp();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    const span = document.createElement('span');
+    const event = new MouseEvent('click');
+    Object.defineProperty(event, 'target', { value: span });
+
+    expect(() => internals(f).onContentClick(event)).not.toThrow();
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  // ---------------------------------------------------------------- image lightbox
+
+  it('openLightbox: records the clicked index and prevents default navigation', () => {
+    const f = setUp(makeStatus({ media_attachments: [makeMedia('a'), makeMedia('b')] }));
+    const event = { preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as Event;
+
+    internals(f).openLightbox(1, event);
+
+    expect(internals(f).lightboxIndex()).toBe(1);
+    expect((event.preventDefault as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+  });
+
+  it('renders a clickable media thumbnail per attachment', () => {
+    const f = setUp(makeStatus({ media_attachments: [makeMedia('a'), makeMedia('b')] }));
+    const thumbs = (f.nativeElement as HTMLElement).querySelectorAll('.media-thumb');
+    expect(thumbs).toHaveLength(2);
+  });
+
+  it('mounts the lightbox only after an image is opened', () => {
+    const f = setUp(makeStatus({ media_attachments: [makeMedia('a')] }));
+    expect((f.nativeElement as HTMLElement).querySelector('app-lightbox')).toBeNull();
+
+    internals(f).lightboxIndex.set(0);
+    f.detectChanges();
+
+    expect((f.nativeElement as HTMLElement).querySelector('app-lightbox')).not.toBeNull();
+  });
+
+  it('shows a "Boosted" label only while the status is reblogged', () => {
+    const f = setUp(makeStatus({ reblogged: false }));
+    expect((f.nativeElement as HTMLElement).querySelector('.did')).toBeNull();
+
+    f.componentRef.setInput('status', makeStatus({ reblogged: true }));
+    f.detectChanges();
+    const label = (f.nativeElement as HTMLElement).querySelector('.did');
+    expect(label?.textContent).toContain('Boosted');
   });
 });

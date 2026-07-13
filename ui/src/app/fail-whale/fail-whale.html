@@ -1,0 +1,11 @@
+<div class="fail-whale" role="alertdialog" aria-labelledby="fail-whale-title">
+  <img class="whale-img" src="insufficient_whale.png" alt="" />
+  <h1 id="fail-whale-title">Can't reach the server</h1>
+  <p class="muted">
+    The server isn't responding right now. Your connection may be down, or the instance may be
+    temporarily unavailable.
+  </p>
+  <button class="btn" type="button" [disabled]="health.checking()" (click)="retry()">
+    {{ health.checking() ? 'Checking…' : 'Try again' }}
+  </button>
+</div>
