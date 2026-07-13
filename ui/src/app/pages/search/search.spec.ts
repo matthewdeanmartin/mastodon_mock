@@ -2,8 +2,15 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { WritableSignal } from '@angular/core';
-import { provideRouter } from '@angular/router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  ActivatedRoute,
+  ParamMap,
+  Router,
+  convertToParamMap,
+  provideRouter,
+} from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchResults, Status } from '../../models';
 import { Search } from './search';
 
@@ -55,22 +62,45 @@ function makeResults(statuses: Status[] = []): SearchResults {
 
 describe('Search', () => {
   let httpMock: HttpTestingController;
+  // Drives the component's queryParamMap subscription; the Router mock feeds it.
+  let queryParams$: BehaviorSubject<ParamMap>;
 
   beforeEach(() => {
+    queryParams$ = new BehaviorSubject<ParamMap>(convertToParamMap({}));
+
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        // provideRouter wires up RouterLink + Location; we override only the
+        // ActivatedRoute stream so we can control the query params directly.
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { queryParamMap: queryParams$.asObservable() } },
+      ],
     });
     httpMock = TestBed.inject(HttpTestingController);
-  });
 
-  afterEach(() => {
-    httpMock.verify();
+    // run() calls router.navigate to push the query into the URL; reflect that
+    // back into our controllable ActivatedRoute stream instead of navigating.
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockImplementation((_commands, extras) => {
+      const qp = (extras?.queryParams ?? {}) as Record<string, string>;
+      queryParams$.next(convertToParamMap(qp));
+      return Promise.resolve(true);
+    });
   });
 
   function setUp(): ComponentFixture<Search> {
     const fixture = TestBed.createComponent(Search);
     fixture.detectChanges();
     return fixture;
+  }
+
+  /** Type a query and run the search (navigation is synchronous in the stub). */
+  function search(fixture: ComponentFixture<Search>, query: string): void {
+    internals(fixture).query.set(query);
+    internals(fixture).run();
+    fixture.detectChanges();
   }
 
   it('starts with searching=false and no results', () => {
@@ -82,18 +112,15 @@ describe('Search', () => {
 
   it('run() does nothing when query is blank', () => {
     const fixture = setUp();
-    internals(fixture).query.set('   ');
-    internals(fixture).run();
+    search(fixture, '   ');
 
-    // No HTTP request should be made
     httpMock.expectNone('/api/v2/search');
     expect(internals(fixture).searching()).toBe(false);
   });
 
   it('run() sets searching=true while request is in flight', () => {
     const fixture = setUp();
-    internals(fixture).query.set('cats');
-    internals(fixture).run();
+    search(fixture, 'cats');
 
     expect(internals(fixture).searching()).toBe(true);
 
@@ -104,8 +131,7 @@ describe('Search', () => {
     const fixture = setUp();
     const s1 = makeStatus('1');
 
-    internals(fixture).query.set('cats');
-    internals(fixture).run();
+    search(fixture, 'cats');
 
     const req = httpMock.expectOne(
       (r) => r.url === '/api/v2/search' && r.params.get('q') === 'cats',
@@ -118,8 +144,7 @@ describe('Search', () => {
 
   it('run() clears searching on HTTP error', () => {
     const fixture = setUp();
-    internals(fixture).query.set('dogs');
-    internals(fixture).run();
+    search(fixture, 'dogs');
 
     httpMock.expectOne((r) => r.url === '/api/v2/search').error(new ProgressEvent('error'));
 
@@ -132,8 +157,7 @@ describe('Search', () => {
     const s1 = makeStatus('1');
     const s2 = makeStatus('2');
 
-    internals(fixture).query.set('cats');
-    internals(fixture).run();
+    search(fixture, 'cats');
     httpMock.expectOne((r) => r.url === '/api/v2/search').flush(makeResults([s1, s2]));
 
     const updated = { ...s2, content: '<p>changed</p>' };
@@ -156,8 +180,7 @@ describe('Search', () => {
     const s1 = makeStatus('1');
     const s2 = makeStatus('2');
 
-    internals(fixture).query.set('cats');
-    internals(fixture).run();
+    search(fixture, 'cats');
     httpMock.expectOne((r) => r.url === '/api/v2/search').flush(makeResults([s1, s2]));
 
     internals(fixture).onDeleted(s1);
@@ -175,11 +198,23 @@ describe('Search', () => {
 
   it('run() trims the query before sending', () => {
     const fixture = setUp();
-    internals(fixture).query.set('  angular  ');
-    internals(fixture).run();
+    search(fixture, '  angular  ');
 
     const req = httpMock.expectOne((r) => r.url === '/api/v2/search');
     expect(req.request.params.get('q')).toBe('angular');
     req.flush(makeResults());
+  });
+
+  it('restores the search when the URL already carries query params', () => {
+    // Simulate arriving at /search?q=cats (e.g. via the browser back button).
+    queryParams$.next(convertToParamMap({ q: 'cats', type: 'accounts' }));
+    const fixture = setUp();
+
+    const req = httpMock.expectOne(
+      (r) => r.url === '/api/v2/search' && r.params.get('q') === 'cats',
+    );
+    req.flush(makeResults());
+
+    expect(internals(fixture).query()).toBe('cats');
   });
 });

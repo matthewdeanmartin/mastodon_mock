@@ -34,7 +34,7 @@
         </div>
       </div>
     } @else {
-      <a class="content-link" [routerLink]="['/statuses', display.id]">
+      <a class="content-link" [routerLink]="['/statuses', display.id]" (click)="onContentClick($event)">
         @if (translation(); as t) {
           @if (t.spoiler_text) {
             <div class="spoiler">{{ t.spoiler_text }}</div>
@@ -109,8 +109,15 @@
     }
     @if (display.media_attachments.length) {
       <div class="media">
-        @for (m of display.media_attachments; track m.id) {
-          <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+        @for (m of display.media_attachments; track m.id; let i = $index) {
+          <button
+            type="button"
+            class="media-thumb"
+            (click)="openLightbox(i, $event)"
+            [attr.aria-label]="'View image' + (m.description ? ': ' + m.description : '')"
+          >
+            <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+          </button>
         }
       </div>
     }
@@ -122,9 +129,12 @@
         class="action"
         [class.on]="display.reblogged"
         (click)="toggleReblog($event)"
-        title="Boost"
+        [title]="display.reblogged ? 'Undo boost' : 'Boost'"
+        [attr.aria-pressed]="display.reblogged"
       >
-        🔁
+        🔁 @if (display.reblogged) {
+          <span class="did">Boosted</span>
+        }
       </button>
       <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
         ❝
@@ -140,9 +150,12 @@
         class="action"
         [class.on]="display.favourited"
         (click)="toggleFavourite($event)"
-        title="Favourite"
+        [title]="display.favourited ? 'Undo favourite' : 'Favourite'"
+        [attr.aria-pressed]="display.favourited"
       >
-        ⭐
+        ⭐ @if (display.favourited) {
+          <span class="did">Favourited</span>
+        }
       </button>
       <button
         class="action count-link"
@@ -155,7 +168,8 @@
         class="action"
         [class.on]="display.bookmarked"
         (click)="toggleBookmark($event)"
-        title="Bookmark"
+        [title]="display.bookmarked ? 'Remove bookmark' : 'Bookmark'"
+        [attr.aria-pressed]="display.bookmarked"
       >
         🔖
       </button>
@@ -258,4 +272,12 @@
 
 @if (showHistory()) {
   <app-history-dialog [statusId]="display.id" (closed)="showHistory.set(false)" />
+}
+
+@if (lightboxIndex() !== null) {
+  <app-lightbox
+    [items]="display.media_attachments"
+    [startIndex]="lightboxIndex()!"
+    (closed)="lightboxIndex.set(null)"
+  />
 }

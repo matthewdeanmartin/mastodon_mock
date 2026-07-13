@@ -1,3 +1,21 @@
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 16px 0;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.back-button:hover {
+  background: var(--bg);
+}
+
 .profile-header {
   padding: 0 16px 12px;
   border-bottom: 1px solid var(--border);

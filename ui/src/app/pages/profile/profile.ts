@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Location } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -17,6 +18,7 @@ export class Profile implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   private auth = inject(Auth);
+  private location = inject(Location);
 
   protected account = signal<Account | null>(null);
   protected statuses = signal<Status[]>([]);
@@ -29,6 +31,11 @@ export class Profile implements OnInit {
   protected showBlockConfirm = signal(false);
 
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
+
+  /** Return to the previous page (e.g. back to search results). */
+  goBack(): void {
+    this.location.back();
+  }
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {

@@ -6,6 +6,7 @@ import { Api } from '../api';
 import { Auth } from '../auth';
 import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
+import { Lightbox } from '../lightbox/lightbox';
 import { Poll, Status, Translation } from '../models';
 import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
@@ -22,6 +23,7 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
     FormsModule,
     Compose,
     HumanTimePipe,
+    Lightbox,
   ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
@@ -61,6 +63,9 @@ export class StatusCard {
   protected accountListMode = signal<AccountListMode | null>(null);
   protected showHistory = signal(false);
   protected showPolicyMenu = signal(false);
+
+  // Image lightbox: the index of the attachment being viewed, or null when closed.
+  protected lightboxIndex = signal<number | null>(null);
 
   /** Whether the logged-in user owns the displayed status (can edit/delete). */
   protected isOwn = computed(() => this.display.account.id === this.auth.account()?.id);
@@ -117,6 +122,35 @@ export class StatusCard {
       return;
     }
     this.api.deleteStatus(this.display.id).subscribe(() => this.deleted.emit(this.status()));
+  }
+
+  /** Open the image lightbox at the clicked attachment. */
+  openLightbox(index: number, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.lightboxIndex.set(index);
+  }
+
+  /**
+   * Intercept clicks inside rendered post HTML: if the user clicked a link
+   * that points off-site, open it in a new tab instead of letting the
+   * surrounding router link swallow the navigation.
+   */
+  onContentClick(event: MouseEvent): void {
+    const anchor = (event.target as HTMLElement).closest('a');
+    if (!anchor) {
+      return;
+    }
+    const href = anchor.getAttribute('href');
+    if (!href) {
+      return;
+    }
+    // Treat anything with an explicit http(s) origin as external.
+    if (/^https?:\/\//i.test(href)) {
+      event.preventDefault();
+      event.stopPropagation();
+      window.open(href, '_blank', 'noopener,noreferrer');
+    }
   }
 
   /** The status to render: unwrap a boost to the original. */

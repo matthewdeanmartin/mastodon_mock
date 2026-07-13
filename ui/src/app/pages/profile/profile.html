@@ -1,6 +1,7 @@
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (account(); as a) {
+  <button class="back-button" type="button" (click)="goBack()">← Back</button>
   <header class="profile-header">
     <div
       class="header-banner"

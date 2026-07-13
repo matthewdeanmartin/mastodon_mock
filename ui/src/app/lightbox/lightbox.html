@@ -1,0 +1,35 @@
+<div
+  class="lightbox-overlay"
+  (click)="onOverlayClick($event)"
+  (keydown.escape)="close()"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Image viewer"
+  tabindex="-1"
+>
+  <button class="lightbox-close" type="button" (click)="close()" aria-label="Close">✕</button>
+
+  @if (hasMultiple()) {
+    <button class="lightbox-nav prev" type="button" (click)="prev($event)" aria-label="Previous image">
+      ‹
+    </button>
+  }
+
+  @if (current(); as m) {
+    <figure class="lightbox-figure">
+      <img class="lightbox-img" [src]="m.url || m.preview_url" [alt]="m.description || ''" />
+      @if (m.description) {
+        <figcaption class="lightbox-caption">{{ m.description }}</figcaption>
+      }
+      @if (hasMultiple()) {
+        <div class="lightbox-counter">{{ index() + 1 }} / {{ items().length }}</div>
+      }
+    </figure>
+  }
+
+  @if (hasMultiple()) {
+    <button class="lightbox-nav next" type="button" (click)="next($event)" aria-label="Next image">
+      ›
+    </button>
+  }
+</div>

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test website surfaces explore page
 - Test website retweets fixed
 - Swagger docs page now groups endpoints by category
+- Errors return correct schema now.
 
 ## [0.6.0] - 2026-06-20
 
