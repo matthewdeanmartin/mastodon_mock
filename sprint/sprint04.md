@@ -94,3 +94,6 @@ work against mastodon.social as well as the local mock** → no new backend endp
   un-mockOnly'd (theme buttons were invisible in the Mockingbird build — that was the "where
   are the theme buttons" bug), password form replaced with an /auth/edit link on real
   instances (Mastodon has no password-change client API).
+- 2026-07-13: Right-rail rework (user request): trends moved to left rail under Who to
+  follow; right rail = Fediverse card (Explore, Public timeline, donate links: home server
+  /about inferred from acct domain, joinmastodon.org/sponsors, IFTAS) + MIMB house-ad card.
