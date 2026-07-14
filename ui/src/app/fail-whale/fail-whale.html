@@ -1,11 +1,22 @@
 <div class="fail-whale" role="alertdialog" aria-labelledby="fail-whale-title">
   <img class="whale-img" src="insufficient_whale.png" alt="" />
-  <h1 id="fail-whale-title">Can't reach the server</h1>
+  @if (status.currentDomain(); as domain) {
+    <h1 id="fail-whale-title">{{ domain }} appears to be unavailable</h1>
+  } @else {
+    <h1 id="fail-whale-title">Can't reach the server</h1>
+  }
   <p class="muted">
     The server isn't responding right now. Your connection may be down, or the instance may be
     temporarily unavailable.
   </p>
-  <button class="btn" type="button" [disabled]="health.checking()" (click)="retry()">
-    {{ health.checking() ? 'Checking…' : 'Try again' }}
-  </button>
+  <div class="actions">
+    @if (status.statusLink(); as link) {
+      <a class="btn" [href]="link.url" target="_blank" rel="noopener noreferrer">
+        {{ link.label }}
+      </a>
+    }
+    <button class="btn" type="button" [disabled]="health.checking()" (click)="retry()">
+      {{ health.checking() ? 'Checking…' : 'Try again' }}
+    </button>
+  </div>
 </div>

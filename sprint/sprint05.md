@@ -48,3 +48,12 @@ Continues sprint04's Blue features based on user feedback (2026-07-14).
   since its instance payload advertises the configured domain, which the browser may not
   reach. Adds reconnect-with-backoff (WebSocket, unlike EventSource, never auto-reconnects).
   User-confirmed decisions: WebSocket-only; no polling fallback; URL from instance API.
+- 2026-07-14: fail whale now offers an instance-status link (user-provided spec). New
+  InstanceStatus service: curated registry (mastodon.social/.online, mstdn.social, mas.to,
+  fosstodon.org, infosec.exchange, techhub.social — verified 2026-07) → admin-provided
+  link discovered from /api/v1/instance/extended_description while healthy (cached in
+  localStorage, revalidated after 30 days) → fediverse.observer labelled as third-party
+  → nothing. status.<domain> is never guessed: browser CORS makes client-side content
+  verification impossible, so per the spec's "no link beats a misleading one" it's only
+  used via the registry or admin-page discovery. Links are https-only, no ports/creds/
+  IPs/.onion, opened with noopener noreferrer. Whale headline names the down instance.
