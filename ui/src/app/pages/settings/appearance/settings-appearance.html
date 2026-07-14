@@ -12,8 +12,8 @@
           <input
             type="radio"
             value="auto"
-            [ngModel]="theme()"
-            (ngModelChange)="theme.set($event)"
+            [ngModel]="prefs.themeMode()"
+            (ngModelChange)="prefs.setThemeMode($event)"
             name="theme"
           />
           Automatic
@@ -22,8 +22,8 @@
           <input
             type="radio"
             value="light"
-            [ngModel]="theme()"
-            (ngModelChange)="theme.set($event)"
+            [ngModel]="prefs.themeMode()"
+            (ngModelChange)="prefs.setThemeMode($event)"
             name="theme"
           />
           Light
@@ -32,79 +32,125 @@
           <input
             type="radio"
             value="dark"
-            [ngModel]="theme()"
-            (ngModelChange)="theme.set($event)"
+            [ngModel]="prefs.themeMode()"
+            (ngModelChange)="prefs.setThemeMode($event)"
             name="theme"
           />
           Dark
         </label>
-        <span class="hint">Automatic follows your system preference.</span>
+        <span class="hint">
+          Automatic follows your system preference. Theme and accent apply immediately and are saved
+          in this browser.
+        </span>
       </div>
     </div>
 
     <div class="srow">
-      <span class="slabel">Media display</span>
+      <span class="slabel">Accent color</span>
       <div class="scontrol">
-        <select
-          [ngModel]="displayMedia()"
-          (ngModelChange)="displayMedia.set($event)"
-          name="display_media"
-        >
-          <option value="default">Hide media marked as sensitive</option>
-          <option value="show_all">Always show media</option>
-          <option value="hide_all">Always hide media</option>
-        </select>
+        <div class="accent-swatches">
+          @for (preset of accents; track preset.id) {
+            <button
+              type="button"
+              class="swatch"
+              [class.selected]="prefs.accentId() === preset.id"
+              [style.background]="preset.accent"
+              [title]="preset.label"
+              [attr.aria-label]="'Accent color: ' + preset.label"
+              [attr.aria-pressed]="prefs.accentId() === preset.id"
+              (click)="prefs.setAccent(preset.id)"
+            ></button>
+          }
+        </div>
       </div>
     </div>
   </div>
 
   <div class="ssection">
     <div class="srow">
-      <span class="slabel">Animations</span>
+      <span class="slabel">Posting</span>
       <div class="scontrol">
         <label class="checkline">
           <input
             type="checkbox"
-            [ngModel]="reduceMotion()"
-            (ngModelChange)="reduceMotion.set($event)"
-            name="reduce_motion"
+            [ngModel]="prefs.undoSend()"
+            (ngModelChange)="prefs.setUndoSend($event)"
+            name="undo_send"
           />
-          Reduce motion in animations
+          Ask "do you really want to post that?" and wait 30 seconds before posting, so you can
+          cancel
         </label>
-        <label class="checkline">
-          <input
-            type="checkbox"
-            [ngModel]="disableSwiping()"
-            (ngModelChange)="disableSwiping.set($event)"
-            name="disable_swiping"
-          />
-          Disable swiping motions
-        </label>
-      </div>
-    </div>
-
-    <div class="srow">
-      <span class="slabel">Content warnings</span>
-      <div class="scontrol">
-        <label class="checkline">
-          <input
-            type="checkbox"
-            [ngModel]="expandSpoilers()"
-            (ngModelChange)="expandSpoilers.set($event)"
-            name="expand_spoilers"
-          />
-          Always expand posts marked with content warnings
-        </label>
+        <span class="hint">Applies to new posts from the composer. Saved in this browser.</span>
       </div>
     </div>
   </div>
 
-  <div class="sactions">
-    @if (saved()) {
-      <span class="saved-note">Saved ✓</span>
-    }
-    <button class="btn" type="submit" [disabled]="saving()">
-      {{ saving() ? 'Saving…' : 'Save changes' }}
-    </button>
-  </div>
+  @if (isMock) {
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">Media display</span>
+        <div class="scontrol">
+          <select
+            [ngModel]="displayMedia()"
+            (ngModelChange)="displayMedia.set($event)"
+            name="display_media"
+          >
+            <option value="default">Hide media marked as sensitive</option>
+            <option value="show_all">Always show media</option>
+            <option value="hide_all">Always hide media</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">Animations</span>
+        <div class="scontrol">
+          <label class="checkline">
+            <input
+              type="checkbox"
+              [ngModel]="reduceMotion()"
+              (ngModelChange)="reduceMotion.set($event)"
+              name="reduce_motion"
+            />
+            Reduce motion in animations
+          </label>
+          <label class="checkline">
+            <input
+              type="checkbox"
+              [ngModel]="disableSwiping()"
+              (ngModelChange)="disableSwiping.set($event)"
+              name="disable_swiping"
+            />
+            Disable swiping motions
+          </label>
+        </div>
+      </div>
+
+      <div class="srow">
+        <span class="slabel">Content warnings</span>
+        <div class="scontrol">
+          <label class="checkline">
+            <input
+              type="checkbox"
+              [ngModel]="expandSpoilers()"
+              (ngModelChange)="expandSpoilers.set($event)"
+              name="expand_spoilers"
+            />
+            Always expand posts marked with content warnings
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="sactions">
+      @if (saved()) {
+        <span class="saved-note">Saved ✓</span>
+      }
+      <button class="btn" type="submit" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Save changes' }}
+      </button>
+    </div>
+  }
 </form>

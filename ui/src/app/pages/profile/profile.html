@@ -31,7 +31,7 @@
         </div>
       }
     </div>
-    <h2>{{ a.display_name || a.username }}</h2>
+    <h2>{{ a.display_name || a.username }} <app-verified-badge [account]="a" /></h2>
     <div class="acct muted">&#64;{{ a.acct }}</div>
     @if (reportDone()) {
       <div class="report-done">

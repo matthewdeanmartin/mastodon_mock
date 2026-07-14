@@ -9,6 +9,50 @@
   --accent-soft: #e8f5fe;
   --hover: #eff3f4;
   --col-width: 600px;
+  color-scheme: light;
+}
+
+/* Dark theme (2018-Twitter "dim"). Applied by ClientPrefs as data-theme on <html>. */
+:root[data-theme='dark'] {
+  --bg: #10171e;
+  --col-bg: #15202b;
+  --border: #38444d;
+  --text: #f7f9f9;
+  --muted: #8899a6;
+  --hover: #1c2732;
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, var(--col-bg));
+  color-scheme: dark;
+}
+
+/* Accent presets. Applied by ClientPrefs as data-accent on <html>; blue is the default
+   from :root above. Light-theme soft tints listed per accent; dark derives via color-mix. */
+:root[data-accent='yellow'] {
+  --accent: #ffad1f;
+  --accent-hover: #e79c16;
+  --accent-soft: #fff5e0;
+}
+:root[data-accent='rose'] {
+  --accent: #f91880;
+  --accent-hover: #dd1573;
+  --accent-soft: #fee7f2;
+}
+:root[data-accent='purple'] {
+  --accent: #7856ff;
+  --accent-hover: #6a4ce0;
+  --accent-soft: #efebff;
+}
+:root[data-accent='orange'] {
+  --accent: #ff7a00;
+  --accent-hover: #e56e00;
+  --accent-soft: #ffefe0;
+}
+:root[data-accent='green'] {
+  --accent: #00ba7c;
+  --accent-hover: #00a56e;
+  --accent-soft: #e0f7ef;
+}
+:root[data-theme='dark'][data-accent] {
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, var(--col-bg));
 }
 
 * {
@@ -244,6 +288,24 @@ a.tab:hover {
 .saved-note {
   color: var(--muted);
   font-size: 13px;
+}
+
+.accent-swatches {
+  display: flex;
+  gap: 10px;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+.swatch.selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--col-bg) inset;
 }
 
 @media (max-width: 720px) {

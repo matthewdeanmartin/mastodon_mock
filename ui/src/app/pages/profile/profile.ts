@@ -7,10 +7,11 @@ import { Account, Relationship, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { ListDialog } from '../../list-dialog/list-dialog';
+import { VerifiedBadge } from '../../verified-badge/verified-badge';
 
 @Component({
   selector: 'app-profile',
-  imports: [StatusCard, ReportDialog, ListDialog],
+  imports: [StatusCard, ReportDialog, ListDialog, VerifiedBadge],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })

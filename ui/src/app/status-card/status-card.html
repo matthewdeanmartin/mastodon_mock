@@ -10,6 +10,7 @@
       <a class="name" [routerLink]="['/accounts', display.account.id]">{{
         display.account.display_name || display.account.username
       }}</a>
+      <app-verified-badge [account]="display.account" />
       <span class="acct muted">&#64;{{ display.account.acct }}</span>
       <a
         class="post-time muted"

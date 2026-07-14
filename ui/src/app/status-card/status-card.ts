@@ -10,6 +10,7 @@ import { Lightbox } from '../lightbox/lightbox';
 import { Poll, Status, Translation } from '../models';
 import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
+import { VerifiedBadge } from '../verified-badge/verified-badge';
 
 const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
 
@@ -24,6 +25,7 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
     Compose,
     HumanTimePipe,
     Lightbox,
+    VerifiedBadge,
   ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
