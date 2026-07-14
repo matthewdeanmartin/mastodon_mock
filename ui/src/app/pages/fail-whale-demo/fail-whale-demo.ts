@@ -1,10 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { InstanceStatus } from '../../instance-status';
 
 /**
  * The fail whale, on demand and with no side effects: a nostalgia page linked
  * from the footer. The real one still appears on its own when the server is
- * actually unreachable.
+ * actually unreachable — and so this page also previews the status link the
+ * real whale would offer for the currently selected instance (see
+ * {@link InstanceStatus}).
  */
 @Component({
   selector: 'app-fail-whale-demo',
@@ -18,7 +21,19 @@ import { RouterLink } from '@angular/router';
         broken. This one is just here for the memories. If the server ever really goes down, the
         whale will find you.)
       </p>
-      <a class="btn" routerLink="/home">Back to your feed</a>
+      @if (status.currentDomain(); as domain) {
+        <p class="muted">
+          And if {{ domain }} ever really is down, the whale will offer this:
+        </p>
+      }
+      <div class="actions">
+        @if (status.statusLink(); as link) {
+          <a class="btn" [href]="link.url" target="_blank" rel="noopener noreferrer">
+            {{ link.label }}
+          </a>
+        }
+        <a class="btn" routerLink="/home">Back to your feed</a>
+      </div>
     </div>
   `,
   styles: `
@@ -37,6 +52,14 @@ import { RouterLink } from '@angular/router';
       max-width: 460px;
       margin: 0 auto 20px;
     }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
   `,
 })
-export class FailWhaleDemo {}
+export class FailWhaleDemo {
+  protected status = inject(InstanceStatus);
+}

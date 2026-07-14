@@ -57,3 +57,11 @@ Continues sprint04's Blue features based on user feedback (2026-07-14).
   verification impossible, so per the spec's "no link beats a misleading one" it's only
   used via the registry or admin-page discovery. Links are https-only, no ports/creds/
   IPs/.onion, opened with noopener noreferrer. Whale headline names the down instance.
+- 2026-07-14: user deployed and saw no status link on mawkingbird.com/fail-whale — that's
+  the *demo* page, which never rendered links (the real outage overlay did). Demo page now
+  previews the status link the real whale would offer for the selected instance. Also
+  added a footer build stamp: CI (mockingbird-pages.yml "Stamp build info" step) runs
+  ui/scripts/gen-build-info.mjs to overwrite the checked-in ui/src/app/build-info.ts
+  placeholder with date + commit + Actions run URL; footer renders "Built <date UTC> ·
+  <short-sha link> · build log" and hides the line entirely on unstamped (dev/embedded)
+  builds. The stamped file is a build artifact — never commit it.

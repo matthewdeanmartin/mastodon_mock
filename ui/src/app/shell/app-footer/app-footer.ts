@@ -1,6 +1,8 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../../auth';
+import { BUILD_INFO } from '../../build-info';
 import { Server } from '../../server';
 
 /**
@@ -9,7 +11,7 @@ import { Server } from '../../server';
  */
 @Component({
   selector: 'app-app-footer',
-  imports: [RouterLink],
+  imports: [DatePipe, RouterLink],
   template: `
     <footer class="app-footer muted">
       <a [href]="aboutUrl()" target="_blank" rel="noopener noreferrer">
@@ -26,6 +28,21 @@ import { Server } from '../../server';
       <span aria-hidden="true">·</span>
       <a routerLink="/fail-whale">Fail whale</a>
       <p class="footer-note">You reached the end. That's allowed here.</p>
+      @if (build.builtAt) {
+        <p class="build-info">
+          Built {{ build.builtAt | date: 'yyyy-MM-dd HH:mm' : 'UTC' }} UTC
+          @if (build.commitUrl) {
+            <span aria-hidden="true">·</span>
+            <a [href]="build.commitUrl" target="_blank" rel="noopener noreferrer">
+              {{ build.commit!.slice(0, 7) }}
+            </a>
+          }
+          @if (build.runUrl) {
+            <span aria-hidden="true">·</span>
+            <a [href]="build.runUrl" target="_blank" rel="noopener noreferrer">build log</a>
+          }
+        </p>
+      }
     </footer>
   `,
   styles: `
@@ -45,11 +62,18 @@ import { Server } from '../../server';
       margin: 8px 0 0;
       font-size: 11.5px;
     }
+    .build-info {
+      margin: 4px 0 0;
+      font-size: 11px;
+    }
   `,
 })
 export class AppFooter {
   private auth = inject(Auth);
   private server = inject(Server);
+
+  /** CI-stamped build metadata; the placeholder (null builtAt) hides the line. */
+  protected build = BUILD_INFO;
 
   /** Same home-host inference as the right rail's donate link. */
   protected host = computed<string | null>(() => {

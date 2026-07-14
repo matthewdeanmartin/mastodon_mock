@@ -34,6 +34,10 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: ui/package-lock.json
+      - name: Stamp build info
+        # Bake the build date, commit, and this run's URL into the footer
+        # (overwrites the checked-in placeholder ui/src/app/build-info.ts).
+        run: node ui/scripts/gen-build-info.mjs
       - name: Build Mocking Bird
         # The custom domain serves the site from the origin root, not a repository
         # sub-path, so build the Angular app with a root base href.
