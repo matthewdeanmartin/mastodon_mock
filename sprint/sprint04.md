@@ -88,3 +88,9 @@ work against mastodon.social as well as the local mock** → no new backend endp
 - 2026-07-13: Sprint C done + committed ("feat(ui): reader mode for threads and auto-grouped
   bookmark library"). ALL SPRINTS COMPLETE. Possible follow-ups (not requested): reduce_motion
   pref actually applying CSS, reader mode for CW posts, per-accent dark soft-tint tuning.
+- 2026-07-13: Feedback round (commit a7be105): 📖 reader deep-link on status cards
+  (?reader=1), Reader toggle always visible on threads, readerChain follows reply-to-root
+  storms, blue-check threshold 50,000 → 9,728 (top-10,000 account), Appearance nav item
+  un-mockOnly'd (theme buttons were invisible in the Mockingbird build — that was the "where
+  are the theme buttons" bug), password form replaced with an /auth/edit link on real
+  instances (Mastodon has no password-change client API).
