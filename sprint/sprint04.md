@@ -62,16 +62,20 @@ work against mastodon.social as well as the local mock** → no new backend endp
 9. [x] Specs: post-splitter.spec.ts (8), compose.spec.ts +7 (split chain, undo timers
        via vi.useFakeTimers, decline/cancel paths), status-card.spec.ts +4 (redraft).
 
-### Sprint C — reader mode + bookmark library
-10. [ ] Reader mode: toggle on thread page; renders the same-author chain (root author's
-        posts, in order) as a clean article — larger serif type, no action bars, media
-        inline; font-size control persisted via readerFontSize pref.
-11. [ ] Bookmark library: bookmarks page gets computed group tabs — All / By author /
-        By hashtag / With media — pure client over the fetched list.
-12. [ ] Specs for grouping + reader chain logic.
+### Sprint C — reader mode + bookmark library — DONE
+10. [x] Reader mode: `pages/thread/reader-chain.ts` (readerChain: root + same-author
+        self-reply chain, skips others' replies and author side-replies); Reader toggle
+        appears when chain > 1; serif article view w/ author header, inline media,
+        A−/A+ font control via prefs.readerFontSize (clamped 15–24px).
+11. [x] Bookmark library: `pages/bookmarks/bookmark-groups.ts` (groupByAuthor,
+        groupByHashtag incl. "no hashtags" shelf, withMedia; hashtags regex-parsed from
+        rendered HTML; boosts group by original). Tabs All/By author/By hashtag/With media.
+        Bookmarks onChanged switched from index-based to id-based patching.
+12. [x] Specs: reader-chain.spec.ts (6), thread.spec.ts +3, bookmarks.spec.ts +4.
 
-### Wrap-up
-13. [ ] Full check: `npm test`, `ng build` (both configs), lint; one commit per sprint.
+### Wrap-up — DONE
+13. [x] Full check after each sprint: 50 spec files green, lint + prettier clean, both
+        builds (`build`, `build:mockingbird`) pass. One commit per sprint on main.
 
 ## Status log
 - 2026-07-13: Sprint doc created; decisions confirmed with user via Q&A.
@@ -80,5 +84,7 @@ work against mastodon.social as well as the local mock** → no new backend endp
   files (shell, status-card) can flake with 5s timeouts under load — rerun before blaming
   your change. Next: Sprint B task 6 (Delete & Repost).
 - 2026-07-13: Sprint B done + committed ("feat(ui): auto-split threads, undo-send countdown,
-  delete & repost"). 49 spec files green, lint clean, both builds pass. Next: Sprint C
-  task 10 (reader mode on thread page).
+  delete & repost"). 49 spec files green, lint clean, both builds pass.
+- 2026-07-13: Sprint C done + committed ("feat(ui): reader mode for threads and auto-grouped
+  bookmark library"). ALL SPRINTS COMPLETE. Possible follow-ups (not requested): reduce_motion
+  pref actually applying CSS, reader mode for CW posts, per-accent dark soft-tint tuning.
