@@ -68,7 +68,6 @@ describe('RightRail', () => {
     );
     expect(hrefs).toContain('https://elekk.xyz/about');
     expect(hrefs).toContain('https://joinmastodon.org/sponsors');
-    expect(hrefs).toContain('https://about.iftas.org/');
     expect(hrefs).toContain('https://github.com/matthewdeanmartin/mastodon_is_my_blog/');
     expect(el.querySelector('.ad-card')?.textContent).toContain('blog interface');
   });

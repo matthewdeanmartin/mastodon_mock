@@ -7,7 +7,7 @@ import { Server } from '../../server';
 
 /**
  * Right sidebar: the Fediverse card — explore entry points, ways to give back
- * (your own server, the Mastodon project, IFTAS trust & safety), server info —
+ * (your own server, the Mastodon project), server info —
  * and a house ad for MIMB. Trends moved to the left rail under "Who to follow".
  */
 @Component({
