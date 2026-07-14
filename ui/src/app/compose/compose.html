@@ -120,11 +120,24 @@
       </label>
     </div>
 
-    <span class="muted">{{ text().length }}</span>
+    <span class="muted" [class.over-limit]="text().length > maxChars">{{ text().length }}</span>
     <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
       {{
         uploading() ? 'Uploading…' : inReplyToId() ? 'Reply' : quotedStatusId() ? 'Quote' : 'Post'
       }}
     </button>
   </div>
+
+  @if (chunkCount() > 1) {
+    <div class="thread-hint muted">
+      Long post — will be split into a thread of {{ chunkCount() }}.
+    </div>
+  }
+
+  @if (countdown() !== null) {
+    <div class="undo-banner">
+      <span>Posting in {{ countdown() }}s…</span>
+      <button class="btn btn-outline btn-sm" type="button" (click)="cancelSend()">Cancel</button>
+    </div>
+  }
 </div>

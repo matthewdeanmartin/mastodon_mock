@@ -329,6 +329,23 @@
   border-top: 1px solid var(--border);
 }
 
+.redraft-note {
+  font-size: 0.85em;
+  padding: 4px 16px 0;
+}
+
+.linklike {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+}
+
+.linklike:hover {
+  text-decoration: underline;
+}
+
 .danger-menu {
   position: relative;
 }

@@ -1,7 +1,18 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  OnDestroy,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../api';
+import { ClientPrefs } from '../client-prefs';
 import { ComposeOptions, MediaAttachment, Status } from '../models';
+import { MAX_POST_CHARS, splitPost } from './post-splitter';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 
@@ -27,8 +38,13 @@ interface PendingMedia {
   templateUrl: './compose.html',
   styleUrl: './compose.css',
 })
-export class Compose {
+export class Compose implements OnDestroy {
   private api = inject(Api);
+  private prefs = inject(ClientPrefs);
+
+  ngOnDestroy(): void {
+    this.clearCountdown();
+  }
 
   readonly inReplyToId = input<string | undefined>(undefined);
   /** When set, the composed status quotes this status id. */
@@ -75,8 +91,16 @@ export class Compose {
   protected canAttachMedia = computed(() => !this.pollOpen());
   protected canAddPoll = computed(() => this.media().length === 0);
 
+  /** Seconds left on the undo-send countdown, or null when no send is pending. */
+  protected countdown = signal<number | null>(null);
+  private countdownTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** How many statuses the current text will become (auto-split threading). */
+  protected chunkCount = computed(() => splitPost(this.text()).length);
+  protected readonly maxChars = MAX_POST_CHARS;
+
   protected canSubmit = computed(() => {
-    if (this.submitting() || this.uploading()) {
+    if (this.submitting() || this.uploading() || this.countdown() !== null) {
       return false;
     }
     const hasText = !!this.text().trim();
@@ -144,6 +168,39 @@ export class Compose {
     if (!this.canSubmit()) {
       return;
     }
+    if (this.prefs.undoSend()) {
+      if (!confirm('Do you really want to post that?')) {
+        return;
+      }
+      this.countdown.set(30);
+      this.countdownTimer = setInterval(() => {
+        const left = (this.countdown() ?? 1) - 1;
+        if (left <= 0) {
+          this.clearCountdown();
+          this.send();
+        } else {
+          this.countdown.set(left);
+        }
+      }, 1000);
+      return;
+    }
+    this.send();
+  }
+
+  /** Abort a pending undo-send countdown, keeping the draft intact. */
+  cancelSend(): void {
+    this.clearCountdown();
+  }
+
+  private clearCountdown(): void {
+    if (this.countdownTimer !== null) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    this.countdown.set(null);
+  }
+
+  private send(): void {
     this.submitting.set(true);
 
     const options: ComposeOptions = {
@@ -180,11 +237,28 @@ export class Compose {
       }
     }
 
-    this.api.postStatus(this.text().trim(), options).subscribe({
-      next: (status) => {
-        this.reset();
-        this.posted.emit(status);
-      },
+    // Over-limit text is auto-split into a self-reply thread; media/poll/CW ride
+    // on the first status only, the rest inherit visibility and chain as replies.
+    const chunks = splitPost(this.text().trim());
+    this.api.postStatus(chunks[0], options).subscribe({
+      next: (status) => this.postRest(status, status, chunks.slice(1)),
+      error: () => this.submitting.set(false),
+    });
+  }
+
+  /** Post remaining thread chunks sequentially, then emit the root status. */
+  private postRest(root: Status, previous: Status, rest: string[]): void {
+    if (!rest.length) {
+      this.reset();
+      this.posted.emit(root);
+      return;
+    }
+    const options: ComposeOptions = {
+      inReplyToId: previous.id,
+      visibility: this.visibility(),
+    };
+    this.api.postStatus(rest[0], options).subscribe({
+      next: (status) => this.postRest(root, status, rest.slice(1)),
       error: () => this.submitting.set(false),
     });
   }

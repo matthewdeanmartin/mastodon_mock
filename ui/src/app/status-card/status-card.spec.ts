@@ -678,4 +678,77 @@ describe('StatusCard', () => {
     const label = (f.nativeElement as HTMLElement).querySelector('.did');
     expect(label?.textContent).toContain('Boosted');
   });
+
+  // ---------------------------------------------------------------- delete & repost
+
+  describe('delete & repost', () => {
+    interface RedraftInternals {
+      redrafting: WritableSignal<boolean>;
+      redraftText: WritableSignal<string>;
+      deleteAndRedraft(event: Event): void;
+      onRedrafted(status: Status): void;
+      cancelRedraft(): void;
+    }
+
+    function redraftInternals(f: ComponentFixture<StatusCard>): RedraftInternals {
+      return f.componentInstance as unknown as RedraftInternals;
+    }
+
+    function startRedraft(f: ComponentFixture<StatusCard>): void {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      redraftInternals(f).deleteAndRedraft(fakeEvent());
+      httpMock
+        .expectOne('/api/v1/statuses/1/source')
+        .flush({ id: '1', text: 'original text', spoiler_text: '' });
+      httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus());
+    }
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('fetches the source, deletes the post, and opens the seeded composer', () => {
+      const f = setUp();
+      startRedraft(f);
+      f.detectChanges();
+
+      expect(redraftInternals(f).redrafting()).toBe(true);
+      expect(redraftInternals(f).redraftText()).toBe('original text');
+      expect((f.nativeElement as HTMLElement).querySelector('.redraft app-compose')).not.toBeNull();
+    });
+
+    it('does nothing when the confirmation is declined', () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const f = setUp();
+      redraftInternals(f).deleteAndRedraft(fakeEvent());
+
+      httpMock.expectNone('/api/v1/statuses/1/source');
+      expect(redraftInternals(f).redrafting()).toBe(false);
+    });
+
+    it('emits changed with the reposted status so containers swap it in', () => {
+      const f = setUp();
+      const changed: Status[] = [];
+      const deleted: Status[] = [];
+      f.componentInstance.changed.subscribe((s) => changed.push(s));
+      f.componentInstance.deleted.subscribe((s) => deleted.push(s));
+      startRedraft(f);
+
+      redraftInternals(f).onRedrafted(makeStatus({ id: '2' }));
+
+      expect(redraftInternals(f).redrafting()).toBe(false);
+      expect(changed.map((s) => s.id)).toEqual(['2']);
+      expect(deleted).toHaveLength(0);
+    });
+
+    it('emits deleted when the redraft is discarded (post is already gone)', () => {
+      const f = setUp();
+      const deleted: Status[] = [];
+      f.componentInstance.deleted.subscribe((s) => deleted.push(s));
+      startRedraft(f);
+
+      redraftInternals(f).cancelRedraft();
+
+      expect(redraftInternals(f).redrafting()).toBe(false);
+      expect(deleted.map((s) => s.id)).toEqual(['1']);
+    });
+  });
 });

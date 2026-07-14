@@ -37,19 +37,17 @@ work against mastodon.social as well as the local mock** → no new backend endp
 
 ## Task board
 
-### Sprint A — foundation + theming + blue checks
-1. [ ] `client-prefs.ts`: localStorage-backed signals service — themeMode
-       ('light'|'dark'|'auto'), accent preset id, undoSend (bool), readerFontSize (later).
-2. [ ] Dark palette + accent presets: `:root[data-theme='dark']` var overrides in
-       `styles.css`; accent presets as `[data-accent='...']` overrides. Applied on
-       `document.documentElement` by an effect in the prefs service (works on every route).
-3. [ ] Appearance settings page: theme selector + accent swatches drive ClientPrefs
-       (instant apply); non-theme prefs still save to mock blob only when `server.isMock`
-       (guarded so the page also works on mastodon.social).
-4. [ ] Blue check: `verified-badge` shared component; shown in status-card header +
-       profile page when `followers_count >= 50000` or account is the viewer's own
-       (self-check gets the "only you can see this" tooltip + subtle style variant).
-5. [ ] Specs for prefs service + badge rules.
+### Sprint A — foundation + theming + blue checks — DONE
+1. [x] `client-prefs.ts`: localStorage-backed signals service — themeMode
+       ('light'|'dark'|'auto'), accent preset id, undoSend (bool), readerFontSize.
+2. [x] Dark palette + accent presets in `styles.css` (`data-theme`/`data-accent` on <html>,
+       applied by an effect in ClientPrefs; service eagerly injected in `app.ts`).
+3. [x] Appearance settings page: theme radios + accent swatches drive ClientPrefs (instant
+       apply); undo-send toggle added here too (task 8 pref); server-backed rows (media/
+       motion/spoilers) hidden unless `server.isMock`.
+4. [x] Blue check: `verified-badge/` component in status-card header + profile h2;
+       >=50k followers → public check; own account → self-only check w/ tooltip.
+5. [x] Specs: client-prefs.spec.ts (7), verified-badge.spec.ts (5), appearance spec updated.
 
 ### Sprint B — compose powers
 6. [ ] Delete & Repost on own statuses in status-card: getStatusSource → deleteStatus →
@@ -73,4 +71,8 @@ work against mastodon.social as well as the local mock** → no new backend endp
 13. [ ] Full check: `npm test`, `ng build` (both configs), lint; one commit per sprint.
 
 ## Status log
-- 2026-07-13: Sprint doc created; decisions confirmed with user via Q&A. Work not started.
+- 2026-07-13: Sprint doc created; decisions confirmed with user via Q&A.
+- 2026-07-13: Sprint A done + committed ("feat(ui): client-side theming, accent colors, and
+  blue verification checks"). 352 tests green, lint clean, both builds pass. Note: two spec
+  files (shell, status-card) can flake with 5s timeouts under load — rerun before blaming
+  your change. Next: Sprint B task 6 (Delete & Repost).

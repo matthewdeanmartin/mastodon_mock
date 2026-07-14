@@ -126,6 +126,39 @@ export class StatusCard {
     this.api.deleteStatus(this.display.id).subscribe(() => this.deleted.emit(this.status()));
   }
 
+  // --- delete & repost ---
+  protected redrafting = signal(false);
+  protected redraftText = signal('');
+
+  /**
+   * Delete the post on the server, then reopen its source text in an inline
+   * composer so it can be tweaked and reposted (Blue's "edit", the honest way).
+   */
+  deleteAndRedraft(event: Event): void {
+    event.stopPropagation();
+    if (!confirm('Delete this post and re-draft it?')) {
+      return;
+    }
+    this.api.getStatusSource(this.display.id).subscribe((src) => {
+      this.api.deleteStatus(this.display.id).subscribe(() => {
+        this.redraftText.set(src.text);
+        this.redrafting.set(true);
+      });
+    });
+  }
+
+  /** The redraft was posted: swap the (already deleted) original for the new status. */
+  onRedrafted(status: Status): void {
+    this.redrafting.set(false);
+    this.changed.emit(status);
+  }
+
+  /** Redraft abandoned: the original is gone from the server, so drop the card. */
+  cancelRedraft(): void {
+    this.redrafting.set(false);
+    this.deleted.emit(this.status());
+  }
+
   /** Open the image lightbox at the clicked attachment. */
   openLightbox(index: number, event: Event): void {
     event.preventDefault();

@@ -2,7 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ClientPrefs } from '../client-prefs';
 import { Status } from '../models';
 import { Compose } from './compose';
 
@@ -23,6 +24,9 @@ interface ComposeInternals {
   canSubmit: Signal<boolean>;
   canAttachMedia: Signal<boolean>;
   canAddPoll: Signal<boolean>;
+  countdown: Signal<number | null>;
+  chunkCount: Signal<number>;
+  cancelSend(): void;
   toggleCw(): void;
   togglePoll(): void;
   addPollOption(): void;
@@ -41,6 +45,7 @@ describe('Compose', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
@@ -49,6 +54,8 @@ describe('Compose', () => {
 
   afterEach(() => {
     httpMock.verify();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   function setUp(): ComponentFixture<Compose> {
@@ -335,5 +342,126 @@ describe('Compose', () => {
       multiple: false,
     });
     req.flush({ id: '1' });
+  });
+
+  // ---------------------------------------------------------------- auto-split threads
+
+  it('submit() splits over-limit text into a chained self-reply thread', () => {
+    const f = setUp();
+    const posted: Status[] = [];
+    f.componentInstance.posted.subscribe((s) => posted.push(s));
+
+    const text = Array.from({ length: 150 }, (_, i) => `word${i}`).join(' ');
+    internals(f).text.set(text);
+    expect(internals(f).chunkCount()).toBeGreaterThan(1);
+    internals(f).submit();
+
+    const first = httpMock.expectOne('/api/v1/statuses');
+    expect(first.request.body.status).toMatch(/\(1\/\d+\)$/);
+    expect(first.request.body.in_reply_to_id).toBeUndefined();
+    first.flush({ id: 'root' });
+
+    const second = httpMock.expectOne('/api/v1/statuses');
+    expect(second.request.body.status).toMatch(/\(2\/\d+\)$/);
+    expect(second.request.body.in_reply_to_id).toBe('root');
+    second.flush({ id: 'child' });
+
+    // Chain may continue; flush any remaining chunks.
+    let prev = 'child';
+    for (;;) {
+      const pending = httpMock.match('/api/v1/statuses');
+      if (!pending.length) {
+        break;
+      }
+      expect(pending[0].request.body.in_reply_to_id).toBe(prev);
+      prev = `n${pending.length}`;
+      pending[0].flush({ id: prev });
+    }
+
+    // The root status (not the tail) is what containers receive.
+    expect(posted).toHaveLength(1);
+    expect(posted[0].id).toBe('root');
+    expect(internals(f).text()).toBe('');
+  });
+
+  it('short text posts as a single unmarked status', () => {
+    const f = setUp();
+    internals(f).text.set('just a short post');
+    internals(f).submit();
+
+    const req = httpMock.expectOne('/api/v1/statuses');
+    expect(req.request.body.status).toBe('just a short post');
+    req.flush({ id: '1' });
+    httpMock.expectNone('/api/v1/statuses');
+  });
+
+  // ---------------------------------------------------------------- undo send
+
+  function enableUndoSend(): void {
+    TestBed.inject(ClientPrefs).setUndoSend(true);
+  }
+
+  it('undo-send asks for confirmation and defers the POST by 30 seconds', () => {
+    vi.useFakeTimers();
+    enableUndoSend();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const f = setUp();
+    internals(f).text.set('risky post');
+    internals(f).submit();
+
+    expect(confirmSpy).toHaveBeenCalledWith('Do you really want to post that?');
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).countdown()).toBe(30);
+
+    vi.advanceTimersByTime(29_000);
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).countdown()).toBe(1);
+
+    vi.advanceTimersByTime(1_000);
+    const req = httpMock.expectOne('/api/v1/statuses');
+    expect(req.request.body.status).toBe('risky post');
+    req.flush({ id: '1' });
+    expect(internals(f).countdown()).toBeNull();
+  });
+
+  it('declining the confirmation aborts without posting and keeps the draft', () => {
+    enableUndoSend();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    const f = setUp();
+    internals(f).text.set('never mind');
+    internals(f).submit();
+
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).text()).toBe('never mind');
+    expect(internals(f).countdown()).toBeNull();
+  });
+
+  it('cancelSend() stops the countdown and keeps the draft', () => {
+    vi.useFakeTimers();
+    enableUndoSend();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const f = setUp();
+    internals(f).text.set('second thoughts');
+    internals(f).submit();
+    vi.advanceTimersByTime(10_000);
+    internals(f).cancelSend();
+    vi.advanceTimersByTime(60_000);
+
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).text()).toBe('second thoughts');
+    expect(internals(f).countdown()).toBeNull();
+  });
+
+  it('undo-send disabled: posts immediately without confirmation', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    const f = setUp();
+    internals(f).text.set('normal post');
+    internals(f).submit();
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
   });
 });

@@ -225,6 +225,9 @@
         </div>
         <button class="action" (click)="startEdit($event)" title="Edit">✏️</button>
         <button class="action" (click)="remove($event)" title="Delete">🗑️</button>
+        <button class="action" (click)="deleteAndRedraft($event)" title="Delete &amp; repost">
+          ♻️
+        </button>
       } @else if (reported()) {
         <span class="action reported" title="Reported">🚩 reported</span>
       } @else {
@@ -236,6 +239,22 @@
         </details>
       }
     </div>
+
+    @if (redrafting()) {
+      <div class="inline-compose redraft" (click)="$event.stopPropagation()">
+        <div class="redraft-note muted">
+          Post deleted — edit below and repost, or
+          <button type="button" class="linklike" (click)="cancelRedraft()">discard</button>.
+        </div>
+        <app-compose
+          [initialText]="redraftText()"
+          [initialVisibility]="display.visibility"
+          [inReplyToId]="display.in_reply_to_id ?? undefined"
+          placeholder="Edit and repost"
+          (posted)="onRedrafted($event)"
+        />
+      </div>
+    }
 
     @if (replying()) {
       <div class="inline-compose" (click)="$event.stopPropagation()">
