@@ -53,3 +53,17 @@
     <p class="card-hint muted">Boosted by people across the network</p>
   </section>
 }
+
+@if (trends().length) {
+  <section class="card">
+    <h2 class="card-title">Trends for you</h2>
+    @for (tag of trends().slice(0, 10); track tag.name) {
+      <a class="trend" [routerLink]="['/tags', tag.name]">
+        <span class="trend-name">#{{ tag.name }}</span>
+        @if (uses(tag); as count) {
+          <span class="trend-count muted">{{ count }} posts</span>
+        }
+      </a>
+    }
+  </section>
+}

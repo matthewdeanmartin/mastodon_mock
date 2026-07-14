@@ -14,32 +14,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.trend {
-  display: flex;
-  flex-direction: column;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-}
-
-.trend:last-of-type {
-  border-bottom: none;
-}
-
-.trend:hover {
-  background: var(--hover);
-  text-decoration: none;
-}
-
-.trend-name {
-  font-weight: 800;
-  font-size: 15px;
-}
-
-.trend-count {
-  font-size: 12px;
-}
-
 .rail-link {
   display: flex;
   align-items: center;
@@ -68,6 +42,32 @@
   stroke-width: 1.9;
 }
 
+.donate-block {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.donate-head {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.donate-link {
+  display: block;
+  padding: 5px 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.donate-link:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .server-info {
   padding: 10px 14px 12px;
 }
@@ -81,4 +81,43 @@
 .server-line {
   margin: 2px 0 0;
   font-size: 12px;
+}
+
+.ad-card {
+  border-color: var(--accent);
+}
+
+.ad-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 6px;
+  color: var(--text);
+}
+
+.ad-body:hover {
+  background: var(--accent-soft);
+  text-decoration: none;
+}
+
+.ad-title {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.ad-text {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ad-cta {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ad-disclosure {
+  margin: 0;
+  padding: 4px 14px 10px;
+  font-size: 11px;
 }

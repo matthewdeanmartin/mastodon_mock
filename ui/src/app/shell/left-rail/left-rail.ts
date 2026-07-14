@@ -2,14 +2,14 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
-import { Account } from '../../models';
+import { Account, Tag } from '../../models';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
 
 /**
- * Left sidebar: the signed-in user's profile card (2018-Twitter style) and a
- * "Who to follow" widget. Suggestions are derived synthetically: accounts whose
- * posts were boosted by other people on the user's home timeline, uniquified, minus
- * yourself and anyone you already follow.
+ * Left sidebar: the signed-in user's profile card (2018-Twitter style), a
+ * "Who to follow" widget, and trending hashtags beneath it. Suggestions are
+ * derived synthetically: accounts whose posts were boosted by other people on
+ * the user's home timeline, uniquified, minus yourself and anyone you follow.
  */
 @Component({
   selector: 'app-left-rail',
@@ -26,8 +26,20 @@ export class LeftRail implements OnInit {
   protected suggestions = signal<Account[]>([]);
   /** Ids the user followed from this widget (flips the button to "Following"). */
   protected followed = signal<Set<string>>(new Set());
+  protected trends = signal<Tag[]>([]);
+
+  /** Most recent day's use count for a trending tag, if the server provides one. */
+  uses(tag: Tag): string | null {
+    return tag.history?.[0]?.uses ?? null;
+  }
 
   ngOnInit(): void {
+    this.api.trendingTags().subscribe({
+      next: (tags) => this.trends.set(tags),
+      error: () => {
+        // Sidebar widget: fail silently.
+      },
+    });
     this.homeTimelineFeed.loaded.subscribe((statuses) => {
       const me = this.auth.account()?.id;
       for (const s of statuses) {

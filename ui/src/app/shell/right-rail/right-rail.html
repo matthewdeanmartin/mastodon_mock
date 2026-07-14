@@ -1,26 +1,6 @@
-@if (trends().length) {
-  <section class="card">
-    <h2 class="card-title">Trends for you</h2>
-    @for (tag of trends().slice(0, 10); track tag.name) {
-      <a class="trend" [routerLink]="['/tags', tag.name]">
-        <span class="trend-name">#{{ tag.name }}</span>
-        @if (uses(tag); as count) {
-          <span class="trend-count muted">{{ count }} posts</span>
-        }
-      </a>
-    }
-  </section>
-}
-
 <section class="card">
-  <h2 class="card-title">Discover</h2>
-  <a class="rail-link" routerLink="/public">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-    </svg>
-    <span>Public timeline</span>
-  </a>
+  <h2 class="card-title">Fediverse</h2>
+
   <a class="rail-link" routerLink="/explore">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="9" />
@@ -28,6 +8,36 @@
     </svg>
     <span>Explore</span>
   </a>
+  <a class="rail-link" routerLink="/public">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+    </svg>
+    <span>Public timeline</span>
+  </a>
+
+  <div class="donate-block">
+    <p class="donate-head muted">Keep the network running</p>
+    <a class="donate-link" [href]="donateServerUrl()" target="_blank" rel="noopener noreferrer">
+      💙 Donate to {{ homeHost() || 'your server' }}
+    </a>
+    <a
+      class="donate-link"
+      href="https://joinmastodon.org/sponsors"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      🐘 Donate to Mastodon
+    </a>
+    <a
+      class="donate-link"
+      href="https://about.iftas.org/"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      🛡️ Donate to IFTAS
+    </a>
+  </div>
 
   @if (instance(); as info) {
     <div class="server-info">
@@ -36,4 +46,20 @@
       <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
     </div>
   }
+</section>
+
+<section class="card ad-card">
+  <a
+    class="ad-body"
+    href="https://github.com/matthewdeanmartin/mastodon_is_my_blog/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    <span class="ad-title">📝 MIMB — Mastodon Is My Blog</span>
+    <span class="ad-text">
+      An advanced desktop Mastodon client with more of a blog interface.
+    </span>
+    <span class="ad-cta">Get it on GitHub ↗</span>
+  </a>
+  <p class="ad-disclosure muted">House ad</p>
 </section>

@@ -159,3 +159,29 @@
   padding: 10px 14px;
   font-size: 12px;
 }
+
+.trend {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.trend:last-of-type {
+  border-bottom: none;
+}
+
+.trend:hover {
+  background: var(--hover);
+  text-decoration: none;
+}
+
+.trend-name {
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.trend-count {
+  font-size: 12px;
+}
