@@ -40,3 +40,11 @@ Continues sprint04's Blue features based on user feedback (2026-07-14).
   mock serves, but real Mastodon only offers WebSocket streaming (wss://streaming.<host>) —
   so Go Live silently does nothing against mastodon.social (EventSource errors are swallowed).
   Now at least it refetches on enable. A follow-up could add a WebSocket fallback.
+- 2026-07-14: follow-up done — streaming.ts rewritten WebSocket-only (no fallback chain:
+  the mock already serves the real WS wire format at /api/v1/streaming, so one code path
+  covers both mock and real instances; real Mastodon dropped SSE in 4.2). WS host is
+  discovered from /api/v2/instance configuration.urls.streaming (mastodon.social streams
+  from wss://streaming.mastodon.social, a separate subdomain); the mock uses the UI origin
+  since its instance payload advertises the configured domain, which the browser may not
+  reach. Adds reconnect-with-backoff (WebSocket, unlike EventSource, never auto-reconnects).
+  User-confirmed decisions: WebSocket-only; no polling fallback; URL from instance API.

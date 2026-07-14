@@ -188,6 +188,7 @@ filterwarnings = [
     # uvicorn still imports the deprecated websockets.legacy / WebSocketServerProtocol.
     "ignore:websockets\\.legacy is deprecated:DeprecationWarning",
     "ignore:websockets\\.server\\.WebSocketServerProtocol is deprecated:DeprecationWarning",
+    "ignore:remove second argument of ws_handler:DeprecationWarning",
     # FastAPI 0.138 + pydantic 2.13: FastAPI sets ``alias`` on auto-generated
     # request field models (e.g. the ``authorization`` header / ``filter_id`` path
     # param) in a way pydantic 2.13 flags. Not our Field definitions (we set no

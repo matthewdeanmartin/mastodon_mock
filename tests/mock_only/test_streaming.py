@@ -1,4 +1,4 @@
-"""Contract tests for the SSE streaming API (spec/streaming.md).
+"""Contract tests for the streaming API, SSE and WebSocket (spec/streaming.md).
 
 These drive the mock through real ``Mastodon.py`` streaming calls, so they prove
 the wire format, the streaming-base-URL rewrite, and the write-path event routing
@@ -107,6 +107,61 @@ def test_direct_conversation_stream(mastodon_mock_server: MockServer) -> None:
         alice.status_post(f"@{bob_acct} secret", visibility="direct")
         conv = events.next("conversation", timeout=5)
         assert "secret" in conv["last_status"]["content"]
+
+
+def _ws_base(server: MockServer) -> str:
+    return server.base_url.replace("https://", "wss://").replace("http://", "ws://")
+
+
+def test_websocket_stream_uses_real_wire_format(mastodon_mock_server: MockServer) -> None:
+    """The WS transport frames events like real Mastodon: one JSON object per message
+    with a double-encoded ``payload`` (except ``delete``, whose payload is the bare id).
+
+    Real instances dropped the SSE transport in Mastodon 4.2, so the bundled browser
+    client (ui/src/app/streaming.ts) streams over WebSocket exclusively — this proves
+    the endpoint it depends on end to end.
+    """
+    import json
+
+    from websockets.sync.client import connect
+
+    alice = mastodon_mock_server.client("alice")
+    with connect(f"{_ws_base(mastodon_mock_server)}/api/v1/streaming?stream=public") as ws:
+        post = alice.status_post("ws hello")
+        frame = json.loads(ws.recv(timeout=5))
+        assert frame["stream"] == ["public"]
+        assert frame["event"] == "update"
+        payload = json.loads(frame["payload"])  # payload is a JSON-encoded *string*
+        assert "ws hello" in payload["content"]
+
+        alice.status_delete(post["id"])
+        frame = json.loads(ws.recv(timeout=5))
+        assert frame["event"] == "delete"
+        assert frame["payload"] == str(post["id"])
+
+
+def test_websocket_user_stream_authenticates_via_query_token(
+    mastodon_mock_server: MockServer,
+) -> None:
+    """``stream=user`` resolves the account from the ``access_token`` query param
+    (browser WebSocket APIs cannot set an ``Authorization`` header)."""
+    import json
+
+    from websockets.sync.client import connect
+
+    alice = mastodon_mock_server.client("alice")
+    bob = mastodon_mock_server.client("bob")
+    alice.account_follow(bob.me().id)
+
+    url = (
+        f"{_ws_base(mastodon_mock_server)}/api/v1/streaming"
+        f"?stream=user&access_token={alice.access_token}"
+    )
+    with connect(url) as ws:
+        bob.status_post("ws live from bob!")
+        frame = json.loads(ws.recv(timeout=5))
+        assert frame["event"] == "update"
+        assert "ws live from bob" in json.loads(frame["payload"])["content"]
 
 
 def test_streaming_disabled_404s() -> None:
