@@ -30,8 +30,13 @@ Continues sprint04's Blue features based on user feedback (2026-07-14).
 11. [x] /fail-whale demo route (art on demand, no side effects).
 12. [x] Go Live: investigate; force timeline refresh when toggled on. (Was real but
        silent-failed vs mastodon.social; now refreshes feed on enable.)
-13. [x] Specs + lint + both builds. (All 54 files green.)
+13. [x] Specs + lint + both builds. (All 52 spec files green; shell.spec/status-card
+       timeout flakes still occur under load — rerun before blaming a change.)
 
 ## Status log
 - 2026-07-14: created after user feedback; questions answered (see Decisions).
-- 2026-07-14: ALL TASKS DONE. Committed. 54 spec files green, lint clean, both builds pass.
+- 2026-07-14: ALL TASKS DONE. Committed. 52 spec files green, lint clean, both builds pass.
+  Go Live findings: the client streams via SSE EventSource at /api/v1/streaming/* which the
+  mock serves, but real Mastodon only offers WebSocket streaming (wss://streaming.<host>) —
+  so Go Live silently does nothing against mastodon.social (EventSource errors are swallowed).
+  Now at least it refetches on enable. A follow-up could add a WebSocket fallback.
