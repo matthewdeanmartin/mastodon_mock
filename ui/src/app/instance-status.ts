@@ -196,10 +196,7 @@ export class InstanceStatus {
 
   private loadCache(): Record<string, DiscoveryRecord> {
     try {
-      return JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}') as Record<
-        string,
-        DiscoveryRecord
-      >;
+      return JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}') as Record<string, DiscoveryRecord>;
     } catch {
       return {};
     }

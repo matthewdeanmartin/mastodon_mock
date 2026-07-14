@@ -1,6 +1,12 @@
 <div class="login-wrap">
   <div class="login-card">
-    <h1>{{ brand }}</h1>
+    <div class="hero">
+      <img class="hero-logo" src="mockigbird_logo.png" alt="" />
+      <div>
+        <h1>{{ brand }}</h1>
+        <p class="tagline muted">A fast web client for Mastodon and the Fediverse.</p>
+      </div>
+    </div>
 
     <div class="tabs" role="tablist">
       <button
@@ -36,8 +42,37 @@
 
     <!-- ====================== Sign in / Register ====================== -->
     @if (tab() === 'signin') {
+      <!-- ---------- Primary: big obvious sign-in ---------- -->
+      @if (needsInstance()) {
+        <p class="muted">Choose a server below to sign in.</p>
+      } @else {
+        @if (oauthError()) {
+          <p class="error">{{ oauthError() }}</p>
+        }
+        <button class="btn btn-hero" [disabled]="oauthWorking()" (click)="startOAuth()">
+          {{ oauthWorking() ? 'Redirecting…' : 'Sign in with ' + serverHostLabel() }}
+        </button>
+        <p class="muted small center">
+          You'll be sent to {{ serverHostLabel() }}'s own login &amp; consent page, then redirected
+          back here.
+        </p>
+        @if (signupUrl(); as signup) {
+          <p class="muted small center">
+            New to Mastodon?
+            <a [href]="signup" target="_blank" rel="noopener noreferrer">
+              Create an account on {{ serverHostLabel() }} ↗
+            </a>
+          </p>
+        }
+      }
+
+      <!-- ---------- Pick a server ---------- -->
       <div class="dev">
-        <div class="dev-head"><span class="muted">Instance</span></div>
+        <div class="dev-head"><span class="muted">Pick a server</span></div>
+        <p class="muted small">
+          Your account lives on a server (an “instance”), but you can follow anyone on any server.
+          <strong>mastodon.social</strong> is the biggest general-purpose one — a safe default.
+        </p>
         <div class="dev-gen">
           @for (preset of serverPresets; track preset.baseUrl) {
             <button
@@ -65,25 +100,27 @@
             server.baseUrl() || (server.allowsThisServer ? 'this server' : '— pick an instance —')
           }}</code>
         </p>
+        <details class="server-help">
+          <summary>How do I choose?</summary>
+          <ul class="muted small">
+            <li>
+              Some servers are special-interest communities (tech, art, a language…). Their local
+              feed reads like a forum for that topic — a nice built-in home timeline.
+            </li>
+            <li>
+              Small servers see less of the network: if you follow hashtags, expect fewer results
+              than on a big server.
+            </li>
+            <li>
+              Small servers run on donations and volunteer time, so they can be less financially
+              stable in the long run.
+            </li>
+            <li>You can move your account (and followers) to another server later.</li>
+          </ul>
+        </details>
       </div>
 
-      @if (needsInstance()) {
-        <p class="muted">Choose an instance above to sign in.</p>
-      } @else {
-        <!-- ---------- Primary: OAuth sign-in ---------- -->
-        <p class="muted">
-          Sign in on <code>{{ server.baseUrl() || 'this server' }}</code> — you'll be sent to its
-          own login &amp; consent page, then redirected back here.
-        </p>
-        @if (oauthError()) {
-          <p class="error">{{ oauthError() }}</p>
-        }
-        <button class="btn" [disabled]="oauthWorking()" (click)="startOAuth()">
-          {{
-            oauthWorking() ? 'Redirecting…' : 'Sign in with ' + (server.baseUrl() || 'this server')
-          }}
-        </button>
-
+      @if (!needsInstance()) {
         <!-- ---------- Secondary: access token ---------- -->
         <div class="dev">
           <div class="dev-head">

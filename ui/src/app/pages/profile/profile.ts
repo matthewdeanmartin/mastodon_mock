@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Location } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, Relationship, Status } from '../../models';
@@ -11,7 +12,7 @@ import { VerifiedBadge } from '../../verified-badge/verified-badge';
 
 @Component({
   selector: 'app-profile',
-  imports: [StatusCard, ReportDialog, ListDialog, VerifiedBadge],
+  imports: [RouterLink, StatusCard, ReportDialog, ListDialog, VerifiedBadge],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })
@@ -32,6 +33,18 @@ export class Profile implements OnInit {
   protected showBlockConfirm = signal(false);
 
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
+
+  /** Accounts this profile features ("collections") — shown prominently up top. */
+  protected featured = signal<Account[]>([]);
+  /** Ids among featured() the viewer already follows (or has requested). */
+  protected featuredFollowing = signal<Set<string>>(new Set());
+  protected featuredBusy = signal(false);
+
+  protected featuredToFollow = computed(() =>
+    this.featured().filter(
+      (f) => !this.featuredFollowing().has(f.id) && f.id !== this.auth.account()?.id,
+    ),
+  );
 
   /** Return to the previous page (e.g. back to search results). */
   goBack(): void {
@@ -57,6 +70,63 @@ export class Profile implements OnInit {
     });
     this.api.getAccountStatuses(id).subscribe((s) => this.statuses.set(s));
     this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null));
+    this.loadFeatured(id);
+  }
+
+  private loadFeatured(id: string): void {
+    this.featured.set([]);
+    this.featuredFollowing.set(new Set());
+    this.api.accountEndorsements(id).subscribe({
+      next: (accounts) => {
+        this.featured.set(accounts);
+        if (!accounts.length) {
+          return;
+        }
+        this.api.relationships(accounts.map((a) => a.id)).subscribe({
+          next: (rels) =>
+            this.featuredFollowing.set(
+              new Set(rels.filter((r) => r.following || r.requested).map((r) => r.id)),
+            ),
+          error: () => {
+            // Follow buttons just show for everyone; following again is harmless.
+          },
+        });
+      },
+      error: () => {
+        // Older servers (pre-4.4) 404 here; the section simply doesn't render.
+      },
+    });
+  }
+
+  followFeatured(target: Account): void {
+    this.api.follow(target.id).subscribe((rel) => {
+      if (rel.following || rel.requested) {
+        this.featuredFollowing.update((s) => new Set(s).add(target.id));
+      }
+    });
+  }
+
+  /** Follow every featured account the viewer doesn't already follow, one at a time. */
+  async followAllFeatured(): Promise<void> {
+    if (this.featuredBusy()) {
+      return;
+    }
+    this.featuredBusy.set(true);
+    try {
+      for (const target of this.featuredToFollow()) {
+        try {
+          const rel = await firstValueFrom(this.api.follow(target.id));
+          if (rel.following || rel.requested) {
+            this.featuredFollowing.update((s) => new Set(s).add(target.id));
+          }
+        } catch {
+          // Keep going; one failed follow shouldn't abort the batch.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    } finally {
+      this.featuredBusy.set(false);
+    }
   }
 
   toggleFollow(): void {

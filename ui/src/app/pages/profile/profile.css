@@ -160,3 +160,77 @@ h2 {
   gap: 8px;
   margin-top: 18px;
 }
+
+.featured-card {
+  margin: 12px 0;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  background: var(--col-bg);
+  padding: 12px 14px;
+}
+
+.featured-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.featured-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.featured-head .btn {
+  width: auto;
+  white-space: nowrap;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.featured-hint {
+  margin: 4px 0 8px;
+  font-size: 12px;
+}
+
+.featured-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.featured-avatar img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.featured-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.featured-name:hover {
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.featured-display {
+  font-weight: 700;
+}
+
+.featured-follow {
+  width: auto;
+  padding: 5px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}

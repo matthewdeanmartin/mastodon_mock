@@ -55,7 +55,11 @@ export class Search implements OnInit {
 
   private fetch(q: string, type: SearchType): void {
     this.searching.set(true);
-    this.api.search(q, type).subscribe({
+    // Handle- or URL-shaped queries get resolve=true so the server webfingers
+    // accounts it hasn't federated with yet (how you find someone by address).
+    const resolve =
+      type === 'accounts' && (/^@?[\w.-]+@[\w.-]+\.\w+$/.test(q) || /^https?:\/\//.test(q));
+    this.api.search(q, type, resolve ? { resolve: true } : undefined).subscribe({
       next: (r) => {
         this.results.set(r);
         this.searching.set(false);

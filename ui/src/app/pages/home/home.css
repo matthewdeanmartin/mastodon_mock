@@ -1,0 +1,34 @@
+.follow-nudge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  background: var(--accent-soft, var(--col-bg));
+}
+
+.nudge-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.nudge-cta {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nudge-dismiss {
+  border: none;
+  background: none;
+  color: var(--muted, #888);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}

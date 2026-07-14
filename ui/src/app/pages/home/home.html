@@ -1,4 +1,21 @@
 <app-announcements />
+
+@if (showFollowNudge()) {
+  <aside class="follow-nudge">
+    <div class="nudge-copy">
+      <strong>Your timeline gets better with every follow.</strong>
+      <span class="muted">
+        You follow {{ followingCount() }} {{ followingCount() === 1 ? 'account' : 'accounts' }} —
+        import a follow list or browse directories to fill your feed.
+      </span>
+    </div>
+    <a class="btn nudge-cta" routerLink="/find-people">Find people</a>
+    <button class="nudge-dismiss" type="button" aria-label="Dismiss" (click)="dismissNudge()">
+      ✕
+    </button>
+  </aside>
+}
+
 <app-compose (posted)="onPosted($event)" />
 
 <app-command-bar [live]="live()" (toggleLive)="toggleLive()" />
@@ -6,7 +23,10 @@
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!statuses().length) {
-  <p class="muted center">Your home timeline is empty. Follow someone, or post something.</p>
+  <p class="muted center">
+    Your home timeline is empty.
+    <a routerLink="/find-people">Find people to follow</a>, or post something.
+  </p>
 } @else {
   @for (s of statuses(); track s.id; let i = $index) {
     <app-status-card

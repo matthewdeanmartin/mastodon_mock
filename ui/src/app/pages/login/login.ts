@@ -47,6 +47,21 @@ export class Login implements OnInit {
    */
   protected needsInstance = computed(() => !this.server.allowsThisServer && !this.server.baseUrl());
 
+  /** Short host name for buttons/copy: "mastodon.social" instead of the full URL. */
+  protected serverHostLabel = computed(() => {
+    const base = this.server.baseUrl();
+    return base ? base.replace(/^https?:\/\//, '') : 'this server';
+  });
+
+  /**
+   * The selected instance's own signup page. Only offered for remote instances —
+   * the embedded mock has its own inline register form instead.
+   */
+  protected signupUrl = computed<string | null>(() => {
+    const base = this.server.baseUrl();
+    return base ? `${base}/auth/sign_up` : null;
+  });
+
   // --- Sign in (token) ---
   /** OAuth is the primary flow; the pasted-token form is tucked behind this toggle. */
   protected showToken = signal(false);
@@ -81,6 +96,11 @@ export class Login implements OnInit {
   protected oauthError = signal<string | null>(null);
 
   ngOnInit(): void {
+    // Onboarding default: Mocking Bird has no "this server", so rather than greeting
+    // a new user with an empty picker, preselect the biggest general-purpose instance.
+    if (!this.server.allowsThisServer && !this.server.baseUrl()) {
+      this.server.setBaseUrl('https://mastodon.social');
+    }
     this.customServer.set(this.server.isMock ? '' : this.server.baseUrl());
     // The dev-user stable is mock-server-only. In Mocking Bird the MockApi is a stub that
     // throws, so only poll it when the mock tooling is actually present.

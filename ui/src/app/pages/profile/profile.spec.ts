@@ -30,12 +30,13 @@ describe('Profile block/unblock', () => {
     const fixture = TestBed.createComponent(Profile);
     fixture.detectChanges();
 
-    // load() fans out three requests; satisfy them so the component settles.
+    // load() fans out four requests; satisfy them so the component settles.
     httpMock.expectOne('/api/v1/accounts/900').flush({ id: '900', username: 'eve' } as Account);
     httpMock.expectOne('/api/v1/accounts/900/statuses').flush([]);
     httpMock
       .expectOne((r) => r.url === '/api/v1/accounts/relationships')
       .flush([{ id: '900', blocking: false } as Relationship]);
+    httpMock.expectOne('/api/v1/accounts/900/endorsements').flush([]);
 
     return fixture;
   }

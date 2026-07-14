@@ -185,3 +185,17 @@
 .trend-count {
   font-size: 12px;
 }
+
+.find-people-link {
+  display: block;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.find-people-link:hover {
+  background: var(--hover);
+  text-decoration: none;
+}

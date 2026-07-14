@@ -2,13 +2,15 @@ import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
+import { HOUSE_ADS } from '../../house-ads';
 import { InstanceInfo } from '../../models';
 import { Server } from '../../server';
 
 /**
- * Right sidebar: the Fediverse card — explore entry points, ways to give back
- * (your own server, the Mastodon project), server info —
- * and a house ad for MIMB. Trends moved to the left rail under "Who to follow".
+ * Right sidebar: house ads (inventory lives in house-ads.ts — edit that file to
+ * change them), then the Fediverse card — explore entry points, ways to give back
+ * (your own server, the Mastodon project), server info.
+ * Trends moved to the left rail under "Who to follow".
  */
 @Component({
   selector: 'app-right-rail',
@@ -20,6 +22,8 @@ export class RightRail {
   private api = inject(Api);
   private auth = inject(Auth);
   private server = inject(Server);
+
+  protected ads = HOUSE_ADS;
 
   protected instance = signal<InstanceInfo | null>(null);
 

@@ -1,6 +1,8 @@
-import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Api } from '../../api';
+import { Auth } from '../../auth';
 import { Status } from '../../models';
 import { CommandBar } from '../../command-bar/command-bar';
 import { Compose } from '../../compose/compose';
@@ -9,19 +11,41 @@ import { Announcements } from '../../announcements/announcements';
 import { Streaming } from '../../streaming';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
 
+/** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
+const FOLLOW_NUDGE_THRESHOLD = 5;
+const NUDGE_DISMISSED_KEY = 'mockingbird_follow_nudge_dismissed';
+
 @Component({
   selector: 'app-home',
-  imports: [CommandBar, Compose, StatusCard, Announcements],
+  imports: [CommandBar, Compose, StatusCard, Announcements, RouterLink],
   templateUrl: './home.html',
+  styleUrl: './home.css',
 })
 export class Home implements OnInit, OnDestroy {
   private api = inject(Api);
+  private auth = inject(Auth);
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
   protected live = signal(false);
+
+  private nudgeDismissed = signal(localStorage.getItem(NUDGE_DISMISSED_KEY) === 'true');
+
+  protected followingCount = computed(() => this.auth.account()?.following_count ?? 0);
+
+  protected showFollowNudge = computed(
+    () =>
+      !this.nudgeDismissed() &&
+      this.auth.account() !== null &&
+      this.followingCount() < FOLLOW_NUDGE_THRESHOLD,
+  );
+
+  dismissNudge(): void {
+    localStorage.setItem(NUDGE_DISMISSED_KEY, 'true');
+    this.nudgeDismissed.set(true);
+  }
 
   private liveSub: Subscription | null = null;
 

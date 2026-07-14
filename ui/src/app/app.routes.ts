@@ -149,6 +149,10 @@ export const routes: Routes = [
       },
       ...mockOnlyChildren,
       {
+        path: 'find-people',
+        loadComponent: () => import('./pages/find-people/find-people').then((m) => m.FindPeople),
+      },
+      {
         path: 'tags',
         loadComponent: () =>
           import('./pages/followed-tags/followed-tags').then((m) => m.FollowedTags),

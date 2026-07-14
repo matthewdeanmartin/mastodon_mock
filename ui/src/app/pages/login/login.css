@@ -16,7 +16,58 @@
 
 h1 {
   color: var(--accent);
-  margin: 0 0 12px;
+  margin: 0;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.hero-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.btn-hero {
+  font-size: 17px;
+  font-weight: 800;
+  padding: 14px;
+  margin-top: 4px;
+}
+
+.center {
+  text-align: center;
+}
+
+.server-help {
+  margin-top: 8px;
+}
+
+.server-help summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.server-help ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.server-help li {
+  margin-bottom: 6px;
 }
 
 .tabs {

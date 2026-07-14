@@ -54,6 +54,45 @@
     </div>
   </header>
 
+  @if (featured().length) {
+    <section class="featured-card">
+      <div class="featured-head">
+        <h3>⭐ Featured by {{ a.display_name || a.username }}</h3>
+        @if (!isSelf() && featuredToFollow().length) {
+          <button class="btn" [disabled]="featuredBusy()" (click)="followAllFeatured()">
+            {{ featuredBusy() ? 'Following…' : 'Follow all (' + featuredToFollow().length + ')' }}
+          </button>
+        }
+      </div>
+      <p class="featured-hint muted">
+        A hand-picked collection of accounts this profile vouches for.
+      </p>
+      @for (f of featured(); track f.id) {
+        <div class="featured-row">
+          <a class="featured-avatar" [routerLink]="['/accounts', f.id]">
+            <img [src]="f.avatar_static || f.avatar" alt="" />
+          </a>
+          <a class="featured-name" [routerLink]="['/accounts', f.id]">
+            <span class="featured-display">{{ f.display_name || f.username }}</span>
+            <span class="muted">&#64;{{ f.acct }}</span>
+          </a>
+          @if (featuredFollowing().has(f.id)) {
+            <button type="button" class="btn featured-follow" disabled>Following</button>
+          } @else if (!isSelf()) {
+            <button
+              type="button"
+              class="btn btn-outline featured-follow"
+              [disabled]="featuredBusy()"
+              (click)="followFeatured(f)"
+            >
+              Follow
+            </button>
+          }
+        </div>
+      }
+    </section>
+  }
+
   @for (s of statuses(); track s.id; let i = $index) {
     <app-status-card [status]="s" (changed)="onChanged(i, $event)" (deleted)="onDeleted($event)" />
   }

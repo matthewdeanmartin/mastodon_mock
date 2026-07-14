@@ -68,6 +68,11 @@ export class Api {
     return this.http.post<Relationship>(`/api/v1/accounts/${id}/follow`, {});
   }
 
+  /** Accounts this account features on its profile ("collections"; Mastodon 4.4+). */
+  accountEndorsements(id: string): Observable<Account[]> {
+    return this.http.get<Account[]>(`/api/v1/accounts/${id}/endorsements`);
+  }
+
   unfollow(id: string): Observable<Relationship> {
     return this.http.post<Relationship>(`/api/v1/accounts/${id}/unfollow`, {});
   }
@@ -248,10 +253,21 @@ export class Api {
   }
 
   // --- search ---
-  search(q: string, type?: 'accounts' | 'statuses' | 'hashtags'): Observable<SearchResults> {
+  search(
+    q: string,
+    type?: 'accounts' | 'statuses' | 'hashtags',
+    opts?: { resolve?: boolean; limit?: number },
+  ): Observable<SearchResults> {
     let params = new HttpParams().set('q', q);
     if (type) {
       params = params.set('type', type);
+    }
+    if (opts?.resolve) {
+      // Asks the server to webfinger accounts it hasn't seen yet (needs auth).
+      params = params.set('resolve', 'true');
+    }
+    if (opts?.limit) {
+      params = params.set('limit', String(opts.limit));
     }
     return this.http.get<SearchResults>('/api/v2/search', { params });
   }

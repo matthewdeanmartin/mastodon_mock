@@ -29,9 +29,9 @@
   </section>
 }
 
-@if (suggestions().length) {
-  <section class="card">
-    <h2 class="card-title">Who to follow</h2>
+<section class="card">
+  <h2 class="card-title">Who to follow</h2>
+  @if (suggestions().length) {
     @for (account of suggestions().slice(0, 5); track account.id) {
       <div class="suggestion">
         <a class="suggestion-avatar" [routerLink]="['/accounts', account.id]">
@@ -51,8 +51,9 @@
       </div>
     }
     <p class="card-hint muted">Boosted by people across the network</p>
-  </section>
-}
+  }
+  <a class="find-people-link" routerLink="/find-people">Find people to follow →</a>
+</section>
 
 @if (trends().length) {
   <section class="card">

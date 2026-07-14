@@ -22,9 +22,7 @@ import { InstanceStatus } from '../../instance-status';
         whale will find you.)
       </p>
       @if (status.currentDomain(); as domain) {
-        <p class="muted">
-          And if {{ domain }} ever really is down, the whale will offer this:
-        </p>
+        <p class="muted">And if {{ domain }} ever really is down, the whale will offer this:</p>
       }
       <div class="actions">
         @if (status.statusLink(); as link) {
