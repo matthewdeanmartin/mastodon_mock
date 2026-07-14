@@ -28,6 +28,8 @@ export class SettingsShell {
 
   protected readonly nav: SettingsNavItem[] = [
     { label: 'Public profile', path: 'profile', exact: true },
+    // Client-side premium-style features; the same controls also live in Appearance.
+    { label: 'Mockingbird Blue', path: 'blue', exact: true },
     { label: 'Privacy and reach', path: 'privacy', exact: true },
     // Appearance is client-side (theme/accent/undo-send in localStorage) and works
     // against any instance; the page hides its server-backed rows off-mock itself.

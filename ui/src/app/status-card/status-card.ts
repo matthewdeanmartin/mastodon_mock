@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
 import { Api } from '../api';
 import { Auth } from '../auth';
+import { ClientPrefs } from '../client-prefs';
 import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
@@ -33,6 +34,10 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
 export class StatusCard {
   private api = inject(Api);
   private auth = inject(Auth);
+  private prefs = inject(ClientPrefs);
+
+  /** Pictures render only when images are on and feed reader mode is off. */
+  protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
 
   readonly status = input.required<Status>();
   readonly changed = output<Status>();

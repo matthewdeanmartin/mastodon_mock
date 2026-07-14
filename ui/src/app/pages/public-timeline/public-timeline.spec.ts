@@ -75,9 +75,15 @@ describe('PublicTimeline', () => {
     return fixture;
   }
 
+  /** Toggle live on and flush the fresh-snapshot refetch that going live triggers. */
+  function goLive(fixture: ComponentFixture<PublicTimeline>): void {
+    internals(fixture).toggleLive();
+    httpMock.expectOne('/api/v1/timelines/public?limit=20').flush([]);
+  }
+
   it('toggleLive() opens a non-local public stream by default', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
 
     expect(internals(fixture).live()).toBe(true);
     expect(fakeStreaming.lastKind).toEqual({ stream: 'public', local: false });
@@ -85,7 +91,7 @@ describe('PublicTimeline', () => {
 
   it('switching to Local while live re-opens the stream as local', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
     expect(fakeStreaming.openCount).toBe(1);
 
     internals(fixture).setLocal(true);
@@ -106,7 +112,7 @@ describe('PublicTimeline', () => {
 
   it('prepends an incoming update and removes on delete', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
 
     fakeStreaming.emit({ event: 'update', payload: makeStatus('1') });
     fakeStreaming.emit({ event: 'update', payload: makeStatus('2') });
@@ -126,7 +132,7 @@ describe('PublicTimeline', () => {
 
   it('toggling live off closes the stream', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
     internals(fixture).toggleLive();
 
     expect(internals(fixture).live()).toBe(false);

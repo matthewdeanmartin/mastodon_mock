@@ -1,13 +1,14 @@
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { Api } from '../../api';
+import { CommandBar } from '../../command-bar/command-bar';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { Streaming } from '../../streaming';
 
 @Component({
   selector: 'app-public-timeline',
-  imports: [StatusCard],
+  imports: [CommandBar, StatusCard],
   templateUrl: './public-timeline.html',
 })
 export class PublicTimeline implements OnInit, OnDestroy {
@@ -48,6 +49,8 @@ export class PublicTimeline implements OnInit, OnDestroy {
       return;
     }
     this.live.set(true);
+    // Going live starts from a fresh snapshot: refetch, then stream deltas on top.
+    this.load();
     this.restartLive();
   }
 

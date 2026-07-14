@@ -26,7 +26,7 @@
   </div>
 
   @if (readerMode()) {
-    <article class="reader" [style.font-size.px]="prefs.readerFontSize()">
+    <article class="reader">
       @if (chain()[0].account; as author) {
         <header class="reader-head">
           <img class="reader-avatar" [src]="author.avatar" [alt]="author.username" />
@@ -44,6 +44,70 @@
         @for (m of post.media_attachments; track m.id) {
           <img class="reader-media" [src]="m.preview_url || m.url" [alt]="m.description || ''" />
         }
+        <div class="reader-actions">
+          <button
+            class="raction"
+            [class.on]="replyingTo() === post.id"
+            (click)="toggleReaderReply(post.id)"
+            title="Reply"
+          >
+            💬 {{ post.replies_count }}
+          </button>
+          <button
+            class="raction"
+            [class.on]="post.reblogged"
+            (click)="toggleReblog(post)"
+            [title]="post.reblogged ? 'Undo boost' : 'Boost'"
+          >
+            🔁 {{ post.reblogs_count }}
+          </button>
+          <button
+            class="raction"
+            [class.on]="post.favourited"
+            (click)="toggleFavourite(post)"
+            [title]="post.favourited ? 'Undo favourite' : 'Favourite'"
+          >
+            ⭐ {{ post.favourites_count }}
+          </button>
+          <button
+            class="raction"
+            [class.on]="post.bookmarked"
+            (click)="toggleBookmark(post)"
+            [title]="post.bookmarked ? 'Remove bookmark' : 'Bookmark'"
+          >
+            🔖
+          </button>
+        </div>
+        @if (replyingTo() === post.id) {
+          <div class="reader-reply">
+            <app-compose
+              [inReplyToId]="post.id"
+              placeholder="Post your reply"
+              (posted)="onReaderReplied($event)"
+            />
+          </div>
+        }
+      }
+
+      @if (comments().length) {
+        <section class="reader-comments">
+          <h2 class="comments-title">{{ comments().length }} comments</h2>
+          @for (c of comments(); track c.id) {
+            <div class="comment">
+              <img class="comment-avatar" [src]="c.account.avatar" [alt]="c.account.username" />
+              <div class="comment-body">
+                <div class="comment-meta">
+                  <span class="comment-author">
+                    {{ c.account.display_name || c.account.username }}
+                  </span>
+                  <span class="muted">&#64;{{ c.account.acct }}</span>
+                  <span class="muted">· {{ c.created_at | humanTime }}</span>
+                </div>
+                <div class="comment-content" [innerHTML]="c.content"></div>
+              </div>
+            </div>
+          }
+        </section>
       }
     </article>
   } @else {

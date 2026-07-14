@@ -38,6 +38,47 @@ export class Thread implements OnInit {
   /** The author chain reader mode renders (root post + same-author self-replies). */
   protected chain = computed<Status[]>(() => readerChain(this.thread()));
 
+  /** Everything in the thread that is not part of the author chain: the comments. */
+  protected comments = computed<Status[]>(() => {
+    const chainIds = new Set(this.chain().map((s) => s.id));
+    return this.thread().filter((s) => !chainIds.has(s.id));
+  });
+
+  /** Id of the chain post whose inline reply composer is open (reader mode). */
+  protected replyingTo = signal<string | null>(null);
+
+  toggleReaderReply(id: string): void {
+    this.replyingTo.update((current) => (current === id ? null : id));
+  }
+
+  onReaderReplied(status: Status): void {
+    this.replyingTo.set(null);
+    this.onReply(status);
+  }
+
+  /** Patch a status wherever it lives (focused post, ancestors, or descendants). */
+  patch(updated: Status): void {
+    if (this.status()?.id === updated.id) {
+      this.status.set(updated);
+    }
+    this.onContextChanged(updated);
+  }
+
+  toggleFavourite(post: Status): void {
+    const call = post.favourited ? this.api.unfavourite(post.id) : this.api.favourite(post.id);
+    call.subscribe((updated) => this.patch(updated));
+  }
+
+  toggleReblog(post: Status): void {
+    const call = post.reblogged ? this.api.unreblog(post.id) : this.api.reblog(post.id);
+    call.subscribe((updated) => this.patch(updated.reblog ?? updated));
+  }
+
+  toggleBookmark(post: Status): void {
+    const call = post.bookmarked ? this.api.unbookmark(post.id) : this.api.bookmark(post.id);
+    call.subscribe((updated) => this.patch(updated));
+  }
+
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');

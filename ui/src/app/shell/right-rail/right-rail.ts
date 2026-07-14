@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -16,7 +16,7 @@ import { Server } from '../../server';
   templateUrl: './right-rail.html',
   styleUrl: './right-rail.css',
 })
-export class RightRail implements OnInit {
+export class RightRail {
   private api = inject(Api);
   private auth = inject(Auth);
   private server = inject(Server);
@@ -47,7 +47,17 @@ export class RightRail implements OnInit {
     return host ? `https://${host}/about` : '/about';
   });
 
-  ngOnInit(): void {
+  constructor() {
+    // Runs on init and again when the user switches accounts or instances, so
+    // the server-info block and donate link don't go stale mid-session.
+    effect(() => {
+      this.auth.account();
+      this.server.baseUrl();
+      this.fetchInstance();
+    });
+  }
+
+  private fetchInstance(): void {
     this.api.instanceInfo().subscribe({
       next: (info) => this.instance.set(info),
       error: () => {

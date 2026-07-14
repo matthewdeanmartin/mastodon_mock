@@ -1,8 +1,10 @@
-import { effect, Injectable, signal } from '@angular/core';
+import { effect, Injectable, signal, WritableSignal } from '@angular/core';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
+export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
+export type ReaderTextAlign = 'left' | 'justify';
 
 export interface AccentPreset {
   id: string;
@@ -41,11 +43,30 @@ export const ACCENT_PRESETS: AccentPreset[] = [
   { id: 'green', label: 'Green', accent: '#00ba7c', accentHover: '#00a56e', accentSoft: '#e0f7ef' },
 ];
 
+const FONT_STACKS: Record<ReaderFontFamily, string> = {
+  serif: "Georgia, 'Times New Roman', serif",
+  sans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  mono: "'Cascadia Code', Consolas, 'Courier New', monospace",
+};
+
 interface StoredPrefs {
   themeMode?: ThemeMode;
   accentId?: string;
   undoSend?: boolean;
   readerFontSize?: number;
+  readerFontFamily?: ReaderFontFamily;
+  readerFontWeight?: number;
+  readerLineHeight?: number;
+  readerLetterSpacing?: number;
+  readerWordSpacing?: number;
+  readerTextAlign?: ReaderTextAlign;
+  feedReader?: boolean;
+  showImages?: boolean;
+}
+
+/** Clamp helper shared by the numeric reader prefs. */
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 /**
@@ -53,14 +74,29 @@ interface StoredPrefs {
  * Mastodon instance (e.g. mastodon.social), so nothing here touches the server.
  *
  * The service applies theme + accent to `document.documentElement` as
- * `data-theme` / `data-accent` attributes; `styles.css` carries the palettes.
+ * `data-theme` / `data-accent` attributes (`styles.css` carries the palettes),
+ * reader typography as `--reader-*` CSS variables, and the feed-wide reader /
+ * images toggles as `data-feed-reader` / `data-images` attributes so every
+ * timeline picks them up without wiring.
  */
 @Injectable({ providedIn: 'root' })
 export class ClientPrefs {
   readonly themeMode = signal<ThemeMode>('auto');
   readonly accentId = signal<string>('blue');
   readonly undoSend = signal<boolean>(false);
+
+  // Reader typography (thread reader mode + feed reader mode).
   readonly readerFontSize = signal<number>(18);
+  readonly readerFontFamily = signal<ReaderFontFamily>('serif');
+  readonly readerFontWeight = signal<number>(400);
+  readonly readerLineHeight = signal<number>(1.65);
+  readonly readerLetterSpacing = signal<number>(0);
+  readonly readerWordSpacing = signal<number>(0);
+  readonly readerTextAlign = signal<ReaderTextAlign>('left');
+
+  // Feed-wide toggles (command bar).
+  readonly feedReader = signal<boolean>(false);
+  readonly showImages = signal<boolean>(true);
 
   /** Resolved theme actually in effect ('auto' resolved against the OS preference). */
   readonly resolvedTheme = signal<'light' | 'dark'>('light');
@@ -72,9 +108,9 @@ export class ClientPrefs {
 
   constructor() {
     this.load();
-    this.darkQuery?.addEventListener('change', () => this.applyTheme());
+    this.darkQuery?.addEventListener('change', () => this.apply());
     effect(() => {
-      this.applyTheme();
+      this.apply();
       this.persist();
     });
   }
@@ -94,7 +130,43 @@ export class ClientPrefs {
   }
 
   setReaderFontSize(px: number): void {
-    this.readerFontSize.set(Math.min(24, Math.max(15, px)));
+    this.readerFontSize.set(clamp(px, 15, 24));
+  }
+
+  setReaderFontFamily(family: ReaderFontFamily): void {
+    if (family in FONT_STACKS) {
+      this.readerFontFamily.set(family);
+    }
+  }
+
+  setReaderFontWeight(weight: number): void {
+    this.readerFontWeight.set(clamp(Math.round(weight / 100) * 100, 300, 700));
+  }
+
+  setReaderLineHeight(value: number): void {
+    this.readerLineHeight.set(clamp(value, 1.2, 2.4));
+  }
+
+  setReaderLetterSpacing(px: number): void {
+    this.readerLetterSpacing.set(clamp(px, 0, 3));
+  }
+
+  setReaderWordSpacing(px: number): void {
+    this.readerWordSpacing.set(clamp(px, 0, 8));
+  }
+
+  setReaderTextAlign(align: ReaderTextAlign): void {
+    if (align === 'left' || align === 'justify') {
+      this.readerTextAlign.set(align);
+    }
+  }
+
+  setFeedReader(on: boolean): void {
+    this.feedReader.set(on);
+  }
+
+  setShowImages(on: boolean): void {
+    this.showImages.set(on);
   }
 
   private load(): void {
@@ -117,11 +189,35 @@ export class ClientPrefs {
     ) {
       this.accentId.set(stored.accentId);
     }
-    if (typeof stored.undoSend === 'boolean') {
-      this.undoSend.set(stored.undoSend);
-    }
+    this.loadBool(stored.undoSend, this.undoSend);
+    this.loadBool(stored.feedReader, this.feedReader);
+    this.loadBool(stored.showImages, this.showImages);
     if (typeof stored.readerFontSize === 'number') {
-      this.readerFontSize.set(Math.min(24, Math.max(15, stored.readerFontSize)));
+      this.setReaderFontSize(stored.readerFontSize);
+    }
+    if (typeof stored.readerFontFamily === 'string' && stored.readerFontFamily in FONT_STACKS) {
+      this.readerFontFamily.set(stored.readerFontFamily);
+    }
+    if (typeof stored.readerFontWeight === 'number') {
+      this.setReaderFontWeight(stored.readerFontWeight);
+    }
+    if (typeof stored.readerLineHeight === 'number') {
+      this.setReaderLineHeight(stored.readerLineHeight);
+    }
+    if (typeof stored.readerLetterSpacing === 'number') {
+      this.setReaderLetterSpacing(stored.readerLetterSpacing);
+    }
+    if (typeof stored.readerWordSpacing === 'number') {
+      this.setReaderWordSpacing(stored.readerWordSpacing);
+    }
+    if (stored.readerTextAlign === 'left' || stored.readerTextAlign === 'justify') {
+      this.readerTextAlign.set(stored.readerTextAlign);
+    }
+  }
+
+  private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
+    if (typeof value === 'boolean') {
+      target.set(value);
     }
   }
 
@@ -131,16 +227,33 @@ export class ClientPrefs {
       accentId: this.accentId(),
       undoSend: this.undoSend(),
       readerFontSize: this.readerFontSize(),
+      readerFontFamily: this.readerFontFamily(),
+      readerFontWeight: this.readerFontWeight(),
+      readerLineHeight: this.readerLineHeight(),
+      readerLetterSpacing: this.readerLetterSpacing(),
+      readerWordSpacing: this.readerWordSpacing(),
+      readerTextAlign: this.readerTextAlign(),
+      feedReader: this.feedReader(),
+      showImages: this.showImages(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   }
 
-  private applyTheme(): void {
+  private apply(): void {
     const mode = this.themeMode();
     const dark = mode === 'dark' || (mode === 'auto' && (this.darkQuery?.matches ?? false));
     this.resolvedTheme.set(dark ? 'dark' : 'light');
     const root = document.documentElement;
     root.setAttribute('data-theme', dark ? 'dark' : 'light');
     root.setAttribute('data-accent', this.accentId());
+    root.setAttribute('data-feed-reader', this.feedReader() ? 'on' : 'off');
+    root.setAttribute('data-images', this.showImages() ? 'on' : 'off');
+    root.style.setProperty('--reader-font-family', FONT_STACKS[this.readerFontFamily()]);
+    root.style.setProperty('--reader-font-size', `${this.readerFontSize()}px`);
+    root.style.setProperty('--reader-font-weight', `${this.readerFontWeight()}`);
+    root.style.setProperty('--reader-line-height', `${this.readerLineHeight()}`);
+    root.style.setProperty('--reader-letter-spacing', `${this.readerLetterSpacing()}px`);
+    root.style.setProperty('--reader-word-spacing', `${this.readerWordSpacing()}px`);
+    root.style.setProperty('--reader-text-align', this.readerTextAlign());
   }
 }

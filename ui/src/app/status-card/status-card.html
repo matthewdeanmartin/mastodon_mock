@@ -113,18 +113,29 @@
       <div class="quote-card quote-unavailable muted">Quoted post is unavailable.</div>
     }
     @if (display.media_attachments.length) {
-      <div class="media">
-        @for (m of display.media_attachments; track m.id; let i = $index) {
-          <button
-            type="button"
-            class="media-thumb"
-            (click)="openLightbox(i, $event)"
-            [attr.aria-label]="'View image' + (m.description ? ': ' + m.description : '')"
-          >
-            <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
-          </button>
-        }
-      </div>
+      @if (imagesVisible()) {
+        <div class="media">
+          @for (m of display.media_attachments; track m.id; let i = $index) {
+            <button
+              type="button"
+              class="media-thumb"
+              (click)="openLightbox(i, $event)"
+              [attr.aria-label]="'View image' + (m.description ? ': ' + m.description : '')"
+            >
+              <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+            </button>
+          }
+        </div>
+      } @else {
+        <button
+          type="button"
+          class="media-chip"
+          (click)="openLightbox(0, $event)"
+          [attr.aria-label]="display.media_attachments.length + ' hidden images, click to view'"
+        >
+          🖼️ {{ display.media_attachments.length }}
+        </button>
+      }
     }
     <div class="actions">
       <button class="action" [class.on]="replying()" (click)="toggleReply($event)" title="Reply">

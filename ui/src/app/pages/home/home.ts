@@ -2,6 +2,7 @@ import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Status } from '../../models';
+import { CommandBar } from '../../command-bar/command-bar';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
 import { Announcements } from '../../announcements/announcements';
@@ -10,7 +11,7 @@ import { HomeTimelineFeed } from '../../home-timeline-feed';
 
 @Component({
   selector: 'app-home',
-  imports: [Compose, StatusCard, Announcements],
+  imports: [CommandBar, Compose, StatusCard, Announcements],
   templateUrl: './home.html',
 })
 export class Home implements OnInit, OnDestroy {
@@ -40,6 +41,8 @@ export class Home implements OnInit, OnDestroy {
       return;
     }
     this.live.set(true);
+    // Going live starts from a fresh snapshot: refetch, then stream deltas on top.
+    this.load();
     this.liveSub = this.streaming.open({ stream: 'user' }).subscribe(({ event, payload }) => {
       if (event === 'update') {
         this.statuses.update((list) => [payload as Status, ...list]);

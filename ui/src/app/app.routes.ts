@@ -18,6 +18,11 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'home' },
       { path: 'home', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
       {
+        path: 'fail-whale',
+        loadComponent: () =>
+          import('./pages/fail-whale-demo/fail-whale-demo').then((m) => m.FailWhaleDemo),
+      },
+      {
         path: 'public',
         loadComponent: () =>
           import('./pages/public-timeline/public-timeline').then((m) => m.PublicTimeline),
@@ -41,6 +46,11 @@ export const routes: Routes = [
             path: 'profile',
             loadComponent: () =>
               import('./pages/settings/profile/settings-profile').then((m) => m.SettingsProfile),
+          },
+          {
+            path: 'blue',
+            loadComponent: () =>
+              import('./pages/settings/blue/settings-blue').then((m) => m.SettingsBlue),
           },
           {
             path: 'privacy',

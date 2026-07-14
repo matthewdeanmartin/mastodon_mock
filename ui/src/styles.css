@@ -55,6 +55,18 @@
   --accent-soft: color-mix(in srgb, var(--accent) 18%, var(--col-bg));
 }
 
+/* Feed reader mode: every timeline's post text takes the reader typography.
+   The --reader-* variables are set on <html> by ClientPrefs. */
+:root[data-feed-reader='on'] .status .content {
+  font-family: var(--reader-font-family);
+  font-size: var(--reader-font-size);
+  font-weight: var(--reader-font-weight);
+  line-height: var(--reader-line-height);
+  letter-spacing: var(--reader-letter-spacing);
+  word-spacing: var(--reader-word-spacing);
+  text-align: var(--reader-text-align);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -293,6 +305,21 @@ a.tab:hover {
 .accent-swatches {
   display: flex;
   gap: 10px;
+}
+
+/* Label + control on one line, used by the reader-typography settings. */
+.inline-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 420px;
+  font-size: 14px;
+}
+
+.inline-field input[type='range'] {
+  flex: 1;
+  max-width: 200px;
 }
 
 .swatch {

@@ -1,0 +1,197 @@
+<div class="ssection">
+  <div class="srow">
+    <span class="slabel">Theme</span>
+    <div class="scontrol">
+      <label class="radioline">
+        <input
+          type="radio"
+          value="auto"
+          [ngModel]="prefs.themeMode()"
+          (ngModelChange)="prefs.setThemeMode($event)"
+          name="theme"
+        />
+        Automatic
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="light"
+          [ngModel]="prefs.themeMode()"
+          (ngModelChange)="prefs.setThemeMode($event)"
+          name="theme"
+        />
+        Light
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="dark"
+          [ngModel]="prefs.themeMode()"
+          (ngModelChange)="prefs.setThemeMode($event)"
+          name="theme"
+        />
+        Dark
+      </label>
+      <span class="hint">
+        Automatic follows your system preference. Everything on this page applies immediately and is
+        saved in this browser.
+      </span>
+    </div>
+  </div>
+
+  <div class="srow">
+    <span class="slabel">Accent color</span>
+    <div class="scontrol">
+      <div class="accent-swatches">
+        @for (preset of accents; track preset.id) {
+          <button
+            type="button"
+            class="swatch"
+            [class.selected]="prefs.accentId() === preset.id"
+            [style.background]="preset.accent"
+            [title]="preset.label"
+            [attr.aria-label]="'Accent color: ' + preset.label"
+            [attr.aria-pressed]="prefs.accentId() === preset.id"
+            (click)="prefs.setAccent(preset.id)"
+          ></button>
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ssection">
+  <div class="srow">
+    <span class="slabel">Posting</span>
+    <div class="scontrol">
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.undoSend()"
+          (ngModelChange)="prefs.setUndoSend($event)"
+          name="undo_send"
+        />
+        Ask "do you really want to post that?" and wait 30 seconds before posting, so you can cancel
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="ssection">
+  <div class="srow">
+    <span class="slabel">Reader typography</span>
+    <div class="scontrol">
+      <label class="inline-field">
+        Font family
+        <select
+          [ngModel]="prefs.readerFontFamily()"
+          (ngModelChange)="prefs.setReaderFontFamily($event)"
+          name="reader_font_family"
+        >
+          <option value="serif">Serif</option>
+          <option value="sans">Sans-serif</option>
+          <option value="mono">Monospace</option>
+        </select>
+      </label>
+      <label class="inline-field">
+        Font size ({{ prefs.readerFontSize() }}px)
+        <input
+          type="range"
+          min="15"
+          max="24"
+          step="1"
+          [ngModel]="prefs.readerFontSize()"
+          (ngModelChange)="prefs.setReaderFontSize(+$event)"
+          name="reader_font_size"
+        />
+      </label>
+      <label class="inline-field">
+        Font weight
+        <select
+          [ngModel]="prefs.readerFontWeight()"
+          (ngModelChange)="prefs.setReaderFontWeight(+$event)"
+          name="reader_font_weight"
+        >
+          <option [value]="300">Light</option>
+          <option [value]="400">Normal</option>
+          <option [value]="600">Semi-bold</option>
+          <option [value]="700">Bold</option>
+        </select>
+      </label>
+      <label class="inline-field">
+        Line spacing ({{ prefs.readerLineHeight() }})
+        <input
+          type="range"
+          min="1.2"
+          max="2.4"
+          step="0.05"
+          [ngModel]="prefs.readerLineHeight()"
+          (ngModelChange)="prefs.setReaderLineHeight(+$event)"
+          name="reader_line_height"
+        />
+      </label>
+      <label class="inline-field">
+        Letter spacing ({{ prefs.readerLetterSpacing() }}px)
+        <input
+          type="range"
+          min="0"
+          max="3"
+          step="0.25"
+          [ngModel]="prefs.readerLetterSpacing()"
+          (ngModelChange)="prefs.setReaderLetterSpacing(+$event)"
+          name="reader_letter_spacing"
+        />
+      </label>
+      <label class="inline-field">
+        Word spacing ({{ prefs.readerWordSpacing() }}px)
+        <input
+          type="range"
+          min="0"
+          max="8"
+          step="0.5"
+          [ngModel]="prefs.readerWordSpacing()"
+          (ngModelChange)="prefs.setReaderWordSpacing(+$event)"
+          name="reader_word_spacing"
+        />
+      </label>
+      <label class="inline-field">
+        Text alignment
+        <select
+          [ngModel]="prefs.readerTextAlign()"
+          (ngModelChange)="prefs.setReaderTextAlign($event)"
+          name="reader_text_align"
+        >
+          <option value="left">Left</option>
+          <option value="justify">Justified</option>
+        </select>
+      </label>
+      <span class="hint">
+        Applies to reader mode on threads and, when feed reader is on, to every timeline.
+      </span>
+    </div>
+  </div>
+
+  <div class="srow">
+    <span class="slabel">Feed</span>
+    <div class="scontrol">
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.feedReader()"
+          (ngModelChange)="prefs.setFeedReader($event)"
+          name="feed_reader"
+        />
+        Reader mode for feeds (reader typography, no pictures)
+      </label>
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.showImages()"
+          (ngModelChange)="prefs.setShowImages($event)"
+          name="show_images"
+        />
+        Show images in feeds (off replaces pictures with a 🖼️ chip)
+      </label>
+    </div>
+  </div>
+</div>

@@ -153,6 +153,22 @@
   font-style: italic;
 }
 
+/* Placeholder shown instead of pictures when images are off / feed reader is on. */
+.media-chip {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+.media-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -177,9 +193,14 @@
   color: var(--accent);
 }
 
+/* Active state gets a rounded accent box so it's visible without hovering. */
 .action.on {
   color: var(--accent);
   font-weight: 600;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 2px 8px;
 }
 
 /* A short "you did this" label that appears on active boost/favourite. */

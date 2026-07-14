@@ -1,11 +1,7 @@
 <app-announcements />
 <app-compose (posted)="onPosted($event)" />
 
-<div class="live-toggle">
-  <button class="btn btn-outline" [class.active]="live()" (click)="toggleLive()">
-    {{ live() ? '● Live' : 'Go live' }}
-  </button>
-</div>
+<app-command-bar [live]="live()" (toggleLive)="toggleLive()" />
 
 @if (loading()) {
   <p class="muted center">Loading…</p>

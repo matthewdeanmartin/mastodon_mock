@@ -5,12 +5,13 @@ import { filter, map } from 'rxjs';
 import { Api } from '../api';
 import { Auth, Session } from '../auth';
 import { environment } from '../../environments/environment';
+import { AppFooter } from './app-footer/app-footer';
 import { LeftRail } from './left-rail/left-rail';
 import { RightRail } from './right-rail/right-rail';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LeftRail, RightRail],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LeftRail, RightRail, AppFooter],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })

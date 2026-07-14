@@ -75,9 +75,15 @@ describe('Home', () => {
     return fixture;
   }
 
+  /** Toggle live on and flush the fresh-snapshot refetch that going live triggers. */
+  function goLive(fixture: ComponentFixture<Home>): void {
+    internals(fixture).toggleLive();
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([]);
+  }
+
   it('toggleLive() opens a user stream and flips the live flag', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
 
     expect(internals(fixture).live()).toBe(true);
     expect(fakeStreaming.lastKind).toEqual({ stream: 'user' });
@@ -85,7 +91,7 @@ describe('Home', () => {
 
   it('prepends an incoming "update" event to the timeline', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
 
     fakeStreaming.emit({ event: 'update', payload: makeStatus('99') });
 
@@ -98,7 +104,7 @@ describe('Home', () => {
 
   it('removes a status on an incoming "delete" event', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
     fakeStreaming.emit({ event: 'update', payload: makeStatus('1') });
     fakeStreaming.emit({ event: 'update', payload: makeStatus('2') });
 
@@ -113,7 +119,7 @@ describe('Home', () => {
 
   it('toggling live off closes the stream subscription', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
     expect(fakeStreaming.closed).toBe(false);
 
     internals(fixture).toggleLive();
@@ -124,7 +130,7 @@ describe('Home', () => {
 
   it('ignores events once live is toggled off', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+    goLive(fixture);
     internals(fixture).toggleLive();
 
     fakeStreaming.emit({ event: 'update', payload: makeStatus('99') });
