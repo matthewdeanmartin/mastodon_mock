@@ -1,0 +1,98 @@
+<div class="spage-head">
+  <h1>Public profile</h1>
+  <p>How you appear to other people on this server.</p>
+</div>
+
+<form class="spage-body" (ngSubmit)="saveProfile()">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Display name</span>
+      <div class="scontrol">
+        <input
+          type="text"
+          [ngModel]="displayName()"
+          (ngModelChange)="displayName.set($event)"
+          name="display_name"
+          maxlength="30"
+        />
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Bio</span>
+      <div class="scontrol">
+        <textarea
+          rows="3"
+          [ngModel]="note()"
+          (ngModelChange)="note.set($event)"
+          name="note"
+        ></textarea>
+        <span class="hint">Describe yourself. Appears on your public profile.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Profile metadata</span>
+      <div class="scontrol">
+        @for (f of fields(); track $index; let i = $index) {
+          <div class="meta-row">
+            <input
+              type="text"
+              placeholder="Label"
+              [ngModel]="f.name"
+              (ngModelChange)="setField(i, 'name', $event)"
+              [name]="'field_name_' + i"
+            />
+            <input
+              type="text"
+              placeholder="Content"
+              [ngModel]="f.value"
+              (ngModelChange)="setField(i, 'value', $event)"
+              [name]="'field_value_' + i"
+            />
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              (click)="removeField(i)"
+              aria-label="Remove field"
+            >
+              ✕
+            </button>
+          </div>
+        }
+        @if (fields().length < 4) {
+          <button type="button" class="btn btn-outline btn-sm add-field" (click)="addField()">
+            + Add field
+          </button>
+        }
+        <span class="hint">Up to 4 table rows shown on your profile (links, pronouns, ...).</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Avatar</span>
+      <div class="scontrol">
+        <input type="file" accept="image/*" (change)="onAvatar($event)" />
+      </div>
+    </div>
+    <div class="srow">
+      <span class="slabel">Header</span>
+      <div class="scontrol">
+        <input type="file" accept="image/*" (change)="onHeader($event)" />
+      </div>
+    </div>
+  </div>
+
+  <div class="sactions">
+    @if (saved()) {
+      <span class="saved-note">Saved ✓</span>
+    }
+    <button class="btn" type="submit" [disabled]="saving()">
+      {{ saving() ? 'Saving…' : 'Save changes' }}
+    </button>
+  </div>
+</form>

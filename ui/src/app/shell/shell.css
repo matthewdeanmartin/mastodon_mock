@@ -354,6 +354,16 @@
   background: var(--col-bg);
 }
 
+/* Full-width mode (settings): one column, no rails, page-background canvas. */
+.layout.layout-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layout-wide .column {
+  border: 0;
+  background: transparent;
+}
+
 @media (max-width: 1240px) {
   .layout {
     grid-template-columns: 290px minmax(0, var(--col-width));

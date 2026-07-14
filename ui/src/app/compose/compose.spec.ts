@@ -15,7 +15,7 @@ interface ComposeInternals {
   cwOpen: WritableSignal<boolean>;
   spoilerText: WritableSignal<string>;
   sensitive: WritableSignal<boolean>;
-  media: WritableSignal<Array<{ media: { id: string }; description: string }>>;
+  media: WritableSignal<{ media: { id: string }; description: string }[]>;
   pollOpen: WritableSignal<boolean>;
   pollOptions: WritableSignal<string[]>;
   pollMultiple: WritableSignal<boolean>;

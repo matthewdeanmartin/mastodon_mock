@@ -117,7 +117,14 @@ describe('Lists', () => {
     const l2 = makeList('2');
     httpMock.expectOne('/api/v1/lists').flush([l1, l2]);
 
-    const fakeEvent = { stopPropagation: () => {}, preventDefault: () => {} } as unknown as Event;
+    const fakeEvent = {
+      stopPropagation: () => {
+        /* noop */
+      },
+      preventDefault: () => {
+        /* noop */
+      },
+    } as unknown as Event;
     internals(fixture).remove(l1, fakeEvent);
 
     httpMock.expectOne('/api/v1/lists/1').flush({});
@@ -132,7 +139,14 @@ describe('Lists', () => {
     const l3 = makeList('3');
     httpMock.expectOne('/api/v1/lists').flush([l1, l2, l3]);
 
-    const fakeEvent = { stopPropagation: () => {}, preventDefault: () => {} } as unknown as Event;
+    const fakeEvent = {
+      stopPropagation: () => {
+        /* noop */
+      },
+      preventDefault: () => {
+        /* noop */
+      },
+    } as unknown as Event;
     internals(fixture).remove(l2, fakeEvent);
 
     httpMock.expectOne('/api/v1/lists/2').flush({});

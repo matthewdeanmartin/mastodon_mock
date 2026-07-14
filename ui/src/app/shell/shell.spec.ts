@@ -45,7 +45,13 @@ describe('Shell account switching', () => {
     httpMock
       .expectOne('https://mastodon.art/api/v1/accounts/verify_credentials')
       .flush({ id: '1', username: 'arty' } as never);
+    drainRailRequests();
     return fixture;
+  }
+
+  /** The rendered rails fetch trends/instance metadata; account for those requests. */
+  function drainRailRequests() {
+    httpMock.match((r) => r.url.includes('/api/v1/trends/') || r.url.includes('/api/v2/instance'));
   }
 
   it('switching restores the target instance and verifies against it', () => {

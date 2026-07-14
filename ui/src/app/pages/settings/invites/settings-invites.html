@@ -1,0 +1,77 @@
+<div class="spage-head">
+  <h1>Invite people</h1>
+  <p>Generate invite links to share with people you know.</p>
+</div>
+
+<form class="spage-body" (ngSubmit)="generate()">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Max number of uses</span>
+      <div class="scontrol">
+        <select [ngModel]="maxUses()" (ngModelChange)="maxUses.set($event)" name="max_uses">
+          <option [ngValue]="null">No limit</option>
+          <option [ngValue]="1">1 use</option>
+          <option [ngValue]="5">5 uses</option>
+          <option [ngValue]="10">10 uses</option>
+          <option [ngValue]="25">25 uses</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Expire after</span>
+      <div class="scontrol">
+        <select [ngModel]="expiresIn()" (ngModelChange)="expiresIn.set($event)" name="expires_in">
+          <option [ngValue]="null">Never</option>
+          <option [ngValue]="1800">30 minutes</option>
+          <option [ngValue]="3600">1 hour</option>
+          <option [ngValue]="86400">1 day</option>
+          <option [ngValue]="604800">1 week</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="sactions">
+    <button class="btn" type="submit" [disabled]="creating()">
+      {{ creating() ? 'Generating…' : 'Generate invite link' }}
+    </button>
+  </div>
+
+  @if (invites().length) {
+    <div class="invite-table-wrap">
+      <table class="invite-table">
+        <thead>
+          <tr>
+            <th>Link</th>
+            <th>Uses</th>
+            <th>Expires</th>
+            <th>Created</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (invite of invites(); track invite.id) {
+            <tr [class.revoked]="invite.revoked">
+              <td class="invite-url">{{ invite.url }}</td>
+              <td>{{ invite.uses }} / {{ invite.max_uses ?? '∞' }}</td>
+              <td>{{ formatDate(invite.expires_at) }}</td>
+              <td>{{ formatDate(invite.created_at) }}</td>
+              <td>{{ invite.revoked ? 'Revoked' : 'Active' }}</td>
+              <td>
+                @if (!invite.revoked) {
+                  <button type="button" class="btn btn-outline btn-sm" (click)="revoke(invite)">
+                    Revoke
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="hint">No invites yet.</p>
+  }
+</form>

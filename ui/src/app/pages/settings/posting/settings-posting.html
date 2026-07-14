@@ -1,0 +1,59 @@
+<div class="spage-head">
+  <h1>Posting defaults</h1>
+  <p>Defaults applied when you compose new posts.</p>
+</div>
+
+<form class="spage-body" (ngSubmit)="save()">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Posting privacy</span>
+      <div class="scontrol">
+        <select [ngModel]="privacy()" (ngModelChange)="privacy.set($event)" name="privacy">
+          <option value="public">Public</option>
+          <option value="unlisted">Quiet public</option>
+          <option value="private">Followers only</option>
+        </select>
+        <span class="hint">Default visibility for new posts. You can change it per post.</span>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Media</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="sensitive()"
+            (ngModelChange)="sensitive.set($event)"
+            name="sensitive"
+          />
+          Mark media as sensitive by default
+        </label>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Posting language</span>
+      <div class="scontrol">
+        <input
+          type="text"
+          maxlength="2"
+          placeholder="en"
+          [ngModel]="language()"
+          (ngModelChange)="language.set($event)"
+          name="language"
+        />
+        <span class="hint">Two-letter language code (ISO 639-1). Leave empty for no default.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sactions">
+    @if (saved()) {
+      <span class="saved-note">Saved ✓</span>
+    }
+    <button class="btn" type="submit" [disabled]="saving()">
+      {{ saving() ? 'Saving…' : 'Save changes' }}
+    </button>
+  </div>
+</form>

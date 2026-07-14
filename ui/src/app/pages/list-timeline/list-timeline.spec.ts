@@ -50,23 +50,23 @@ function makeList(id: string, title: string): UserList {
   return { id, title };
 }
 
+let httpMock: HttpTestingController;
+
 function setUpWithList(listId: string): ComponentFixture<ListTimeline> {
   TestBed.overrideProvider(ActivatedRoute, {
     useValue: { paramMap: of(convertToParamMap({ id: listId })) },
   });
+  httpMock = TestBed.inject(HttpTestingController);
   const fixture = TestBed.createComponent(ListTimeline);
   fixture.detectChanges();
   return fixture;
 }
 
 describe('ListTimeline', () => {
-  let httpMock: HttpTestingController;
-
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
-    httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {

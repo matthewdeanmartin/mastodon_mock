@@ -1,0 +1,77 @@
+<div class="spage-head">
+  <h1>Account</h1>
+  <p>Your account identity and security settings.</p>
+</div>
+
+<form class="spage-body" (ngSubmit)="changePassword()">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Username</span>
+      <div class="scontrol">
+        <strong>&#64;{{ acct() }}</strong>
+        <span class="hint">Your username is unique on this server and cannot be changed.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Current password</span>
+      <div class="scontrol">
+        <input
+          type="password"
+          autocomplete="current-password"
+          [ngModel]="currentPassword()"
+          (ngModelChange)="currentPassword.set($event)"
+          name="current_password"
+        />
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">New password</span>
+      <div class="scontrol">
+        <input
+          type="password"
+          autocomplete="new-password"
+          [ngModel]="newPassword()"
+          (ngModelChange)="newPassword.set($event)"
+          name="new_password"
+        />
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Confirm new password</span>
+      <div class="scontrol">
+        <input
+          type="password"
+          autocomplete="new-password"
+          [ngModel]="confirmPassword()"
+          (ngModelChange)="confirmPassword.set($event)"
+          name="confirm_password"
+        />
+        @if (passwordError()) {
+          <span class="hint error">{{ passwordError() }}</span>
+        }
+        <span class="hint">Password changes are simulated in this mock — nothing is stored.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Sessions</span>
+      <div class="scontrol">
+        <span class="hint">Session management is not implemented in the mock.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sactions">
+    @if (saved()) {
+      <span class="saved-note">Saved ✓</span>
+    }
+    <button class="btn" type="submit" [disabled]="saving()">Change password</button>
+  </div>
+</form>

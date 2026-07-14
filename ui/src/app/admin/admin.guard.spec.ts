@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, UrlTree } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Api } from '../api';
 import { Auth } from '../auth';
@@ -78,9 +79,9 @@ describe('adminGuard', () => {
     // account() is null — simulate a deep link before the account was loaded
     expect(auth.account()).toBeNull();
 
-    const guardPromise = TestBed.runInInjectionContext(() =>
-      adminGuard({} as any, {} as any),
-    ) as any;
+    const guardPromise = firstValueFrom(
+      TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any)) as any,
+    );
 
     // The guard should issue a verify_credentials request
     const req = httpMock.expectOne('/api/v1/accounts/verify_credentials');
@@ -96,9 +97,9 @@ describe('adminGuard', () => {
     auth.setToken('user-token');
     expect(auth.account()).toBeNull();
 
-    const guardPromise = TestBed.runInInjectionContext(() =>
-      adminGuard({} as any, {} as any),
-    ) as any;
+    const guardPromise = firstValueFrom(
+      TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any)) as any,
+    );
 
     const req = httpMock.expectOne('/api/v1/accounts/verify_credentials');
     req.flush(makeAccount(''));
@@ -112,9 +113,9 @@ describe('adminGuard', () => {
     auth.setToken('stale-token');
     expect(auth.account()).toBeNull();
 
-    const guardPromise = TestBed.runInInjectionContext(() =>
-      adminGuard({} as any, {} as any),
-    ) as any;
+    const guardPromise = firstValueFrom(
+      TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any)) as any,
+    );
 
     const req = httpMock.expectOne('/api/v1/accounts/verify_credentials');
     req.flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });

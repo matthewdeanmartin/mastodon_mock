@@ -1,0 +1,150 @@
+<div class="spage-head">
+  <h1>{{ isNew ? 'Add new filter' : 'Edit filter' }}</h1>
+  <p>Posts matching any keyword are hidden with a warning, or removed entirely.</p>
+</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else {
+  <form class="spage-body" (ngSubmit)="save()">
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">Title</span>
+        <div class="scontrol">
+          <input
+            type="text"
+            [ngModel]="title()"
+            (ngModelChange)="title.set($event)"
+            name="title"
+            placeholder="e.g. Spoilers"
+          />
+        </div>
+      </div>
+
+      <div class="srow">
+        <span class="slabel">Filter contexts</span>
+        <div class="scontrol">
+          @for (opt of contextOptions; track opt.value) {
+            <label class="checkline">
+              <input
+                type="checkbox"
+                [checked]="hasContext(opt.value)"
+                (change)="toggleContext(opt.value, $any($event.target).checked)"
+              />
+              {{ opt.label }}
+            </label>
+          }
+          <span class="hint">Where the filter should apply.</span>
+        </div>
+      </div>
+
+      <div class="srow">
+        <span class="slabel">Filter action</span>
+        <div class="scontrol">
+          <label class="radioline">
+            <input
+              type="radio"
+              name="action"
+              value="warn"
+              [checked]="action() === 'warn'"
+              (change)="action.set('warn')"
+            />
+            Hide with a warning — the post is collapsed behind the filter's title
+          </label>
+          <label class="radioline">
+            <input
+              type="radio"
+              name="action"
+              value="hide"
+              [checked]="action() === 'hide'"
+              (change)="action.set('hide')"
+            />
+            Hide completely — the post disappears as if it didn't exist
+          </label>
+        </div>
+      </div>
+
+      <div class="srow">
+        <span class="slabel">Expire after</span>
+        <div class="scontrol">
+          @if (!isNew) {
+            <label class="checkline">
+              <input
+                type="checkbox"
+                [checked]="keepExpiry()"
+                (change)="keepExpiry.set($any($event.target).checked)"
+              />
+              Keep current expiry ({{
+                currentExpiry() ? (currentExpiry() | date: 'medium') : 'never expires'
+              }})
+            </label>
+          }
+          @if (isNew || !keepExpiry()) {
+            <select
+              name="expires_in"
+              [ngModel]="expiresIn()"
+              (ngModelChange)="expiresIn.set($event)"
+            >
+              @for (opt of expiryOptions; track opt.label) {
+                <option [ngValue]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="ssection">
+      <h2>Keywords or phrases</h2>
+      <div class="kw-table">
+        @for (row of keywords(); track $index; let i = $index) {
+          <div class="kw-row">
+            <input
+              type="text"
+              placeholder="Keyword or phrase"
+              [ngModel]="row.keyword"
+              (ngModelChange)="setKeyword(i, 'keyword', $event)"
+              [name]="'kw_' + i"
+              [disabled]="row.id !== null"
+            />
+            <label class="checkline kw-whole">
+              <input
+                type="checkbox"
+                [checked]="row.whole_word"
+                [disabled]="row.id !== null"
+                (change)="setKeyword(i, 'whole_word', $any($event.target).checked)"
+              />
+              Whole word
+            </label>
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              (click)="removeKeywordRow(i)"
+              aria-label="Remove keyword"
+            >
+              ✕
+            </button>
+          </div>
+        }
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" (click)="addKeywordRow()">
+        + Add keyword
+      </button>
+      <p class="hint">
+        Whole word: "cat" matches only the word cat, not "category". Existing keywords can be
+        removed and re-added to change them.
+      </p>
+    </div>
+
+    @if (error(); as message) {
+      <p class="form-error">{{ message }}</p>
+    }
+
+    <div class="sactions">
+      <a class="btn btn-outline" routerLink="/settings/filters">Cancel</a>
+      <button class="btn" type="submit" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : isNew ? 'Create filter' : 'Save changes' }}
+      </button>
+    </div>
+  </form>
+}

@@ -1,0 +1,55 @@
+<div class="spage-head">
+  <h1>Privacy and reach</h1>
+  <p>Control who can follow you and how your account is discovered.</p>
+</div>
+
+<form class="spage-body" (ngSubmit)="save()">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Reach</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="locked()"
+            (ngModelChange)="locked.set($event)"
+            name="locked"
+          />
+          Require follow requests
+        </label>
+        <span class="hint">Manually approve who can follow you.</span>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="discoverable()"
+            (ngModelChange)="discoverable.set($event)"
+            name="discoverable"
+          />
+          Feature profile and posts in discovery algorithms
+        </label>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Automation</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input type="checkbox" [ngModel]="bot()" (ngModelChange)="bot.set($event)" name="bot" />
+          This is an automated account
+        </label>
+        <span class="hint"
+          >Signals to others that the account mainly performs automated actions.</span
+        >
+      </div>
+    </div>
+  </div>
+
+  <div class="sactions">
+    @if (saved()) {
+      <span class="saved-note">Saved ✓</span>
+    }
+    <button class="btn" type="submit" [disabled]="saving()">
+      {{ saving() ? 'Saving…' : 'Save changes' }}
+    </button>
+  </div>
+</form>

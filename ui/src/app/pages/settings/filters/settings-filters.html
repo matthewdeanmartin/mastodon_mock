@@ -1,0 +1,39 @@
+<div class="spage-head">
+  <h1>Filters</h1>
+  <p>Hide posts containing muted words or phrases, per context. Filters apply to all sessions.</p>
+</div>
+
+<div class="filters-toolbar">
+  <a class="btn" routerLink="/settings/filters/new">+ Add new filter</a>
+</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!filters().length) {
+  <p class="muted center">
+    You have no filters. Add one to hide posts containing certain words or phrases.
+  </p>
+} @else {
+  <ul class="filter-list">
+    @for (f of filters(); track f.id) {
+      <li class="filter-row">
+        <a class="filter-main" [routerLink]="['/settings/filters', f.id]">
+          <span class="filter-title">
+            {{ f.title || '(untitled filter)' }}
+            <span class="filter-action" [class.hide]="f.filter_action === 'hide'">
+              {{ f.filter_action === 'hide' ? 'Hide completely' : 'Hide with a warning' }}
+            </span>
+          </span>
+          <span class="filter-keywords muted">{{ keywordSummary(f) }}</span>
+          <span class="filter-meta muted">
+            {{ f.context.join(', ') || 'no contexts' }} · {{ expirySummary(f) }}
+          </span>
+        </a>
+        <span class="filter-actions">
+          <a class="btn btn-outline btn-sm" [routerLink]="['/settings/filters', f.id]">Edit</a>
+          <button class="btn btn-outline btn-sm danger" (click)="remove(f)">Delete</button>
+        </span>
+      </li>
+    }
+  </ul>
+}

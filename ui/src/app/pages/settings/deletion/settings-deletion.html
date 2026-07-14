@@ -1,0 +1,118 @@
+<div class="spage-head">
+  <h1>Automatic post deletion</h1>
+  <p>Automatically delete your posts once they reach a specified age, with exceptions.</p>
+</div>
+
+<form class="spage-body" (ngSubmit)="save()">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Deletion</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="enabled()"
+            (ngModelChange)="enabled.set($event)"
+            name="enabled"
+          />
+          Automatically delete old posts
+        </label>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Age threshold (days)</span>
+      <div class="scontrol">
+        <input
+          type="number"
+          min="1"
+          [ngModel]="minAgeDays()"
+          (ngModelChange)="minAgeDays.set($event)"
+          name="min_age_days"
+        />
+        <span class="hint">Posts older than this many days become eligible for deletion.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Exceptions</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="keepPinned()"
+            (ngModelChange)="keepPinned.set($event)"
+            name="keep_pinned"
+          />
+          Keep pinned posts
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="keepFavourited()"
+            (ngModelChange)="keepFavourited.set($event)"
+            name="keep_favourited"
+          />
+          Keep posts you favourited
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="keepMedia()"
+            (ngModelChange)="keepMedia.set($event)"
+            name="keep_media"
+          />
+          Keep posts with media
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="keepPolls()"
+            (ngModelChange)="keepPolls.set($event)"
+            name="keep_polls"
+          />
+          Keep posts with polls
+        </label>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Keep posts with at least this many favourites</span>
+      <div class="scontrol">
+        <input
+          type="number"
+          min="0"
+          [ngModel]="minFavourites()"
+          (ngModelChange)="minFavourites.set($event)"
+          name="min_favourites"
+        />
+        <span class="hint">0 = no threshold.</span>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Keep posts with at least this many boosts</span>
+      <div class="scontrol">
+        <input
+          type="number"
+          min="0"
+          [ngModel]="minReblogs()"
+          (ngModelChange)="minReblogs.set($event)"
+          name="min_reblogs"
+        />
+        <span class="hint">0 = no threshold.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sactions">
+    @if (saved()) {
+      <span class="saved-note">Saved ✓</span>
+    }
+    <button class="btn" type="submit" [disabled]="saving()">
+      {{ saving() ? 'Saving…' : 'Save changes' }}
+    </button>
+  </div>
+</form>

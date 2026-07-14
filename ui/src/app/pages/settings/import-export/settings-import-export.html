@@ -1,0 +1,82 @@
+<div class="spage-head">
+  <h1>Import and export</h1>
+  <p>Move your social graph in and out of this server as CSV files.</p>
+</div>
+
+<div class="spage-body">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Follows</span>
+      <div class="scontrol">
+        <button type="button" class="btn btn-outline btn-sm" (click)="download('following')">
+          Download CSV
+        </button>
+      </div>
+    </div>
+    <div class="srow">
+      <span class="slabel">Mutes</span>
+      <div class="scontrol">
+        <button type="button" class="btn btn-outline btn-sm" (click)="download('mutes')">
+          Download CSV
+        </button>
+      </div>
+    </div>
+    <div class="srow">
+      <span class="slabel">Blocks</span>
+      <div class="scontrol">
+        <button type="button" class="btn btn-outline btn-sm" (click)="download('blocks')">
+          Download CSV
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Import type</span>
+      <div class="scontrol">
+        <select
+          [ngModel]="importKind()"
+          (ngModelChange)="importKind.set($event)"
+          name="import_kind"
+        >
+          <option value="following">Following list</option>
+          <option value="mutes">Muting list</option>
+          <option value="blocks">Blocking list</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Data</span>
+      <div class="scontrol">
+        <input type="file" accept=".csv" (change)="onFile($event)" />
+        <textarea
+          rows="4"
+          placeholder="…or paste CSV here"
+          [ngModel]="csvText()"
+          (ngModelChange)="csvText.set($event)"
+          name="csv_text"
+        ></textarea>
+        <span class="hint">One handle per line, e.g. user&#64;example.com.</span>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel"></span>
+      <div class="scontrol">
+        <button type="button" class="btn" (click)="upload()" [disabled]="uploading()">
+          {{ uploading() ? 'Uploading…' : 'Upload' }}
+        </button>
+        @if (report(); as r) {
+          <span class="hint">
+            Imported {{ r.imported }}.
+            @if (r.skipped.length) {
+              Skipped: {{ r.skipped.join(', ') }}
+            }
+          </span>
+        }
+      </div>
+    </div>
+  </div>
+</div>

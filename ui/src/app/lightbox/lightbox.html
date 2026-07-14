@@ -10,7 +10,12 @@
   <button class="lightbox-close" type="button" (click)="close()" aria-label="Close">✕</button>
 
   @if (hasMultiple()) {
-    <button class="lightbox-nav prev" type="button" (click)="prev($event)" aria-label="Previous image">
+    <button
+      class="lightbox-nav prev"
+      type="button"
+      (click)="prev($event)"
+      aria-label="Previous image"
+    >
       ‹
     </button>
   }

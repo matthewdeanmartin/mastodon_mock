@@ -34,7 +34,108 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
-        loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings),
+        loadComponent: () => import('./pages/settings/settings-shell').then((m) => m.SettingsShell),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'profile' },
+          {
+            path: 'profile',
+            loadComponent: () =>
+              import('./pages/settings/profile/settings-profile').then((m) => m.SettingsProfile),
+          },
+          {
+            path: 'privacy',
+            loadComponent: () =>
+              import('./pages/settings/privacy/settings-privacy').then((m) => m.SettingsPrivacy),
+          },
+          {
+            path: 'appearance',
+            loadComponent: () =>
+              import('./pages/settings/appearance/settings-appearance').then(
+                (m) => m.SettingsAppearance,
+              ),
+          },
+          {
+            path: 'posting',
+            loadComponent: () =>
+              import('./pages/settings/posting/settings-posting').then((m) => m.SettingsPosting),
+          },
+          {
+            path: 'notifications',
+            loadComponent: () =>
+              import('./pages/settings/notifications/settings-notifications').then(
+                (m) => m.SettingsNotifications,
+              ),
+          },
+          {
+            path: 'follows',
+            loadComponent: () =>
+              import('./pages/settings/follows/settings-follows').then((m) => m.SettingsFollows),
+          },
+          {
+            path: 'mutes',
+            data: { kind: 'mutes' },
+            loadComponent: () =>
+              import('./pages/settings/account-list/settings-account-list').then(
+                (m) => m.SettingsAccountList,
+              ),
+          },
+          {
+            path: 'blocks',
+            data: { kind: 'blocks' },
+            loadComponent: () =>
+              import('./pages/settings/account-list/settings-account-list').then(
+                (m) => m.SettingsAccountList,
+              ),
+          },
+          {
+            path: 'filters',
+            loadComponent: () =>
+              import('./pages/settings/filters/settings-filters').then((m) => m.SettingsFilters),
+          },
+          {
+            path: 'filters/new',
+            loadComponent: () =>
+              import('./pages/settings/filters/settings-filter-edit').then(
+                (m) => m.SettingsFilterEdit,
+              ),
+          },
+          {
+            path: 'filters/:id',
+            loadComponent: () =>
+              import('./pages/settings/filters/settings-filter-edit').then(
+                (m) => m.SettingsFilterEdit,
+              ),
+          },
+          {
+            path: 'deletion',
+            loadComponent: () =>
+              import('./pages/settings/deletion/settings-deletion').then((m) => m.SettingsDeletion),
+          },
+          {
+            path: 'account',
+            loadComponent: () =>
+              import('./pages/settings/account/settings-account').then((m) => m.SettingsAccount),
+          },
+          {
+            path: 'import-export',
+            loadComponent: () =>
+              import('./pages/settings/import-export/settings-import-export').then(
+                (m) => m.SettingsImportExport,
+              ),
+          },
+          {
+            path: 'invites',
+            loadComponent: () =>
+              import('./pages/settings/invites/settings-invites').then((m) => m.SettingsInvites),
+          },
+          {
+            path: 'development',
+            loadComponent: () =>
+              import('./pages/settings/development/settings-development').then(
+                (m) => m.SettingsDevelopment,
+              ),
+          },
+        ],
       },
       ...mockOnlyChildren,
       {

@@ -1,0 +1,36 @@
+<div class="spage-head">
+  <h1>Development</h1>
+  <p>Applications with access to your account.</p>
+</div>
+
+<div class="spage-body">
+  <div class="ssection">
+    @if (!loading() && !apps().length) {
+      <p class="hint">No applications have been authorized for this account.</p>
+    }
+    @for (app of apps(); track app.id) {
+      <div class="srow">
+        <span class="slabel"
+          ><strong>{{ app.name }}</strong></span
+        >
+        <div class="scontrol">
+          @if (app.website) {
+            <a [href]="app.website" target="_blank" rel="noopener">{{ app.website }}</a>
+          }
+          <div class="scope-chips">
+            @for (scope of app.scopes; track scope) {
+              <code>{{ scope }}</code>
+            }
+          </div>
+          <span class="hint">Last used: {{ formatDate(app.last_used_at) }}</span>
+        </div>
+      </div>
+    }
+    <div class="srow">
+      <span class="slabel"></span>
+      <div class="scontrol">
+        <span class="hint">New applications register themselves via POST /api/v1/apps.</span>
+      </div>
+    </div>
+  </div>
+</div>

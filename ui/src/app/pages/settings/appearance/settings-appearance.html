@@ -1,0 +1,110 @@
+<div class="spage-head">
+  <h1>Appearance</h1>
+  <p>Adjust how the web interface looks and behaves.</p>
+</div>
+
+<form class="spage-body" (ngSubmit)="save()">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Theme</span>
+      <div class="scontrol">
+        <label class="radioline">
+          <input
+            type="radio"
+            value="auto"
+            [ngModel]="theme()"
+            (ngModelChange)="theme.set($event)"
+            name="theme"
+          />
+          Automatic
+        </label>
+        <label class="radioline">
+          <input
+            type="radio"
+            value="light"
+            [ngModel]="theme()"
+            (ngModelChange)="theme.set($event)"
+            name="theme"
+          />
+          Light
+        </label>
+        <label class="radioline">
+          <input
+            type="radio"
+            value="dark"
+            [ngModel]="theme()"
+            (ngModelChange)="theme.set($event)"
+            name="theme"
+          />
+          Dark
+        </label>
+        <span class="hint">Automatic follows your system preference.</span>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Media display</span>
+      <div class="scontrol">
+        <select
+          [ngModel]="displayMedia()"
+          (ngModelChange)="displayMedia.set($event)"
+          name="display_media"
+        >
+          <option value="default">Hide media marked as sensitive</option>
+          <option value="show_all">Always show media</option>
+          <option value="hide_all">Always hide media</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Animations</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="reduceMotion()"
+            (ngModelChange)="reduceMotion.set($event)"
+            name="reduce_motion"
+          />
+          Reduce motion in animations
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="disableSwiping()"
+            (ngModelChange)="disableSwiping.set($event)"
+            name="disable_swiping"
+          />
+          Disable swiping motions
+        </label>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Content warnings</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="expandSpoilers()"
+            (ngModelChange)="expandSpoilers.set($event)"
+            name="expand_spoilers"
+          />
+          Always expand posts marked with content warnings
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="sactions">
+    @if (saved()) {
+      <span class="saved-note">Saved ✓</span>
+    }
+    <button class="btn" type="submit" [disabled]="saving()">
+      {{ saving() ? 'Saving…' : 'Save changes' }}
+    </button>
+  </div>
+</form>

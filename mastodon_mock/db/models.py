@@ -664,3 +664,33 @@ class TrendReview(Base):
     updated_by_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"))
 
     __table_args__ = (UniqueConstraint("kind", "key", name="uq_trend_review_kind_key"),)
+
+
+class AccountSettings(Base):
+    """Per-account web-settings blob (mock-only; backs ``/api/v1/_mock/settings``).
+
+    Real Mastodon keeps these web-UI settings (appearance, email notifications,
+    automated post deletion, ...) server-side but exposes no public API for them,
+    so the mock stores them as one JSON document per account.
+    """
+
+    __tablename__ = "account_settings"
+
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), primary_key=True)
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Invite(Base):
+    """An invite link owned by an account (mock-only; backs ``/api/v1/_mock/invites``)."""
+
+    __tablename__ = "invites"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), index=True)
+    code: Mapped[str] = mapped_column(String, unique=True)
+    max_uses: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uses: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)

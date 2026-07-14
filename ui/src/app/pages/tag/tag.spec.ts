@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Signal, WritableSignal } from '@angular/core';
+import { WritableSignal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -59,23 +59,23 @@ function makeTagEntity(name: string, overrides: Partial<TagEntity> = {}): TagEnt
   };
 }
 
+let httpMock: HttpTestingController;
+
 function setUpWithTag(tagName: string): ComponentFixture<Tag> {
   TestBed.overrideProvider(ActivatedRoute, {
     useValue: { paramMap: of(convertToParamMap({ tag: tagName })) },
   });
+  httpMock = TestBed.inject(HttpTestingController);
   const fixture = TestBed.createComponent(Tag);
   fixture.detectChanges();
   return fixture;
 }
 
 describe('Tag (timeline)', () => {
-  let httpMock: HttpTestingController;
-
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
-    httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {

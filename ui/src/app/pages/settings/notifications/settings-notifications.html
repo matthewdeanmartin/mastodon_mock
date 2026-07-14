@@ -1,0 +1,93 @@
+<div class="spage-head">
+  <h1>Email notifications</h1>
+  <p>Choose which events send you an e-mail.</p>
+</div>
+
+<form class="spage-body" (ngSubmit)="save()">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Events</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="follow()"
+            (ngModelChange)="follow.set($event)"
+            name="follow"
+          />
+          Someone followed you
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="followRequest()"
+            (ngModelChange)="followRequest.set($event)"
+            name="follow_request"
+          />
+          Someone requested to follow you
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="reblog()"
+            (ngModelChange)="reblog.set($event)"
+            name="reblog"
+          />
+          Someone boosted your post
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="favourite()"
+            (ngModelChange)="favourite.set($event)"
+            name="favourite"
+          />
+          Someone favourited your post
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="mention()"
+            (ngModelChange)="mention.set($event)"
+            name="mention"
+          />
+          Someone mentioned you
+        </label>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="report()"
+            (ngModelChange)="report.set($event)"
+            name="report"
+          />
+          A new report is submitted
+        </label>
+        <span class="hint">Moderators only.</span>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Digest</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="digest()"
+            (ngModelChange)="digest.set($event)"
+            name="digest"
+          />
+          Send digest e-mails of missed activity
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="sactions">
+    @if (saved()) {
+      <span class="saved-note">Saved ✓</span>
+    }
+    <button class="btn" type="submit" [disabled]="saving()">
+      {{ saving() ? 'Saving…' : 'Save changes' }}
+    </button>
+  </div>
+</form>

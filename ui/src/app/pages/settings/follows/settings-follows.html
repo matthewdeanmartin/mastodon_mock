@@ -1,0 +1,28 @@
+<div class="spage-head">
+  <h1>Follows and followers</h1>
+  <p>Pending follow requests. Requests only appear when your account requires follow approval.</p>
+</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!requests().length) {
+  <p class="muted center">No pending follow requests.</p>
+} @else {
+  <ul class="account-list">
+    @for (a of requests(); track a.id) {
+      <li class="account-row">
+        <a class="account-link" [routerLink]="['/accounts', a.id]">
+          <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+          <span class="names">
+            <span class="name">{{ a.display_name || a.username }}</span>
+            <span class="acct muted">&#64;{{ a.acct }}</span>
+          </span>
+        </a>
+        <span class="req-actions">
+          <button class="btn btn-sm" (click)="authorize(a)">Accept</button>
+          <button class="btn btn-outline btn-sm" (click)="reject(a)">Reject</button>
+        </span>
+      </li>
+    }
+  </ul>
+}

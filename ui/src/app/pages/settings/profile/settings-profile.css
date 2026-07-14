@@ -1,0 +1,18 @@
+.meta-row {
+  display: flex;
+  gap: 6px;
+}
+
+.meta-row input {
+  flex: 1;
+  max-width: none;
+}
+
+.add-field {
+  align-self: flex-start;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 0.85em;
+}

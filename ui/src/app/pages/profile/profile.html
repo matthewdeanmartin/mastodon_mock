@@ -70,12 +70,19 @@
     <app-list-dialog [username]="a.username" [accountId]="a.id" (closed)="showLists.set(false)" />
   }
   @if (showBlockConfirm()) {
-    <div class="confirm-overlay" (click)="showBlockConfirm.set(false)">
+    <div
+      class="confirm-overlay"
+      role="presentation"
+      tabindex="-1"
+      (click)="showBlockConfirm.set(false)"
+      (keyup.escape)="showBlockConfirm.set(false)"
+    >
       <div
         class="confirm-dialog"
         role="alertdialog"
         aria-labelledby="block-title"
         (click)="$event.stopPropagation()"
+        (keyup)="$event.stopPropagation()"
       >
         <h3 id="block-title">Block &#64;{{ a.acct }}?</h3>
         <p>

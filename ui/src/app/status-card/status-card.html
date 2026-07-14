@@ -34,7 +34,11 @@
         </div>
       </div>
     } @else {
-      <a class="content-link" [routerLink]="['/statuses', display.id]" (click)="onContentClick($event)">
+      <a
+        class="content-link"
+        [routerLink]="['/statuses', display.id]"
+        (click)="onContentClick($event)"
+      >
         @if (translation(); as t) {
           @if (t.spoiler_text) {
             <div class="spoiler">{{ t.spoiler_text }}</div>
@@ -132,7 +136,8 @@
         [title]="display.reblogged ? 'Undo boost' : 'Boost'"
         [attr.aria-pressed]="display.reblogged"
       >
-        🔁 @if (display.reblogged) {
+        🔁
+        @if (display.reblogged) {
           <span class="did">Boosted</span>
         }
       </button>
@@ -153,7 +158,8 @@
         [title]="display.favourited ? 'Undo favourite' : 'Favourite'"
         [attr.aria-pressed]="display.favourited"
       >
-        ⭐ @if (display.favourited) {
+        ⭐
+        @if (display.favourited) {
           <span class="did">Favourited</span>
         }
       </button>

@@ -43,6 +43,7 @@ from mastodon_mock.routers import (
     streaming,
     tags,
     timelines,
+    user_settings,
 )
 from mastodon_mock.streaming import EventBus
 from mastodon_mock.ui import mount_ui
@@ -78,6 +79,7 @@ OPENAPI_TAGS = [
     {"name": "tags", "description": "Hashtag follow/feature endpoints."},
     {"name": "streaming", "description": "Streaming API (server-sent events / websocket)."},
     {"name": "misc", "description": "Static-shape stubs for rarely-used upstream endpoints."},
+    {"name": "mock settings", "description": "Mock-only web-settings endpoints (no upstream API equivalent)."},
 ]
 
 
@@ -196,6 +198,7 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
         tags,
         streaming,
         misc,
+        user_settings,
     ):
         app.include_router(module.router)
 

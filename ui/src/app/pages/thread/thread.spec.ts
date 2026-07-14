@@ -51,23 +51,23 @@ function makeContext(ancestors: Status[] = [], descendants: Status[] = []): Cont
   return { ancestors, descendants };
 }
 
+let httpMock: HttpTestingController;
+
 function setUpWithId(statusId: string): ComponentFixture<Thread> {
   TestBed.overrideProvider(ActivatedRoute, {
     useValue: { paramMap: of(convertToParamMap({ id: statusId })) },
   });
+  httpMock = TestBed.inject(HttpTestingController);
   const fixture = TestBed.createComponent(Thread);
   fixture.detectChanges();
   return fixture;
 }
 
 describe('Thread', () => {
-  let httpMock: HttpTestingController;
-
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
-    httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {

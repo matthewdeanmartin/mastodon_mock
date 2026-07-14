@@ -4,19 +4,29 @@ import { Observable } from 'rxjs';
 import {
   Account,
   Announcement,
+  AuthorizedApp,
   ComposeOptions,
+  ContentFilter,
   Context,
   Conversation,
   CustomEmoji,
   FeaturedTag,
+  FilterAction,
+  FilterContext,
+  FilterKeyword,
+  FilterKeywordDraft,
+  ImportReport,
   InstanceInfo,
   InstanceRule,
+  Invite,
   TrendLink,
   MastodonNotification,
   MediaAttachment,
+  MockSettings,
   OAuthApp,
   OAuthTokenResponse,
   Poll,
+  Preferences,
   Relationship,
   SearchResults,
   Status,
@@ -487,6 +497,97 @@ export class Api {
       .set('redirect_uri', params.redirectUri)
       .set('code', params.code);
     return this.http.post<OAuthTokenResponse>('/oauth/token', body);
+  }
+
+  // --- preferences ---
+  preferences(): Observable<Preferences> {
+    return this.http.get<Preferences>('/api/v1/preferences');
+  }
+
+  // --- filters (v2) ---
+  filters(): Observable<ContentFilter[]> {
+    return this.http.get<ContentFilter[]>('/api/v2/filters');
+  }
+
+  getFilter(id: string): Observable<ContentFilter> {
+    return this.http.get<ContentFilter>(`/api/v2/filters/${id}`);
+  }
+
+  createFilter(draft: {
+    title: string;
+    context: FilterContext[];
+    filter_action: FilterAction;
+    expires_in?: number | null;
+    keywords_attributes?: FilterKeywordDraft[];
+  }): Observable<ContentFilter> {
+    return this.http.post<ContentFilter>('/api/v2/filters', draft);
+  }
+
+  updateFilter(
+    id: string,
+    changes: {
+      title?: string;
+      context?: FilterContext[];
+      filter_action?: FilterAction;
+      expires_in?: number | null;
+    },
+  ): Observable<ContentFilter> {
+    return this.http.put<ContentFilter>(`/api/v2/filters/${id}`, changes);
+  }
+
+  deleteFilter(id: string): Observable<unknown> {
+    return this.http.delete(`/api/v2/filters/${id}`);
+  }
+
+  addFilterKeyword(
+    filterId: string,
+    keyword: string,
+    wholeWord: boolean,
+  ): Observable<FilterKeyword> {
+    return this.http.post<FilterKeyword>(`/api/v2/filters/${filterId}/keywords`, {
+      keyword,
+      whole_word: wholeWord,
+    });
+  }
+
+  deleteFilterKeyword(keywordId: string): Observable<unknown> {
+    return this.http.delete(`/api/v2/filters/keywords/${keywordId}`);
+  }
+
+  // --- mock-only settings (`/api/v1/_mock/...`; no upstream API equivalent) ---
+  mockSettings(): Observable<MockSettings> {
+    return this.http.get<MockSettings>('/api/v1/_mock/settings');
+  }
+
+  updateMockSettings(changes: Partial<MockSettings>): Observable<MockSettings> {
+    return this.http.put<MockSettings>('/api/v1/_mock/settings', changes);
+  }
+
+  invites(): Observable<Invite[]> {
+    return this.http.get<Invite[]>('/api/v1/_mock/invites');
+  }
+
+  createInvite(draft: {
+    max_uses?: number | null;
+    expires_in?: number | null;
+  }): Observable<Invite> {
+    return this.http.post<Invite>('/api/v1/_mock/invites', draft);
+  }
+
+  revokeInvite(id: string): Observable<Invite> {
+    return this.http.delete<Invite>(`/api/v1/_mock/invites/${id}`);
+  }
+
+  authorizedApps(): Observable<AuthorizedApp[]> {
+    return this.http.get<AuthorizedApp[]>('/api/v1/_mock/apps');
+  }
+
+  exportCsv(kind: 'following' | 'mutes' | 'blocks'): Observable<string> {
+    return this.http.get(`/api/v1/_mock/export/${kind}`, { responseType: 'text' });
+  }
+
+  importCsv(kind: 'following' | 'mutes' | 'blocks', csv: string): Observable<ImportReport> {
+    return this.http.post<ImportReport>('/api/v1/_mock/import', { type: kind, csv });
   }
 
   private pageParams(maxId?: string): HttpParams {

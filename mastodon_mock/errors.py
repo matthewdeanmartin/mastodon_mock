@@ -55,9 +55,7 @@ def _validation_details(exc: RequestValidationError) -> dict[str, list[dict[str,
     details: dict[str, list[dict[str, str]]] = {}
     for err in exc.errors():
         code = "ERR_BLANK" if err.get("type") == "missing" else "ERR_INVALID"
-        details.setdefault(_field_of(err), []).append(
-            {"error": code, "description": err.get("msg", "is invalid")}
-        )
+        details.setdefault(_field_of(err), []).append({"error": code, "description": err.get("msg", "is invalid")})
     return details
 
 

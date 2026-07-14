@@ -38,6 +38,7 @@ export interface Account {
   statuses_count: number;
   bot: boolean;
   locked: boolean;
+  discoverable?: boolean | null;
   fields: AccountField[];
   // Present on verify_credentials (CredentialAccount): the current user's role, or null.
   role?: Role | null;
@@ -451,4 +452,108 @@ export interface OAuthTokenResponse {
   token_type: string;
   scope: string;
   created_at: number;
+}
+
+// --- Filters (v2) ---
+
+export interface FilterKeyword {
+  id: string;
+  keyword: string;
+  whole_word: boolean;
+}
+
+export interface FilterStatus {
+  id: string;
+  status_id: string;
+}
+
+export type FilterContext = 'home' | 'notifications' | 'public' | 'thread' | 'account';
+export type FilterAction = 'warn' | 'hide';
+
+export interface ContentFilter {
+  id: string;
+  title: string;
+  context: FilterContext[];
+  expires_at: string | null;
+  filter_action: FilterAction;
+  keywords: FilterKeyword[];
+  statuses: FilterStatus[];
+}
+
+/** Draft keyword rows sent as `keywords_attributes` when creating a filter. */
+export interface FilterKeywordDraft {
+  keyword: string;
+  whole_word: boolean;
+}
+
+// --- Preferences (`/api/v1/preferences`, read-only) ---
+
+export interface Preferences {
+  'posting:default:visibility': string;
+  'posting:default:sensitive': boolean;
+  'posting:default:language': string | null;
+  'reading:expand:media': string;
+  'reading:expand:spoilers': boolean;
+}
+
+// --- Mock-only settings (`/api/v1/_mock/settings` and friends) ---
+
+export interface AppearanceSettings {
+  theme: 'auto' | 'light' | 'dark';
+  reduce_motion: boolean;
+  disable_swiping: boolean;
+  expand_spoilers: boolean;
+  display_media: 'default' | 'show_all' | 'hide_all';
+}
+
+export interface EmailNotificationSettings {
+  follow: boolean;
+  follow_request: boolean;
+  reblog: boolean;
+  favourite: boolean;
+  mention: boolean;
+  report: boolean;
+  digest: boolean;
+}
+
+export interface PostDeletionSettings {
+  enabled: boolean;
+  min_age_days: number;
+  keep_pinned: boolean;
+  keep_favourited: boolean;
+  keep_media: boolean;
+  keep_polls: boolean;
+  min_favourites: number;
+  min_reblogs: number;
+}
+
+export interface MockSettings {
+  appearance: AppearanceSettings;
+  email_notifications: EmailNotificationSettings;
+  post_deletion: PostDeletionSettings;
+}
+
+export interface Invite {
+  id: string;
+  code: string;
+  url: string;
+  max_uses: number | null;
+  uses: number;
+  expires_at: string | null;
+  created_at: string;
+  revoked: boolean;
+}
+
+export interface AuthorizedApp {
+  id: string;
+  name: string;
+  website: string | null;
+  scopes: string[];
+  last_used_at: string | null;
+}
+
+export interface ImportReport {
+  type: string;
+  imported: number;
+  skipped: string[];
 }

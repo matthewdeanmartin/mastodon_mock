@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Signal, WritableSignal } from '@angular/core';
+import { WritableSignal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Announcement, AnnouncementReaction } from '../models';
 import { Announcements } from './announcements';

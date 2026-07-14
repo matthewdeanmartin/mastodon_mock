@@ -119,16 +119,20 @@
   </div>
 </header>
 
-<div class="layout">
-  <aside class="rail rail-left">
-    <app-left-rail />
-  </aside>
+<div class="layout" [class.layout-wide]="wide()">
+  @if (!wide()) {
+    <aside class="rail rail-left">
+      <app-left-rail />
+    </aside>
+  }
   <main class="column">
     <router-outlet />
   </main>
-  <aside class="rail rail-right">
-    <app-right-rail />
-  </aside>
+  @if (!wide()) {
+    <aside class="rail rail-right">
+      <app-right-rail />
+    </aside>
+  }
 </div>
 
 @if (toast(); as message) {

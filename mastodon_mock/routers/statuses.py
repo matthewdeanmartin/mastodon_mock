@@ -34,8 +34,8 @@ from mastodon_mock.routers.helpers import (
     array_query,
     read_body,
     set_link_header,
-    validation_error as _validation_error,
 )
+from mastodon_mock.routers.helpers import validation_error as _validation_error
 from mastodon_mock.serializers.accounts import serialize_account
 from mastodon_mock.serializers.common import iso
 from mastodon_mock.serializers.instance import MAX_MEDIA_ATTACHMENTS, MAX_STATUS_CHARACTERS

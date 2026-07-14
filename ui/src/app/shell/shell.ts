@@ -1,5 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { Api } from '../api';
 import { Auth, Session } from '../auth';
 import { environment } from '../../environments/environment';
@@ -26,6 +28,15 @@ export class Shell implements OnInit {
     const role = this.auth.account()?.role;
     return !!role && role.name !== '';
   });
+
+  /** Settings takes the full width below the top bar (no rails), like 2018 Twitter. */
+  protected wide = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.router.url.startsWith('/settings')),
+    ),
+    { initialValue: this.router.url.startsWith('/settings') },
+  );
 
   /** Transient, non-blocking message (e.g. a failed account switch). null = hidden. */
   protected toast = signal<string | null>(null);

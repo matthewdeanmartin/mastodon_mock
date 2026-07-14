@@ -27,9 +27,7 @@ describe('healthInterceptor', () => {
 
   it('marks the server down on a network error (status 0)', () => {
     http.get('/api/v1/timelines/home').subscribe({ error: () => undefined });
-    httpMock
-      .expectOne('/api/v1/timelines/home')
-      .error(new ProgressEvent('error'), { status: 0 });
+    httpMock.expectOne('/api/v1/timelines/home').error(new ProgressEvent('error'), { status: 0 });
     expect(health.down()).toBe(true);
   });
 
@@ -82,7 +80,9 @@ describe('healthInterceptor', () => {
     expect(health.down()).toBe(true);
 
     http.get('/api/v1/statuses/nope').subscribe({ error: () => undefined });
-    httpMock.expectOne('/api/v1/statuses/nope').flush('nf', { status: 404, statusText: 'Not Found' });
+    httpMock
+      .expectOne('/api/v1/statuses/nope')
+      .flush('nf', { status: 404, statusText: 'Not Found' });
     expect(health.down()).toBe(false);
   });
 });
