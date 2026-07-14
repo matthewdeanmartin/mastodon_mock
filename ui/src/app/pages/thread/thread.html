@@ -1,24 +1,29 @@
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (status(); as s) {
-  @if (readerAvailable()) {
-    <div class="reader-bar">
-      @if (readerMode()) {
-        <div class="reader-font">
-          <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(-1)" title="Smaller text">
-            A−
-          </button>
-          <span class="muted">{{ prefs.readerFontSize() }}px</span>
-          <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(1)" title="Larger text">
-            A+
-          </button>
-        </div>
-      }
-      <button class="btn btn-outline" [class.active]="readerMode()" (click)="toggleReader()">
-        📖 {{ readerMode() ? 'Exit reader' : 'Reader' }}
-      </button>
-    </div>
-  }
+  <div class="reader-bar">
+    @if (readerMode()) {
+      <div class="reader-font">
+        <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(-1)" title="Smaller text">
+          A−
+        </button>
+        <span class="muted">{{ prefs.readerFontSize() }}px</span>
+        <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(1)" title="Larger text">
+          A+
+        </button>
+      </div>
+    }
+    <button class="btn btn-outline" [class.active]="readerMode()" (click)="toggleReader()">
+      📖
+      {{
+        readerMode()
+          ? 'Exit reader'
+          : chain().length > 1
+            ? 'Reader (' + chain().length + ' posts)'
+            : 'Reader'
+      }}
+    </button>
+  </div>
 
   @if (readerMode()) {
     <article class="reader" [style.font-size.px]="prefs.readerFontSize()">

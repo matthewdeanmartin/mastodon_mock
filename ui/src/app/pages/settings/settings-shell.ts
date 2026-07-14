@@ -29,7 +29,9 @@ export class SettingsShell {
   protected readonly nav: SettingsNavItem[] = [
     { label: 'Public profile', path: 'profile', exact: true },
     { label: 'Privacy and reach', path: 'privacy', exact: true },
-    { label: 'Appearance', path: 'appearance', exact: true, mockOnly: true },
+    // Appearance is client-side (theme/accent/undo-send in localStorage) and works
+    // against any instance; the page hides its server-backed rows off-mock itself.
+    { label: 'Appearance', path: 'appearance', exact: true },
     { label: 'Posting defaults', path: 'posting', exact: true },
     { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
     { label: 'Follows and followers', path: 'follows', exact: true },

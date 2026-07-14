@@ -44,6 +44,14 @@ describe('readerChain', () => {
     expect(readerChain([p1, other, aside]).map((s) => s.id)).toEqual(['1']);
   });
 
+  it('handles storms where every self-reply points at the root', () => {
+    const p1 = makeStatus('1', 'a');
+    const p2 = makeStatus('2', 'a', '1');
+    const p3 = makeStatus('3', 'a', '1');
+    const p4 = makeStatus('4', 'a', '1');
+    expect(readerChain([p1, p2, p3, p4]).map((s) => s.id)).toEqual(['1', '2', '3', '4']);
+  });
+
   it('stops when a different account continues the thread', () => {
     const p1 = makeStatus('1', 'a');
     const p2 = makeStatus('2', 'a', '1');

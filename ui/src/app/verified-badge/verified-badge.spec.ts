@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from '../auth';
 import { Account } from '../models';
-import { VerifiedBadge } from './verified-badge';
+import { VERIFIED_FOLLOWER_THRESHOLD, VerifiedBadge } from './verified-badge';
 
 function makeAccount(overrides: Partial<Account> = {}): Account {
   return {
@@ -37,16 +37,20 @@ describe('VerifiedBadge', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('shows a public check at 50,000 followers or more', () => {
-    const el = render(makeAccount({ followers_count: 50_000 }));
+  it('shows a public check at the follower threshold or more', () => {
+    const el = render(makeAccount({ followers_count: VERIFIED_FOLLOWER_THRESHOLD }));
     const badge = el.querySelector('svg.badge');
     expect(badge).not.toBeNull();
     expect(badge!.classList.contains('self')).toBe(false);
   });
 
-  it('shows no check below 50,000 followers for other accounts', () => {
-    const el = render(makeAccount({ followers_count: 49_999 }));
+  it('shows no check just below the threshold for other accounts', () => {
+    const el = render(makeAccount({ followers_count: VERIFIED_FOLLOWER_THRESHOLD - 1 }));
     expect(el.querySelector('svg.badge')).toBeNull();
+  });
+
+  it('the threshold is 9,728 — the 10,000th most-followed account', () => {
+    expect(VERIFIED_FOLLOWER_THRESHOLD).toBe(9_728);
   });
 
   it("shows the self-only check on the viewer's own account regardless of followers", () => {

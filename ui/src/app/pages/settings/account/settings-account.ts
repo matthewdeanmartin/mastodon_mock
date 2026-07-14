@@ -1,8 +1,13 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../../../api';
+import { Server } from '../../../server';
 
-/** Account: username, simulated password change, sessions note. */
+/**
+ * Account: username, password, sessions note. Password "changes" are simulated on the
+ * mock only; real Mastodon has no client API for this, so against a real instance we
+ * link to its /auth/edit page instead.
+ */
 @Component({
   selector: 'app-settings-account',
   imports: [FormsModule],
@@ -10,6 +15,11 @@ import { Api } from '../../../api';
 })
 export class SettingsAccount implements OnInit {
   private api = inject(Api);
+  private server = inject(Server);
+
+  protected readonly isMock = this.server.isMock;
+  protected readonly passwordChangeUrl = `${this.server.baseUrl()}/auth/edit`;
+  protected readonly instanceHost = this.server.baseUrl().replace(/^https?:\/\//, '');
 
   protected acct = signal('');
   protected currentPassword = signal('');

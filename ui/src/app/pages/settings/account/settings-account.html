@@ -14,50 +14,67 @@
     </div>
   </div>
 
-  <div class="ssection">
-    <div class="srow">
-      <span class="slabel">Current password</span>
-      <div class="scontrol">
-        <input
-          type="password"
-          autocomplete="current-password"
-          [ngModel]="currentPassword()"
-          (ngModelChange)="currentPassword.set($event)"
-          name="current_password"
-        />
+  @if (isMock) {
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">Current password</span>
+        <div class="scontrol">
+          <input
+            type="password"
+            autocomplete="current-password"
+            [ngModel]="currentPassword()"
+            (ngModelChange)="currentPassword.set($event)"
+            name="current_password"
+          />
+        </div>
       </div>
-    </div>
 
-    <div class="srow">
-      <span class="slabel">New password</span>
-      <div class="scontrol">
-        <input
-          type="password"
-          autocomplete="new-password"
-          [ngModel]="newPassword()"
-          (ngModelChange)="newPassword.set($event)"
-          name="new_password"
-        />
+      <div class="srow">
+        <span class="slabel">New password</span>
+        <div class="scontrol">
+          <input
+            type="password"
+            autocomplete="new-password"
+            [ngModel]="newPassword()"
+            (ngModelChange)="newPassword.set($event)"
+            name="new_password"
+          />
+        </div>
       </div>
-    </div>
 
-    <div class="srow">
-      <span class="slabel">Confirm new password</span>
-      <div class="scontrol">
-        <input
-          type="password"
-          autocomplete="new-password"
-          [ngModel]="confirmPassword()"
-          (ngModelChange)="confirmPassword.set($event)"
-          name="confirm_password"
-        />
-        @if (passwordError()) {
-          <span class="hint error">{{ passwordError() }}</span>
-        }
-        <span class="hint">Password changes are simulated in this mock — nothing is stored.</span>
+      <div class="srow">
+        <span class="slabel">Confirm new password</span>
+        <div class="scontrol">
+          <input
+            type="password"
+            autocomplete="new-password"
+            [ngModel]="confirmPassword()"
+            (ngModelChange)="confirmPassword.set($event)"
+            name="confirm_password"
+          />
+          @if (passwordError()) {
+            <span class="hint error">{{ passwordError() }}</span>
+          }
+          <span class="hint">Password changes are simulated in this mock — nothing is stored.</span>
+        </div>
       </div>
     </div>
-  </div>
+  } @else {
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">Password</span>
+        <div class="scontrol">
+          <span class="hint">
+            Mastodon has no client API for changing passwords — that happens on your instance's own
+            website.
+          </span>
+          <a [href]="passwordChangeUrl" target="_blank" rel="noopener noreferrer">
+            Change your password on {{ instanceHost }} ↗
+          </a>
+        </div>
+      </div>
+    </div>
+  }
 
   <div class="ssection">
     <div class="srow">
@@ -68,10 +85,12 @@
     </div>
   </div>
 
-  <div class="sactions">
-    @if (saved()) {
-      <span class="saved-note">Saved ✓</span>
-    }
-    <button class="btn" type="submit" [disabled]="saving()">Change password</button>
-  </div>
+  @if (isMock) {
+    <div class="sactions">
+      @if (saved()) {
+        <span class="saved-note">Saved ✓</span>
+      }
+      <button class="btn" type="submit" [disabled]="saving()">Change password</button>
+    </div>
+  }
 </form>

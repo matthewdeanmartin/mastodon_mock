@@ -1,10 +1,11 @@
 import { Status } from '../../models';
 
 /**
- * Extract the author's own chain from a thread for reader mode: starting at the
- * thread's first post, follow replies that the same author made to their own
- * previous post (the classic 1/n thread shape). Posts by other people, and the
- * author's side-replies to them, are not part of the article.
+ * Extract the author's own chain from a thread for reader mode: the thread's first
+ * post plus every later post where the same author replied to any post already in
+ * the chain. This covers both storm styles — replying to your own previous post
+ * and replying repeatedly to the root. Posts by other people, and the author's
+ * side-replies to them, are not part of the article.
  */
 export function readerChain(thread: Status[]): Status[] {
   if (!thread.length) {
@@ -12,15 +13,13 @@ export function readerChain(thread: Status[]): Status[] {
   }
   const root = thread[0];
   const chain = [root];
+  const chainIds = new Set([root.id]);
   const authorId = root.account.id;
-  const remaining = thread.slice(1);
-  let tailId = root.id;
-  for (;;) {
-    const next = remaining.find((s) => s.account.id === authorId && s.in_reply_to_id === tailId);
-    if (!next) {
-      return chain;
+  for (const s of thread.slice(1)) {
+    if (s.account.id === authorId && s.in_reply_to_id !== null && chainIds.has(s.in_reply_to_id)) {
+      chain.push(s);
+      chainIds.add(s.id);
     }
-    chain.push(next);
-    tailId = next.id;
   }
+  return chain;
 }

@@ -54,9 +54,15 @@ function makeContext(ancestors: Status[] = [], descendants: Status[] = []): Cont
 
 let httpMock: HttpTestingController;
 
-function setUpWithId(statusId: string): ComponentFixture<Thread> {
+function setUpWithId(
+  statusId: string,
+  queryParams: Record<string, string> = {},
+): ComponentFixture<Thread> {
   TestBed.overrideProvider(ActivatedRoute, {
-    useValue: { paramMap: of(convertToParamMap({ id: statusId })) },
+    useValue: {
+      paramMap: of(convertToParamMap({ id: statusId })),
+      queryParamMap: of(convertToParamMap(queryParams)),
+    },
   });
   httpMock = TestBed.inject(HttpTestingController);
   const fixture = TestBed.createComponent(Thread);
@@ -194,7 +200,6 @@ describe('Thread', () => {
   // ---------------------------------------------------------------- reader mode
 
   interface ReaderInternals {
-    readerAvailable: () => boolean;
     readerMode: WritableSignal<boolean>;
     chain: () => Status[];
   }
@@ -207,15 +212,18 @@ describe('Thread', () => {
     return { ...makeStatus(id), in_reply_to_id: inReplyToId };
   }
 
-  it('reader mode is unavailable for a post with no self-reply chain', () => {
+  it('the Reader toggle is always offered on a loaded thread', () => {
     const fixture = setUpWithId('1');
     httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
     httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+    fixture.detectChanges();
 
-    expect(readerInternals(fixture).readerAvailable()).toBe(false);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.reader-bar')).not.toBeNull();
+    expect(readerInternals(fixture).readerMode()).toBe(false);
   });
 
-  it('reader mode offers the author chain and renders it as an article', () => {
+  it('reader mode renders the author chain as an article', () => {
     const fixture = setUpWithId('1');
     httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
     httpMock
@@ -224,7 +232,6 @@ describe('Thread', () => {
     fixture.detectChanges();
 
     const r = readerInternals(fixture);
-    expect(r.readerAvailable()).toBe(true);
     expect(r.chain().map((s) => s.id)).toEqual(['1', '2', '3']);
 
     fixture.componentInstance.toggleReader();
@@ -233,6 +240,16 @@ describe('Thread', () => {
     expect(el.querySelector('article.reader')).not.toBeNull();
     expect(el.querySelectorAll('.reader-post')).toHaveLength(3);
     expect(el.querySelector('app-status-card')).toBeNull();
+  });
+
+  it('?reader=1 opens the thread directly in reader mode', () => {
+    const fixture = setUpWithId('1', { reader: '1' });
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext([], [selfReply('2', '1')]));
+    fixture.detectChanges();
+
+    expect(readerInternals(fixture).readerMode()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('article.reader')).not.toBeNull();
   });
 
   it('A+/A− buttons adjust the persisted reader font size', () => {

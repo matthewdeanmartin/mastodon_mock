@@ -38,15 +38,16 @@ export class Thread implements OnInit {
   /** The author chain reader mode renders (root post + same-author self-replies). */
   protected chain = computed<Status[]>(() => readerChain(this.thread()));
 
-  /** Reader mode is only worth offering for actual threads. */
-  protected readerAvailable = computed(() => this.chain().length > 1);
-
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
         this.load(id);
       }
+    });
+    // Deep link: status cards link here with ?reader=1 to open straight into reader mode.
+    this.route.queryParamMap.subscribe((params) => {
+      this.readerMode.set(params.get('reader') === '1');
     });
   }
 

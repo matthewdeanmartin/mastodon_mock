@@ -130,6 +130,17 @@
       <button class="action" [class.on]="replying()" (click)="toggleReply($event)" title="Reply">
         💬 <span>{{ display.replies_count }}</span>
       </button>
+      @if (display.replies_count > 0 || display.in_reply_to_id) {
+        <a
+          class="action"
+          [routerLink]="['/statuses', display.id]"
+          [queryParams]="{ reader: 1 }"
+          (click)="$event.stopPropagation()"
+          title="Read thread as article"
+        >
+          📖
+        </a>
+      }
       <button
         class="action"
         [class.on]="display.reblogged"

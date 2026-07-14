@@ -2,8 +2,11 @@ import { Component, computed, inject, input } from '@angular/core';
 import { Auth } from '../auth';
 import { Account } from '../models';
 
-/** Follower count at which an account earns a check visible to everyone. */
-export const VERIFIED_FOLLOWER_THRESHOLD = 50_000;
+/**
+ * Follower count at which an account earns a check visible to everyone —
+ * what the 10,000th most-followed account has, so the check marks the top 10k.
+ */
+export const VERIFIED_FOLLOWER_THRESHOLD = 9_728;
 
 /**
  * Blue verification check, 2018-Twitter style, decided entirely client-side:
@@ -16,7 +19,7 @@ export const VERIFIED_FOLLOWER_THRESHOLD = 50_000;
   template: `
     @if (publicCheck()) {
       <svg class="badge" viewBox="0 0 24 24" aria-label="Verified" role="img">
-        <title>Verified — over 50,000 followers</title>
+        <title>Verified — a top-10,000 account (9,728+ followers)</title>
         <path [attr.d]="checkPath" />
       </svg>
     } @else if (selfCheck()) {
