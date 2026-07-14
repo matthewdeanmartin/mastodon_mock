@@ -3,7 +3,23 @@
 } @else if (!statuses().length) {
   <p class="muted center">You haven't bookmarked anything yet.</p>
 } @else {
-  @for (s of statuses(); track s.id; let i = $index) {
-    <app-status-card [status]="s" (changed)="onChanged(i, $event)" (deleted)="onDeleted($event)" />
+  <div class="tabs">
+    @for (v of views; track v.id) {
+      <button class="tab" [class.active]="view() === v.id" (click)="view.set(v.id)">
+        {{ v.label }}
+      </button>
+    }
+  </div>
+
+  @for (group of groups(); track group.label) {
+    @if (group.label && view() !== 'all') {
+      <h3 class="page-head">{{ group.label }} ({{ group.statuses.length }})</h3>
+    }
+    @if (!group.statuses.length) {
+      <p class="muted center">Nothing here.</p>
+    }
+    @for (s of group.statuses; track s.id) {
+      <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
+    }
   }
 }

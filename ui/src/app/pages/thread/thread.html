@@ -1,28 +1,70 @@
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (status(); as s) {
-  @for (a of ancestors(); track a.id) {
-    <app-status-card
-      [status]="a"
-      (changed)="onContextChanged($event)"
-      (deleted)="onContextDeleted($event)"
-      (replied)="onReply($event)"
-    />
+  @if (readerAvailable()) {
+    <div class="reader-bar">
+      @if (readerMode()) {
+        <div class="reader-font">
+          <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(-1)" title="Smaller text">
+            A−
+          </button>
+          <span class="muted">{{ prefs.readerFontSize() }}px</span>
+          <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(1)" title="Larger text">
+            A+
+          </button>
+        </div>
+      }
+      <button class="btn btn-outline" [class.active]="readerMode()" (click)="toggleReader()">
+        📖 {{ readerMode() ? 'Exit reader' : 'Reader' }}
+      </button>
+    </div>
   }
-  <app-status-card
-    [status]="s"
-    (changed)="onChanged($event)"
-    (deleted)="onFocusedDeleted()"
-    (replied)="onReply($event)"
-  />
-  <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
-  @for (d of descendants(); track d.id) {
+
+  @if (readerMode()) {
+    <article class="reader" [style.font-size.px]="prefs.readerFontSize()">
+      @if (chain()[0].account; as author) {
+        <header class="reader-head">
+          <img class="reader-avatar" [src]="author.avatar" [alt]="author.username" />
+          <div>
+            <div class="reader-author">{{ author.display_name || author.username }}</div>
+            <div class="muted">
+              &#64;{{ author.acct }} · {{ chain()[0].created_at | humanTime }} ·
+              {{ chain().length }} posts
+            </div>
+          </div>
+        </header>
+      }
+      @for (post of chain(); track post.id) {
+        <section class="reader-post" [innerHTML]="post.content"></section>
+        @for (m of post.media_attachments; track m.id) {
+          <img class="reader-media" [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+        }
+      }
+    </article>
+  } @else {
+    @for (a of ancestors(); track a.id) {
+      <app-status-card
+        [status]="a"
+        (changed)="onContextChanged($event)"
+        (deleted)="onContextDeleted($event)"
+        (replied)="onReply($event)"
+      />
+    }
     <app-status-card
-      [status]="d"
-      (changed)="onContextChanged($event)"
-      (deleted)="onContextDeleted($event)"
+      [status]="s"
+      (changed)="onChanged($event)"
+      (deleted)="onFocusedDeleted()"
       (replied)="onReply($event)"
     />
+    <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
+    @for (d of descendants(); track d.id) {
+      <app-status-card
+        [status]="d"
+        (changed)="onContextChanged($event)"
+        (deleted)="onContextDeleted($event)"
+        (replied)="onReply($event)"
+      />
+    }
   }
 } @else {
   <p class="muted center">Status not found.</p>

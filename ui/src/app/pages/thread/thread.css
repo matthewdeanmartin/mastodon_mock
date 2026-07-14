@@ -1,0 +1,56 @@
+.reader-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reader-font {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+}
+
+.reader {
+  padding: 24px 32px 48px;
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.65;
+}
+
+.reader-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.reader-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.reader-author {
+  font-weight: 700;
+}
+
+.reader-post {
+  margin-bottom: 1em;
+}
+
+.reader-post p {
+  margin: 0 0 1em;
+}
+
+.reader-media {
+  display: block;
+  max-width: 100%;
+  border-radius: 12px;
+  margin: 0 0 1em;
+}

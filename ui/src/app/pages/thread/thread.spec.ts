@@ -5,6 +5,7 @@ import { WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ClientPrefs } from '../../client-prefs';
 import { Context, Status } from '../../models';
 import { Thread } from './thread';
 
@@ -65,6 +66,7 @@ function setUpWithId(statusId: string): ComponentFixture<Thread> {
 
 describe('Thread', () => {
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
@@ -187,5 +189,60 @@ describe('Thread', () => {
     fixture.componentInstance.onFocusedDeleted();
 
     expect(spy).toHaveBeenCalledWith('/home');
+  });
+
+  // ---------------------------------------------------------------- reader mode
+
+  interface ReaderInternals {
+    readerAvailable: () => boolean;
+    readerMode: WritableSignal<boolean>;
+    chain: () => Status[];
+  }
+
+  function readerInternals(fixture: ComponentFixture<Thread>): ReaderInternals {
+    return fixture.componentInstance as unknown as ReaderInternals;
+  }
+
+  function selfReply(id: string, inReplyToId: string): Status {
+    return { ...makeStatus(id), in_reply_to_id: inReplyToId };
+  }
+
+  it('reader mode is unavailable for a post with no self-reply chain', () => {
+    const fixture = setUpWithId('1');
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+
+    expect(readerInternals(fixture).readerAvailable()).toBe(false);
+  });
+
+  it('reader mode offers the author chain and renders it as an article', () => {
+    const fixture = setUpWithId('1');
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock
+      .expectOne('/api/v1/statuses/1/context')
+      .flush(makeContext([], [selfReply('2', '1'), selfReply('3', '2')]));
+    fixture.detectChanges();
+
+    const r = readerInternals(fixture);
+    expect(r.readerAvailable()).toBe(true);
+    expect(r.chain().map((s) => s.id)).toEqual(['1', '2', '3']);
+
+    fixture.componentInstance.toggleReader();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('article.reader')).not.toBeNull();
+    expect(el.querySelectorAll('.reader-post')).toHaveLength(3);
+    expect(el.querySelector('app-status-card')).toBeNull();
+  });
+
+  it('A+/A− buttons adjust the persisted reader font size', () => {
+    const fixture = setUpWithId('1');
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext([], [selfReply('2', '1')]));
+
+    const prefs = TestBed.inject(ClientPrefs);
+    const before = prefs.readerFontSize();
+    fixture.componentInstance.bumpReaderFont(2);
+    expect(prefs.readerFontSize()).toBe(before + 2);
   });
 });

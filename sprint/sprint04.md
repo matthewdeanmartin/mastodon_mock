@@ -49,15 +49,18 @@ work against mastodon.social as well as the local mock** → no new backend endp
        >=50k followers → public check; own account → self-only check w/ tooltip.
 5. [x] Specs: client-prefs.spec.ts (7), verified-badge.spec.ts (5), appearance spec updated.
 
-### Sprint B — compose powers
-6. [ ] Delete & Repost on own statuses in status-card: getStatusSource → deleteStatus →
-       composer seeded with text, new post emitted so containers swap it in.
-7. [ ] Auto-split: if text > 500 chars, split at word boundaries into (i/n)-suffixed chunks;
-       first chunk posted with original options, rest chained as self-replies. Preview hint
-       in composer ("will post as a thread of N").
-8. [ ] Undo-send: when pref enabled, submit → confirm prompt → 30s countdown banner with
-       Cancel; POST deferred until countdown elapses. Pref toggle in Appearance settings.
-9. [ ] Specs: split algorithm, undo-send timer (fake timers), delete&repost flow.
+### Sprint B — compose powers — DONE
+6. [x] Delete & Repost (♻️ button on own statuses): getStatusSource → deleteStatus →
+       inline composer seeded (preserves visibility + in_reply_to); posting emits
+       changed(new) so containers swap in place; discarding emits deleted(old).
+7. [x] Auto-split via `compose/post-splitter.ts` (`splitPost`, iterated (i/n) suffix
+       budgeting, word-boundary cuts, hard-cut giant words); chained sequential posting
+       in compose.send()/postRest(); "thread of N" hint + red over-limit counter.
+8. [x] Undo-send: confirm + 30s setInterval countdown banner w/ Cancel (draft kept);
+       canSubmit blocked while pending; timer cleared on destroy. Pref toggle was
+       already added to Appearance in Sprint A.
+9. [x] Specs: post-splitter.spec.ts (8), compose.spec.ts +7 (split chain, undo timers
+       via vi.useFakeTimers, decline/cancel paths), status-card.spec.ts +4 (redraft).
 
 ### Sprint C — reader mode + bookmark library
 10. [ ] Reader mode: toggle on thread page; renders the same-author chain (root author's
@@ -76,3 +79,6 @@ work against mastodon.social as well as the local mock** → no new backend endp
   blue verification checks"). 352 tests green, lint clean, both builds pass. Note: two spec
   files (shell, status-card) can flake with 5s timeouts under load — rerun before blaming
   your change. Next: Sprint B task 6 (Delete & Repost).
+- 2026-07-13: Sprint B done + committed ("feat(ui): auto-split threads, undo-send countdown,
+  delete & repost"). 49 spec files green, lint clean, both builds pass. Next: Sprint C
+  task 10 (reader mode on thread page).
