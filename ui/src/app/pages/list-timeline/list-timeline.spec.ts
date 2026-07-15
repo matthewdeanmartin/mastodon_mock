@@ -5,13 +5,21 @@ import { WritableSignal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Status, UserList } from '../../models';
+import { Account, Status, UserList } from '../../models';
 import { ListTimeline } from './list-timeline';
 
 interface ListTimelineInternals {
   title: WritableSignal<string>;
   statuses: WritableSignal<Status[]>;
   loading: WritableSignal<boolean>;
+  tab: WritableSignal<'posts' | 'members'>;
+  members: WritableSignal<Account[]>;
+  setTab(tab: 'posts' | 'members'): void;
+  removeMember(account: Account): void;
+}
+
+function makeAccount(id: string): Account {
+  return { id, username: `u${id}`, acct: `u${id}`, display_name: `User ${id}` } as Account;
 }
 
 function internals(fixture: ComponentFixture<ListTimeline>): ListTimelineInternals {
@@ -138,5 +146,58 @@ describe('ListTimeline', () => {
         .statuses()
         .map((s) => s.id),
     ).toEqual(['x', 'z']);
+  });
+
+  // ---------------------------------------------------------------- members tab
+
+  /** Load the list + timeline so the component settles on the posts tab. */
+  function loadList(fixture: ComponentFixture<ListTimeline>, id: string): void {
+    httpMock.expectOne(`/api/v1/lists/${id}`).flush(makeList(id, 'Members List'));
+    httpMock.expectOne((r) => r.url === `/api/v1/timelines/list/${id}`).flush([]);
+  }
+
+  it('does NOT request members on init (posts tab is default)', () => {
+    const fixture = setUpWithList('10');
+    loadList(fixture, '10');
+
+    expect(internals(fixture).tab()).toBe('posts');
+    httpMock.expectNone('/api/v1/lists/10/accounts');
+  });
+
+  it('lazy-loads members on the first members-tab click, and does not refetch on the second', () => {
+    const fixture = setUpWithList('11');
+    loadList(fixture, '11');
+
+    internals(fixture).setTab('members');
+    httpMock.expectOne('/api/v1/lists/11/accounts').flush([makeAccount('a'), makeAccount('b')]);
+    expect(
+      internals(fixture)
+        .members()
+        .map((m) => m.id),
+    ).toEqual(['a', 'b']);
+
+    // Second visit → guard prevents a refetch.
+    internals(fixture).setTab('posts');
+    internals(fixture).setTab('members');
+    httpMock.expectNone('/api/v1/lists/11/accounts');
+  });
+
+  it('removeMember DELETEs /lists/:id/accounts and drops the row', () => {
+    const fixture = setUpWithList('12');
+    loadList(fixture, '12');
+
+    internals(fixture).setTab('members');
+    httpMock.expectOne('/api/v1/lists/12/accounts').flush([makeAccount('a'), makeAccount('b')]);
+
+    internals(fixture).removeMember(makeAccount('a'));
+    const del = httpMock.expectOne('/api/v1/lists/12/accounts');
+    expect(del.request.method).toBe('DELETE');
+    del.flush({});
+
+    expect(
+      internals(fixture)
+        .members()
+        .map((m) => m.id),
+    ).toEqual(['b']);
   });
 });

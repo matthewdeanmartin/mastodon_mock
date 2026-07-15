@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { UserList } from '../../models';
+import { Collection, UserList } from '../../models';
 import { Lists } from './lists';
 
 /** Exposes Lists' protected signals for white-box testing. */
@@ -12,10 +12,41 @@ interface ListsInternals {
   lists: WritableSignal<UserList[]>;
   loading: WritableSignal<boolean>;
   newTitle: WritableSignal<string>;
+  collections: WritableSignal<Collection[]>;
+  collectionsSupported: WritableSignal<boolean>;
+  newCollectionName: WritableSignal<string>;
   load(): void;
   create(): void;
   remove(list: UserList, event: Event): void;
+  createCollection(): void;
+  removeCollection(c: Collection, event: Event): void;
 }
+
+function makeCollection(id: string, name = `Collection ${id}`): Collection {
+  return {
+    id,
+    account_id: '9',
+    name,
+    description: '',
+    discoverable: false,
+    sensitive: false,
+    local: true,
+    item_count: 0,
+    items: [],
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    uri: `https://example.social/collections/${id}`,
+  };
+}
+
+const noopEvent = {
+  stopPropagation: () => {
+    /* noop */
+  },
+  preventDefault: () => {
+    /* noop */
+  },
+} as unknown as Event;
 
 function internals(fixture: ComponentFixture<Lists>): ListsInternals {
   return fixture.componentInstance as unknown as ListsInternals;
@@ -47,9 +78,7 @@ describe('Lists', () => {
   function setUp(): ComponentFixture<Lists> {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
-    httpMock
-      .expectOne('/api/v1/accounts/verify_credentials')
-      .error(new ProgressEvent('error'));
+    httpMock.expectOne('/api/v1/accounts/verify_credentials').error(new ProgressEvent('error'));
     return fixture;
   }
 
@@ -170,8 +199,8 @@ describe('Lists', () => {
       .expectOne('/api/v1/accounts/verify_credentials')
       .flush({ id: '9', username: 'me', acct: 'me' });
     httpMock.expectOne('/api/v1/lists').flush([]);
-    httpMock.expectOne('/api/v1/9/collections').flush([]);
-    httpMock.expectOne('/api/v1/9/in_collections').flush([]);
+    httpMock.expectOne('/api/v1/accounts/9/collections').flush({ collections: [] });
+    httpMock.expectOne('/api/v1/accounts/9/in_collections').flush({ collections: [] });
 
     const c = fixture.componentInstance as unknown as {
       collectionsLoading: WritableSignal<boolean>;
@@ -179,6 +208,91 @@ describe('Lists', () => {
     };
     expect(c.collectionsLoading()).toBe(false);
     expect(c.collectionsSupported()).toBe(true);
+  });
+
+  /**
+   * Settle ngOnInit with a *verified* account (id 9), flushing the lists fetch
+   * and both collection GETs. Returns the fixture with collections loaded.
+   */
+  function setUpVerified(collections: Collection[] = []): ComponentFixture<Lists> {
+    const fixture = TestBed.createComponent(Lists);
+    fixture.detectChanges();
+    httpMock
+      .expectOne('/api/v1/accounts/verify_credentials')
+      .flush({ id: '9', username: 'me', acct: 'me' });
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    httpMock.expectOne('/api/v1/accounts/9/collections').flush({ collections });
+    httpMock.expectOne('/api/v1/accounts/9/in_collections').flush({ collections: [] });
+    return fixture;
+  }
+
+  it('flips collectionsSupported=false when the collections GET 404s (pre-4.6 server)', () => {
+    const fixture = TestBed.createComponent(Lists);
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne('/api/v1/accounts/verify_credentials')
+      .flush({ id: '9', username: 'me', acct: 'me' });
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    httpMock
+      .expectOne('/api/v1/accounts/9/collections')
+      .flush('', { status: 404, statusText: 'Not Found' });
+    httpMock.expectOne('/api/v1/accounts/9/in_collections').flush({ collections: [] });
+
+    expect(internals(fixture).collectionsSupported()).toBe(false);
+  });
+
+  it('createCollection() POSTs the create body and appends the wrapped collection', () => {
+    const fixture = setUpVerified();
+
+    internals(fixture).newCollectionName.set('Besties');
+    internals(fixture).createCollection();
+
+    const post = httpMock.expectOne('/api/v1/collections');
+    expect(post.request.method).toBe('POST');
+    // mastodon.social requires sensitive + discoverable on create (verified live).
+    expect(post.request.body).toEqual({ name: 'Besties', sensitive: false, discoverable: false });
+    post.flush({ collection: makeCollection('C1', 'Besties') });
+
+    expect(
+      internals(fixture)
+        .collections()
+        .map((c) => c.name),
+    ).toEqual(['Besties']);
+    expect(internals(fixture).newCollectionName()).toBe('');
+  });
+
+  it('createCollection() reloads instead of appending when the stub returns {collection:null}', () => {
+    const fixture = setUpVerified();
+
+    internals(fixture).newCollectionName.set('Stub');
+    internals(fixture).createCollection();
+    httpMock.expectOne('/api/v1/collections').flush({ collection: null });
+
+    // Null payload → loadCollections() re-runs (account already verified).
+    httpMock.expectOne('/api/v1/accounts/9/collections').flush({ collections: [makeCollection('C2')] });
+    httpMock.expectOne('/api/v1/accounts/9/in_collections').flush({ collections: [] });
+
+    expect(
+      internals(fixture)
+        .collections()
+        .map((c) => c.id),
+    ).toEqual(['C2']);
+  });
+
+  it('removeCollection() DELETEs and drops the row', () => {
+    const c1 = makeCollection('C1');
+    const c2 = makeCollection('C2');
+    const fixture = setUpVerified([c1, c2]);
+
+    internals(fixture).removeCollection(c1, noopEvent);
+    httpMock.expectOne('/api/v1/collections/C1').flush({});
+
+    expect(
+      internals(fixture)
+        .collections()
+        .map((c) => c.id),
+    ).toEqual(['C2']);
   });
 
   it('load() sets loading=true then fetches fresh data', () => {

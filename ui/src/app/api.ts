@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import {
   Account,
   Announcement,
@@ -332,15 +332,21 @@ export class Api {
   // --- collections (Mastodon 4.6+) ---
   // Note: the local mock's collection endpoints are stateless stubs (empty
   // lists / 404s), so these are mainly exercised against a real server.
+  // The account-scoped lists live under /accounts/{id}/... (verified against
+  // mastodon.social) and wrap their payload in `{collections: [...]}`.
 
   /** Collections curated by the given account. */
   accountCollections(accountId: string): Observable<Collection[]> {
-    return this.http.get<Collection[]>(`/api/v1/${accountId}/collections`);
+    return this.http
+      .get<{ collections: Collection[] }>(`/api/v1/accounts/${accountId}/collections`)
+      .pipe(map((r) => r.collections ?? []));
   }
 
   /** Collections the given account is featured in ("who has me in a collection"). */
   accountInCollections(accountId: string): Observable<Collection[]> {
-    return this.http.get<Collection[]>(`/api/v1/${accountId}/in_collections`);
+    return this.http
+      .get<{ collections: Collection[] }>(`/api/v1/accounts/${accountId}/in_collections`)
+      .pipe(map((r) => r.collections ?? []));
   }
 
   getCollection(id: string): Observable<CollectionWithAccounts> {
@@ -348,7 +354,9 @@ export class Api {
   }
 
   createCollection(name: string, description?: string): Observable<{ collection: Collection }> {
-    const body: Record<string, unknown> = { name };
+    // mastodon.social rejects the create (422) unless `sensitive` and
+    // `discoverable` are present, so send explicit defaults (verified live).
+    const body: Record<string, unknown> = { name, sensitive: false, discoverable: false };
     if (description?.trim()) {
       body['description'] = description.trim();
     }
