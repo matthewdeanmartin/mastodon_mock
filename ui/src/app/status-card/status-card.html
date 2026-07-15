@@ -180,6 +180,7 @@
         <button
           class="action"
           [class.on]="display.reblogged"
+          [disabled]="actionBusy()"
           (click)="toggleReblog($event)"
           [title]="display.reblogged ? 'Undo boost' : 'Boost'"
           [attr.aria-pressed]="display.reblogged"
@@ -208,6 +209,7 @@
         <button
           class="action"
           [class.on]="display.favourited"
+          [disabled]="actionBusy()"
           (click)="toggleFavourite($event)"
           [title]="display.favourited ? 'Undo favourite' : 'Favourite'"
           [attr.aria-pressed]="display.favourited"
@@ -315,6 +317,10 @@
         }
       }
     </div>
+
+    @if (actionError(); as err) {
+      <div class="action-error">{{ err }}</div>
+    }
 
     @if (redrafting()) {
       <div class="inline-compose redraft" (click)="$event.stopPropagation()">

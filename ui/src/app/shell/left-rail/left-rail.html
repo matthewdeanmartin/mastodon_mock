@@ -9,7 +9,9 @@
       <a class="profile-avatar" [routerLink]="['/accounts', acc.id]">
         <img [src]="acc.avatar_static || acc.avatar" alt="" />
       </a>
-      <a class="profile-name" [routerLink]="['/accounts', acc.id]">{{ acc.display_name }}</a>
+      <a class="profile-name" [routerLink]="['/accounts', acc.id]"
+        >{{ acc.display_name }} <app-verified-badge [account]="acc"
+      /></a>
       <span class="profile-handle muted">&#64;{{ acc.username }}</span>
       <div class="profile-stats">
         <a [routerLink]="['/accounts', acc.id]">

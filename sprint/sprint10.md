@@ -9,8 +9,13 @@ verification, not for unit tests or builds).
 
 ## First: verify sprint09 live
 
-Sprint09 shipped on unit tests + builds only — no runtime pass. Use the `verify`
-skill / Playwright against the mock server, and bsky.social for the Bluesky legs:
+UPDATE (2026-07-15, end of sprint09): a runtime pass DID happen for most of
+this list — hover card, left-rail check, profile fields/toggles, notification
+underline, compose picker visibility (mock server + Playwright/Edge), and
+bsky like→unlike / repost→unrepost against the real API (all 200, account left
+clean). Still NOT live-tested: **compose target `bsky` and `both` actually
+posting** (creates real posts — delete them after via listRecords), the
+cross-post error banner, and ads-with-uBlock. Checklist kept for reference:
 
 1. Compose target picker (Settings → Connections → link Bluesky first):
    - default is 🦣 Fedi; picker hidden when not linked and on reply/quote composers.

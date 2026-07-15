@@ -4,6 +4,7 @@ import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, Tag } from '../../models';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
+import { VerifiedBadge } from '../../verified-badge/verified-badge';
 
 /**
  * Left sidebar: the signed-in user's profile card (2018-Twitter style), a
@@ -13,7 +14,7 @@ import { HomeTimelineFeed } from '../../home-timeline-feed';
  */
 @Component({
   selector: 'app-left-rail',
-  imports: [RouterLink],
+  imports: [RouterLink, VerifiedBadge],
   templateUrl: './left-rail.html',
   styleUrl: './left-rail.css',
 })

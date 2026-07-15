@@ -151,6 +151,31 @@ describe('Profile block/unblock', () => {
     req.flush([]);
   });
 
+  it('renders custom profile fields, marking verified ones', () => {
+    const fixture = setUp();
+    const cmp = fixture.componentInstance as any;
+    cmp.account.set({
+      id: '900',
+      username: 'eve',
+      acct: 'eve',
+      display_name: 'Eve',
+      fields: [
+        { name: 'Blog', value: '<a href="https://eve.blog">eve.blog</a>', verified_at: null },
+        { name: 'Site', value: '<a href="https://eve.dev">eve.dev</a>', verified_at: '2026-01-01' },
+      ],
+    } as Account);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const rows = el.querySelectorAll('.profile-field');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('Blog');
+    expect(rows[0].querySelector('a')?.getAttribute('href')).toBe('https://eve.blog');
+    expect(rows[0].classList.contains('verified')).toBe(false);
+    expect(rows[1].classList.contains('verified')).toBe(true);
+    expect(rows[1].querySelector('.field-check')).not.toBeNull();
+  });
+
   it('hides pinned duplicates from the main list while the pinned strip is on', () => {
     const fixture = setUp();
     const cmp = fixture.componentInstance as any;

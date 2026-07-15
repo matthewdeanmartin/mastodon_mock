@@ -109,6 +109,47 @@ describe('StatusCard', () => {
     return fixture;
   }
 
+  // ---------------------------------------------------------------- action errors
+
+  it('a failed favourite surfaces an error instead of failing silently', () => {
+    const bsky = makeStatus({
+      id: 'bsky:at://did:plc:x/app.bsky.feed.post/1',
+      provider: 'bluesky',
+      providerRef: {
+        uri: 'at://did:plc:x/app.bsky.feed.post/1',
+        cid: 'c1',
+        likeUri: null,
+        repostUri: null,
+        replyRoot: { uri: 'at://did:plc:x/app.bsky.feed.post/1', cid: 'c1' },
+      },
+    });
+    // BlueskyApi has no session in tests → toggleFavourite errors immediately.
+    const f = setUp(bsky);
+    const cmp = f.componentInstance as any;
+
+    cmp.toggleFavourite(fakeEvent());
+
+    expect(cmp.actionBusy()).toBe(false);
+    expect(cmp.actionError()).toContain('Re-link in Settings');
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).querySelector('.action-error')).not.toBeNull();
+  });
+
+  it('a successful favourite clears busy state and emits changed', () => {
+    const f = setUp(makeStatus({ id: '5' }));
+    const cmp = f.componentInstance as any;
+    const changed: Status[] = [];
+    f.componentInstance.changed.subscribe((s: Status) => changed.push(s));
+
+    cmp.toggleFavourite(fakeEvent());
+    expect(cmp.actionBusy()).toBe(true);
+    httpMock.expectOne('/api/v1/statuses/5/favourite').flush(makeStatus({ id: '5', favourited: true }));
+
+    expect(cmp.actionBusy()).toBe(false);
+    expect(cmp.actionError()).toBeNull();
+    expect(changed[0]?.favourited).toBe(true);
+  });
+
   // ---------------------------------------------------------------- display / boostedBy
 
   it('display returns the status itself when it is not a reblog', () => {

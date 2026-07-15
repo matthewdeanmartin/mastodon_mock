@@ -41,6 +41,19 @@
     @if (a.note) {
       <div class="note" [innerHTML]="a.note"></div>
     }
+    @if (a.fields?.length) {
+      <div class="profile-fields">
+        @for (f of a.fields; track f.name) {
+          <div class="profile-field" [class.verified]="f.verified_at">
+            <span class="field-name muted">{{ f.name }}</span>
+            <span class="field-value" [innerHTML]="f.value"></span>
+            @if (f.verified_at) {
+              <span class="field-check" title="Link ownership verified">✓</span>
+            }
+          </div>
+        }
+      </div>
+    }
     <div class="stats muted">
       <span
         ><strong>{{ a.statuses_count }}</strong> posts</span

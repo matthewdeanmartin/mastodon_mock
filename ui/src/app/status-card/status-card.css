@@ -38,6 +38,12 @@
   transition-delay: 0.45s;
 }
 
+.action-error {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #e0245e;
+}
+
 .body {
   flex: 1;
   min-width: 0;

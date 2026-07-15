@@ -271,17 +271,50 @@ export class StatusCard {
     this.replied.emit(quote);
   }
 
+  /** An action (fav/boost) is in flight; the button is disabled meanwhile. */
+  protected actionBusy = signal(false);
+  /** Last fav/boost failure, shown under the actions row until the next attempt. */
+  protected actionError = signal<string | null>(null);
+
   toggleFavourite(event: Event): void {
     event.stopPropagation();
-    // Routed by provider (Mastodon API vs Bluesky like records).
-    this.actions.toggleFavourite(this.display).subscribe((updated) => this.changed.emit(updated));
+    // Routed by provider (Mastodon API vs Bluesky like records). Foreign calls
+    // cross the network to another service, so show pending + surface failures
+    // (a silently dead Bluesky session used to make this button "do nothing").
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    this.actions.toggleFavourite(this.display).subscribe({
+      next: (updated) => {
+        this.actionBusy.set(false);
+        this.changed.emit(updated);
+      },
+      error: () => {
+        this.actionBusy.set(false);
+        this.actionError.set(this.actionFailureMessage('like'));
+      },
+    });
   }
 
   toggleReblog(event: Event): void {
     event.stopPropagation();
-    this.actions
-      .toggleReblog(this.display)
-      .subscribe((updated) => this.changed.emit(updated.reblog ?? updated));
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    this.actions.toggleReblog(this.display).subscribe({
+      next: (updated) => {
+        this.actionBusy.set(false);
+        this.changed.emit(updated.reblog ?? updated);
+      },
+      error: () => {
+        this.actionBusy.set(false);
+        this.actionError.set(this.actionFailureMessage('boost'));
+      },
+    });
+  }
+
+  private actionFailureMessage(verb: string): string {
+    return this.display.provider === 'bluesky'
+      ? `Couldn't ${verb} on Bluesky — your link may have expired. Re-link in Settings → Connections.`
+      : `Couldn't ${verb} — try again.`;
   }
 
   toggleBookmark(event: Event): void {

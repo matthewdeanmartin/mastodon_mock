@@ -114,3 +114,26 @@ mastodon.social; Bluesky direct via XRPC CORS `*`). Mix of roadmap Phase 4 polis
   vitest testTimeout to 30s in test-setup.ts (Shell/StatusCard specs flaked at
   5s under worker contention). Now 527 tests green (67 files), lint clean,
   both builds pass.
+- 2026-07-15 (third batch, from user feedback on the live site):
+  - Hover card had a transparent background: it used `var(--panel)`, which was
+    never defined (profile/search css had the same phantom var) — all swapped
+    to `var(--col-bg)`.
+  - Left-rail profile card now shows the verified badge (verifiedMode rules;
+    own account always gets at least the private self-check).
+  - Profile page renders custom fields (Account.fields) under the bio — name /
+    HTML value rows, green + ✓ for `verified_at` links.
+  - Bsky like/repost "don't work": **live-verified WORKING** against the real
+    API (linked real account via Connections UI headlessly, like→unlike and
+    repost→unrepost all 200, records confirmed created/removed via
+    listRecords, account left clean). Root cause of the perception was UX:
+    no pending state during the 1–2s XRPC round-trip and a silent subscribe
+    with no error handler (a dead/stale session made clicks do literally
+    nothing). Fav/boost buttons now disable while in flight and failures show
+    an inline error ("Re-link in Settings → Connections" for bsky). If the
+    user still sees dead buttons after redeploying, have them unlink/relink —
+    their stored tokens may be from before and unrefreshable.
+  - Runtime verify pass done this time (mock server + Playwright/Edge +
+    real bsky.social): hover bg opaque, left-rail check, profile fields,
+    filter toggles fire exclude_* requests, notification excerpt underline
+    gone, compose picker hidden when unlinked. 530 tests green (67 files),
+    lint clean, both builds pass.
