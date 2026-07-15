@@ -86,6 +86,14 @@ export interface Quote {
   quoted_status: Status | null;
 }
 
+/** `StatusMention` — a resolved @-mention inside a status. */
+export interface Mention {
+  id: string;
+  username: string;
+  acct: string;
+  url: string;
+}
+
 export interface Status {
   /** Absent = Mastodon. Foreign statuses use namespaced ids (e.g. "rss:…"). */
   provider?: ProviderId;
@@ -114,6 +122,8 @@ export interface Status {
   poll: Poll | null;
   quote_approval_policy: string | null;
   media_attachments: MediaAttachment[];
+  /** Optional: not every provider supplies it, but Mastodon (and the mock) do. */
+  mentions?: Mention[];
 }
 
 /** A single edit-history snapshot (`GET /api/v1/statuses/{id}/history`). */

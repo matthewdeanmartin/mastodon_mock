@@ -9,6 +9,10 @@ import { AppFooter } from './app-footer/app-footer';
 import { LeftRail } from './left-rail/left-rail';
 import { RightRail } from './right-rail/right-rail';
 
+function isWideUrl(url: string): boolean {
+  return url.startsWith('/settings') || url.startsWith('/conversations');
+}
+
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, LeftRail, RightRail, AppFooter],
@@ -30,13 +34,13 @@ export class Shell implements OnInit {
     return !!role && role.name !== '';
   });
 
-  /** Settings takes the full width below the top bar (no rails), like 2018 Twitter. */
+  /** Settings and chat take the full width below the top bar (no rails), like 2018 Twitter. */
   protected wide = toSignal(
     this.router.events.pipe(
       filter((e) => e instanceof NavigationEnd),
-      map(() => this.router.url.startsWith('/settings')),
+      map(() => isWideUrl(this.router.url)),
     ),
-    { initialValue: this.router.url.startsWith('/settings') },
+    { initialValue: isWideUrl(this.router.url) },
   );
 
   /** Transient, non-blocking message (e.g. a failed account switch). null = hidden. */

@@ -1,56 +1,197 @@
-<div class="page-head">Direct messages</div>
-
-@if (loading()) {
-  <p class="muted center">Loading…</p>
-} @else {
-  <div class="conv-layout">
-    <aside class="conv-list">
-      @if (!conversations().length) {
-        <p class="muted center small">No conversations yet. Post with visibility "direct".</p>
-      }
-      @for (c of conversations(); track c.id) {
-        <button
-          class="conv-row"
-          [class.active]="c.id === selectedId()"
-          [class.unread]="c.unread"
-          (click)="select(c)"
-        >
+<div class="chat-page">
+  <aside class="chat-list">
+    <div class="chat-list-head">Chat</div>
+    @if (loading()) {
+      <p class="muted center">Loading…</p>
+    } @else if (!chats().length) {
+      <p class="muted center small">
+        No conversations yet. Post with visibility "direct", or reply to a mention.
+      </p>
+    }
+    @for (c of chats(); track c.key) {
+      <button
+        class="conv-row"
+        [class.active]="c.key === selectedKey()"
+        [class.unread]="c.unread"
+        (click)="select(c)"
+      >
+        <div class="conv-avatars">
+          @for (a of c.accounts.slice(0, 3); track a.id) {
+            <img [src]="a.avatar_static || a.avatar" alt="" />
+          }
+          @if (!c.accounts.length) {
+            <span class="avatar-fallback">💬</span>
+          }
+        </div>
+        <div class="conv-body">
           <div class="conv-title">
-            {{ title(c) }}
+            <span class="conv-names">{{ title(c) }}</span>
             @if (c.unread) {
               <span class="unread-dot" title="Unread">●</span>
             }
           </div>
-          @if (c.last_status) {
-            <div class="conv-preview muted" [innerHTML]="c.last_status.content"></div>
-          }
-        </button>
-      }
-    </aside>
-
-    <section class="conv-thread">
-      @if (selected(); as conv) {
-        <div class="thread-head">
-          <span>{{ title(conv) }}</span>
-          @if (!conv.unread) {
-            <span class="muted small">read</span>
-          } @else {
-            <button class="btn btn-outline btn-sm" (click)="markRead(conv)">Mark read</button>
+          @if (c.lastStatus) {
+            <div class="conv-preview muted" [innerHTML]="c.lastStatus.content"></div>
           }
         </div>
-        @if (conv.last_status) {
-          <app-status-card [status]="conv.last_status" />
+        @if (c.kind === 'public') {
+          <span class="kind-badge kind-public">📢 PUBLIC</span>
+        } @else {
+          <span class="kind-badge kind-private">🔒 Private</span>
         }
+      </button>
+    }
+  </aside>
+
+  <section class="chat-pane">
+    @if (selected(); as chat) {
+      <header class="chat-head">
+        <div class="head-avatars">
+          @for (a of chat.accounts.slice(0, 4); track a.id) {
+            <a [routerLink]="['/accounts', a.id]" [attr.aria-label]="a.display_name"
+              ><img [src]="a.avatar_static || a.avatar" alt=""
+            /></a>
+          }
+        </div>
+        <div class="head-identity">
+          <div class="head-title">{{ title(chat) }}</div>
+          <div class="head-accts muted small">
+            @for (h of chat.handles; track h; let last = $last) {
+              <span>&#64;{{ h }}{{ last ? '' : ', ' }}</span>
+            }
+          </div>
+        </div>
+        @if (chat.kind === 'public') {
+          <span class="kind-badge kind-public">📢 PUBLIC</span>
+        } @else {
+          <span class="kind-badge kind-private">🔒 Private</span>
+        }
+        @if (chat.accounts.length) {
+          <details class="danger-menu">
+            <summary aria-label="Conversation actions">•••</summary>
+            <div class="danger-menu-panel">
+              @for (a of chat.accounts; track a.id) {
+                <div class="menu-account">
+                  <div class="menu-account-name muted small">&#64;{{ a.acct }}</div>
+                  @if (moderated()[a.id]; as state) {
+                    <span class="muted small">{{ state }}</span>
+                  } @else {
+                    <button type="button" (click)="muteParticipant(a)">Mute</button>
+                    <button type="button" (click)="blockParticipant(a)">Block</button>
+                    <button type="button" (click)="reportTarget.set(a)">Report</button>
+                  }
+                </div>
+              }
+            </div>
+          </details>
+        }
+      </header>
+
+      @if (chat.kind === 'public') {
+        <div class="public-banner" role="alert">
+          <span class="public-banner-icon">📢</span>
+          <div>
+            <strong>THIS CONVERSATION IS PUBLIC.</strong>
+            Every message here is visible to anyone on the internet — this is a reply
+            thread, not a private DM.
+          </div>
+        </div>
+      }
+
+      <div class="chat-scroll" #scroller>
+        @if (threadLoading()) {
+          <p class="muted center small">Loading thread…</p>
+        }
+        @for (m of messages(); track m.id) {
+          <div class="bubble-row" [class.mine]="isMine(m)">
+            @if (!isMine(m)) {
+              <a
+                [routerLink]="['/accounts', m.account.id]"
+                class="bubble-avatar"
+                [attr.aria-label]="m.account.acct"
+              >
+                <img [src]="m.account.avatar_static || m.account.avatar" alt="" />
+              </a>
+            }
+            <div class="bubble" [class.bubble-mine]="isMine(m)">
+              @if (!isMine(m) && chat.accounts.length > 1) {
+                <div class="bubble-author small">{{ m.account.display_name || m.account.username }}</div>
+              }
+              <div class="bubble-content" [innerHTML]="m.content"></div>
+              @for (media of m.media_attachments; track media.id) {
+                @if (media.type === 'image') {
+                  <img class="bubble-media" [src]="media.preview_url || media.url" alt="" />
+                }
+              }
+              <div class="bubble-meta muted">
+                <span>{{ m.created_at | humanTime }}</span>
+                <span class="bubble-actions">
+                  <button
+                    class="bubble-action"
+                    [class.on]="m.favourited"
+                    (click)="toggleFave(m)"
+                    title="Like"
+                  >
+                    ⭐
+                  </button>
+                  <button
+                    class="bubble-action"
+                    [class.on]="m.bookmarked"
+                    (click)="toggleBookmark(m)"
+                    title="Bookmark"
+                  >
+                    🔖
+                  </button>
+                  @if (chat.kind === 'public') {
+                    <button
+                      class="bubble-action"
+                      [class.on]="m.reblogged"
+                      (click)="toggleBoost(m)"
+                      title="Boost"
+                    >
+                      🔁
+                    </button>
+                  }
+                  <a class="bubble-action" [routerLink]="['/statuses', m.id]" title="Open as post"
+                    >↗</a
+                  >
+                </span>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (chat.kind === 'private' && chat.accounts.length > 1) {
+        <div class="group-hint muted small">
+          🔒 Group membership is just who's &#64;-mentioned — anyone replying can add or
+          remove people by editing the mentions.
+        </div>
+      }
+
+      <div class="chat-compose" [class.compose-public]="chat.kind === 'public'">
         <app-compose
           [inReplyToId]="replyToId()"
           [initialText]="replyMentions()"
-          initialVisibility="direct"
-          placeholder="Reply privately…"
+          [initialVisibility]="replyVisibility()"
+          [placeholder]="chat.kind === 'public' ? 'Reply publicly…' : 'Reply privately…'"
           (posted)="onReplyPosted($event)"
         />
-      } @else {
-        <p class="muted center">Select a conversation.</p>
-      }
-    </section>
-  </div>
+      </div>
+    } @else {
+      <div class="chat-empty muted center">
+        <p>Select a conversation.</p>
+        <p class="small">🔒 rows are private DMs; 📢 rows are public reply threads.</p>
+      </div>
+    }
+  </section>
+</div>
+
+@if (reportTarget(); as target) {
+  <app-report-dialog
+    [username]="target.acct"
+    [accountId]="target.id"
+    (closed)="reportTarget.set(null)"
+    (submitted)="reportTarget.set(null)"
+  />
 }
