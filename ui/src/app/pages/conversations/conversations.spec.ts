@@ -281,7 +281,7 @@ describe('Conversations', () => {
       last_status: makeStatus('s1'),
     });
     const fixture = setUp([conv]);
-    internals(fixture).selectedKey.set('priv:c1');
+    internals(fixture).selectedKey.set('priv:alice,bob');
 
     expect(internals(fixture).replyMentions()).toBe('@alice @bob ');
     expect(internals(fixture).replyVisibility()).toBe('direct');
@@ -315,7 +315,7 @@ describe('Conversations', () => {
   it('replyToId chains onto the newest loaded message, not the list row', () => {
     const conv = makeConversation('c1', { last_status: makeStatus('s1') });
     const fixture = setUp([conv]);
-    internals(fixture).selectedKey.set('priv:c1');
+    internals(fixture).selectedKey.set('priv:');
     internals(fixture).messages.set([
       makeStatus('s1'),
       makeStatus('s2', { created_at: '2026-01-02T00:00:00Z' }),
@@ -355,7 +355,7 @@ describe('Conversations', () => {
 
     const chats = internals(fixture).chats();
     expect(chats).toHaveLength(1);
-    expect(chats[0].key).toBe('priv:c9');
+    expect(chats[0].key).toBe('priv:');
   });
 
   it('a mention notification on the user stream adds a public chat row', () => {
@@ -402,7 +402,7 @@ describe('Conversations', () => {
   it('onReplyPosted (private): appends the message and refreshes conversations', () => {
     const conv = makeConversation('c1', { last_status: makeStatus('s1') });
     const fixture = setUp([conv]);
-    internals(fixture).selectedKey.set('priv:c1');
+    internals(fixture).selectedKey.set('priv:');
 
     const posted = makeStatus('s2', { created_at: '2026-01-02T00:00:00Z', account: ME });
     fixture.componentInstance.onReplyPosted(posted);

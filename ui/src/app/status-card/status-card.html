@@ -18,7 +18,7 @@
       </span>
       <app-verified-badge [account]="display.account" />
       <span class="acct muted">&#64;{{ display.account.acct }}</span>
-      @if (foreign) {
+      @if (foreign && !threadable) {
         <a
           class="post-time muted"
           [href]="display.url"
@@ -59,7 +59,7 @@
     } @else {
       <a
         class="content-link"
-        [routerLink]="foreign ? null : ['/statuses', display.id]"
+        [routerLink]="threadable ? ['/statuses', display.id] : null"
         (click)="onContentClick($event)"
       >
         @if (translation(); as t) {

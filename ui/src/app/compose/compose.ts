@@ -68,6 +68,8 @@ export class Compose implements OnDestroy {
   readonly initialText = input('');
   /** Optional initial visibility (e.g. 'direct' for a conversation reply). */
   readonly initialVisibility = input('public');
+  /** Pin visibility to initialVisibility (no picker) — e.g. private chats stay direct. */
+  readonly lockVisibility = input(false);
   readonly posted = output<Status>();
 
   protected readonly visibilities = VISIBILITIES;

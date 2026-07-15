@@ -7,6 +7,9 @@ import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { readerChain } from './reader-chain';
+import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
+import { adaptPost } from '../../providers/bluesky/bluesky-adapter';
+import { BskyThreadNode } from '../../providers/bluesky/bluesky-types';
 
 @Component({
   selector: 'app-thread',
@@ -16,6 +19,7 @@ import { readerChain } from './reader-chain';
 })
 export class Thread implements OnInit {
   private api = inject(Api);
+  private bsky = inject(BlueskyApi);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -94,6 +98,10 @@ export class Thread implements OnInit {
 
   load(id: string): void {
     this.loading.set(true);
+    if (id.startsWith('bsky:')) {
+      this.loadBsky(id.slice('bsky:'.length));
+      return;
+    }
     this.api.getStatus(id).subscribe((s) => {
       this.status.set(s);
       this.loading.set(false);
@@ -101,6 +109,29 @@ export class Thread implements OnInit {
     this.api.getContext(id).subscribe((ctx) => {
       this.ancestors.set(ctx.ancestors);
       this.descendants.set(ctx.descendants);
+    });
+  }
+
+  /** Bluesky thread: `getPostThread` mapped onto the same ancestors/descendants shape. */
+  private loadBsky(uri: string): void {
+    this.bsky.getPostThread(uri).subscribe({
+      next: ({ thread }) => {
+        if (!thread.post) {
+          this.loading.set(false);
+          return;
+        }
+        this.status.set(adaptPost(thread.post));
+        const ancestors: Status[] = [];
+        for (let node = thread.parent; node; node = node.parent) {
+          if (node.post) {
+            ancestors.unshift(adaptPost(node.post));
+          }
+        }
+        this.ancestors.set(ancestors);
+        this.descendants.set(flattenReplies(thread.replies ?? []));
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
     });
   }
 
@@ -136,4 +167,18 @@ export class Thread implements OnInit {
   onFocusedDeleted(): void {
     this.router.navigateByUrl('/home');
   }
+}
+
+/** Depth-first flatten of a bsky reply tree into Mastodon-style descendants order. */
+function flattenReplies(nodes: BskyThreadNode[]): Status[] {
+  const out: Status[] = [];
+  for (const node of nodes) {
+    if (node.post) {
+      out.push(adaptPost(node.post));
+    }
+    if (node.replies?.length) {
+      out.push(...flattenReplies(node.replies));
+    }
+  }
+  return out;
 }

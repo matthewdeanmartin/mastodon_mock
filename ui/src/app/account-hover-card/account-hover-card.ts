@@ -23,17 +23,19 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
       @if (account().note) {
         <div class="hc-note" [innerHTML]="account().note"></div>
       }
-      <div class="hc-stats muted">
-        <span
-          ><strong>{{ account().statuses_count }}</strong> posts</span
-        >
-        <span
-          ><strong>{{ account().following_count }}</strong> following</span
-        >
-        <span
-          ><strong>{{ account().followers_count }}</strong> followers</span
-        >
-      </div>
+      @if (hasStats) {
+        <div class="hc-stats muted">
+          <span
+            ><strong>{{ account().statuses_count }}</strong> posts</span
+          >
+          <span
+            ><strong>{{ account().following_count }}</strong> following</span
+          >
+          <span
+            ><strong>{{ account().followers_count }}</strong> followers</span
+          >
+        </div>
+      }
     </div>
   `,
   styles: `
@@ -99,4 +101,13 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
 })
 export class AccountHoverCard {
   readonly account = input.required<Account>();
+
+  /**
+   * Foreign accounts (e.g. Bluesky, id `bsky:did:…`) carry no counts — the
+   * adapters zero-fill them — so showing "0 posts, 0 followers" would just be
+   * wrong. Hide the stats row rather than lie.
+   */
+  protected get hasStats(): boolean {
+    return !this.account().id.includes(':');
+  }
 }

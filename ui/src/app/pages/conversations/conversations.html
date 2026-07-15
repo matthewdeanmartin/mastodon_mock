@@ -156,9 +156,11 @@
               }
               <div class="bubble-content" [innerHTML]="stripped(m)"></div>
               @for (media of m.media_attachments; track media.id) {
-                @if (media.type === 'image') {
-                  <img class="bubble-media" [src]="media.preview_url || media.url" alt="" />
-                }
+                <img
+                  class="bubble-media"
+                  [src]="media.preview_url || media.url"
+                  [alt]="media.description || ''"
+                />
               }
               <div class="bubble-meta muted">
                 <span>{{ m.created_at | humanTime }}</span>
@@ -211,6 +213,7 @@
           [inReplyToId]="replyToId()"
           [initialText]="replyMentions()"
           [initialVisibility]="replyVisibility()"
+          [lockVisibility]="chat.kind === 'private'"
           [placeholder]="chat.kind === 'public' ? 'Reply publicly…' : 'Reply privately…'"
           (posted)="onReplyPosted($event)"
         />

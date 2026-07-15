@@ -39,8 +39,8 @@ const READ_KEY = 'mockingbird_chat_read';
 export interface Chat {
   key: string;
   kind: 'private' | 'public';
-  /** The conversation id (private chats only; used for mark-read). */
-  convId: string | null;
+  /** Ids of the merged conversations (private chats only; used for mark-read). */
+  convIds: string[];
   /** Participants we hold full Account records for (avatars, moderation menu). */
   accounts: Account[];
   /** Every other participant's handle, including mention-only ones. */
@@ -168,22 +168,41 @@ export class Conversations implements OnInit, OnDestroy {
   /** Private + public rows merged, newest activity first. */
   protected chats = computed<Chat[]>(() => {
     const me = this.auth.account();
-    const rows: Chat[] = this.privateConvs().map((c) => ({
-      key: `priv:${c.id}`,
-      kind: 'private' as const,
-      convId: c.id,
-      accounts: c.accounts,
-      handles: c.accounts.map((a) => a.acct),
-      lastStatus: c.last_status,
-      unread: c.unread,
-    }));
+    // The conversations API returns one row per thread; like public chats we
+    // group by the people instead, merging every thread with the same set.
+    const byKey = new Map<string, Chat>();
+    for (const c of this.privateConvs()) {
+      const key = privateKey(c.accounts);
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, {
+          key,
+          kind: 'private',
+          convIds: [c.id],
+          accounts: c.accounts,
+          handles: c.accounts.map((a) => a.acct),
+          lastStatus: c.last_status,
+          unread: c.unread,
+        });
+        continue;
+      }
+      existing.convIds.push(c.id);
+      existing.unread = existing.unread || c.unread;
+      if (
+        c.last_status &&
+        (!existing.lastStatus || c.last_status.created_at > existing.lastStatus.created_at)
+      ) {
+        existing.lastStatus = c.last_status;
+      }
+    }
+    const rows: Chat[] = [...byKey.values()];
     const read = this.lastRead();
     for (const [key, statuses] of this.publicStatuses()) {
       const last = statuses[statuses.length - 1] ?? null;
       rows.push({
         key,
         kind: 'public',
-        convId: null,
+        convIds: [],
         accounts: this.publicAccounts().get(key) ?? [],
         handles: key.slice('pub:'.length).split(','),
         lastStatus: last,
@@ -359,7 +378,14 @@ export class Conversations implements OnInit, OnDestroy {
 
   private loadThread(chat: Chat): void {
     const anchor = chat.lastStatus;
-    const known = chat.kind === 'public' ? (this.publicStatuses().get(chat.key) ?? []) : [];
+    // Merged private chats span several threads; their last statuses at least
+    // belong in the history even though only the anchor's context is fetched.
+    const known =
+      chat.kind === 'public'
+        ? (this.publicStatuses().get(chat.key) ?? [])
+        : this.privateConvs()
+            .filter((c) => chat.convIds.includes(c.id) && c.last_status)
+            .map((c) => c.last_status!);
     if (!anchor) {
       this.messages.set([]);
       return;
@@ -398,8 +424,8 @@ export class Conversations implements OnInit, OnDestroy {
       this.api.conversations().subscribe((convs) => {
         this.privateConvs.set(convs);
         const mine = convs.find((c) => c.last_status?.id === status.id);
-        if (mine && chat?.convId !== mine.id) {
-          this.selectedKey.set(`priv:${mine.id}`);
+        if (mine) {
+          this.selectedKey.set(privateKey(mine.accounts));
         }
       });
     } else {
@@ -412,10 +438,13 @@ export class Conversations implements OnInit, OnDestroy {
 
   private markRead(chat: Chat): void {
     if (chat.kind === 'private') {
-      if (chat.unread && chat.convId) {
-        this.api.markConversationRead(chat.convId).subscribe(() => {
+      const unreadIds = this.privateConvs()
+        .filter((c) => chat.convIds.includes(c.id) && c.unread)
+        .map((c) => c.id);
+      for (const id of unreadIds) {
+        this.api.markConversationRead(id).subscribe(() => {
           this.privateConvs.update((list) =>
-            list.map((c) => (c.id === chat.convId ? { ...c, unread: false } : c)),
+            list.map((c) => (c.id === id ? { ...c, unread: false } : c)),
           );
         });
       }
@@ -438,7 +467,7 @@ export class Conversations implements OnInit, OnDestroy {
       return [conv, ...rest];
     });
     const chat = this.selected();
-    if (chat?.kind === 'private' && chat.convId === conv.id && conv.last_status) {
+    if (chat?.kind === 'private' && chat.key === privateKey(conv.accounts) && conv.last_status) {
       this.messages.update((list) => dedupeSort([...list, conv.last_status!]));
       this.scrollToBottom();
       this.markRead({ ...chat, unread: true, lastStatus: conv.last_status });
@@ -539,6 +568,17 @@ export class Conversations implements OnInit, OnDestroy {
       this.moderated.update((m) => ({ ...m, [acc.id]: 'blocked' }));
     });
   }
+}
+
+/** Private chats group by participant set (matching how public ones group by author). */
+function privateKey(accounts: Account[]): string {
+  return (
+    'priv:' +
+    accounts
+      .map((a) => a.acct)
+      .sort()
+      .join(',')
+  );
 }
 
 function dedupeSort(statuses: Status[]): Status[] {

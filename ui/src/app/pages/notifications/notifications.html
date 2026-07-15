@@ -1,4 +1,26 @@
 <div class="live-toggle">
+  <div class="notif-filters">
+    <div class="seg" role="group" aria-label="From">
+      <button [class.active]="audience() === 'all'" (click)="audience.set('all')">All</button>
+      <button [class.active]="audience() === 'friends'" (click)="audience.set('friends')">
+        Friends
+      </button>
+      <button [class.active]="audience() === 'followers'" (click)="audience.set('followers')">
+        Followers
+      </button>
+    </div>
+    <select
+      class="type-select"
+      [ngModel]="typeFilter()"
+      (ngModelChange)="typeFilter.set($event)"
+      title="Notification type"
+    >
+      <option value="all">All types</option>
+      @for (t of types(); track t) {
+        <option [value]="t">{{ t }}</option>
+      }
+    </select>
+  </div>
   <button class="btn btn-outline" [class.active]="live()" (click)="toggleLive()">
     {{ live() ? '● Live' : 'Go live' }}
   </button>
@@ -8,8 +30,10 @@
   <p class="muted center">Loading…</p>
 } @else if (!items().length) {
   <p class="muted center">No notifications yet.</p>
+} @else if (!visible().length) {
+  <p class="muted center">No notifications match the filters.</p>
 } @else {
-  @for (n of items(); track n.id) {
+  @for (n of visible(); track n.id) {
     <div class="notif">
       <a [routerLink]="['/accounts', n.account.id]">
         <img class="notif-avatar" [src]="n.account.avatar" [alt]="n.account.username" />

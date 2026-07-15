@@ -90,16 +90,20 @@
           <option value="both">🦣+🦋 Both</option>
         </select>
       }
-      <select
-        class="visibility-select"
-        [ngModel]="visibility()"
-        (ngModelChange)="visibility.set($event)"
-        title="Visibility"
-      >
-        @for (v of visibilities; track v) {
-          <option [value]="v">{{ v }}</option>
-        }
-      </select>
+      @if (lockVisibility()) {
+        <span class="visibility-locked" title="Visibility is fixed here">🔒 {{ visibility() }}</span>
+      } @else {
+        <select
+          class="visibility-select"
+          [ngModel]="visibility()"
+          (ngModelChange)="visibility.set($event)"
+          title="Visibility"
+        >
+          @for (v of visibilities; track v) {
+            <option [value]="v">{{ v }}</option>
+          }
+        </select>
+      }
 
       <label class="tool-btn" [class.disabled]="!canAttachMedia()" title="Attach media">
         📎

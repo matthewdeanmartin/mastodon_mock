@@ -75,6 +75,14 @@ export interface BskyTimeline {
   cursor?: string;
 }
 
+/** `app.bsky.feed.getPostThread` node; `post` is absent on notFound/blocked variants. */
+export interface BskyThreadNode {
+  $type?: string;
+  post?: BskyPostView;
+  parent?: BskyThreadNode;
+  replies?: BskyThreadNode[];
+}
+
 /** What the provider stashes in `Status.providerRef` for later interactions. */
 export interface BskyRef {
   uri: string;

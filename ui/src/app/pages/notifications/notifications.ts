@@ -1,15 +1,18 @@
-import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { ClientPrefs } from '../../client-prefs';
-import { MastodonNotification } from '../../models';
+import { MastodonNotification, Relationship } from '../../models';
 import { Streaming } from '../../streaming';
 import { Compose } from '../../compose/compose';
 
+type NotifAudience = 'all' | 'friends' | 'followers';
+
 @Component({
   selector: 'app-notifications',
-  imports: [RouterLink, Compose],
+  imports: [RouterLink, Compose, FormsModule],
   templateUrl: './notifications.html',
   styleUrl: './notifications.css',
 })
@@ -24,6 +27,63 @@ export class Notifications implements OnInit, OnDestroy {
   protected items = signal<MastodonNotification[]>([]);
   protected loading = signal(true);
   protected live = signal(false);
+
+  // List filters: who the notification is from, and what kind it is.
+  protected audience = signal<NotifAudience>('all');
+  protected typeFilter = signal<string>('all');
+
+  /** Relationships for the friends/followers filters; fetched lazily. */
+  private rels = signal<Map<string, Relationship>>(new Map());
+  private requestedRels = new Set<string>();
+
+  /** Distinct notification types present, for the type dropdown. */
+  protected types = computed(() => [...new Set(this.items().map((n) => n.type))].sort());
+
+  protected visible = computed(() => {
+    const type = this.typeFilter();
+    const audience = this.audience();
+    const rels = this.rels();
+    return this.items().filter((n) => {
+      if (type !== 'all' && n.type !== type) {
+        return false;
+      }
+      if (audience === 'all') {
+        return true;
+      }
+      const r = rels.get(n.account.id);
+      return audience === 'friends' ? !!r?.following : !!r?.followed_by;
+    });
+  });
+
+  constructor() {
+    effect(() => {
+      if (this.audience() === 'all') {
+        return;
+      }
+      const missing = [
+        ...new Set(
+          this.items()
+            .map((n) => n.account.id)
+            .filter((id) => !this.requestedRels.has(id)),
+        ),
+      ];
+      if (!missing.length) {
+        return;
+      }
+      for (const id of missing) {
+        this.requestedRels.add(id);
+      }
+      this.api.relationships(missing).subscribe((list) => {
+        this.rels.update((map) => {
+          const next = new Map(map);
+          for (const r of list) {
+            next.set(r.id, r);
+          }
+          return next;
+        });
+      });
+    });
+  }
 
   private liveSub: Subscription | null = null;
 

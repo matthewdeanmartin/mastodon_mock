@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, Observable, switchMap, throwError } from 'rxjs';
 import { externalFetch } from '../external-fetch';
 import { BlueskySession } from './bluesky-session';
-import { BskyFacet, BskyTimeline } from './bluesky-types';
+import { BskyFacet, BskyThreadNode, BskyTimeline } from './bluesky-types';
 
 interface CreateRecordResponse {
   uri: string;
@@ -39,6 +39,12 @@ export class BlueskyApi {
       params = params.set('cursor', cursor);
     }
     return this.get<BskyTimeline>('app.bsky.feed.getTimeline', params);
+  }
+
+  /** Full thread (ancestors + replies) for a post's at-uri. */
+  getPostThread(uri: string): Observable<{ thread: BskyThreadNode }> {
+    const params = new HttpParams().set('uri', uri).set('depth', '50');
+    return this.get<{ thread: BskyThreadNode }>('app.bsky.feed.getPostThread', params);
   }
 
   /** Like a post; returns the like record's at-uri (needed to unlike). */

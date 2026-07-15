@@ -215,6 +215,15 @@ export class StatusCard {
     return (this.display.provider ?? 'mastodon') !== 'mastodon';
   }
 
+  /**
+   * True when the thread page can render this post's conversation. Bluesky
+   * threads load via `getPostThread`; RSS items have no thread at all.
+   */
+  protected get threadable(): boolean {
+    const provider = this.display.provider ?? 'mastodon';
+    return provider === 'mastodon' || provider === 'bluesky';
+  }
+
   protected get providerBadge(): string | null {
     switch (this.display.provider) {
       case 'rss':

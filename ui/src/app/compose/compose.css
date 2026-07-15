@@ -65,6 +65,15 @@ textarea {
   text-transform: capitalize;
 }
 
+.visibility-locked {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 13px;
+  text-transform: capitalize;
+  opacity: 0.8;
+}
+
 .target-select {
   border: 1px solid var(--border);
   border-radius: 12px;
