@@ -4,6 +4,7 @@ import {
   OnDestroy,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -12,19 +13,28 @@ import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
+import { ClientPrefs } from '../../client-prefs';
 import { Compose } from '../../compose/compose';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { Streaming } from '../../streaming';
-import { Account, Conversation, MastodonNotification, Status } from '../../models';
+import {
+  Account,
+  Conversation,
+  MastodonNotification,
+  Relationship,
+  Status,
+} from '../../models';
 
 /** localStorage map of chat key → ISO timestamp of the newest message seen there. */
 const READ_KEY = 'mockingbird_chat_read';
 
 /**
- * One row in the chat list. Private chats wrap a Mastodon conversation; public
- * chats are synthesized client-side from mention notifications, grouped by
- * participant set (so all threads with the same people read as one IM history).
+ * One row in the chat list. Private chats wrap a Mastodon conversation. Public
+ * chats are synthesized client-side from mention notifications, grouped by the
+ * reply guy (status author): tracing reply graphs to identify "the same thread"
+ * is deliberately avoided, so all public mentions from steve read as one IM
+ * history with steve, separate from any private chat with him.
  */
 export interface Chat {
   key: string;
@@ -47,6 +57,47 @@ function readMap(): Record<string, string> {
   }
 }
 
+/** Leading `@user` / `@user@domain` runs (with separating spaces/commas). */
+const LEADING_MENTIONS = /^(?:[\s,]*@[\w.-]+(?:@[\w.-]+)?)+[\s,:]*/;
+
+/**
+ * Drop the `@a @b …` prelude that starts almost every reply, so chat rows and
+ * bubbles lead with the actual message. Handles both Mastodon's h-card markup
+ * and plain-text mentions. Falls back to the original when nothing but
+ * mentions remain (an empty bubble is worse than a noisy one).
+ */
+export function stripLeadingMentions(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const container = doc.body.querySelector('p') ?? doc.body;
+  let node: ChildNode | null = container.firstChild;
+  while (node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const stripped = (node.textContent ?? '').replace(LEADING_MENTIONS, '');
+      if (!stripped.trim()) {
+        const next = node.nextSibling;
+        node.remove();
+        node = next;
+        continue;
+      }
+      node.textContent = stripped.replace(/^\s+/, '');
+      break;
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      if (el.classList.contains('h-card') || el.classList.contains('mention')) {
+        const next = node.nextSibling;
+        el.remove();
+        node = next;
+        continue;
+      }
+      break;
+    }
+    node = node.nextSibling;
+  }
+  const out = doc.body.innerHTML.trim();
+  return out && out !== '<p></p>' ? out : html;
+}
+
 @Component({
   selector: 'app-conversations',
   imports: [Compose, HumanTimePipe, ReportDialog, RouterLink],
@@ -57,6 +108,7 @@ export class Conversations implements OnInit, OnDestroy {
   private api = inject(Api);
   private auth = inject(Auth);
   private streaming = inject(Streaming);
+  protected prefs = inject(ClientPrefs);
 
   protected loading = signal(true);
   protected privateConvs = signal<Conversation[]>([]);
@@ -75,6 +127,43 @@ export class Conversations implements OnInit, OnDestroy {
   private lastRead = signal<Record<string, string>>(readMap());
   private scroller = viewChild<ElementRef<HTMLElement>>('scroller');
   private subs: Subscription[] = [];
+
+  /** Relationships for the mutuals filter; fetched lazily, only when it's on. */
+  private rels = signal<Map<string, Relationship>>(new Map());
+  private requestedRels = new Set<string>();
+
+  private strippedCache = new Map<string, string>();
+
+  constructor() {
+    effect(() => {
+      if (this.prefs.chatAudience() !== 'mutuals') {
+        return;
+      }
+      const missing = new Set<string>();
+      for (const chat of this.chats()) {
+        for (const a of chat.accounts) {
+          if (!this.requestedRels.has(a.id)) {
+            missing.add(a.id);
+          }
+        }
+      }
+      if (!missing.size) {
+        return;
+      }
+      for (const id of missing) {
+        this.requestedRels.add(id);
+      }
+      this.api.relationships([...missing]).subscribe((list) => {
+        this.rels.update((map) => {
+          const next = new Map(map);
+          for (const r of list) {
+            next.set(r.id, r);
+          }
+          return next;
+        });
+      });
+    });
+  }
 
   /** Private + public rows merged, newest activity first. */
   protected chats = computed<Chat[]>(() => {
@@ -109,6 +198,28 @@ export class Conversations implements OnInit, OnDestroy {
     );
   });
 
+  /** The chat list after the audience (mutuals) and kind (🔒/📢) toggles. */
+  protected visibleChats = computed<Chat[]>(() => {
+    const kind = this.prefs.chatKind();
+    const audience = this.prefs.chatAudience();
+    const rels = this.rels();
+    return this.chats().filter((c) => {
+      if (kind !== 'all' && c.kind !== kind) {
+        return false;
+      }
+      if (audience === 'mutuals' && c.accounts.length) {
+        const mutual = c.accounts.every((a) => {
+          const r = rels.get(a.id);
+          return !!r && r.following && r.followed_by;
+        });
+        if (!mutual) {
+          return false;
+        }
+      }
+      return true;
+    });
+  });
+
   protected selected = computed(
     () => this.chats().find((c) => c.key === this.selectedKey()) ?? null,
   );
@@ -116,10 +227,27 @@ export class Conversations implements OnInit, OnDestroy {
   /** Pre-seed the composer with @mentions of the other participants. */
   protected replyMentions = computed(() => {
     const chat = this.selected();
-    if (!chat?.handles.length) {
+    if (!chat) {
       return '';
     }
-    return chat.handles.map((h) => `@${h}`).join(' ') + ' ';
+    const handles = new Set<string>(chat.handles.filter((h) => h !== ''));
+    if (chat.kind === 'public') {
+      // Author-grouped chats only know the reply guy; keep everyone the last
+      // message was addressed to in the thread too.
+      const me = this.auth.account();
+      const last = this.messages().at(-1) ?? chat.lastStatus;
+      if (last) {
+        if (last.account.acct !== me?.acct) {
+          handles.add(last.account.acct);
+        }
+        for (const m of last.mentions ?? []) {
+          if (m.acct !== me?.acct) {
+            handles.add(m.acct);
+          }
+        }
+      }
+    }
+    return handles.size ? [...handles].map((h) => `@${h}`).join(' ') + ' ' : '';
   });
 
   /** Replies chain onto the newest message in the open thread. */
@@ -202,18 +330,29 @@ export class Conversations implements OnInit, OnDestroy {
   }
 
   title(chat: Chat): string {
-    if (!chat.accounts.length && !chat.handles.length) {
+    if (!chat.accounts.length && !chat.handles.some((h) => h !== '')) {
       // A self-conversation (direct message to yourself).
       return this.auth.account()?.display_name || 'You';
     }
     const named = chat.accounts.map((a) => a.display_name || a.username);
     const known = new Set(chat.accounts.map((a) => a.acct));
-    const unnamed = chat.handles.filter((h) => !known.has(h)).map((h) => `@${h}`);
+    const unnamed = chat.handles.filter((h) => h !== '' && !known.has(h)).map((h) => `@${h}`);
     return [...named, ...unnamed].join(', ');
   }
 
   protected isMine(m: Status): boolean {
     return m.account.id === this.auth.account()?.id;
+  }
+
+  /** Message HTML minus the leading @mention run (memoized; edits re-render). */
+  protected stripped(s: Status): string {
+    const cacheKey = `${s.id}:${s.edited_at ?? ''}`;
+    let out = this.strippedCache.get(cacheKey);
+    if (out === undefined) {
+      out = stripLeadingMentions(s.content);
+      this.strippedCache.set(cacheKey, out);
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------- thread
@@ -264,7 +403,8 @@ export class Conversations implements OnInit, OnDestroy {
         }
       });
     } else {
-      this.addPublicStatus(status, status.account);
+      // My own reply can't be keyed by author; it belongs to the open chat.
+      this.addPublicStatus(status, status.account, chat.key);
     }
   }
 
@@ -305,11 +445,14 @@ export class Conversations implements OnInit, OnDestroy {
     }
   }
 
-  private addPublicStatus(status: Status, author: Account): void {
+  private addPublicStatus(status: Status, author: Account, keyOverride?: string): void {
     if (status.visibility === 'direct') {
       return; // direct mentions belong to the conversations API, not public chats
     }
-    const key = this.publicKey(status);
+    const key = keyOverride ?? this.publicKey(author);
+    if (!key) {
+      return;
+    }
     this.publicStatuses.update((map) => {
       const next = new Map(map);
       next.set(key, dedupeSort([...(next.get(key) ?? []), status]));
@@ -352,19 +495,14 @@ export class Conversations implements OnInit, OnDestroy {
     this.scrollToBottom();
   }
 
-  /** Chat key for a public status: the sorted set of everyone else in it. */
-  private publicKey(status: Status): string {
-    const me = this.auth.account();
-    const handles = new Set<string>();
-    if (status.account.acct !== me?.acct) {
-      handles.add(status.account.acct);
-    }
-    for (const m of status.mentions ?? []) {
-      if (m.acct !== me?.acct) {
-        handles.add(m.acct);
-      }
-    }
-    return 'pub:' + [...handles].sort().join(',');
+  /**
+   * Public chats group by the reply guy: all public mentions authored by the
+   * same person read as one IM history, regardless of which thread they came
+   * from (no reply-graph tracing). My own statuses have no key of their own —
+   * they join whichever chat they were sent from (see onReplyPosted).
+   */
+  private publicKey(author: Account): string | null {
+    return author.id === this.auth.account()?.id ? null : `pub:${author.acct}`;
   }
 
   // ---------------------------------------------------------------- bubble actions

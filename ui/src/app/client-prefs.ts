@@ -12,6 +12,10 @@ export type VerifiedMode = 'fixed' | 'famous' | 'everyone';
 export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
 export type ReaderTextAlign = 'left' | 'justify';
 
+// Chat-list filters (the toggles above the conversation list).
+export type ChatAudience = 'everyone' | 'mutuals';
+export type ChatKindFilter = 'all' | 'private' | 'public';
+
 export interface AccentPreset {
   id: string;
   label: string;
@@ -73,6 +77,8 @@ interface StoredPrefs {
   feedReader?: boolean;
   showImages?: boolean;
   hiddenProviders?: ProviderId[];
+  chatAudience?: ChatAudience;
+  chatKind?: ChatKindFilter;
 }
 
 /** Clamp helper shared by the numeric reader prefs. */
@@ -116,6 +122,10 @@ export class ClientPrefs {
 
   /** Providers filtered OUT of the home feed via the command-bar chips. */
   readonly hiddenProviders = signal<ProviderId[]>([]);
+
+  // Chat-list filters.
+  readonly chatAudience = signal<ChatAudience>('everyone');
+  readonly chatKind = signal<ChatKindFilter>('all');
 
   /** Resolved theme actually in effect ('auto' resolved against the OS preference). */
   readonly resolvedTheme = signal<'light' | 'dark'>('light');
@@ -202,6 +212,18 @@ export class ClientPrefs {
     return !this.hiddenProviders().includes(id);
   }
 
+  setChatAudience(who: ChatAudience): void {
+    if (who === 'everyone' || who === 'mutuals') {
+      this.chatAudience.set(who);
+    }
+  }
+
+  setChatKind(kind: ChatKindFilter): void {
+    if (kind === 'all' || kind === 'private' || kind === 'public') {
+      this.chatKind.set(kind);
+    }
+  }
+
   toggleProvider(id: ProviderId): void {
     this.hiddenProviders.update((hidden) =>
       hidden.includes(id) ? hidden.filter((p) => p !== id) : [...hidden, id],
@@ -266,6 +288,12 @@ export class ClientPrefs {
     if (Array.isArray(stored.hiddenProviders)) {
       this.hiddenProviders.set(stored.hiddenProviders.filter((p) => PROVIDER_IDS.includes(p)));
     }
+    if (stored.chatAudience === 'everyone' || stored.chatAudience === 'mutuals') {
+      this.chatAudience.set(stored.chatAudience);
+    }
+    if (stored.chatKind === 'all' || stored.chatKind === 'private' || stored.chatKind === 'public') {
+      this.chatKind.set(stored.chatKind);
+    }
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -291,6 +319,8 @@ export class ClientPrefs {
       feedReader: this.feedReader(),
       showImages: this.showImages(),
       hiddenProviders: this.hiddenProviders(),
+      chatAudience: this.chatAudience(),
+      chatKind: this.chatKind(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   }

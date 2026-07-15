@@ -1,14 +1,51 @@
 <div class="chat-page">
   <aside class="chat-list">
     <div class="chat-list-head">Chat</div>
+    <div class="chat-filters">
+      <div class="seg" role="group" aria-label="Who">
+        <button
+          [class.active]="prefs.chatAudience() === 'everyone'"
+          (click)="prefs.setChatAudience('everyone')"
+        >
+          Everyone
+        </button>
+        <button
+          [class.active]="prefs.chatAudience() === 'mutuals'"
+          (click)="prefs.setChatAudience('mutuals')"
+        >
+          Mutuals
+        </button>
+      </div>
+      <div class="seg" role="group" aria-label="Kind">
+        <button [class.active]="prefs.chatKind() === 'all'" (click)="prefs.setChatKind('all')">
+          All
+        </button>
+        <button
+          [class.active]="prefs.chatKind() === 'private'"
+          (click)="prefs.setChatKind('private')"
+          title="Private DMs"
+        >
+          🔒 Private
+        </button>
+        <button
+          [class.active]="prefs.chatKind() === 'public'"
+          (click)="prefs.setChatKind('public')"
+          title="Public reply threads"
+        >
+          📢 Public
+        </button>
+      </div>
+    </div>
     @if (loading()) {
       <p class="muted center">Loading…</p>
     } @else if (!chats().length) {
       <p class="muted center small">
         No conversations yet. Post with visibility "direct", or reply to a mention.
       </p>
+    } @else if (!visibleChats().length) {
+      <p class="muted center small">No chats match the filters.</p>
     }
-    @for (c of chats(); track c.key) {
+    @for (c of visibleChats(); track c.key) {
       <button
         class="conv-row"
         [class.active]="c.key === selectedKey()"
@@ -29,16 +66,16 @@
             @if (c.unread) {
               <span class="unread-dot" title="Unread">●</span>
             }
+            @if (c.kind === 'public') {
+              <span class="kind-badge kind-public">📢 PUBLIC</span>
+            } @else {
+              <span class="kind-badge kind-private">🔒 Private</span>
+            }
           </div>
           @if (c.lastStatus) {
-            <div class="conv-preview muted" [innerHTML]="c.lastStatus.content"></div>
+            <div class="conv-preview muted" [innerHTML]="stripped(c.lastStatus)"></div>
           }
         </div>
-        @if (c.kind === 'public') {
-          <span class="kind-badge kind-public">📢 PUBLIC</span>
-        } @else {
-          <span class="kind-badge kind-private">🔒 Private</span>
-        }
       </button>
     }
   </aside>
@@ -117,7 +154,7 @@
               @if (!isMine(m) && chat.accounts.length > 1) {
                 <div class="bubble-author small">{{ m.account.display_name || m.account.username }}</div>
               }
-              <div class="bubble-content" [innerHTML]="m.content"></div>
+              <div class="bubble-content" [innerHTML]="stripped(m)"></div>
               @for (media of m.media_attachments; track media.id) {
                 @if (media.type === 'image') {
                   <img class="bubble-media" [src]="media.preview_url || media.url" alt="" />
