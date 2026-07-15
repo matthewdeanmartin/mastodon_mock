@@ -1,37 +1,157 @@
 <div class="overlay" (click)="closed.emit()">
   <div class="dialog" (click)="$event.stopPropagation()">
-    <h3>Add &#64;{{ username() }} to lists</h3>
+    <h3>Add &#64;{{ username() }} to lists &amp; collections</h3>
 
     @if (loading()) {
       <p class="muted">Loading…</p>
     } @else {
-      @if (rows().length) {
-        <ul class="list-rows">
-          @for (row of rows(); track row.list.id) {
-            <li>
-              <label>
-                <input type="checkbox" [checked]="row.member" (change)="toggle(row)" />
-                {{ row.list.title }}
-              </label>
-            </li>
-          }
-        </ul>
-      } @else {
-        <p class="muted small">You have no lists yet. Create one below.</p>
-      }
+      <!-- Lists (private) -->
+      <section class="section">
+        <h4>Lists <span class="tag">private</span></h4>
+        @if (rows().length) {
+          <ul class="list-rows">
+            @for (row of rows(); track row.list.id) {
+              <li>
+                <label>
+                  <input type="checkbox" [checked]="row.member" (change)="toggle(row)" />
+                  {{ row.list.title }}
+                </label>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="muted small">No lists yet. Create one below.</p>
+        }
 
-      <div class="new-list">
-        <input
-          type="text"
-          [ngModel]="newTitle()"
-          (ngModelChange)="newTitle.set($event)"
-          (keyup.enter)="createAndAdd()"
-          placeholder="New list name"
-        />
-        <button class="btn" [disabled]="!newTitle().trim()" (click)="createAndAdd()">
-          Create &amp; add
-        </button>
-      </div>
+        <div class="new-row">
+          <input
+            type="text"
+            [ngModel]="newTitle()"
+            (ngModelChange)="newTitle.set($event)"
+            (keyup.enter)="createAndAdd()"
+            placeholder="New list name"
+          />
+          <button class="btn" [disabled]="!newTitle().trim()" (click)="createAndAdd()">
+            Create &amp; add
+          </button>
+        </div>
+      </section>
+
+      <!-- Collections (public) -->
+      <section class="section">
+        <h4>Collections <span class="tag tag-public">public</span></h4>
+        @if (!collectionsSupported()) {
+          <p class="muted small">This server does not support collections.</p>
+        } @else {
+          @if (collectionRows().length) {
+            <ul class="list-rows">
+              @for (row of collectionRows(); track row.collection.id) {
+                <li>
+                  <label>
+                    <input
+                      type="checkbox"
+                      [checked]="row.member"
+                      [disabled]="row.busy"
+                      (change)="toggleCollection(row)"
+                    />
+                    {{ row.collection.name }}
+                  </label>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="muted small">No collections yet. Create one below.</p>
+          }
+
+          <div class="new-row">
+            <input
+              type="text"
+              [ngModel]="newCollectionName()"
+              (ngModelChange)="newCollectionName.set($event)"
+              (keyup.enter)="createCollectionAndAdd()"
+              placeholder="New collection name"
+            />
+            <button
+              class="btn"
+              [disabled]="!newCollectionName().trim()"
+              (click)="createCollectionAndAdd()"
+            >
+              Create &amp; add
+            </button>
+          </div>
+        }
+      </section>
+
+      <!-- Bulk add-by-name -->
+      <section class="section">
+        <h4>Add several people by name</h4>
+        <p class="muted small">
+          Paste handles separated by commas, spaces, or line breaks. They're resolved and added to
+          the target below, one after another.
+        </p>
+
+        <div class="bulk-target">
+          <input
+            type="text"
+            [ngModel]="bulkTarget()"
+            (ngModelChange)="bulkTarget.set($event)"
+            placeholder="Target name (created if new)"
+          />
+          <label class="radio">
+            <input
+              type="radio"
+              name="bulkKind"
+              value="list"
+              [checked]="bulkKind() === 'list'"
+              (change)="bulkKind.set('list')"
+            />
+            list
+          </label>
+          <label class="radio">
+            <input
+              type="radio"
+              name="bulkKind"
+              value="collection"
+              [checked]="bulkKind() === 'collection'"
+              (change)="bulkKind.set('collection')"
+            />
+            collection
+          </label>
+        </div>
+
+        <textarea
+          class="bulk-handles"
+          rows="3"
+          [ngModel]="bulkHandles()"
+          (ngModelChange)="bulkHandles.set($event)"
+          placeholder="&#64;alice, &#64;bob@example.social&#10;&#64;carol"
+        ></textarea>
+
+        <div class="bulk-actions">
+          <button
+            class="btn"
+            [disabled]="bulkBusy() || !bulkTarget().trim() || !bulkCount()"
+            (click)="bulkAdd()"
+          >
+            {{
+              bulkBusy()
+                ? 'Adding…'
+                : 'Add ' + bulkCount() + ' ' + (bulkCount() === 1 ? 'person' : 'people')
+            }}
+          </button>
+        </div>
+
+        @if (bulkResults().length) {
+          <ul class="bulk-results small">
+            @for (r of bulkResults(); track $index) {
+              <li [class]="'result-' + r.status">
+                <span class="result-handle">{{ r.handle }}</span>
+                <span class="result-status">{{ r.status }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
     }
 
     <div class="dialog-actions">

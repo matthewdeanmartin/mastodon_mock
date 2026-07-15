@@ -11,7 +11,9 @@
       <img class="avatar" [src]="a.avatar" [alt]="a.username" />
       @if (!isSelf()) {
         <div class="profile-buttons">
-          <button class="btn btn-outline" (click)="showLists.set(true)">Lists</button>
+          <button class="btn btn-outline" (click)="showLists.set(true)">
+            Lists &amp; collections
+          </button>
           <details class="account-danger-menu">
             <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
             <div class="account-danger-panel">

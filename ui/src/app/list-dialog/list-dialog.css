@@ -13,12 +13,42 @@
   background: var(--col-bg);
   border-radius: 16px;
   padding: 24px;
-  width: 360px;
+  width: 400px;
   max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 h3 {
   margin: 0 0 12px;
+}
+
+.section {
+  margin-bottom: 18px;
+}
+
+.section h4 {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.tag {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--border);
+  color: var(--col-fg-muted, inherit);
+}
+
+.tag-public {
+  background: var(--brand, #6364ff);
+  color: #fff;
 }
 
 .small {
@@ -29,7 +59,7 @@ h3 {
   list-style: none;
   margin: 0 0 12px;
   padding: 0;
-  max-height: 220px;
+  max-height: 180px;
   overflow-y: auto;
 }
 
@@ -44,22 +74,98 @@ h3 {
   cursor: pointer;
 }
 
-.new-list {
+.new-row {
   display: flex;
   gap: 8px;
   border-top: 1px solid var(--border);
   padding-top: 12px;
 }
 
-.new-list input {
+.new-row input {
   flex: 1;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.new-list .btn {
+.new-row .btn {
   white-space: nowrap;
+}
+
+.bulk-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.bulk-target input[type='text'] {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.bulk-target .radio {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bulk-handles {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+  font: inherit;
+}
+
+.bulk-actions {
+  margin-top: 8px;
+}
+
+.bulk-results {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.bulk-results li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+}
+
+.result-handle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-status {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+.result-added .result-status {
+  color: #2e7d32;
+}
+
+.result-exists .result-status {
+  color: var(--col-fg-muted, gray);
+}
+
+.result-notfound .result-status,
+.result-error .result-status {
+  color: #c62828;
 }
 
 .dialog-actions {
