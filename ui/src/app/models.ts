@@ -89,6 +89,8 @@ export interface Quote {
 export interface Status {
   /** Absent = Mastodon. Foreign statuses use namespaced ids (e.g. "rss:…"). */
   provider?: ProviderId;
+  /** Opaque handle the owning provider needs for interactions (uri/cid etc.). */
+  providerRef?: unknown;
   id: string;
   created_at: string;
   edited_at: string | null;

@@ -1,24 +1,37 @@
-import { WritableSignal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BlueskySession, BskySession } from '../../../providers/bluesky/bluesky-session';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 import { SettingsConnections } from './settings-connections';
 
-/** Expose the protected url signal — ngModel writes are async in specs. */
+/** Expose the protected signals — ngModel writes are async in specs. */
 interface ConnectionsInternals {
   feedUrl: WritableSignal<string>;
+  bskyHandle: WritableSignal<string>;
+  bskyPassword: WritableSignal<string>;
 }
 
 describe('SettingsConnections', () => {
   let fetchFeed: ReturnType<typeof vi.fn>;
+  let bskySession: {
+    session: WritableSignal<BskySession | null>;
+    login: ReturnType<typeof vi.fn>;
+    unlink: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     localStorage.clear();
     fetchFeed = vi.fn();
+    bskySession = { session: signal<BskySession | null>(null), login: vi.fn(), unlink: vi.fn() };
     TestBed.configureTestingModule({
-      providers: [{ provide: RssFetch, useValue: { fetchFeed } }],
+      providers: [
+        { provide: RssFetch, useValue: { fetchFeed } },
+        { provide: BlueskySession, useValue: bskySession },
+      ],
     });
   });
 
@@ -95,5 +108,75 @@ describe('SettingsConnections', () => {
     fixture.detectChanges();
     expect(subs.feeds()).toEqual([]);
     expect(el.textContent).toContain('No feeds yet');
+  });
+
+  // ---------------------------------------------------------------- Bluesky
+
+  function fillBsky(fixture: ComponentFixture<SettingsConnections>, handle: string, pw: string) {
+    const c = fixture.componentInstance as unknown as ConnectionsInternals;
+    c.bskyHandle.set(handle);
+    c.bskyPassword.set(pw);
+    fixture.detectChanges();
+  }
+
+  function submitBsky(fixture: ComponentFixture<SettingsConnections>): void {
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('form.bsky-form')!
+      .dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+  }
+
+  it('links Bluesky with a stripped @handle and shows the linked identity', () => {
+    const linked: BskySession = {
+      service: 'https://bsky.social',
+      handle: 'me.bsky.social',
+      did: 'did:plc:me',
+      accessJwt: 'a',
+      refreshJwt: 'r',
+      displayName: 'Me!',
+    };
+    bskySession.login.mockImplementation(() => {
+      bskySession.session.set(linked);
+      return of(linked);
+    });
+    const fixture = setUp();
+
+    fillBsky(fixture, '@me.bsky.social', 'app-pass');
+    submitBsky(fixture);
+
+    expect(bskySession.login).toHaveBeenCalledWith('me.bsky.social', 'app-pass');
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Me!');
+    expect(el.textContent).toContain('@me.bsky.social');
+    expect(el.textContent).toContain('Unlink');
+  });
+
+  it('shows a friendly error when Bluesky rejects the credentials', () => {
+    bskySession.login.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 401, error: {} })),
+    );
+    const fixture = setUp();
+
+    fillBsky(fixture, 'me.bsky.social', 'wrong');
+    submitBsky(fixture);
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'rejected that handle/app password',
+    );
+  });
+
+  it('unlink calls the session service', () => {
+    bskySession.session.set({
+      service: 'https://bsky.social',
+      handle: 'me.bsky.social',
+      did: 'did:plc:me',
+      accessJwt: 'a',
+      refreshJwt: 'r',
+    });
+    const fixture = setUp();
+    const el = fixture.nativeElement as HTMLElement;
+
+    [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Unlink'))!.click();
+    expect(bskySession.unlink).toHaveBeenCalled();
   });
 });

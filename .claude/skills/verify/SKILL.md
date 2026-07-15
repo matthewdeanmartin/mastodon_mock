@@ -45,3 +45,9 @@ uv venv pwenv && uv pip install --python pwenv/Scripts/python.exe playwright
   `app-fail-whale` overlay element instead.
 - After an in-page action, wait for the *new* state (`:has-text(...)`), not just the
   selector — stale text races Angular's re-render.
+- Bluesky live checks: `app.bsky.feed.getPostThread` / `getLikes` read the AppView,
+  which indexes asynchronously — a record you just created may not appear for seconds.
+  Verify writes via `com.atproto.repo.listRecords` against the PDS instead (immediate),
+  and ALWAYS delete test records by listRecords lookup, not by remembering uris.
+- Real Bluesky credentials: `.env` (gitignored) has `BSK_APP_PASSWORD`; handle is
+  mistersql.bsky.social. Never echo the password or tokens into logs.

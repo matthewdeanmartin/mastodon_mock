@@ -9,6 +9,9 @@ import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
 import { Poll, Status, Translation } from '../models';
+import { PROVIDER_CAPS, ProviderCapabilities } from '../providers/provider';
+import { BskyReply } from '../providers/bluesky/bluesky-reply';
+import { StatusActions } from '../providers/status-actions';
 import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
@@ -24,6 +27,7 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
     HistoryDialog,
     FormsModule,
     Compose,
+    BskyReply,
     HumanTimePipe,
     Lightbox,
     VerifiedBadge,
@@ -35,6 +39,7 @@ export class StatusCard {
   private api = inject(Api);
   private auth = inject(Auth);
   private prefs = inject(ClientPrefs);
+  private actions = inject(StatusActions);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
@@ -219,6 +224,11 @@ export class StatusCard {
     }
   }
 
+  /** Which interactions this post's network supports (buttons hide per provider). */
+  protected get caps(): ProviderCapabilities {
+    return PROVIDER_CAPS[this.display.provider ?? 'mastodon'];
+  }
+
   get boostedBy(): string | null {
     const s = this.status();
     return s.reblog ? s.account.display_name : null;
@@ -261,16 +271,15 @@ export class StatusCard {
 
   toggleFavourite(event: Event): void {
     event.stopPropagation();
-    const s = this.display;
-    const call = s.favourited ? this.api.unfavourite(s.id) : this.api.favourite(s.id);
-    call.subscribe((updated) => this.changed.emit(updated));
+    // Routed by provider (Mastodon API vs Bluesky like records).
+    this.actions.toggleFavourite(this.display).subscribe((updated) => this.changed.emit(updated));
   }
 
   toggleReblog(event: Event): void {
     event.stopPropagation();
-    const s = this.display;
-    const call = s.reblogged ? this.api.unreblog(s.id) : this.api.reblog(s.id);
-    call.subscribe((updated) => this.changed.emit(updated.reblog ?? updated));
+    this.actions
+      .toggleReblog(this.display)
+      .subscribe((updated) => this.changed.emit(updated.reblog ?? updated));
   }
 
   toggleBookmark(event: Event): void {

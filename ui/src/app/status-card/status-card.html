@@ -153,34 +153,24 @@
         </button>
       }
     }
-    @if (foreign) {
-      <div class="actions">
-        <a
-          class="action open-original"
-          [href]="display.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Open on the original site"
-        >
-          ↗ Open original
-        </a>
-      </div>
-    } @else {
-      <div class="actions">
+    <div class="actions">
+      @if (caps.reply) {
         <button class="action" [class.on]="replying()" (click)="toggleReply($event)" title="Reply">
           💬 <span>{{ display.replies_count }}</span>
         </button>
-        @if (display.replies_count > 0 || display.in_reply_to_id) {
-          <a
-            class="action"
-            [routerLink]="['/statuses', display.id]"
-            [queryParams]="{ reader: 1 }"
-            (click)="$event.stopPropagation()"
-            title="Read thread as article"
-          >
-            📖
-          </a>
-        }
+      }
+      @if (!foreign && (display.replies_count > 0 || display.in_reply_to_id)) {
+        <a
+          class="action"
+          [routerLink]="['/statuses', display.id]"
+          [queryParams]="{ reader: 1 }"
+          (click)="$event.stopPropagation()"
+          title="Read thread as article"
+        >
+          📖
+        </a>
+      }
+      @if (caps.reblog) {
         <button
           class="action"
           [class.on]="display.reblogged"
@@ -193,6 +183,8 @@
             <span class="did">Boosted</span>
           }
         </button>
+      }
+      @if (!foreign) {
         <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
           ❝
         </button>
@@ -203,6 +195,10 @@
         >
           {{ display.reblogs_count }}
         </button>
+      } @else if (caps.reblog) {
+        <span class="action" title="Reposts">{{ display.reblogs_count }}</span>
+      }
+      @if (caps.favourite) {
         <button
           class="action"
           [class.on]="display.favourited"
@@ -215,6 +211,8 @@
             <span class="did">Favourited</span>
           }
         </button>
+      }
+      @if (!foreign) {
         <button
           class="action count-link"
           (click)="openAccountList('favourited_by', $event)"
@@ -222,6 +220,21 @@
         >
           {{ display.favourites_count }}
         </button>
+      } @else if (caps.favourite) {
+        <span class="action" title="Likes">{{ display.favourites_count }}</span>
+      }
+      @if (foreign) {
+        <a
+          class="action open-original"
+          [href]="display.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open on the original site"
+        >
+          ↗ Open original
+        </a>
+      }
+      @if (!foreign) {
         <button
           class="action"
           [class.on]="display.bookmarked"
@@ -294,8 +307,8 @@
             </div>
           </details>
         }
-      </div>
-    }
+      }
+    </div>
 
     @if (redrafting()) {
       <div class="inline-compose redraft" (click)="$event.stopPropagation()">
@@ -315,11 +328,15 @@
 
     @if (replying()) {
       <div class="inline-compose" (click)="$event.stopPropagation()">
-        <app-compose
-          [inReplyToId]="display.id"
-          placeholder="Post your reply"
-          (posted)="onReplied($event)"
-        />
+        @if (display.provider === 'bluesky') {
+          <app-bsky-reply [replyTo]="display" (posted)="onReplied($event)" />
+        } @else {
+          <app-compose
+            [inReplyToId]="display.id"
+            placeholder="Post your reply"
+            (posted)="onReplied($event)"
+          />
+        }
       </div>
     }
 

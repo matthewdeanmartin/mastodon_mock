@@ -2,6 +2,19 @@ import { Signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ProviderId, Status } from '../models';
 
+/** What a viewer can do to a post, by provider. Everything else is Mastodon-only. */
+export interface ProviderCapabilities {
+  reply: boolean;
+  favourite: boolean;
+  reblog: boolean;
+}
+
+export const PROVIDER_CAPS: Record<ProviderId, ProviderCapabilities> = {
+  mastodon: { reply: true, favourite: true, reblog: true },
+  bluesky: { reply: true, favourite: true, reblog: true },
+  rss: { reply: false, favourite: false, reblog: false },
+};
+
 /**
  * A non-Mastodon content source that contributes to the home timeline.
  *

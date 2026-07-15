@@ -797,5 +797,56 @@ describe('StatusCard', () => {
       expect(el.querySelector('a.open-original')).toBeNull();
       expect(el.textContent).toContain('💬');
     });
+
+    it('Bluesky posts get reply/boost/favourite plus Open original, but no Mastodon extras', () => {
+      const f = setUp(
+        makeStatus({
+          id: 'bsky:at://did:plc:x/app.bsky.feed.post/1',
+          provider: 'bluesky',
+          url: 'https://bsky.app/profile/x/post/1',
+          providerRef: {
+            uri: 'at://did:plc:x/app.bsky.feed.post/1',
+            cid: 'c',
+            likeUri: null,
+            repostUri: null,
+            replyRoot: { uri: 'at://did:plc:x/app.bsky.feed.post/1', cid: 'c' },
+          },
+        }),
+      );
+      const el = f.nativeElement as HTMLElement;
+      expect(el.querySelector('button[title="Reply"]')).toBeTruthy();
+      expect(el.querySelector('button[title="Boost"]')).toBeTruthy();
+      expect(el.querySelector('button[title="Favourite"]')).toBeTruthy();
+      expect(el.querySelector('a.open-original')).toBeTruthy();
+      // Mastodon-only actions stay hidden on foreign posts.
+      expect(el.querySelector('button[title="Bookmark"]')).toBeNull();
+      expect(el.querySelector('button[title="Quote"]')).toBeNull();
+      expect(el.querySelector('button[title="Translate"]')).toBeNull();
+      expect(el.querySelector('.provider-badge')?.textContent).toContain('Bluesky');
+    });
+
+    it('replying to a Bluesky post opens the Bluesky composer, not the Mastodon one', () => {
+      const f = setUp(
+        makeStatus({
+          id: 'bsky:at://did:plc:x/app.bsky.feed.post/1',
+          provider: 'bluesky',
+          url: 'https://bsky.app/profile/x/post/1',
+          providerRef: {
+            uri: 'at://did:plc:x/app.bsky.feed.post/1',
+            cid: 'c',
+            likeUri: null,
+            repostUri: null,
+            replyRoot: { uri: 'at://did:plc:x/app.bsky.feed.post/1', cid: 'c' },
+          },
+        }),
+      );
+      (f.nativeElement as HTMLElement)
+        .querySelector<HTMLButtonElement>('button[title="Reply"]')!
+        .click();
+      f.detectChanges();
+      const el = f.nativeElement as HTMLElement;
+      expect(el.querySelector('app-bsky-reply')).toBeTruthy();
+      expect(el.querySelector('app-compose')).toBeNull();
+    });
   });
 });
