@@ -22,6 +22,22 @@
   object-fit: cover;
 }
 
+/* Wraps an avatar or name; lingering on it fades in the account hover card. */
+.hover-anchor {
+  position: relative;
+}
+
+.avatar-anchor {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.hover-anchor:hover app-account-hover-card {
+  visibility: visible;
+  opacity: 1;
+  transition-delay: 0.45s;
+}
+
 .body {
   flex: 1;
   min-width: 0;

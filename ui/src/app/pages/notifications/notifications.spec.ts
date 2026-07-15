@@ -91,6 +91,26 @@ describe('Notifications', () => {
     expect(internals(fixture).items()).toEqual([]);
   });
 
+  it('renders media thumbnails inside a mention excerpt', () => {
+    const fixture = TestBed.createComponent(Notifications);
+    fixture.detectChanges();
+    const n = makeNotification('9', 'mention');
+    n.status = {
+      id: 's9',
+      content: '<p>look at this</p>',
+      media_attachments: [
+        { id: 'm1', type: 'image', url: 'https://x/full.png', preview_url: 'https://x/prev.png' },
+      ],
+    } as unknown as MastodonNotification['status'];
+    httpMock.expectOne('/api/v1/notifications').flush([n]);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const img = el.querySelector<HTMLImageElement>('.excerpt-media img');
+    expect(img?.getAttribute('src')).toBe('https://x/prev.png');
+    expect(el.querySelector('.excerpt-content')?.textContent).toContain('look at this');
+  });
+
   it('toggling live off closes the stream', () => {
     const fixture = setUp();
     internals(fixture).toggleLive();

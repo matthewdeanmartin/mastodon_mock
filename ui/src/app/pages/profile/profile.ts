@@ -26,6 +26,25 @@ export class Profile implements OnInit {
   protected statuses = signal<Status[]>([]);
   protected relationship = signal<Relationship | null>(null);
   protected loading = signal(true);
+  protected statusesLoading = signal(false);
+
+  // Timeline filter toggles. Defaults mirror Mastodon's profile view:
+  // boosts shown, replies hidden, pinned strip on top.
+  protected showBoosts = signal(true);
+  protected showReplies = signal(false);
+  protected showPinned = signal(true);
+  protected pinnedStatuses = signal<Status[]>([]);
+  /** Invalidates in-flight status fetches when filters change or the route moves. */
+  private loadSeq = 0;
+
+  /** The main list, minus anything already shown in the pinned strip. */
+  protected visibleStatuses = computed(() => {
+    if (!this.showPinned()) {
+      return this.statuses();
+    }
+    const pinnedIds = new Set(this.pinnedStatuses().map((s) => s.id));
+    return this.statuses().filter((s) => !pinnedIds.has(s.id));
+  });
 
   protected showReport = signal(false);
   protected showLists = signal(false);
@@ -68,9 +87,86 @@ export class Profile implements OnInit {
       this.account.set(a);
       this.loading.set(false);
     });
-    this.api.getAccountStatuses(id).subscribe((s) => this.statuses.set(s));
+    this.loadStatuses(id);
+    this.loadPinned(id);
     this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null));
     this.loadFeatured(id);
+  }
+
+  toggleBoosts(): void {
+    this.showBoosts.update((v) => !v);
+    this.reloadStatuses();
+  }
+
+  toggleReplies(): void {
+    this.showReplies.update((v) => !v);
+    this.reloadStatuses();
+  }
+
+  togglePinned(): void {
+    this.showPinned.update((v) => !v);
+  }
+
+  private reloadStatuses(): void {
+    const id = this.account()?.id;
+    if (id) {
+      this.loadStatuses(id);
+    }
+  }
+
+  /** How many statuses a filtered profile view should end up with. */
+  private static readonly TARGET_COUNT = 20;
+  /** Safety cap on the fetch-until-full loop (filtered pages can come back short). */
+  private static readonly MAX_PAGES = 8;
+
+  /**
+   * Load the account's statuses under the current filter toggles. Mastodon
+   * applies exclude_* filtering per page, so filtered pages can return fewer
+   * than `limit` items — keep paging older until TARGET_COUNT accumulate,
+   * the account runs out, or MAX_PAGES is hit.
+   */
+  private loadStatuses(id: string): void {
+    const seq = ++this.loadSeq;
+    this.statuses.set([]);
+    this.statusesLoading.set(true);
+    const opts = {
+      excludeReblogs: !this.showBoosts(),
+      excludeReplies: !this.showReplies(),
+      limit: Profile.TARGET_COUNT,
+    };
+    const fetchPage = (maxId: string | undefined, acc: Status[], page: number): void => {
+      this.api.getAccountStatuses(id, { ...opts, maxId }).subscribe({
+        next: (batch) => {
+          if (seq !== this.loadSeq) {
+            return; // A newer load superseded this one.
+          }
+          const all = [...acc, ...batch];
+          if (batch.length > 0 && all.length < Profile.TARGET_COUNT && page < Profile.MAX_PAGES) {
+            fetchPage(batch[batch.length - 1].id, all, page + 1);
+            return;
+          }
+          this.statuses.set(all);
+          this.statusesLoading.set(false);
+        },
+        error: () => {
+          if (seq === this.loadSeq) {
+            this.statuses.set(acc);
+            this.statusesLoading.set(false);
+          }
+        },
+      });
+    };
+    fetchPage(undefined, [], 1);
+  }
+
+  private loadPinned(id: string): void {
+    this.pinnedStatuses.set([]);
+    this.api.getAccountStatuses(id, { pinned: true }).subscribe({
+      next: (pinned) => this.pinnedStatuses.set(pinned),
+      error: () => {
+        // No pinned strip, the rest of the profile still works.
+      },
+    });
   }
 
   private loadFeatured(id: string): void {
@@ -162,12 +258,14 @@ export class Profile implements OnInit {
     this.toggleBlock();
   }
 
-  onChanged(index: number, updated: Status): void {
-    this.statuses.update((list) => list.map((s, i) => (i === index ? updated : s)));
+  onChanged(updated: Status): void {
+    this.statuses.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
+    this.pinnedStatuses.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
   }
 
   onDeleted(removed: Status): void {
     this.statuses.update((list) => list.filter((s) => s.id !== removed.id));
+    this.pinnedStatuses.update((list) => list.filter((s) => s.id !== removed.id));
   }
 
   onReported(): void {

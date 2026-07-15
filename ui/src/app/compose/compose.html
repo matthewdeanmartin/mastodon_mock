@@ -78,6 +78,18 @@
 
   <div class="compose-actions">
     <div class="compose-tools">
+      @if (showTargetPicker()) {
+        <select
+          class="target-select"
+          [ngModel]="target()"
+          (ngModelChange)="target.set($event)"
+          title="Post to"
+        >
+          <option value="fedi">🦣 Fedi</option>
+          <option value="bsky">🦋 Bluesky</option>
+          <option value="both">🦣+🦋 Both</option>
+        </select>
+      }
       <select
         class="visibility-select"
         [ngModel]="visibility()"
@@ -120,6 +132,11 @@
       </label>
     </div>
 
+    @if (targetIncludesBsky()) {
+      <span class="muted bsky-count" [class.over-limit]="bskyRemaining() < 0" title="Bluesky limit">
+        🦋 {{ bskyRemaining() }}
+      </span>
+    }
     <span class="muted" [class.over-limit]="text().length > maxChars">{{ text().length }}</span>
     <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
       {{
@@ -127,6 +144,16 @@
       }}
     </button>
   </div>
+
+  @if (crossPostError(); as err) {
+    <div class="cross-post-error">{{ err }}</div>
+  }
+
+  @if (target() === 'bsky' && (media().length || pollOpen())) {
+    <div class="thread-hint muted">Bluesky posts are text-only here — remove media/poll first.</div>
+  } @else if (target() === 'both' && (media().length || pollOpen() || cwOpen())) {
+    <div class="thread-hint muted">Media, polls and CWs go to Fedi only.</div>
+  }
 
   @if (chunkCount() > 1) {
     <div class="thread-hint muted">
@@ -137,6 +164,7 @@
   @if (countdown() !== null) {
     <div class="undo-banner">
       <span>Posting in {{ countdown() }}s…</span>
+      <button class="btn btn-sm" type="button" (click)="publishNow()">Publish now</button>
       <button class="btn btn-outline btn-sm" type="button" (click)="cancelSend()">Cancel</button>
     </div>
   }

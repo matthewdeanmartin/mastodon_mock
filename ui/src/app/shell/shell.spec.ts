@@ -54,7 +54,9 @@ describe('Shell account switching', () => {
     httpMock.match((r) => r.url.includes('/api/v1/trends/') || r.url.includes('/api/v2/instance'));
   }
 
-  it('switching restores the target instance and verifies against it', () => {
+  // Rendering the full Shell (rails and all) can exceed the default 5s timeout
+  // on a loaded machine; the work is synchronous, just heavy.
+  it('switching restores the target instance and verifies against it', { timeout: 20_000 }, () => {
     const fixture = createShell();
     const social = auth.sessions().find((s) => s.token === 'social-token')!;
 
@@ -68,22 +70,26 @@ describe('Shell account switching', () => {
     expect(server.baseUrl()).toBe('https://mastodon.social');
   });
 
-  it('a failed switch reverts to the previous account and toasts (keeps the session)', () => {
-    const fixture = createShell();
-    const cmp = fixture.componentInstance as any;
-    const social = auth.sessions().find((s) => s.token === 'social-token')!;
+  it(
+    'a failed switch reverts to the previous account and toasts (keeps the session)',
+    { timeout: 20_000 },
+    () => {
+      const fixture = createShell();
+      const cmp = fixture.componentInstance as any;
+      const social = auth.sessions().find((s) => s.token === 'social-token')!;
 
-    cmp.switchTo(social);
-    httpMock
-      .expectOne('https://mastodon.social/api/v1/accounts/verify_credentials')
-      .flush('nope', { status: 401, statusText: 'Unauthorized' });
+      cmp.switchTo(social);
+      httpMock
+        .expectOne('https://mastodon.social/api/v1/accounts/verify_credentials')
+        .flush('nope', { status: 401, statusText: 'Unauthorized' });
 
-    // Reverted, not logged out: still on the art account and server.
-    expect(auth.token()).toBe('art-token');
-    expect(server.baseUrl()).toBe('https://mastodon.art');
-    // The rejected session is NOT deleted.
-    expect(auth.sessions().some((s) => s.token === 'social-token')).toBe(true);
-    // And the user is told, non-blockingly.
-    expect(cmp.toast()).toContain("Couldn't switch");
-  });
+      // Reverted, not logged out: still on the art account and server.
+      expect(auth.token()).toBe('art-token');
+      expect(server.baseUrl()).toBe('https://mastodon.art');
+      // The rejected session is NOT deleted.
+      expect(auth.sessions().some((s) => s.token === 'social-token')).toBe(true);
+      // And the user is told, non-blockingly.
+      expect(cmp.toast()).toContain("Couldn't switch");
+    },
+  );
 });

@@ -20,11 +20,16 @@
         }}</a>
         <span class="what muted">{{ label(n.type) }}</span>
         @if (n.status) {
-          <a
-            class="excerpt"
-            [routerLink]="['/statuses', n.status.id]"
-            [innerHTML]="n.status.content"
-          ></a>
+          <a class="excerpt" [routerLink]="['/statuses', n.status.id]">
+            <span class="excerpt-content" [innerHTML]="n.status.content"></span>
+            @if (n.status.media_attachments.length && showImages()) {
+              <span class="excerpt-media">
+                @for (m of n.status.media_attachments; track m.id) {
+                  <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                }
+              </span>
+            }
+          </a>
           @if (n.type === 'mention') {
             <div class="mention-reply">
               <app-compose [inReplyToId]="n.status.id" placeholder="Post your reply" />

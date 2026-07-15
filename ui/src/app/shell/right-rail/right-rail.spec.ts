@@ -57,7 +57,7 @@ describe('RightRail', () => {
     expect(internals(fixture).donateServerUrl()).toBe('https://mastodon.social/about');
   });
 
-  it('renders the donate links and the MIMB house ad', () => {
+  it('renders the donate links and all three house ads', () => {
     TestBed.inject(Auth).account.set({ id: '1', acct: 'matt@elekk.xyz' } as Account);
     const fixture = setUp();
     fixture.detectChanges();
@@ -69,7 +69,11 @@ describe('RightRail', () => {
     expect(hrefs).toContain('https://elekk.xyz/about');
     expect(hrefs).toContain('https://joinmastodon.org/sponsors');
     expect(hrefs).toContain('https://github.com/matthewdeanmartin/mastodon_is_my_blog/');
-    expect(el.querySelector('.ad-card')?.textContent).toContain('blog interface');
+    expect(hrefs).toContain(
+      'https://matthewdeanmartin.github.io/mastodon_is_my_blog/mimb_lite/index.html',
+    );
+    expect(hrefs).toContain('https://matthewdeanmartin.github.io/youtuberfinder/');
+    expect(el.querySelectorAll('.ad-card')).toHaveLength(3);
   });
 
   it('no longer hosts the trends widget (moved to the left rail)', () => {

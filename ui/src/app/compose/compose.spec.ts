@@ -5,7 +5,8 @@ import { Signal, WritableSignal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../client-prefs';
 import { Status } from '../models';
-import { Compose } from './compose';
+import { BlueskySession } from '../providers/bluesky/bluesky-session';
+import { Compose, PostTarget } from './compose';
 
 /** Expose the protected internals for white-box testing. */
 interface ComposeInternals {
@@ -27,6 +28,10 @@ interface ComposeInternals {
   countdown: Signal<number | null>;
   chunkCount: Signal<number>;
   cancelSend(): void;
+  publishNow(): void;
+  target: WritableSignal<PostTarget>;
+  showTargetPicker: Signal<boolean>;
+  crossPostError: Signal<string | null>;
   toggleCw(): void;
   togglePoll(): void;
   addPollOption(): void;
@@ -398,7 +403,9 @@ describe('Compose', () => {
   // ---------------------------------------------------------------- undo send
 
   function enableUndoSend(): void {
-    TestBed.inject(ClientPrefs).setUndoSend(true);
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.setConfirmBeforePost(true);
+    prefs.setDelayedSend(true);
   }
 
   it('undo-send asks for confirmation and defers the POST by 30 seconds', () => {
@@ -455,6 +462,55 @@ describe('Compose', () => {
     expect(internals(f).countdown()).toBeNull();
   });
 
+  it('publishNow() during the countdown posts immediately', () => {
+    vi.useFakeTimers();
+    enableUndoSend();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const f = setUp();
+    internals(f).text.set('impatient post');
+    internals(f).submit();
+    vi.advanceTimersByTime(5_000);
+    internals(f).publishNow();
+
+    const req = httpMock.expectOne('/api/v1/statuses');
+    expect(req.request.body.status).toBe('impatient post');
+    req.flush({ id: '1' });
+    expect(internals(f).countdown()).toBeNull();
+
+    // The dead timer must not fire a second post.
+    vi.advanceTimersByTime(60_000);
+    httpMock.expectNone('/api/v1/statuses');
+  });
+
+  it('confirm-only (no delay) posts immediately after an accepted confirmation', () => {
+    TestBed.inject(ClientPrefs).setConfirmBeforePost(true);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const f = setUp();
+    internals(f).text.set('confirmed post');
+    internals(f).submit();
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(internals(f).countdown()).toBeNull();
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
+  });
+
+  it('delay-only (no confirm) starts the countdown without asking', () => {
+    vi.useFakeTimers();
+    TestBed.inject(ClientPrefs).setDelayedSend(true);
+    const confirmSpy = vi.spyOn(window, 'confirm');
+
+    const f = setUp();
+    internals(f).text.set('slow post');
+    internals(f).submit();
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(internals(f).countdown()).toBe(30);
+    vi.advanceTimersByTime(30_000);
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
+  });
+
   it('undo-send disabled: posts immediately without confirmation', () => {
     const confirmSpy = vi.spyOn(window, 'confirm');
     const f = setUp();
@@ -463,5 +519,117 @@ describe('Compose', () => {
 
     expect(confirmSpy).not.toHaveBeenCalled();
     httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
+  });
+
+  // -------------------------------------------------------------- post target
+
+  const CREATE_RECORD = 'https://bsky.social/xrpc/com.atproto.repo.createRecord';
+
+  function linkBsky(): void {
+    TestBed.inject(BlueskySession).session.set({
+      service: 'https://bsky.social',
+      handle: 'me.bsky.social',
+      did: 'did:plc:me',
+      accessJwt: 'jwt',
+      refreshJwt: 'refresh',
+    });
+  }
+
+  it('shows no target picker (and posts to Fedi as before) when Bluesky is not linked', () => {
+    const f = setUp();
+    expect(internals(f).showTargetPicker()).toBe(false);
+    expect(internals(f).target()).toBe('fedi');
+    internals(f).text.set('plain post');
+    internals(f).submit();
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
+  });
+
+  it('defaults to Fedi even when Bluesky is linked', () => {
+    linkBsky();
+    const f = setUp();
+    expect(internals(f).showTargetPicker()).toBe(true);
+    expect(internals(f).target()).toBe('fedi');
+    internals(f).text.set('fedi post');
+    internals(f).submit();
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
+    httpMock.expectNone(CREATE_RECORD);
+  });
+
+  it('target=bsky posts a record to Bluesky only and emits a local status', () => {
+    linkBsky();
+    const f = setUp();
+    const posted: Status[] = [];
+    f.componentInstance.posted.subscribe((s: Status) => posted.push(s));
+
+    internals(f).target.set('bsky');
+    internals(f).text.set('hello butterfly');
+    internals(f).submit();
+
+    httpMock.expectNone('/api/v1/statuses');
+    const req = httpMock.expectOne(CREATE_RECORD);
+    expect(req.request.body.collection).toBe('app.bsky.feed.post');
+    expect(req.request.body.record.text).toBe('hello butterfly');
+    req.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/xyz', cid: 'cid1' });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0].provider).toBe('bluesky');
+    expect(posted[0].id).toBe('bsky:at://did:plc:me/app.bsky.feed.post/xyz');
+    expect(internals(f).text()).toBe('');
+  });
+
+  it('target=both posts to Fedi and Bluesky, emitting the Fedi status', () => {
+    linkBsky();
+    const f = setUp();
+    const posted: Status[] = [];
+    f.componentInstance.posted.subscribe((s: Status) => posted.push(s));
+
+    internals(f).target.set('both');
+    internals(f).text.set('everywhere at once');
+    internals(f).submit();
+
+    const bsky = httpMock.expectOne(CREATE_RECORD);
+    bsky.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/abc', cid: 'cid2' });
+    const fedi = httpMock.expectOne('/api/v1/statuses');
+    expect(fedi.request.body.status).toBe('everywhere at once');
+    fedi.flush({ id: 'm1' });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0].id).toBe('m1');
+  });
+
+  it('a failed Bluesky leg on "both" surfaces an error without retracting the Fedi post', () => {
+    linkBsky();
+    const f = setUp();
+    const posted: Status[] = [];
+    f.componentInstance.posted.subscribe((s: Status) => posted.push(s));
+
+    internals(f).target.set('both');
+    internals(f).text.set('half delivered');
+    internals(f).submit();
+
+    httpMock.expectOne(CREATE_RECORD).flush({ error: 'boom' }, { status: 500, statusText: 'ISE' });
+    httpMock.expectOne('/api/v1/statuses').flush({ id: 'm2' });
+
+    expect(posted.map((s) => s.id)).toEqual(['m2']);
+    expect(internals(f).crossPostError()).toContain('Bluesky');
+  });
+
+  it('blocks submit when a Bluesky-bound post exceeds 300 graphemes', () => {
+    linkBsky();
+    const f = setUp();
+    internals(f).target.set('both');
+    internals(f).text.set('x'.repeat(301));
+    expect(internals(f).canSubmit()).toBe(false);
+    internals(f).target.set('fedi');
+    expect(internals(f).canSubmit()).toBe(true);
+  });
+
+  it('blocks a bsky-only post that has media attached', () => {
+    linkBsky();
+    const f = setUp();
+    internals(f).target.set('bsky');
+    internals(f).text.set('with a picture');
+    internals(f).media.set([{ media: { id: 'm1' }, description: '' }]);
+    expect(internals(f).canSubmit()).toBe(false);
   });
 });

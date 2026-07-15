@@ -67,11 +67,56 @@
       <label class="checkline">
         <input
           type="checkbox"
-          [ngModel]="prefs.undoSend()"
-          (ngModelChange)="prefs.setUndoSend($event)"
-          name="undo_send"
+          [ngModel]="prefs.confirmBeforePost()"
+          (ngModelChange)="prefs.setConfirmBeforePost($event)"
+          name="confirm_before_post"
         />
-        Ask "do you really want to post that?" and wait 30 seconds before posting, so you can cancel
+        Ask "do you really want to post that?" before posting
+      </label>
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.delayedSend()"
+          (ngModelChange)="prefs.setDelayedSend($event)"
+          name="delayed_send"
+        />
+        Wait 30 seconds before posting, so you can cancel (or publish early)
+      </label>
+    </div>
+  </div>
+
+  <div class="srow">
+    <span class="slabel">Blue checks</span>
+    <div class="scontrol">
+      <label class="radioline">
+        <input
+          type="radio"
+          value="fixed"
+          [ngModel]="prefs.verifiedMode()"
+          (ngModelChange)="prefs.setVerifiedMode($event)"
+          name="verified_mode"
+        />
+        Top accounts only (a fixed follower bar)
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="famous"
+          [ngModel]="prefs.verifiedMode()"
+          (ngModelChange)="prefs.setVerifiedMode($event)"
+          name="verified_mode"
+        />
+        More followers than me — compared to me, they're famous
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="everyone"
+          [ngModel]="prefs.verifiedMode()"
+          (ngModelChange)="prefs.setVerifiedMode($event)"
+          name="verified_mode"
+        />
+        Everyone, because everyone deserves a blue check mark
       </label>
     </div>
   </div>

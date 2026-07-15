@@ -9,12 +9,24 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { switchMap } from 'rxjs';
 import { Api } from '../api';
 import { ClientPrefs } from '../client-prefs';
 import { ComposeOptions, MediaAttachment, Status } from '../models';
+import { BlueskyApi } from '../providers/bluesky/bluesky-api';
+import { detectFacets, graphemeLength } from '../providers/bluesky/bluesky-facets';
+import { buildLocalBskyStatus } from '../providers/bluesky/bluesky-local-status';
+import { BlueskySession } from '../providers/bluesky/bluesky-session';
+import { BskyFacet } from '../providers/bluesky/bluesky-types';
 import { MAX_POST_CHARS, splitPost } from './post-splitter';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
+
+/** Where a top-level compose publishes. Fedi is home; Bluesky is opt-in per post. */
+export type PostTarget = 'fedi' | 'bsky' | 'both';
+
+/** Bluesky's post limit, in graphemes (not characters). */
+const BSKY_MAX_GRAPHEMES = 300;
 
 /** Poll expiry presets (label → seconds). */
 const POLL_EXPIRY = [
@@ -41,6 +53,8 @@ interface PendingMedia {
 export class Compose implements OnDestroy {
   private api = inject(Api);
   private prefs = inject(ClientPrefs);
+  private bskyApi = inject(BlueskyApi);
+  private bskySession = inject(BlueskySession);
 
   ngOnDestroy(): void {
     this.clearCountdown();
@@ -91,6 +105,19 @@ export class Compose implements OnDestroy {
   protected canAttachMedia = computed(() => !this.pollOpen());
   protected canAddPoll = computed(() => this.media().length === 0);
 
+  // Post target (top-level composes only; replies/quotes always stay on Fedi).
+  protected target = signal<PostTarget>('fedi');
+  protected showTargetPicker = computed(
+    () => this.bskySession.linked() && !this.inReplyToId() && !this.quotedStatusId(),
+  );
+  protected targetIncludesBsky = computed(
+    () => this.showTargetPicker() && this.target() !== 'fedi',
+  );
+  /** Graphemes left under Bluesky's 300 limit (only meaningful when posting there). */
+  protected bskyRemaining = computed(() => BSKY_MAX_GRAPHEMES - graphemeLength(this.text()));
+  /** The Bluesky leg of a cross-post failed after the Fedi post went out. */
+  protected crossPostError = signal<string | null>(null);
+
   /** Seconds left on the undo-send countdown, or null when no send is pending. */
   protected countdown = signal<number | null>(null);
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
@@ -102,6 +129,16 @@ export class Compose implements OnDestroy {
   protected canSubmit = computed(() => {
     if (this.submitting() || this.uploading() || this.countdown() !== null) {
       return false;
+    }
+    if (this.targetIncludesBsky()) {
+      // Bluesky legs are text-only and capped at 300 graphemes (no auto-thread).
+      if (!this.text().trim() || this.bskyRemaining() < 0) {
+        return false;
+      }
+      if (this.target() === 'bsky' && (this.media().length > 0 || this.pollOpen())) {
+        return false;
+      }
+      return true;
     }
     const hasText = !!this.text().trim();
     const hasMedia = this.media().length > 0;
@@ -168,10 +205,10 @@ export class Compose implements OnDestroy {
     if (!this.canSubmit()) {
       return;
     }
-    if (this.prefs.undoSend()) {
-      if (!confirm('Do you really want to post that?')) {
-        return;
-      }
+    if (this.prefs.confirmBeforePost() && !confirm('Do you really want to post that?')) {
+      return;
+    }
+    if (this.prefs.delayedSend()) {
       this.countdown.set(30);
       this.countdownTimer = setInterval(() => {
         const left = (this.countdown() ?? 1) - 1;
@@ -192,6 +229,15 @@ export class Compose implements OnDestroy {
     this.clearCountdown();
   }
 
+  /** Skip the rest of a pending countdown and post immediately. */
+  publishNow(): void {
+    if (this.countdown() === null) {
+      return;
+    }
+    this.clearCountdown();
+    this.send();
+  }
+
   private clearCountdown(): void {
     if (this.countdownTimer !== null) {
       clearInterval(this.countdownTimer);
@@ -202,6 +248,18 @@ export class Compose implements OnDestroy {
 
   private send(): void {
     this.submitting.set(true);
+    this.crossPostError.set(null);
+
+    if (this.targetIncludesBsky()) {
+      const text = this.text().trim();
+      if (this.target() === 'bsky') {
+        this.sendToBluesky(text, true);
+        return;
+      }
+      // 'both': Fedi is primary (emits the posted status); the Bluesky leg is
+      // fired alongside and reports failure without retracting the Fedi post.
+      this.sendToBluesky(text, false);
+    }
 
     const options: ComposeOptions = {
       inReplyToId: this.inReplyToId(),
@@ -244,6 +302,49 @@ export class Compose implements OnDestroy {
       next: (status) => this.postRest(status, status, chunks.slice(1)),
       error: () => this.submitting.set(false),
     });
+  }
+
+  /**
+   * Publish the text (link/mention facets attached) as a top-level Bluesky
+   * post. When `primary`, this IS the post: it resets the composer and emits
+   * a locally-built Status; otherwise it's the secondary leg of "both" and
+   * only surfaces errors.
+   */
+  private sendToBluesky(text: string, primary: boolean): void {
+    let sentFacets: BskyFacet[] = [];
+    detectFacets(text, (handle) => this.bskyApi.resolveHandle(handle))
+      .pipe(
+        switchMap((facets) => {
+          sentFacets = facets;
+          return this.bskyApi.post({ text, facets: facets.length ? facets : undefined });
+        }),
+      )
+      .subscribe({
+        next: (created) => {
+          if (primary) {
+            this.reset();
+            this.posted.emit(
+              buildLocalBskyStatus(
+                this.bskySession.session()!,
+                created.uri,
+                created.cid,
+                text,
+                sentFacets,
+              ),
+            );
+          }
+        },
+        error: () => {
+          if (primary) {
+            this.submitting.set(false);
+            this.crossPostError.set("Couldn't post to Bluesky — try again.");
+          } else {
+            this.crossPostError.set(
+              "Posted to Fedi, but the Bluesky copy failed — post it there manually.",
+            );
+          }
+        },
+      });
   }
 
   /** Post remaining thread chunks sequentially, then emit the root status. */

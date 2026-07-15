@@ -22,4 +22,16 @@ export const HOUSE_ADS: HouseAd[] = [
     url: 'https://github.com/matthewdeanmartin/mastodon_is_my_blog/',
     cta: 'Get it on GitHub ↗',
   },
+  {
+    title: '🪶 MIMB lite',
+    text: 'The blog-style Mastodon reader, right in your browser. No install, no build.',
+    url: 'https://matthewdeanmartin.github.io/mastodon_is_my_blog/mimb_lite/index.html',
+    cta: 'Open MIMB lite ↗',
+  },
+  {
+    title: '📺 YouTuber Finder',
+    text: 'Find the YouTube channels behind the people you follow.',
+    url: 'https://matthewdeanmartin.github.io/youtuberfinder/',
+    cta: 'Try YouTuber Finder ↗',
+  },
 ];

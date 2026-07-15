@@ -2,14 +2,20 @@
   <div class="boost-label muted">🔁 {{ boostedBy }} boosted</div>
 }
 <article class="status">
-  <a class="avatar-link" [routerLink]="foreign ? null : ['/accounts', display.account.id]">
-    <img class="avatar" [src]="display.account.avatar" [alt]="display.account.username" />
-  </a>
+  <span class="hover-anchor avatar-anchor">
+    <a class="avatar-link" [routerLink]="foreign ? null : ['/accounts', display.account.id]">
+      <img class="avatar" [src]="display.account.avatar" [alt]="display.account.username" />
+    </a>
+    <app-account-hover-card [account]="display.account" />
+  </span>
   <div class="body">
     <div class="meta">
-      <a class="name" [routerLink]="foreign ? null : ['/accounts', display.account.id]">{{
-        display.account.display_name || display.account.username
-      }}</a>
+      <span class="hover-anchor">
+        <a class="name" [routerLink]="foreign ? null : ['/accounts', display.account.id]">{{
+          display.account.display_name || display.account.username
+        }}</a>
+        <app-account-hover-card [account]="display.account" />
+      </span>
       <app-verified-badge [account]="display.account" />
       <span class="acct muted">&#64;{{ display.account.acct }}</span>
       @if (foreign) {

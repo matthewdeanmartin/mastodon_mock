@@ -93,8 +93,52 @@
     </section>
   }
 
-  @for (s of statuses(); track s.id; let i = $index) {
-    <app-status-card [status]="s" (changed)="onChanged(i, $event)" (deleted)="onDeleted($event)" />
+  <div class="profile-filters" role="group" aria-label="Timeline filters">
+    <button
+      type="button"
+      class="btn btn-outline btn-sm"
+      [class.active]="showBoosts()"
+      [attr.aria-pressed]="showBoosts()"
+      (click)="toggleBoosts()"
+    >
+      🔁 Boosts
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm"
+      [class.active]="showReplies()"
+      [attr.aria-pressed]="showReplies()"
+      (click)="toggleReplies()"
+    >
+      💬 Replies
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm"
+      [class.active]="showPinned()"
+      [attr.aria-pressed]="showPinned()"
+      (click)="togglePinned()"
+    >
+      📌 Pinned
+    </button>
+  </div>
+
+  @if (showPinned()) {
+    @for (s of pinnedStatuses(); track s.id) {
+      <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
+    }
+  }
+
+  @if (statusesLoading()) {
+    <p class="muted center">Loading posts…</p>
+  } @else {
+    @for (s of visibleStatuses(); track s.id) {
+      <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
+    } @empty {
+      @if (!showPinned() || !pinnedStatuses().length) {
+        <p class="muted center">No posts match these filters.</p>
+      }
+    }
   }
 
   @if (showReport()) {

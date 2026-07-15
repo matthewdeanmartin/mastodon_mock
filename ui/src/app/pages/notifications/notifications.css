@@ -34,3 +34,27 @@
   color: var(--muted);
   margin-top: 4px;
 }
+
+/* The excerpt is one big link; underlining an entire post on hover is obnoxious. */
+.excerpt:hover,
+.excerpt:hover * {
+  text-decoration: none;
+}
+
+.excerpt:hover .excerpt-content {
+  color: var(--text);
+}
+
+.excerpt-media {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.excerpt-media img {
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}

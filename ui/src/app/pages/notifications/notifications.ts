@@ -2,6 +2,7 @@ import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Api } from '../../api';
+import { ClientPrefs } from '../../client-prefs';
 import { MastodonNotification } from '../../models';
 import { Streaming } from '../../streaming';
 import { Compose } from '../../compose/compose';
@@ -15,6 +16,10 @@ import { Compose } from '../../compose/compose';
 export class Notifications implements OnInit, OnDestroy {
   private api = inject(Api);
   private streaming = inject(Streaming);
+  private prefs = inject(ClientPrefs);
+
+  /** Media thumbnails respect the feed-wide images on/off preference. */
+  protected showImages = this.prefs.showImages;
 
   protected items = signal<MastodonNotification[]>([]);
   protected loading = signal(true);

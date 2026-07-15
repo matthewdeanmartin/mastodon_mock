@@ -17,11 +17,13 @@ describe('ClientPrefs', () => {
     return prefs;
   }
 
-  it('defaults to auto theme, blue accent, undo-send off', () => {
+  it('defaults to auto theme, blue accent, posting guards off, fixed blue checks', () => {
     const prefs = create();
     expect(prefs.themeMode()).toBe('auto');
     expect(prefs.accentId()).toBe('blue');
-    expect(prefs.undoSend()).toBe(false);
+    expect(prefs.confirmBeforePost()).toBe(false);
+    expect(prefs.delayedSend()).toBe(false);
+    expect(prefs.verifiedMode()).toBe('fixed');
   });
 
   it('applies data-theme and data-accent to the document root', () => {
@@ -38,25 +40,44 @@ describe('ClientPrefs', () => {
   it('persists changes to localStorage', () => {
     const prefs = create();
     prefs.setThemeMode('light');
-    prefs.setUndoSend(true);
+    prefs.setDelayedSend(true);
+    prefs.setVerifiedMode('everyone');
     TestBed.tick();
 
     const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
     expect(stored.themeMode).toBe('light');
-    expect(stored.undoSend).toBe(true);
+    expect(stored.delayedSend).toBe(true);
+    expect(stored.confirmBeforePost).toBe(false);
+    expect(stored.verifiedMode).toBe('everyone');
   });
 
   it('restores persisted prefs on construction', () => {
     localStorage.setItem(
       PREFS_KEY,
-      JSON.stringify({ themeMode: 'dark', accentId: 'green', undoSend: true, readerFontSize: 21 }),
+      JSON.stringify({
+        themeMode: 'dark',
+        accentId: 'green',
+        confirmBeforePost: true,
+        verifiedMode: 'famous',
+        readerFontSize: 21,
+      }),
     );
     const prefs = create();
 
     expect(prefs.themeMode()).toBe('dark');
     expect(prefs.accentId()).toBe('green');
-    expect(prefs.undoSend()).toBe(true);
+    expect(prefs.confirmBeforePost()).toBe(true);
+    expect(prefs.delayedSend()).toBe(false);
+    expect(prefs.verifiedMode()).toBe('famous');
     expect(prefs.readerFontSize()).toBe(21);
+  });
+
+  it('migrates the legacy combined undoSend pref onto both new halves', () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ undoSend: true }));
+    const prefs = create();
+
+    expect(prefs.confirmBeforePost()).toBe(true);
+    expect(prefs.delayedSend()).toBe(true);
   });
 
   it('ignores corrupt or unknown stored values', () => {

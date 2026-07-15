@@ -38,6 +38,15 @@ import {
   UserList,
 } from './models';
 
+/** Filters/paging for an account's statuses (Mastodon query params). */
+export interface AccountStatusesOptions {
+  excludeReplies?: boolean;
+  excludeReblogs?: boolean;
+  pinned?: boolean;
+  maxId?: string;
+  limit?: number;
+}
+
 /** Thin wrapper over the mastodon_mock REST API, served same-origin. */
 @Injectable({ providedIn: 'root' })
 export class Api {
@@ -52,8 +61,24 @@ export class Api {
     return this.http.get<Account>(`/api/v1/accounts/${id}`);
   }
 
-  getAccountStatuses(id: string): Observable<Status[]> {
-    return this.http.get<Status[]>(`/api/v1/accounts/${id}/statuses`);
+  getAccountStatuses(id: string, opts: AccountStatusesOptions = {}): Observable<Status[]> {
+    let params = new HttpParams();
+    if (opts.excludeReplies) {
+      params = params.set('exclude_replies', 'true');
+    }
+    if (opts.excludeReblogs) {
+      params = params.set('exclude_reblogs', 'true');
+    }
+    if (opts.pinned) {
+      params = params.set('pinned', 'true');
+    }
+    if (opts.maxId) {
+      params = params.set('max_id', opts.maxId);
+    }
+    if (opts.limit) {
+      params = params.set('limit', String(opts.limit));
+    }
+    return this.http.get<Status[]>(`/api/v1/accounts/${id}/statuses`, { params });
   }
 
   relationships(ids: string[]): Observable<Relationship[]> {

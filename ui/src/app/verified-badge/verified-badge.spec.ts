@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from '../auth';
+import { ClientPrefs } from '../client-prefs';
 import { Account } from '../models';
 import { VERIFIED_FOLLOWER_THRESHOLD, VerifiedBadge } from './verified-badge';
 
@@ -73,5 +74,24 @@ describe('VerifiedBadge', () => {
   it('shows nothing to logged-out viewers for small accounts', () => {
     const el = render(makeAccount({ followers_count: 100 }), null);
     expect(el.querySelector('svg.badge')).toBeNull();
+  });
+
+  it("famous mode checks anyone with more followers than the viewer, and no one with fewer", () => {
+    TestBed.inject(ClientPrefs).setVerifiedMode('famous');
+    const viewer = makeAccount({ id: '42', followers_count: 50 });
+
+    const above = render(makeAccount({ followers_count: 51 }), viewer);
+    expect(above.querySelector('svg.badge')).not.toBeNull();
+
+    const below = render(makeAccount({ followers_count: 50 }), viewer);
+    expect(below.querySelector('svg.badge')).toBeNull();
+  });
+
+  it('everyone mode checks even a zero-follower account', () => {
+    TestBed.inject(ClientPrefs).setVerifiedMode('everyone');
+    const el = render(makeAccount({ followers_count: 0 }), null);
+    const badge = el.querySelector('svg.badge');
+    expect(badge).not.toBeNull();
+    expect(badge!.querySelector('title')?.textContent).toContain('everyone deserves');
   });
 });

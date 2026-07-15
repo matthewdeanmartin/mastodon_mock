@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { AccountHoverCard } from '../account-hover-card/account-hover-card';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
 import { Api } from '../api';
 import { Auth } from '../auth';
@@ -22,6 +23,7 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
   selector: 'app-status-card',
   imports: [
     RouterLink,
+    AccountHoverCard,
     ReportDialog,
     AccountListDialog,
     HistoryDialog,

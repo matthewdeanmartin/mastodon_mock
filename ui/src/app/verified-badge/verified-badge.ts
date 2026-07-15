@@ -1,5 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { Auth } from '../auth';
+import { ClientPrefs } from '../client-prefs';
 import { Account } from '../models';
 
 /**
@@ -9,17 +10,18 @@ import { Account } from '../models';
 export const VERIFIED_FOLLOWER_THRESHOLD = 9_728;
 
 /**
- * Blue verification check, 2018-Twitter style, decided entirely client-side:
- * - accounts with at least 50k followers show a check to every viewer;
- * - the logged-in user's own account always shows a check to them alone —
- *   only you can know that you really are you.
+ * Blue verification check, 2018-Twitter style, decided entirely client-side.
+ * Who gets one is a viewer preference (ClientPrefs.verifiedMode): a fixed
+ * follower bar (default), anyone with more followers than the viewer, or
+ * everyone. The viewer's own account additionally always shows a private
+ * self-check — only you can know that you really are you.
  */
 @Component({
   selector: 'app-verified-badge',
   template: `
     @if (publicCheck()) {
       <svg class="badge" viewBox="0 0 24 24" aria-label="Verified" role="img">
-        <title>Verified — a top-10,000 account (9,728+ followers)</title>
+        <title>{{ publicTitle() }}</title>
         <path [attr.d]="checkPath" />
       </svg>
     } @else if (selfCheck()) {
@@ -47,6 +49,7 @@ export const VERIFIED_FOLLOWER_THRESHOLD = 9_728;
 })
 export class VerifiedBadge {
   private auth = inject(Auth);
+  private prefs = inject(ClientPrefs);
 
   readonly account = input.required<Account>();
 
@@ -59,9 +62,27 @@ export class VerifiedBadge {
     '-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26' +
     ' 4.8-5.23 1.47 1.36-6.2 6.77z';
 
-  protected readonly publicCheck = computed(
-    () => this.account().followers_count >= VERIFIED_FOLLOWER_THRESHOLD,
-  );
+  protected readonly publicCheck = computed(() => {
+    switch (this.prefs.verifiedMode()) {
+      case 'everyone':
+        return true;
+      case 'famous':
+        return this.account().followers_count > (this.auth.account()?.followers_count ?? 0);
+      default:
+        return this.account().followers_count >= VERIFIED_FOLLOWER_THRESHOLD;
+    }
+  });
+
+  protected readonly publicTitle = computed(() => {
+    switch (this.prefs.verifiedMode()) {
+      case 'everyone':
+        return 'Verified — everyone deserves a blue check mark';
+      case 'famous':
+        return 'Verified — more followers than you; compared to you, famous';
+      default:
+        return 'Verified — a top-10,000 account (9,728+ followers)';
+    }
+  });
 
   protected readonly selfCheck = computed(() => this.account().id === this.auth.account()?.id);
 }

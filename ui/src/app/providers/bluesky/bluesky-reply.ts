@@ -2,9 +2,9 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { Status } from '../../models';
-import { adaptAuthor, postUrl, renderRichText } from './bluesky-adapter';
 import { BlueskyApi } from './bluesky-api';
 import { detectFacets, graphemeLength } from './bluesky-facets';
+import { buildLocalBskyStatus } from './bluesky-local-status';
 import { BlueskySession } from './bluesky-session';
 import { BskyFacet, BskyRef } from './bluesky-types';
 
@@ -102,62 +102,21 @@ export class BskyReply {
         next: (created) => {
           this.posting.set(false);
           this.text.set('');
-          this.posted.emit(this.localStatus(created.uri, created.cid, text, sentFacets, ref));
+          this.posted.emit(
+            buildLocalBskyStatus(
+              this.session.session()!,
+              created.uri,
+              created.cid,
+              text,
+              sentFacets,
+              ref,
+            ),
+          );
         },
         error: () => {
           this.posting.set(false);
           this.error.set("Couldn't post the reply — try again.");
         },
       });
-  }
-
-  /** Bluesky returns only uri/cid for a new record; build the visible Status locally. */
-  private localStatus(
-    uri: string,
-    cid: string,
-    text: string,
-    facets: BskyFacet[],
-    parent: BskyRef,
-  ): Status {
-    const session = this.session.session()!;
-    const account = adaptAuthor({
-      did: session.did,
-      handle: session.handle,
-      displayName: session.displayName,
-      avatar: session.avatar,
-    });
-    return {
-      provider: 'bluesky',
-      providerRef: {
-        uri,
-        cid,
-        likeUri: null,
-        repostUri: null,
-        replyRoot: parent.replyRoot,
-      } satisfies BskyRef,
-      id: `bsky:${uri}`,
-      created_at: new Date().toISOString(),
-      edited_at: null,
-      content: renderRichText(text, facets),
-      spoiler_text: '',
-      visibility: 'public',
-      url: postUrl(session.handle, uri),
-      account,
-      reblog: null,
-      quote: null,
-      in_reply_to_id: `bsky:${parent.uri}`,
-      replies_count: 0,
-      reblogs_count: 0,
-      favourites_count: 0,
-      favourited: false,
-      reblogged: false,
-      bookmarked: false,
-      muted: false,
-      pinned: false,
-      sensitive: false,
-      poll: null,
-      quote_approval_policy: null,
-      media_attachments: [],
-    };
   }
 }

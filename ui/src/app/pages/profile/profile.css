@@ -16,6 +16,13 @@
   background: var(--bg);
 }
 
+.profile-filters {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
 .profile-header {
   padding: 0 16px 12px;
   border-bottom: 1px solid var(--border);

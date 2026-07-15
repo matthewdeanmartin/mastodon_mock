@@ -6,6 +6,9 @@ const PREFS_KEY = 'mockingbird_client_prefs';
 const PROVIDER_IDS: ProviderId[] = ['mastodon', 'bluesky', 'rss'];
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
+
+/** When the blue verification check shows on other accounts. */
+export type VerifiedMode = 'fixed' | 'famous' | 'everyone';
 export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
 export type ReaderTextAlign = 'left' | 'justify';
 
@@ -55,7 +58,11 @@ const FONT_STACKS: Record<ReaderFontFamily, string> = {
 interface StoredPrefs {
   themeMode?: ThemeMode;
   accentId?: string;
+  /** Legacy combined pref; migrated to confirmBeforePost + delayedSend on load. */
   undoSend?: boolean;
+  confirmBeforePost?: boolean;
+  delayedSend?: boolean;
+  verifiedMode?: VerifiedMode;
   readerFontSize?: number;
   readerFontFamily?: ReaderFontFamily;
   readerFontWeight?: number;
@@ -87,7 +94,12 @@ function clamp(value: number, min: number, max: number): number {
 export class ClientPrefs {
   readonly themeMode = signal<ThemeMode>('auto');
   readonly accentId = signal<string>('blue');
-  readonly undoSend = signal<boolean>(false);
+  /** Ask "do you really want to post that?" before sending. */
+  readonly confirmBeforePost = signal<boolean>(false);
+  /** Hold posts for 30 seconds with a cancel (and publish-now) option. */
+  readonly delayedSend = signal<boolean>(false);
+  /** Who gets a blue check: fixed follower bar, more followers than me, or everyone. */
+  readonly verifiedMode = signal<VerifiedMode>('fixed');
 
   // Reader typography (thread reader mode + feed reader mode).
   readonly readerFontSize = signal<number>(18);
@@ -132,8 +144,18 @@ export class ClientPrefs {
     }
   }
 
-  setUndoSend(enabled: boolean): void {
-    this.undoSend.set(enabled);
+  setConfirmBeforePost(enabled: boolean): void {
+    this.confirmBeforePost.set(enabled);
+  }
+
+  setDelayedSend(enabled: boolean): void {
+    this.delayedSend.set(enabled);
+  }
+
+  setVerifiedMode(mode: VerifiedMode): void {
+    if (mode === 'fixed' || mode === 'famous' || mode === 'everyone') {
+      this.verifiedMode.set(mode);
+    }
   }
 
   setReaderFontSize(px: number): void {
@@ -206,7 +228,18 @@ export class ClientPrefs {
     ) {
       this.accentId.set(stored.accentId);
     }
-    this.loadBool(stored.undoSend, this.undoSend);
+    // Legacy combined pref maps onto both halves; explicit new keys win.
+    this.loadBool(stored.undoSend, this.confirmBeforePost);
+    this.loadBool(stored.undoSend, this.delayedSend);
+    this.loadBool(stored.confirmBeforePost, this.confirmBeforePost);
+    this.loadBool(stored.delayedSend, this.delayedSend);
+    if (
+      stored.verifiedMode === 'fixed' ||
+      stored.verifiedMode === 'famous' ||
+      stored.verifiedMode === 'everyone'
+    ) {
+      this.verifiedMode.set(stored.verifiedMode);
+    }
     this.loadBool(stored.feedReader, this.feedReader);
     this.loadBool(stored.showImages, this.showImages);
     if (typeof stored.readerFontSize === 'number') {
@@ -245,7 +278,9 @@ export class ClientPrefs {
     const prefs: StoredPrefs = {
       themeMode: this.themeMode(),
       accentId: this.accentId(),
-      undoSend: this.undoSend(),
+      confirmBeforePost: this.confirmBeforePost(),
+      delayedSend: this.delayedSend(),
+      verifiedMode: this.verifiedMode(),
       readerFontSize: this.readerFontSize(),
       readerFontFamily: this.readerFontFamily(),
       readerFontWeight: this.readerFontWeight(),

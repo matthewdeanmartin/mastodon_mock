@@ -65,6 +65,25 @@ textarea {
   text-transform: capitalize;
 }
 
+.target-select {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 8px;
+}
+
+.bsky-count {
+  white-space: nowrap;
+}
+
+.cross-post-error {
+  margin-top: 6px;
+  padding: 8px 12px;
+  border: 1px solid #e0245e;
+  border-radius: 12px;
+  color: #e0245e;
+  font-size: 0.9em;
+}
+
 .media-previews {
   display: flex;
   flex-direction: column;
