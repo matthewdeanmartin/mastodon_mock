@@ -73,7 +73,19 @@ describe('RightRail', () => {
       'https://matthewdeanmartin.github.io/mastodon_is_my_blog/mimb_lite/index.html',
     );
     expect(hrefs).toContain('https://matthewdeanmartin.github.io/youtuberfinder/');
-    expect(el.querySelectorAll('.ad-card')).toHaveLength(3);
+    expect(el.querySelectorAll('.spotlight-card')).toHaveLength(3);
+  });
+
+  it('house-ad markup carries no ad-* classes (ad blockers hide those cosmetically)', () => {
+    const fixture = setUp();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelectorAll('.spotlight-card').length).toBeGreaterThan(0);
+    const adClassed = [...el.querySelectorAll('*')].filter((node) =>
+      [...node.classList].some((cls) => /^ad[s]?([-_]|$)/i.test(cls)),
+    );
+    expect(adClassed).toHaveLength(0);
   });
 
   it('no longer hosts the trends widget (moved to the left rail)', () => {

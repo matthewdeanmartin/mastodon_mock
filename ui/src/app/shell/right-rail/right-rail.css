@@ -83,11 +83,17 @@
   font-size: 12px;
 }
 
-.ad-card {
+/*
+ * House-ad cards. Deliberately NOT named .ad-anything: EasyList-style ad-blocker
+ * cosmetic filters hide elements with generic ad classes (.ad-card, .ad-body,
+ * .ad-title, …), which made these invisible for anyone running uBlock/AdBlock.
+ * The visible "House ad" text label stays — filters match selectors, not text.
+ */
+.spotlight-card {
   border-color: var(--accent);
 }
 
-.ad-body {
+.spotlight-body {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -95,28 +101,28 @@
   color: var(--text);
 }
 
-.ad-body:hover {
+.spotlight-body:hover {
   background: var(--accent-soft);
   text-decoration: none;
 }
 
-.ad-title {
+.spotlight-title {
   font-weight: 800;
   font-size: 14px;
 }
 
-.ad-text {
+.spotlight-text {
   font-size: 13px;
   line-height: 1.45;
 }
 
-.ad-cta {
+.spotlight-cta {
   color: var(--accent);
   font-size: 13px;
   font-weight: 700;
 }
 
-.ad-disclosure {
+.spotlight-disclosure {
   margin: 0;
   padding: 4px 14px 10px;
   font-size: 11px;

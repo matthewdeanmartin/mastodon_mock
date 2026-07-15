@@ -40,11 +40,15 @@ mastodon.social; Bluesky direct via XRPC CORS `*`). Mix of roadmap Phase 4 polis
 9. **Blue-check policy** — ClientPrefs `verifiedMode` radio in the Mockingbird
    Blue / Appearance control cluster: `fixed` (default; the 9,728-follower bar),
    `famous` (more followers than the viewer), `everyone`.
-10. **House ads** — the inventory (`house-ads.ts`) only contained the MIMB GitHub
-    ad; added MIMB lite and YouTuber Finder. NOTE: the right rail (where ads
-    live) is `display: none` below 1240px viewport width (`shell.css`) — that is
-    almost certainly why they seemed "broken". Not changed; flag if narrower
-    viewports should get ads somewhere else.
+10. **House ads** — two real causes, both fixed:
+    - the inventory (`house-ads.ts`) only contained the MIMB GitHub ad; added
+      MIMB lite and YouTuber Finder.
+    - **ad blockers were hiding the cards** (user diagnosed this): the markup
+      used `.ad-card` / `.ad-body` / `.ad-title` / `.ad-cta` classes, which
+      EasyList-style cosmetic filters hide. Renamed to `.spotlight-*`; the
+      honest "House ad" text label stays (filters match selectors, not text).
+      A spec now fails if any `ad-*` class sneaks back into the ad markup.
+    - (Also true but secondary: the right rail is `display: none` below 1240px.)
 
 ## Decisions
 - Profile toggle defaults: Boosts ON, Replies OFF, Pinned ON — matches Mastodon's
@@ -104,3 +108,9 @@ mastodon.social; Bluesky direct via XRPC CORS `*`). Mix of roadmap Phase 4 polis
   builds pass. NOT live-verified against real servers this sprint (token
   budget) — sprint10 should start with a Playwright pass, especially
   compose→Bluesky and compose→Both against bsky.social.
+- 2026-07-15 (later): user screenshot showed ads still missing on a wide
+  desktop — root cause was ad-blocker cosmetic filtering of the `.ad-*` class
+  names, renamed to `.spotlight-*` (see scope item 10). Also raised the global
+  vitest testTimeout to 30s in test-setup.ts (Shell/StatusCard specs flaked at
+  5s under worker contention). Now 527 tests green (67 files), lint clean,
+  both builds pass.

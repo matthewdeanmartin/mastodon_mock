@@ -1,11 +1,11 @@
 @for (ad of ads; track ad.url) {
-  <section class="card ad-card">
-    <a class="ad-body" [href]="ad.url" target="_blank" rel="noopener noreferrer">
-      <span class="ad-title">{{ ad.title }}</span>
-      <span class="ad-text">{{ ad.text }}</span>
-      <span class="ad-cta">{{ ad.cta }}</span>
+  <section class="card spotlight-card">
+    <a class="spotlight-body" [href]="ad.url" target="_blank" rel="noopener noreferrer">
+      <span class="spotlight-title">{{ ad.title }}</span>
+      <span class="spotlight-text">{{ ad.text }}</span>
+      <span class="spotlight-cta">{{ ad.cta }}</span>
     </a>
-    <p class="ad-disclosure muted">House ad</p>
+    <p class="spotlight-disclosure muted">House ad</p>
   </section>
 }
 
