@@ -18,20 +18,20 @@
 
 <app-compose (posted)="onPosted($event)" />
 
-<app-command-bar [live]="live()" (toggleLive)="toggleLive()" />
+<app-command-bar [live]="live()" [providerChips]="true" (toggleLive)="toggleLive()" />
 
 @if (loading()) {
   <p class="muted center">Loading…</p>
-} @else if (!statuses().length) {
+} @else if (!visible().length) {
   <p class="muted center">
     Your home timeline is empty.
     <a routerLink="/find-people">Find people to follow</a>, or post something.
   </p>
 } @else {
-  @for (s of statuses(); track s.id; let i = $index) {
+  @for (s of visible(); track s.id) {
     <app-status-card
       [status]="s"
-      (changed)="onChanged(i, $event)"
+      (changed)="onChanged(s, $event)"
       (deleted)="onDeleted($event)"
       (replied)="onPosted($event)"
     />

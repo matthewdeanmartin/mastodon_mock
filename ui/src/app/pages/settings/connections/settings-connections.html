@@ -1,0 +1,73 @@
+<div class="spage-head">
+  <h1>Connections</h1>
+  <p>
+    Follow your people wherever they post. Mastodon is home — connections are merged into your home
+    timeline as guests, and everything here stays in this browser (localStorage), like all
+    Mockingbird preferences.
+  </p>
+</div>
+
+<section class="conn-section">
+  <h2>📡 RSS feeds</h2>
+  <p class="muted">
+    Any RSS or Atom feed becomes posts in your home feed, read-only, with an "Open original" link.
+    Mockingbird has no server, so a feed only works if its site allows browser (CORS) access —
+    you'll know right away when you add it.
+  </p>
+
+  <form class="add-feed" (ngSubmit)="addFeed()">
+    <input
+      type="url"
+      name="feedUrl"
+      placeholder="https://example.com/feed.xml"
+      [ngModel]="feedUrl()"
+      (ngModelChange)="feedUrl.set($event)"
+      [disabled]="adding()"
+    />
+    <button class="btn" type="submit" [disabled]="!feedUrl().trim() || adding()">
+      {{ adding() ? 'Checking…' : 'Add feed' }}
+    </button>
+  </form>
+  @if (error(); as msg) {
+    <p class="feed-error">{{ msg }}</p>
+  }
+
+  @if (subs.feeds().length) {
+    <ul class="feed-list">
+      @for (f of subs.feeds(); track f.url) {
+        <li class="feed-row">
+          <label class="feed-toggle">
+            <input type="checkbox" [checked]="f.enabled" (change)="toggle(f)" />
+            <span class="names">
+              <span class="name">{{ f.title || f.url }}</span>
+              <span class="muted small">{{ f.url }}</span>
+            </span>
+          </label>
+          <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="muted">No feeds yet.</p>
+  }
+
+  <details class="nitter-tip">
+    <summary>Following someone who's still on X?</summary>
+    <p class="muted">
+      A <strong>Nitter</strong> instance turns an X account into a feed:
+      <code>https://&lt;nitter-host&gt;/&lt;username&gt;/rss</code>. Public instances come and go —
+      you need one that's up and allows browser access. Replies aren't possible for feed posts; use
+      "Open original" to respond over there.
+    </p>
+  </details>
+</section>
+
+<section class="conn-section coming-soon">
+  <h2>🦋 Bluesky</h2>
+  <p class="muted">
+    Coming soon: link your Bluesky account with an
+    <strong>app password</strong> (revocable, made in Bluesky's settings — never your real
+    password). Your Bluesky timeline will merge into home, and replies, likes and reposts will go
+    back to Bluesky.
+  </p>
+</section>

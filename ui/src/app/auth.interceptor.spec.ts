@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from './auth';
 import { authInterceptor } from './auth.interceptor';
+import { externalFetch } from './providers/external-fetch';
 import { Server } from './server';
 
 describe('authInterceptor', () => {
@@ -45,6 +46,18 @@ describe('authInterceptor', () => {
     const req = httpMock.expectOne('/api/v1/timelines/home');
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush([]);
+  });
+
+  it('never sends the token to external hosts (RSS feeds etc.)', () => {
+    auth.setToken('my-access-token');
+
+    httpClient
+      .get('https://example.com/feed.xml', { responseType: 'text', context: externalFetch() })
+      .subscribe();
+
+    const req = httpMock.expectOne('https://example.com/feed.xml');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush('<rss/>');
   });
 
   it('does not overwrite a caller-supplied Authorization header', () => {

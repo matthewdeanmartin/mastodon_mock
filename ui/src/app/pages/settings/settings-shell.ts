@@ -30,6 +30,8 @@ export class SettingsShell {
     { label: 'Public profile', path: 'profile', exact: true },
     // Client-side premium-style features; the same controls also live in Appearance.
     { label: 'Mockingbird Blue', path: 'blue', exact: true },
+    // Client-side (localStorage): RSS feeds now, Bluesky next. Works anywhere.
+    { label: 'Connections', path: 'connections', exact: true },
     { label: 'Privacy and reach', path: 'privacy', exact: true },
     // Appearance is client-side (theme/accent/undo-send in localStorage) and works
     // against any instance; the page hides its server-backed rows off-mock itself.

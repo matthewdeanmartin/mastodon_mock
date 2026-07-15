@@ -751,4 +751,51 @@ describe('StatusCard', () => {
       expect(deleted.map((s) => s.id)).toEqual(['1']);
     });
   });
+
+  // ---------------------------------------------------------------- foreign providers (RSS)
+
+  describe('foreign statuses', () => {
+    function makeRssStatus(): Status {
+      return makeStatus({
+        id: 'rss:https://blog.example/feed::g1',
+        provider: 'rss',
+        url: 'https://blog.example/post',
+      });
+    }
+
+    it('shows a provider badge instead of the visibility badge', () => {
+      const f = setUp(makeRssStatus());
+      const el = f.nativeElement as HTMLElement;
+      expect(el.querySelector('.provider-badge')?.textContent).toContain('RSS');
+      expect(el.textContent).not.toContain('public');
+    });
+
+    it('replaces the action row with an external "Open original" link', () => {
+      const f = setUp(makeRssStatus());
+      const el = f.nativeElement as HTMLElement;
+      const open = el.querySelector<HTMLAnchorElement>('a.open-original')!;
+      expect(open.href).toBe('https://blog.example/post');
+      expect(open.target).toBe('_blank');
+      // No reply/boost/favourite buttons for a read-only source.
+      expect(el.textContent).not.toContain('💬');
+      expect(el.textContent).not.toContain('🔁');
+      expect(el.textContent).not.toContain('⭐');
+    });
+
+    it('does not link the author or timestamp to in-app routes', () => {
+      const f = setUp(makeRssStatus());
+      const el = f.nativeElement as HTMLElement;
+      expect(el.querySelector('a.name')?.getAttribute('href')).toBeNull();
+      const time = el.querySelector<HTMLAnchorElement>('a.post-time')!;
+      expect(time.href).toBe('https://blog.example/post');
+    });
+
+    it('keeps normal in-app links for Mastodon statuses', () => {
+      const f = setUp(makeStatus({ id: '42' }));
+      const el = f.nativeElement as HTMLElement;
+      expect(el.querySelector('a.name')?.getAttribute('href')).toBe('/accounts/1');
+      expect(el.querySelector('a.open-original')).toBeNull();
+      expect(el.textContent).toContain('💬');
+    });
+  });
 });

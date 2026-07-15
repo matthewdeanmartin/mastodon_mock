@@ -1,15 +1,23 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../client-prefs';
+import { RssSubscriptions } from '../providers/rss/rss-subscriptions';
 import { CommandBar } from './command-bar';
 
 describe('CommandBar', () => {
   beforeEach(() => {
     localStorage.clear();
+    // The provider registry (filter chips) reaches HttpClient via RssFetch.
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
   });
 
-  function setUp() {
+  function setUp(providerChips = false) {
     const fixture = TestBed.createComponent(CommandBar);
+    fixture.componentRef.setInput('providerChips', providerChips);
     fixture.detectChanges();
     return fixture;
   }
@@ -45,6 +53,40 @@ describe('CommandBar', () => {
     prefs.setFeedReader(true);
     fixture.detectChanges();
     expect(el.textContent).toContain('A+');
+  });
+
+  it('shows provider filter chips only on provider pages with a linked provider', () => {
+    // No chips without the input, even with feeds configured.
+    TestBed.inject(RssSubscriptions).add('https://a.example/feed', 'A');
+    let el = setUp(false).nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('Fedi');
+
+    // Chips with the input and a linked provider.
+    el = setUp(true).nativeElement as HTMLElement;
+    expect(el.textContent).toContain('🦣 Fedi');
+    expect(el.textContent).toContain('📡 RSS');
+  });
+
+  it('hides the chips when no provider is linked', () => {
+    const el = setUp(true).nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('Fedi');
+    expect(el.textContent).not.toContain('RSS');
+  });
+
+  it('chips toggle provider visibility in ClientPrefs', () => {
+    TestBed.inject(RssSubscriptions).add('https://a.example/feed', 'A');
+    const fixture = setUp(true);
+    const prefs = TestBed.inject(ClientPrefs);
+    const rssChip = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+      (b) => b.textContent?.includes('RSS'),
+    )!;
+
+    expect(prefs.isProviderVisible('rss')).toBe(true);
+    rssChip.click();
+    fixture.detectChanges();
+    expect(prefs.isProviderVisible('rss')).toBe(false);
+    rssChip.click();
+    expect(prefs.isProviderVisible('rss')).toBe(true);
   });
 
   it('emits toggleLive without owning the live state', () => {

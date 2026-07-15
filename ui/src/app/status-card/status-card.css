@@ -406,3 +406,12 @@
 .danger-menu-panel button:hover {
   background: var(--border);
 }
+
+/* Foreign (RSS/Bluesky) posts: the read-only escape hatch to the source site. */
+a.open-original {
+  text-decoration: none;
+}
+
+.provider-badge {
+  white-space: nowrap;
+}

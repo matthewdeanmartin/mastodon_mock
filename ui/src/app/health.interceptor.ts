@@ -1,6 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { tap } from 'rxjs';
+import { EXTERNAL_FETCH } from './providers/external-fetch';
 import { ServerHealth } from './server-health';
 
 /**
@@ -12,6 +13,10 @@ import { ServerHealth } from './server-health';
  * too, so the whale disappears the moment traffic recovers.
  */
 export const healthInterceptor: HttpInterceptorFn = (req, next) => {
+  // Foreign-host fetches (RSS feeds etc.) say nothing about the instance's health.
+  if (req.context.get(EXTERNAL_FETCH)) {
+    return next(req);
+  }
   const health = inject(ServerHealth);
   return next(req).pipe(
     tap({

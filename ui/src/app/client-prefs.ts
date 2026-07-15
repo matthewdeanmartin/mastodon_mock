@@ -1,6 +1,9 @@
 import { effect, Injectable, signal, WritableSignal } from '@angular/core';
+import { ProviderId } from './models';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
+
+const PROVIDER_IDS: ProviderId[] = ['mastodon', 'bluesky', 'rss'];
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
@@ -62,6 +65,7 @@ interface StoredPrefs {
   readerTextAlign?: ReaderTextAlign;
   feedReader?: boolean;
   showImages?: boolean;
+  hiddenProviders?: ProviderId[];
 }
 
 /** Clamp helper shared by the numeric reader prefs. */
@@ -97,6 +101,9 @@ export class ClientPrefs {
   // Feed-wide toggles (command bar).
   readonly feedReader = signal<boolean>(false);
   readonly showImages = signal<boolean>(true);
+
+  /** Providers filtered OUT of the home feed via the command-bar chips. */
+  readonly hiddenProviders = signal<ProviderId[]>([]);
 
   /** Resolved theme actually in effect ('auto' resolved against the OS preference). */
   readonly resolvedTheme = signal<'light' | 'dark'>('light');
@@ -169,6 +176,16 @@ export class ClientPrefs {
     this.showImages.set(on);
   }
 
+  isProviderVisible(id: ProviderId): boolean {
+    return !this.hiddenProviders().includes(id);
+  }
+
+  toggleProvider(id: ProviderId): void {
+    this.hiddenProviders.update((hidden) =>
+      hidden.includes(id) ? hidden.filter((p) => p !== id) : [...hidden, id],
+    );
+  }
+
   private load(): void {
     let stored: StoredPrefs = {};
     try {
@@ -213,6 +230,9 @@ export class ClientPrefs {
     if (stored.readerTextAlign === 'left' || stored.readerTextAlign === 'justify') {
       this.readerTextAlign.set(stored.readerTextAlign);
     }
+    if (Array.isArray(stored.hiddenProviders)) {
+      this.hiddenProviders.set(stored.hiddenProviders.filter((p) => PROVIDER_IDS.includes(p)));
+    }
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -235,6 +255,7 @@ export class ClientPrefs {
       readerTextAlign: this.readerTextAlign(),
       feedReader: this.feedReader(),
       showImages: this.showImages(),
+      hiddenProviders: this.hiddenProviders(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   }

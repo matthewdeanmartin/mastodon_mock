@@ -199,6 +199,26 @@ export class StatusCard {
     return s.reblog ?? s;
   }
 
+  /**
+   * True for posts from a foreign provider (RSS, Bluesky, …). Foreign posts
+   * have no server-side account/thread to link to, and their interactions are
+   * capability-gated — RSS is read-only, so it gets "Open original" instead.
+   */
+  protected get foreign(): boolean {
+    return (this.display.provider ?? 'mastodon') !== 'mastodon';
+  }
+
+  protected get providerBadge(): string | null {
+    switch (this.display.provider) {
+      case 'rss':
+        return '📡 RSS';
+      case 'bluesky':
+        return '🦋 Bluesky';
+      default:
+        return null;
+    }
+  }
+
   get boostedBy(): string | null {
     const s = this.status();
     return s.reblog ? s.account.display_name : null;

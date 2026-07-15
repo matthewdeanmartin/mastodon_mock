@@ -1,10 +1,12 @@
 import { Component, inject, input, output } from '@angular/core';
 import { ClientPrefs } from '../client-prefs';
+import { ProviderRegistry } from '../providers/provider-registry';
 
 /**
  * The timeline command bar: Go Live (owned by the host page), plus the global
  * feed toggles — Reader mode, images on/off, and text size (shown in reader).
  * Reader/images are ClientPrefs, so every timeline honours them at once.
+ * Pages that merge foreign providers (home) also get per-provider filter chips.
  */
 @Component({
   selector: 'app-command-bar',
@@ -31,6 +33,26 @@ import { ClientPrefs } from '../client-prefs';
       >
         🖼️ {{ prefs.showImages() ? 'Images' : 'No images' }}
       </button>
+      @if (providerChips() && registry.linked().length) {
+        <button
+          class="btn btn-outline"
+          [class.active]="prefs.isProviderVisible('mastodon')"
+          (click)="prefs.toggleProvider('mastodon')"
+          title="Show or hide Mastodon posts"
+        >
+          🦣 Fedi
+        </button>
+        @for (p of registry.linked(); track p.id) {
+          <button
+            class="btn btn-outline"
+            [class.active]="prefs.isProviderVisible(p.id)"
+            (click)="prefs.toggleProvider(p.id)"
+            [title]="'Show or hide ' + p.label + ' posts'"
+          >
+            {{ p.badge }}
+          </button>
+        }
+      }
       @if (prefs.feedReader()) {
         <span class="font-controls">
           <button
@@ -72,9 +94,12 @@ import { ClientPrefs } from '../client-prefs';
 })
 export class CommandBar {
   protected readonly prefs = inject(ClientPrefs);
+  protected readonly registry = inject(ProviderRegistry);
 
   /** Whether the host page has a live stream to offer. */
   readonly showLive = input(true);
   readonly live = input(false);
+  /** Whether this page merges foreign providers (home) — shows the filter chips. */
+  readonly providerChips = input(false);
   readonly toggleLive = output<void>();
 }

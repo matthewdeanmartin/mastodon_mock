@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { healthInterceptor } from './health.interceptor';
+import { externalFetch } from './providers/external-fetch';
 import { ServerHealth } from './server-health';
 
 describe('healthInterceptor', () => {
@@ -61,6 +62,24 @@ describe('healthInterceptor', () => {
       .expectOne('/api/v1/statuses/nope')
       .flush('not found', { status: 404, statusText: 'Not Found' });
     expect(health.down()).toBe(false);
+  });
+
+  it('ignores external fetches entirely (a dead RSS feed is not a dead server)', () => {
+    http
+      .get('https://example.com/feed.xml', { responseType: 'text', context: externalFetch() })
+      .subscribe({ error: () => undefined });
+    httpMock
+      .expectOne('https://example.com/feed.xml')
+      .error(new ProgressEvent('error'), { status: 0 });
+    expect(health.down()).toBe(false);
+
+    // Nor does a foreign success clear a real down state.
+    health.markDown();
+    http
+      .get('https://example.com/feed.xml', { responseType: 'text', context: externalFetch() })
+      .subscribe();
+    httpMock.expectOne('https://example.com/feed.xml').flush('<rss/>');
+    expect(health.down()).toBe(true);
   });
 
   it('clears a down state when a later request succeeds', () => {

@@ -53,6 +53,13 @@ export const routes: Routes = [
               import('./pages/settings/blue/settings-blue').then((m) => m.SettingsBlue),
           },
           {
+            path: 'connections',
+            loadComponent: () =>
+              import('./pages/settings/connections/settings-connections').then(
+                (m) => m.SettingsConnections,
+              ),
+          },
+          {
             path: 'privacy',
             loadComponent: () =>
               import('./pages/settings/privacy/settings-privacy').then((m) => m.SettingsPrivacy),

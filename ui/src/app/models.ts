@@ -1,5 +1,12 @@
 // Mastodon API object shapes (the subset the UI consumes).
 
+/**
+ * Where a timeline item came from. Absent means Mastodon (the primary network).
+ * Foreign providers (`providers/`) adapt their content into these same Mastodon
+ * shapes and tag it, so the rest of the app renders everything identically.
+ */
+export type ProviderId = 'mastodon' | 'bluesky' | 'rss';
+
 export interface Role {
   id: string;
   name: string;
@@ -80,6 +87,8 @@ export interface Quote {
 }
 
 export interface Status {
+  /** Absent = Mastodon. Foreign statuses use namespaced ids (e.g. "rss:…"). */
+  provider?: ProviderId;
   id: string;
   created_at: string;
   edited_at: string | null;

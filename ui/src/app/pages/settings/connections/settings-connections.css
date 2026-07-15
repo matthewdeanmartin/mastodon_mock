@@ -1,0 +1,71 @@
+.conn-section {
+  margin-bottom: 28px;
+}
+
+.conn-section h2 {
+  font-size: 17px;
+  margin: 0 0 6px;
+}
+
+.add-feed {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.add-feed input {
+  flex: 1;
+  min-width: 0;
+}
+
+.feed-error {
+  color: #d63b3b;
+  font-size: 13px;
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.feed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.feed-toggle .names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.feed-toggle .names span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nitter-tip {
+  margin-top: 14px;
+}
+
+.nitter-tip summary {
+  cursor: pointer;
+}
+
+.coming-soon {
+  opacity: 0.85;
+}
