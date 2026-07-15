@@ -270,7 +270,9 @@ describe('Lists', () => {
     httpMock.expectOne('/api/v1/collections').flush({ collection: null });
 
     // Null payload → loadCollections() re-runs (account already verified).
-    httpMock.expectOne('/api/v1/accounts/9/collections').flush({ collections: [makeCollection('C2')] });
+    httpMock
+      .expectOne('/api/v1/accounts/9/collections')
+      .flush({ collections: [makeCollection('C2')] });
     httpMock.expectOne('/api/v1/accounts/9/in_collections').flush({ collections: [] });
 
     expect(
