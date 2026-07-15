@@ -1,0 +1,104 @@
+@if (loading()) {
+  <div class="page-head">Collection</div>
+  <p class="muted center">Loading…</p>
+} @else if (error()) {
+  <div class="page-head">Collection</div>
+  <p class="muted center">{{ error() }}</p>
+} @else if (data(); as d) {
+  <div class="page-head">{{ d.collection.name }}</div>
+
+  <div class="coll-head">
+    @if (d.collection.description) {
+      <p class="description">{{ d.collection.description }}</p>
+    }
+    <p class="muted small">
+      @if (curator(); as c) {
+        Curated by
+        <a [routerLink]="['/accounts', c.id]">{{ c.display_name || c.username }}</a>
+        ·
+      }
+      {{ d.collection.item_count }} member{{ d.collection.item_count === 1 ? '' : 's' }}
+    </p>
+    <div class="coll-actions">
+      @if (isOwner()) {
+        <button class="btn btn-outline danger" (click)="remove()">Delete collection</button>
+      } @else if (myItem()) {
+        <button class="btn btn-outline danger" (click)="revokeSelf()">
+          Remove me from this collection
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab" [class.active]="tab() === 'feed'" (click)="setTab('feed')">Feed</button>
+    <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
+      Members
+    </button>
+  </div>
+
+  @if (tab() === 'feed') {
+    @if (feedLoading()) {
+      <p class="muted center">Loading feed…</p>
+    } @else if (!feed().length) {
+      <p class="muted center">No recent posts from this collection's members.</p>
+    } @else {
+      @for (s of feed(); track s.id; let i = $index) {
+        <app-status-card
+          [status]="s"
+          (changed)="onChanged(i, $event)"
+          (deleted)="onDeleted($event)"
+        />
+      }
+    }
+  } @else {
+    @if (isOwner()) {
+      <div class="add-member">
+        <input
+          type="text"
+          [ngModel]="query()"
+          (ngModelChange)="query.set($event)"
+          (keyup.enter)="search()"
+          placeholder="Search accounts to add…"
+        />
+        <button class="btn" [disabled]="!query().trim() || searching()" (click)="search()">
+          Search
+        </button>
+      </div>
+      @for (a of results(); track a.id) {
+        <div class="member-row">
+          <a class="member-link" [routerLink]="['/accounts', a.id]">
+            <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+            <span class="names">
+              <span class="name">{{ a.display_name || a.username }}</span>
+              <span class="acct muted">&#64;{{ a.acct }}</span>
+            </span>
+          </a>
+          <button class="btn btn-outline" (click)="addMember(a)">Add</button>
+        </div>
+      }
+    }
+
+    @if (!members().length) {
+      <p class="muted center">No members in this collection yet.</p>
+    } @else {
+      @for (m of members(); track m.itemId) {
+        <div class="member-row">
+          <a class="member-link" [routerLink]="['/accounts', m.account.id]">
+            <img class="avatar" [src]="m.account.avatar" [alt]="m.account.username" />
+            <span class="names">
+              <span class="name">{{ m.account.display_name || m.account.username }}</span>
+              <span class="acct muted">&#64;{{ m.account.acct }}</span>
+            </span>
+          </a>
+          @if (m.state === 'pending') {
+            <span class="muted small">pending</span>
+          }
+          @if (isOwner()) {
+            <button class="del" title="Remove from collection" (click)="removeMember(m)">✕</button>
+          }
+        </div>
+      }
+    }
+  }
+}
