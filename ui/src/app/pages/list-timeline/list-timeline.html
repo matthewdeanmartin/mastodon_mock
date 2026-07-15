@@ -1,11 +1,45 @@
 <div class="page-head">{{ title() || 'List' }}</div>
 
-@if (loading()) {
-  <p class="muted center">Loading…</p>
-} @else if (!statuses().length) {
-  <p class="muted center">No statuses in this list yet.</p>
+<div class="tabs">
+  <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Posts</button>
+  <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
+    Members
+  </button>
+</div>
+
+@if (tab() === 'posts') {
+  @if (loading()) {
+    <p class="muted center">Loading…</p>
+  } @else if (!statuses().length) {
+    <p class="muted center">No statuses in this list yet.</p>
+  } @else {
+    @for (s of statuses(); track s.id; let i = $index) {
+      <app-status-card
+        [status]="s"
+        (changed)="onChanged(i, $event)"
+        (deleted)="onDeleted($event)"
+      />
+    }
+  }
 } @else {
-  @for (s of statuses(); track s.id; let i = $index) {
-    <app-status-card [status]="s" (changed)="onChanged(i, $event)" (deleted)="onDeleted($event)" />
+  @if (membersLoading()) {
+    <p class="muted center">Loading…</p>
+  } @else if (!members().length) {
+    <p class="muted center">
+      No members in this list yet. Add people from the menu on their profile.
+    </p>
+  } @else {
+    @for (a of members(); track a.id) {
+      <div class="member-row">
+        <a class="member-link" [routerLink]="['/accounts', a.id]">
+          <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+          <span class="names">
+            <span class="name">{{ a.display_name || a.username }}</span>
+            <span class="acct muted">&#64;{{ a.acct }}</span>
+          </span>
+        </a>
+        <button class="del" title="Remove from list" (click)="removeMember(a)">✕</button>
+      </div>
+    }
   }
 }

@@ -39,9 +39,17 @@ describe('Lists', () => {
     httpMock.verify();
   });
 
+  /**
+   * Creates the component and settles the collections side of ngOnInit.
+   * By default the auth snapshot is empty, so loadCollections() first calls
+   * verify_credentials; erroring it short-circuits the collection fetches.
+   */
   function setUp(): ComponentFixture<Lists> {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
+    httpMock
+      .expectOne('/api/v1/accounts/verify_credentials')
+      .error(new ProgressEvent('error'));
     return fixture;
   }
 
@@ -152,6 +160,25 @@ describe('Lists', () => {
     httpMock.expectOne('/api/v1/lists/2').flush({});
 
     expect(internals(fixture).lists()).toEqual([l1, l3]);
+  });
+
+  it('loads collections once credentials are verified', () => {
+    const fixture = TestBed.createComponent(Lists);
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne('/api/v1/accounts/verify_credentials')
+      .flush({ id: '9', username: 'me', acct: 'me' });
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    httpMock.expectOne('/api/v1/9/collections').flush([]);
+    httpMock.expectOne('/api/v1/9/in_collections').flush([]);
+
+    const c = fixture.componentInstance as unknown as {
+      collectionsLoading: WritableSignal<boolean>;
+      collectionsSupported: WritableSignal<boolean>;
+    };
+    expect(c.collectionsLoading()).toBe(false);
+    expect(c.collectionsSupported()).toBe(true);
   });
 
   it('load() sets loading=true then fetches fresh data', () => {

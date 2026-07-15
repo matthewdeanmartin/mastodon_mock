@@ -25,3 +25,55 @@
     </a>
   }
 }
+
+<div class="section-head">Collections</div>
+
+@if (!collectionsSupported()) {
+  <p class="muted center">This server does not support collections (Mastodon 4.6+).</p>
+} @else {
+  <div class="new-list">
+    <input
+      type="text"
+      [ngModel]="newCollectionName()"
+      (ngModelChange)="newCollectionName.set($event)"
+      (keyup.enter)="createCollection()"
+      placeholder="New collection name"
+    />
+    <button class="btn" [disabled]="!newCollectionName().trim()" (click)="createCollection()">
+      Create
+    </button>
+  </div>
+
+  @if (collectionsLoading()) {
+    <p class="muted center">Loading…</p>
+  } @else if (!collections().length) {
+    <p class="muted center">
+      You have no collections. A collection is a public, curated set of accounts you recommend.
+    </p>
+  } @else {
+    @for (c of collections(); track c.id) {
+      <a class="list-row" [routerLink]="['/collections', c.id]">
+        <span>
+          {{ c.name }}
+          <span class="muted small">
+            · {{ c.item_count }} member{{ c.item_count === 1 ? '' : 's' }}
+          </span>
+        </span>
+        <button class="del" (click)="removeCollection(c, $event)" title="Delete collection">
+          ✕
+        </button>
+      </a>
+    }
+  }
+
+  <div class="section-head">Collections featuring me</div>
+  @if (!inCollections().length) {
+    <p class="muted center">Nobody has featured you in a collection yet.</p>
+  } @else {
+    @for (c of inCollections(); track c.id) {
+      <a class="list-row" [routerLink]="['/collections', c.id]">
+        <span>{{ c.name }}</span>
+      </a>
+    }
+  }
+}

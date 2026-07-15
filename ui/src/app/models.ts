@@ -243,6 +243,38 @@ export interface UserList {
   title: string;
 }
 
+/** A single membership entry inside a Collection (Mastodon 4.6+). */
+export interface CollectionItem {
+  id: string;
+  account_id: string | null;
+  state: 'pending' | 'accepted';
+  created_at: string;
+}
+
+/** A curated collection of accounts a user recommends (Mastodon 4.6+). */
+export interface Collection {
+  id: string;
+  account_id: string;
+  name: string;
+  description: string;
+  discoverable: boolean;
+  sensitive: boolean;
+  local: boolean;
+  item_count: number;
+  items: CollectionItem[];
+  created_at: string;
+  updated_at: string;
+  uri: string;
+  url?: string | null;
+  language?: string | null;
+}
+
+/** GET /api/v1/collections/:id — the collection plus full account entities. */
+export interface CollectionWithAccounts {
+  collection: Collection;
+  accounts: Account[];
+}
+
 /** Mock-only dev account record used by the login screen. */
 export interface DevUser {
   id: string;

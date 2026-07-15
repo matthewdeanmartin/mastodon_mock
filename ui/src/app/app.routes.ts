@@ -183,6 +183,10 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),
       },
+      {
+        path: 'collections/:id',
+        loadComponent: () => import('./pages/collection/collection').then((m) => m.CollectionPage),
+      },
       { path: 'tags/:tag', loadComponent: () => import('./pages/tag/tag').then((m) => m.Tag) },
       {
         path: 'statuses/:id',

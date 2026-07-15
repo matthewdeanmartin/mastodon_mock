@@ -5,6 +5,9 @@ import {
   Account,
   Announcement,
   AuthorizedApp,
+  Collection,
+  CollectionItem,
+  CollectionWithAccounts,
   ComposeOptions,
   ContentFilter,
   Context,
@@ -324,6 +327,63 @@ export class Api {
 
   listAccounts(id: string): Observable<Account[]> {
     return this.http.get<Account[]>(`/api/v1/lists/${id}/accounts`);
+  }
+
+  // --- collections (Mastodon 4.6+) ---
+  // Note: the local mock's collection endpoints are stateless stubs (empty
+  // lists / 404s), so these are mainly exercised against a real server.
+
+  /** Collections curated by the given account. */
+  accountCollections(accountId: string): Observable<Collection[]> {
+    return this.http.get<Collection[]>(`/api/v1/${accountId}/collections`);
+  }
+
+  /** Collections the given account is featured in ("who has me in a collection"). */
+  accountInCollections(accountId: string): Observable<Collection[]> {
+    return this.http.get<Collection[]>(`/api/v1/${accountId}/in_collections`);
+  }
+
+  getCollection(id: string): Observable<CollectionWithAccounts> {
+    return this.http.get<CollectionWithAccounts>(`/api/v1/collections/${id}`);
+  }
+
+  createCollection(name: string, description?: string): Observable<{ collection: Collection }> {
+    const body: Record<string, unknown> = { name };
+    if (description?.trim()) {
+      body['description'] = description.trim();
+    }
+    return this.http.post<{ collection: Collection }>('/api/v1/collections', body);
+  }
+
+  updateCollection(
+    id: string,
+    changes: { name?: string; description?: string; discoverable?: boolean },
+  ): Observable<{ collection: Collection }> {
+    return this.http.patch<{ collection: Collection }>(`/api/v1/collections/${id}`, changes);
+  }
+
+  deleteCollection(id: string): Observable<unknown> {
+    return this.http.delete(`/api/v1/collections/${id}`);
+  }
+
+  addCollectionAccount(
+    collectionId: string,
+    accountId: string,
+  ): Observable<{ collection_item: CollectionItem }> {
+    return this.http.post<{ collection_item: CollectionItem }>(
+      `/api/v1/collections/${collectionId}/items`,
+      { account_id: accountId },
+    );
+  }
+
+  /** Owner removes an item (a member) from their collection. */
+  removeCollectionItem(collectionId: string, itemId: string): Observable<unknown> {
+    return this.http.delete(`/api/v1/collections/${collectionId}/items/${itemId}`);
+  }
+
+  /** The featured user removes *themselves* from someone else's collection. */
+  revokeCollectionItem(collectionId: string, itemId: string): Observable<unknown> {
+    return this.http.post(`/api/v1/collections/${collectionId}/items/${itemId}/revoke`, {});
   }
 
   addToList(id: string, accountId: string): Observable<unknown> {

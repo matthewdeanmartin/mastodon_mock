@@ -2,7 +2,8 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
-import { UserList } from '../../models';
+import { Auth } from '../../auth';
+import { Collection, UserList } from '../../models';
 
 @Component({
   selector: 'app-lists',
@@ -12,13 +13,22 @@ import { UserList } from '../../models';
 })
 export class Lists implements OnInit {
   private api = inject(Api);
+  private auth = inject(Auth);
 
   protected lists = signal<UserList[]>([]);
   protected loading = signal(true);
   protected newTitle = signal('');
 
+  // Collections (Mastodon 4.6+). Older servers 404 → collectionsSupported=false.
+  protected collections = signal<Collection[]>([]);
+  protected inCollections = signal<Collection[]>([]);
+  protected collectionsLoading = signal(true);
+  protected collectionsSupported = signal(true);
+  protected newCollectionName = signal('');
+
   ngOnInit(): void {
     this.load();
+    this.loadCollections();
   }
 
   load(): void {
@@ -29,6 +39,36 @@ export class Lists implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  loadCollections(): void {
+    const me = this.auth.account();
+    if (!me) {
+      // Auth snapshot not verified yet; fetch it, then retry.
+      this.api.verifyCredentials().subscribe({
+        next: (account) => {
+          this.auth.setAccount(account);
+          this.loadCollections();
+        },
+        error: () => this.collectionsLoading.set(false),
+      });
+      return;
+    }
+    this.collectionsLoading.set(true);
+    this.api.accountCollections(me.id).subscribe({
+      next: (c) => {
+        this.collections.set(c);
+        this.collectionsLoading.set(false);
+      },
+      error: () => {
+        this.collectionsSupported.set(false);
+        this.collectionsLoading.set(false);
+      },
+    });
+    this.api.accountInCollections(me.id).subscribe({
+      next: (c) => this.inCollections.set(c),
+      error: () => this.inCollections.set([]),
     });
   }
 
@@ -48,6 +88,30 @@ export class Lists implements OnInit {
     event.preventDefault();
     this.api.deleteList(list.id).subscribe(() => {
       this.lists.update((l) => l.filter((x) => x.id !== list.id));
+    });
+  }
+
+  createCollection(): void {
+    const name = this.newCollectionName().trim();
+    if (!name) {
+      return;
+    }
+    this.api.createCollection(name).subscribe((wrapped) => {
+      this.newCollectionName.set('');
+      // The mock's stub returns {collection: null}; only append real payloads.
+      if (wrapped?.collection) {
+        this.collections.update((c) => [...c, wrapped.collection]);
+      } else {
+        this.loadCollections();
+      }
+    });
+  }
+
+  removeCollection(collection: Collection, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.api.deleteCollection(collection.id).subscribe(() => {
+      this.collections.update((c) => c.filter((x) => x.id !== collection.id));
     });
   }
 }
