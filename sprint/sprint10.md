@@ -28,7 +28,9 @@ skill / Playwright against the mock server, and bsky.social for the Bluesky legs
 6. Undo-send: enable only "wait 30 seconds" → no confirm dialog, countdown with
    Publish now + Cancel.
 7. House ads: all three render in the right rail — **window must be ≥1240px wide**
-   (below that `shell.css` hides `.rail-right`; this is why they "looked broken").
+   (below that `shell.css` hides `.rail-right`). They were invisible to
+   ad-blocker users because the old `.ad-*` class names matched EasyList
+   cosmetic filters; now `.spotlight-*`. Verify WITH uBlock enabled.
 
 ## Candidate scope (from roadmap Phase 4 + sprint09 leftovers)
 
