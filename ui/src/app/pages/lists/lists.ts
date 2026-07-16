@@ -4,10 +4,11 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Collection, UserList } from '../../models';
+import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'app-lists',
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, ConfirmDialog],
   templateUrl: './lists.html',
   styleUrl: './lists.css',
 })
@@ -25,6 +26,10 @@ export class Lists implements OnInit {
   protected collectionsLoading = signal(true);
   protected collectionsSupported = signal(true);
   protected newCollectionName = signal('');
+
+  // Pending deletions awaiting confirmation.
+  protected listToDelete = signal<UserList | null>(null);
+  protected collectionToDelete = signal<Collection | null>(null);
 
   ngOnInit(): void {
     this.load();
@@ -83,9 +88,15 @@ export class Lists implements OnInit {
     });
   }
 
-  remove(list: UserList, event: Event): void {
+  /** The ✕ sits inside a routerLink; open the confirm without navigating. */
+  askDeleteList(list: UserList, event: Event): void {
     event.stopPropagation();
     event.preventDefault();
+    this.listToDelete.set(list);
+  }
+
+  remove(list: UserList): void {
+    this.listToDelete.set(null);
     this.api.deleteList(list.id).subscribe(() => {
       this.lists.update((l) => l.filter((x) => x.id !== list.id));
     });
@@ -107,9 +118,14 @@ export class Lists implements OnInit {
     });
   }
 
-  removeCollection(collection: Collection, event: Event): void {
+  askDeleteCollection(collection: Collection, event: Event): void {
     event.stopPropagation();
     event.preventDefault();
+    this.collectionToDelete.set(collection);
+  }
+
+  removeCollection(collection: Collection): void {
+    this.collectionToDelete.set(null);
     this.api.deleteCollection(collection.id).subscribe(() => {
       this.collections.update((c) => c.filter((x) => x.id !== collection.id));
     });

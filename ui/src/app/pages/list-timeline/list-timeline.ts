@@ -3,10 +3,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Account, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
+import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
+import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'app-list-timeline',
-  imports: [RouterLink, StatusCard],
+  imports: [RouterLink, StatusCard, BulkAddDialog, ConfirmDialog],
   templateUrl: './list-timeline.html',
   styleUrl: './list-timeline.css',
 })
@@ -23,13 +25,18 @@ export class ListTimeline implements OnInit {
   protected members = signal<Account[]>([]);
   protected membersLoading = signal(false);
   private membersLoadedFor = '';
-  private listId = '';
+  /** The current list id, exposed for the bulk-add dialog target. */
+  protected listId = signal('');
+
+  // Dialog state
+  protected showBulk = signal(false);
+  protected memberToRemove = signal<Account | null>(null);
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
-        this.listId = id;
+        this.listId.set(id);
         this.tab.set('posts');
         this.membersLoadedFor = '';
         this.load(id);
@@ -51,15 +58,15 @@ export class ListTimeline implements OnInit {
 
   setTab(tab: 'posts' | 'members'): void {
     this.tab.set(tab);
-    if (tab === 'members' && this.membersLoadedFor !== this.listId) {
+    if (tab === 'members' && this.membersLoadedFor !== this.listId()) {
       this.loadMembers();
     }
   }
 
   loadMembers(): void {
     this.membersLoading.set(true);
-    this.membersLoadedFor = this.listId;
-    this.api.listAccounts(this.listId).subscribe({
+    this.membersLoadedFor = this.listId();
+    this.api.listAccounts(this.listId()).subscribe({
       next: (accounts) => {
         this.members.set(accounts);
         this.membersLoading.set(false);
@@ -69,9 +76,19 @@ export class ListTimeline implements OnInit {
   }
 
   removeMember(account: Account): void {
-    this.api.removeFromList(this.listId, account.id).subscribe(() => {
+    this.memberToRemove.set(null);
+    this.api.removeFromList(this.listId(), account.id).subscribe(() => {
       this.members.update((m) => m.filter((a) => a.id !== account.id));
     });
+  }
+
+  /** After a bulk add, force the members list to reload next time it's shown. */
+  onBulkAdded(): void {
+    this.showBulk.set(false);
+    this.membersLoadedFor = '';
+    if (this.tab() === 'members') {
+      this.loadMembers();
+    }
   }
 
   onChanged(index: number, updated: Status): void {

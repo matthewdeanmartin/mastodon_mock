@@ -6,6 +6,8 @@ import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, CollectionWithAccounts, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
+import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
+import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 
 /** How many statuses to pull per member when synthesizing the feed. */
 const FEED_PER_MEMBER = 20;
@@ -27,7 +29,7 @@ interface Member {
  */
 @Component({
   selector: 'app-collection',
-  imports: [FormsModule, RouterLink, StatusCard],
+  imports: [FormsModule, RouterLink, StatusCard, BulkAddDialog, ConfirmDialog],
   templateUrl: './collection.html',
   styleUrl: './collection.css',
 })
@@ -50,6 +52,11 @@ export class CollectionPage implements OnInit {
   protected query = signal('');
   protected searching = signal(false);
   protected results = signal<Account[]>([]);
+
+  // Dialog state
+  protected showBulk = signal(false);
+  protected showDeleteConfirm = signal(false);
+  protected memberToRemove = signal<Member | null>(null);
 
   protected members = computed<Member[]>(() => {
     const d = this.data();
@@ -199,6 +206,7 @@ export class CollectionPage implements OnInit {
 
   removeMember(member: Member): void {
     const d = this.data();
+    this.memberToRemove.set(null);
     if (!d) {
       return;
     }
@@ -217,10 +225,17 @@ export class CollectionPage implements OnInit {
 
   remove(): void {
     const d = this.data();
+    this.showDeleteConfirm.set(false);
     if (!d) {
       return;
     }
     this.api.deleteCollection(d.collection.id).subscribe(() => this.router.navigate(['/lists']));
+  }
+
+  /** Re-fetch the collection after a bulk add (the server assigns item ids). */
+  onBulkAdded(): void {
+    this.showBulk.set(false);
+    this.reload();
   }
 
   private reload(): void {

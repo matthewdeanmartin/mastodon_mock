@@ -21,7 +21,7 @@
   @for (l of lists(); track l.id) {
     <a class="list-row" [routerLink]="['/lists', l.id]">
       <span>{{ l.title }}</span>
-      <button class="del" (click)="remove(l, $event)" title="Delete list">✕</button>
+      <button class="del" (click)="askDeleteList(l, $event)" title="Delete list">✕</button>
     </a>
   }
 }
@@ -59,7 +59,7 @@
             · {{ c.item_count }} member{{ c.item_count === 1 ? '' : 's' }}
           </span>
         </span>
-        <button class="del" (click)="removeCollection(c, $event)" title="Delete collection">
+        <button class="del" (click)="askDeleteCollection(c, $event)" title="Delete collection">
           ✕
         </button>
       </a>
@@ -76,4 +76,23 @@
       </a>
     }
   }
+}
+
+@if (listToDelete(); as l) {
+  <app-confirm-dialog
+    title="Delete this list?"
+    [message]="'“' + l.title + '” will be permanently deleted. This cannot be undone.'"
+    confirmLabel="Delete list"
+    (confirmed)="remove(l)"
+    (cancelled)="listToDelete.set(null)"
+  />
+}
+@if (collectionToDelete(); as c) {
+  <app-confirm-dialog
+    title="Delete this collection?"
+    [message]="'“' + c.name + '” will be permanently deleted. This cannot be undone.'"
+    confirmLabel="Delete collection"
+    (confirmed)="removeCollection(c)"
+    (cancelled)="collectionToDelete.set(null)"
+  />
 }

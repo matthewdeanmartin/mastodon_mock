@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../auth';
 import { Status, Translation } from '../models';
@@ -143,7 +143,9 @@ describe('StatusCard', () => {
 
     cmp.toggleFavourite(fakeEvent());
     expect(cmp.actionBusy()).toBe(true);
-    httpMock.expectOne('/api/v1/statuses/5/favourite').flush(makeStatus({ id: '5', favourited: true }));
+    httpMock
+      .expectOne('/api/v1/statuses/5/favourite')
+      .flush(makeStatus({ id: '5', favourited: true }));
 
     expect(cmp.actionBusy()).toBe(false);
     expect(cmp.actionError()).toBeNull();
@@ -630,10 +632,13 @@ describe('StatusCard', () => {
   }
 
   /** Build a MouseEvent whose target is an <a href> inside rendered content. */
-  function clickOnAnchor(href: string): MouseEvent {
+  function clickOnAnchor(href: string, className = ''): MouseEvent {
     const anchor = document.createElement('a');
     if (href) {
       anchor.setAttribute('href', href);
+    }
+    if (className) {
+      anchor.className = className;
     }
     const event = new MouseEvent('click', { bubbles: true, cancelable: true });
     Object.defineProperty(event, 'target', { value: anchor });
@@ -657,16 +662,32 @@ describe('StatusCard', () => {
     openSpy.mockRestore();
   });
 
-  it('onContentClick: leaves in-app (relative / hashtag) links to the router', () => {
+  it('onContentClick: leaves genuinely relative (non-tag) links to the router', () => {
     const f = setUp();
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
-    const event = clickOnAnchor('/tags/spaceflight');
+    const event = clickOnAnchor('/accounts/42');
     const preventSpy = vi.spyOn(event, 'preventDefault');
 
     internals(f).onContentClick(event);
 
     expect(openSpy).not.toHaveBeenCalled();
     expect(preventSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('onContentClick: routes a hashtag link in-app instead of opening the instance', () => {
+    const f = setUp();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    const navSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    // Server content points hashtags at the origin instance.
+    const event = clickOnAnchor('https://mastodon.social/tags/spaceflight', 'mention hashtag');
+    const preventSpy = vi.spyOn(event, 'preventDefault');
+
+    internals(f).onContentClick(event);
+
+    expect(navSpy).toHaveBeenCalledWith(['/tags', 'spaceflight']);
+    expect(openSpy).not.toHaveBeenCalled(); // NOT opened externally
+    expect(preventSpy).toHaveBeenCalled();
     openSpy.mockRestore();
   });
 

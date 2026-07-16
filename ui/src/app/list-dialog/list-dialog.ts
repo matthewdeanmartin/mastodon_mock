@@ -1,7 +1,7 @@
 import { Component, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { concatMap, forkJoin, from, Observable, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { Collection, UserList } from '../models';
@@ -19,17 +19,11 @@ interface CollectionRow {
   busy: boolean;
 }
 
-/** One line of the bulk add-by-name result. */
-interface BulkResult {
-  handle: string;
-  status: 'added' | 'exists' | 'notfound' | 'error';
-}
-
 /**
- * Add an account to the viewer's **lists** (private) and **collections**
- * (public) from a profile. Also supports bulk "add by name" into a single
- * named target: paste one handle, a CSV, or one-per-line and they're resolved
- * and added in rapid succession.
+ * Add a single account (from their profile) to the viewer's **lists**
+ * (private) and **collections** (public), via membership checkboxes.
+ * Bulk "add several people by name" lives on the list/collection pages
+ * instead — this dialog is strictly about one person.
  */
 @Component({
   selector: 'app-list-dialog',
@@ -53,13 +47,6 @@ export class ListDialog implements OnInit {
   protected collectionRows = signal<CollectionRow[]>([]);
   protected collectionsSupported = signal(true);
   protected newCollectionName = signal('');
-
-  // Bulk add-by-name.
-  protected bulkTarget = signal('');
-  protected bulkKind = signal<'list' | 'collection'>('list');
-  protected bulkHandles = signal('');
-  protected bulkBusy = signal(false);
-  protected bulkResults = signal<BulkResult[]>([]);
 
   ngOnInit(): void {
     this.load();
@@ -218,110 +205,5 @@ export class ListDialog implements OnInit {
 
   private setCollectionBusy(id: string, busy: boolean): void {
     this.markCollection(id, { busy });
-  }
-
-  // ------------------------------------------------------------ bulk add-by-name
-
-  /** Split a paste into handles: comma, newline, or whitespace separated. */
-  protected parseHandles(raw: string): string[] {
-    return raw
-      .split(/[\s,]+/)
-      .map((h) => h.replace(/^@/, ''))
-      .filter((h) => h.length > 0);
-  }
-
-  protected bulkCount(): number {
-    return this.parseHandles(this.bulkHandles()).length;
-  }
-
-  /**
-   * Resolve each pasted handle and add it to the named list/collection,
-   * creating the target if it doesn't exist. Adds run in rapid succession.
-   */
-  bulkAdd(): void {
-    const targetName = this.bulkTarget().trim();
-    const handles = this.parseHandles(this.bulkHandles());
-    if (!targetName || !handles.length || this.bulkBusy()) {
-      return;
-    }
-    this.bulkBusy.set(true);
-    this.bulkResults.set([]);
-
-    const kind = this.bulkKind();
-    const id$ = kind === 'list' ? this.ensureList(targetName) : this.ensureCollection(targetName);
-
-    id$
-      .pipe(
-        switchMap((id) => {
-          if (!id) {
-            return of<BulkResult>({ handle: '(target unavailable)', status: 'error' });
-          }
-          const add = (accountId: string) =>
-            kind === 'list'
-              ? this.api.addToList(id, accountId)
-              : this.api.addCollectionAccount(id, accountId);
-          return from(handles).pipe(concatMap((handle) => this.addOne(handle, add)));
-        }),
-      )
-      .subscribe({
-        next: (result) => this.bulkResults.update((r) => [...r, result]),
-        complete: () => {
-          this.bulkBusy.set(false);
-          // Refresh the checkbox sections so newly-added rows reflect reality.
-          this.load();
-          this.loadCollections();
-        },
-        error: () => this.bulkBusy.set(false),
-      });
-  }
-
-  /** Resolve one handle to an account and add it; never errors the outer stream. */
-  private addOne(
-    handle: string,
-    add: (accountId: string) => Observable<unknown>,
-  ): Observable<BulkResult> {
-    return this.api.search(handle, 'accounts', { resolve: true, limit: 1 }).pipe(
-      switchMap((res) => {
-        const account = res.accounts[0];
-        if (!account) {
-          return of<BulkResult>({ handle, status: 'notfound' });
-        }
-        return add(account.id).pipe(
-          map(() => ({ handle, status: 'added' }) as BulkResult),
-          catchError(() => of<BulkResult>({ handle, status: 'error' })),
-        );
-      }),
-      catchError(() => of<BulkResult>({ handle, status: 'error' })),
-    );
-  }
-
-  /** Find an existing list by (case-insensitive) title, else create one. */
-  private ensureList(name: string): Observable<string> {
-    return this.api.lists().pipe(
-      switchMap((lists) => {
-        const existing = lists.find((l) => l.title.toLowerCase() === name.toLowerCase());
-        return existing ? of(existing.id) : this.api.createList(name).pipe(map((l) => l.id));
-      }),
-    );
-  }
-
-  /** Find an existing collection of the viewer's by name, else create one. */
-  private ensureCollection(name: string): Observable<string> {
-    const me = this.auth.account();
-    const mine$ = me
-      ? this.api.accountCollections(me.id).pipe(catchError(() => of([] as Collection[])))
-      : of([] as Collection[]);
-    return mine$.pipe(
-      switchMap((cols) => {
-        const existing = cols.find((c) => c.name.toLowerCase() === name.toLowerCase());
-        if (existing) {
-          return of(existing.id);
-        }
-        // createCollection may return {collection:null} on stub servers.
-        return this.api
-          .createCollection(name)
-          .pipe(map((wrapped) => wrapped?.collection?.id ?? ''));
-      }),
-    );
   }
 }

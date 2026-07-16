@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AccountHoverCard } from '../account-hover-card/account-hover-card';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
 import { Api } from '../api';
@@ -42,6 +42,7 @@ export class StatusCard {
   private auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private actions = inject(StatusActions);
+  private router = inject(Router);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
@@ -192,12 +193,38 @@ export class StatusCard {
     if (!href) {
       return;
     }
-    // Treat anything with an explicit http(s) origin as external.
+    // Hashtag links in server-rendered content point at the origin instance
+    // (e.g. https://mastodon.social/tags/foo). Keep them in-app: route to
+    // Mockingbird's own tag page instead of opening the instance.
+    const tag = this.hashtagName(anchor, href);
+    if (tag) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.router.navigate(['/tags', tag]);
+      return;
+    }
+    // Treat anything else with an explicit http(s) origin as external.
     if (/^https?:\/\//i.test(href)) {
       event.preventDefault();
       event.stopPropagation();
       window.open(href, '_blank', 'noopener,noreferrer');
     }
+  }
+
+  /**
+   * Extract a hashtag name from a content anchor, or null if it isn't one.
+   * Mastodon marks these with `class="… hashtag"` and an href ending in
+   * `/tags/<name>`; we fall back to the anchor's visible `#text`.
+   */
+  private hashtagName(anchor: HTMLAnchorElement, href: string): string | null {
+    const isHashtag = anchor.classList.contains('hashtag') || /\/tags?\/[^/?#]+\/?$/i.test(href);
+    if (!isHashtag) {
+      return null;
+    }
+    const fromHref = href.match(/\/tags?\/([^/?#]+)\/?$/i)?.[1];
+    const raw = fromHref ?? anchor.textContent ?? '';
+    const name = decodeURIComponent(raw).replace(/^#/, '').trim();
+    return name || null;
   }
 
   /** The status to render: unwrap a boost to the original. */

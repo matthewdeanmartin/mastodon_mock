@@ -1,0 +1,26 @@
+<div
+  class="overlay"
+  role="presentation"
+  tabindex="-1"
+  (click)="cancelled.emit()"
+  (keyup.escape)="cancelled.emit()"
+>
+  <div
+    class="dialog"
+    role="alertdialog"
+    aria-labelledby="confirm-title"
+    (click)="$event.stopPropagation()"
+    (keyup)="$event.stopPropagation()"
+  >
+    <h3 id="confirm-title">{{ title() }}</h3>
+    @if (message()) {
+      <p>{{ message() }}</p>
+    }
+    <div class="confirm-actions">
+      <button class="btn btn-outline" type="button" (click)="cancelled.emit()">Cancel</button>
+      <button class="btn" [class.btn-danger]="danger()" type="button" (click)="confirmed.emit()">
+        {{ confirmLabel() }}
+      </button>
+    </div>
+  </div>
+</div>

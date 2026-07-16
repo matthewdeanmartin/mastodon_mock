@@ -21,7 +21,10 @@
     </p>
     <div class="coll-actions">
       @if (isOwner()) {
-        <button class="btn btn-outline danger" (click)="remove()">Delete collection</button>
+        <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
+        <button class="btn btn-outline danger" (click)="showDeleteConfirm.set(true)">
+          Delete collection
+        </button>
       } @else if (myItem()) {
         <button class="btn btn-outline danger" (click)="revokeSelf()">
           Remove me from this collection
@@ -95,10 +98,40 @@
             <span class="muted small">pending</span>
           }
           @if (isOwner()) {
-            <button class="del" title="Remove from collection" (click)="removeMember(m)">✕</button>
+            <button class="del" title="Remove from collection" (click)="memberToRemove.set(m)">
+              ✕
+            </button>
           }
         </div>
       }
     }
+  }
+
+  @if (showBulk() && isOwner()) {
+    <app-bulk-add-dialog
+      [targetId]="d.collection.id"
+      targetKind="collection"
+      [targetName]="d.collection.name"
+      (added)="onBulkAdded()"
+      (closed)="showBulk.set(false)"
+    />
+  }
+  @if (showDeleteConfirm()) {
+    <app-confirm-dialog
+      title="Delete this collection?"
+      [message]="'“' + d.collection.name + '” will be permanently deleted. This cannot be undone.'"
+      confirmLabel="Delete collection"
+      (confirmed)="remove()"
+      (cancelled)="showDeleteConfirm.set(false)"
+    />
+  }
+  @if (memberToRemove(); as m) {
+    <app-confirm-dialog
+      title="Remove from collection?"
+      [message]="'Remove @' + m.account.acct + ' from “' + d.collection.name + '”?'"
+      confirmLabel="Remove"
+      (confirmed)="removeMember(m)"
+      (cancelled)="memberToRemove.set(null)"
+    />
   }
 }

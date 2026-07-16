@@ -1,0 +1,56 @@
+<div
+  class="overlay"
+  role="presentation"
+  tabindex="-1"
+  (click)="closed.emit()"
+  (keyup.escape)="closed.emit()"
+>
+  <div
+    class="dialog"
+    role="dialog"
+    aria-label="Add people by name"
+    tabindex="-1"
+    (click)="$event.stopPropagation()"
+    (keyup)="$event.stopPropagation()"
+  >
+    <h3>
+      Add people to
+      {{ targetKind() === 'list' ? 'list' : 'collection' }}
+      @if (targetName()) {
+        <span class="target-name">“{{ targetName() }}”</span>
+      }
+    </h3>
+    <p class="muted small">
+      Paste handles separated by commas, spaces, or line breaks. Each is resolved and added, one
+      after another.
+    </p>
+
+    <textarea
+      class="bulk-handles"
+      rows="4"
+      [ngModel]="handles()"
+      (ngModelChange)="handles.set($event)"
+      placeholder="&#64;alice, &#64;bob@example.social&#10;&#64;carol"
+    ></textarea>
+
+    <div class="dialog-actions">
+      <button class="btn btn-outline" (click)="closed.emit()">
+        {{ results().length ? 'Done' : 'Cancel' }}
+      </button>
+      <button class="btn" [disabled]="busy() || !count()" (click)="add()">
+        {{ busy() ? 'Adding…' : 'Add ' + count() + ' ' + (count() === 1 ? 'person' : 'people') }}
+      </button>
+    </div>
+
+    @if (results().length) {
+      <ul class="bulk-results small">
+        @for (r of results(); track $index) {
+          <li [class]="'result-' + r.status">
+            <span class="result-handle">{{ r.handle }}</span>
+            <span class="result-status">{{ r.status }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</div>

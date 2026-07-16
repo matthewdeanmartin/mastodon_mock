@@ -40,6 +40,9 @@
       @if (display.pinned) {
         <span class="badge" title="Pinned">📌</span>
       }
+      @if (display.visibility === 'private') {
+        <span class="badge" title="Followers-only post">🔒</span>
+      }
       @if (providerBadge; as badge) {
         <span class="badge muted provider-badge" title="Source">{{ badge }}</span>
       } @else {

@@ -15,11 +15,15 @@ interface ListsInternals {
   collections: WritableSignal<Collection[]>;
   collectionsSupported: WritableSignal<boolean>;
   newCollectionName: WritableSignal<string>;
+  listToDelete: WritableSignal<UserList | null>;
+  collectionToDelete: WritableSignal<Collection | null>;
   load(): void;
   create(): void;
-  remove(list: UserList, event: Event): void;
+  askDeleteList(list: UserList, event: Event): void;
+  remove(list: UserList): void;
   createCollection(): void;
-  removeCollection(c: Collection, event: Event): void;
+  askDeleteCollection(c: Collection, event: Event): void;
+  removeCollection(c: Collection): void;
 }
 
 function makeCollection(id: string, name = `Collection ${id}`): Collection {
@@ -154,15 +158,7 @@ describe('Lists', () => {
     const l2 = makeList('2');
     httpMock.expectOne('/api/v1/lists').flush([l1, l2]);
 
-    const fakeEvent = {
-      stopPropagation: () => {
-        /* noop */
-      },
-      preventDefault: () => {
-        /* noop */
-      },
-    } as unknown as Event;
-    internals(fixture).remove(l1, fakeEvent);
+    internals(fixture).remove(l1);
 
     httpMock.expectOne('/api/v1/lists/1').flush({});
 
@@ -176,15 +172,7 @@ describe('Lists', () => {
     const l3 = makeList('3');
     httpMock.expectOne('/api/v1/lists').flush([l1, l2, l3]);
 
-    const fakeEvent = {
-      stopPropagation: () => {
-        /* noop */
-      },
-      preventDefault: () => {
-        /* noop */
-      },
-    } as unknown as Event;
-    internals(fixture).remove(l2, fakeEvent);
+    internals(fixture).remove(l2);
 
     httpMock.expectOne('/api/v1/lists/2').flush({});
 
@@ -282,12 +270,24 @@ describe('Lists', () => {
     ).toEqual(['C2']);
   });
 
+  it('askDeleteList() stages the list for confirmation without deleting', () => {
+    const fixture = setUp();
+    const l1 = makeList('1');
+    httpMock.expectOne('/api/v1/lists').flush([l1]);
+
+    internals(fixture).askDeleteList(l1, noopEvent);
+
+    // No DELETE yet — just staged for the confirm dialog.
+    expect(internals(fixture).listToDelete()).toEqual(l1);
+    httpMock.expectNone('/api/v1/lists/1');
+  });
+
   it('removeCollection() DELETEs and drops the row', () => {
     const c1 = makeCollection('C1');
     const c2 = makeCollection('C2');
     const fixture = setUpVerified([c1, c2]);
 
-    internals(fixture).removeCollection(c1, noopEvent);
+    internals(fixture).removeCollection(c1);
     httpMock.expectOne('/api/v1/collections/C1').flush({});
 
     expect(

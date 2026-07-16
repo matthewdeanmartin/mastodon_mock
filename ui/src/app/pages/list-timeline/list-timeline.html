@@ -22,11 +22,15 @@
     }
   }
 } @else {
+  <div class="members-actions">
+    <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
+  </div>
   @if (membersLoading()) {
     <p class="muted center">Loading…</p>
   } @else if (!members().length) {
     <p class="muted center">
-      No members in this list yet. Add people from the menu on their profile.
+      No members in this list yet. Add people from the menu on their profile, or with “Add people by
+      name” above.
     </p>
   } @else {
     @for (a of members(); track a.id) {
@@ -38,8 +42,27 @@
             <span class="acct muted">&#64;{{ a.acct }}</span>
           </span>
         </a>
-        <button class="del" title="Remove from list" (click)="removeMember(a)">✕</button>
+        <button class="del" title="Remove from list" (click)="memberToRemove.set(a)">✕</button>
       </div>
     }
   }
+}
+
+@if (showBulk()) {
+  <app-bulk-add-dialog
+    [targetId]="listId()"
+    targetKind="list"
+    [targetName]="title()"
+    (added)="onBulkAdded()"
+    (closed)="showBulk.set(false)"
+  />
+}
+@if (memberToRemove(); as a) {
+  <app-confirm-dialog
+    title="Remove from list?"
+    [message]="'Remove @' + a.acct + ' from “' + title() + '”?'"
+    confirmLabel="Remove"
+    (confirmed)="removeMember(a)"
+    (cancelled)="memberToRemove.set(null)"
+  />
 }

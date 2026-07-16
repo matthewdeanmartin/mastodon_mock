@@ -7,24 +7,11 @@ import { Auth } from '../auth';
 import { Account, Collection, UserList } from '../models';
 import { ListDialog } from './list-dialog';
 
-interface BulkResult {
-  handle: string;
-  status: string;
-}
-
 interface DialogInternals {
   rows: WritableSignal<{ list: UserList; member: boolean }[]>;
   loading: WritableSignal<boolean>;
   collectionRows: WritableSignal<{ collection: Collection; member: boolean; itemId: string }[]>;
   collectionsSupported: WritableSignal<boolean>;
-  bulkTarget: WritableSignal<string>;
-  bulkKind: WritableSignal<'list' | 'collection'>;
-  bulkHandles: WritableSignal<string>;
-  bulkBusy: WritableSignal<boolean>;
-  bulkResults: WritableSignal<BulkResult[]>;
-  parseHandles(raw: string): string[];
-  bulkCount(): number;
-  bulkAdd(): void;
   toggleCollection(row: { collection: Collection; member: boolean; itemId: string }): void;
 }
 
@@ -169,112 +156,5 @@ describe('ListDialog', () => {
     del.flush({});
 
     expect(internals(fixture).collectionRows()[0].member).toBe(false);
-  });
-
-  // ----------------------------------------------------------------- parseHandles
-
-  it('parseHandles splits on commas, newlines, and whitespace and strips @', () => {
-    const fixture = setUp();
-    const parsed = internals(fixture).parseHandles(' @alice, @bob@x.social\n@carol  @dave ');
-    expect(parsed).toEqual(['alice', 'bob@x.social', 'carol', 'dave']);
-    expect(internals(fixture).bulkCount()).toBe(0); // handles signal untouched
-  });
-
-  // ----------------------------------------------------------------- bulk add
-
-  it('bulkAdd resolves each handle and adds sequentially to an existing list', () => {
-    const fixture = setUp({ lists: [{ id: 'L1', title: 'Devs' }] });
-
-    internals(fixture).bulkTarget.set('Devs');
-    internals(fixture).bulkKind.set('list');
-    internals(fixture).bulkHandles.set('@alice, @bob');
-    internals(fixture).bulkAdd();
-
-    // ensureList → GET /lists finds "Devs" (case-insensitive).
-    httpMock.expectOne('/api/v1/lists').flush([{ id: 'L1', title: 'Devs' }]);
-
-    // First handle: search → add.
-    httpMock
-      .expectOne((r) => r.url === '/api/v2/search')
-      .flush({ accounts: [makeAccount('A')], statuses: [], hashtags: [] });
-    httpMock.expectOne('/api/v1/lists/L1/accounts').flush({});
-
-    // Second handle (concatMap → only after the first completes).
-    httpMock
-      .expectOne((r) => r.url === '/api/v2/search')
-      .flush({ accounts: [makeAccount('B')], statuses: [], hashtags: [] });
-    httpMock.expectOne('/api/v1/lists/L1/accounts').flush({});
-
-    // Completion refreshes the sections.
-    httpMock.expectOne('/api/v1/lists').flush([{ id: 'L1', title: 'Devs' }]);
-    httpMock.expectOne('/api/v1/lists/L1/accounts').flush([]);
-    httpMock.expectOne('/api/v1/accounts/ME/collections').flush({ collections: [] });
-    httpMock.expectOne('/api/v1/accounts/T/in_collections').flush({ collections: [] });
-
-    expect(
-      internals(fixture)
-        .bulkResults()
-        .map((r) => r.status),
-    ).toEqual(['added', 'added']);
-    expect(internals(fixture).bulkBusy()).toBe(false);
-  });
-
-  it('bulkAdd marks a handle notfound when search returns nothing, without stopping', () => {
-    const fixture = setUp({ lists: [{ id: 'L1', title: 'Devs' }] });
-
-    internals(fixture).bulkTarget.set('Devs');
-    internals(fixture).bulkHandles.set('@ghost, @real');
-    internals(fixture).bulkAdd();
-
-    httpMock.expectOne('/api/v1/lists').flush([{ id: 'L1', title: 'Devs' }]);
-
-    // ghost → no accounts
-    httpMock
-      .expectOne((r) => r.url === '/api/v2/search')
-      .flush({ accounts: [], statuses: [], hashtags: [] });
-    // real → resolves and adds
-    httpMock
-      .expectOne((r) => r.url === '/api/v2/search')
-      .flush({ accounts: [makeAccount('R')], statuses: [], hashtags: [] });
-    httpMock.expectOne('/api/v1/lists/L1/accounts').flush({});
-
-    // completion refresh
-    httpMock.expectOne('/api/v1/lists').flush([{ id: 'L1', title: 'Devs' }]);
-    httpMock.expectOne('/api/v1/lists/L1/accounts').flush([]);
-    httpMock.expectOne('/api/v1/accounts/ME/collections').flush({ collections: [] });
-    httpMock.expectOne('/api/v1/accounts/T/in_collections').flush({ collections: [] });
-
-    expect(
-      internals(fixture)
-        .bulkResults()
-        .map((r) => r.status),
-    ).toEqual(['notfound', 'added']);
-  });
-
-  it('bulkAdd creates the list when the named target does not exist', () => {
-    const fixture = setUp();
-
-    internals(fixture).bulkTarget.set('Brand New');
-    internals(fixture).bulkHandles.set('@solo');
-    internals(fixture).bulkAdd();
-
-    // ensureList: GET /lists (empty) → POST /lists to create.
-    httpMock.expectOne('/api/v1/lists').flush([]);
-    const create = httpMock.expectOne('/api/v1/lists');
-    expect(create.request.method).toBe('POST');
-    create.flush({ id: 'NEW', title: 'Brand New' });
-
-    httpMock
-      .expectOne((r) => r.url === '/api/v2/search')
-      .flush({ accounts: [makeAccount('S')], statuses: [], hashtags: [] });
-    httpMock.expectOne('/api/v1/lists/NEW/accounts').flush({});
-
-    // completion refresh
-    httpMock.expectOne('/api/v1/lists').flush([{ id: 'NEW', title: 'Brand New' }]);
-    httpMock.expectOne('/api/v1/lists/NEW/accounts').flush([]);
-    httpMock.expectOne('/api/v1/accounts/ME/collections').flush({ collections: [] });
-    httpMock.expectOne('/api/v1/accounts/T/in_collections').flush({ collections: [] });
-
-    expect(internals(fixture).bulkResults()).toEqual([{ handle: 'solo', status: 'added' }]);
   });
 });
