@@ -1,0 +1,50 @@
+<div class="page-head">
+  <h2>Drafts</h2>
+  <p class="muted">
+    Drafts are saved in this browser only — Mastodon has no server-side drafts, so they won't
+    follow you to other devices.
+  </p>
+</div>
+
+@if (!drafts.drafts().length) {
+  <p class="muted center">
+    No drafts yet. While composing, hit 💾 to save one, and anything half-written is auto-kept
+    for you anyway.
+  </p>
+} @else {
+  @for (d of drafts.drafts(); track d.id) {
+    <div class="draft-row">
+      <div class="draft-main">
+        <div class="draft-text">{{ preview(d) }}</div>
+        <div class="draft-meta muted">
+          <span>{{ d.updatedAt | humanTime }}</span>
+          <span class="draft-visibility">· {{ d.visibility }}</span>
+          @for (b of badges(d); track b) {
+            <span class="draft-badge">{{ b }}</span>
+          }
+        </div>
+      </div>
+      <div class="draft-actions">
+        <button class="btn btn-sm" type="button" (click)="open(d)">Continue</button>
+        <button
+          class="btn btn-outline btn-sm"
+          type="button"
+          (click)="pendingDelete.set(d)"
+          title="Delete draft"
+        >
+          🗑
+        </button>
+      </div>
+    </div>
+  }
+}
+
+@if (pendingDelete()) {
+  <app-confirm-dialog
+    title="Delete this draft?"
+    message="It only exists in this browser — there's no getting it back."
+    confirmLabel="Delete"
+    (confirmed)="confirmDelete()"
+    (cancelled)="pendingDelete.set(null)"
+  />
+}

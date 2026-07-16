@@ -1,7 +1,7 @@
 @if (boostedBy) {
   <div class="boost-label muted">🔁 {{ boostedBy }} boosted</div>
 }
-<article class="status">
+<article class="status" tabindex="-1" (keydown)="onCardKeydown($event)">
   <span class="hover-anchor avatar-anchor">
     <a class="avatar-link" [routerLink]="foreign ? null : ['/accounts', display.account.id]">
       <img class="avatar" [src]="display.account.avatar" [alt]="display.account.username" />

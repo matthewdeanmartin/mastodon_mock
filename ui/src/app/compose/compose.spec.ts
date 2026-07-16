@@ -26,7 +26,12 @@ interface ComposeInternals {
   canAttachMedia: Signal<boolean>;
   canAddPoll: Signal<boolean>;
   countdown: Signal<number | null>;
-  chunkCount: Signal<number>;
+  thread: WritableSignal<string[]>;
+  segments: Signal<string[]>;
+  overLimit: Signal<boolean>;
+  addThreadBox(): void;
+  setThreadText(index: number, value: string): void;
+  removeThreadBox(index: number): void;
   cancelSend(): void;
   publishNow(): void;
   target: WritableSignal<PostTarget>;
@@ -349,44 +354,60 @@ describe('Compose', () => {
     req.flush({ id: '1' });
   });
 
-  // ---------------------------------------------------------------- auto-split threads
+  // ---------------------------------------------------------------- thread boxes
 
-  it('submit() splits over-limit text into a chained self-reply thread', () => {
+  it('thread boxes post as a chained self-reply thread', () => {
     const f = setUp();
     const posted: Status[] = [];
     f.componentInstance.posted.subscribe((s) => posted.push(s));
 
-    const text = Array.from({ length: 150 }, (_, i) => `word${i}`).join(' ');
-    internals(f).text.set(text);
-    expect(internals(f).chunkCount()).toBeGreaterThan(1);
+    internals(f).text.set('first post');
+    internals(f).addThreadBox();
+    internals(f).setThreadText(0, 'second post');
+    internals(f).addThreadBox();
+    internals(f).setThreadText(1, 'third post');
     internals(f).submit();
 
     const first = httpMock.expectOne('/api/v1/statuses');
-    expect(first.request.body.status).toMatch(/\(1\/\d+\)$/);
+    expect(first.request.body.status).toBe('first post');
     expect(first.request.body.in_reply_to_id).toBeUndefined();
     first.flush({ id: 'root' });
 
     const second = httpMock.expectOne('/api/v1/statuses');
-    expect(second.request.body.status).toMatch(/\(2\/\d+\)$/);
+    expect(second.request.body.status).toBe('second post');
     expect(second.request.body.in_reply_to_id).toBe('root');
     second.flush({ id: 'child' });
 
-    // Chain may continue; flush any remaining chunks.
-    let prev = 'child';
-    for (;;) {
-      const pending = httpMock.match('/api/v1/statuses');
-      if (!pending.length) {
-        break;
-      }
-      expect(pending[0].request.body.in_reply_to_id).toBe(prev);
-      prev = `n${pending.length}`;
-      pending[0].flush({ id: prev });
-    }
+    const third = httpMock.expectOne('/api/v1/statuses');
+    expect(third.request.body.status).toBe('third post');
+    expect(third.request.body.in_reply_to_id).toBe('child');
+    third.flush({ id: 'tail' });
 
     // The root status (not the tail) is what containers receive.
     expect(posted).toHaveLength(1);
     expect(posted[0].id).toBe('root');
     expect(internals(f).text()).toBe('');
+    expect(internals(f).thread()).toEqual([]);
+  });
+
+  it('empty thread boxes are skipped when posting', () => {
+    const f = setUp();
+    internals(f).text.set('only real post');
+    internals(f).addThreadBox();
+    internals(f).submit();
+
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
+    httpMock.expectNone('/api/v1/statuses');
+  });
+
+  it('over-limit text blocks posting instead of auto-splitting', () => {
+    const f = setUp();
+    internals(f).text.set('x'.repeat(501));
+
+    expect(internals(f).overLimit()).toBe(true);
+    expect(internals(f).canSubmit()).toBe(false);
+    internals(f).submit();
+    httpMock.expectNone('/api/v1/statuses');
   });
 
   it('short text posts as a single unmarked status', () => {

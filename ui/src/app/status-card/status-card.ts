@@ -93,6 +93,74 @@ export class StatusCard {
     );
   });
 
+  /**
+   * Mastodon-compatible per-status shortcuts, active while the card is
+   * focused (j/k in Hotkeys moves focus here). Handled keys stop propagating
+   * so the global handler never doubles up.
+   */
+  onCardKeydown(event: KeyboardEvent): void {
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    const target = event.target as HTMLElement;
+    const tag = target.tagName.toLowerCase();
+    if (['input', 'textarea', 'select'].includes(tag) || target.isContentEditable) {
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (['a', 'button', 'label'].includes(tag) && key === 'enter') {
+      return;
+    }
+    if (this.handleCardKey(key, event)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  private handleCardKey(key: string, event: Event): boolean {
+    switch (key) {
+      case 'f':
+        if (this.caps.favourite) {
+          this.toggleFavourite(event);
+        }
+        return true;
+      case 'b':
+        if (this.caps.reblog) {
+          this.toggleReblog(event);
+        }
+        return true;
+      case 'r':
+      case 'm':
+        if (this.caps.reply) {
+          this.toggleReply(event);
+        }
+        return true;
+      case 'q':
+        if (!this.foreign) {
+          this.toggleQuote(event);
+        }
+        return true;
+      case 'enter':
+      case 'o':
+        if (this.threadable) {
+          void this.router.navigate(['/statuses', this.display.id]);
+        }
+        return true;
+      case 'p':
+        if (!this.foreign) {
+          void this.router.navigate(['/accounts', this.display.account.id]);
+        }
+        return true;
+      case 'e':
+        if (this.display.media_attachments?.length) {
+          this.lightboxIndex.set(0);
+        }
+        return true;
+      default:
+        return false;
+    }
+  }
+
   openReport(event: Event): void {
     event.stopPropagation();
     this.showReport.set(true);

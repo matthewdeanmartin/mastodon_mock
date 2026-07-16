@@ -14,7 +14,43 @@
     (ngModelChange)="text.set($event)"
     [placeholder]="placeholder()"
     rows="3"
+    (focus)="onBoxFocus(0, $event)"
+    (keydown)="onBoxKeydown($event)"
   ></textarea>
+  @if (thread().length || text().length > maxChars - 50) {
+    <div class="seg-count muted" [class.over-limit]="text().length > maxChars">
+      {{ text().length }}/{{ maxChars }}
+    </div>
+  }
+
+  @for (t of thread(); track $index; let i = $index) {
+    <div class="thread-box">
+      <div class="thread-box-rail" aria-hidden="true"></div>
+      <div class="thread-box-body">
+        <textarea
+          [ngModel]="t"
+          (ngModelChange)="setThreadText(i, $event)"
+          [placeholder]="'Post ' + (i + 2) + ' of the thread'"
+          rows="2"
+          (focus)="onBoxFocus(i + 1, $event)"
+          (keydown)="onBoxKeydown($event)"
+        ></textarea>
+        <div class="thread-box-meta">
+          <span class="muted" [class.over-limit]="t.length > maxChars"
+            >{{ t.length }}/{{ maxChars }}</span
+          >
+          <button
+            class="btn btn-outline btn-sm"
+            type="button"
+            (click)="removeThreadBox(i)"
+            title="Remove this post from the thread"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 
   @if (media().length) {
     <div class="media-previews">
@@ -76,6 +112,24 @@
     </div>
   }
 
+  @if (previewOpen()) {
+    <div class="preview">
+      <div class="preview-label muted">Preview — as it will appear in the feed</div>
+      @for (html of previewHtml(); track $index; let i = $index) {
+        <div class="preview-card">
+          @if (cwOpen() && spoilerText().trim() && i === 0) {
+            <div class="spoiler">{{ spoilerText() }}</div>
+          }
+          @if (html) {
+            <div class="content" [innerHTML]="html"></div>
+          } @else {
+            <div class="content muted preview-empty">Nothing here yet…</div>
+          }
+        </div>
+      }
+    </div>
+  }
+
   <div class="compose-actions">
     <div class="compose-tools">
       @if (showTargetPicker()) {
@@ -134,6 +188,43 @@
         <input type="checkbox" [ngModel]="sensitive()" (ngModelChange)="sensitive.set($event)" />
         ⚠️
       </label>
+
+      <span class="emoji-anchor">
+        <button
+          class="tool-btn"
+          [class.on]="emojiOpen()"
+          (click)="toggleEmoji()"
+          title="Insert emoji"
+        >
+          🙂
+        </button>
+        @if (emojiOpen()) {
+          <div class="emoji-popover">
+            <app-emoji-picker (picked)="insertEmoji($event)" />
+          </div>
+        }
+      </span>
+
+      <button
+        class="tool-btn"
+        (click)="addThreadBox()"
+        title="Add another post (thread / tweet storm)"
+      >
+        ➕🧵
+      </button>
+
+      <button
+        class="tool-btn"
+        [class.on]="previewOpen()"
+        (click)="togglePreview()"
+        title="Live preview"
+      >
+        👁
+      </button>
+
+      @if (hasDraftContent()) {
+        <button class="tool-btn" (click)="saveDraft()" title="Save as draft">💾</button>
+      }
     </div>
 
     @if (targetIncludesBsky()) {
@@ -144,7 +235,15 @@
     <span class="muted" [class.over-limit]="text().length > maxChars">{{ text().length }}</span>
     <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
       {{
-        uploading() ? 'Uploading…' : inReplyToId() ? 'Reply' : quotedStatusId() ? 'Quote' : 'Post'
+        uploading()
+          ? 'Uploading…'
+          : inReplyToId()
+            ? 'Reply'
+            : quotedStatusId()
+              ? 'Quote'
+              : thread().length
+                ? 'Post all'
+                : 'Post'
       }}
     </button>
   </div>
@@ -153,16 +252,26 @@
     <div class="cross-post-error">{{ err }}</div>
   }
 
+  @if (draftSaved()) {
+    <div class="thread-hint muted">Saved to drafts.</div>
+  }
+
   @if (target() === 'bsky' && (media().length || pollOpen())) {
     <div class="thread-hint muted">Bluesky posts are text-only here — remove media/poll first.</div>
   } @else if (target() === 'both' && (media().length || pollOpen() || cwOpen())) {
     <div class="thread-hint muted">Media, polls and CWs go to Fedi only.</div>
   }
+  @if (targetIncludesBsky() && thread().length) {
+    <div class="thread-hint muted">Threads post to Fedi only — Bluesky gets nothing.</div>
+  }
 
-  @if (chunkCount() > 1) {
-    <div class="thread-hint muted">
-      Long post — will be split into a thread of {{ chunkCount() }}.
+  @if (overLimit()) {
+    <div class="thread-hint over-limit">
+      A post is over {{ maxChars }} characters — shorten it or move text to another thread post
+      (➕🧵).
     </div>
+  } @else if (thread().length) {
+    <div class="thread-hint muted">Will post as a thread of {{ segments().length }}.</div>
   }
 
   @if (countdown() !== null) {

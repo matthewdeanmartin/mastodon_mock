@@ -16,7 +16,7 @@
   </aside>
 }
 
-<app-compose (posted)="onPosted($event)" />
+<app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
 
 <app-command-bar [live]="live()" [providerChips]="true" (toggleLive)="toggleLive()" />
 

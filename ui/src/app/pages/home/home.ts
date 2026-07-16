@@ -1,7 +1,9 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { map, Subscription } from 'rxjs';
 import { Auth } from '../../auth';
+import { Drafts } from '../../drafts';
 import { ClientPrefs, FEED_MAX_COOLDOWN_MS } from '../../client-prefs';
 import { Status } from '../../models';
 import { CommandBar } from '../../command-bar/command-bar';
@@ -28,6 +30,19 @@ export class Home implements OnInit, OnDestroy {
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private aggregator = inject(FeedAggregator);
+  private route = inject(ActivatedRoute);
+  private drafts = inject(Drafts);
+
+  /** A draft opened from /drafts (?draft=<id>), handed to the composer. */
+  protected openedDraft = toSignal(
+    this.route.queryParamMap.pipe(
+      map((params) => {
+        const id = params.get('draft');
+        return id ? this.drafts.get(id) : undefined;
+      }),
+    ),
+    { initialValue: undefined },
+  );
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);

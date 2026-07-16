@@ -179,6 +179,10 @@ export const routes: Routes = [
       { path: 'lists', loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists) },
       { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
       {
+        path: 'drafts',
+        loadComponent: () => import('./pages/drafts/drafts-page').then((m) => m.DraftsPage),
+      },
+      {
         path: 'lists/:id',
         loadComponent: () =>
           import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),

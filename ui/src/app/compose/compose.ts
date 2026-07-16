@@ -12,15 +12,21 @@ import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { Api } from '../api';
 import { ClientPrefs } from '../client-prefs';
+import { CustomEmojis } from '../custom-emojis';
+import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
+import { EmojiPicker } from '../emoji-picker/emoji-picker';
 import { ComposeOptions, MediaAttachment, Status } from '../models';
 import { BlueskyApi } from '../providers/bluesky/bluesky-api';
 import { detectFacets, graphemeLength } from '../providers/bluesky/bluesky-facets';
 import { buildLocalBskyStatus } from '../providers/bluesky/bluesky-local-status';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { BskyFacet } from '../providers/bluesky/bluesky-types';
-import { MAX_POST_CHARS, splitPost } from './post-splitter';
+import { renderStatusText } from './status-text';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
+
+/** Mastodon's default per-status character limit. */
+export const MAX_POST_CHARS = 500;
 
 /** Where a top-level compose publishes. Fedi is home; Bluesky is opt-in per post. */
 export type PostTarget = 'fedi' | 'bsky' | 'both';
@@ -46,7 +52,7 @@ interface PendingMedia {
 
 @Component({
   selector: 'app-compose',
-  imports: [FormsModule],
+  imports: [FormsModule, EmojiPicker],
   templateUrl: './compose.html',
   styleUrl: './compose.css',
 })
@@ -55,9 +61,12 @@ export class Compose implements OnDestroy {
   private prefs = inject(ClientPrefs);
   private bskyApi = inject(BlueskyApi);
   private bskySession = inject(BlueskySession);
+  private drafts = inject(Drafts);
+  private customEmojis = inject(CustomEmojis);
 
   ngOnDestroy(): void {
     this.clearCountdown();
+    this.flushAutosave();
   }
 
   readonly inReplyToId = input<string | undefined>(undefined);
@@ -70,25 +79,63 @@ export class Compose implements OnDestroy {
   readonly initialVisibility = input('public');
   /** Pin visibility to initialVisibility (no picker) — e.g. private chats stay direct. */
   readonly lockVisibility = input(false);
+  /** A saved draft to open in the composer (it is consumed from the drafts list). */
+  readonly initialDraft = input<Draft | undefined>(undefined);
   readonly posted = output<Status>();
 
   protected readonly visibilities = VISIBILITIES;
   protected readonly pollExpiry = POLL_EXPIRY;
 
   protected text = signal('');
+  /** Extra thread boxes ("tweet storm"): each is one additional self-reply post. */
+  protected thread = signal<string[]>([]);
   protected submitting = signal(false);
 
   // Visibility + content warning.
   protected visibility = signal<string>('public');
 
+  /** Every box in order; index 0 is the primary post. */
+  protected segments = computed(() => [this.text(), ...this.thread()]);
+
   constructor() {
-    // Seed the composer from inputs once they resolve. Runs again only if the
-    // container swaps the bound conversation (new initial values).
+    // Seed the composer from inputs once they resolve (runs again only if the
+    // container swaps the bound conversation), then let any autosaved text or
+    // an explicitly opened draft override the seed.
     effect(() => {
       this.text.set(this.initialText());
       this.visibility.set(this.initialVisibility());
+      const draft = this.initialDraft();
+      const saved = draft ?? this.drafts.loadAutosave(this.contextKey());
+      if (saved && draftHasContent(saved)) {
+        this.applySnapshot(saved);
+      }
+      if (draft) {
+        // The draft moves into the composer (and its autosave slot).
+        this.drafts.remove(draft.id);
+      }
+      this.restored = true;
+    });
+
+    // Autosave (debounced) so a stray reload never eats a half-written post.
+    effect(() => {
+      const snapshot = this.snapshot();
+      const key = this.contextKey();
+      if (!this.restored) {
+        return;
+      }
+      if (this.autosaveTimer) {
+        clearTimeout(this.autosaveTimer);
+      }
+      this.autosaveTimer = setTimeout(() => {
+        this.autosaveTimer = null;
+        this.drafts.autosave(key, snapshot);
+      }, 500);
     });
   }
+
+  private restored = false;
+  private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+
   protected cwOpen = signal(false);
   protected spoilerText = signal('');
   protected sensitive = signal(false);
@@ -107,6 +154,17 @@ export class Compose implements OnDestroy {
   protected canAttachMedia = computed(() => !this.pollOpen());
   protected canAddPoll = computed(() => this.media().length === 0);
 
+  // Live preview (rendered like the feed will render it — not WYSIWYG).
+  protected previewOpen = signal(false);
+  protected previewHtml = computed(() =>
+    this.segments().map((s) => renderStatusText(s, this.customEmojis.emojis())),
+  );
+
+  // Emoji panel.
+  protected emojiOpen = signal(false);
+  /** The box (index + element) that last had focus, for emoji insertion. */
+  private lastFocusedBox: { index: number; el: HTMLTextAreaElement } | null = null;
+
   // Post target (top-level composes only; replies/quotes always stay on Fedi).
   protected target = signal<PostTarget>('fedi');
   protected showTargetPicker = computed(
@@ -124,17 +182,28 @@ export class Compose implements OnDestroy {
   protected countdown = signal<number | null>(null);
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
 
-  /** How many statuses the current text will become (auto-split threading). */
-  protected chunkCount = computed(() => splitPost(this.text()).length);
   protected readonly maxChars = MAX_POST_CHARS;
+
+  /** Any box over the limit blocks posting (no more silent auto-splitting). */
+  protected overLimit = computed(() => this.segments().some((s) => s.length > MAX_POST_CHARS));
+
+  /** "Saved to drafts" flash after an explicit save. */
+  protected draftSaved = signal(false);
+  private draftSavedTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected canSubmit = computed(() => {
     if (this.submitting() || this.uploading() || this.countdown() !== null) {
       return false;
     }
+    if (this.overLimit()) {
+      return false;
+    }
     if (this.targetIncludesBsky()) {
-      // Bluesky legs are text-only and capped at 300 graphemes (no auto-thread).
+      // Bluesky legs are text-only, single-post, capped at 300 graphemes.
       if (!this.text().trim() || this.bskyRemaining() < 0) {
+        return false;
+      }
+      if (this.thread().some((t) => t.trim())) {
         return false;
       }
       if (this.target() === 'bsky' && (this.media().length > 0 || this.pollOpen())) {
@@ -142,11 +211,79 @@ export class Compose implements OnDestroy {
       }
       return true;
     }
-    const hasText = !!this.text().trim();
+    const hasText = this.segments().some((s) => s.trim());
     const hasMedia = this.media().length > 0;
     const hasPoll = this.pollOpen() && this.pollOptions().filter((o) => o.trim()).length >= 2;
     return hasText || hasMedia || hasPoll;
   });
+
+  // --- thread boxes ---
+
+  addThreadBox(): void {
+    this.thread.update((list) => [...list, '']);
+  }
+
+  setThreadText(index: number, value: string): void {
+    this.thread.update((list) => list.map((t, i) => (i === index ? value : t)));
+  }
+
+  removeThreadBox(index: number): void {
+    this.thread.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  /** Remember which box has focus so emoji insertion lands in the right place. */
+  onBoxFocus(index: number, event: FocusEvent): void {
+    this.lastFocusedBox = { index, el: event.target as HTMLTextAreaElement };
+  }
+
+  /** Mastodon-compatible keys inside the box: ctrl/⌘+enter sends, alt+x toggles CW. */
+  onBoxKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      this.submit();
+    } else if (event.altKey && event.code === 'KeyX') {
+      event.preventDefault();
+      this.toggleCw();
+    } else if (event.key === 'Escape') {
+      (event.target as HTMLTextAreaElement).blur();
+    }
+  }
+
+  // --- emoji ---
+
+  toggleEmoji(): void {
+    this.emojiOpen.update((v) => !v);
+  }
+
+  /** Insert picked emoji text at the caret of the last-focused box. */
+  insertEmoji(emojiText: string): void {
+    const box = this.lastFocusedBox ?? { index: 0, el: null };
+    const current = box.index === 0 ? this.text() : (this.thread()[box.index - 1] ?? '');
+    const start = box.el?.selectionStart ?? current.length;
+    const end = box.el?.selectionEnd ?? current.length;
+    const next = current.slice(0, start) + emojiText + current.slice(end);
+    if (box.index === 0) {
+      this.text.set(next);
+    } else {
+      this.setThreadText(box.index - 1, next);
+    }
+    // Put the caret right after the inserted emoji.
+    const el = box.el;
+    if (el) {
+      setTimeout(() => {
+        el.focus();
+        const caret = start + emojiText.length;
+        el.setSelectionRange(caret, caret);
+      });
+    }
+  }
+
+  togglePreview(): void {
+    this.previewOpen.update((v) => !v);
+    if (this.previewOpen()) {
+      this.customEmojis.ensureLoaded();
+    }
+  }
 
   toggleCw(): void {
     this.cwOpen.update((v) => !v);
@@ -200,6 +337,88 @@ export class Compose implements OnDestroy {
   removePollOption(index: number): void {
     if (this.pollOptions().length > 2) {
       this.pollOptions.update((opts) => opts.filter((_, i) => i !== index));
+    }
+  }
+
+  // --- drafts ---
+
+  /** 'new', 'reply:<id>' or 'quote:<id>' — each context autosaves separately. */
+  private contextKey(): string {
+    const reply = this.inReplyToId();
+    if (reply) {
+      return `reply:${reply}`;
+    }
+    const quote = this.quotedStatusId();
+    if (quote) {
+      return `quote:${quote}`;
+    }
+    return 'new';
+  }
+
+  private snapshot(): DraftSnapshot {
+    return {
+      segments: this.segments(),
+      spoilerText: this.cwOpen() ? this.spoilerText() : '',
+      sensitive: this.sensitive(),
+      visibility: this.visibility(),
+      poll: this.pollOpen()
+        ? {
+            options: this.pollOptions(),
+            multiple: this.pollMultiple(),
+            expiresIn: this.pollExpiresIn(),
+          }
+        : null,
+      inReplyToId: this.inReplyToId(),
+      quotedStatusId: this.quotedStatusId(),
+    };
+  }
+
+  private applySnapshot(d: DraftSnapshot): void {
+    this.text.set(d.segments[0] ?? '');
+    this.thread.set(d.segments.slice(1));
+    this.spoilerText.set(d.spoilerText);
+    this.cwOpen.set(!!d.spoilerText);
+    this.sensitive.set(d.sensitive);
+    if (!this.lockVisibility()) {
+      this.visibility.set(d.visibility);
+    }
+    if (d.poll) {
+      this.pollOpen.set(true);
+      this.pollOptions.set(d.poll.options.length >= 2 ? d.poll.options : ['', '']);
+      this.pollMultiple.set(d.poll.multiple);
+      this.pollExpiresIn.set(d.poll.expiresIn);
+    }
+  }
+
+  /** True when there's anything a draft could keep. */
+  protected hasDraftContent = computed(
+    () =>
+      this.segments().some((s) => s.trim()) || (this.cwOpen() && this.spoilerText().trim() !== ''),
+  );
+
+  /** Move the current composer state into the drafts list and clear the box. */
+  saveDraft(): void {
+    const snapshot = this.snapshot();
+    if (!draftHasContent(snapshot)) {
+      return;
+    }
+    this.drafts.save(snapshot);
+    this.reset();
+    this.draftSaved.set(true);
+    if (this.draftSavedTimer) {
+      clearTimeout(this.draftSavedTimer);
+    }
+    this.draftSavedTimer = setTimeout(() => this.draftSaved.set(false), 4000);
+  }
+
+  private flushAutosave(): void {
+    if (this.autosaveTimer) {
+      clearTimeout(this.autosaveTimer);
+      this.autosaveTimer = null;
+      this.drafts.autosave(this.contextKey(), this.snapshot());
+    }
+    if (this.draftSavedTimer) {
+      clearTimeout(this.draftSavedTimer);
     }
   }
 
@@ -297,11 +516,13 @@ export class Compose implements OnDestroy {
       }
     }
 
-    // Over-limit text is auto-split into a self-reply thread; media/poll/CW ride
-    // on the first status only, the rest inherit visibility and chain as replies.
-    const chunks = splitPost(this.text().trim());
-    this.api.postStatus(chunks[0], options).subscribe({
-      next: (status) => this.postRest(status, status, chunks.slice(1)),
+    // Thread boxes post as a self-reply chain: media/poll/CW ride on the first
+    // status only, the rest inherit visibility and chain as replies.
+    const posts = this.segments()
+      .map((s) => s.trim())
+      .filter((s, i) => i === 0 || s !== '');
+    this.api.postStatus(posts[0], options).subscribe({
+      next: (status) => this.postRest(status, status, posts.slice(1)),
       error: () => this.submitting.set(false),
     });
   }
@@ -349,7 +570,7 @@ export class Compose implements OnDestroy {
       });
   }
 
-  /** Post remaining thread chunks sequentially, then emit the root status. */
+  /** Post remaining thread posts sequentially, then emit the root status. */
   private postRest(root: Status, previous: Status, rest: string[]): void {
     if (!rest.length) {
       this.reset();
@@ -368,6 +589,7 @@ export class Compose implements OnDestroy {
 
   private reset(): void {
     this.text.set('');
+    this.thread.set([]);
     this.submitting.set(false);
     this.cwOpen.set(false);
     this.spoilerText.set('');
@@ -376,5 +598,12 @@ export class Compose implements OnDestroy {
     this.pollOpen.set(false);
     this.pollOptions.set(['', '']);
     this.pollMultiple.set(false);
+    this.emojiOpen.set(false);
+    this.lastFocusedBox = null;
+    if (this.autosaveTimer) {
+      clearTimeout(this.autosaveTimer);
+      this.autosaveTimer = null;
+    }
+    this.drafts.clearAutosave(this.contextKey());
   }
 }

@@ -5,6 +5,8 @@ import { filter, map } from 'rxjs';
 import { Api } from '../api';
 import { Auth, Session } from '../auth';
 import { environment } from '../../environments/environment';
+import { Hotkeys } from '../hotkeys';
+import { ShortcutHelp } from '../shortcut-help/shortcut-help';
 import { AppFooter } from './app-footer/app-footer';
 import { LeftRail } from './left-rail/left-rail';
 import { RightRail } from './right-rail/right-rail';
@@ -15,7 +17,15 @@ function isWideUrl(url: string): boolean {
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LeftRail, RightRail, AppFooter],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    LeftRail,
+    RightRail,
+    AppFooter,
+    ShortcutHelp,
+  ],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
@@ -23,6 +33,8 @@ export class Shell implements OnInit {
   protected auth = inject(Auth);
   private api = inject(Api);
   private router = inject(Router);
+  /** Mastodon-compatible keyboard shortcuts (and the "?" help dialog). */
+  protected hotkeys = inject(Hotkeys);
 
   /** Build flavor: drives the brand and whether mock-only nav links are shown. */
   protected brand = environment.brand;
@@ -60,6 +72,7 @@ export class Shell implements OnInit {
   }
 
   ngOnInit(): void {
+    this.hotkeys.start();
     if (!this.auth.account()) {
       this.api.verifyCredentials().subscribe({
         next: (acc) => this.auth.setAccount(acc),

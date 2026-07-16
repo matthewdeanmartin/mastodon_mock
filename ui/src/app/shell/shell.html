@@ -58,6 +58,7 @@
         <div class="menu-panel">
           <a routerLink="/favourites">Favourites</a>
           <a routerLink="/bookmarks">Bookmarks</a>
+          <a routerLink="/drafts">Drafts</a>
           <a routerLink="/about">About</a>
           <div class="menu-divider"></div>
           <a routerLink="/settings">Settings</a>
@@ -135,6 +136,10 @@
     </aside>
   }
 </div>
+
+@if (hotkeys.helpOpen()) {
+  <app-shortcut-help (closed)="hotkeys.helpOpen.set(false)" />
+}
 
 @if (toast(); as message) {
   <div class="toast" role="alert">
