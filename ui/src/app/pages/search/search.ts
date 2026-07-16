@@ -4,12 +4,13 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { SearchResults, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
+import { FindPeople } from '../find-people/find-people';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
 @Component({
   selector: 'app-search',
-  imports: [FormsModule, RouterLink, StatusCard],
+  imports: [FormsModule, RouterLink, StatusCard, FindPeople],
   templateUrl: './search.html',
   styleUrl: './search.css',
 })

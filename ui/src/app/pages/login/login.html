@@ -42,182 +42,195 @@
 
     <!-- ====================== Sign in / Register ====================== -->
     @if (tab() === 'signin') {
-      <!-- ---------- Primary: big obvious sign-in ---------- -->
-      @if (needsInstance()) {
-        <p class="muted">Choose a server below to sign in.</p>
-      } @else {
-        @if (oauthError()) {
-          <p class="error">{{ oauthError() }}</p>
-        }
-        <button class="btn btn-hero" [disabled]="oauthWorking()" (click)="startOAuth()">
-          {{ oauthWorking() ? 'Redirecting…' : 'Sign in with ' + serverHostLabel() }}
-        </button>
-        <p class="muted small center">
-          You'll be sent to {{ serverHostLabel() }}'s own login &amp; consent page, then redirected
-          back here.
-        </p>
-        @if (signupUrl(); as signup) {
-          <p class="muted small center">
-            New to Mastodon?
-            <a [href]="signup" target="_blank" rel="noopener noreferrer">
-              Create an account on {{ serverHostLabel() }} ↗
-            </a>
-          </p>
-        }
-      }
-
-      <!-- ---------- Pick a server ---------- -->
-      <div class="dev">
-        <div class="dev-head"><span class="muted">Pick a server</span></div>
-        <p class="muted small">
-          Your account lives on a server (an “instance”), but you can follow anyone on any server.
-          <strong>mastodon.social</strong> is the biggest general-purpose one — a safe default.
-        </p>
-        <div class="dev-gen">
-          @for (preset of serverPresets; track preset.baseUrl) {
+      <!-- ---------- Server combo: pick a common one or type your own ---------- -->
+      <div class="server-row">
+        <label class="server-label muted" for="server-combo">Your server</label>
+        <div class="server-combo">
+          <input
+            id="server-combo"
+            type="text"
+            list="server-suggestions"
+            [ngModel]="customServer()"
+            (ngModelChange)="onServerInput($event)"
+            (keyup.enter)="applyServerNow()"
+            placeholder="mastodon.social — or type any instance"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <datalist id="server-suggestions">
+            @for (host of commonServers; track host) {
+              <option [value]="host"></option>
+            }
+          </datalist>
+          @if (server.allowsThisServer) {
             <button
-              class="btn btn-outline"
-              [class.active]="server.baseUrl() === preset.baseUrl"
-              (click)="selectServer(preset.baseUrl)"
+              class="btn btn-outline chip"
+              [class.active]="server.isMock"
+              (click)="selectServer('')"
             >
-              {{ preset.label }}
+              This server (mock)
             </button>
           }
         </div>
-        <div class="dev-gen">
-          <input
-            type="text"
-            [ngModel]="customServer()"
-            (ngModelChange)="customServer.set($event)"
-            (keyup.enter)="useCustomServer()"
-            placeholder="https://another.instance"
-          />
-          <button class="btn btn-outline" (click)="useCustomServer()">Use</button>
-        </div>
-        <p class="muted small">
-          Talking to
-          <code>{{
-            server.baseUrl() || (server.allowsThisServer ? 'this server' : '— pick an instance —')
-          }}</code>
-        </p>
-        <details class="server-help">
-          <summary>How do I choose?</summary>
-          <ul class="muted small">
-            <li>
-              Some servers are special-interest communities (tech, art, a language…). Their local
-              feed reads like a forum for that topic — a nice built-in home timeline.
-            </li>
-            <li>
-              Small servers see less of the network: if you follow hashtags, expect fewer results
-              than on a big server.
-            </li>
-            <li>
-              Small servers run on donations and volunteer time, so they can be less financially
-              stable in the long run.
-            </li>
-            <li>You can move your account (and followers) to another server later.</li>
-          </ul>
-        </details>
-      </div>
-
-      @if (!needsInstance()) {
-        <!-- ---------- Secondary: access token ---------- -->
-        <div class="dev">
-          <div class="dev-head">
-            <span class="muted">Use an access token</span>
-            <button class="link" (click)="toggleToken()">
-              {{ showToken() ? 'hide' : 'show' }}
-            </button>
-          </div>
-          @if (showToken()) {
-            @if (!showRegister()) {
-              <p class="muted small">
-                Already have an access token for this instance? Paste it here.
-              </p>
-              <input
-                type="text"
-                [ngModel]="token()"
-                (ngModelChange)="token.set($event)"
-                (keyup.enter)="submit()"
-                placeholder="access token"
-              />
-              @if (error()) {
-                <p class="error">{{ error() }}</p>
-              }
-              <button
-                class="btn btn-outline"
-                [disabled]="!token().trim() || checking()"
-                (click)="submit()"
-              >
-                {{ checking() ? 'Checking…' : 'Sign in with token' }}
-              </button>
-              <p class="muted small switch-line">
-                No account? <button class="link" (click)="toggleRegister()">Create one</button>
-              </p>
-            } @else {
-              @if (pendingToken()) {
-                <p class="muted small">
-                  Almost there! We sent a confirmation email to
-                  <code>{{ regEmail() }}</code
-                  >. Click the link to verify your address.
-                </p>
-                <button
-                  class="btn verify-link"
-                  [disabled]="verifying()"
-                  (click)="confirmAndEnter()"
-                >
-                  {{ verifying() ? 'Verifying…' : '✉ Verify email & continue' }}
-                </button>
-                <p class="muted small">
-                  (This mock doesn't really send mail — clicking just exercises
-                  <code>/api/v1/emails/confirmations</code> and signs you in.)
-                </p>
-              } @else {
-                <p class="muted small">
-                  Create an account on <code>{{ server.baseUrl() || 'this server' }}</code
-                  >.
-                </p>
-                <input
-                  type="text"
-                  [ngModel]="regUsername()"
-                  (ngModelChange)="regUsername.set($event)"
-                  placeholder="username"
-                />
-                <input
-                  type="email"
-                  [ngModel]="regEmail()"
-                  (ngModelChange)="regEmail.set($event)"
-                  placeholder="email"
-                />
-                <input
-                  type="password"
-                  [ngModel]="regPassword()"
-                  (ngModelChange)="regPassword.set($event)"
-                  placeholder="password"
-                />
-                <label class="agree">
-                  <input
-                    type="checkbox"
-                    [ngModel]="regAgree()"
-                    (ngModelChange)="regAgree.set($event)"
-                  />
-                  <span>I agree to the server rules</span>
-                </label>
-                @if (regError()) {
-                  <p class="error">{{ regError() }}</p>
-                }
-                <button class="btn btn-outline" [disabled]="regWorking()" (click)="register()">
-                  {{ regWorking() ? 'Creating…' : 'Sign up' }}
-                </button>
-                <p class="muted small switch-line">
-                  Have a token?
-                  <button class="link" (click)="toggleRegister()">Sign in instead</button>
-                </p>
+        <p class="server-status muted small">
+          @switch (serverStatus()) {
+            @case ('checking') {
+              Checking {{ customServer() }}…
+            }
+            @case ('ok') {
+              ✓ Connected to <strong>{{ serverHostLabel() }}</strong>
+              @if (serverTitle()) {
+                ({{ serverTitle() }})
               }
             }
+            @case ('unreachable') {
+              ⚠ Can't reach {{ customServer() }} — check the address.
+            }
+            @default {
+              Talking to
+              <code>{{
+                server.baseUrl() || (server.allowsThisServer ? 'this server' : '— pick a server —')
+              }}</code>
+            }
           }
-        </div>
-      }
+        </p>
+      </div>
+
+      <!-- ---------- Three ways in ---------- -->
+      <div class="paths">
+        <!-- Path 1: existing account, OAuth (never your password) -->
+        <section class="path path-primary">
+          <h2>I have an account</h2>
+          @if (needsInstance()) {
+            <p class="muted small">Pick your server above, then sign in.</p>
+          } @else {
+            @if (oauthError()) {
+              <p class="error">{{ oauthError() }}</p>
+            }
+            <button class="btn btn-hero" [disabled]="oauthWorking()" (click)="startOAuth()">
+              {{ oauthWorking() ? 'Redirecting…' : 'Sign in with ' + serverHostLabel() }}
+            </button>
+            <p class="muted small">
+              You'll log in on {{ serverHostLabel() }}'s own page and come straight back.
+              <strong>We never see your password.</strong>
+            </p>
+          }
+        </section>
+
+        <!-- Path 2: no account yet -->
+        <section class="path">
+          <h2>I'm new here</h2>
+          <p class="muted small">
+            Your account lives on a server (an “instance”), but you can follow anyone anywhere.
+            <strong>mastodon.social</strong> is the biggest general-purpose one — a safe default.
+          </p>
+          @if (server.isMock) {
+            <!-- The embedded mock owns its accounts, so an inline signup is safe here. -->
+            @if (pendingToken()) {
+              <p class="muted small">
+                Almost there! We sent a confirmation email to
+                <code>{{ regEmail() }}</code
+                >. Click the link to verify your address.
+              </p>
+              <button class="btn verify-link" [disabled]="verifying()" (click)="confirmAndEnter()">
+                {{ verifying() ? 'Verifying…' : '✉ Verify email & continue' }}
+              </button>
+              <p class="muted small">
+                (This mock doesn't really send mail — clicking just exercises
+                <code>/api/v1/emails/confirmations</code> and signs you in.)
+              </p>
+            } @else {
+              <input
+                type="text"
+                [ngModel]="regUsername()"
+                (ngModelChange)="regUsername.set($event)"
+                placeholder="username"
+              />
+              <input
+                type="email"
+                [ngModel]="regEmail()"
+                (ngModelChange)="regEmail.set($event)"
+                placeholder="email"
+              />
+              <input
+                type="password"
+                [ngModel]="regPassword()"
+                (ngModelChange)="regPassword.set($event)"
+                placeholder="password"
+              />
+              <label class="agree">
+                <input
+                  type="checkbox"
+                  [ngModel]="regAgree()"
+                  (ngModelChange)="regAgree.set($event)"
+                />
+                <span>I agree to the server rules</span>
+              </label>
+              @if (regError()) {
+                <p class="error">{{ regError() }}</p>
+              }
+              <button class="btn btn-outline" [disabled]="regWorking()" (click)="register()">
+                {{ regWorking() ? 'Creating…' : 'Sign up on the mock' }}
+              </button>
+            }
+          } @else if (signupUrl(); as signup) {
+            <!-- Real instances get their own signup page: never type real
+                 credentials into a third-party client like this one. -->
+            <a class="btn btn-outline signup-btn" [href]="signup" target="_blank" rel="noopener">
+              Create an account on {{ serverHostLabel() }} ↗
+            </a>
+            <p class="muted small">
+              Sign-up happens on the server itself — a client like this should never handle your
+              email or password. Come back and hit “Sign in” when you're done.
+            </p>
+          }
+          <details class="server-help">
+            <summary>How do I choose a server?</summary>
+            <ul class="muted small">
+              <li>
+                Some servers are special-interest communities (tech, art, a language…). Their local
+                feed reads like a forum for that topic — a nice built-in home timeline.
+              </li>
+              <li>
+                Small servers see less of the network: if you follow hashtags, expect fewer results
+                than on a big server.
+              </li>
+              <li>
+                Small servers run on donations and volunteer time, so they can be less financially
+                stable in the long run.
+              </li>
+              <li>You can move your account (and followers) to another server later.</li>
+            </ul>
+          </details>
+        </section>
+
+        <!-- Path 3: developers with a token -->
+        <section class="path">
+          <h2>I have an API token</h2>
+          <p class="muted small">
+            For developers and power users: paste an access token for
+            {{ serverHostLabel() }} (create one under Preferences → Development on your server).
+          </p>
+          <input
+            type="text"
+            [ngModel]="token()"
+            (ngModelChange)="token.set($event)"
+            (keyup.enter)="submit()"
+            placeholder="access token"
+            [disabled]="needsInstance()"
+          />
+          @if (error()) {
+            <p class="error">{{ error() }}</p>
+          }
+          <button
+            class="btn btn-outline"
+            [disabled]="!token().trim() || checking() || needsInstance()"
+            (click)="submit()"
+          >
+            {{ checking() ? 'Checking…' : 'Sign in with token' }}
+          </button>
+        </section>
+      </div>
     }
 
     <!-- ====================== Mock Login ====================== -->

@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../../api';
@@ -18,13 +18,31 @@ interface StoredApp {
 
 type Tab = 'signin' | 'mock' | 'init';
 
+/** Well-known instances offered in the server combo's suggestion list. */
+const COMMON_SERVERS = [
+  'mastodon.social',
+  'mastodon.online',
+  'fosstodon.org',
+  'hachyderm.io',
+  'mstdn.social',
+  'mas.to',
+  'techhub.social',
+  'mastodon.art',
+];
+
+/** Something that could plausibly be an instance host (with or without scheme). */
+const DOMAIN_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}$/i;
+
+/** How the current server-combo text relates to a reachable instance. */
+type ServerStatus = 'idle' | 'checking' | 'ok' | 'unreachable';
+
 @Component({
   selector: 'app-login',
   imports: [FormsModule],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
-export class Login implements OnInit {
+export class Login implements OnInit, OnDestroy {
   private api = inject(Api);
   private mockApi = inject(MockApi);
   private auth = inject(Auth);
@@ -39,7 +57,15 @@ export class Login implements OnInit {
   protected mockTooling = environment.mockTooling;
 
   protected serverPresets = SERVER_PRESETS;
+  protected readonly commonServers = COMMON_SERVERS;
   protected customServer = signal('');
+  /** Reachability of what's typed in the server combo (drives the ✓/⚠ hint). */
+  protected serverStatus = signal<ServerStatus>('idle');
+  /** The reached instance's self-reported title ("Mastodon", …). */
+  protected serverTitle = signal<string | null>(null);
+  private serverDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** Guards against a slow instance probe overwriting a newer one. */
+  private probeSeq = 0;
 
   /**
    * Mocking Bird has no "this server"; until the user picks an instance, every API call
@@ -63,14 +89,11 @@ export class Login implements OnInit {
   });
 
   // --- Sign in (token) ---
-  /** OAuth is the primary flow; the pasted-token form is tucked behind this toggle. */
-  protected showToken = signal(false);
   protected token = signal('');
   protected error = signal<string | null>(null);
   protected checking = signal(false);
 
-  // --- Register ---
-  protected showRegister = signal(false);
+  // --- Register (mock server only: never proxy a real server's credentials) ---
   protected regUsername = signal('');
   protected regEmail = signal('');
   protected regPassword = signal('');
@@ -114,9 +137,17 @@ export class Login implements OnInit {
     this.tab.set(tab);
   }
 
+  ngOnDestroy(): void {
+    if (this.serverDebounce) {
+      clearTimeout(this.serverDebounce);
+    }
+  }
+
   selectServer(baseUrl: string): void {
     this.server.setBaseUrl(baseUrl);
     this.customServer.set(baseUrl);
+    this.serverStatus.set('idle');
+    this.serverTitle.set(null);
     // Dev users only exist on the local mock; skip the call (and its throwing stub) when
     // we've switched to a real instance or this is the Mocking Bird build.
     if (this.mockTooling && this.server.isMock) {
@@ -124,8 +155,61 @@ export class Login implements OnInit {
     }
   }
 
-  useCustomServer(): void {
-    this.selectServer(this.customServer());
+  /**
+   * The server combo has no "Use" button: as soon as the text looks like a
+   * domain (typed, picked from the suggestion list, or Enter), we probe its
+   * /api/v1/instance and switch to it on success.
+   */
+  onServerInput(value: string): void {
+    this.customServer.set(value);
+    this.serverStatus.set('idle');
+    this.serverTitle.set(null);
+    if (this.serverDebounce) {
+      clearTimeout(this.serverDebounce);
+    }
+    if (!DOMAIN_RE.test(value.trim())) {
+      return;
+    }
+    this.serverDebounce = setTimeout(() => this.probeAndApply(value), 500);
+  }
+
+  /** Enter in the combo: don't wait for the debounce. */
+  applyServerNow(): void {
+    if (this.serverDebounce) {
+      clearTimeout(this.serverDebounce);
+    }
+    void this.probeAndApply(this.customServer());
+  }
+
+  private async probeAndApply(value: string): Promise<void> {
+    const trimmed = value.trim().replace(/\/+$/, '');
+    if (!DOMAIN_RE.test(trimmed)) {
+      return;
+    }
+    const base = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const seq = ++this.probeSeq;
+    this.serverStatus.set('checking');
+    try {
+      const res = await fetch(`${base}/api/v1/instance`, { signal: AbortSignal.timeout(6000) });
+      if (seq !== this.probeSeq) {
+        return; // a newer probe superseded this one
+      }
+      if (!res.ok) {
+        this.serverStatus.set('unreachable');
+        return;
+      }
+      const info = (await res.json()) as { title?: string };
+      if (seq !== this.probeSeq) {
+        return;
+      }
+      this.server.setBaseUrl(base);
+      this.serverStatus.set('ok');
+      this.serverTitle.set(info.title ?? null);
+    } catch {
+      if (seq === this.probeSeq) {
+        this.serverStatus.set('unreachable');
+      }
+    }
   }
 
   // ---------- Sign in with a pasted token ----------
@@ -152,16 +236,7 @@ export class Login implements OnInit {
     });
   }
 
-  // ---------- Register (mastodon.social-style signup) ----------
-
-  toggleToken(): void {
-    this.showToken.update((v) => !v);
-  }
-
-  toggleRegister(): void {
-    this.showRegister.update((v) => !v);
-    this.regError.set(null);
-  }
+  // ---------- Register (mock-server-only signup) ----------
 
   /** Register an app for a client_credentials token, then create the account. */
   register(): void {

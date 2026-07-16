@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ImportFollows, parseHandles } from '../../import-follows';
@@ -17,6 +17,9 @@ import { ImportFollows, parseHandles } from '../../import-follows';
 })
 export class FindPeople {
   protected importer = inject(ImportFollows);
+
+  /** True when hosted inside another page (e.g. search's empty state): no page title. */
+  readonly embedded = input(false);
 
   protected pasted = signal('');
   protected fileName = signal<string | null>(null);
