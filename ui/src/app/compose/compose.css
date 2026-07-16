@@ -113,6 +113,16 @@ textarea {
   border-radius: 10px;
 }
 
+/* Row 1: where the post goes (target / visibility) and the drafts picker. */
+.compose-selects {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* Row 2: attach / poll / CW / … tools, counters and the Post button. */
 .compose-actions {
   display: flex;
   justify-content: flex-end;
@@ -138,6 +148,18 @@ textarea {
   background: none;
   cursor: pointer;
   font-size: 0.9em;
+  white-space: nowrap;
+}
+
+.thread-btn {
+  flex-direction: row;
+}
+
+.drafts-select {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 8px;
+  max-width: 220px;
 }
 
 .tool-btn.on {

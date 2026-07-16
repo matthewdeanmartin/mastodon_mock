@@ -123,6 +123,10 @@ export class Compose implements OnDestroy {
       if (!this.restored) {
         return;
       }
+      // The preview only needs the custom-emoji list once a :shortcode: shows up.
+      if (snapshot.segments.some((s) => /:[a-z0-9_]+:/i.test(s))) {
+        this.customEmojis.ensureLoaded();
+      }
       if (this.autosaveTimer) {
         clearTimeout(this.autosaveTimer);
       }
@@ -155,7 +159,8 @@ export class Compose implements OnDestroy {
   protected canAddPoll = computed(() => this.media().length === 0);
 
   // Live preview (rendered like the feed will render it — not WYSIWYG).
-  protected previewOpen = signal(false);
+  // Appears as soon as there's a character to render, gone when empty.
+  protected previewVisible = computed(() => this.segments().some((s) => s.trim() !== ''));
   protected previewHtml = computed(() =>
     this.segments().map((s) => renderStatusText(s, this.customEmojis.emojis())),
   );
@@ -253,6 +258,9 @@ export class Compose implements OnDestroy {
 
   toggleEmoji(): void {
     this.emojiOpen.update((v) => !v);
+    if (this.emojiOpen()) {
+      this.customEmojis.ensureLoaded();
+    }
   }
 
   /** Insert picked emoji text at the caret of the last-focused box. */
@@ -275,13 +283,6 @@ export class Compose implements OnDestroy {
         const caret = start + emojiText.length;
         el.setSelectionRange(caret, caret);
       });
-    }
-  }
-
-  togglePreview(): void {
-    this.previewOpen.update((v) => !v);
-    if (this.previewOpen()) {
-      this.customEmojis.ensureLoaded();
     }
   }
 
@@ -387,6 +388,10 @@ export class Compose implements OnDestroy {
       this.pollOptions.set(d.poll.options.length >= 2 ? d.poll.options : ['', '']);
       this.pollMultiple.set(d.poll.multiple);
       this.pollExpiresIn.set(d.poll.expiresIn);
+    } else {
+      this.pollOpen.set(false);
+      this.pollOptions.set(['', '']);
+      this.pollMultiple.set(false);
     }
   }
 
@@ -395,6 +400,42 @@ export class Compose implements OnDestroy {
     () =>
       this.segments().some((s) => s.trim()) || (this.cwOpen() && this.spoilerText().trim() !== ''),
   );
+
+  /** The saved-drafts list, for the picker dropdown. */
+  protected savedDrafts = this.drafts.drafts;
+
+  /** Short label for a draft in the picker. */
+  draftLabel(d: Draft): string {
+    const text = d.segments.find((s) => s.trim()) ?? '';
+    const snippet = text.trim().replace(/\s+/g, ' ');
+    if (snippet) {
+      return snippet.length > 32 ? snippet.slice(0, 32) + '…' : snippet;
+    }
+    return d.poll ? '(poll draft)' : '(empty draft)';
+  }
+
+  /**
+   * The drafts dropdown: save the current text as a draft, or load one.
+   * Loading swaps — anything half-written is saved as a draft first, so
+   * picking a draft never loses work.
+   */
+  onDraftSelect(select: HTMLSelectElement): void {
+    const value = select.value;
+    select.value = '';
+    if (value === 'save') {
+      this.saveDraft();
+      return;
+    }
+    const draft = this.drafts.get(value);
+    if (!draft) {
+      return;
+    }
+    if (draftHasContent(this.snapshot())) {
+      this.drafts.save(this.snapshot());
+    }
+    this.drafts.remove(draft.id);
+    this.applySnapshot(draft);
+  }
 
   /** Move the current composer state into the drafts list and clear the box. */
   saveDraft(): void {

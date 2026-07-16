@@ -112,7 +112,7 @@
     </div>
   }
 
-  @if (previewOpen()) {
+  @if (previewVisible()) {
     <div class="preview">
       <div class="preview-label muted">Preview — as it will appear in the feed</div>
       @for (html of previewHtml(); track $index; let i = $index) {
@@ -130,35 +130,49 @@
     </div>
   }
 
+  <div class="compose-selects">
+    @if (showTargetPicker()) {
+      <select
+        class="target-select"
+        [ngModel]="target()"
+        (ngModelChange)="target.set($event)"
+        title="Post to"
+      >
+        <option value="fedi">🦣 Fedi</option>
+        <option value="bsky">🦋 Bluesky</option>
+        <option value="both">🦣+🦋 Both</option>
+      </select>
+    }
+    @if (lockVisibility()) {
+      <span class="visibility-locked" title="Visibility is fixed here">🔒 {{ visibility() }}</span>
+    } @else {
+      <select
+        class="visibility-select"
+        [ngModel]="visibility()"
+        (ngModelChange)="visibility.set($event)"
+        title="Visibility"
+      >
+        @for (v of visibilities; track v) {
+          <option [value]="v">{{ v }}</option>
+        }
+      </select>
+    }
+
+    @if (savedDrafts().length || hasDraftContent()) {
+      <select class="drafts-select" (change)="onDraftSelect($any($event.target))" title="Drafts">
+        <option value="" selected>📝 Drafts</option>
+        @if (hasDraftContent()) {
+          <option value="save">💾 Save as draft</option>
+        }
+        @for (d of savedDrafts(); track d.id) {
+          <option [value]="d.id">{{ draftLabel(d) }}</option>
+        }
+      </select>
+    }
+  </div>
+
   <div class="compose-actions">
     <div class="compose-tools">
-      @if (showTargetPicker()) {
-        <select
-          class="target-select"
-          [ngModel]="target()"
-          (ngModelChange)="target.set($event)"
-          title="Post to"
-        >
-          <option value="fedi">🦣 Fedi</option>
-          <option value="bsky">🦋 Bluesky</option>
-          <option value="both">🦣+🦋 Both</option>
-        </select>
-      }
-      @if (lockVisibility()) {
-        <span class="visibility-locked" title="Visibility is fixed here">🔒 {{ visibility() }}</span>
-      } @else {
-        <select
-          class="visibility-select"
-          [ngModel]="visibility()"
-          (ngModelChange)="visibility.set($event)"
-          title="Visibility"
-        >
-          @for (v of visibilities; track v) {
-            <option [value]="v">{{ v }}</option>
-          }
-        </select>
-      }
-
       <label class="tool-btn" [class.disabled]="!canAttachMedia()" title="Attach media">
         📎
         <input
@@ -184,10 +198,14 @@
         CW
       </button>
 
-      <label class="tool-btn sensitive-toggle" title="Mark media sensitive">
-        <input type="checkbox" [ngModel]="sensitive()" (ngModelChange)="sensitive.set($event)" />
+      <button
+        class="tool-btn"
+        [class.on]="sensitive()"
+        (click)="sensitive.set(!sensitive())"
+        title="Mark media sensitive"
+      >
         ⚠️
-      </label>
+      </button>
 
       <span class="emoji-anchor">
         <button
@@ -206,25 +224,12 @@
       </span>
 
       <button
-        class="tool-btn"
+        class="tool-btn thread-btn"
         (click)="addThreadBox()"
         title="Add another post (thread / tweet storm)"
       >
         ➕🧵
       </button>
-
-      <button
-        class="tool-btn"
-        [class.on]="previewOpen()"
-        (click)="togglePreview()"
-        title="Live preview"
-      >
-        👁
-      </button>
-
-      @if (hasDraftContent()) {
-        <button class="tool-btn" (click)="saveDraft()" title="Save as draft">💾</button>
-      }
     </div>
 
     @if (targetIncludesBsky()) {
