@@ -18,5 +18,9 @@
     <button class="btn" type="button" [disabled]="health.checking()" (click)="retry()">
       {{ health.checking() ? 'Checking…' : 'Try again' }}
     </button>
+    <button class="btn" type="button" (click)="reporting.set(true)">Report this</button>
   </div>
 </div>
+@if (reporting()) {
+  <app-bug-report-dialog (closed)="reporting.set(false)" />
+}

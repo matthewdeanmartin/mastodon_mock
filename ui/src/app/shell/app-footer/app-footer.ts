@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../../auth';
+import { BugReportDialog } from '../../bug-report-dialog/bug-report-dialog';
 import { BUILD_INFO } from '../../build-info';
 import { Server } from '../../server';
 
@@ -11,7 +12,7 @@ import { Server } from '../../server';
  */
 @Component({
   selector: 'app-app-footer',
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, BugReportDialog],
   template: `
     <footer class="app-footer muted">
       <a [href]="aboutUrl()" target="_blank" rel="noopener noreferrer">
@@ -25,6 +26,8 @@ import { Server } from '../../server';
       >
         Mockingbird source
       </a>
+      <span aria-hidden="true">·</span>
+      <button class="link" type="button" (click)="reporting.set(true)">Report a bug</button>
       <span aria-hidden="true">·</span>
       <a routerLink="/fail-whale">Fail whale</a>
       <p class="footer-note">You reached the end. That's allowed here.</p>
@@ -44,6 +47,9 @@ import { Server } from '../../server';
         </p>
       }
     </footer>
+    @if (reporting()) {
+      <app-bug-report-dialog (closed)="reporting.set(false)" />
+    }
   `,
   styles: `
     .app-footer {
@@ -52,11 +58,21 @@ import { Server } from '../../server';
       font-size: 12.5px;
       text-align: center;
     }
-    .app-footer a {
+    .app-footer a,
+    .app-footer .link {
       color: var(--muted);
     }
-    .app-footer a:hover {
+    .app-footer a:hover,
+    .app-footer .link:hover {
       color: var(--accent);
+    }
+    .app-footer .link {
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline;
     }
     .footer-note {
       margin: 8px 0 0;
@@ -74,6 +90,9 @@ export class AppFooter {
 
   /** CI-stamped build metadata; the placeholder (null builtAt) hides the line. */
   protected build = BUILD_INFO;
+
+  /** Whether the "Report a bug" dialog is open. */
+  protected reporting = signal(false);
 
   /** Same home-host inference as the right rail's donate link. */
   protected host = computed<string | null>(() => {

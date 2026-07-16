@@ -1,4 +1,5 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+import { BugReportDialog } from '../bug-report-dialog/bug-report-dialog';
 import { InstanceStatus } from '../instance-status';
 import { ServerHealth } from '../server-health';
 
@@ -11,13 +12,14 @@ import { ServerHealth } from '../server-health';
  */
 @Component({
   selector: 'app-fail-whale',
-  imports: [],
+  imports: [BugReportDialog],
   templateUrl: './fail-whale.html',
   styleUrl: './fail-whale.css',
 })
 export class FailWhale {
   protected health = inject(ServerHealth);
   protected status = inject(InstanceStatus);
+  protected reporting = signal(false);
 
   retry(): void {
     this.health.recheck();

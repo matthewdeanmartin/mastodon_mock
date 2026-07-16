@@ -33,4 +33,23 @@
       </div>
     </div>
   </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel"><strong>Report a bug</strong></span>
+      <div class="scontrol">
+        <button class="btn btn-outline" type="button" (click)="reporting.set(true)">
+          Report a bug
+        </button>
+        <span class="hint">
+          Builds a report from your description plus build and environment details. Nothing is sent
+          automatically — you review it, then copy it or open a prefilled GitHub issue.
+        </span>
+      </div>
+    </div>
+  </div>
 </div>
+
+@if (reporting()) {
+  <app-bug-report-dialog (closed)="reporting.set(false)" />
+}
