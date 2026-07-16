@@ -36,5 +36,20 @@
       (replied)="onPosted($event)"
     />
   }
-  <button class="btn btn-outline more" (click)="loadMore()">Load more</button>
+
+  @if (capActive()) {
+    <div class="feed-cap">
+      <div class="feed-cap-rule">—— that’s the end of your feed for now ——</div>
+      <p class="feed-cap-msg">
+        You’ve had enough for now, bub. Take it easy.
+        <span class="muted">Resets in ~{{ capMinutesLeft() }} min, or on reload.</span>
+      </p>
+    </div>
+  } @else if (autoLoading()) {
+    <p class="muted center">Loading more…</p>
+  } @else if (canLoadMore()) {
+    <button class="btn btn-outline more" (click)="loadMore()">Load more</button>
+  } @else {
+    <p class="muted center small">You’re all caught up.</p>
+  }
 }

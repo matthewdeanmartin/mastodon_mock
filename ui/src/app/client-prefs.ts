@@ -79,7 +79,17 @@ interface StoredPrefs {
   hiddenProviders?: ProviderId[];
   chatAudience?: ChatAudience;
   chatKind?: ChatKindFilter;
+  feedMin?: number;
+  feedMax?: number;
 }
+
+/** Feed-size bounds (see feedMin / feedMax). */
+export const FEED_MIN_DEFAULT = 20;
+export const FEED_MAX_DEFAULT = 500;
+const FEED_MIN_FLOOR = 5;
+const FEED_MAX_CEILING = 5000;
+/** How long the "you've had enough" cap sticks before it lifts, in ms. */
+export const FEED_MAX_COOLDOWN_MS = 60 * 60 * 1000;
 
 /** Clamp helper shared by the numeric reader prefs. */
 function clamp(value: number, min: number, max: number): number {
@@ -126,6 +136,15 @@ export class ClientPrefs {
   // Chat-list filters.
   readonly chatAudience = signal<ChatAudience>('everyone');
   readonly chatKind = signal<ChatKindFilter>('all');
+
+  /**
+   * Feed-size bounds. `feedMin` auto-loads more pages until the feed holds at
+   * least this many (or the timeline is exhausted). `feedMax` caps how much a
+   * feed will load in one sitting; hitting it disables "Load more" until a
+   * cooldown passes or the page reloads.
+   */
+  readonly feedMin = signal<number>(FEED_MIN_DEFAULT);
+  readonly feedMax = signal<number>(FEED_MAX_DEFAULT);
 
   /** Resolved theme actually in effect ('auto' resolved against the OS preference). */
   readonly resolvedTheme = signal<'light' | 'dark'>('light');
@@ -224,6 +243,23 @@ export class ClientPrefs {
     }
   }
 
+  setFeedMin(n: number): void {
+    if (Number.isFinite(n)) {
+      this.feedMin.set(clamp(Math.round(n), FEED_MIN_FLOOR, this.feedMax()));
+    }
+  }
+
+  setFeedMax(n: number): void {
+    if (Number.isFinite(n)) {
+      const max = clamp(Math.round(n), FEED_MIN_FLOOR, FEED_MAX_CEILING);
+      this.feedMax.set(max);
+      // Keep min ≤ max.
+      if (this.feedMin() > max) {
+        this.feedMin.set(max);
+      }
+    }
+  }
+
   toggleProvider(id: ProviderId): void {
     this.hiddenProviders.update((hidden) =>
       hidden.includes(id) ? hidden.filter((p) => p !== id) : [...hidden, id],
@@ -294,6 +330,13 @@ export class ClientPrefs {
     if (stored.chatKind === 'all' || stored.chatKind === 'private' || stored.chatKind === 'public') {
       this.chatKind.set(stored.chatKind);
     }
+    // feedMax first so setFeedMin can clamp against it.
+    if (typeof stored.feedMax === 'number') {
+      this.setFeedMax(stored.feedMax);
+    }
+    if (typeof stored.feedMin === 'number') {
+      this.setFeedMin(stored.feedMin);
+    }
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -321,6 +364,8 @@ export class ClientPrefs {
       hiddenProviders: this.hiddenProviders(),
       chatAudience: this.chatAudience(),
       chatKind: this.chatKind(),
+      feedMin: this.feedMin(),
+      feedMax: this.feedMax(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   }

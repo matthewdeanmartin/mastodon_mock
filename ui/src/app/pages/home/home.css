@@ -32,3 +32,27 @@
   padding: 4px;
   flex-shrink: 0;
 }
+
+.feed-cap {
+  text-align: center;
+  padding: 24px 16px 40px;
+}
+
+.feed-cap-rule {
+  color: var(--muted, #888);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
+.feed-cap-msg {
+  margin: 0;
+  font-weight: 600;
+}
+
+.feed-cap-msg .muted {
+  display: block;
+  font-weight: 400;
+  font-size: 13px;
+  margin-top: 4px;
+}

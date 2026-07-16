@@ -237,6 +237,39 @@
         />
         Show images in feeds (off replaces pictures with a 🖼️ chip)
       </label>
+
+      <label class="inline-field">
+        Minimum feed size ({{ prefs.feedMin() }} posts)
+        <input
+          type="number"
+          min="5"
+          [max]="prefs.feedMax()"
+          step="5"
+          [ngModel]="prefs.feedMin()"
+          (ngModelChange)="prefs.setFeedMin(+$event)"
+          name="feed_min"
+        />
+      </label>
+      <span class="hint">
+        Auto-loads more until the feed holds at least this many posts (or the timeline runs out).
+      </span>
+
+      <label class="inline-field">
+        Maximum feed size ({{ prefs.feedMax() }} posts)
+        <input
+          type="number"
+          min="5"
+          max="5000"
+          step="10"
+          [ngModel]="prefs.feedMax()"
+          (ngModelChange)="prefs.setFeedMax(+$event)"
+          name="feed_max"
+        />
+      </label>
+      <span class="hint">
+        “You’ve had enough for now.” Load more is disabled once the feed reaches this size; it lifts
+        after about an hour or when you reload.
+      </span>
     </div>
   </div>
 </div>

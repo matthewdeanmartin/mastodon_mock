@@ -2,7 +2,7 @@ import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Auth } from '../../auth';
-import { ClientPrefs } from '../../client-prefs';
+import { ClientPrefs, FEED_MAX_COOLDOWN_MS } from '../../client-prefs';
 import { Status } from '../../models';
 import { CommandBar } from '../../command-bar/command-bar';
 import { Compose } from '../../compose/compose';
@@ -32,10 +32,42 @@ export class Home implements OnInit, OnDestroy {
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
   protected live = signal(false);
+  /** True while auto-loading pages to reach the configured minimum feed size. */
+  protected autoLoading = signal(false);
+
+  /**
+   * When the feed hit the user's maximum, the wall-clock time it happened.
+   * A plain signal (not persisted) so it naturally clears on page reload;
+   * the 60-minute cooldown lifts it sooner. Null means "cap not hit".
+   */
+  private maxHitAt = signal<number | null>(null);
+  /** Ticks so `capActive` re-evaluates the cooldown without a user action. */
+  private now = signal(Date.now());
+  private clock: ReturnType<typeof setInterval> | null = null;
 
   /** The loaded feed minus providers hidden via the command-bar chips. */
   protected visible = computed(() =>
     this.statuses().filter((s) => this.prefs.isProviderVisible(s.provider ?? 'mastodon')),
+  );
+
+  /** True while the max-feed cap is in force (hit, and within the cooldown). */
+  protected capActive = computed(() => {
+    const hit = this.maxHitAt();
+    return hit !== null && this.now() - hit < FEED_MAX_COOLDOWN_MS;
+  });
+
+  /** Roughly how many minutes remain on the cap, for the message. */
+  protected capMinutesLeft = computed(() => {
+    const hit = this.maxHitAt();
+    if (hit === null) {
+      return 0;
+    }
+    return Math.max(1, Math.ceil((FEED_MAX_COOLDOWN_MS - (this.now() - hit)) / 60000));
+  });
+
+  /** Show "Load more" only when there's more AND we're not capped/auto-loading. */
+  protected canLoadMore = computed(
+    () => this.aggregator.hasMore() && !this.capActive() && !this.autoLoading(),
   );
 
   private nudgeDismissed = signal(localStorage.getItem(NUDGE_DISMISSED_KEY) === 'true');
@@ -58,10 +90,15 @@ export class Home implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.load();
+    // Re-tick every 30s so the cap message / cooldown updates on its own.
+    this.clock = setInterval(() => this.now.set(Date.now()), 30000);
   }
 
   ngOnDestroy(): void {
     this.liveSub?.unsubscribe();
+    if (this.clock) {
+      clearInterval(this.clock);
+    }
   }
 
   toggleLive(): void {
@@ -86,19 +123,52 @@ export class Home implements OnInit, OnDestroy {
 
   load(): void {
     this.loading.set(true);
+    this.maxHitAt.set(null);
     this.aggregator.reset();
     this.aggregator.nextPage().subscribe({
       next: (s) => {
         this.statuses.set(s);
         this.publishMastodon(s);
         this.loading.set(false);
+        // Auto-load further pages until the feed reaches the configured minimum.
+        this.fillToMinimum();
       },
       error: () => this.loading.set(false),
     });
   }
 
+  /**
+   * Keep fetching pages until the feed holds at least `feedMin` items, the
+   * timeline is exhausted, or the maximum is hit. Runs one page at a time.
+   */
+  private fillToMinimum(): void {
+    if (
+      this.statuses().length >= this.prefs.feedMin() ||
+      this.statuses().length >= this.prefs.feedMax() ||
+      !this.aggregator.hasMore()
+    ) {
+      this.autoLoading.set(false);
+      return;
+    }
+    this.autoLoading.set(true);
+    this.aggregator.nextPage().subscribe({
+      next: (more) => {
+        this.statuses.update((s) => [...s, ...more]);
+        this.publishMastodon(more);
+        this.fillToMinimum();
+      },
+      error: () => this.autoLoading.set(false),
+    });
+  }
+
   loadMore(): void {
-    if (!this.aggregator.hasMore()) {
+    // Enforce the maximum: once the feed is this big, stop and start the
+    // cooldown. Paging may overshoot slightly (a partial last page) — fine.
+    if (this.statuses().length >= this.prefs.feedMax()) {
+      this.maxHitAt.set(Date.now());
+      return;
+    }
+    if (!this.canLoadMore()) {
       return;
     }
     this.aggregator.nextPage().subscribe((more) => {
