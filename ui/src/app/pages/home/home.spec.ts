@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ClientPrefs } from '../../client-prefs';
 import { Status } from '../../models';
 import { Streaming } from '../../streaming';
 import { FakeStreaming } from '../../testing/fake-streaming';
@@ -12,7 +13,11 @@ import { Home } from './home';
 interface HomeInternals {
   statuses: Signal<Status[]>;
   live: WritableSignal<boolean>;
+  autoLoading: Signal<boolean>;
+  capActive: Signal<boolean>;
+  canLoadMore: Signal<boolean>;
   toggleLive(): void;
+  loadMore(): void;
 }
 
 function internals(fixture: ComponentFixture<Home>): HomeInternals {
@@ -65,6 +70,7 @@ describe('Home', () => {
 
   afterEach(() => {
     httpMock.verify();
+    localStorage.clear();
   });
 
   function setUp(): ComponentFixture<Home> {
@@ -136,5 +142,48 @@ describe('Home', () => {
     fakeStreaming.emit({ event: 'update', payload: makeStatus('99') });
 
     expect(internals(fixture).statuses()).toEqual([]);
+  });
+
+  // ---------------------------------------------------------------- feed size
+
+  /** A full page of `n` statuses (ids offset so pages don't collide). */
+  function page(n: number, offset = 0): Status[] {
+    return Array.from({ length: n }, (_, i) => makeStatus(String(offset + i)));
+  }
+
+  it('auto-loads further pages until the minimum feed size is reached', () => {
+    // Minimum 40 → a full first page (20) triggers one more page automatically.
+    TestBed.inject(ClientPrefs).setFeedMin(40);
+
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+
+    // First page: a full 20 → below min(40), so auto-load fires a second page.
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page(20, 0));
+    // Second page: another full 20 → now 40, min reached, auto-load stops.
+    httpMock.expectOne((r) => r.url === '/api/v1/timelines/home').flush(page(20, 20));
+
+    expect(internals(fixture).statuses()).toHaveLength(40);
+    expect(internals(fixture).autoLoading()).toBe(false);
+    httpMock.expectNone((r) => r.url === '/api/v1/timelines/home');
+  });
+
+  it('loadMore stops at the maximum and activates the cap', () => {
+    // Min 20 (default), max 20 → first page already hits the cap boundary.
+    TestBed.inject(ClientPrefs).setFeedMax(20);
+
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page(20, 0));
+
+    // Feed is at 20 == max; loadMore must NOT fetch, and the cap engages.
+    expect(internals(fixture).statuses()).toHaveLength(20);
+    internals(fixture).loadMore();
+
+    httpMock.expectNone((r) => r.url === '/api/v1/timelines/home');
+    expect(internals(fixture).capActive()).toBe(true);
+    expect(internals(fixture).canLoadMore()).toBe(false);
   });
 });

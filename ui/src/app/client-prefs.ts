@@ -327,7 +327,11 @@ export class ClientPrefs {
     if (stored.chatAudience === 'everyone' || stored.chatAudience === 'mutuals') {
       this.chatAudience.set(stored.chatAudience);
     }
-    if (stored.chatKind === 'all' || stored.chatKind === 'private' || stored.chatKind === 'public') {
+    if (
+      stored.chatKind === 'all' ||
+      stored.chatKind === 'private' ||
+      stored.chatKind === 'public'
+    ) {
       this.chatKind.set(stored.chatKind);
     }
     // feedMax first so setFeedMin can clamp against it.

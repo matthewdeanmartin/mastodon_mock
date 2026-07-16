@@ -100,4 +100,37 @@ describe('ClientPrefs', () => {
     expect(ACCENT_PRESETS[0].id).toBe('blue');
     expect(ACCENT_PRESETS.length).toBeGreaterThanOrEqual(6);
   });
+
+  // ---------------------------------------------------------------- feed size
+
+  it('defaults feed size to 20 min / 500 max', () => {
+    const prefs = create();
+    expect(prefs.feedMin()).toBe(20);
+    expect(prefs.feedMax()).toBe(500);
+  });
+
+  it('clamps feed min to the floor and never above the current max', () => {
+    const prefs = create();
+    prefs.setFeedMin(2); // below floor
+    expect(prefs.feedMin()).toBe(5);
+
+    prefs.setFeedMax(30);
+    prefs.setFeedMin(100); // above max
+    expect(prefs.feedMin()).toBe(30);
+  });
+
+  it('lowering the max below the current min pulls the min down too', () => {
+    const prefs = create();
+    prefs.setFeedMin(200);
+    prefs.setFeedMax(50);
+    expect(prefs.feedMax()).toBe(50);
+    expect(prefs.feedMin()).toBe(50);
+  });
+
+  it('persists and restores feed size prefs', () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ feedMin: 30, feedMax: 300 }));
+    const prefs = create();
+    expect(prefs.feedMin()).toBe(30);
+    expect(prefs.feedMax()).toBe(300);
+  });
 });
