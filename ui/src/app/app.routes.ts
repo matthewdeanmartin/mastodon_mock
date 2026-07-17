@@ -179,7 +179,15 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/bookmarks/bookmarks').then((m) => m.Bookmarks),
       },
       { path: 'lists', loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists) },
+      {
+        path: 'analytics',
+        loadComponent: () => import('./pages/analytics/analytics').then((m) => m.Analytics),
+      },
       { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
+      {
+        path: 'credits',
+        loadComponent: () => import('./pages/credits/credits').then((m) => m.Credits),
+      },
       {
         path: 'drafts',
         loadComponent: () => import('./pages/drafts/drafts-page').then((m) => m.DraftsPage),

@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AccountHoverCard } from '../account-hover-card/account-hover-card';
@@ -9,7 +9,7 @@ import { ClientPrefs } from '../client-prefs';
 import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
-import { Poll, Status, Translation } from '../models';
+import { FilterContext, FilterResult, Poll, Status, Translation } from '../models';
 import { PROVIDER_CAPS, ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
 import { StatusActions } from '../providers/status-actions';
@@ -48,6 +48,11 @@ export class StatusCard {
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
 
   readonly status = input.required<Status>();
+  /**
+   * Which timeline this card renders in — content filters are scoped per
+   * context (a filter can apply to home but not threads, say).
+   */
+  readonly filterContext = input<FilterContext>('home');
   readonly changed = output<Status>();
   /** Emitted when the user deletes this status, so containers can drop it. */
   readonly deleted = output<Status>();
@@ -57,6 +62,68 @@ export class StatusCard {
   // Inline composers (reply / quote), shown beneath the status when toggled.
   protected replying = signal(false);
   protected quoting = signal(false);
+
+  // --- content warnings ---
+
+  /** CW revealed by the viewer; resets whenever a different status is bound. */
+  protected cwOpen = linkedSignal({ source: this.status, computation: () => false });
+
+  /** The CW label to show (a translation may carry its own spoiler text). */
+  protected spoilerText = computed(
+    () => this.translation()?.spoiler_text || this.display.spoiler_text,
+  );
+
+  /** True while the body (text, media, poll, quote) hides behind the CW. */
+  protected cwCollapsed = computed(() => !!this.spoilerText() && !this.cwOpen());
+
+  toggleCw(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.cwOpen.update((v) => !v);
+  }
+
+  // --- content filters (server-computed `filtered`, applied client-side) ---
+
+  /** Matched filters that apply in this timeline's context. */
+  private activeFilters = computed<FilterResult[]>(() => {
+    const s = this.status();
+    const results = s.reblog
+      ? [...(s.filtered ?? []), ...(s.reblog.filtered ?? [])]
+      : (s.filtered ?? []);
+    return results.filter((r) => r.filter.context.includes(this.filterContext()));
+  });
+
+  /** A hide-action filter matched: the post renders as nothing at all. */
+  protected hiddenByFilter = computed(() =>
+    this.activeFilters().some((r) => r.filter.filter_action === 'hide'),
+  );
+
+  /** Viewer clicked "Show anyway" on a warn filter; resets per status. */
+  protected filterOverridden = linkedSignal({ source: this.status, computation: () => false });
+
+  /** A warn-action filter matched and hasn't been overridden: show the stub. */
+  protected filterCollapsed = computed(
+    () =>
+      !this.hiddenByFilter() &&
+      !this.filterOverridden() &&
+      this.activeFilters().some((r) => r.filter.filter_action === 'warn'),
+  );
+
+  /** "Filtered: <titles>" label for the collapsed stub. */
+  protected filterTitles = computed(() =>
+    [
+      ...new Set(
+        this.activeFilters()
+          .filter((r) => r.filter.filter_action === 'warn')
+          .map((r) => r.filter.title),
+      ),
+    ].join(', '),
+  );
+
+  showFiltered(event: Event): void {
+    event.stopPropagation();
+    this.filterOverridden.set(true);
+  }
 
   protected readonly quotePolicies = QUOTE_POLICIES;
 
@@ -154,6 +221,12 @@ export class StatusCard {
       case 'e':
         if (this.display.media_attachments?.length) {
           this.lightboxIndex.set(0);
+        }
+        return true;
+      case 'x':
+        // Mastodon's shortcut: toggle the content-warning fold.
+        if (this.spoilerText()) {
+          this.cwOpen.update((v) => !v);
         }
         return true;
       default:

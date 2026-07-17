@@ -17,6 +17,15 @@ import { ProviderRegistry } from '../providers/provider-registry';
           {{ live() ? '● Live' : 'Go live' }}
         </button>
       }
+      @if (showRefresh()) {
+        <button
+          class="btn btn-outline"
+          (click)="refresh.emit()"
+          title="Reload the feed from the newest posts"
+        >
+          🔄 Refresh
+        </button>
+      }
       <button
         class="btn btn-outline"
         [class.active]="prefs.feedReader()"
@@ -99,7 +108,14 @@ export class CommandBar {
   /** Whether the host page has a live stream to offer. */
   readonly showLive = input(true);
   readonly live = input(false);
+  /**
+   * Whether to show a manual refresh button — for pages where live streaming
+   * is off by default and re-clicking the nav link is the only other way to
+   * fetch newer posts.
+   */
+  readonly showRefresh = input(false);
   /** Whether this page merges foreign providers (home) — shows the filter chips. */
   readonly providerChips = input(false);
   readonly toggleLive = output<void>();
+  readonly refresh = output<void>();
 }

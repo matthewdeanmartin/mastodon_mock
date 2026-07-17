@@ -114,6 +114,7 @@
     @for (a of ancestors(); track a.id) {
       <app-status-card
         [status]="a"
+        filterContext="thread"
         (changed)="onContextChanged($event)"
         (deleted)="onContextDeleted($event)"
         (replied)="onReply($event)"
@@ -121,6 +122,7 @@
     }
     <app-status-card
       [status]="s"
+      filterContext="thread"
       (changed)="onChanged($event)"
       (deleted)="onFocusedDeleted()"
       (replied)="onReply($event)"
@@ -129,6 +131,7 @@
     @for (d of descendants(); track d.id) {
       <app-status-card
         [status]="d"
+        filterContext="thread"
         (changed)="onContextChanged($event)"
         (deleted)="onContextDeleted($event)"
         (replied)="onReply($event)"

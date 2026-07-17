@@ -76,7 +76,7 @@ describe('VerifiedBadge', () => {
     expect(el.querySelector('svg.badge')).toBeNull();
   });
 
-  it("famous mode checks anyone with more followers than the viewer, and no one with fewer", () => {
+  it('famous mode checks anyone with more followers than the viewer, and no one with fewer', () => {
     TestBed.inject(ClientPrefs).setVerifiedMode('famous');
     const viewer = makeAccount({ id: '42', followers_count: 50 });
 

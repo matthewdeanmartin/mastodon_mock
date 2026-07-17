@@ -18,13 +18,7 @@ import { Compose } from '../../compose/compose';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { Streaming } from '../../streaming';
-import {
-  Account,
-  Conversation,
-  MastodonNotification,
-  Relationship,
-  Status,
-} from '../../models';
+import { Account, Conversation, MastodonNotification, Relationship, Status } from '../../models';
 
 /** localStorage map of chat key → ISO timestamp of the newest message seen there. */
 const READ_KEY = 'mockingbird_chat_read';
@@ -206,10 +200,7 @@ export class Conversations implements OnInit, OnDestroy {
         accounts: this.publicAccounts().get(key) ?? [],
         handles: key.slice('pub:'.length).split(','),
         lastStatus: last,
-        unread:
-          !!last &&
-          last.account.id !== me?.id &&
-          (!read[key] || last.created_at > read[key]),
+        unread: !!last && last.account.id !== me?.id && (!read[key] || last.created_at > read[key]),
       });
     }
     return rows.sort((a, b) =>
@@ -394,9 +385,7 @@ export class Conversations implements OnInit, OnDestroy {
     this.messages.set(known.length ? known : [anchor]);
     this.api.getContext(anchor.id).subscribe({
       next: (ctx) => {
-        this.messages.set(
-          dedupeSort([...ctx.ancestors, anchor, ...ctx.descendants, ...known]),
-        );
+        this.messages.set(dedupeSort([...ctx.ancestors, anchor, ...ctx.descendants, ...known]));
         this.threadLoading.set(false);
         this.scrollToBottom();
       },

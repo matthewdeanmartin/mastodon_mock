@@ -27,61 +27,6 @@
   }
 </section>
 
-<section class="card">
-  <h2>Custom emojis</h2>
-  @if (!emojis().length) {
-    <p class="muted">No custom emojis.</p>
-  } @else {
-    <div class="emoji-grid">
-      @for (e of emojis(); track e.shortcode) {
-        <div class="emoji" [title]="':' + e.shortcode + ':'">
-          <img [src]="e.url" [alt]="e.shortcode" />
-          <span class="shortcode">:{{ e.shortcode }}:</span>
-        </div>
-      }
-    </div>
-  }
-</section>
-
-<section class="card">
-  <h2>Credits</h2>
-  <p class="muted">This client is built on open-source software that ships with every page:</p>
-  <ul class="credits">
-    <li>
-      <a href="https://angular.dev" target="_blank" rel="noopener noreferrer">Angular</a>
-      <span class="muted">— the application framework (core, router, forms; MIT license).</span>
-    </li>
-    <li>
-      <a href="https://rxjs.dev" target="_blank" rel="noopener noreferrer">RxJS</a>
-      <span class="muted">— reactive streams powering all API calls (Apache-2.0 license).</span>
-    </li>
-    <li>
-      <a href="https://github.com/missive/emoji-mart" target="_blank" rel="noopener noreferrer"
-        >emoji-mart</a
-      >
-      <span class="muted"
-        >— the emoji picker, with its
-        <a
-          href="https://github.com/missive/emoji-mart#-data"
-          target="_blank"
-          rel="noopener noreferrer"
-          >&#64;emoji-mart/data</a
-        >
-        emoji set (MIT license).</span
-      >
-    </li>
-    <li>
-      <a href="https://github.com/microsoft/tslib" target="_blank" rel="noopener noreferrer"
-        >tslib</a
-      >
-      <span class="muted">— TypeScript runtime helpers (0BSD license).</span>
-    </li>
-  </ul>
-  <p class="muted">
-    emoji-mart is the same picker
-    <a href="https://elk.zone" target="_blank" rel="noopener noreferrer">Elk</a>
-    uses — thanks to the Elk team for showing how it should look. Keyboard shortcuts follow
-    <a href="https://mastodon.social" target="_blank" rel="noopener noreferrer">mastodon.social</a>
-    (press <kbd>?</kbd> for the list), so there's nothing new to memorize.
-  </p>
-</section>
+<p class="see-credits muted">
+  Looking for the software this client is built on? See <a routerLink="/credits">Credits</a>.
+</p>

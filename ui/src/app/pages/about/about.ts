@@ -1,11 +1,12 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
-import { CustomEmoji, InstanceRule, TermsOfService } from '../../models';
+import { InstanceRule, TermsOfService } from '../../models';
 
-/** "About this server": instance rules, terms of service, and custom emojis. */
+/** "About this server": instance rules and terms of service. */
 @Component({
   selector: 'app-about',
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './about.html',
   styleUrl: './about.css',
 })
@@ -14,8 +15,6 @@ export class About implements OnInit {
 
   protected rules = signal<InstanceRule[]>([]);
   protected tos = signal<TermsOfService | null>(null);
-  protected emojis = signal<CustomEmoji[]>([]);
-  protected loading = signal(true);
 
   ngOnInit(): void {
     this.api.instanceRules().subscribe((r) => this.rules.set(r));
@@ -23,13 +22,6 @@ export class About implements OnInit {
     this.api.termsOfService().subscribe({
       next: (t) => this.tos.set(t),
       error: () => this.tos.set(null),
-    });
-    this.api.customEmojis().subscribe({
-      next: (e) => {
-        this.emojis.set(e);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
     });
   }
 }

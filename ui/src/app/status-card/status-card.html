@@ -1,398 +1,428 @@
-@if (boostedBy) {
-  <div class="boost-label muted">🔁 {{ boostedBy }} boosted</div>
-}
-<article class="status" tabindex="-1" (keydown)="onCardKeydown($event)">
-  <span class="hover-anchor avatar-anchor">
-    <a class="avatar-link" [routerLink]="foreign ? null : ['/accounts', display.account.id]">
-      <img class="avatar" [src]="display.account.avatar" [alt]="display.account.username" />
-    </a>
-    <app-account-hover-card [account]="display.account" />
-  </span>
-  <div class="body">
-    <div class="meta">
-      <span class="hover-anchor">
-        <a class="name" [routerLink]="foreign ? null : ['/accounts', display.account.id]">{{
-          display.account.display_name || display.account.username
-        }}</a>
-        <app-account-hover-card [account]="display.account" />
-      </span>
-      <app-verified-badge [account]="display.account" />
-      <span class="acct muted">&#64;{{ display.account.acct }}</span>
-      @if (foreign && !threadable) {
-        <a
-          class="post-time muted"
-          [href]="display.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          [title]="display.created_at"
-        >
-          · {{ display.created_at | humanTime }}
-        </a>
-      } @else {
-        <a
-          class="post-time muted"
-          [routerLink]="['/statuses', display.id]"
-          [title]="display.created_at"
-        >
-          · {{ display.created_at | humanTime }}
-        </a>
-      }
-      @if (display.pinned) {
-        <span class="badge" title="Pinned">📌</span>
-      }
-      @if (display.visibility === 'private') {
-        <span class="badge" title="Followers-only post">🔒</span>
-      }
-      @if (providerBadge; as badge) {
-        <span class="badge muted provider-badge" title="Source">{{ badge }}</span>
-      } @else {
-        <span class="badge muted" title="Visibility">{{ display.visibility }}</span>
-      }
-    </div>
-    @if (editing()) {
-      <div class="editor">
-        <textarea rows="3" [ngModel]="editText()" (ngModelChange)="editText.set($event)"></textarea>
-        <div class="editor-actions">
-          <button class="btn btn-outline" (click)="cancelEdit()">Cancel</button>
-          <button class="btn" [disabled]="!editText().trim() || saving()" (click)="saveEdit()">
-            {{ saving() ? 'Saving…' : 'Save' }}
-          </button>
-        </div>
-      </div>
-    } @else {
-      <a
-        class="content-link"
-        [routerLink]="threadable ? ['/statuses', display.id] : null"
-        (click)="onContentClick($event)"
-      >
-        @if (translation(); as t) {
-          @if (t.spoiler_text) {
-            <div class="spoiler">{{ t.spoiler_text }}</div>
-          }
-          <div class="content" [innerHTML]="t.content"></div>
+@if (filterCollapsed()) {
+  <!-- A warn-action content filter matched: collapse to a stub, Mastodon-style. -->
+  <div class="filter-stub">
+    <span class="muted">Filtered: {{ filterTitles() }}</span>
+    <button type="button" class="btn btn-outline btn-sm" (click)="showFiltered($event)">
+      Show anyway
+    </button>
+  </div>
+} @else if (!hiddenByFilter()) {
+  @if (boostedBy) {
+    <div class="boost-label muted">🔁 {{ boostedBy }} boosted</div>
+  }
+  <article class="status" tabindex="-1" (keydown)="onCardKeydown($event)">
+    <span class="hover-anchor avatar-anchor">
+      <a class="avatar-link" [routerLink]="foreign ? null : ['/accounts', display.account.id]">
+        <img class="avatar" [src]="display.account.avatar" [alt]="display.account.username" />
+      </a>
+      <app-account-hover-card [account]="display.account" />
+    </span>
+    <div class="body">
+      <div class="meta">
+        <span class="hover-anchor">
+          <a class="name" [routerLink]="foreign ? null : ['/accounts', display.account.id]">{{
+            display.account.display_name || display.account.username
+          }}</a>
+          <app-account-hover-card [account]="display.account" />
+        </span>
+        <app-verified-badge [account]="display.account" />
+        <span class="acct muted">&#64;{{ display.account.acct }}</span>
+        @if (foreign && !threadable) {
+          <a
+            class="post-time muted"
+            [href]="display.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            [title]="display.created_at"
+          >
+            · {{ display.created_at | humanTime }}
+          </a>
         } @else {
-          @if (display.spoiler_text) {
-            <div class="spoiler">{{ display.spoiler_text }}</div>
-          }
-          <div class="content" [innerHTML]="display.content"></div>
+          <a
+            class="post-time muted"
+            [routerLink]="['/statuses', display.id]"
+            [title]="display.created_at"
+          >
+            · {{ display.created_at | humanTime }}
+          </a>
         }
-      </a>
-      @if (translation()) {
-        <div class="translation-note muted small">Translated via {{ translation()!.provider }}</div>
-      }
-    }
-
-    @if (poll(); as p) {
-      <div class="poll" (click)="$event.stopPropagation()">
-        @for (opt of p.options; track $index) {
-          @if (pollClosed()) {
-            <div class="poll-result" [class.own]="p.own_votes.includes($index)">
-              <div class="poll-bar" [style.width.%]="pollPercent(opt)"></div>
-              <span class="poll-label">{{ opt.title }}</span>
-              <span class="poll-pct muted">{{ pollPercent(opt) }}% · {{ opt.votes_count }}</span>
-            </div>
-          } @else {
-            <label class="poll-choice">
-              <input
-                [type]="p.multiple ? 'checkbox' : 'radio'"
-                [checked]="pollSelection().includes($index)"
-                (change)="toggleChoice($index)"
-              />
-              {{ opt.title }}
-            </label>
-          }
+        @if (display.pinned) {
+          <span class="badge" title="Pinned">📌</span>
         }
-        <div class="poll-footer muted small">
-          <span>{{ p.votes_count }} votes</span>
-          @if (p.expired) {
-            <span>· Closed</span>
-          }
-          @if (!pollClosed()) {
-            <button
-              class="btn btn-sm"
-              [disabled]="!pollSelection().length"
-              (click)="submitVote($event)"
-            >
-              Vote
-            </button>
-          }
-        </div>
+        @if (display.visibility === 'private') {
+          <span class="badge" title="Followers-only post">🔒</span>
+        }
+        @if (providerBadge; as badge) {
+          <span class="badge muted provider-badge" title="Source">{{ badge }}</span>
+        } @else {
+          <span class="badge muted" title="Visibility">{{ display.visibility }}</span>
+        }
       </div>
-    }
-
-    @if (quotedStatus(); as q) {
-      <a class="quote-card" [routerLink]="['/statuses', q.id]" (click)="$event.stopPropagation()">
-        <div class="quote-meta">
-          <img class="quote-avatar" [src]="q.account.avatar" [alt]="q.account.username" />
-          <span class="quote-name">{{ q.account.display_name || q.account.username }}</span>
-          <span class="acct muted">&#64;{{ q.account.acct }}</span>
+      @if (editing()) {
+        <div class="editor">
+          <textarea
+            rows="3"
+            [ngModel]="editText()"
+            (ngModelChange)="editText.set($event)"
+          ></textarea>
+          <div class="editor-actions">
+            <button class="btn btn-outline" (click)="cancelEdit()">Cancel</button>
+            <button class="btn" [disabled]="!editText().trim() || saving()" (click)="saveEdit()">
+              {{ saving() ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
         </div>
-        <div class="quote-content" [innerHTML]="q.content"></div>
-      </a>
-      @if (canRevokeQuote()) {
-        <button class="btn btn-outline btn-sm revoke-btn" (click)="revokeQuote($event)">
-          Revoke quote permission
-        </button>
-      }
-    } @else if (quoteUnavailable()) {
-      <div class="quote-card quote-unavailable muted">Quoted post is unavailable.</div>
-    }
-    @if (display.media_attachments.length) {
-      @if (imagesVisible()) {
-        <div class="media">
-          @for (m of display.media_attachments; track m.id; let i = $index) {
+      } @else {
+        @if (spoilerText()) {
+          <div class="cw-row">
+            <span class="spoiler">{{ spoilerText() }}</span>
             <button
               type="button"
-              class="media-thumb"
-              (click)="openLightbox(i, $event)"
-              [attr.aria-label]="'View image' + (m.description ? ': ' + m.description : '')"
+              class="btn btn-outline btn-sm cw-toggle"
+              [attr.aria-expanded]="!cwCollapsed()"
+              (click)="toggleCw($event)"
             >
-              <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+              {{ cwCollapsed() ? 'Show more' : 'Show less' }}
             </button>
-          }
-        </div>
-      } @else {
-        <button
-          type="button"
-          class="media-chip"
-          (click)="openLightbox(0, $event)"
-          [attr.aria-label]="display.media_attachments.length + ' hidden images, click to view'"
-        >
-          🖼️ {{ display.media_attachments.length }}
-        </button>
-      }
-    }
-    <div class="actions">
-      @if (caps.reply) {
-        <button class="action" [class.on]="replying()" (click)="toggleReply($event)" title="Reply">
-          💬 <span>{{ display.replies_count }}</span>
-        </button>
-      }
-      @if (!foreign && (display.replies_count > 0 || display.in_reply_to_id)) {
-        <a
-          class="action"
-          [routerLink]="['/statuses', display.id]"
-          [queryParams]="{ reader: 1 }"
-          (click)="$event.stopPropagation()"
-          title="Read thread as article"
-        >
-          📖
-        </a>
-      }
-      @if (caps.reblog) {
-        <button
-          class="action"
-          [class.on]="display.reblogged"
-          [disabled]="actionBusy()"
-          (click)="toggleReblog($event)"
-          [title]="display.reblogged ? 'Undo boost' : 'Boost'"
-          [attr.aria-pressed]="display.reblogged"
-        >
-          🔁
-          @if (display.reblogged) {
-            <span class="did">Boosted</span>
-          }
-        </button>
-      }
-      @if (!foreign) {
-        <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
-          ❝
-        </button>
-        <button
-          class="action count-link"
-          (click)="openAccountList('reblogged_by', $event)"
-          title="Boosted by"
-        >
-          {{ display.reblogs_count }}
-        </button>
-      } @else if (caps.reblog) {
-        <span class="action" title="Reposts">{{ display.reblogs_count }}</span>
-      }
-      @if (caps.favourite) {
-        <button
-          class="action"
-          [class.on]="display.favourited"
-          [disabled]="actionBusy()"
-          (click)="toggleFavourite($event)"
-          [title]="display.favourited ? 'Undo favourite' : 'Favourite'"
-          [attr.aria-pressed]="display.favourited"
-        >
-          ⭐
-          @if (display.favourited) {
-            <span class="did">Favourited</span>
-          }
-        </button>
-      }
-      @if (!foreign) {
-        <button
-          class="action count-link"
-          (click)="openAccountList('favourited_by', $event)"
-          title="Favourited by"
-        >
-          {{ display.favourites_count }}
-        </button>
-      } @else if (caps.favourite) {
-        <span class="action" title="Likes">{{ display.favourites_count }}</span>
-      }
-      @if (foreign) {
-        <a
-          class="action open-original"
-          [href]="display.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Open on the original site"
-        >
-          ↗ Open original
-        </a>
-      }
-      @if (!foreign) {
-        <button
-          class="action"
-          [class.on]="display.bookmarked"
-          (click)="toggleBookmark($event)"
-          [title]="display.bookmarked ? 'Remove bookmark' : 'Bookmark'"
-          [attr.aria-pressed]="display.bookmarked"
-        >
-          🔖
-        </button>
-        <button
-          class="action"
-          [class.on]="!!translation()"
-          [disabled]="translating()"
-          (click)="toggleTranslate($event)"
-          title="Translate"
-        >
-          🌐
-        </button>
-        @if (display.edited_at) {
-          <button class="action" (click)="openHistory($event)" title="Edit history">🕘</button>
+          </div>
         }
-        @if (isOwn()) {
-          <button
-            class="action"
-            [class.on]="display.pinned"
-            (click)="togglePin($event)"
-            title="Pin"
+        @if (!cwCollapsed()) {
+          <a
+            class="content-link"
+            [routerLink]="threadable ? ['/statuses', display.id] : null"
+            (click)="onContentClick($event)"
           >
-            📌
-          </button>
-          <button
-            class="action"
-            [class.on]="display.muted"
-            (click)="toggleMute($event)"
-            title="Mute thread"
-          >
-            🔕
-          </button>
-          <div class="policy-wrap">
-            <button class="action" (click)="togglePolicyMenu($event)" title="Who can quote">
-              💬🔒
-            </button>
-            @if (showPolicyMenu()) {
-              <div class="policy-menu" (click)="$event.stopPropagation()">
-                <div class="policy-title muted small">Who can quote</div>
-                @for (p of quotePolicies; track p) {
-                  <button
-                    class="policy-option"
-                    [class.active]="display.quote_approval_policy === p"
-                    (click)="setPolicy(p)"
-                  >
-                    {{ p }}
-                  </button>
-                }
+            @if (translation(); as t) {
+              <div class="content" [innerHTML]="t.content"></div>
+            } @else {
+              <div class="content" [innerHTML]="display.content"></div>
+            }
+          </a>
+          @if (translation()) {
+            <div class="translation-note muted small">
+              Translated via {{ translation()!.provider }}
+            </div>
+          }
+        }
+      }
+
+      @if (!cwCollapsed() && poll(); as p) {
+        <div class="poll" (click)="$event.stopPropagation()">
+          @for (opt of p.options; track $index) {
+            @if (pollClosed()) {
+              <div class="poll-result" [class.own]="p.own_votes.includes($index)">
+                <div class="poll-bar" [style.width.%]="pollPercent(opt)"></div>
+                <span class="poll-label">{{ opt.title }}</span>
+                <span class="poll-pct muted">{{ pollPercent(opt) }}% · {{ opt.votes_count }}</span>
               </div>
+            } @else {
+              <label class="poll-choice">
+                <input
+                  [type]="p.multiple ? 'checkbox' : 'radio'"
+                  [checked]="pollSelection().includes($index)"
+                  (change)="toggleChoice($index)"
+                />
+                {{ opt.title }}
+              </label>
+            }
+          }
+          <div class="poll-footer muted small">
+            <span>{{ p.votes_count }} votes</span>
+            @if (p.expired) {
+              <span>· Closed</span>
+            }
+            @if (!pollClosed()) {
+              <button
+                class="btn btn-sm"
+                [disabled]="!pollSelection().length"
+                (click)="submitVote($event)"
+              >
+                Vote
+              </button>
             }
           </div>
-          <button class="action" (click)="startEdit($event)" title="Edit">✏️</button>
-          <button class="action" (click)="remove($event)" title="Delete">🗑️</button>
-          <button class="action" (click)="deleteAndRedraft($event)" title="Delete &amp; repost">
-            ♻️
+        </div>
+      }
+
+      @if (!cwCollapsed() && quotedStatus(); as q) {
+        <a class="quote-card" [routerLink]="['/statuses', q.id]" (click)="$event.stopPropagation()">
+          <div class="quote-meta">
+            <img class="quote-avatar" [src]="q.account.avatar" [alt]="q.account.username" />
+            <span class="quote-name">{{ q.account.display_name || q.account.username }}</span>
+            <span class="acct muted">&#64;{{ q.account.acct }}</span>
+          </div>
+          <div class="quote-content" [innerHTML]="q.content"></div>
+        </a>
+        @if (canRevokeQuote()) {
+          <button class="btn btn-outline btn-sm revoke-btn" (click)="revokeQuote($event)">
+            Revoke quote permission
           </button>
-        } @else if (reported()) {
-          <span class="action reported" title="Reported">🚩 reported</span>
+        }
+      } @else if (!cwCollapsed() && quoteUnavailable()) {
+        <div class="quote-card quote-unavailable muted">Quoted post is unavailable.</div>
+      }
+      @if (!cwCollapsed() && display.media_attachments.length) {
+        @if (imagesVisible()) {
+          <div class="media">
+            @for (m of display.media_attachments; track m.id; let i = $index) {
+              <button
+                type="button"
+                class="media-thumb"
+                (click)="openLightbox(i, $event)"
+                [attr.aria-label]="'View image' + (m.description ? ': ' + m.description : '')"
+              >
+                <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+              </button>
+            }
+          </div>
         } @else {
-          <details class="danger-menu" (click)="$event.stopPropagation()">
-            <summary class="action" aria-label="More post actions">•••</summary>
-            <div class="danger-menu-panel">
-              <button type="button" (click)="openReport($event)">Report post</button>
-            </div>
-          </details>
+          <button
+            type="button"
+            class="media-chip"
+            (click)="openLightbox(0, $event)"
+            [attr.aria-label]="display.media_attachments.length + ' hidden images, click to view'"
+          >
+            🖼️ {{ display.media_attachments.length }}
+          </button>
         }
       }
-    </div>
-
-    @if (actionError(); as err) {
-      <div class="action-error">{{ err }}</div>
-    }
-
-    @if (redrafting()) {
-      <div class="inline-compose redraft" (click)="$event.stopPropagation()">
-        <div class="redraft-note muted">
-          Post deleted — edit below and repost, or
-          <button type="button" class="linklike" (click)="cancelRedraft()">discard</button>.
-        </div>
-        <app-compose
-          [initialText]="redraftText()"
-          [initialVisibility]="display.visibility"
-          [inReplyToId]="display.in_reply_to_id ?? undefined"
-          placeholder="Edit and repost"
-          (posted)="onRedrafted($event)"
-        />
-      </div>
-    }
-
-    @if (replying()) {
-      <div class="inline-compose" (click)="$event.stopPropagation()">
-        @if (display.provider === 'bluesky') {
-          <app-bsky-reply [replyTo]="display" (posted)="onReplied($event)" />
-        } @else {
-          <app-compose
-            [inReplyToId]="display.id"
-            placeholder="Post your reply"
-            (posted)="onReplied($event)"
-          />
+      <div class="actions">
+        @if (caps.reply) {
+          <button
+            class="action"
+            [class.on]="replying()"
+            (click)="toggleReply($event)"
+            title="Reply"
+          >
+            💬 <span>{{ display.replies_count }}</span>
+          </button>
+        }
+        @if (!foreign && (display.replies_count > 0 || display.in_reply_to_id)) {
+          <a
+            class="action"
+            [routerLink]="['/statuses', display.id]"
+            [queryParams]="{ reader: 1 }"
+            (click)="$event.stopPropagation()"
+            title="Read thread as article"
+          >
+            📖
+          </a>
+        }
+        @if (caps.reblog) {
+          <button
+            class="action"
+            [class.on]="display.reblogged"
+            [disabled]="actionBusy()"
+            (click)="toggleReblog($event)"
+            [title]="display.reblogged ? 'Undo boost' : 'Boost'"
+            [attr.aria-pressed]="display.reblogged"
+          >
+            🔁
+            @if (display.reblogged) {
+              <span class="did">Boosted</span>
+            }
+          </button>
+        }
+        @if (!foreign) {
+          <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
+            ❝
+          </button>
+          <button
+            class="action count-link"
+            (click)="openAccountList('reblogged_by', $event)"
+            title="Boosted by"
+          >
+            {{ display.reblogs_count }}
+          </button>
+        } @else if (caps.reblog) {
+          <span class="action" title="Reposts">{{ display.reblogs_count }}</span>
+        }
+        @if (caps.favourite) {
+          <button
+            class="action"
+            [class.on]="display.favourited"
+            [disabled]="actionBusy()"
+            (click)="toggleFavourite($event)"
+            [title]="display.favourited ? 'Undo favourite' : 'Favourite'"
+            [attr.aria-pressed]="display.favourited"
+          >
+            ⭐
+            @if (display.favourited) {
+              <span class="did">Favourited</span>
+            }
+          </button>
+        }
+        @if (!foreign) {
+          <button
+            class="action count-link"
+            (click)="openAccountList('favourited_by', $event)"
+            title="Favourited by"
+          >
+            {{ display.favourites_count }}
+          </button>
+        } @else if (caps.favourite) {
+          <span class="action" title="Likes">{{ display.favourites_count }}</span>
+        }
+        @if (foreign) {
+          <a
+            class="action open-original"
+            [href]="display.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open on the original site"
+          >
+            ↗ Open original
+          </a>
+        }
+        @if (!foreign) {
+          <button
+            class="action"
+            [class.on]="display.bookmarked"
+            (click)="toggleBookmark($event)"
+            [title]="display.bookmarked ? 'Remove bookmark' : 'Bookmark'"
+            [attr.aria-pressed]="display.bookmarked"
+          >
+            🔖
+          </button>
+          <button
+            class="action"
+            [class.on]="!!translation()"
+            [disabled]="translating()"
+            (click)="toggleTranslate($event)"
+            title="Translate"
+          >
+            🌐
+          </button>
+          @if (display.edited_at) {
+            <button class="action" (click)="openHistory($event)" title="Edit history">🕘</button>
+          }
+          @if (isOwn()) {
+            <button
+              class="action"
+              [class.on]="display.pinned"
+              (click)="togglePin($event)"
+              title="Pin"
+            >
+              📌
+            </button>
+            <button
+              class="action"
+              [class.on]="display.muted"
+              (click)="toggleMute($event)"
+              title="Mute thread"
+            >
+              🔕
+            </button>
+            <div class="policy-wrap">
+              <button class="action" (click)="togglePolicyMenu($event)" title="Who can quote">
+                💬🔒
+              </button>
+              @if (showPolicyMenu()) {
+                <div class="policy-menu" (click)="$event.stopPropagation()">
+                  <div class="policy-title muted small">Who can quote</div>
+                  @for (p of quotePolicies; track p) {
+                    <button
+                      class="policy-option"
+                      [class.active]="display.quote_approval_policy === p"
+                      (click)="setPolicy(p)"
+                    >
+                      {{ p }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+            <button class="action" (click)="startEdit($event)" title="Edit">✏️</button>
+            <button class="action" (click)="remove($event)" title="Delete">🗑️</button>
+            <button class="action" (click)="deleteAndRedraft($event)" title="Delete &amp; repost">
+              ♻️
+            </button>
+          } @else if (reported()) {
+            <span class="action reported" title="Reported">🚩 reported</span>
+          } @else {
+            <details class="danger-menu" (click)="$event.stopPropagation()">
+              <summary class="action" aria-label="More post actions">•••</summary>
+              <div class="danger-menu-panel">
+                <button type="button" (click)="openReport($event)">Report post</button>
+              </div>
+            </details>
+          }
         }
       </div>
-    }
 
-    @if (quoting()) {
-      <div class="inline-compose" (click)="$event.stopPropagation()">
-        <app-compose
-          [quotedStatusId]="display.id"
-          placeholder="Add a comment"
-          (posted)="onQuoted($event)"
-        />
-      </div>
-    }
-  </div>
-</article>
+      @if (actionError(); as err) {
+        <div class="action-error">{{ err }}</div>
+      }
 
-@if (showReport()) {
-  <app-report-dialog
-    [username]="display.account.username"
-    [accountId]="display.account.id"
-    [statusId]="display.id"
-    (closed)="showReport.set(false)"
-    (submitted)="onReported()"
-  />
-}
+      @if (redrafting()) {
+        <div class="inline-compose redraft" (click)="$event.stopPropagation()">
+          <div class="redraft-note muted">
+            Post deleted — edit below and repost, or
+            <button type="button" class="linklike" (click)="cancelRedraft()">discard</button>.
+          </div>
+          <app-compose
+            [initialText]="redraftText()"
+            [initialVisibility]="display.visibility"
+            [inReplyToId]="display.in_reply_to_id ?? undefined"
+            placeholder="Edit and repost"
+            (posted)="onRedrafted($event)"
+          />
+        </div>
+      }
 
-@if (accountListMode(); as mode) {
-  <app-account-list-dialog
-    [statusId]="display.id"
-    [mode]="mode"
-    (closed)="accountListMode.set(null)"
-  />
-}
+      @if (replying()) {
+        <div class="inline-compose" (click)="$event.stopPropagation()">
+          @if (display.provider === 'bluesky') {
+            <app-bsky-reply [replyTo]="display" (posted)="onReplied($event)" />
+          } @else {
+            <app-compose
+              [inReplyToId]="display.id"
+              placeholder="Post your reply"
+              (posted)="onReplied($event)"
+            />
+          }
+        </div>
+      }
 
-@if (showHistory()) {
-  <app-history-dialog [statusId]="display.id" (closed)="showHistory.set(false)" />
-}
+      @if (quoting()) {
+        <div class="inline-compose" (click)="$event.stopPropagation()">
+          <app-compose
+            [quotedStatusId]="display.id"
+            placeholder="Add a comment"
+            (posted)="onQuoted($event)"
+          />
+        </div>
+      }
+    </div>
+  </article>
 
-@if (lightboxIndex() !== null) {
-  <app-lightbox
-    [items]="display.media_attachments"
-    [startIndex]="lightboxIndex()!"
-    (closed)="lightboxIndex.set(null)"
-  />
+  @if (showReport()) {
+    <app-report-dialog
+      [username]="display.account.username"
+      [accountId]="display.account.id"
+      [statusId]="display.id"
+      (closed)="showReport.set(false)"
+      (submitted)="onReported()"
+    />
+  }
+
+  @if (accountListMode(); as mode) {
+    <app-account-list-dialog
+      [statusId]="display.id"
+      [mode]="mode"
+      (closed)="accountListMode.set(null)"
+    />
+  }
+
+  @if (showHistory()) {
+    <app-history-dialog [statusId]="display.id" (closed)="showHistory.set(false)" />
+  }
+
+  @if (lightboxIndex() !== null) {
+    <app-lightbox
+      [items]="display.media_attachments"
+      [startIndex]="lightboxIndex()!"
+      (closed)="lightboxIndex.set(null)"
+    />
+  }
 }

@@ -3,7 +3,12 @@
   <button class="tab" [class.active]="local()" (click)="setLocal(true)">Local</button>
 </div>
 
-<app-command-bar [live]="live()" (toggleLive)="toggleLive()" />
+<app-command-bar
+  [live]="live()"
+  [showRefresh]="!live()"
+  (refresh)="load()"
+  (toggleLive)="toggleLive()"
+/>
 
 @if (loading()) {
   <p class="muted center">Loading…</p>
@@ -11,6 +16,11 @@
   <p class="muted center">No public statuses yet.</p>
 } @else {
   @for (s of statuses(); track s.id; let i = $index) {
-    <app-status-card [status]="s" (changed)="onChanged(i, $event)" (deleted)="onDeleted($event)" />
+    <app-status-card
+      [status]="s"
+      filterContext="public"
+      (changed)="onChanged(i, $event)"
+      (deleted)="onDeleted($event)"
+    />
   }
 }

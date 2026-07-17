@@ -2,7 +2,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgb(255 255 255 / 95%);
+  background: color-mix(in srgb, var(--col-bg) 95%, transparent);
   border-bottom: 1px solid var(--border);
 }
 
@@ -150,7 +150,7 @@
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: #fff;
+  background: var(--col-bg);
   box-shadow: 0 8px 28px rgb(15 20 25 / 16%);
 }
 
@@ -423,7 +423,7 @@
     height: 58px;
     justify-content: space-around;
     border-top: 1px solid var(--border);
-    background: rgb(255 255 255 / 97%);
+    background: color-mix(in srgb, var(--col-bg) 97%, transparent);
   }
 
   .primary-nav a {

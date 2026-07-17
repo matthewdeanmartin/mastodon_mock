@@ -101,6 +101,12 @@ export class Api {
     return this.http.get<Account[]>(`/api/v1/accounts/${id}/endorsements`);
   }
 
+  /** One page of an account's followers (Mastodon caps limit at 80). */
+  accountFollowers(id: string, limit = 80): Observable<Account[]> {
+    const params = new HttpParams().set('limit', String(limit));
+    return this.http.get<Account[]>(`/api/v1/accounts/${id}/followers`, { params });
+  }
+
   unfollow(id: string): Observable<Relationship> {
     return this.http.post<Relationship>(`/api/v1/accounts/${id}/unfollow`, {});
   }

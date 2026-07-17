@@ -124,6 +124,25 @@ export interface Status {
   media_attachments: MediaAttachment[];
   /** Optional: not every provider supplies it, but Mastodon (and the mock) do. */
   mentions?: Mention[];
+  /**
+   * The viewer's content filters this status matched, computed by the server
+   * (Mastodon 4.0+). Clients must apply them: `warn` collapses the post,
+   * `hide` drops it. Absent on foreign providers and older servers.
+   */
+  filtered?: FilterResult[];
+}
+
+/** One matched filter on a status (`Status.filtered[]`). */
+export interface FilterResult {
+  filter: {
+    id: string;
+    title: string;
+    context: FilterContext[];
+    expires_at: string | null;
+    filter_action: FilterAction;
+  };
+  keyword_matches: string[] | null;
+  status_matches: string[] | null;
 }
 
 /** A single edit-history snapshot (`GET /api/v1/statuses/{id}/history`). */

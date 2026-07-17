@@ -82,7 +82,10 @@ describe('Drafts', () => {
     expect(draftHasContent(snapshot({ segments: [''], spoilerText: 'cw' }))).toBe(true);
     expect(
       draftHasContent(
-        snapshot({ segments: [''], poll: { options: ['a', 'b'], multiple: false, expiresIn: 300 } }),
+        snapshot({
+          segments: [''],
+          poll: { options: ['a', 'b'], multiple: false, expiresIn: 300 },
+        }),
       ),
     ).toBe(true);
   });

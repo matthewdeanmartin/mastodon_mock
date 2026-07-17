@@ -281,13 +281,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: repeating-linear-gradient(
-    -45deg,
-    #ffb300,
-    #ffb300 14px,
-    #ffc94d 14px,
-    #ffc94d 28px
-  );
+  background: repeating-linear-gradient(-45deg, #ffb300, #ffb300 14px, #ffc94d 14px, #ffc94d 28px);
   color: #402c00;
   font-size: 15px;
   border-bottom: 2px solid #b37c00;

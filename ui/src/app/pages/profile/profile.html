@@ -140,7 +140,12 @@
 
   @if (showPinned()) {
     @for (s of pinnedStatuses(); track s.id) {
-      <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
+      <app-status-card
+        [status]="s"
+        filterContext="account"
+        (changed)="onChanged($event)"
+        (deleted)="onDeleted($event)"
+      />
     }
   }
 
@@ -148,7 +153,12 @@
     <p class="muted center">Loading posts…</p>
   } @else {
     @for (s of visibleStatuses(); track s.id) {
-      <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
+      <app-status-card
+        [status]="s"
+        filterContext="account"
+        (changed)="onChanged($event)"
+        (deleted)="onDeleted($event)"
+      />
     } @empty {
       @if (!showPinned() || !pinnedStatuses().length) {
         <p class="muted center">No posts match these filters.</p>

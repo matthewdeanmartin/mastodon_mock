@@ -18,7 +18,13 @@
 
 <app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
 
-<app-command-bar [live]="live()" [providerChips]="true" (toggleLive)="toggleLive()" />
+<app-command-bar
+  [live]="live()"
+  [providerChips]="true"
+  [showRefresh]="!live()"
+  (refresh)="load()"
+  (toggleLive)="toggleLive()"
+/>
 
 @if (loading()) {
   <p class="muted center">Loading…</p>

@@ -256,7 +256,11 @@ describe('Conversations', () => {
       .expectOne('/api/v1/statuses/s1/context')
       .flush({ ancestors: [ancestor], descendants: [] });
 
-    expect(internals(fixture).messages().map((m) => m.id)).toEqual(['s0', 's1']);
+    expect(
+      internals(fixture)
+        .messages()
+        .map((m) => m.id),
+    ).toEqual(['s0', 's1']);
   });
 
   it('select on a public chat marks it read locally (no server call)', () => {
@@ -326,7 +330,7 @@ describe('Conversations', () => {
 
   // ---------------------------------------------------------------- title()
 
-  it("title: a public chat is named after its author (the reply guy)", () => {
+  it('title: a public chat is named after its author (the reply guy)', () => {
     const alice = makeAccount('2', 'alice', 'Alice A');
     const s1 = makeStatus('s1', {
       visibility: 'public',
@@ -385,7 +389,11 @@ describe('Conversations', () => {
     });
     streaming.emit('user', { event: 'update', payload: reply });
 
-    expect(internals(fixture).messages().map((m) => m.id)).toEqual(['s1', 's2']);
+    expect(
+      internals(fixture)
+        .messages()
+        .map((m) => m.id),
+    ).toEqual(['s1', 's2']);
   });
 
   it('a delete on the user stream removes the message from the open thread', () => {
@@ -394,7 +402,11 @@ describe('Conversations', () => {
 
     streaming.emit('user', { event: 'delete', payload: 's1' });
 
-    expect(internals(fixture).messages().map((m) => m.id)).toEqual(['s2']);
+    expect(
+      internals(fixture)
+        .messages()
+        .map((m) => m.id),
+    ).toEqual(['s2']);
   });
 
   // ---------------------------------------------------------------- onReplyPosted
@@ -407,7 +419,11 @@ describe('Conversations', () => {
     const posted = makeStatus('s2', { created_at: '2026-01-02T00:00:00Z', account: ME });
     fixture.componentInstance.onReplyPosted(posted);
 
-    expect(internals(fixture).messages().some((m) => m.id === 's2')).toBe(true);
+    expect(
+      internals(fixture)
+        .messages()
+        .some((m) => m.id === 's2'),
+    ).toBe(true);
     httpMock
       .expectOne((r) => r.url === '/api/v1/conversations')
       .flush([makeConversation('c1', { last_status: posted })]);
@@ -426,7 +442,11 @@ describe('Conversations', () => {
     });
     fixture.componentInstance.onReplyPosted(posted);
 
-    expect(internals(fixture).messages().some((m) => m.id === 's2')).toBe(true);
+    expect(
+      internals(fixture)
+        .messages()
+        .some((m) => m.id === 's2'),
+    ).toBe(true);
     httpMock.expectNone((r) => r.url === '/api/v1/conversations');
     // The posted status also advances the public chat row.
     expect(internals(fixture).chats()[0].lastStatus?.id).toBe('s2');
@@ -443,10 +463,18 @@ describe('Conversations', () => {
     expect(internals(fixture).visibleChats()).toHaveLength(2);
 
     prefs.setChatKind('private');
-    expect(internals(fixture).visibleChats().map((c) => c.kind)).toEqual(['private']);
+    expect(
+      internals(fixture)
+        .visibleChats()
+        .map((c) => c.kind),
+    ).toEqual(['private']);
 
     prefs.setChatKind('public');
-    expect(internals(fixture).visibleChats().map((c) => c.kind)).toEqual(['public']);
+    expect(
+      internals(fixture)
+        .visibleChats()
+        .map((c) => c.kind),
+    ).toEqual(['public']);
 
     expect(internals(fixture).chats()).toHaveLength(2);
   });

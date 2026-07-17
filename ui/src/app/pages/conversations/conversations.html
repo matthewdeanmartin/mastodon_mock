@@ -129,8 +129,8 @@
           <span class="public-banner-icon">📢</span>
           <div>
             <strong>THIS CONVERSATION IS PUBLIC.</strong>
-            Every message here is visible to anyone on the internet — this is a reply
-            thread, not a private DM.
+            Every message here is visible to anyone on the internet — this is a reply thread, not a
+            private DM.
           </div>
         </div>
       }
@@ -152,7 +152,9 @@
             }
             <div class="bubble" [class.bubble-mine]="isMine(m)">
               @if (!isMine(m) && chat.accounts.length > 1) {
-                <div class="bubble-author small">{{ m.account.display_name || m.account.username }}</div>
+                <div class="bubble-author small">
+                  {{ m.account.display_name || m.account.username }}
+                </div>
               }
               <div class="bubble-content" [innerHTML]="stripped(m)"></div>
               @for (media of m.media_attachments; track media.id) {
@@ -203,8 +205,8 @@
 
       @if (chat.kind === 'private' && chat.accounts.length > 1) {
         <div class="group-hint muted small">
-          🔒 Group membership is just who's &#64;-mentioned — anyone replying can add or
-          remove people by editing the mentions.
+          🔒 Group membership is just who's &#64;-mentioned — anyone replying can add or remove
+          people by editing the mentions.
         </div>
       }
 

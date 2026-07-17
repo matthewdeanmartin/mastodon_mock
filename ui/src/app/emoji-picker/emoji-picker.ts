@@ -1,12 +1,4 @@
-import {
-  Component,
-  effect,
-  ElementRef,
-  inject,
-  OnDestroy,
-  output,
-  viewChild,
-} from '@angular/core';
+import { Component, effect, ElementRef, inject, OnDestroy, output, viewChild } from '@angular/core';
 import { ClientPrefs } from '../client-prefs';
 import { CustomEmojis } from '../custom-emojis';
 
