@@ -3,6 +3,14 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* Files are being dragged over the composer: show the whole box as a drop target. */
+.compose.drag-over {
+  outline: 2px dashed var(--accent, #1d9bf0);
+  outline-offset: -4px;
+  border-radius: 12px;
+  background: var(--accent-soft, rgba(29, 155, 240, 0.08));
+}
+
 textarea {
   width: 100%;
   border: 1px solid var(--border);

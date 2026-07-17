@@ -1,0 +1,94 @@
+<div class="demo">
+  <header class="demo-banner">
+    <div class="demo-banner-text">
+      <h1>Demo mode</h1>
+      <p class="muted">
+        You're browsing live public posts from <strong>{{ demoHost }}</strong> — read-only, no
+        account needed. Sign in to reply, boost, favourite and follow.
+      </p>
+    </div>
+    <a class="btn btn-primary" routerLink="/login">Sign in / Sign up</a>
+  </header>
+
+  <div class="feed-tabs" role="tablist">
+    <button
+      role="tab"
+      [class.active]="tab() === 'trending'"
+      [attr.aria-selected]="tab() === 'trending'"
+      (click)="selectTab('trending')"
+    >
+      Trending
+    </button>
+    <button
+      role="tab"
+      [class.active]="tab() === 'live'"
+      [attr.aria-selected]="tab() === 'live'"
+      (click)="selectTab('live')"
+    >
+      Live hashtags
+    </button>
+  </div>
+
+  @if (tab() === 'live' && tags().length) {
+    <div class="tag-chips">
+      @for (t of tags(); track t.name) {
+        <button class="chip" [class.active]="activeTag() === t.name" (click)="selectTag(t.name)">
+          #{{ t.name }}
+        </button>
+      }
+    </div>
+  }
+
+  @if (loading()) {
+    <p class="muted pad">Loading posts from {{ demoHost }}…</p>
+  } @else if (error() && !posts().length) {
+    <p class="muted pad">
+      Couldn't reach {{ demoHost }} — check your connection and reload to try again.
+    </p>
+  } @else {
+    @for (status of posts(); track status.id) {
+      <article class="post">
+        <div class="post-head">
+          <img
+            class="avatar"
+            [src]="status.account.avatar_static || status.account.avatar"
+            alt=""
+            loading="lazy"
+          />
+          <div class="who">
+            <span class="name">{{ status.account.display_name || status.account.username }}</span>
+            <span class="acct muted">&#64;{{ status.account.acct }}</span>
+          </div>
+          <span class="when muted">{{ status.created_at | humanTime }}</span>
+        </div>
+        @if (status.spoiler_text) {
+          <div class="spoiler">CW: {{ status.spoiler_text }}</div>
+        }
+        <div class="post-body" [innerHTML]="status.content"></div>
+        @if (status.media_attachments.length) {
+          @if (mediaHidden(status)) {
+            <button class="media-hidden" (click)="reveal(status)">
+              Marked sensitive by the author — click to show
+            </button>
+          } @else {
+            <div class="media">
+              @for (m of status.media_attachments; track m.id) {
+                <img [src]="m.preview_url || m.url" [alt]="m.description || ''" loading="lazy" />
+              }
+            </div>
+          }
+        }
+        <div class="post-meta muted">
+          <span>{{ status.replies_count }} replies</span>
+          <span>{{ status.reblogs_count }} boosts</span>
+          <span>{{ status.favourites_count }} favourites</span>
+        </div>
+      </article>
+    }
+    @if (posts().length) {
+      <button class="btn btn-outline load-more" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ loadingMore() ? 'Loading…' : 'Show more' }}
+      </button>
+    }
+  }
+</div>

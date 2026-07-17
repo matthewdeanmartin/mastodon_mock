@@ -1,4 +1,11 @@
-<div class="compose">
+<div
+  class="compose"
+  [class.drag-over]="dragOver()"
+  (dragenter)="onDragEnter($event)"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+>
   @if (cwOpen()) {
     <input
       class="cw-input"
@@ -16,6 +23,7 @@
     rows="3"
     (focus)="onBoxFocus(0, $event)"
     (keydown)="onBoxKeydown($event)"
+    (paste)="onPaste($event)"
   ></textarea>
   @if (thread().length || text().length > maxChars - 50) {
     <div class="seg-count muted" [class.over-limit]="text().length > maxChars">
@@ -34,6 +42,7 @@
           rows="2"
           (focus)="onBoxFocus(i + 1, $event)"
           (keydown)="onBoxKeydown($event)"
+          (paste)="onPaste($event)"
         ></textarea>
         <div class="thread-box-meta">
           <span class="muted" [class.over-limit]="t.length > maxChars"
@@ -173,7 +182,11 @@
 
   <div class="compose-actions">
     <div class="compose-tools">
-      <label class="tool-btn" [class.disabled]="!canAttachMedia()" title="Attach media">
+      <label
+        class="tool-btn"
+        [class.disabled]="!canAttachMedia()"
+        title="Attach media — or paste / drag & drop an image"
+      >
         📎
         <input
           type="file"

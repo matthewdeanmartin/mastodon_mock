@@ -50,6 +50,16 @@ interface PendingMedia {
   description: string;
 }
 
+/** Mastodon accepts images, video and audio as attachments. */
+function isAttachable(file: File): boolean {
+  return /^(image|video|audio)\//.test(file.type);
+}
+
+/** True when the drag carries files (not text selections, links, …). */
+function dragHasFiles(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+}
+
 @Component({
   selector: 'app-compose',
   imports: [FormsModule, EmojiPicker],
@@ -297,15 +307,82 @@ export class Compose implements OnDestroy {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
+    this.uploadFiles(files);
+  }
+
+  /** Pasting an image (screenshot, copied file) attaches it; plain text pastes normally. */
+  onPaste(event: ClipboardEvent): void {
+    const files = Array.from(event.clipboardData?.files ?? []);
+    const media = files.filter((f) => isAttachable(f));
+    if (!media.length) {
+      return;
+    }
+    event.preventDefault();
+    this.uploadFiles(media);
+  }
+
+  // Drag & drop anywhere on the composer attaches the dropped files.
+  // Depth-counted because dragenter/leave also fire on every child element.
+  protected dragOver = signal(false);
+  private dragDepth = 0;
+
+  onDragEnter(event: DragEvent): void {
+    if (!dragHasFiles(event)) {
+      return;
+    }
+    event.preventDefault();
+    this.dragDepth++;
+    this.dragOver.set(this.canAttachMedia());
+  }
+
+  onDragOver(event: DragEvent): void {
+    if (dragHasFiles(event)) {
+      // Without this the browser navigates to the dropped file.
+      event.preventDefault();
+    }
+  }
+
+  onDragLeave(_event: DragEvent): void {
+    if (this.dragDepth > 0 && --this.dragDepth === 0) {
+      this.dragOver.set(false);
+    }
+  }
+
+  onDrop(event: DragEvent): void {
+    if (!dragHasFiles(event)) {
+      return;
+    }
+    event.preventDefault();
+    this.dragDepth = 0;
+    this.dragOver.set(false);
+    const files = Array.from(event.dataTransfer?.files ?? []).filter((f) => isAttachable(f));
+    this.uploadFiles(files);
+  }
+
+  /** In-flight uploads; `uploading` stays true until the last one settles. */
+  private pendingUploads = 0;
+
+  private uploadFiles(files: File[]): void {
+    if (!this.canAttachMedia() || !files.length) {
+      return;
+    }
     for (const file of files) {
+      this.pendingUploads++;
       this.uploading.set(true);
       this.api.uploadMedia(file).subscribe({
         next: (media) => {
           this.media.update((list) => [...list, { media, description: '' }]);
-          this.uploading.set(false);
+          this.settleUpload();
         },
-        error: () => this.uploading.set(false),
+        error: () => this.settleUpload(),
       });
+    }
+  }
+
+  private settleUpload(): void {
+    if (--this.pendingUploads <= 0) {
+      this.pendingUploads = 0;
+      this.uploading.set(false);
     }
   }
 
@@ -604,7 +681,7 @@ export class Compose implements OnDestroy {
             this.crossPostError.set("Couldn't post to Bluesky — try again.");
           } else {
             this.crossPostError.set(
-              "Posted to Fedi, but the Bluesky copy failed — post it there manually.",
+              'Posted to Fedi, but the Bluesky copy failed — post it there manually.',
             );
           }
         },

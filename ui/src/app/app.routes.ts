@@ -10,6 +10,8 @@ export const routes: Routes = [
     path: 'explore',
     loadComponent: () => import('./pages/explore/explore').then((m) => m.Explore),
   },
+  // One-click, logged-out demo: read-only live posts from a public instance.
+  { path: 'demo', loadComponent: () => import('./pages/demo/demo').then((m) => m.Demo) },
   {
     path: '',
     canActivate: [authGuard],
