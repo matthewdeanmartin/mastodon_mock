@@ -10,7 +10,7 @@ from __future__ import annotations
 from mastodon_mock.config import SeedAccount, SeedConfig, SeedFollow
 
 # These access tokens are fixtures for a mock server, not real credentials.
-DEFAULT_TEST_SEED = SeedConfig(  # nosec B106
+DEFAULT_TEST_SEED = SeedConfig(
     accounts=[
         SeedAccount(username="alice", display_name="Alice", access_token="alice_token"),  # nosec B106
         SeedAccount(username="bob", display_name="Bob", access_token="bob_token"),  # nosec B106

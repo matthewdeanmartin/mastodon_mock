@@ -1,0 +1,19 @@
+.algo-bar {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.algo-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.algo-meta {
+  margin: 6px 0 0;
+}
+
+.algo-source {
+  margin: 8px 16px 0;
+}

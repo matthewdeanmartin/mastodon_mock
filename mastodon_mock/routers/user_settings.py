@@ -194,15 +194,14 @@ def list_authorized_apps(db: DbSession, account: RequiredAccount) -> list[dict[s
 def _relationship_rows(db: DbSession, account_id: int, kind: str) -> list[tuple[Account, Relationship]]:
     """Return (target account, relationship) pairs for one export kind."""
     flag = {"following": Relationship.following, "mutes": Relationship.muting, "blocks": Relationship.blocking}[kind]
-    return [
-        (acc, rel)
-        for acc, rel in db.execute(
+    return list(
+        db.execute(
             select(Account, Relationship)
             .join(Relationship, Relationship.target_account_id == Account.id)
             .where(Relationship.source_account_id == account_id, flag.is_(True))
             .order_by(Account.username)
         ).all()
-    ]
+    )
 
 
 @router.get("/api/v1/_mock/export/{kind}")

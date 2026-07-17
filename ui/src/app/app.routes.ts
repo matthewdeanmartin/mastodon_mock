@@ -19,6 +19,7 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'home' },
       { path: 'home', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
+      { path: 'algo', loadComponent: () => import('./pages/algo/algo').then((m) => m.Algo) },
       {
         path: 'fail-whale',
         loadComponent: () =>

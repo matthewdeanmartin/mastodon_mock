@@ -23,7 +23,7 @@ import { ProviderRegistry } from '../providers/provider-registry';
           (click)="refresh.emit()"
           title="Reload the feed from the newest posts"
         >
-          🔄 Refresh
+          🔄 More
         </button>
       }
       <button

@@ -168,7 +168,7 @@ def _serve(args: argparse.Namespace) -> None:
         # instead of the unresolvable "mock.local" default, so avatar/header
         # placeholders and status permalinks (built from config.domain) are
         # clickable/loadable rather than 404ing against a host that doesn't resolve.
-        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host  # nosec B104
+        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
         config.domain = f"{display_host}:{port}"
     app = create_app(config)
     _silence_proactor_connection_reset()

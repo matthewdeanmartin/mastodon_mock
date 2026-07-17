@@ -546,7 +546,7 @@ def _token_response(token: OAuthToken) -> dict[str, Any]:
     return {
         "access_token": token.access_token,
         # "Bearer" is the OAuth token_type label, not a secret
-        "token_type": "Bearer",  # nosec B105
+        "token_type": "Bearer",
         "scope": " ".join(token.scopes),
         "created_at": int(token.created_at.timestamp()),
     }

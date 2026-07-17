@@ -97,16 +97,16 @@ def revoke_collection_item(collection_id: str, item_id: str) -> dict[str, Any]:
     return {}
 
 
-# Path verified against mastodon.social: these are account-scoped under
-# /api/v1/accounts/{id}/... and wrap the payload in `{"collections": [...]}`.
-@router.get("/api/v1/accounts/{account_id}/collections")
+# Unlike most account-scoped Mastodon endpoints, Collections deliberately omit
+# the ``accounts`` path segment. Both responses use the extensible wrapper shape.
+@router.get("/api/v1/{account_id}/collections")
 def account_collections(account_id: str) -> dict[str, Any]:
     """List collections for an account. The mock keeps no collections."""
     del account_id
     return {"collections": []}
 
 
-@router.get("/api/v1/accounts/{account_id}/in_collections")
+@router.get("/api/v1/{account_id}/in_collections")
 def account_in_collections(account_id: str) -> dict[str, Any]:
     """List collections an account appears in. The mock keeps no collections."""
     del account_id

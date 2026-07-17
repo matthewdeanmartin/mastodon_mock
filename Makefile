@@ -245,18 +245,13 @@ security: bandit audit
 bandit:
 	@$(UV) run bandit -q -c pyproject.toml -r $(PACKAGE)
 
-# textstat (pulled in by pylint[spelling]) currently drags in nltk advisories.
-# Keep the no-fix issue suppressed until upstream ships a patched release, and
-# suppress the fixable one here until the spelling toolchain can absorb it.
 audit:
 	@echo "=== uv audit ==="
 	@$(UV) audit \
-		--ignore-until-fixed GHSA-p4gq-832x-fm9v \
 		--ignore-until-fixed PYSEC-2026-597 \
 		--ignore PYSEC-2026-2078
 	@echo "=== pip-audit ==="
 	@$(UV) tool run pip-audit \
-		--ignore-vuln GHSA-p4gq-832x-fm9v \
 		--ignore-vuln PYSEC-2026-597 \
 		--ignore-vuln PYSEC-2026-2078
 

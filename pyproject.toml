@@ -148,6 +148,8 @@ dev = [
     "pyrefly>=1.0.0",
     "ty>=0.0.49",
     "httpx2>=2.4.0",
+    # Transitive build dependency; keep at the bottom as an audit floor.
+    "setuptools>=83.0.0",
 ]
 
 [tool.uv]

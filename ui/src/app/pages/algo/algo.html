@@ -1,0 +1,78 @@
+<div class="algo-bar">
+  <div class="algo-chips" role="group" aria-label="Filter the Algo feed">
+    <button
+      type="button"
+      class="btn btn-outline"
+      [class.active]="prefs.algoAudience() === 'all'"
+      (click)="setAudience('all')"
+    >
+      Everything
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
+      [class.active]="prefs.algoAudience() === 'friends'"
+      (click)="setAudience('friends')"
+      title="Posts from people you follow"
+    >
+      Friends
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
+      [class.active]="prefs.algoAudience() === 'platform'"
+      (click)="setAudience('platform')"
+      title="Posts found via hashtags you follow, from people you don't"
+    >
+      Platform
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
+      [class.active]="prefs.algoCalm()"
+      (click)="toggleCalm()"
+      title="Hide posts that read as inflammatory (a small on-device word list — no server involved)"
+    >
+      😌 Calm
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
+      (click)="refresh()"
+      [disabled]="feed.loading()"
+      title="Rebuild the feed from fresh data"
+    >
+      🔄 Refresh
+    </button>
+  </div>
+  @if (feed.builtAt() !== null) {
+    <p class="algo-meta muted small">
+      {{ feed.posts().length }} posts from {{ feed.callsUsed() }} API calls
+      @if (feed.hashtag(); as tag) {
+        · sampled #{{ tag }}
+      }
+      @if (calmHidden(); as hidden) {
+        · calm mode hid {{ hidden }}
+      }
+    </p>
+  }
+</div>
+
+@if (feed.loading()) {
+  <p class="muted center">Gathering the good stuff…</p>
+} @else if (feed.error()) {
+  <p class="muted center">Couldn’t build your Algo feed. Try refreshing.</p>
+} @else if (!visible().length) {
+  <p class="muted center">Nothing here yet — follow some people and hashtags, then refresh.</p>
+} @else {
+  @for (p of visible(); track p.status.id) {
+    <div class="algo-item">
+      <p class="algo-source muted small">{{ sourceLabel(p) }}</p>
+      <app-status-card
+        [status]="p.status"
+        (changed)="onChanged(p, $event)"
+        (deleted)="onDeleted($event)"
+      />
+    </div>
+  }
+}

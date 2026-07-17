@@ -16,6 +16,9 @@ export type ReaderTextAlign = 'left' | 'justify';
 export type ChatAudience = 'everyone' | 'mutuals';
 export type ChatKindFilter = 'all' | 'private' | 'public';
 
+/** Algo-feed audience chip: everything, friends content, or hashtag finds. */
+export type AlgoAudience = 'all' | 'friends' | 'platform';
+
 export interface AccentPreset {
   id: string;
   label: string;
@@ -81,6 +84,8 @@ interface StoredPrefs {
   chatKind?: ChatKindFilter;
   feedMin?: number;
   feedMax?: number;
+  algoAudience?: AlgoAudience;
+  algoCalm?: boolean;
 }
 
 /** Feed-size bounds (see feedMin / feedMax). */
@@ -136,6 +141,11 @@ export class ClientPrefs {
   // Chat-list filters.
   readonly chatAudience = signal<ChatAudience>('everyone');
   readonly chatKind = signal<ChatKindFilter>('all');
+
+  // Algo-feed filters.
+  readonly algoAudience = signal<AlgoAudience>('all');
+  /** Calm mode: hide posts the rage lexicon flags as inflammatory. */
+  readonly algoCalm = signal<boolean>(false);
 
   /**
    * Feed-size bounds. `feedMin` auto-loads more pages until the feed holds at
@@ -243,6 +253,16 @@ export class ClientPrefs {
     }
   }
 
+  setAlgoAudience(audience: AlgoAudience): void {
+    if (audience === 'all' || audience === 'friends' || audience === 'platform') {
+      this.algoAudience.set(audience);
+    }
+  }
+
+  setAlgoCalm(on: boolean): void {
+    this.algoCalm.set(on);
+  }
+
   setFeedMin(n: number): void {
     if (Number.isFinite(n)) {
       this.feedMin.set(clamp(Math.round(n), FEED_MIN_FLOOR, this.feedMax()));
@@ -334,6 +354,14 @@ export class ClientPrefs {
     ) {
       this.chatKind.set(stored.chatKind);
     }
+    if (
+      stored.algoAudience === 'all' ||
+      stored.algoAudience === 'friends' ||
+      stored.algoAudience === 'platform'
+    ) {
+      this.algoAudience.set(stored.algoAudience);
+    }
+    this.loadBool(stored.algoCalm, this.algoCalm);
     // feedMax first so setFeedMin can clamp against it.
     if (typeof stored.feedMax === 'number') {
       this.setFeedMax(stored.feedMax);
@@ -370,6 +398,8 @@ export class ClientPrefs {
       chatKind: this.chatKind(),
       feedMin: this.feedMin(),
       feedMax: this.feedMax(),
+      algoAudience: this.algoAudience(),
+      algoCalm: this.algoCalm(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   }
