@@ -80,6 +80,33 @@ Shipped and verified. All planned changes landed as designed; nothing was cut.
 - Replies and the user's own posts are excluded from the pool.
 - Calm mode checks the boost target's content **and** its content warning.
 
+## Round 2 (boss feedback tickets)
+
+All landed and verified (653 specs green, live Playwright pass):
+
+- **Chip rework**: "Everything" → **All** (letters are expensive). **Friends**
+  now means posts *authored* by follows only — boosts and hashtag finds are
+  out. "Platform" replaced by a **Tags** include/exclude toggle (default on,
+  only shown in All mode since Friends never includes hashtag finds); legacy
+  stored `platform` pref falls back to `all`.
+- **1-like floor**: a post (or boost target) with zero favourites never enters
+  the Algo pool. This is the good stuff.
+- **🔀 Shuffle**: re-deals the cached posts in random order without refetching.
+- **Bookmark tail on Home**: hitting the feed-max cap now fetches up to 40
+  bookmarks (`bookmarks(limit)` param added to `api.ts`) and tacks them on
+  under "some posts you saved for later", *then* shows the "you've had
+  enough" wall. Fetched once per cap; failure just means no tail.
+- **Reader mode expands all**: with 📖 Reader on, CWs render pre-expanded and
+  warn-filter stubs auto-expand (`status-card.ts`). Hide-action filters still
+  hide — the user configured those to never appear.
+- **Bug found & fixed in verification**: landing directly on `/algo` raced
+  `verify_credentials` — no account yet meant a dead error state. `AlgoFeed`
+  now holds the build in a pending state and an `effect` fires it when the
+  account arrives.
+
+Deferred by explicit decision: mutual-discovery pagination, sentiment-lexicon
+improvements, Algo pagination (bounded by construction anyway).
+
 ### Known gaps / follow-ups
 
 - Mutual discovery reads one page (80) of following/followers each — heavy

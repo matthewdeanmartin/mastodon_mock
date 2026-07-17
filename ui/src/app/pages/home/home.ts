@@ -2,6 +2,7 @@ import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map, Subscription } from 'rxjs';
+import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Drafts } from '../../drafts';
 import { ClientPrefs, FEED_MAX_COOLDOWN_MS } from '../../client-prefs';
@@ -17,6 +18,8 @@ import { FeedAggregator } from '../../providers/feed-aggregator';
 /** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
 const NUDGE_DISMISSED_KEY = 'mockingbird_follow_nudge_dismissed';
+/** How many saved bookmarks get tacked onto the feed when the cap hits. */
+const BOOKMARK_TAIL_SIZE = 40;
 
 @Component({
   selector: 'app-home',
@@ -25,6 +28,7 @@ const NUDGE_DISMISSED_KEY = 'mockingbird_follow_nudge_dismissed';
   styleUrl: './home.css',
 })
 export class Home implements OnInit, OnDestroy {
+  private api = inject(Api);
   private auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private streaming = inject(Streaming);
@@ -56,6 +60,11 @@ export class Home implements OnInit, OnDestroy {
    * the 60-minute cooldown lifts it sooner. Null means "cap not hit".
    */
   private maxHitAt = signal<number | null>(null);
+  /**
+   * Saved bookmarks tacked onto the bottom when the feed cap hits — something
+   * the reader chose to keep, instead of an abrupt wall. Fetched once per cap.
+   */
+  protected bookmarkTail = signal<Status[]>([]);
   /** Ticks so `capActive` re-evaluates the cooldown without a user action. */
   private now = signal(Date.now());
   private clock: ReturnType<typeof setInterval> | null = null;
@@ -139,6 +148,7 @@ export class Home implements OnInit, OnDestroy {
   load(): void {
     this.loading.set(true);
     this.maxHitAt.set(null);
+    this.bookmarkTail.set([]);
     this.aggregator.reset();
     this.aggregator.nextPage().subscribe({
       next: (s) => {
@@ -181,6 +191,7 @@ export class Home implements OnInit, OnDestroy {
     // cooldown. Paging may overshoot slightly (a partial last page) — fine.
     if (this.statuses().length >= this.prefs.feedMax()) {
       this.maxHitAt.set(Date.now());
+      this.loadBookmarkTail();
       return;
     }
     if (!this.canLoadMore()) {
@@ -190,6 +201,25 @@ export class Home implements OnInit, OnDestroy {
       this.statuses.update((s) => [...s, ...more]);
       this.publishMastodon(more);
     });
+  }
+
+  /** Fetch the bookmark tail once per cap; a failure just means no tail. */
+  private loadBookmarkTail(): void {
+    if (this.bookmarkTail().length) {
+      return;
+    }
+    this.api.bookmarks(BOOKMARK_TAIL_SIZE).subscribe({
+      next: (marks) => this.bookmarkTail.set(marks),
+      error: () => undefined,
+    });
+  }
+
+  onBookmarkChanged(original: Status, updated: Status): void {
+    this.bookmarkTail.update((list) => list.map((s) => (s === original ? updated : s)));
+  }
+
+  onBookmarkDeleted(removed: Status): void {
+    this.bookmarkTail.update((list) => list.filter((s) => s.id !== removed.id));
   }
 
   /** Timeline-derived widgets (who-to-follow) only understand Mastodon posts. */

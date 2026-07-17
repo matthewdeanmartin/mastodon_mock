@@ -288,8 +288,12 @@ export class Api {
     return this.http.get<Status[]>('/api/v1/favourites');
   }
 
-  bookmarks(): Observable<Status[]> {
-    return this.http.get<Status[]>('/api/v1/bookmarks');
+  bookmarks(limit?: number): Observable<Status[]> {
+    let params = new HttpParams();
+    if (limit) {
+      params = params.set('limit', String(limit));
+    }
+    return this.http.get<Status[]>('/api/v1/bookmarks', { params });
   }
 
   // --- search ---

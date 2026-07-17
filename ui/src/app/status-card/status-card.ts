@@ -73,8 +73,13 @@ export class StatusCard {
     () => this.translation()?.spoiler_text || this.display.spoiler_text,
   );
 
-  /** True while the body (text, media, poll, quote) hides behind the CW. */
-  protected cwCollapsed = computed(() => !!this.spoilerText() && !this.cwOpen());
+  /**
+   * True while the body (text, media, poll, quote) hides behind the CW.
+   * Reader mode means "I want to read it": CWs render pre-expanded.
+   */
+  protected cwCollapsed = computed(
+    () => !!this.spoilerText() && !this.cwOpen() && !this.prefs.feedReader(),
+  );
 
   toggleCw(event: Event): void {
     event.preventDefault();
@@ -101,11 +106,15 @@ export class StatusCard {
   /** Viewer clicked "Show anyway" on a warn filter; resets per status. */
   protected filterOverridden = linkedSignal({ source: this.status, computation: () => false });
 
-  /** A warn-action filter matched and hasn't been overridden: show the stub. */
+  /**
+   * A warn-action filter matched and hasn't been overridden: show the stub.
+   * Reader mode expands these too (hide-action filters still hide outright).
+   */
   protected filterCollapsed = computed(
     () =>
       !this.hiddenByFilter() &&
       !this.filterOverridden() &&
+      !this.prefs.feedReader() &&
       this.activeFilters().some((r) => r.filter.filter_action === 'warn'),
   );
 

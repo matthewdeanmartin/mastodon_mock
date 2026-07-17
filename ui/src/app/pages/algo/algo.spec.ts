@@ -50,6 +50,7 @@ interface FakeFeed {
   hashtag: ReturnType<typeof signal<string | null>>;
   ensureBuilt: ReturnType<typeof vi.fn>;
   refresh: ReturnType<typeof vi.fn>;
+  shufflePosts: ReturnType<typeof vi.fn>;
   updateStatus: ReturnType<typeof vi.fn>;
   removeStatus: ReturnType<typeof vi.fn>;
 }
@@ -82,6 +83,7 @@ describe('Algo page', () => {
       hashtag: signal<string | null>('cats'),
       ensureBuilt: vi.fn(),
       refresh: vi.fn(),
+      shufflePosts: vi.fn(),
       updateStatus: vi.fn(),
       removeStatus: vi.fn(),
     };
@@ -105,24 +107,56 @@ describe('Algo page', () => {
     expect(text()).toContain('Top post from a mutual');
   });
 
-  it('friends and platform chips split the feed by the friend flag', () => {
+  it('Friends shows only posts authored by follows — no boosts, no hashtag finds', () => {
     feed.posts.set([
-      makePost('friendly', 'original', true),
-      makePost('stranger', 'hashtag', false),
+      makePost('authored', 'original', true),
+      makePost('mutualpost', 'mutual', true),
+      makePost('boosted', 'boost', true),
+      makePost('tagfind', 'hashtag', false),
     ]);
     fixture.detectChanges();
-    expect(text()).toContain('friendly');
-    expect(text()).toContain('stranger');
+    expect(text()).toContain('authored');
+    expect(text()).toContain('boosted');
+    expect(text()).toContain('tagfind');
 
     chip('Friends').click();
     fixture.detectChanges();
-    expect(text()).toContain('friendly');
-    expect(text()).not.toContain('stranger');
+    expect(text()).toContain('authored');
+    expect(text()).toContain('mutualpost');
+    expect(text()).not.toContain('boosted');
+    expect(text()).not.toContain('tagfind');
 
-    chip('Platform').click();
+    chip('All').click();
     fixture.detectChanges();
-    expect(text()).not.toContain('friendly');
-    expect(text()).toContain('stranger');
+    expect(text()).toContain('boosted');
+    expect(text()).toContain('tagfind');
+  });
+
+  it('Tags chip toggles hashtag posts in and out (only offered in All mode)', () => {
+    feed.posts.set([makePost('authored', 'original', true), makePost('tagfind', 'hashtag', false)]);
+    fixture.detectChanges();
+    expect(text()).toContain('tagfind');
+
+    chip('Tags').click(); // toggle off
+    fixture.detectChanges();
+    expect(text()).toContain('authored');
+    expect(text()).not.toContain('tagfind');
+    expect(TestBed.inject(ClientPrefs).algoTags()).toBe(false);
+
+    chip('Tags').click(); // back on
+    fixture.detectChanges();
+    expect(text()).toContain('tagfind');
+
+    // In Friends mode the Tags chip disappears — it has nothing to govern.
+    chip('Friends').click();
+    fixture.detectChanges();
+    expect(() => chip('Tags')).toThrow();
+  });
+
+  it('shuffle button re-deals via the service', () => {
+    fixture.detectChanges();
+    chip('Shuffle').click();
+    expect(feed.shufflePosts).toHaveBeenCalled();
   });
 
   it('calm mode hides heated posts and reports how many', () => {

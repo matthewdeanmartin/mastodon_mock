@@ -6,26 +6,28 @@
       [class.active]="prefs.algoAudience() === 'all'"
       (click)="setAudience('all')"
     >
-      Everything
+      All
     </button>
     <button
       type="button"
       class="btn btn-outline"
       [class.active]="prefs.algoAudience() === 'friends'"
       (click)="setAudience('friends')"
-      title="Posts from people you follow"
+      title="Only posts written by people you follow — no boosts, no hashtag finds"
     >
       Friends
     </button>
-    <button
-      type="button"
-      class="btn btn-outline"
-      [class.active]="prefs.algoAudience() === 'platform'"
-      (click)="setAudience('platform')"
-      title="Posts found via hashtags you follow, from people you don't"
-    >
-      Platform
-    </button>
+    @if (prefs.algoAudience() === 'all') {
+      <button
+        type="button"
+        class="btn btn-outline"
+        [class.active]="prefs.algoTags()"
+        (click)="toggleTags()"
+        title="Include popular recent posts from hashtags you follow"
+      >
+        Tags
+      </button>
+    }
     <button
       type="button"
       class="btn btn-outline"
@@ -34,6 +36,15 @@
       title="Hide posts that read as inflammatory (a small on-device word list — no server involved)"
     >
       😌 Calm
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
+      (click)="shuffle()"
+      [disabled]="feed.loading()"
+      title="Re-deal the same posts in a random order"
+    >
+      🔀 Shuffle
     </button>
     <button
       type="button"

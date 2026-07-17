@@ -185,7 +185,33 @@ describe('Home', () => {
     internals(fixture).loadMore();
 
     httpMock.expectNone((r) => r.url === '/api/v1/timelines/home');
+    // Hitting the cap tacks the bookmark tail onto the bottom first.
+    httpMock.expectOne('/api/v1/bookmarks?limit=40').flush([]);
     expect(internals(fixture).capActive()).toBe(true);
     expect(internals(fixture).canLoadMore()).toBe(false);
+  });
+
+  it('hitting the cap tacks up to 40 bookmarks onto the bottom, once', () => {
+    TestBed.inject(ClientPrefs).setFeedMax(20);
+
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page(20, 0));
+
+    internals(fixture).loadMore();
+    httpMock.expectOne('/api/v1/bookmarks?limit=40').flush([makeStatus('bm1'), makeStatus('bm2')]);
+
+    fixture.detectChanges();
+    const rendered = fixture.nativeElement.textContent as string;
+    expect(rendered).toContain('some posts you saved for later');
+    expect(rendered).toContain('status bm1');
+    // The "had enough" wall still lands after the bookmarks.
+    expect(rendered).toContain('You’ve had enough for now');
+    expect(rendered.indexOf('saved for later')).toBeLessThan(rendered.indexOf('had enough'));
+
+    // A second cap hit reuses the fetched tail — no refetch.
+    internals(fixture).loadMore();
+    httpMock.expectNone((r) => r.url === '/api/v1/bookmarks');
   });
 });

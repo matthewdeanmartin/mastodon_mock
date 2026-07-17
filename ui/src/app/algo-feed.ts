@@ -1,4 +1,4 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { effect, inject, Injectable, signal } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { Api } from './api';
 import { Auth } from './auth';
@@ -73,6 +73,20 @@ export class AlgoFeed {
   /** The followed hashtag sampled for this build, if any. */
   readonly hashtag = signal<string | null>(null);
 
+  /** A build was requested before verify_credentials resolved the account. */
+  private pendingBuild = signal(false);
+
+  constructor() {
+    // Landing directly on /algo races the account fetch: hold the build until
+    // the account arrives instead of failing.
+    effect(() => {
+      if (this.pendingBuild() && this.auth.account()) {
+        this.pendingBuild.set(false);
+        this.refresh();
+      }
+    });
+  }
+
   /** Build on first visit; later visits reuse the cached feed. */
   ensureBuilt(): void {
     if (this.builtAt() === null && !this.loading()) {
@@ -83,7 +97,9 @@ export class AlgoFeed {
   refresh(): void {
     const me = this.auth.account();
     if (!me) {
-      this.error.set(true);
+      // Behind the auth guard an account is coming; show loading, build then.
+      this.loading.set(true);
+      this.pendingBuild.set(true);
       return;
     }
     this.loading.set(true);
@@ -164,6 +180,11 @@ export class AlgoFeed {
       });
   }
 
+  /** Re-deal the cached feed in random order — same posts, fresh sequence. */
+  shufflePosts(): void {
+    this.posts.update((list) => shuffle(list));
+  }
+
   /** Reflect an interaction (fav/boost/edit) back into the cached feed. */
   updateStatus(original: Status, updated: Status): void {
     this.posts.update((list) =>
@@ -210,9 +231,13 @@ export class AlgoFeed {
     // Dedupe on the boost target so a post never appears twice under two wrappers.
     const pool = new Map<string, AlgoPost>();
     const add = (status: Status, source: AlgoSource, friend: boolean): void => {
-      const key = status.reblog?.id ?? status.id;
-      if (!pool.has(key)) {
-        pool.set(key, { status, source, friend, score: engagementScore(status) });
+      const target = status.reblog ?? status;
+      // This is the good stuff: no likes, no entry.
+      if (target.favourites_count < 1) {
+        return;
+      }
+      if (!pool.has(target.id)) {
+        pool.set(target.id, { status, source, friend, score: engagementScore(status) });
       }
     };
 

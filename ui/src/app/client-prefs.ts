@@ -16,8 +16,8 @@ export type ReaderTextAlign = 'left' | 'justify';
 export type ChatAudience = 'everyone' | 'mutuals';
 export type ChatKindFilter = 'all' | 'private' | 'public';
 
-/** Algo-feed audience chip: everything, friends content, or hashtag finds. */
-export type AlgoAudience = 'all' | 'friends' | 'platform';
+/** Algo-feed audience chip: everything, or only posts authored by follows. */
+export type AlgoAudience = 'all' | 'friends';
 
 export interface AccentPreset {
   id: string;
@@ -86,6 +86,7 @@ interface StoredPrefs {
   feedMax?: number;
   algoAudience?: AlgoAudience;
   algoCalm?: boolean;
+  algoTags?: boolean;
 }
 
 /** Feed-size bounds (see feedMin / feedMax). */
@@ -146,6 +147,8 @@ export class ClientPrefs {
   readonly algoAudience = signal<AlgoAudience>('all');
   /** Calm mode: hide posts the rage lexicon flags as inflammatory. */
   readonly algoCalm = signal<boolean>(false);
+  /** Include popular recent posts from followed hashtags in the Algo feed. */
+  readonly algoTags = signal<boolean>(true);
 
   /**
    * Feed-size bounds. `feedMin` auto-loads more pages until the feed holds at
@@ -254,13 +257,17 @@ export class ClientPrefs {
   }
 
   setAlgoAudience(audience: AlgoAudience): void {
-    if (audience === 'all' || audience === 'friends' || audience === 'platform') {
+    if (audience === 'all' || audience === 'friends') {
       this.algoAudience.set(audience);
     }
   }
 
   setAlgoCalm(on: boolean): void {
     this.algoCalm.set(on);
+  }
+
+  setAlgoTags(on: boolean): void {
+    this.algoTags.set(on);
   }
 
   setFeedMin(n: number): void {
@@ -354,14 +361,12 @@ export class ClientPrefs {
     ) {
       this.chatKind.set(stored.chatKind);
     }
-    if (
-      stored.algoAudience === 'all' ||
-      stored.algoAudience === 'friends' ||
-      stored.algoAudience === 'platform'
-    ) {
+    // A legacy stored 'platform' value simply falls back to the 'all' default.
+    if (stored.algoAudience === 'all' || stored.algoAudience === 'friends') {
       this.algoAudience.set(stored.algoAudience);
     }
     this.loadBool(stored.algoCalm, this.algoCalm);
+    this.loadBool(stored.algoTags, this.algoTags);
     // feedMax first so setFeedMin can clamp against it.
     if (typeof stored.feedMax === 'number') {
       this.setFeedMax(stored.feedMax);
@@ -400,6 +405,7 @@ export class ClientPrefs {
       feedMax: this.feedMax(),
       algoAudience: this.algoAudience(),
       algoCalm: this.algoCalm(),
+      algoTags: this.algoTags(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   }

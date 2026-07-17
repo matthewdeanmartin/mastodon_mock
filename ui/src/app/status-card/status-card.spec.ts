@@ -5,6 +5,7 @@ import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../auth';
+import { ClientPrefs } from '../client-prefs';
 import { Status, Translation } from '../models';
 import { StatusCard } from './status-card';
 
@@ -910,5 +911,87 @@ describe('StatusCard', () => {
       expect(el.querySelector('app-bsky-reply')).toBeTruthy();
       expect(el.querySelector('app-compose')).toBeNull();
     });
+  });
+});
+
+// ---------------------------------------------------------------- reader mode
+
+describe('StatusCard reader mode (expand all)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+  });
+
+  function setUpCard(status: Status): ComponentFixture<StatusCard> {
+    const fixture = TestBed.createComponent(StatusCard);
+    fixture.componentRef.setInput('status', status);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function readerOn(fixture: ComponentFixture<StatusCard>): void {
+    TestBed.inject(ClientPrefs).setFeedReader(true);
+    fixture.detectChanges();
+  }
+
+  it('pre-expands content warnings', () => {
+    const fixture = setUpCard(
+      makeStatus({ spoiler_text: 'long post', content: '<p>the hidden essay</p>' }),
+    );
+    expect(fixture.nativeElement.textContent).not.toContain('the hidden essay');
+
+    readerOn(fixture);
+    expect(fixture.nativeElement.textContent).toContain('the hidden essay');
+  });
+
+  it('expands warn-filter stubs', () => {
+    const fixture = setUpCard(
+      makeStatus({
+        content: '<p>the filtered take</p>',
+        filtered: [
+          {
+            filter: {
+              id: 'f1',
+              title: 'Politics',
+              context: ['home'],
+              expires_at: null,
+              filter_action: 'warn',
+            },
+            keyword_matches: null,
+            status_matches: null,
+          },
+        ],
+      }),
+    );
+    expect(fixture.nativeElement.textContent).toContain('Filtered: Politics');
+    expect(fixture.nativeElement.textContent).not.toContain('the filtered take');
+
+    readerOn(fixture);
+    expect(fixture.nativeElement.textContent).toContain('the filtered take');
+  });
+
+  it('still respects hide-action filters', () => {
+    const fixture = setUpCard(
+      makeStatus({
+        content: '<p>never show this</p>',
+        filtered: [
+          {
+            filter: {
+              id: 'f2',
+              title: 'Muted topic',
+              context: ['home'],
+              expires_at: null,
+              filter_action: 'hide',
+            },
+            keyword_matches: null,
+            status_matches: null,
+          },
+        ],
+      }),
+    );
+    readerOn(fixture);
+    expect(fixture.nativeElement.textContent).not.toContain('never show this');
   });
 });

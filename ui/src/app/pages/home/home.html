@@ -44,6 +44,19 @@
   }
 
   @if (capActive()) {
+    @if (bookmarkTail().length) {
+      <div class="feed-cap">
+        <div class="feed-cap-rule">—— some posts you saved for later ——</div>
+      </div>
+      @for (s of bookmarkTail(); track s.id) {
+        <app-status-card
+          [status]="s"
+          (changed)="onBookmarkChanged(s, $event)"
+          (deleted)="onBookmarkDeleted($event)"
+          (replied)="onPosted($event)"
+        />
+      }
+    }
     <div class="feed-cap">
       <div class="feed-cap-rule">—— that’s the end of your feed for now ——</div>
       <p class="feed-cap-msg">

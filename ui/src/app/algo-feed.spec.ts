@@ -26,7 +26,8 @@ function makeStatus(id: string, overrides: Partial<Status> = {}): Status {
     in_reply_to_id: null,
     replies_count: 0,
     reblogs_count: 0,
-    favourites_count: 0,
+    // One like by default: the feed's floor is "at least 1 like".
+    favourites_count: 1,
     favourited: false,
     reblogged: false,
     bookmarked: false,
@@ -80,12 +81,18 @@ describe('AlgoFeed', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('does not build without an account', () => {
+  it('defers the build until verify_credentials delivers the account', () => {
     account.set(null);
     const feed = TestBed.inject(AlgoFeed);
     feed.refresh();
-    expect(feed.error()).toBe(true);
+    expect(feed.loading()).toBe(true);
     expect(api.homeTimeline).not.toHaveBeenCalled();
+
+    account.set(makeAccount('me'));
+    TestBed.tick(); // flush the pending-build effect
+    expect(api.homeTimeline).toHaveBeenCalled();
+    expect(feed.loading()).toBe(false);
+    expect(feed.builtAt()).not.toBeNull();
   });
 
   it('gathers all four buckets, dedupes, and ranks by smoothed engagement', () => {
@@ -128,6 +135,32 @@ describe('AlgoFeed', () => {
     // Hashtag post by a non-followed account is platform content.
     expect(posts.find((p) => p.status.id === 'tp')?.friend).toBe(false);
     expect(posts.find((p) => p.status.id === 'orig')?.friend).toBe(true);
+  });
+
+  it('excludes posts with zero likes — this is the good stuff', () => {
+    api.homeTimeline.mockReturnValue(
+      of([
+        makeStatus('liked'),
+        makeStatus('unliked', { favourites_count: 0 }),
+        makeStatus('boost-of-unliked', {
+          reblog: makeStatus('cold', { favourites_count: 0 }),
+        }),
+      ]),
+    );
+    const feed = TestBed.inject(AlgoFeed);
+    feed.refresh();
+    expect(feed.posts().map((p) => p.status.id)).toEqual(['liked']);
+  });
+
+  it('shufflePosts re-deals the same posts in a new order', () => {
+    api.homeTimeline.mockReturnValue(of([makeStatus('h1'), makeStatus('h2'), makeStatus('h3')]));
+    const feed = TestBed.inject(AlgoFeed);
+    feed.refresh();
+    expect(feed.posts().map((p) => p.status.id)).toEqual(['h1', 'h2', 'h3']);
+
+    // Math.random is pinned to 0, so the Fisher–Yates result is deterministic.
+    feed.shufflePosts();
+    expect(feed.posts().map((p) => p.status.id)).toEqual(['h2', 'h3', 'h1']);
   });
 
   it('keeps only one entry when two boosts wrap the same target', () => {
