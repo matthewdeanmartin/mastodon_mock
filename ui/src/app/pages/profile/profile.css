@@ -283,3 +283,9 @@ h2 {
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* Marker above each post in the pinned strip, boost-label style. */
+.pinned-label {
+  font-size: 13px;
+  padding: 8px 16px 0 56px;
+}

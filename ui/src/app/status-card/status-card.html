@@ -93,9 +93,9 @@
             (click)="onContentClick($event)"
           >
             @if (translation(); as t) {
-              <div class="content" [innerHTML]="t.content"></div>
+              <div class="content" [innerHTML]="md(t.content)"></div>
             } @else {
-              <div class="content" [innerHTML]="display.content"></div>
+              <div class="content" [innerHTML]="md(display.content)"></div>
             }
           </a>
           @if (translation()) {

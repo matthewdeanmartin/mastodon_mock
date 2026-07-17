@@ -49,6 +49,7 @@
         <div class="feed-cap-rule">—— some posts you saved for later ——</div>
       </div>
       @for (s of bookmarkTail(); track s.id) {
+        <div class="bookmark-label muted">🔖 From your bookmarks</div>
         <app-status-card
           [status]="s"
           (changed)="onBookmarkChanged(s, $event)"

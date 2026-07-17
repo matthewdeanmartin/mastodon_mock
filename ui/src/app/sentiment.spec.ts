@@ -84,4 +84,27 @@ describe('isHeated', () => {
   it('reads the content warning text too', () => {
     expect(isHeated(makeStatus('<p>…</p>', { spoiler_text: 'unhinged rage inside' }))).toBe(true);
   });
+
+  it('any content warning counts as negative sentiment, however mild', () => {
+    expect(isHeated(makeStatus('<p>lunch photos</p>', { spoiler_text: 'food' }))).toBe(true);
+  });
+
+  it('a viewer content-filter match counts as negative sentiment', () => {
+    const filtered = makeStatus('<p>perfectly pleasant words</p>', {
+      filtered: [
+        {
+          filter: {
+            id: 'f1',
+            title: 'Discourse',
+            context: ['home'],
+            expires_at: null,
+            filter_action: 'warn',
+          },
+          keyword_matches: null,
+          status_matches: null,
+        },
+      ],
+    });
+    expect(isHeated(filtered)).toBe(true);
+  });
 });

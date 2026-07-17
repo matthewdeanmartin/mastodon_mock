@@ -344,3 +344,35 @@ a.tab:hover {
     text-align: left;
   }
 }
+
+/* Minimal-markdown elements inside rendered post bodies and the compose
+   preview (injected via innerHTML, so these must live in global styles). */
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.content h5,
+.content h6 {
+  margin: 0.4em 0 0.2em;
+  line-height: 1.25;
+}
+.content h1 {
+  font-size: 1.35em;
+}
+.content h2 {
+  font-size: 1.25em;
+}
+.content h3 {
+  font-size: 1.15em;
+}
+.content h4,
+.content h5,
+.content h6 {
+  font-size: 1.05em;
+}
+.content code {
+  background: var(--hover);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}

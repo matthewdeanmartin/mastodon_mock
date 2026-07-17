@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { Auth } from '../../auth';
 import { BugReportDialog } from '../../bug-report-dialog/bug-report-dialog';
 import { BUILD_INFO } from '../../build-info';
+import { Hotkeys } from '../../hotkeys';
 import { Server } from '../../server';
 
 /**
@@ -30,6 +31,15 @@ import { Server } from '../../server';
       <button class="link" type="button" (click)="reporting.set(true)">Report a bug</button>
       <span aria-hidden="true">·</span>
       <a routerLink="/fail-whale">Fail whale</a>
+      <span aria-hidden="true">·</span>
+      <button
+        class="link"
+        type="button"
+        title="Keyboard shortcuts (or press ? anywhere)"
+        (click)="hotkeys.helpOpen.set(true)"
+      >
+        ? for keyboard
+      </button>
       <p class="footer-note">You reached the end. That's allowed here.</p>
       @if (build.builtAt) {
         <p class="build-info">
@@ -87,6 +97,8 @@ import { Server } from '../../server';
 export class AppFooter {
   private auth = inject(Auth);
   private server = inject(Server);
+  /** Opens the same shortcut-help overlay the ? key does (rendered by Shell). */
+  protected hotkeys = inject(Hotkeys);
 
   /** CI-stamped build metadata; the placeholder (null builtAt) hides the line. */
   protected build = BUILD_INFO;

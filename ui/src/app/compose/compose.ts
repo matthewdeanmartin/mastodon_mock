@@ -21,6 +21,7 @@ import { detectFacets, graphemeLength } from '../providers/bluesky/bluesky-facet
 import { buildLocalBskyStatus } from '../providers/bluesky/bluesky-local-status';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { BskyFacet } from '../providers/bluesky/bluesky-types';
+import { applyMinimalMarkdown } from '../markdown';
 import { renderStatusText } from './status-text';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
@@ -172,7 +173,9 @@ export class Compose implements OnDestroy {
   // Appears as soon as there's a character to render, gone when empty.
   protected previewVisible = computed(() => this.segments().some((s) => s.trim() !== ''));
   protected previewHtml = computed(() =>
-    this.segments().map((s) => renderStatusText(s, this.customEmojis.emojis())),
+    this.segments().map((s) =>
+      applyMinimalMarkdown(renderStatusText(s, this.customEmojis.emojis())),
+    ),
   );
 
   // Emoji panel.

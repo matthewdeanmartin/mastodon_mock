@@ -56,3 +56,9 @@
   font-size: 13px;
   margin-top: 4px;
 }
+
+/* Marker above each post in the bookmark tail, boost-label style. */
+.bookmark-label {
+  font-size: 13px;
+  padding: 8px 16px 0 56px;
+}

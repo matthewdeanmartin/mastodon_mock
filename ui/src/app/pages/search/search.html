@@ -20,8 +20,9 @@
   <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
 </div>
 
-@if (!results()) {
-  <!-- Nothing searched yet: use the space for follow-list import & directories. -->
+@if (!results() && type() === 'accounts') {
+  <!-- Nothing searched yet and looking for people: offer follow-list import &
+       directories. Irrelevant noise for tag / post searches, so hidden there. -->
   <div class="search-idle">
     <div class="page-head">Find people to follow</div>
     <app-find-people [embedded]="true" />

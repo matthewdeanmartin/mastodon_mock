@@ -140,6 +140,7 @@
 
   @if (showPinned()) {
     @for (s of pinnedStatuses(); track s.id) {
+      <div class="pinned-label muted">📌 Pinned</div>
       <app-status-card
         [status]="s"
         filterContext="account"

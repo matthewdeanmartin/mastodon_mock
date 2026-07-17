@@ -9,6 +9,7 @@ import { ClientPrefs } from '../client-prefs';
 import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
+import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, Poll, Status, Translation } from '../models';
 import { PROVIDER_CAPS, ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
@@ -46,6 +47,9 @@ export class StatusCard {
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
+
+  /** Minimal markdown (bold/italic/code/headers) applied to the body HTML. */
+  protected md = applyMinimalMarkdown;
 
   readonly status = input.required<Status>();
   /**

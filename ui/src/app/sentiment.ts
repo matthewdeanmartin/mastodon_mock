@@ -152,10 +152,20 @@ export function rageScore(text: string): number {
 
 /**
  * Whether a status (or the status it boosts) reads as inflammatory.
- * Checks the content warning text too — heat often lives in the CW.
+ *
+ * Beyond the lexicon, two structural signals count as negative sentiment
+ * outright: a content warning (the author flagged it themselves), and a match
+ * on any of the viewer's own content filters (the viewer already said "less
+ * of this, please").
  */
 export function isHeated(status: Status): boolean {
   const target = status.reblog ?? status;
-  const text = `${target.spoiler_text} ${stripHtml(target.content)}`;
+  if (target.spoiler_text.trim()) {
+    return true;
+  }
+  if ((status.filtered?.length ?? 0) > 0 || (target.filtered?.length ?? 0) > 0) {
+    return true;
+  }
+  const text = stripHtml(target.content);
   return rageScore(text) >= HEATED_THRESHOLD;
 }
