@@ -1,0 +1,55 @@
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (error()) {
+  <p class="muted center">Couldn't load this list.</p>
+} @else if (!accounts().length) {
+  <p class="muted center">{{ emptyLabel() }}</p>
+} @else {
+  <div class="people-grid">
+    @for (a of accounts(); track a.id) {
+      <div class="person-card">
+        <a class="person-avatar" [routerLink]="['/accounts', a.id]" [attr.aria-label]="a.acct">
+          <img [src]="a.avatar_static || a.avatar" [alt]="a.username" />
+        </a>
+        <div class="person-body">
+          <a class="person-name-row" [routerLink]="['/accounts', a.id]">
+            <span class="person-name">{{ a.display_name || a.username }}</span>
+            <app-verified-badge [account]="a" />
+          </a>
+          <div class="person-acct muted">&#64;{{ a.acct }}</div>
+          @if (a.note) {
+            <div class="person-note" [innerHTML]="a.note"></div>
+          }
+          <div class="person-stats muted small">
+            <span>{{ a.followers_count.toLocaleString() }} followers</span>
+            <span>·</span>
+            <span>{{ a.following_count.toLocaleString() }} following</span>
+          </div>
+        </div>
+        @if (!isSelf(a)) {
+          <button
+            class="follow-btn"
+            [class.following]="isFollowing(a)"
+            [disabled]="isBusy(a)"
+            (click)="toggleFollow(a)"
+            [attr.aria-pressed]="isFollowing(a)"
+          >
+            {{ isBusy(a) ? '…' : followLabel(a) }}
+          </button>
+        } @else {
+          <span class="follow-btn is-self muted">You</span>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="people-more">
+    @if (exhausted()) {
+      <span class="muted small">End of the list.</span>
+    } @else {
+      <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ loadingMore() ? 'Loading…' : 'More' }}
+      </button>
+    }
+  </div>
+}

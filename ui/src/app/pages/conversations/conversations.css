@@ -75,6 +75,12 @@
   background: var(--border);
 }
 
+.chat-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
 .conv-row.active {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }

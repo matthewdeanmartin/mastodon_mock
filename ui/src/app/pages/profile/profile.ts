@@ -11,12 +11,24 @@ import { ReportDialog } from '../../report-dialog/report-dialog';
 import { ListDialog } from '../../list-dialog/list-dialog';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
 import { HumanCountPipe } from '../../human-count.pipe';
+import { PeopleBrowser } from '../../people-browser/people-browser';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 
+/** Profile body tabs: the account's posts, who they follow, who follows them. */
+type ProfileTab = 'posts' | 'following' | 'followers';
+
 @Component({
   selector: 'app-profile',
-  imports: [RouterLink, StatusCard, ReportDialog, ListDialog, VerifiedBadge, HumanCountPipe],
+  imports: [
+    RouterLink,
+    StatusCard,
+    ReportDialog,
+    ListDialog,
+    VerifiedBadge,
+    HumanCountPipe,
+    PeopleBrowser,
+  ],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })
@@ -67,6 +79,12 @@ export class Profile implements OnInit {
   protected showReplies = signal(false);
   protected showPinned = signal(true);
   protected pinnedStatuses = signal<Status[]>([]);
+  /** Which body tab is showing: the posts feed, or a people browser. */
+  protected tab = signal<ProfileTab>('posts');
+
+  setTab(tab: ProfileTab): void {
+    this.tab.set(tab);
+  }
   /** Invalidates in-flight status fetches when filters change or the route moves. */
   private loadSeq = 0;
 
@@ -118,6 +136,7 @@ export class Profile implements OnInit {
     this.reportDone.set(false);
     this.isRss.set(false);
     this.rssFeedUrl.set(null);
+    this.tab.set('posts');
     if (id.startsWith('rss:')) {
       this.loadRss(id);
       return;

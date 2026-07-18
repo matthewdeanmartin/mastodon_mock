@@ -21,7 +21,16 @@
       }
     </select>
   </div>
-  <button class="btn btn-outline" [class.active]="live()" (click)="toggleLive()">
+  <button
+    class="btn btn-outline"
+    [class.active]="live()"
+    (click)="toggleLive()"
+    [title]="
+      live()
+        ? 'Live: new notifications stream in as they arrive — click to stop'
+        : 'Stream new notifications live as they arrive'
+    "
+  >
     {{ live() ? '● Live' : 'Go live' }}
   </button>
 </div>

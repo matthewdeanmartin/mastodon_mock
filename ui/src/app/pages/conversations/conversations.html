@@ -111,6 +111,22 @@
         </div>
       </button>
     }
+    @if (!loading() && chats().length) {
+      <div class="chat-load-more">
+        @if (chatsExhausted()) {
+          <span class="muted small">No older messages.</span>
+        } @else {
+          <button
+            class="btn btn-outline btn-sm"
+            [disabled]="loadingMoreChats()"
+            (click)="loadMoreChats()"
+            title="Load older mentions into your public chats"
+          >
+            {{ loadingMoreChats() ? 'Loading…' : 'Load more' }}
+          </button>
+        }
+      </div>
+    }
   </aside>
 
   <section class="chat-pane">

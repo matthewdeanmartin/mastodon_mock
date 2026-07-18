@@ -87,12 +87,12 @@
         {{ isRss() ? 'items' : words().posts }}</span
       >
       @if (!isRss()) {
-        <span
-          ><strong>{{ a.following_count | humanCount }}</strong> following</span
-        >
-        <span
-          ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
-        >
+        <button type="button" class="count-btn" (click)="setTab('following')">
+          <strong>{{ a.following_count | humanCount }}</strong> following
+        </button>
+        <button type="button" class="count-btn" (click)="setTab('followers')">
+          <strong>{{ a.followers_count | humanCount }}</strong> followers
+        </button>
       }
     </div>
   </header>
@@ -137,6 +137,35 @@
   }
 
   @if (!isRss()) {
+    <div class="profile-tabs" role="group" aria-label="Profile sections">
+      <button type="button" class="ptab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">
+        {{ words().Posts }}
+      </button>
+      <button
+        type="button"
+        class="ptab"
+        [class.active]="tab() === 'following'"
+        (click)="setTab('following')"
+      >
+        Following
+      </button>
+      <button
+        type="button"
+        class="ptab"
+        [class.active]="tab() === 'followers'"
+        (click)="setTab('followers')"
+      >
+        Followers
+      </button>
+    </div>
+  }
+
+  @if (!isRss() && tab() !== 'posts') {
+    <app-people-browser [accountId]="a.id" [mode]="tab() === 'followers' ? 'followers' : 'following'" />
+  }
+
+  @if (tab() === 'posts') {
+    @if (!isRss()) {
     <div class="profile-filters" role="group" aria-label="Timeline filters">
       <button
         type="button"
@@ -206,6 +235,7 @@
         }
       </div>
     }
+  }
   }
 
   @if (showReport()) {

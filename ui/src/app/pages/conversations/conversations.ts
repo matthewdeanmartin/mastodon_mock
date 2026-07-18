@@ -127,6 +127,12 @@ export class Conversations implements OnInit, OnDestroy {
   private openHandled = false;
 
   protected loading = signal(true);
+  /** Loading an older page of mention notifications (public-chat history). */
+  protected loadingMoreChats = signal(false);
+  /** No older mention notifications remain to page in. */
+  protected chatsExhausted = signal(false);
+  /** Oldest notification id fetched so far, the cursor for "Load more". */
+  private oldestNotifId: string | null = null;
   protected privateConvs = signal<Conversation[]>([]);
   protected bskyConvos = signal<BskyConvoView[]>([]);
   /** The linked app password can't read DMs; show the relink hint. */
@@ -291,28 +297,48 @@ export class Conversations implements OnInit, OnDestroy {
     () => this.chats().find((c) => c.key === this.selectedKey()) ?? null,
   );
 
-  /** Pre-seed the composer with @mentions of the other participants. */
+  /**
+   * Pre-seed the composer with @mentions of the *extra* participants only.
+   *
+   * The person we're replying to is reached automatically via `in_reply_to_id`
+   * (Mastodon adds the parent author to the reply's mentions server-side), so
+   * seeding their handle into the box is just noise — a 1:1 chat gets an empty
+   * box. Group chats still seed the *other* members, who wouldn't otherwise be
+   * notified. This keeps the obvious recipient out of the box while preserving
+   * delivery to everyone in a wider thread.
+   */
   protected replyMentions = computed(() => {
     const chat = this.selected();
     if (!chat) {
       return '';
     }
+    const me = this.auth.account();
+    // Who the reply already reaches implicitly: the author of the message we're
+    // chaining onto (the newest one in the open thread).
+    const replyTo = this.messages().at(-1) ?? chat.lastStatus;
+    const implicit = replyTo?.account.acct;
+
     const handles = new Set<string>(chat.handles.filter((h) => h !== ''));
     if (chat.kind === 'public') {
       // Author-grouped chats only know the reply guy; keep everyone the last
       // message was addressed to in the thread too.
-      const me = this.auth.account();
-      const last = this.messages().at(-1) ?? chat.lastStatus;
-      if (last) {
-        if (last.account.acct !== me?.acct) {
-          handles.add(last.account.acct);
+      if (replyTo) {
+        if (replyTo.account.acct !== me?.acct) {
+          handles.add(replyTo.account.acct);
         }
-        for (const m of last.mentions ?? []) {
+        for (const m of replyTo.mentions ?? []) {
           if (m.acct !== me?.acct) {
             handles.add(m.acct);
           }
         }
       }
+    }
+    // Drop the obvious recipient (reached via the reply itself) and myself.
+    if (implicit) {
+      handles.delete(implicit);
+    }
+    if (me?.acct) {
+      handles.delete(me.acct);
     }
     return handles.size ? [...handles].map((h) => `@${h}`).join(' ') + ' ' : '';
   });
@@ -403,14 +429,49 @@ export class Conversations implements OnInit, OnDestroy {
     });
     this.api.notifications().subscribe({
       next: (notifs) => {
-        for (const n of notifs) {
-          if (n.type === 'mention' && n.status) {
-            this.addPublicStatus(n.status, n.account);
-          }
-        }
+        this.ingestNotifPage(notifs);
         done();
       },
       error: done,
+    });
+  }
+
+  /**
+   * Fold one page of notifications into the public chats and advance the
+   * "Load more" cursor. Only mentions build chat history; the cursor tracks the
+   * overall oldest id so paging steps past non-mention notifications too.
+   */
+  private ingestNotifPage(notifs: MastodonNotification[]): void {
+    for (const n of notifs) {
+      if (n.type === 'mention' && n.status) {
+        this.addPublicStatus(n.status, n.account);
+      }
+    }
+    const oldest = notifs.at(-1);
+    if (oldest) {
+      this.oldestNotifId = oldest.id;
+    }
+  }
+
+  /**
+   * Page in older mention notifications so the public chat list and open thread
+   * fill out — the first page alone shows only a sliver of a busy history.
+   */
+  loadMoreChats(): void {
+    if (!this.oldestNotifId || this.loadingMoreChats() || this.chatsExhausted()) {
+      return;
+    }
+    this.loadingMoreChats.set(true);
+    this.api.notifications(this.oldestNotifId).subscribe({
+      next: (notifs) => {
+        this.loadingMoreChats.set(false);
+        if (!notifs.length) {
+          this.chatsExhausted.set(true);
+          return;
+        }
+        this.ingestNotifPage(notifs);
+      },
+      error: () => this.loadingMoreChats.set(false),
     });
   }
 

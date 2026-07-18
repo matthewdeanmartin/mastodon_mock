@@ -103,14 +103,20 @@ export class Api {
   }
 
   /** One page of an account's followers (Mastodon caps limit at 80). */
-  accountFollowers(id: string, limit = 80): Observable<Account[]> {
-    const params = new HttpParams().set('limit', String(limit));
+  accountFollowers(id: string, maxId?: string, limit = 80): Observable<Account[]> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
     return this.http.get<Account[]>(`/api/v1/accounts/${id}/followers`, { params });
   }
 
   /** One page of the accounts this account follows (Mastodon caps limit at 80). */
-  accountFollowing(id: string, limit = 80): Observable<Account[]> {
-    const params = new HttpParams().set('limit', String(limit));
+  accountFollowing(id: string, maxId?: string, limit = 80): Observable<Account[]> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
     return this.http.get<Account[]>(`/api/v1/accounts/${id}/following`, { params });
   }
 

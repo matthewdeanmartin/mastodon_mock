@@ -300,7 +300,9 @@ describe('Conversations', () => {
     expect(internals(fixture).replyVisibility()).toBe('unlisted');
   });
 
-  it("replyMentions (public): includes the last message's other recipients, not just the author", () => {
+  it("replyMentions (public): seeds the other recipients but drops the obvious author", () => {
+    // The reply reaches alice implicitly via in_reply_to_id, so her handle is
+    // left out of the box; bob (a co-recipient) still needs an explicit mention.
     const alice = makeAccount('2', 'alice');
     const s1 = makeStatus('s1', {
       visibility: 'public',
@@ -313,7 +315,7 @@ describe('Conversations', () => {
     const fixture = setUp([], [makeMention('n1', s1)]);
     internals(fixture).selectedKey.set(internals(fixture).chats()[0].key);
 
-    expect(internals(fixture).replyMentions()).toBe('@alice @bob ');
+    expect(internals(fixture).replyMentions()).toBe('@bob ');
   });
 
   it('replyToId chains onto the newest loaded message, not the list row', () => {
