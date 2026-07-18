@@ -122,6 +122,8 @@ export interface Status {
   poll: Poll | null;
   quote_approval_policy: string | null;
   media_attachments: MediaAttachment[];
+  /** The app the post was made with (nullable; absent on some providers). */
+  application?: { name: string; website?: string | null } | null;
   /** Optional: not every provider supplies it, but Mastodon (and the mock) do. */
   mentions?: Mention[];
   /**

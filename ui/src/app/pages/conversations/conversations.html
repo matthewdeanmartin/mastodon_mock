@@ -246,7 +246,7 @@
                     (click)="toggleFave(m)"
                     title="Like"
                   >
-                    ⭐
+                    {{ prefs.favStyle() === 'heart' ? '❤️' : '⭐' }}
                   </button>
                   <button
                     class="bubble-action"

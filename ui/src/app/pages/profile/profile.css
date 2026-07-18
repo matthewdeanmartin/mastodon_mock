@@ -134,6 +134,36 @@
   background: var(--border);
 }
 
+.account-danger-panel .menu-note {
+  display: block;
+  padding: 4px 10px 0;
+  white-space: nowrap;
+}
+
+/* Mute-duration presets: one compact row, less alarming than the red actions. */
+.account-danger-panel .mute-durations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px 5px 4px;
+}
+
+.account-danger-panel .mute-durations button {
+  display: inline-block;
+  width: auto;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
 /* Blocked state: turn the (outline) Block button into a clear danger affordance. */
 .btn-danger {
   color: #e0245e;

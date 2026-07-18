@@ -459,6 +459,34 @@
   background: var(--border);
 }
 
+.danger-menu-panel .menu-note {
+  display: block;
+  padding: 4px 9px 0;
+  white-space: nowrap;
+}
+
+/* Mute-duration presets sit in one compact row, less alarming than the red actions. */
+.mute-durations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px 4px 4px;
+}
+
+.mute-durations button {
+  width: auto;
+  padding: 3px 7px;
+  font-size: 12px;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.source-badge {
+  white-space: nowrap;
+  text-decoration: none;
+}
+
 /* Foreign (RSS/Bluesky) posts: the read-only escape hatch to the source site. */
 a.open-original {
   text-decoration: none;

@@ -115,6 +115,7 @@
       <app-status-card
         [status]="a"
         filterContext="thread"
+        [showSource]="true"
         (changed)="onContextChanged($event)"
         (deleted)="onContextDeleted($event)"
         (replied)="onReply($event)"
@@ -123,6 +124,7 @@
     <app-status-card
       [status]="s"
       filterContext="thread"
+      [showSource]="true"
       (changed)="onChanged($event)"
       (deleted)="onFocusedDeleted()"
       (replied)="onReply($event)"
@@ -132,6 +134,7 @@
       <app-status-card
         [status]="d"
         filterContext="thread"
+        [showSource]="true"
         (changed)="onContextChanged($event)"
         (deleted)="onContextDeleted($event)"
         (replied)="onReply($event)"

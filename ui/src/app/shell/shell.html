@@ -132,8 +132,8 @@
   </div>
 </header>
 
-<div class="layout" [class.layout-wide]="wide()">
-  @if (!wide()) {
+<div class="layout" [class.layout-wide]="wide()" [class.layout-zen]="!wide() && prefs.zenMode()">
+  @if (!wide() && !prefs.zenMode()) {
     <aside class="rail rail-left">
       <app-left-rail />
     </aside>
@@ -142,7 +142,7 @@
     <router-outlet />
     <app-app-footer />
   </main>
-  @if (!wide()) {
+  @if (!wide() && !prefs.zenMode()) {
     <aside class="rail rail-right">
       <app-right-rail />
     </aside>

@@ -78,6 +78,11 @@
         </div>
       }
     </div>
+    @if (altTextMissing()) {
+      <div class="alt-required muted small">
+        Alt text is required on every image before posting (Settings → Mockingbird Blue).
+      </div>
+    }
   }
 
   @if (pollOpen()) {

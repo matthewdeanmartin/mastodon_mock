@@ -279,8 +279,12 @@ export class Api {
   }
 
   // --- notifications ---
-  notifications(): Observable<MastodonNotification[]> {
-    return this.http.get<MastodonNotification[]>('/api/v1/notifications');
+  notifications(maxId?: string): Observable<MastodonNotification[]> {
+    let params = new HttpParams();
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
+    return this.http.get<MastodonNotification[]>('/api/v1/notifications', { params });
   }
 
   // --- favourites / bookmarks ---
@@ -478,8 +482,12 @@ export class Api {
     return this.http.get<Account[]>('/api/v1/blocks');
   }
 
-  muteAccount(id: string): Observable<Relationship> {
-    return this.http.post<Relationship>(`/api/v1/accounts/${id}/mute`, {});
+  /** Mute an account, optionally auto-expiring after `duration` seconds. */
+  muteAccount(id: string, duration?: number): Observable<Relationship> {
+    return this.http.post<Relationship>(
+      `/api/v1/accounts/${id}/mute`,
+      duration ? { duration } : {},
+    );
   }
 
   unmuteAccount(id: string): Observable<Relationship> {

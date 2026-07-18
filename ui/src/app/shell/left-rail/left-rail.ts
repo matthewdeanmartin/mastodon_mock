@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AccountHoverCard } from '../../account-hover-card/account-hover-card';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, Tag } from '../../models';
@@ -14,7 +15,7 @@ import { VerifiedBadge } from '../../verified-badge/verified-badge';
  */
 @Component({
   selector: 'app-left-rail',
-  imports: [RouterLink, VerifiedBadge],
+  imports: [RouterLink, VerifiedBadge, AccountHoverCard],
   templateUrl: './left-rail.html',
   styleUrl: './left-rail.css',
 })

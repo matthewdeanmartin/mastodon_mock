@@ -27,6 +27,9 @@ export class Profile implements OnInit {
   protected relationship = signal<Relationship | null>(null);
   protected loading = signal(true);
   protected statusesLoading = signal(false);
+  protected loadingMore = signal(false);
+  /** An older page came back empty: the account's history is fully loaded. */
+  protected exhausted = signal(false);
 
   // Timeline filter toggles. Defaults mirror Mastodon's profile view:
   // boosts shown, replies hidden, pinned strip on top.
@@ -129,6 +132,7 @@ export class Profile implements OnInit {
     const seq = ++this.loadSeq;
     this.statuses.set([]);
     this.statusesLoading.set(true);
+    this.exhausted.set(false);
     const opts = {
       excludeReblogs: !this.showBoosts(),
       excludeReplies: !this.showReplies(),
@@ -157,6 +161,39 @@ export class Profile implements OnInit {
       });
     };
     fetchPage(undefined, [], 1);
+  }
+
+  /** Fetch one older page below the current list ("Load more" at the bottom). */
+  loadMore(): void {
+    const id = this.account()?.id;
+    const last = this.statuses().at(-1);
+    if (!id || !last || this.loadingMore() || this.exhausted()) {
+      return;
+    }
+    const seq = this.loadSeq;
+    this.loadingMore.set(true);
+    this.api
+      .getAccountStatuses(id, {
+        excludeReblogs: !this.showBoosts(),
+        excludeReplies: !this.showReplies(),
+        limit: Profile.TARGET_COUNT,
+        maxId: last.id,
+      })
+      .subscribe({
+        next: (batch) => {
+          this.loadingMore.set(false);
+          if (seq !== this.loadSeq) {
+            return; // Filters changed or the route moved mid-flight.
+          }
+          if (!batch.length) {
+            this.exhausted.set(true);
+            return;
+          }
+          const seen = new Set(this.statuses().map((s) => s.id));
+          this.statuses.update((list) => [...list, ...batch.filter((s) => !seen.has(s.id))]);
+        },
+        error: () => this.loadingMore.set(false),
+      });
   }
 
   private loadPinned(id: string): void {
@@ -233,6 +270,32 @@ export class Profile implements OnInit {
     }
     const call = rel?.following ? this.api.unfollow(acc.id) : this.api.follow(acc.id);
     call.subscribe((updated) => this.relationship.set(updated));
+  }
+
+  /** Mute duration presets (seconds; null = until unmuted). */
+  protected readonly muteDurations: { label: string; seconds: number | null }[] = [
+    { label: '1 hour', seconds: 3600 },
+    { label: '1 day', seconds: 86400 },
+    { label: '7 days', seconds: 604800 },
+    { label: 'forever', seconds: null },
+  ];
+
+  mute(seconds: number | null): void {
+    const acc = this.account();
+    if (!acc) {
+      return;
+    }
+    this.api
+      .muteAccount(acc.id, seconds ?? undefined)
+      .subscribe((updated) => this.relationship.set(updated));
+  }
+
+  unmute(): void {
+    const acc = this.account();
+    if (!acc) {
+      return;
+    }
+    this.api.unmuteAccount(acc.id).subscribe((updated) => this.relationship.set(updated));
   }
 
   toggleBlock(): void {

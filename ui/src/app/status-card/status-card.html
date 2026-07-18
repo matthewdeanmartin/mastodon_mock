@@ -1,4 +1,6 @@
-@if (filterCollapsed()) {
+@if (mutedLocally()) {
+  <!-- "Mute this post": the viewer asked to never see this one again. -->
+} @else if (filterCollapsed()) {
   <!-- A warn-action content filter matched: collapse to a stub, Mastodon-style. -->
   <div class="filter-stub">
     <span class="muted">Filtered: {{ filterTitles() }}</span>
@@ -56,6 +58,21 @@
           <span class="badge muted provider-badge" title="Source">{{ badge }}</span>
         } @else {
           <span class="badge muted" title="Visibility">{{ display.visibility }}</span>
+        }
+        @if (showSource() && display.application; as app) {
+          @if (app.website) {
+            <a
+              class="badge muted source-badge"
+              [href]="app.website"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Posted via"
+              (click)="$event.stopPropagation()"
+              >via {{ app.name }}</a
+            >
+          } @else {
+            <span class="badge muted source-badge" title="Posted via">via {{ app.name }}</span>
+          }
         }
       </div>
       @if (editing()) {
@@ -246,7 +263,7 @@
             [title]="display.favourited ? 'Undo favourite' : 'Favourite'"
             [attr.aria-pressed]="display.favourited"
           >
-            ⭐
+            {{ favIcon() }}
             @if (display.favourited) {
               <span class="did">Favourited</span>
             }
@@ -343,6 +360,21 @@
             <details class="danger-menu" (click)="$event.stopPropagation()">
               <summary class="action" aria-label="More post actions">•••</summary>
               <div class="danger-menu-panel">
+                <button type="button" (click)="mutePost($event)" title="Hide this post for 30 days">
+                  Mute this post
+                </button>
+                @if (mutedAuthor()) {
+                  <span class="muted small menu-note">&#64;{{ display.account.acct }} muted</span>
+                } @else {
+                  <div class="menu-note muted small">Mute &#64;{{ display.account.acct }} for…</div>
+                  <div class="mute-durations">
+                    @for (d of muteDurations; track d.label) {
+                      <button type="button" (click)="muteAuthor($event, d.seconds)">
+                        {{ d.label }}
+                      </button>
+                    }
+                  </div>
+                }
                 <button type="button" (click)="openReport($event)">Report post</button>
               </div>
             </details>

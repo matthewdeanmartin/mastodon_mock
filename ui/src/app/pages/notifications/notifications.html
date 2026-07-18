@@ -110,6 +110,18 @@
   }
 }
 
+@if (!loading() && items().length) {
+  <div class="load-more-row">
+    @if (exhausted()) {
+      <span class="muted small">You're all caught up.</span>
+    } @else {
+      <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+      </button>
+    }
+  </div>
+}
+
 @if (listTarget(); as target) {
   <app-account-list-dialog
     [statusId]="target.statusId"

@@ -359,6 +359,11 @@
   background: transparent;
 }
 
+/* Zen mode: no rails, but the feed stays a centered column. */
+.layout.layout-zen {
+  grid-template-columns: minmax(0, var(--col-width));
+}
+
 @media (max-width: 1240px) {
   .layout {
     grid-template-columns: 290px minmax(0, var(--col-width));

@@ -11,6 +11,7 @@ import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, Poll, Status, Translation } from '../models';
+import { MutedPosts } from '../muted-posts';
 import { PROVIDER_CAPS, ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
 import { StatusActions } from '../providers/status-actions';
@@ -44,9 +45,21 @@ export class StatusCard {
   private prefs = inject(ClientPrefs);
   private actions = inject(StatusActions);
   private router = inject(Router);
+  private mutedPosts = inject(MutedPosts);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
+
+  /** ⭐ or ❤️, per the Mockingbird Blue preference. */
+  protected favIcon = computed(() => (this.prefs.favStyle() === 'heart' ? '❤️' : '⭐'));
+
+  /** The viewer hid this post ("mute this post"); renders as nothing. */
+  protected mutedLocally = computed(() => {
+    const map = this.mutedPosts.muted();
+    const s = this.status();
+    const shown = s.reblog ?? s;
+    return (map[shown.id] ?? 0) > Date.now();
+  });
 
   /** Minimal markdown (bold/italic/code/headers) applied to the body HTML. */
   protected md = applyMinimalMarkdown;
@@ -57,6 +70,8 @@ export class StatusCard {
    * context (a filter can apply to home but not threads, say).
    */
   readonly filterContext = input<FilterContext>('home');
+  /** Thread view turns this on: show which app the post was made with. */
+  readonly showSource = input(false);
   readonly changed = output<Status>();
   /** Emitted when the user deletes this status, so containers can drop it. */
   readonly deleted = output<Status>();
@@ -255,6 +270,31 @@ export class StatusCard {
   onReported(): void {
     this.showReport.set(false);
     this.reported.set(true);
+  }
+
+  /** Mute duration presets for the ••• menu (seconds; null = indefinite). */
+  protected readonly muteDurations: { label: string; seconds: number | null }[] = [
+    { label: '1 hour', seconds: 3600 },
+    { label: '1 day', seconds: 86400 },
+    { label: '7 days', seconds: 604800 },
+    { label: 'forever', seconds: null },
+  ];
+
+  /** Set once the viewer mutes the author from this card (flips the menu row). */
+  protected mutedAuthor = signal(false);
+
+  muteAuthor(event: Event, seconds: number | null): void {
+    event.stopPropagation();
+    this.api.muteAccount(this.display.account.id, seconds ?? undefined).subscribe({
+      next: () => this.mutedAuthor.set(true),
+      error: () => this.actionError.set('Could not mute this account.'),
+    });
+  }
+
+  /** Hide this post locally for 30 days (there is no server-side per-post hide). */
+  mutePost(event: Event): void {
+    event.stopPropagation();
+    this.mutedPosts.mute(this.display.id);
   }
 
   startEdit(event: Event): void {

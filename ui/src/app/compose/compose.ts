@@ -223,11 +223,16 @@ export class Compose implements OnDestroy {
   protected draftSaved = signal(false);
   private draftSavedTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Opt-in accessibility gate: some attached image still lacks alt text. */
+  protected altTextMissing = computed(
+    () => this.prefs.requireAltText() && this.media().some((m) => !m.description.trim()),
+  );
+
   protected canSubmit = computed(() => {
     if (this.submitting() || this.uploading() || this.countdown() !== null) {
       return false;
     }
-    if (this.overLimit()) {
+    if (this.overLimit() || this.altTextMissing()) {
       return false;
     }
     if (this.targetIncludesBsky()) {

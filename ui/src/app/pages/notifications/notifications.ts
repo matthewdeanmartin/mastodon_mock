@@ -106,6 +106,9 @@ export class Notifications implements OnInit, OnDestroy {
   protected items = signal<MastodonNotification[]>([]);
   protected loading = signal(true);
   protected live = signal(false);
+  protected loadingMore = signal(false);
+  /** An empty older page came back: the history is fully loaded. */
+  protected exhausted = signal(false);
 
   // List filters: who the notification is from, and what kind it is.
   protected audience = signal<NotifAudience>('all');
@@ -184,6 +187,26 @@ export class Notifications implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.liveSub?.unsubscribe();
+  }
+
+  loadMore(): void {
+    const last = this.items().at(-1);
+    if (!last || this.loadingMore() || this.exhausted()) {
+      return;
+    }
+    this.loadingMore.set(true);
+    this.api.notifications(last.id).subscribe({
+      next: (batch) => {
+        this.loadingMore.set(false);
+        if (!batch.length) {
+          this.exhausted.set(true);
+          return;
+        }
+        const seen = new Set(this.items().map((n) => n.id));
+        this.items.update((list) => [...list, ...batch.filter((n) => !seen.has(n.id))]);
+      },
+      error: () => this.loadingMore.set(false),
+    });
   }
 
   toggleLive(): void {

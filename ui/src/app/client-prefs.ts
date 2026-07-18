@@ -19,6 +19,14 @@ export type ChatKindFilter = 'all' | 'private' | 'public' | 'bsky';
 /** Algo-feed audience chip: everything, or only posts authored by follows. */
 export type AlgoAudience = 'all' | 'friends';
 
+/** Whether the favourite action renders as a star or a heart. */
+export type FavStyle = 'star' | 'heart';
+
+/** Custom color overrides; a `#rrggbb` string, or null for the theme default. */
+export type CustomColor = string | null;
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
 export interface AccentPreset {
   id: string;
   label: string;
@@ -87,6 +95,12 @@ interface StoredPrefs {
   algoAudience?: AlgoAudience;
   algoCalm?: boolean;
   algoTags?: boolean;
+  favStyle?: FavStyle;
+  zenMode?: boolean;
+  requireAltText?: boolean;
+  customBg?: CustomColor;
+  customLink?: CustomColor;
+  customSidebar?: CustomColor;
 }
 
 /** Feed-size bounds (see feedMin / feedMax). */
@@ -158,6 +172,18 @@ export class ClientPrefs {
    */
   readonly feedMin = signal<number>(FEED_MIN_DEFAULT);
   readonly feedMax = signal<number>(FEED_MAX_DEFAULT);
+
+  /** Favourite buttons render as ⭐ (Mastodon-style) or ❤️ (Twitter-style). */
+  readonly favStyle = signal<FavStyle>('star');
+  /** Zen mode: both sidebars disappear, leaving just the feed column. */
+  readonly zenMode = signal<boolean>(false);
+  /** Opt-in: refuse to post while any attached image lacks alt text. */
+  readonly requireAltText = signal<boolean>(false);
+
+  // Custom colors (null = keep the theme's own value).
+  readonly customBg = signal<CustomColor>(null);
+  readonly customLink = signal<CustomColor>(null);
+  readonly customSidebar = signal<CustomColor>(null);
 
   /** Resolved theme actually in effect ('auto' resolved against the OS preference). */
   readonly resolvedTheme = signal<'light' | 'dark'>('light');
@@ -287,6 +313,32 @@ export class ClientPrefs {
     }
   }
 
+  setFavStyle(style: FavStyle): void {
+    if (style === 'star' || style === 'heart') {
+      this.favStyle.set(style);
+    }
+  }
+
+  setZenMode(on: boolean): void {
+    this.zenMode.set(on);
+  }
+
+  setRequireAltText(on: boolean): void {
+    this.requireAltText.set(on);
+  }
+
+  setCustomBg(color: CustomColor): void {
+    this.customBg.set(normalizeColor(color));
+  }
+
+  setCustomLink(color: CustomColor): void {
+    this.customLink.set(normalizeColor(color));
+  }
+
+  setCustomSidebar(color: CustomColor): void {
+    this.customSidebar.set(normalizeColor(color));
+  }
+
   toggleProvider(id: ProviderId): void {
     this.hiddenProviders.update((hidden) =>
       hidden.includes(id) ? hidden.filter((p) => p !== id) : [...hidden, id],
@@ -375,6 +427,14 @@ export class ClientPrefs {
     if (typeof stored.feedMin === 'number') {
       this.setFeedMin(stored.feedMin);
     }
+    if (stored.favStyle === 'star' || stored.favStyle === 'heart') {
+      this.favStyle.set(stored.favStyle);
+    }
+    this.loadBool(stored.zenMode, this.zenMode);
+    this.loadBool(stored.requireAltText, this.requireAltText);
+    this.customBg.set(normalizeColor(stored.customBg ?? null));
+    this.customLink.set(normalizeColor(stored.customLink ?? null));
+    this.customSidebar.set(normalizeColor(stored.customSidebar ?? null));
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -407,6 +467,12 @@ export class ClientPrefs {
       algoAudience: this.algoAudience(),
       algoCalm: this.algoCalm(),
       algoTags: this.algoTags(),
+      favStyle: this.favStyle(),
+      zenMode: this.zenMode(),
+      requireAltText: this.requireAltText(),
+      customBg: this.customBg(),
+      customLink: this.customLink(),
+      customSidebar: this.customSidebar(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   }
@@ -427,5 +493,23 @@ export class ClientPrefs {
     root.style.setProperty('--reader-letter-spacing', `${this.readerLetterSpacing()}px`);
     root.style.setProperty('--reader-word-spacing', `${this.readerWordSpacing()}px`);
     root.style.setProperty('--reader-text-align', this.readerTextAlign());
+    // Custom colors ride on top of the theme/accent as inline overrides;
+    // clearing one falls back to whatever the palette defines.
+    setOrRemove(root, '--bg', this.customBg());
+    setOrRemove(root, '--accent', this.customLink());
+    setOrRemove(root, '--accent-hover', this.customLink());
+    setOrRemove(root, '--rail-bg', this.customSidebar());
   }
+}
+
+function setOrRemove(root: HTMLElement, prop: string, value: CustomColor): void {
+  if (value) {
+    root.style.setProperty(prop, value);
+  } else {
+    root.style.removeProperty(prop);
+  }
+}
+
+function normalizeColor(color: CustomColor): CustomColor {
+  return color && HEX_COLOR.test(color) ? color.toLowerCase() : null;
 }

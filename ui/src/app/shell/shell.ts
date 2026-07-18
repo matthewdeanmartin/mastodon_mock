@@ -4,6 +4,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter, map } from 'rxjs';
 import { Api } from '../api';
 import { Auth, Session } from '../auth';
+import { ClientPrefs } from '../client-prefs';
 import { environment } from '../../environments/environment';
 import { Hotkeys } from '../hotkeys';
 import { ShortcutHelp } from '../shortcut-help/shortcut-help';
@@ -35,6 +36,7 @@ export class Shell implements OnInit {
   private router = inject(Router);
   /** Mastodon-compatible keyboard shortcuts (and the "?" help dialog). */
   protected hotkeys = inject(Hotkeys);
+  protected prefs = inject(ClientPrefs);
 
   /** Build flavor: drives the brand and whether mock-only nav links are shown. */
   protected brand = environment.brand;

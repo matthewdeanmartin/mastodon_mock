@@ -115,7 +115,14 @@ export class Login implements OnInit, OnDestroy {
   protected seedMessage = signal<string | null>(null);
 
   // --- Full OAuth flow (primary sign-in) ---
-  protected appName = signal('mastodon_mock UI');
+  // The OAuth app name is what other clients show as each post's source, so it
+  // carries the product name: the hosted flavor when served from mawkingbird.com,
+  // the generic open-source name anywhere else (self-hosts, localhost).
+  protected appName = signal(
+    (window.location?.hostname ?? '').toLowerCase().includes('mawkingbird')
+      ? 'Mawkingbird'
+      : 'Mockingbird',
+  );
   protected oauthWorking = signal(false);
   protected oauthError = signal<string | null>(null);
 

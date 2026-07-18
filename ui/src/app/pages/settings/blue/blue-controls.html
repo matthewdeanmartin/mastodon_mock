@@ -58,6 +58,95 @@
       </div>
     </div>
   </div>
+
+  <div class="srow">
+    <span class="slabel">Custom colors</span>
+    <div class="scontrol">
+      <label class="inline-field">
+        Background
+        <input
+          type="color"
+          [ngModel]="prefs.customBg() ?? '#f7f9f9'"
+          (ngModelChange)="prefs.setCustomBg($event)"
+          name="custom_bg"
+        />
+        @if (prefs.customBg()) {
+          <button type="button" class="linklike" (click)="prefs.setCustomBg(null)">reset</button>
+        }
+      </label>
+      <label class="inline-field">
+        Links &amp; buttons
+        <input
+          type="color"
+          [ngModel]="prefs.customLink() ?? '#1da1f2'"
+          (ngModelChange)="prefs.setCustomLink($event)"
+          name="custom_link"
+        />
+        @if (prefs.customLink()) {
+          <button type="button" class="linklike" (click)="prefs.setCustomLink(null)">reset</button>
+        }
+      </label>
+      <label class="inline-field">
+        Sidebar cards
+        <input
+          type="color"
+          [ngModel]="prefs.customSidebar() ?? '#ffffff'"
+          (ngModelChange)="prefs.setCustomSidebar($event)"
+          name="custom_sidebar"
+        />
+        @if (prefs.customSidebar()) {
+          <button type="button" class="linklike" (click)="prefs.setCustomSidebar(null)">
+            reset
+          </button>
+        }
+      </label>
+      <span class="hint">
+        Overrides ride on top of the theme; reset any of them to fall back to the theme's own color.
+        A custom link color replaces the accent preset above.
+      </span>
+    </div>
+  </div>
+
+  <div class="srow">
+    <span class="slabel">Favourites look like</span>
+    <div class="scontrol">
+      <label class="radioline">
+        <input
+          type="radio"
+          value="star"
+          [ngModel]="prefs.favStyle()"
+          (ngModelChange)="prefs.setFavStyle($event)"
+          name="fav_style"
+        />
+        ⭐ Stars (classic Mastodon)
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="heart"
+          [ngModel]="prefs.favStyle()"
+          (ngModelChange)="prefs.setFavStyle($event)"
+          name="fav_style"
+        />
+        ❤️ Hearts (like the bird site)
+      </label>
+    </div>
+  </div>
+
+  <div class="srow">
+    <span class="slabel">Zen mode</span>
+    <div class="scontrol">
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.zenMode()"
+          (ngModelChange)="prefs.setZenMode($event)"
+          name="zen_mode"
+        />
+        Hide both sidebars — just you and the feed
+      </label>
+    </div>
+  </div>
 </div>
 
 <div class="ssection">
@@ -81,6 +170,15 @@
           name="delayed_send"
         />
         Wait 30 seconds before posting, so you can cancel (or publish early)
+      </label>
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.requireAltText()"
+          (ngModelChange)="prefs.setRequireAltText($event)"
+          name="require_alt_text"
+        />
+        Require alt text on every image before posting
       </label>
     </div>
   </div>
