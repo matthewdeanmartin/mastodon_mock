@@ -307,8 +307,11 @@ export class Api {
     return this.http.get<Status[]>('/api/v1/favourites');
   }
 
-  bookmarks(limit?: number): Observable<Status[]> {
+  bookmarks(maxId?: string, limit?: number): Observable<Status[]> {
     let params = new HttpParams();
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
     if (limit) {
       params = params.set('limit', String(limit));
     }

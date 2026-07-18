@@ -215,7 +215,7 @@ export class Home implements OnInit, OnDestroy {
     if (this.bookmarkTail().length) {
       return;
     }
-    this.api.bookmarks(BOOKMARK_TAIL_SIZE).subscribe({
+    this.api.bookmarks(undefined, BOOKMARK_TAIL_SIZE).subscribe({
       next: (marks) => this.bookmarkTail.set(marks),
       error: () => undefined,
     });

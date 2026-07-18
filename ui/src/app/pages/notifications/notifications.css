@@ -100,8 +100,16 @@
   justify-content: center;
   padding: 16px;
 }
-.mention-reply {
+.mention-actions {
   margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The action buttons are anchors; keep them from picking up link underlines. */
+.mention-actions .btn {
+  text-decoration: none;
 }
 
 .who {

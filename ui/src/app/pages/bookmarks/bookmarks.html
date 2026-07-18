@@ -22,4 +22,14 @@
       <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
     }
   }
+
+  <div class="load-more-row">
+    @if (exhausted()) {
+      <span class="muted small">That's all your bookmarks.</span>
+    } @else {
+      <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+      </button>
+    }
+  </div>
 }

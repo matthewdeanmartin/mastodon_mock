@@ -27,14 +27,11 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
       @if (hasStats) {
         <div class="hc-stats muted">
           <span
-            ><strong>{{ account().statuses_count | humanCount }}</strong> posts</span
-          >
+            ><strong>{{ account().statuses_count | humanCount }}</strong> posts</span>
           <span
-            ><strong>{{ account().following_count | humanCount }}</strong> following</span
-          >
+            ><strong>{{ account().following_count | humanCount }}</strong> following</span>
           <span
-            ><strong>{{ account().followers_count | humanCount }}</strong> followers</span
-          >
+            ><strong>{{ account().followers_count | humanCount }}</strong> followers</span>
         </div>
       }
     </div>

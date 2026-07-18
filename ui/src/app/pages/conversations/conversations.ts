@@ -9,7 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../../api';
@@ -117,8 +117,14 @@ export class Conversations implements OnInit, OnDestroy {
   private auth = inject(Auth);
   private streaming = inject(Streaming);
   private bskyChat = inject(BlueskyChatApi);
+  private route = inject(ActivatedRoute);
   protected bsky = inject(BlueskySession);
   protected prefs = inject(ClientPrefs);
+
+  /** A chat key requested via `?open=…` (e.g. from a notification) to auto-select. */
+  private pendingOpen = signal<string | null>(null);
+  /** True once we've honoured a pending `?open=…` so it can't re-fire on re-select. */
+  private openHandled = false;
 
   protected loading = signal(true);
   protected privateConvs = signal<Conversation[]>([]);
@@ -152,6 +158,19 @@ export class Conversations implements OnInit, OnDestroy {
   private strippedCache = new Map<string, string>();
 
   constructor() {
+    // Honour `?open=<chat key>` (from a notification's "Open in chat") once the
+    // matching chat row has loaded. Runs once, then leaves manual selection alone.
+    effect(() => {
+      const want = this.pendingOpen();
+      if (!want || this.openHandled) {
+        return;
+      }
+      const chat = this.chats().find((c) => c.key === want);
+      if (chat) {
+        this.openHandled = true;
+        this.select(chat);
+      }
+    });
     effect(() => {
       if (this.prefs.chatAudience() !== 'mutuals') {
         return;
@@ -314,6 +333,10 @@ export class Conversations implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    const open = this.route.snapshot.queryParamMap.get('open');
+    if (open) {
+      this.pendingOpen.set(open);
+    }
     this.load();
     // The IM feel: streams are live while this page is open, closed on leave.
     this.subs.push(

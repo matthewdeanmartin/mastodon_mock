@@ -180,7 +180,7 @@
       }
       @if (!cwCollapsed() && display.media_attachments.length) {
         @if (imagesVisible()) {
-          <div class="media">
+          <div class="media" [class.media-sensitive]="mediaBlurred()">
             @for (m of display.media_attachments; track m.id; let i = $index) {
               <button
                 type="button"
@@ -189,6 +189,16 @@
                 [attr.aria-label]="'View image' + (m.description ? ': ' + m.description : '')"
               >
                 <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+              </button>
+            }
+            @if (mediaBlurred()) {
+              <button
+                type="button"
+                class="sensitive-reveal"
+                (click)="revealSensitive($event)"
+                aria-label="Show sensitive content"
+              >
+                <span>⚠️ Sensitive content — click to view</span>
               </button>
             }
           </div>
@@ -364,12 +374,59 @@
             <button class="action" (click)="deleteAndRedraft($event)" title="Delete &amp; repost">
               ♻️
             </button>
+            @if (display.url || display.account.url) {
+              <details class="danger-menu" (click)="$event.stopPropagation()">
+                <summary class="action" aria-label="More post actions">•••</summary>
+                <div class="danger-menu-panel">
+                  @if (display.url) {
+                    <a
+                      [href]="display.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      (click)="$event.stopPropagation()"
+                    >
+                      Open post on original site ↗
+                    </a>
+                  }
+                  @if (display.account.url) {
+                    <a
+                      [href]="display.account.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      (click)="$event.stopPropagation()"
+                    >
+                      Open profile on original site ↗
+                    </a>
+                  }
+                </div>
+              </details>
+            }
           } @else if (reported()) {
             <span class="action reported" title="Reported">🚩 reported</span>
           } @else {
             <details class="danger-menu" (click)="$event.stopPropagation()">
               <summary class="action" aria-label="More post actions">•••</summary>
               <div class="danger-menu-panel">
+                @if (display.url) {
+                  <a
+                    [href]="display.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    (click)="$event.stopPropagation()"
+                  >
+                    Open post on original site ↗
+                  </a>
+                }
+                @if (display.account.url) {
+                  <a
+                    [href]="display.account.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    (click)="$event.stopPropagation()"
+                  >
+                    Open profile on original site ↗
+                  </a>
+                }
                 <button type="button" (click)="mutePost($event)" title="Hide this post for 30 days">
                   Mute this post
                 </button>

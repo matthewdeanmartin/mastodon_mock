@@ -6,7 +6,6 @@ import { Api } from '../../api';
 import { ClientPrefs } from '../../client-prefs';
 import { MastodonNotification, Relationship, Status } from '../../models';
 import { Streaming } from '../../streaming';
-import { Compose } from '../../compose/compose';
 import { AccountListDialog, AccountListMode } from '../../account-list-dialog/account-list-dialog';
 
 type NotifAudience = 'all' | 'friends' | 'followers';
@@ -91,7 +90,7 @@ function dedupeByAccount(bucket: MastodonNotification[]): MastodonNotification[]
 
 @Component({
   selector: 'app-notifications',
-  imports: [RouterLink, Compose, FormsModule, AccountListDialog],
+  imports: [RouterLink, FormsModule, AccountListDialog],
   templateUrl: './notifications.html',
   styleUrl: './notifications.css',
 })
@@ -239,6 +238,16 @@ export class Notifications implements OnInit, OnDestroy {
     if (mode) {
       this.listTarget.set({ statusId: row.status.id, mode });
     }
+  }
+
+  /**
+   * The conversations-tab chat key for a mention, matching how the chat list
+   * groups public replies (by the reply guy). Passed as `?open=` so the DM tab
+   * opens straight onto that chat — we nudge people toward the chat view over
+   * the raw thread.
+   */
+  chatKey(n: MastodonNotification): string {
+    return `pub:${n.account.acct}`;
   }
 
   label(type: string): string {

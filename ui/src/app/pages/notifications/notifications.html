@@ -88,20 +88,46 @@
           }}</a>
           <span class="what muted">{{ label(n.type) }}</span>
           @if (n.status) {
-            <a class="excerpt" [routerLink]="['/statuses', n.status.id]">
-              <span class="excerpt-content" [innerHTML]="n.status.content"></span>
-              @if (n.status.media_attachments.length && showImages()) {
-                <span class="excerpt-media">
-                  @for (m of n.status.media_attachments; track m.id) {
-                    <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
-                  }
-                </span>
-              }
-            </a>
             @if (n.type === 'mention') {
-              <div class="mention-reply">
-                <app-compose [inReplyToId]="n.status.id" placeholder="Post your reply" />
+              <!-- Mentions open as a chat: click the body to jump into the DM
+                   tab's public chat with this person (we nudge chat over thread). -->
+              <a
+                class="excerpt"
+                [routerLink]="['/conversations']"
+                [queryParams]="{ open: chatKey(n) }"
+              >
+                <span class="excerpt-content" [innerHTML]="n.status.content"></span>
+                @if (n.status.media_attachments.length && showImages()) {
+                  <span class="excerpt-media">
+                    @for (m of n.status.media_attachments; track m.id) {
+                      <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                    }
+                  </span>
+                }
+              </a>
+              <div class="mention-actions">
+                <a
+                  class="btn btn-sm"
+                  [routerLink]="['/conversations']"
+                  [queryParams]="{ open: chatKey(n) }"
+                >
+                  💬 Open in chat
+                </a>
+                <a class="btn btn-outline btn-sm" [routerLink]="['/statuses', n.status.id]">
+                  🧵 View thread
+                </a>
               </div>
+            } @else {
+              <a class="excerpt" [routerLink]="['/statuses', n.status.id]">
+                <span class="excerpt-content" [innerHTML]="n.status.content"></span>
+                @if (n.status.media_attachments.length && showImages()) {
+                  <span class="excerpt-media">
+                    @for (m of n.status.media_attachments; track m.id) {
+                      <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                    }
+                  </span>
+                }
+              </a>
             }
           }
         </div>

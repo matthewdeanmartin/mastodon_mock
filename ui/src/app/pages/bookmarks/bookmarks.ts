@@ -21,6 +21,9 @@ export class Bookmarks implements OnInit {
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
+  protected loadingMore = signal(false);
+  /** An empty older page came back: the whole library is loaded. */
+  protected exhausted = signal(false);
   protected view = signal<LibraryView>('all');
 
   protected readonly views: { id: LibraryView; label: string }[] = [
@@ -50,6 +53,31 @@ export class Bookmarks implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  loadMore(): void {
+    const last = this.statuses().at(-1);
+    if (!last || this.loadingMore() || this.exhausted()) {
+      return;
+    }
+    this.loadingMore.set(true);
+    this.api.bookmarks(last.id).subscribe({
+      next: (batch) => {
+        this.loadingMore.set(false);
+        if (!batch.length) {
+          this.exhausted.set(true);
+          return;
+        }
+        const seen = new Set(this.statuses().map((s) => s.id));
+        const fresh = batch.filter((s) => !seen.has(s.id));
+        if (!fresh.length) {
+          this.exhausted.set(true);
+          return;
+        }
+        this.statuses.update((list) => [...list, ...fresh]);
+      },
+      error: () => this.loadingMore.set(false),
     });
   }
 

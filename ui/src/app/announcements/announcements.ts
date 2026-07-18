@@ -5,6 +5,23 @@ import { Announcement } from '../models';
 // A few quick-pick reactions; the API accepts any unicode emoji shortcode/char.
 const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀'];
 
+/**
+ * localStorage key holding the ids the viewer has dismissed. The server-side
+ * dismiss endpoint isn't reachable on every instance (and doesn't hide the
+ * banner on refresh for the current session anyway), so we keep a client-side
+ * "seen it" list — the banner must be dismissable against mastodon.social.
+ */
+const DISMISSED_KEY = 'mockingbird_dismissed_announcements';
+
+function readDismissed(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? '[]') as unknown;
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Active instance announcements shown above a timeline (dismiss + react). */
 @Component({
   selector: 'app-announcements',
@@ -18,14 +35,24 @@ export class Announcements implements OnInit {
   protected readonly quickReactions = QUICK_REACTIONS;
   protected announcements = signal<Announcement[]>([]);
 
+  /** Ids the viewer has already dismissed (client-side "seen it" list). */
+  private dismissed = new Set<string>(readDismissed());
+
   ngOnInit(): void {
-    this.api.announcements().subscribe((a) => this.announcements.set(a));
+    this.api.announcements().subscribe((a) =>
+      // Filter out anything already dismissed on this device, then keep it hidden.
+      this.announcements.set(a.filter((x) => !this.dismissed.has(x.id))),
+    );
   }
 
   dismiss(a: Announcement): void {
-    // Optimistically drop it; dismiss is idempotent server-side.
+    // Optimistically drop it and remember the choice locally so it stays gone
+    // on refresh even when the server dismiss endpoint isn't available.
     this.announcements.update((list) => list.filter((x) => x.id !== a.id));
-    this.api.dismissAnnouncement(a.id).subscribe();
+    this.dismissed.add(a.id);
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...this.dismissed]));
+    // Best-effort server dismiss; a failure is fine, the local flag holds.
+    this.api.dismissAnnouncement(a.id).subscribe({ error: () => undefined });
   }
 
   toggleReaction(a: Announcement, name: string): void {

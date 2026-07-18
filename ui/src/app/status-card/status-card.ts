@@ -110,6 +110,26 @@ export class StatusCard {
     this.cwOpen.update((v) => !v);
   }
 
+  // --- sensitive media ---
+
+  /** Viewer clicked through the sensitive-media blur; resets per status. */
+  private sensitiveRevealed = linkedSignal({ source: this.status, computation: () => false });
+
+  /**
+   * True while media should sit behind a "sensitive content" blur. A CW already
+   * gates the whole body, so we only blur when the post is flagged sensitive but
+   * carries no spoiler text — and only until the viewer reveals it.
+   */
+  protected mediaBlurred = computed(
+    () => this.display.sensitive && !this.spoilerText() && !this.sensitiveRevealed(),
+  );
+
+  revealSensitive(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.sensitiveRevealed.set(true);
+  }
+
   // --- content filters (server-computed `filtered`, applied client-side) ---
 
   /** Matched filters that apply in this timeline's context. */
