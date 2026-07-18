@@ -107,6 +107,33 @@ All landed and verified (653 specs green, live Playwright pass):
 Deferred by explicit decision: mutual-discovery pagination, sentiment-lexicon
 improvements, Algo pagination (bounded by construction anyway).
 
+## Round 3 (quality-of-life batch)
+
+All landed and verified (664 specs green across 79 files, live Playwright pass):
+
+- **"? for keyboard" hint**: footer entry on every page that opens the same
+  shortcut-help overlay the `?` key does (`app-footer.ts` + `Hotkeys`).
+- **Pinned visibility**: profile's pinned strip now labels each card
+  "📌 Pinned" (boost-label style) — previously indistinguishable.
+- **Calm mode structural signals** (`sentiment.ts`): any content warning, and
+  any match on the viewer's own content filters, count as negative sentiment
+  outright — the author or the viewer already flagged it.
+- **Tag page toggle fix**: Follow's `btn-outline` binding was inverted (blue
+  when NOT following). Both Follow and Feature now behave as toggles: filled
+  when on, outline when off.
+- **Search idle panel**: the "Find people to follow" block only shows when
+  the Accounts search type is selected — noise for tag/post searches.
+- **Bookmark tail marker**: each tacked-on bookmark gets a
+  "🔖 From your bookmarks" label above the card.
+- **Minimal markdown** (`markdown.ts` + spec, no dependency): `**bold**`,
+  `*italic*`, `` `code` ``, and `#`–`######` headers, in both status bodies
+  (`status-card`) and the compose live preview. Elk-inspired design: parse the
+  HTML, transform *text nodes only* (never inside `<a>`/`<code>`/`<pre>`), so
+  markers in URLs can't be mangled; headers split `<p>`s at `<br>`s.
+  "Anything weird turns it off": fenced code blocks and markdown links/images
+  return the input unchanged; unpaired markers stay literal. Element styles
+  live in global `styles.css` (innerHTML content escapes component scoping).
+
 ### Known gaps / follow-ups
 
 - Mutual discovery reads one page (80) of following/followers each — heavy

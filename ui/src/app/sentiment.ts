@@ -1,3 +1,5 @@
+import { array as profanityWords } from 'badwords-list';
+
 import { Status } from './models';
 
 /**
@@ -10,7 +12,8 @@ import { Status } from './models';
  * while a word list is a few KB and synchronous. It will misfire sometimes —
  * that's the accepted trade, and the filter is opt-in and reversible.
  *
- * Scoring: weighted keyword hits, plus small boosts for shouting (many
+ * Scoring: weighted keyword hits, an established 450-word English profanity
+ * list (whole-token matches only), plus small boosts for shouting (many
  * ALL-CAPS words) and exclamation pile-ups — the classic cheap VADER cues.
  */
 
@@ -97,6 +100,26 @@ const RAGE_WEIGHTS = new Map<string, number>([
   ['bullshit', 2],
 ]);
 
+/**
+ * English profanity terms from `badwords-list` (MIT, zero runtime dependencies).
+ *
+ * This remains separate from the rage lexicon: profanity is an explicit product
+ * rule, rather than a context-dependent sentiment signal. Matching tokens rather
+ * than substrings avoids false positives such as "shitake".
+ */
+const PROFANITY_WORDS = new Set([...profanityWords, 'dogshit'].map((word) => word.toLowerCase()));
+
+/** Consonant skeletons allow asterisks to stand in for omitted vowels (for example, "f*ck"). */
+const DISEMVOWELLED_PROFANITY_WORDS = new Set(
+  [...PROFANITY_WORDS]
+    .filter((word) => /^[a-z]+$/.test(word))
+    .map((word) => word.replace(/[aeiou]/g, ''))
+    .filter((word) => word.length >= 3),
+);
+
+/** Strongly negative emoji are an explicit Calm mode signal, not a general sentiment classifier. */
+const NEGATIVE_EMOJIS = ['🤬', '😡', '😠', '🤮', '💩', '🖕', '👎'] as const;
+
 /** Posts scoring at or above this are considered heated. */
 export const HEATED_THRESHOLD = 2;
 
@@ -115,7 +138,7 @@ export function stripHtml(html: string): string {
     .trim();
 }
 
-/** Rage score for a plain-text snippet: keyword weights + shouting cues. */
+/** Rage score for a plain-text snippet: words, obfuscation, emoji, and shouting cues. */
 export function rageScore(text: string): number {
   const lower = text.toLowerCase();
   const tokens = lower.split(/[^a-z']+/).filter(Boolean);
@@ -123,6 +146,12 @@ export function rageScore(text: string): number {
 
   const seen = new Set<string>();
   for (const token of tokens) {
+    // A whole-word profanity hit is always considered heated on its own.
+    if (PROFANITY_WORDS.has(token) && !seen.has(token)) {
+      seen.add(token);
+      score += HEATED_THRESHOLD;
+      continue;
+    }
     const weight = RAGE_WEIGHTS.get(token);
     // Count each distinct word once — repetition is covered by the caps/bang cues.
     if (weight && !seen.has(token)) {
@@ -130,6 +159,28 @@ export function rageScore(text: string): number {
       score += weight;
     }
   }
+
+  // Asterisks commonly replace vowels in profanity ("f*ck", "sh*t").
+  // Only star-containing, whole-token candidates are considered, so regular
+  // Markdown emphasis or a normal word cannot trigger this path.
+  const obfuscatedTokens = lower.match(/[a-z*]+/g) ?? [];
+  for (const token of obfuscatedTokens) {
+    const consonantSkeleton = token.replace(/[aeiou*]/g, '');
+    if (
+      token.includes('*') &&
+      consonantSkeleton.length >= 3 &&
+      DISEMVOWELLED_PROFANITY_WORDS.has(consonantSkeleton)
+    ) {
+      score += HEATED_THRESHOLD;
+      break;
+    }
+  }
+
+  // Calm mode is opt-in, so treat these unambiguously negative emoji as heated.
+  if (NEGATIVE_EMOJIS.some((emoji) => text.includes(emoji))) {
+    score += HEATED_THRESHOLD;
+  }
+
   // Two-word phrases ("sick of", "war on", "fed up").
   for (const [phrase, weight] of RAGE_WEIGHTS) {
     if (phrase.includes(' ') && lower.includes(phrase)) {

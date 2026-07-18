@@ -52,6 +52,25 @@ describe('rageScore', () => {
     expect(rageScore('trash trash trash')).toBe(rageScore('trash'));
   });
 
+  it('treats a whole-word profanity hit as heated', () => {
+    expect(rageScore('This release is dogshit.')).toBeGreaterThanOrEqual(HEATED_THRESHOLD);
+    expect(rageScore('This is shit.')).toBeGreaterThanOrEqual(HEATED_THRESHOLD);
+  });
+
+  it('does not match profanity inside an otherwise harmless word', () => {
+    expect(rageScore('I made a shiitake mushroom risotto.')).toBe(0);
+  });
+
+  it('recognizes profanity with vowels replaced by asterisks', () => {
+    expect(rageScore('This is f*cking broken.')).toBeGreaterThanOrEqual(HEATED_THRESHOLD);
+    expect(rageScore('What a sh*t show.')).toBeGreaterThanOrEqual(HEATED_THRESHOLD);
+  });
+
+  it('treats strongly negative emoji as heated', () => {
+    expect(rageScore('What a day 🤬')).toBeGreaterThanOrEqual(HEATED_THRESHOLD);
+    expect(rageScore('That is disgusting 🤮')).toBeGreaterThanOrEqual(HEATED_THRESHOLD);
+  });
+
   it('matches two-word phrases', () => {
     expect(rageScore('so sick of this, honestly fed up')).toBeGreaterThan(0);
   });
