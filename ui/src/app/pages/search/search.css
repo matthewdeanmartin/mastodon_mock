@@ -59,3 +59,46 @@
 .search-idle {
   padding: 0 16px 16px;
 }
+
+/* Advanced search: date-operator builder. */
+.advanced-panel {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.advanced-panel p {
+  margin: 0 0 8px;
+}
+
+.advanced-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.advanced-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.advanced-fields input {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.advanced-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.result-tag .tag-uses {
+  font-weight: 400;
+  font-size: 0.85em;
+  margin-left: 8px;
+}

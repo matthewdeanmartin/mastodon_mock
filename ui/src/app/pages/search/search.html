@@ -18,7 +18,44 @@
     <option value="hashtags">Hashtags</option>
   </select>
   <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
+  <button
+    class="btn btn-outline"
+    [class.on]="advancedOpen()"
+    (click)="advancedOpen.set(!advancedOpen())"
+    [attr.aria-expanded]="advancedOpen()"
+  >
+    Advanced ▾
+  </button>
 </div>
+
+@if (advancedOpen()) {
+  <div class="advanced-panel">
+    <p class="muted small">
+      Narrow post searches by time — these become <code>before:</code> / <code>after:</code> /
+      <code>during:</code> operators in the query.
+    </p>
+    <div class="advanced-fields">
+      <label>
+        <span class="muted small">Before</span>
+        <input type="date" [ngModel]="before()" (ngModelChange)="before.set($event)" />
+      </label>
+      <label>
+        <span class="muted small">After</span>
+        <input type="date" [ngModel]="after()" (ngModelChange)="after.set($event)" />
+      </label>
+      <label>
+        <span class="muted small">During (one day)</span>
+        <input type="date" [ngModel]="during()" (ngModelChange)="during.set($event)" />
+      </label>
+    </div>
+    <div class="advanced-actions">
+      <button class="btn btn-sm" (click)="applyAdvanced()">Apply &amp; search</button>
+      @if (before() || after() || during()) {
+        <button class="btn btn-outline btn-sm" (click)="clearAdvanced()">Clear dates</button>
+      }
+    </div>
+  </div>
+}
 
 @if (!results() && type() === 'accounts') {
   <!-- Nothing searched yet and looking for people: offer follow-list import &
@@ -27,6 +64,32 @@
     <div class="page-head">Find people to follow</div>
     <app-find-people [embedded]="true" />
   </div>
+}
+
+@if (!results() && type() === 'statuses') {
+  <!-- Nothing searched yet: fill the blank space with what's trending now. -->
+  @if (trendingPosts().length) {
+    <div class="page-head">Trending posts</div>
+    @for (s of trendingPosts(); track s.id) {
+      <app-status-card
+        [status]="s"
+        (changed)="onTrendChanged($event)"
+        (deleted)="onTrendDeleted($event)"
+      />
+    }
+  }
+}
+
+@if (!results() && type() === 'hashtags') {
+  @if (trendingTags().length) {
+    <div class="page-head">Trending hashtags</div>
+    @for (h of trendingTags(); track h.name) {
+      <a class="result-tag" [routerLink]="['/tags', h.name]">
+        #{{ h.name }}
+        <span class="muted tag-uses">{{ tagUses(h).toLocaleString() }} recent uses</span>
+      </a>
+    }
+  }
 }
 
 @if (results(); as r) {

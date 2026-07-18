@@ -145,6 +145,24 @@
     </div>
   }
 
+  @if (scheduleOpen()) {
+    <div class="schedule-row">
+      <label class="muted small" for="schedule-at">Publish at</label>
+      <input
+        id="schedule-at"
+        type="datetime-local"
+        [min]="scheduleMin()"
+        [ngModel]="scheduleAt()"
+        (ngModelChange)="scheduleAt.set($event)"
+      />
+      @if (scheduleAt()) {
+        <button class="btn btn-outline btn-sm" type="button" (click)="scheduleAt.set('')">
+          Clear
+        </button>
+      }
+    </div>
+  }
+
   <div class="compose-bottom">
     <div class="compose-selects">
       @if (showTargetPicker()) {
@@ -215,6 +233,17 @@
         >
           📊
         </button>
+
+        @if (!inReplyToId() && !quotedStatusId()) {
+          <button
+            class="tool-btn"
+            [class.on]="scheduleOpen()"
+            (click)="toggleSchedule()"
+            title="Schedule post"
+          >
+            🕒
+          </button>
+        }
 
         <button class="tool-btn" [class.on]="cwOpen()" (click)="toggleCw()" title="Content warning">
           CW
@@ -291,9 +320,11 @@
               ? 'Reply'
               : quotedStatusId()
                 ? 'Quote'
-                : thread().length
-                  ? 'Post all'
-                  : 'Post'
+                : scheduleActive()
+                  ? 'Schedule'
+                  : thread().length
+                    ? 'Post all'
+                    : 'Post'
         }}
       </button>
     </div>
@@ -305,6 +336,21 @@
 
   @if (draftSaved()) {
     <div class="thread-hint muted">Saved to drafts.</div>
+  }
+
+  @if (scheduledFlash(); as flash) {
+    <div class="thread-hint muted">{{ flash }}</div>
+  }
+  @if (scheduleTooSoon()) {
+    <div class="thread-hint muted">
+      Times less than ~5 minutes out publish immediately instead of scheduling.
+    </div>
+  }
+  @if (scheduleActive() && thread().length) {
+    <div class="thread-hint muted">Threads can't be scheduled — remove the extra posts.</div>
+  }
+  @if (scheduleActive() && targetIncludesBsky()) {
+    <div class="thread-hint muted">Scheduling is Fedi-only — switch the post target to 🦣.</div>
   }
 
   @if (target() === 'bsky' && (media().length || pollOpen())) {

@@ -1,13 +1,17 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { Api } from '../../api';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { Draft, Drafts } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
+import { ScheduledStatus } from '../../models';
 
 /**
- * The saved-drafts list. Drafts live only in this browser's localStorage —
- * Mastodon has no server-side drafts — so they don't follow you across
- * devices. "Continue" opens the draft in the home composer.
+ * The saved-drafts list plus the account's scheduled posts. Drafts live only
+ * in this browser's localStorage — Mastodon has no server-side drafts — so
+ * they don't follow you across devices. Scheduled posts DO live server-side
+ * (`/api/v1/scheduled_statuses`); cancelling one deletes it on the server.
+ * "Continue" opens a draft in the home composer.
  */
 @Component({
   selector: 'app-drafts-page',
@@ -15,11 +19,27 @@ import { HumanTimePipe } from '../../human-time.pipe';
   templateUrl: './drafts-page.html',
   styleUrl: './drafts-page.css',
 })
-export class DraftsPage {
+export class DraftsPage implements OnInit {
   protected drafts = inject(Drafts);
+  private api = inject(Api);
   private router = inject(Router);
 
   protected pendingDelete = signal<Draft | null>(null);
+
+  protected scheduled = signal<ScheduledStatus[]>([]);
+  protected scheduledLoaded = signal(false);
+  protected pendingCancel = signal<ScheduledStatus | null>(null);
+
+  ngOnInit(): void {
+    // Anonymous/demo sessions can't list scheduled posts — just show nothing.
+    this.api.scheduledStatuses().subscribe({
+      next: (rows) => {
+        this.scheduled.set(rows);
+        this.scheduledLoaded.set(true);
+      },
+      error: () => this.scheduledLoaded.set(true),
+    });
+  }
 
   open(draft: Draft): void {
     void this.router.navigate(['/home'], { queryParams: { draft: draft.id } });
@@ -31,6 +51,29 @@ export class DraftsPage {
       this.drafts.remove(draft.id);
     }
     this.pendingDelete.set(null);
+  }
+
+  confirmCancel(): void {
+    const sched = this.pendingCancel();
+    this.pendingCancel.set(null);
+    if (!sched) {
+      return;
+    }
+    this.api.cancelScheduledStatus(sched.id).subscribe({
+      next: () => this.scheduled.update((list) => list.filter((s) => s.id !== sched.id)),
+    });
+  }
+
+  scheduledPreview(s: ScheduledStatus): string {
+    const text = s.params.text ?? '';
+    if (text.trim()) {
+      return text.length > 140 ? text.slice(0, 140) + '…' : text;
+    }
+    return s.media_attachments.length ? '(media post)' : '(empty post)';
+  }
+
+  scheduledWhen(s: ScheduledStatus): string {
+    return new Date(s.scheduled_at).toLocaleString();
   }
 
   preview(draft: Draft): string {

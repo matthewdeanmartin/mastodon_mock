@@ -31,6 +31,7 @@ import {
   Poll,
   Preferences,
   Relationship,
+  ScheduledStatus,
   SearchResults,
   Status,
   StatusEdit,
@@ -174,7 +175,21 @@ export class Api {
         multiple: options.poll.multiple,
       };
     }
+    if (options.scheduledAt) {
+      // With a far-enough scheduled_at the server returns a ScheduledStatus,
+      // not a Status — callers that schedule must not treat the result as one.
+      body['scheduled_at'] = options.scheduledAt;
+    }
     return this.http.post<Status>('/api/v1/statuses', body);
+  }
+
+  // --- scheduled statuses ---
+  scheduledStatuses(): Observable<ScheduledStatus[]> {
+    return this.http.get<ScheduledStatus[]>('/api/v1/scheduled_statuses');
+  }
+
+  cancelScheduledStatus(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/v1/scheduled_statuses/${id}`);
   }
 
   // --- media ---

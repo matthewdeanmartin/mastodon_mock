@@ -182,6 +182,26 @@ export interface ComposeOptions {
   sensitive?: boolean;
   mediaIds?: string[];
   poll?: PollDraft;
+  /** ISO datetime; when ≥ ~5 min out the server schedules instead of posting. */
+  scheduledAt?: string;
+}
+
+/**
+ * A status waiting to be published (`/api/v1/scheduled_statuses`). `params`
+ * echoes the create-request fields rather than a rendered Status.
+ */
+export interface ScheduledStatus {
+  id: string;
+  scheduled_at: string;
+  params: {
+    text: string;
+    visibility?: string;
+    spoiler_text?: string | null;
+    sensitive?: boolean | null;
+    in_reply_to_id?: string | null;
+    poll?: { options: string[] } | null;
+  };
+  media_attachments: MediaAttachment[];
 }
 
 /** A poll being composed (UI-side), serialized to `poll[...]` params. */

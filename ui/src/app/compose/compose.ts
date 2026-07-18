@@ -167,6 +167,38 @@ export class Compose implements OnDestroy {
   protected media = signal<PendingMedia[]>([]);
   protected uploading = signal(false);
 
+  // Scheduling. The value is a datetime-local string (browser-local time);
+  // it's converted to ISO only when sending.
+  protected scheduleOpen = signal(false);
+  protected scheduleAt = signal('');
+  /** A schedule only takes effect when the picker is open and holds a value. */
+  protected scheduleActive = computed(() => this.scheduleOpen() && !!this.scheduleAt());
+  /** Mastodon publishes immediately when scheduled_at is < ~5 min out. */
+  protected scheduleTooSoon = computed(() => {
+    if (!this.scheduleActive()) {
+      return false;
+    }
+    const at = new Date(this.scheduleAt()).getTime();
+    return !Number.isNaN(at) && at - Date.now() < 6 * 60_000;
+  });
+  /** "Scheduled for …" flash after a successful scheduled submit. */
+  protected scheduledFlash = signal<string | null>(null);
+  private scheduledFlashTimer: ReturnType<typeof setTimeout> | null = null;
+
+  toggleSchedule(): void {
+    this.scheduleOpen.update((v) => !v);
+    if (!this.scheduleOpen()) {
+      this.scheduleAt.set('');
+    }
+  }
+
+  /** min= for the picker: 10 minutes out, in datetime-local format. */
+  protected scheduleMin(): string {
+    const d = new Date(Date.now() + 10 * 60_000);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+
   // Poll.
   protected pollOpen = signal(false);
   protected pollOptions = signal<string[]>(['', '']);
@@ -234,6 +266,12 @@ export class Compose implements OnDestroy {
     }
     if (this.overLimit() || this.altTextMissing()) {
       return false;
+    }
+    if (this.scheduleActive()) {
+      // Scheduling covers exactly one post: no threads, no Bluesky leg.
+      if (this.thread().some((t) => t.trim()) || this.targetIncludesBsky()) {
+        return false;
+      }
     }
     if (this.targetIncludesBsky()) {
       // Bluesky legs are text-only, single-post, capped at 300 graphemes.
@@ -560,6 +598,9 @@ export class Compose implements OnDestroy {
     if (this.draftSavedTimer) {
       clearTimeout(this.draftSavedTimer);
     }
+    if (this.scheduledFlashTimer) {
+      clearTimeout(this.scheduledFlashTimer);
+    }
   }
 
   submit(): void {
@@ -656,6 +697,27 @@ export class Compose implements OnDestroy {
       }
     }
 
+    if (this.scheduleActive()) {
+      // Scheduled sends return a ScheduledStatus, not a Status — nothing to
+      // emit into the feed. canSubmit already ruled out threads/Bluesky.
+      const when = new Date(this.scheduleAt());
+      options.scheduledAt = when.toISOString();
+      this.api.postStatus(this.text().trim(), options).subscribe({
+        next: () => {
+          this.reset();
+          this.scheduledFlash.set(
+            `Scheduled for ${when.toLocaleString()} — see it under Drafts & scheduled.`,
+          );
+          if (this.scheduledFlashTimer) {
+            clearTimeout(this.scheduledFlashTimer);
+          }
+          this.scheduledFlashTimer = setTimeout(() => this.scheduledFlash.set(null), 8000);
+        },
+        error: () => this.submitting.set(false),
+      });
+      return;
+    }
+
     // Thread boxes post as a self-reply chain: media/poll/CW ride on the first
     // status only, the rest inherit visibility and chain as replies.
     const posts = this.segments()
@@ -738,6 +800,8 @@ export class Compose implements OnDestroy {
     this.pollOpen.set(false);
     this.pollOptions.set(['', '']);
     this.pollMultiple.set(false);
+    this.scheduleOpen.set(false);
+    this.scheduleAt.set('');
     this.emojiOpen.set(false);
     this.lastFocusedBox = null;
     if (this.autosaveTimer) {
