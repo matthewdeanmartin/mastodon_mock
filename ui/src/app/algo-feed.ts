@@ -49,9 +49,7 @@ type BudgetFetch = <T>(fallback: T, fetch: () => Observable<T>) => Observable<T>
 export function engagementScore(status: Status): number {
   const target = status.reblog ?? status;
   return (
-    (target.favourites_count + 1) *
-    (target.reblogs_count + 1) *
-    Math.sqrt(target.replies_count + 1)
+    (target.favourites_count + 1) * (target.reblogs_count + 1) * Math.sqrt(target.replies_count + 1)
   );
 }
 

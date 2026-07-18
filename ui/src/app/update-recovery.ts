@@ -60,7 +60,10 @@ export class UpdateRecovery {
   /** True when `error` looks like a failed JS module / Angular chunk load. */
   isChunkLoadError(error: unknown): boolean {
     const message = this.extractErrorText(error).toLowerCase();
-    return CHUNK_ERROR_FRAGMENTS.some((fragment) => message.includes(fragment));
+    return (
+      CHUNK_ERROR_FRAGMENTS.some((fragment) => message.includes(fragment)) ||
+      (message.includes('module') && message.includes('mime type'))
+    );
   }
 
   /**

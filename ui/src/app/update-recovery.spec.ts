@@ -45,6 +45,16 @@ describe('UpdateRecovery', () => {
       ).toBe(true);
     });
 
+    it('matches module scripts blocked by a wrong MIME type', () => {
+      expect(
+        recovery.isChunkLoadError(
+          new TypeError(
+            'Loading module from “https://example.test/chunk.js” was blocked because of a disallowed MIME type (“text/html”).',
+          ),
+        ),
+      ).toBe(true);
+    });
+
     it('unwraps the reason of a rejected promise', () => {
       expect(
         recovery.isChunkLoadError({ reason: new Error('importing a module script failed') }),

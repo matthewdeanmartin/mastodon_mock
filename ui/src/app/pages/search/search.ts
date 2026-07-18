@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { catchError, EMPTY } from 'rxjs';
 import { Api } from '../../api';
 import { SearchResults, Status, Tag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
@@ -65,14 +66,14 @@ export class Search implements OnInit {
       return;
     }
     this.trendsRequested = true;
-    this.api.trendingStatuses().subscribe({
-      next: (posts) => this.trendingPosts.set(posts),
-      error: () => {},
-    });
-    this.api.trendingTags().subscribe({
-      next: (tags) => this.trendingTags.set(tags),
-      error: () => {},
-    });
+    this.api
+      .trendingStatuses()
+      .pipe(catchError(() => EMPTY))
+      .subscribe((posts) => this.trendingPosts.set(posts));
+    this.api
+      .trendingTags()
+      .pipe(catchError(() => EMPTY))
+      .subscribe((tags) => this.trendingTags.set(tags));
   }
 
   /** Sum of a tag's recent-history `uses` for the "N recent uses" line. */

@@ -11,7 +11,7 @@ import {
 } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SearchResults, Status } from '../../models';
+import { SearchResults, Status, Tag } from '../../models';
 import { Search } from './search';
 
 /** Exposes Search's protected signals for white-box testing. */
@@ -19,6 +19,8 @@ interface SearchInternals {
   query: WritableSignal<string>;
   results: WritableSignal<SearchResults | null>;
   searching: WritableSignal<boolean>;
+  trendingPosts: WritableSignal<Status[]>;
+  trendingTags: WritableSignal<Tag[]>;
   run(): void;
   onChanged(updated: Status): void;
   onDeleted(removed: Status): void;
@@ -108,6 +110,18 @@ describe('Search', () => {
     expect(internals(fixture).searching()).toBe(false);
     expect(internals(fixture).results()).toBeNull();
     expect(internals(fixture).query()).toBe('');
+  });
+
+  it('keeps optional idle trends empty when either trends request fails', () => {
+    const fixture = setUp();
+
+    httpMock
+      .expectOne('/api/v1/trends/statuses')
+      .flush('', { status: 503, statusText: 'Unavailable' });
+    httpMock.expectOne('/api/v1/trends/tags').flush('', { status: 503, statusText: 'Unavailable' });
+
+    expect(internals(fixture).trendingPosts()).toEqual([]);
+    expect(internals(fixture).trendingTags()).toEqual([]);
   });
 
   it('run() does nothing when query is blank', () => {
