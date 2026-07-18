@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from mastodon import Mastodon
+from mastodon.errors import MastodonAPIError
 
 
 def test_far_future_schedule_returns_scheduled_status(alice: Mastodon) -> None:
@@ -50,3 +52,33 @@ def test_due_scheduled_status_is_published_on_list(alice: Mastodon) -> None:
     me = alice.account_verify_credentials()
     contents = [s.content for s in alice.account_statuses(me.id)]
     assert any("eventually visible" in c for c in contents)
+
+
+def test_scheduled_status_cannot_be_read_by_another_account(alice: Mastodon, bob: Mastodon) -> None:
+    scheduled = alice.status_post(
+        "alice's private future post", scheduled_at=datetime.now(timezone.utc) + timedelta(hours=2)
+    )
+
+    with pytest.raises(MastodonAPIError):
+        bob.scheduled_status(scheduled.id)
+
+
+def test_scheduled_status_cannot_be_rescheduled_by_another_account(alice: Mastodon, bob: Mastodon) -> None:
+    original_at = datetime.now(timezone.utc) + timedelta(hours=2)
+    scheduled = alice.status_post("alice controls the timing", scheduled_at=original_at)
+
+    with pytest.raises(MastodonAPIError):
+        bob.scheduled_status_update(scheduled.id, scheduled_at=original_at + timedelta(hours=1))
+
+    assert alice.scheduled_status(scheduled.id).scheduled_at == scheduled.scheduled_at
+
+
+def test_scheduled_status_cannot_be_deleted_by_another_account(alice: Mastodon, bob: Mastodon) -> None:
+    scheduled = alice.status_post(
+        "alice decides whether to cancel", scheduled_at=datetime.now(timezone.utc) + timedelta(hours=2)
+    )
+
+    with pytest.raises(MastodonAPIError):
+        bob.scheduled_status_delete(scheduled.id)
+
+    assert alice.scheduled_status(scheduled.id).id == scheduled.id

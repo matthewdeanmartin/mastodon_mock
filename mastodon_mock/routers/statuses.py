@@ -604,7 +604,7 @@ def list_scheduled(db: DbSession, account: RequiredAccount) -> list[dict[str, An
 @router.get("/api/v1/scheduled_statuses/{scheduled_id}")
 def get_scheduled(scheduled_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Fetch one scheduled status."""
-    sched = _get_scheduled_or_404(db, scheduled_id)
+    sched = _get_scheduled_or_404(db, scheduled_id, account)
     return serialize_scheduled_status(sched)
 
 
@@ -613,7 +613,7 @@ async def update_scheduled(
     scheduled_id: str, request: Request, db: DbSession, account: RequiredAccount
 ) -> dict[str, Any]:
     """Reschedule a scheduled status."""
-    sched = _get_scheduled_or_404(db, scheduled_id)
+    sched = _get_scheduled_or_404(db, scheduled_id, account)
     params = await _form_or_json(request)
     new_at = _parse_dt(params.get("scheduled_at"))
     if new_at is not None:
@@ -625,7 +625,7 @@ async def update_scheduled(
 @router.delete("/api/v1/scheduled_statuses/{scheduled_id}", status_code=200)
 def delete_scheduled(scheduled_id: str, db: DbSession, account: RequiredAccount) -> dict[str, Any]:
     """Delete a scheduled status."""
-    sched = _get_scheduled_or_404(db, scheduled_id)
+    sched = _get_scheduled_or_404(db, scheduled_id, account)
     db.delete(sched)
     db.commit()
     return {}
@@ -728,11 +728,11 @@ def _publish_due_scheduled(db: DbSession, account: Account) -> None:
     db.commit()
 
 
-def _get_scheduled_or_404(db: DbSession, scheduled_id: str) -> ScheduledStatus:
-    """Fetch a scheduled status or raise 404."""
+def _get_scheduled_or_404(db: DbSession, scheduled_id: str, account: Account) -> ScheduledStatus:
+    """Fetch an account-owned scheduled status or raise 404."""
     pid = parse_db_id(scheduled_id)
     sched = db.get(ScheduledStatus, pid) if pid is not None else None
-    if sched is None:
+    if sched is None or sched.account_id != account.id:
         raise HTTPException(status_code=404, detail="Record not found")
     return sched
 
