@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../../api';
+import { Terminology } from '../../terminology';
 import { ClientPrefs } from '../../client-prefs';
 import { Status } from '../../models';
 import { Compose } from '../../compose/compose';
@@ -24,6 +25,7 @@ export class Thread implements OnInit {
   private router = inject(Router);
 
   protected readonly prefs = inject(ClientPrefs);
+  protected words = inject(Terminology).words;
 
   protected status = signal<Status | null>(null);
   protected ancestors = signal<Status[]>([]);

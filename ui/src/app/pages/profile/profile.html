@@ -68,7 +68,7 @@
     }
     <div class="stats muted">
       <span
-        ><strong>{{ a.statuses_count }}</strong> posts</span
+        ><strong>{{ a.statuses_count }}</strong> {{ words().posts }}</span
       >
       <span
         ><strong>{{ a.following_count }}</strong> following</span
@@ -126,7 +126,7 @@
       [attr.aria-pressed]="showBoosts()"
       (click)="toggleBoosts()"
     >
-      🔁 Boosts
+      🔁 {{ words().Boosts }}
     </button>
     <button
       type="button"

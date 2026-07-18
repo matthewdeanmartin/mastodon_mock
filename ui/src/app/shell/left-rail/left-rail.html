@@ -15,7 +15,7 @@
       <span class="profile-handle muted">&#64;{{ acc.username }}</span>
       <div class="profile-stats">
         <a [routerLink]="['/accounts', acc.id]">
-          <span class="stat-label">Posts</span>
+          <span class="stat-label">{{ words().Posts }}</span>
           <span class="stat-value">{{ acc.statuses_count }}</span>
         </a>
         <a [routerLink]="['/accounts', acc.id]">
@@ -58,7 +58,7 @@
         }
       </div>
     }
-    <p class="card-hint muted">Boosted by people across the network</p>
+    <p class="card-hint muted">{{ words().Boosted }} by people across the network</p>
   }
   <a class="find-people-link" routerLink="/find-people">Find people to follow →</a>
 </section>
@@ -70,7 +70,7 @@
       <a class="trend" [routerLink]="['/tags', tag.name]">
         <span class="trend-name">#{{ tag.name }}</span>
         @if (uses(tag); as count) {
-          <span class="trend-count muted">{{ count }} posts</span>
+          <span class="trend-count muted">{{ count }} {{ words().posts }}</span>
         }
       </a>
     }

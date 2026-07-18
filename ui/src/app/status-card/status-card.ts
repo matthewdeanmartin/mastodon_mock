@@ -6,6 +6,7 @@ import { AccountListDialog, AccountListMode } from '../account-list-dialog/accou
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
+import { Terminology } from '../terminology';
 import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
@@ -52,6 +53,9 @@ export class StatusCard {
 
   /** ⭐ or ❤️, per the Mockingbird Blue preference. */
   protected favIcon = computed(() => (this.prefs.favStyle() === 'heart' ? '❤️' : '⭐'));
+
+  /** post/boost vs tweet/retweet wording, per the Mockingbird Blue preference. */
+  protected words = inject(Terminology).words;
 
   /** The viewer hid this post ("mute this post"); renders as nothing. */
   protected mutedLocally = computed(() => {

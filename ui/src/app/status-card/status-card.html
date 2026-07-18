@@ -10,7 +10,7 @@
   </div>
 } @else if (!hiddenByFilter()) {
   @if (boostedBy) {
-    <div class="boost-label muted">🔁 {{ boostedBy }} boosted</div>
+    <div class="boost-label muted">🔁 {{ boostedBy }} {{ words().boosted }}</div>
   }
   <article class="status" tabindex="-1" (keydown)="onCardKeydown($event)">
     <span class="hover-anchor avatar-anchor">
@@ -231,12 +231,12 @@
             [class.on]="display.reblogged"
             [disabled]="actionBusy()"
             (click)="toggleReblog($event)"
-            [title]="display.reblogged ? 'Undo boost' : 'Boost'"
+            [title]="display.reblogged ? words().UndoBoost : words().Boost"
             [attr.aria-pressed]="display.reblogged"
           >
             🔁
             @if (display.reblogged) {
-              <span class="did">Boosted</span>
+              <span class="did">{{ words().Boosted }}</span>
             }
           </button>
         }
@@ -247,7 +247,7 @@
           <button
             class="action count-link"
             (click)="openAccountList('reblogged_by', $event)"
-            title="Boosted by"
+            [title]="words().BoostedBy"
           >
             {{ display.reblogs_count }}
           </button>

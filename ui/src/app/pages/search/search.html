@@ -18,17 +18,19 @@
     <option value="hashtags">Hashtags</option>
   </select>
   <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
-  <button
-    class="btn btn-outline"
-    [class.on]="advancedOpen()"
-    (click)="advancedOpen.set(!advancedOpen())"
-    [attr.aria-expanded]="advancedOpen()"
-  >
-    Advanced ▾
-  </button>
+  @if (type() === 'statuses') {
+    <button
+      class="btn btn-outline"
+      [class.on]="advancedOpen()"
+      (click)="advancedOpen.set(!advancedOpen())"
+      [attr.aria-expanded]="advancedOpen()"
+    >
+      Advanced ▾
+    </button>
+  }
 </div>
 
-@if (advancedOpen()) {
+@if (advancedOpen() && type() === 'statuses') {
   <div class="advanced-panel">
     <p class="muted small">
       Narrow post searches by time — these become <code>before:</code> / <code>after:</code> /

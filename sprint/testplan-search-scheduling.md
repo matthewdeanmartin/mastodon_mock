@@ -101,15 +101,23 @@ Against mastodon.social (careful — real account @mistersql, token in .env):
    lists via GET, then DELETE it immediately. Prefer read-only GET
    /api/v1/scheduled_statuses if hesitant.
 
-## Open questions for the humans
+## Decisions made (were open questions)
 
-- When a "too soon" schedule publishes immediately, the success flash still
-  says "Scheduled for …" — should compose instead detect a Status response
-  (has `content`) vs ScheduledStatus (has `params`) and emit `posted`?
-- Should scheduled posts support media/polls from the UI? The API path
-  carries them (`media_ids`, `poll`) and the server stores them; the UI
-  currently allows scheduling with media attached — untested end-to-end.
-- Drafts nav label "Drafts & scheduled" — keep, or shorten back once users
-  learn the page holds both?
-- Advanced panel currently forces type=statuses on Apply. Should it be
-  hidden entirely when type≠Posts instead?
+- "Too soon" schedule: compose now detects the response shape (`params` in
+  it → ScheduledStatus, else a published Status), emits `posted` and says it
+  posted immediately. Test both branches (unit test #5 covers the scheduled
+  branch; add one for the immediate branch).
+- Scheduling with media/polls stays allowed in the UI — still untested
+  end-to-end, verify per runtime step 3.
+- Nav label reverted to plain "Drafts".
+- Advanced ▾ button and panel only render when search type = Posts.
+
+## Also added since: tweet terminology pref
+
+`ClientPrefs.postNoun` ('post' | 'tweet', default 'post'), radio in
+Settings → Mockingbird Blue next to stars/hearts. `Terminology` service
+(`src/app/terminology.ts`) exposes a `words()` computed consumed by
+status-card, compose (submit button), thread reader, profile, left-rail,
+account-list dialog. Tests to add: pref persists/loads; flipping it live
+swaps "Boost"→"Retweet" titles and "Post"→"Tweet" submit label; unknown
+stored value falls back to 'post'.

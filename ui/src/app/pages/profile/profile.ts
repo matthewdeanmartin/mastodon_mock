@@ -3,6 +3,7 @@ import { Location } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../api';
+import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
 import { Account, Relationship, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
@@ -19,6 +20,7 @@ import { VerifiedBadge } from '../../verified-badge/verified-badge';
 export class Profile implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
+  protected words = inject(Terminology).words;
   private auth = inject(Auth);
   private location = inject(Location);
 

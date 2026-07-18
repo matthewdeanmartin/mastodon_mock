@@ -22,6 +22,9 @@ export type AlgoAudience = 'all' | 'friends';
 /** Whether the favourite action renders as a star or a heart. */
 export type FavStyle = 'star' | 'heart';
 
+/** What a post is called across the UI: fediverse "post" or bird-site "tweet". */
+export type PostNoun = 'post' | 'tweet';
+
 /** Custom color overrides; a `#rrggbb` string, or null for the theme default. */
 export type CustomColor = string | null;
 
@@ -96,6 +99,7 @@ interface StoredPrefs {
   algoCalm?: boolean;
   algoTags?: boolean;
   favStyle?: FavStyle;
+  postNoun?: PostNoun;
   zenMode?: boolean;
   requireAltText?: boolean;
   customBg?: CustomColor;
@@ -175,6 +179,8 @@ export class ClientPrefs {
 
   /** Favourite buttons render as ⭐ (Mastodon-style) or ❤️ (Twitter-style). */
   readonly favStyle = signal<FavStyle>('star');
+  /** "post"/"boost" (Mastodon-style) or "tweet"/"retweet" (bird-site nostalgia). */
+  readonly postNoun = signal<PostNoun>('post');
   /** Zen mode: both sidebars disappear, leaving just the feed column. */
   readonly zenMode = signal<boolean>(false);
   /** Opt-in: refuse to post while any attached image lacks alt text. */
@@ -319,6 +325,12 @@ export class ClientPrefs {
     }
   }
 
+  setPostNoun(noun: PostNoun): void {
+    if (noun === 'post' || noun === 'tweet') {
+      this.postNoun.set(noun);
+    }
+  }
+
   setZenMode(on: boolean): void {
     this.zenMode.set(on);
   }
@@ -430,6 +442,9 @@ export class ClientPrefs {
     if (stored.favStyle === 'star' || stored.favStyle === 'heart') {
       this.favStyle.set(stored.favStyle);
     }
+    if (stored.postNoun === 'post' || stored.postNoun === 'tweet') {
+      this.postNoun.set(stored.postNoun);
+    }
     this.loadBool(stored.zenMode, this.zenMode);
     this.loadBool(stored.requireAltText, this.requireAltText);
     this.customBg.set(normalizeColor(stored.customBg ?? null));
@@ -468,6 +483,7 @@ export class ClientPrefs {
       algoCalm: this.algoCalm(),
       algoTags: this.algoTags(),
       favStyle: this.favStyle(),
+      postNoun: this.postNoun(),
       zenMode: this.zenMode(),
       requireAltText: this.requireAltText(),
       customBg: this.customBg(),

@@ -5,6 +5,7 @@ import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, Tag } from '../../models';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
+import { Terminology } from '../../terminology';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
 
 /**
@@ -23,6 +24,7 @@ export class LeftRail implements OnInit {
   protected auth = inject(Auth);
   private api = inject(Api);
   private homeTimelineFeed = inject(HomeTimelineFeed);
+  protected words = inject(Terminology).words;
   private candidates = new Map<string, Account>();
 
   protected suggestions = signal<Account[]>([]);

@@ -22,6 +22,7 @@ import { buildLocalBskyStatus } from '../providers/bluesky/bluesky-local-status'
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { BskyFacet } from '../providers/bluesky/bluesky-types';
 import { applyMinimalMarkdown } from '../markdown';
+import { Terminology } from '../terminology';
 import { renderStatusText } from './status-text';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
@@ -74,6 +75,7 @@ export class Compose implements OnDestroy {
   private bskySession = inject(BlueskySession);
   private drafts = inject(Drafts);
   private customEmojis = inject(CustomEmojis);
+  protected words = inject(Terminology).words;
 
   ngOnDestroy(): void {
     this.clearCountdown();
@@ -184,6 +186,14 @@ export class Compose implements OnDestroy {
   /** "Scheduled for …" flash after a successful scheduled submit. */
   protected scheduledFlash = signal<string | null>(null);
   private scheduledFlashTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private flashScheduled(message: string): void {
+    this.scheduledFlash.set(message);
+    if (this.scheduledFlashTimer) {
+      clearTimeout(this.scheduledFlashTimer);
+    }
+    this.scheduledFlashTimer = setTimeout(() => this.scheduledFlash.set(null), 8000);
+  }
 
   toggleSchedule(): void {
     this.scheduleOpen.update((v) => !v);
@@ -698,20 +708,21 @@ export class Compose implements OnDestroy {
     }
 
     if (this.scheduleActive()) {
-      // Scheduled sends return a ScheduledStatus, not a Status — nothing to
-      // emit into the feed. canSubmit already ruled out threads/Bluesky.
+      // A far-enough scheduled_at returns a ScheduledStatus (has `params`);
+      // a near/past one publishes immediately and returns a plain Status —
+      // tell them apart so the feed and the flash message stay honest.
+      // canSubmit already ruled out threads/Bluesky.
       const when = new Date(this.scheduleAt());
       options.scheduledAt = when.toISOString();
       this.api.postStatus(this.text().trim(), options).subscribe({
-        next: () => {
+        next: (result) => {
           this.reset();
-          this.scheduledFlash.set(
-            `Scheduled for ${when.toLocaleString()} — see it under Drafts & scheduled.`,
-          );
-          if (this.scheduledFlashTimer) {
-            clearTimeout(this.scheduledFlashTimer);
+          if ('params' in result) {
+            this.flashScheduled(`Scheduled for ${when.toLocaleString()} — see it under Drafts.`);
+          } else {
+            this.flashScheduled('That was under ~5 minutes away, so it was posted right away.');
+            this.posted.emit(result);
           }
-          this.scheduledFlashTimer = setTimeout(() => this.scheduledFlash.set(null), 8000);
         },
         error: () => this.submitting.set(false),
       });

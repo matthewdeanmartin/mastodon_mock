@@ -134,6 +134,33 @@
   </div>
 
   <div class="srow">
+    <span class="slabel">Posts are called</span>
+    <div class="scontrol">
+      <label class="radioline">
+        <input
+          type="radio"
+          value="post"
+          [ngModel]="prefs.postNoun()"
+          (ngModelChange)="prefs.setPostNoun($event)"
+          name="post_noun"
+        />
+        Posts &amp; boosts (Mastodon)
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="tweet"
+          [ngModel]="prefs.postNoun()"
+          (ngModelChange)="prefs.setPostNoun($event)"
+          name="post_noun"
+        />
+        Tweets &amp; retweets (like the bird site)
+      </label>
+      <span class="hint">Sick of new words per platform? Bring the old ones back.</span>
+    </div>
+  </div>
+
+  <div class="srow">
     <span class="slabel">Zen mode</span>
     <div class="scontrol">
       <label class="checkline">

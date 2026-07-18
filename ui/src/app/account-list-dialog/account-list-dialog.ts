@@ -3,14 +3,10 @@ import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 import { Api } from '../api';
 import { Account } from '../models';
+import { Terminology } from '../terminology';
 
 /** Which set of accounts to show for a status. */
 export type AccountListMode = 'favourited_by' | 'reblogged_by';
-
-const TITLES: Record<AccountListMode, string> = {
-  favourited_by: 'Favourited by',
-  reblogged_by: 'Boosted by',
-};
 
 /** A modal listing the accounts that favourited or boosted a status. */
 @Component({
@@ -29,8 +25,10 @@ export class AccountListDialog implements OnInit {
   protected accounts = signal<Account[]>([]);
   protected loading = signal(true);
 
+  private words = inject(Terminology).words;
+
   protected get title(): string {
-    return TITLES[this.mode()];
+    return this.mode() === 'favourited_by' ? 'Favourited by' : this.words().BoostedBy;
   }
 
   ngOnInit(): void {
