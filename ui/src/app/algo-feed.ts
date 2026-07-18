@@ -17,14 +17,20 @@ export interface AlgoPost {
 }
 
 /** Hard budget: never more than this many API calls per build. */
-export const ALGO_MAX_CALLS = 20;
-/** Stop gathering once this many candidate posts are in the pool. */
-export const ALGO_TARGET_POSTS = 100;
+export const ALGO_MAX_CALLS = 28;
+/**
+ * Stop gathering once this many candidate posts are in the pool. Oversized on
+ * purpose (~40% above what the page comfortably shows): the client-side calm /
+ * audience / tags filters thin the pool afterwards — calm mode alone can hide
+ * ~30% — and an over-full pool is what keeps the filtered feed from going
+ * anemic.
+ */
+export const ALGO_TARGET_POSTS = 140;
 
-const HOME_PAGES_MAX = 5;
-const MUTUAL_SAMPLE_MAX = 8;
-const HASHTAG_PAGES_MAX = 2;
-const MUTUAL_STATUS_LIMIT = 20;
+const HOME_PAGES_MAX = 7;
+const MUTUAL_SAMPLE_MAX = 11;
+const HASHTAG_PAGES_MAX = 3;
+const MUTUAL_STATUS_LIMIT = 28;
 /** Calls held back from the mutual bucket so the hashtag bucket can run. */
 const HASHTAG_RESERVE = 3;
 

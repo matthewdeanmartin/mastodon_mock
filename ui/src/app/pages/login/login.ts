@@ -120,6 +120,22 @@ export class Login implements OnInit, OnDestroy {
   protected oauthError = signal<string | null>(null);
 
   ngOnInit(): void {
+    // Already signed in? Landing on /login (bookmark, stale tab, back button) shouldn't
+    // demand a fresh login cycle — verify the stored token and go straight home. An OAuth
+    // callback (?code=) and the explicit add-account flow (?add=1) still show the page;
+    // a dead token just leaves the user here.
+    const params = this.route.snapshot.queryParamMap;
+    if (!params.get('code') && !params.get('add') && this.auth.isAuthenticated) {
+      this.api.verifyCredentials().subscribe({
+        next: (acc) => {
+          this.auth.setAccount(acc);
+          void this.router.navigateByUrl('/home');
+        },
+        error: () => {
+          // Token no longer works; stay on the login page.
+        },
+      });
+    }
     // Onboarding default: Mocking Bird has no "this server", so rather than greeting
     // a new user with an empty picker, preselect the biggest general-purpose instance.
     if (!this.server.allowsThisServer && !this.server.baseUrl()) {

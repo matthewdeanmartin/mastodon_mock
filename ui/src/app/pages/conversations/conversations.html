@@ -212,6 +212,7 @@
 
       <div class="chat-compose" [class.compose-public]="chat.kind === 'public'">
         <app-compose
+          [compact]="true"
           [inReplyToId]="replyToId()"
           [initialText]="replyMentions()"
           [initialVisibility]="replyVisibility()"

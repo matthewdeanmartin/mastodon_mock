@@ -146,6 +146,55 @@ textarea {
   margin-right: auto;
 }
 
+/* --- Compact (chat) mode: one toolbar row, tighter everything --- */
+
+.compose-compact {
+  container-type: inline-size;
+  padding: 8px 12px;
+}
+
+/* Collapse the selects row and the tools row into a single wrapping toolbar. */
+.compose-compact .compose-bottom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.compose-compact .compose-selects,
+.compose-compact .compose-actions {
+  display: contents;
+}
+
+.compose-compact .compose-tools {
+  gap: 4px;
+}
+
+.compose-compact .tool-btn,
+.compose-compact .target-select,
+.compose-compact .visibility-select,
+.compose-compact .visibility-locked,
+.compose-compact .drafts-select {
+  padding: 3px 6px;
+  font-size: 0.85em;
+}
+
+.compose-compact .drafts-select {
+  max-width: 140px;
+}
+
+/* The preview toggle only earns a slot when the chat pane is reasonably wide. */
+.compose-compact .preview-toggle {
+  display: none;
+}
+
+@container (min-width: 440px) {
+  .compose-compact .preview-toggle {
+    display: inline-flex;
+  }
+}
+
 .tool-btn {
   display: inline-flex;
   align-items: center;

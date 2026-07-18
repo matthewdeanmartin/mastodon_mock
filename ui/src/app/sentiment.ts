@@ -101,13 +101,99 @@ const RAGE_WEIGHTS = new Map<string, number>([
 ]);
 
 /**
+ * Entries in `badwords-list` that are ordinary English words, proper nouns
+ * ("God", "Cox", "Hoare"), British mild intensifiers, or clinical/anatomical
+ * terms. Any of these can headline a perfectly calm post ("bloody brilliant",
+ * "pawn to e4", "sex education"), so they are excluded from the profanity rule.
+ * Genuinely heated words among them ("damn", "hell") still score via
+ * {@link RAGE_WEIGHTS}.
+ */
+const BENIGN_COLLISIONS = new Set([
+  'anal',
+  'anus',
+  'balls',
+  'bloody',
+  'boner',
+  'boob',
+  'boobs',
+  'breasts',
+  'bugger',
+  'bum',
+  'butt',
+  'cox',
+  'crap',
+  'damn',
+  'dink',
+  'dinks',
+  'ejaculate',
+  'ejaculated',
+  'ejaculates',
+  'ejaculating',
+  'ejaculatings',
+  'ejaculation',
+  'ejakulate',
+  'fanny',
+  'flange',
+  'god',
+  'hell',
+  'hoar',
+  'hoare',
+  'hoer',
+  'hore',
+  'horniest',
+  'horny',
+  'knob',
+  'labia',
+  'lust',
+  'lusting',
+  'masochist',
+  'muff',
+  'orgasim',
+  'orgasims',
+  'orgasm',
+  'orgasms',
+  'pawn',
+  'penis',
+  'poop',
+  'pube',
+  'rectum',
+  'sadist',
+  'screwing',
+  'scrotum',
+  'semen',
+  'sex',
+  'shag',
+  'snatch',
+  'spac',
+  'spunk',
+  'teets',
+  'teez',
+  'testical',
+  'testicle',
+  'vagina',
+  'vulva',
+  'wang',
+  'willies',
+  'willy',
+]);
+
+/**
  * English profanity terms from `badwords-list` (MIT, zero runtime dependencies).
  *
  * This remains separate from the rage lexicon: profanity is an explicit product
  * rule, rather than a context-dependent sentiment signal. Matching tokens rather
- * than substrings avoids false positives such as "shitake".
+ * than substrings avoids false positives such as "shitake" or "button".
+ *
+ * Sanitized on load: only plain single words of 3+ letters survive. One- and
+ * two-letter strings are never profanity ("as" is not "ass"), and the list's
+ * multi-word / symbol entries ("s.o.b.", "f u c k") could never match a token
+ * anyway — dropping them also keeps the disemvowelled set honest.
  */
-const PROFANITY_WORDS = new Set([...profanityWords, 'dogshit'].map((word) => word.toLowerCase()));
+const PROFANITY_WORDS = new Set(
+  [...profanityWords, 'dogshit']
+    .map((word) => word.toLowerCase())
+    .filter((word) => /^[a-z]{3,}$/.test(word) && !BENIGN_COLLISIONS.has(word)),
+);
 
 /** Consonant skeletons allow asterisks to stand in for omitted vowels (for example, "f*ck"). */
 const DISEMVOWELLED_PROFANITY_WORDS = new Set(

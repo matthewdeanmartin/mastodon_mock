@@ -58,14 +58,6 @@
   white-space: nowrap;
 }
 
-.nitter-tip {
-  margin-top: 14px;
-}
-
-.nitter-tip summary {
-  cursor: pointer;
-}
-
 .coming-soon {
   opacity: 0.85;
 }

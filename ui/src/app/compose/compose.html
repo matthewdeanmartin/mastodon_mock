@@ -1,5 +1,6 @@
 <div
   class="compose"
+  [class.compose-compact]="compact()"
   [class.drag-over]="dragOver()"
   (dragenter)="onDragEnter($event)"
   (dragover)="onDragOver($event)"
@@ -20,7 +21,7 @@
     [ngModel]="text()"
     (ngModelChange)="text.set($event)"
     [placeholder]="placeholder()"
-    rows="3"
+    [rows]="compact() ? 2 : 3"
     (focus)="onBoxFocus(0, $event)"
     (keydown)="onBoxKeydown($event)"
     (paste)="onPaste($event)"
@@ -139,131 +140,158 @@
     </div>
   }
 
-  <div class="compose-selects">
-    @if (showTargetPicker()) {
-      <select
-        class="target-select"
-        [ngModel]="target()"
-        (ngModelChange)="target.set($event)"
-        title="Post to"
-      >
-        <option value="fedi">🦣 Fedi</option>
-        <option value="bsky">🦋 Bluesky</option>
-        <option value="both">🦣+🦋 Both</option>
-      </select>
-    }
-    @if (lockVisibility()) {
-      <span class="visibility-locked" title="Visibility is fixed here">🔒 {{ visibility() }}</span>
-    } @else {
-      <select
-        class="visibility-select"
-        [ngModel]="visibility()"
-        (ngModelChange)="visibility.set($event)"
-        title="Visibility"
-      >
-        @for (v of visibilities; track v) {
-          <option [value]="v">{{ v }}</option>
-        }
-      </select>
-    }
-
-    @if (savedDrafts().length || hasDraftContent()) {
-      <select class="drafts-select" (change)="onDraftSelect($any($event.target))" title="Drafts">
-        <option value="" selected>📝 Drafts</option>
-        @if (hasDraftContent()) {
-          <option value="save">💾 Save as draft</option>
-        }
-        @for (d of savedDrafts(); track d.id) {
-          <option [value]="d.id">{{ draftLabel(d) }}</option>
-        }
-      </select>
-    }
-  </div>
-
-  <div class="compose-actions">
-    <div class="compose-tools">
-      <label
-        class="tool-btn"
-        [class.disabled]="!canAttachMedia()"
-        title="Attach media — or paste / drag & drop an image"
-      >
-        📎
-        <input
-          type="file"
-          multiple
-          hidden
-          [disabled]="!canAttachMedia()"
-          (change)="onFilesSelected($event)"
-        />
-      </label>
-
-      <button
-        class="tool-btn"
-        [class.on]="pollOpen()"
-        [disabled]="!canAddPoll()"
-        (click)="togglePoll()"
-        title="Add poll"
-      >
-        📊
-      </button>
-
-      <button class="tool-btn" [class.on]="cwOpen()" (click)="toggleCw()" title="Content warning">
-        CW
-      </button>
-
-      <button
-        class="tool-btn"
-        [class.on]="sensitive()"
-        (click)="sensitive.set(!sensitive())"
-        title="Mark media sensitive"
-      >
-        ⚠️
-      </button>
-
-      <span class="emoji-anchor">
-        <button
-          class="tool-btn"
-          [class.on]="emojiOpen()"
-          (click)="toggleEmoji()"
-          title="Insert emoji"
+  <div class="compose-bottom">
+    <div class="compose-selects">
+      @if (showTargetPicker()) {
+        <select
+          class="target-select"
+          [ngModel]="target()"
+          (ngModelChange)="target.set($event)"
+          title="Post to"
         >
-          🙂
-        </button>
-        @if (emojiOpen()) {
-          <div class="emoji-popover">
-            <app-emoji-picker (picked)="insertEmoji($event)" />
-          </div>
-        }
-      </span>
+          <option value="fedi">🦣 Fedi</option>
+          <option value="bsky">🦋 Bluesky</option>
+          <option value="both">🦣+🦋 Both</option>
+        </select>
+      }
+      @if (lockVisibility()) {
+        <span class="visibility-locked" title="Visibility is fixed here"
+          >🔒 {{ visibility() }}</span
+        >
+      } @else {
+        <select
+          class="visibility-select"
+          [ngModel]="visibility()"
+          (ngModelChange)="visibility.set($event)"
+          title="Visibility"
+        >
+          @for (v of visibilities; track v) {
+            <option [value]="v">{{ v }}</option>
+          }
+        </select>
+      }
 
-      <button
-        class="tool-btn thread-btn"
-        (click)="addThreadBox()"
-        title="Add another post (thread / tweet storm)"
-      >
-        ➕🧵
-      </button>
+      @if ((!compact() || draftsOpen()) && (savedDrafts().length || hasDraftContent())) {
+        <select class="drafts-select" (change)="onDraftSelect($any($event.target))" title="Drafts">
+          <option value="" selected>📝 Drafts</option>
+          @if (hasDraftContent()) {
+            <option value="save">💾 Save as draft</option>
+          }
+          @for (d of savedDrafts(); track d.id) {
+            <option [value]="d.id">{{ draftLabel(d) }}</option>
+          }
+        </select>
+      }
     </div>
 
-    @if (targetIncludesBsky()) {
-      <span class="muted bsky-count" [class.over-limit]="bskyRemaining() < 0" title="Bluesky limit">
-        🦋 {{ bskyRemaining() }}
-      </span>
-    }
-    <span class="muted" [class.over-limit]="text().length > maxChars">{{ text().length }}</span>
-    <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
-      {{
-        uploading()
-          ? 'Uploading…'
-          : inReplyToId()
-            ? 'Reply'
-            : quotedStatusId()
-              ? 'Quote'
-              : thread().length
-                ? 'Post all'
-                : 'Post'
-      }}
-    </button>
+    <div class="compose-actions">
+      <div class="compose-tools">
+        <label
+          class="tool-btn"
+          [class.disabled]="!canAttachMedia()"
+          title="Attach media — or paste / drag & drop an image"
+        >
+          📎
+          <input
+            type="file"
+            multiple
+            hidden
+            [disabled]="!canAttachMedia()"
+            (change)="onFilesSelected($event)"
+          />
+        </label>
+
+        <button
+          class="tool-btn"
+          [class.on]="pollOpen()"
+          [disabled]="!canAddPoll()"
+          (click)="togglePoll()"
+          title="Add poll"
+        >
+          📊
+        </button>
+
+        <button class="tool-btn" [class.on]="cwOpen()" (click)="toggleCw()" title="Content warning">
+          CW
+        </button>
+
+        <button
+          class="tool-btn"
+          [class.on]="sensitive()"
+          (click)="sensitive.set(!sensitive())"
+          title="Mark media sensitive"
+        >
+          ⚠️
+        </button>
+
+        <span class="emoji-anchor">
+          <button
+            class="tool-btn"
+            [class.on]="emojiOpen()"
+            (click)="toggleEmoji()"
+            title="Insert emoji"
+          >
+            🙂
+          </button>
+          @if (emojiOpen()) {
+            <div class="emoji-popover">
+              <app-emoji-picker (picked)="insertEmoji($event)" />
+            </div>
+          }
+        </span>
+
+        <button
+          class="tool-btn thread-btn"
+          (click)="addThreadBox()"
+          title="Add another post (thread / tweet storm)"
+        >
+          ➕🧵
+        </button>
+
+        @if (compact()) {
+          <button
+            class="tool-btn drafts-toggle"
+            [class.on]="draftsOpen()"
+            (click)="draftsOpen.set(!draftsOpen())"
+            title="Show drafts"
+          >
+            📝
+          </button>
+          <button
+            class="tool-btn preview-toggle"
+            [class.on]="previewOn()"
+            (click)="previewOn.set(!previewOn())"
+            title="Toggle preview"
+          >
+            👁
+          </button>
+        }
+      </div>
+
+      @if (targetIncludesBsky()) {
+        <span
+          class="muted bsky-count"
+          [class.over-limit]="bskyRemaining() < 0"
+          title="Bluesky limit"
+        >
+          🦋 {{ bskyRemaining() }}
+        </span>
+      }
+      <span class="muted" [class.over-limit]="text().length > maxChars">{{ text().length }}</span>
+      <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
+        {{
+          uploading()
+            ? 'Uploading…'
+            : inReplyToId()
+              ? 'Reply'
+              : quotedStatusId()
+                ? 'Quote'
+                : thread().length
+                  ? 'Post all'
+                  : 'Post'
+        }}
+      </button>
+    </div>
   </div>
 
   @if (crossPostError(); as err) {

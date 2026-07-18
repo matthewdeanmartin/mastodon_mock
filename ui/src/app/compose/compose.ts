@@ -92,6 +92,12 @@ export class Compose implements OnDestroy {
   readonly lockVisibility = input(false);
   /** A saved draft to open in the composer (it is consumed from the drafts list). */
   readonly initialDraft = input<Draft | undefined>(undefined);
+  /**
+   * Chat-style compact layout: everything on one toolbar row, preview off by
+   * default (toggleable), drafts behind an icon. Used where vertical and
+   * horizontal space is scarce (/conversations).
+   */
+  readonly compact = input(false);
   readonly posted = output<Status>();
 
   protected readonly visibilities = VISIBILITIES;
@@ -126,6 +132,8 @@ export class Compose implements OnDestroy {
       }
       this.restored = true;
     });
+
+    effect(() => this.previewOn.set(!this.compact()));
 
     // Autosave (debounced) so a stray reload never eats a half-written post.
     effect(() => {
@@ -171,7 +179,13 @@ export class Compose implements OnDestroy {
 
   // Live preview (rendered like the feed will render it — not WYSIWYG).
   // Appears as soon as there's a character to render, gone when empty.
-  protected previewVisible = computed(() => this.segments().some((s) => s.trim() !== ''));
+  // Compact composers start with it off; the 👁 toolbar button toggles it.
+  protected previewOn = signal(true);
+  protected previewVisible = computed(
+    () => this.previewOn() && this.segments().some((s) => s.trim() !== ''),
+  );
+  /** Compact mode hides the drafts picker behind a 📝 toolbar toggle. */
+  protected draftsOpen = signal(false);
   protected previewHtml = computed(() =>
     this.segments().map((s) =>
       applyMinimalMarkdown(renderStatusText(s, this.customEmojis.emojis())),

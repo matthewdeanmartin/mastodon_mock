@@ -173,7 +173,7 @@ describe('AlgoFeed', () => {
     expect(feed.posts()).toHaveLength(1);
   });
 
-  it('pages the home timeline on max_id until a short page, capped at 5 pages', () => {
+  it('pages the home timeline on max_id until a short page, capped at 7 pages', () => {
     const fullPage = (start: number) =>
       Array.from({ length: 20 }, (_, i) => makeStatus(`h${start + i}`));
     api.homeTimeline
@@ -189,7 +189,7 @@ describe('AlgoFeed', () => {
     expect(api.homeTimeline).toHaveBeenNthCalledWith(3, 'h39');
   });
 
-  it('skips the mutual and hashtag buckets once the pool already holds 100 posts', () => {
+  it('skips the mutual and hashtag buckets once the pool already holds 140 posts', () => {
     const mutual = makeAccount('m1');
     api.accountFollowing.mockReturnValue(of([mutual]));
     api.accountFollowers.mockReturnValue(of([mutual]));
@@ -203,21 +203,21 @@ describe('AlgoFeed', () => {
     const feed = TestBed.inject(AlgoFeed);
     feed.refresh();
 
-    expect(api.homeTimeline).toHaveBeenCalledTimes(5); // page cap
+    expect(api.homeTimeline).toHaveBeenCalledTimes(7); // page cap
     expect(api.getAccountStatuses).not.toHaveBeenCalled();
     expect(api.followedTags).not.toHaveBeenCalled();
-    expect(feed.posts()).toHaveLength(100);
+    expect(feed.posts()).toHaveLength(140);
   });
 
-  it('samples at most 8 mutuals', () => {
-    const mutuals = Array.from({ length: 12 }, (_, i) => makeAccount(`m${i}`));
+  it('samples at most 11 mutuals', () => {
+    const mutuals = Array.from({ length: 14 }, (_, i) => makeAccount(`m${i}`));
     api.accountFollowing.mockReturnValue(of(mutuals));
     api.accountFollowers.mockReturnValue(of(mutuals));
 
     const feed = TestBed.inject(AlgoFeed);
     feed.refresh();
 
-    expect(api.getAccountStatuses).toHaveBeenCalledTimes(8);
+    expect(api.getAccountStatuses).toHaveBeenCalledTimes(11);
   });
 
   it('tolerates individual bucket failures', () => {

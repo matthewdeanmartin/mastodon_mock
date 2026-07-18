@@ -37,7 +37,7 @@
       <span class="slabel">Profile metadata</span>
       <div class="scontrol">
         @for (f of fields(); track $index; let i = $index) {
-          <div class="meta-row">
+          <div class="meta-row" [class.meta-verified]="verifiedAt()[f.name]">
             <input
               type="text"
               placeholder="Label"
@@ -60,6 +60,13 @@
             >
               ✕
             </button>
+            @if (verifiedAt()[f.name]; as when) {
+              <span
+                class="meta-verified-badge"
+                [title]="'Link ownership verified via rel=me on ' + (when | date: 'mediumDate')"
+                >✓ verified</span
+              >
+            }
           </div>
         }
         @if (fields().length < 4) {
@@ -67,7 +74,11 @@
             + Add field
           </button>
         }
-        <span class="hint">Up to 4 table rows shown on your profile (links, pronouns, ...).</span>
+        <span class="hint">
+          Up to 4 table rows shown on your profile (links, pronouns, ...). A link whose page links
+          back to your profile with rel="me" shows as ✓ verified (checked by the server when you
+          save).
+        </span>
       </div>
     </div>
   </div>

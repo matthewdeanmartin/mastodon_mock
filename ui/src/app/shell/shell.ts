@@ -127,7 +127,8 @@ export class Shell implements OnInit {
   }
 
   addAccount(): void {
-    location.assign('login');
+    // ?add=1 tells the login page not to bounce an already-signed-in user back home.
+    location.assign('login?add=1');
   }
 
   /** Sign out of just the active account; fall back to another if one remains. */

@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../../../api';
@@ -7,7 +8,7 @@ import { AccountField } from '../../../models';
 /** Public profile: display name, bio, metadata fields, avatar/header. */
 @Component({
   selector: 'app-settings-profile',
-  imports: [FormsModule],
+  imports: [DatePipe, FormsModule],
   templateUrl: './settings-profile.html',
   styleUrl: './settings-profile.css',
 })
@@ -22,6 +23,11 @@ export class SettingsProfile implements OnInit {
   protected header = signal<File | null>(null);
   protected saving = signal(false);
   protected saved = signal(false);
+  /**
+   * Field label → rel=me verification date. Only the rendered `fields` (not the
+   * editable `source.fields`) carry `verified_at`, so match them up by name.
+   */
+  protected verifiedAt = signal<Record<string, string>>({});
 
   ngOnInit(): void {
     this.api.verifyCredentials().subscribe((acc) => {
@@ -33,6 +39,13 @@ export class SettingsProfile implements OnInit {
       }));
       // Always offer one empty row to add a new field.
       this.fields.set(fields.length ? fields : [{ name: '', value: '' }]);
+      const verified: Record<string, string> = {};
+      for (const f of acc.fields ?? []) {
+        if (f.verified_at) {
+          verified[f.name] = f.verified_at;
+        }
+      }
+      this.verifiedAt.set(verified);
     });
   }
 

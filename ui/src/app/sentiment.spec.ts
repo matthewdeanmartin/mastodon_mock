@@ -59,6 +59,20 @@ describe('rageScore', () => {
 
   it('does not match profanity inside an otherwise harmless word', () => {
     expect(rageScore('I made a shiitake mushroom risotto.')).toBe(0);
+    expect(rageScore('Press the button to continue.')).toBe(0);
+    expect(rageScore('Classic assessment of the class.')).toBe(0);
+  });
+
+  it('never treats one- or two-letter words as profanity', () => {
+    expect(rageScore('As is, it works as well as it can.')).toBe(0);
+    expect(rageScore('a ok um hi')).toBe(0);
+  });
+
+  it('does not flag ordinary words, proper nouns, or clinical terms from the list', () => {
+    expect(rageScore('Oh my god, the pawn sacrifice was bloody brilliant.')).toBe(0);
+    expect(rageScore('Sex education and testicle self-exams save lives.')).toBe(0);
+    expect(rageScore('Turned the knob, fixed the flange, screwing it back on.')).toBe(0);
+    expect(rageScore('Tony Hoare and Brian Cox on stage together.')).toBe(0);
   });
 
   it('recognizes profanity with vowels replaced by asterisks', () => {
