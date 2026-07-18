@@ -6,6 +6,7 @@ import { routes } from './app.routes';
 import { authInterceptor } from './auth.interceptor';
 import { healthInterceptor } from './health.interceptor';
 import { serverInterceptor } from './server.interceptor';
+import { metricsInterceptor } from './observability/metrics.interceptor';
 import { GlobalErrorHandler } from './global-error-handler';
 import { SettingsPreloading } from './pages/settings/settings-preloading';
 
@@ -16,6 +17,10 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
     provideRouter(routes, withPreloading(SettingsPreloading)),
-    provideHttpClient(withInterceptors([serverInterceptor, healthInterceptor, authInterceptor])),
+    // metricsInterceptor is outermost so it times the full round-trip (including
+    // the server/auth rewrites) and sees the final response/error.
+    provideHttpClient(
+      withInterceptors([metricsInterceptor, serverInterceptor, healthInterceptor, authInterceptor]),
+    ),
   ],
 };

@@ -1,0 +1,227 @@
+<div class="obs-page">
+  <div class="obs-head">
+    <h1>Observability</h1>
+    <p class="muted">
+      API traffic, errors, and local storage for this device. Everything here is captured in your
+      browser and stored compactly in <code>localStorage</code> — nothing is sent anywhere.
+    </p>
+  </div>
+
+  <!-- ============================= API metrics ============================ -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>API calls</h2>
+      <button class="btn btn-outline btn-sm" (click)="resetMetrics()">Reset metrics</button>
+    </div>
+
+    <div class="tiles">
+      <div class="tile">
+        <div class="tile-value">{{ totals().count.toLocaleString() }}</div>
+        <div class="tile-label muted">total calls</div>
+      </div>
+      <div class="tile">
+        <div class="tile-value">{{ totals().endpoints }}</div>
+        <div class="tile-label muted">endpoints</div>
+      </div>
+      <div class="tile">
+        <div class="tile-value">{{ totals().avgMs }}<span class="unit">ms</span></div>
+        <div class="tile-label muted">avg response</div>
+      </div>
+      <div class="tile" [class.tile-bad]="totals().errors > 0">
+        <div class="tile-value">{{ totals().errors.toLocaleString() }}</div>
+        <div class="tile-label muted">errors ({{ pct(totals().errorRate) }})</div>
+      </div>
+    </div>
+
+    @if (highlights(); as h) {
+      <div class="highlights">
+        <div class="hl">
+          <span class="hl-tag muted">Busiest</span>
+          <code>{{ h.busiest.key }}</code>
+          <span class="muted small">{{ h.busiest.count.toLocaleString() }} calls</span>
+        </div>
+        <div class="hl">
+          <span class="hl-tag muted">Slowest avg</span>
+          <code>{{ h.slowest.key }}</code>
+          <span class="muted small">{{ round(mean(h.slowest)) }} ms</span>
+        </div>
+        <div class="hl">
+          <span class="hl-tag muted">Fastest avg</span>
+          <code>{{ h.fastest.key }}</code>
+          <span class="muted small">{{ round(mean(h.fastest)) }} ms</span>
+        </div>
+        @if (h.worst.errors > 0) {
+          <div class="hl">
+            <span class="hl-tag muted">Most errors</span>
+            <code>{{ h.worst.key }}</code>
+            <span class="muted small">{{ h.worst.errors }} / {{ h.worst.count }}</span>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Calls over time (single series: total calls; errors overlaid if any). -->
+    @if (chart(); as c) {
+      <figure class="chart-figure">
+        <figcaption class="muted small">
+          Calls per {{ bucketMinutes }} min (last {{ chart()!.points.length }} buckets)
+        </figcaption>
+        <svg
+          #chartSvg
+          class="calls-chart"
+          [attr.viewBox]="'0 0 ' + chartW + ' ' + chartH"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="API calls over time"
+          (mousemove)="onChartMove($event, chartSvg)"
+          (mouseleave)="onChartLeave()"
+        >
+          <polygon class="area" [attr.points]="c.area" />
+          <polyline class="line" [attr.points]="c.line" />
+          @if (c.errLine) {
+            <polyline class="err-line" [attr.points]="c.errLine" />
+          }
+          @if (hover(); as p) {
+            <line class="crosshair" [attr.x1]="p.x" [attr.x2]="p.x" y1="0" [attr.y2]="chartH" />
+            <circle class="dot" [attr.cx]="p.x" [attr.cy]="p.y" r="3.5" />
+          }
+        </svg>
+        @if (hover(); as p) {
+          <div class="chart-tip small">{{ bucketLabel(p.bucket) }}</div>
+        } @else {
+          <div class="chart-tip small muted">Hover for per-bucket counts.</div>
+        }
+      </figure>
+    } @else {
+      <p class="muted small">Not enough traffic yet to chart. Use the app and come back.</p>
+    }
+
+    <!-- Per-endpoint table -->
+    @if (rows().length) {
+      <div class="table-wrap">
+        <table class="obs-table">
+          <thead>
+            <tr>
+              <th>Endpoint</th>
+              <th class="num sortable" (click)="setSort('count')" [class.on]="sortKey() === 'count'">
+                Calls
+              </th>
+              <th class="num sortable" (click)="setSort('avg')" [class.on]="sortKey() === 'avg'">
+                Avg
+              </th>
+              <th class="num">± SD</th>
+              <th class="num">Min</th>
+              <th class="num sortable" (click)="setSort('max')" [class.on]="sortKey() === 'max'">
+                Max
+              </th>
+              <th
+                class="num sortable"
+                (click)="setSort('errors')"
+                [class.on]="sortKey() === 'errors'"
+              >
+                Errors
+              </th>
+              <th class="num">Last</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of rows(); track s.key) {
+              <tr [class.row-bad]="s.errors > 0">
+                <td class="endpoint">
+                  <span class="method" [attr.data-method]="method(s.key)">{{ method(s.key) }}</span>
+                  <code>{{ endpoint(s.key) }}</code>
+                </td>
+                <td class="num">{{ s.count.toLocaleString() }}</td>
+                <td class="num">{{ round(mean(s)) }} ms</td>
+                <td class="num muted">{{ round(stddev(s)) }}</td>
+                <td class="num muted">{{ s.minMs }}</td>
+                <td class="num">{{ s.maxMs }}</td>
+                <td class="num" [class.err]="s.errors > 0">{{ s.errors }}</td>
+                <td class="num muted">{{ s.lastStatus }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="muted center">No API calls recorded yet.</p>
+    }
+  </section>
+
+  <!-- ============================== Error log ============================= -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>Recent errors</h2>
+      <span class="muted small">{{ errors().length }} logged</span>
+    </div>
+    @if (errors().length) {
+      <ul class="error-list">
+        @for (e of errors(); track e.at) {
+          <li class="error-row">
+            <span class="err-status" [class.net]="e.status === 0">
+              {{ e.status === 0 ? 'NET' : e.status }}
+            </span>
+            <span class="method" [attr.data-method]="e.method">{{ e.method }}</span>
+            <code class="err-endpoint">{{ e.endpoint }}</code>
+            <span class="err-msg muted">{{ e.message }}</span>
+            <span class="err-time muted small">{{ time(e.at) }}</span>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="muted center">Nothing has gone wrong recently. 🎉</p>
+    }
+  </section>
+
+  <!-- ========================== Local storage ============================ -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>Local storage</h2>
+      <div class="section-actions">
+        <span class="muted small">
+          {{ storage().entries.length }} keys · {{ formatBytes(storage().totalBytes) }}
+        </span>
+        <button class="btn btn-outline btn-sm" (click)="refreshStorage()">Refresh</button>
+      </div>
+    </div>
+    @if (storage().entries.length) {
+      <div class="table-wrap">
+        <table class="obs-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th class="num">Size</th>
+              <th class="num">Chars</th>
+              <th class="actions-col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of storage().entries; track entry.key) {
+              <tr>
+                <td class="storage-key">
+                  <code>{{ entry.key }}</code>
+                  @if (keyNote(entry.key); as note) {
+                    <span class="muted small key-note">{{ note }}</span>
+                  }
+                </td>
+                <td class="num">{{ formatBytes(entry.bytes) }}</td>
+                <td class="num muted">{{ entry.valueChars.toLocaleString() }}</td>
+                <td class="actions-col">
+                  <button
+                    class="btn btn-outline btn-sm danger"
+                    (click)="deleteKey(entry)"
+                    [attr.aria-label]="'Delete ' + entry.key"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="muted center">Local storage is empty.</p>
+    }
+  </section>
+</div>

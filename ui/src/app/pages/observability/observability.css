@@ -1,0 +1,344 @@
+.obs-page {
+  padding: 16px;
+  max-width: 100%;
+}
+
+.obs-head h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.obs-head p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.obs-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --------------------------------------------------------------- stat tiles */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--col-bg);
+}
+
+.tile-value {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.tile-value .unit {
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 2px;
+  color: var(--muted);
+}
+
+.tile-label {
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.tile-bad .tile-value {
+  color: #e0245e;
+}
+
+/* --------------------------------------------------------------- highlights */
+.highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.hl {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.hl-tag {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex: none;
+}
+
+.hl code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.hl .small {
+  flex: none;
+  margin-left: auto;
+}
+
+/* -------------------------------------------------------------- calls chart */
+.chart-figure {
+  margin: 16px 0 4px;
+}
+
+.chart-figure figcaption {
+  margin-bottom: 6px;
+}
+
+.calls-chart {
+  width: 100%;
+  height: 160px;
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--col-bg);
+  overflow: visible;
+}
+
+.calls-chart .area {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.calls-chart .line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.calls-chart .err-line {
+  fill: none;
+  stroke: #e0245e;
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.calls-chart .crosshair {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.calls-chart .dot {
+  fill: var(--accent);
+  stroke: var(--col-bg);
+  stroke-width: 1.5;
+}
+
+.chart-tip {
+  margin-top: 6px;
+  min-height: 18px;
+}
+
+/* -------------------------------------------------------------------- tables */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-top: 12px;
+}
+
+.obs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.obs-table th,
+.obs-table td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.obs-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.obs-table th {
+  font-weight: 700;
+  color: var(--muted);
+  position: sticky;
+  top: 0;
+  background: var(--col-bg);
+}
+
+.obs-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.obs-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.obs-table th.sortable:hover {
+  color: var(--text);
+}
+
+.obs-table th.on {
+  color: var(--accent);
+}
+
+.obs-table td.endpoint code {
+  font-size: 13px;
+}
+
+.obs-table td.err {
+  color: #e0245e;
+  font-weight: 700;
+}
+
+.row-bad {
+  background: color-mix(in srgb, #e0245e 7%, transparent);
+}
+
+/* HTTP method chips. */
+.method {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-right: 6px;
+  background: var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.method[data-method='GET'] {
+  background: color-mix(in srgb, #1da1f2 22%, transparent);
+}
+
+.method[data-method='POST'],
+.method[data-method='PUT'] {
+  background: color-mix(in srgb, #00ba7c 24%, transparent);
+}
+
+.method[data-method='DELETE'] {
+  background: color-mix(in srgb, #e0245e 22%, transparent);
+}
+
+/* --------------------------------------------------------------- error list */
+.error-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.error-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.error-row:last-child {
+  border-bottom: none;
+}
+
+.err-status {
+  flex: none;
+  font-weight: 800;
+  font-size: 12px;
+  color: #e0245e;
+  min-width: 34px;
+}
+
+.err-status.net {
+  color: #d97706;
+}
+
+.err-endpoint {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.err-msg {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.err-time {
+  flex: none;
+  margin-left: auto;
+}
+
+/* --------------------------------------------------------- storage inspector */
+.storage-key {
+  max-width: 380px;
+}
+
+.storage-key code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.key-note {
+  margin-left: 8px;
+}
+
+.actions-col {
+  text-align: right;
+  width: 1%;
+}
+
+.btn.danger {
+  color: #e0245e;
+  border-color: #e0245e;
+}
+
+.btn.danger:hover {
+  background: #e0245e;
+  color: #fff;
+}

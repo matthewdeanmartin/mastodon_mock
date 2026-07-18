@@ -203,6 +203,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/analytics/analytics').then((m) => m.Analytics),
       },
       {
+        path: 'observability',
+        loadComponent: () =>
+          import('./pages/observability/observability').then((m) => m.Observability),
+      },
+      {
         path: 'server-rules',
         loadComponent: () => import('./pages/server-rules/server-rules').then((m) => m.ServerRules),
       },
