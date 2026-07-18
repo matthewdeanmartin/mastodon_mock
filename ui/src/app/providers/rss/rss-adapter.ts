@@ -147,9 +147,48 @@ export function feedAccount(feedUrl: string, feed: ParsedFeed): Account {
   };
 }
 
+/**
+ * A per-comment synthetic account. RSS comment feeds attribute each comment to
+ * its own author (dc:creator); fall back to the comment feed's channel account
+ * when a comment has no named author.
+ */
+export function commentAccount(
+  item: ParsedItem,
+  commentsFeedUrl: string,
+  channelAccount: Account,
+): Account {
+  const name = item.author?.trim();
+  if (!name) {
+    return channelAccount;
+  }
+  return {
+    ...channelAccount,
+    id: `rss:${commentsFeedUrl}::author::${name}`,
+    username: name,
+    acct: name,
+    display_name: name,
+  };
+}
+
 /** Normalize for the "is the title already the first line of the body?" check. */
 function squash(text: string): string {
   return text.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+export interface ItemToStatusOptions {
+  /** Set for comment-feed items: the parent post's Status id (makes it a reply). */
+  inReplyToId?: string | null;
+  /** Comment items lead with their author line, not a bold article title. */
+  isComment?: boolean;
+}
+
+/** Render RSS `<category>` labels as a trailing tag line (feed categories, not Mastodon tags). */
+function categoryLine(categories: string[]): string {
+  const tags = categories
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((c) => `<span class="rss-category">#${escapeHtml(c.replace(/\s+/g, ''))}</span>`);
+  return tags.length ? `<p class="rss-categories">${tags.join(' ')}</p>` : '';
 }
 
 export function itemToStatus(
@@ -157,16 +196,23 @@ export function itemToStatus(
   feedUrl: string,
   account: Account,
   fetchedAt: string,
+  options: ItemToStatusOptions = {},
 ): Status {
   const { html, images } = sanitizeFeedHtml(item.html);
 
   // Feed items have titles, posts don't: lead with the title in bold unless the
-  // body already starts with it (common in Nitter/microblog feeds).
+  // body already starts with it (common in Nitter/microblog feeds). Comment
+  // items keep their own (often title-less) body without a synthetic heading.
   let content = html;
   const title = item.title.trim();
-  if (title && !squash(html.replace(/<[^>]+>/g, ' ')).startsWith(squash(title).slice(0, 80))) {
+  if (
+    !options.isComment &&
+    title &&
+    !squash(html.replace(/<[^>]+>/g, ' ')).startsWith(squash(title).slice(0, 80))
+  ) {
     content = `<p><strong>${escapeHtml(title)}</strong></p>${content}`;
   }
+  content += categoryLine(item.categories);
 
   const enclosureImages = item.enclosures
     .filter((e) => (e.type ?? '').startsWith('image/') && isSafeHttpUrl(e.url))
@@ -181,9 +227,15 @@ export function itemToStatus(
       description: null,
     }));
 
+  // Comment ids are namespaced under their parent so they never collide with a
+  // post id (a comment's guid is unique only within its own comment feed).
+  const id = options.inReplyToId
+    ? `${options.inReplyToId}::comment::${item.guid}`
+    : `rss:${feedUrl}::${item.guid}`;
+
   return {
     provider: 'rss',
-    id: `rss:${feedUrl}::${item.guid}`,
+    id,
     created_at: item.publishedAt ?? fetchedAt,
     edited_at: null,
     content,
@@ -193,7 +245,7 @@ export function itemToStatus(
     account,
     reblog: null,
     quote: null,
-    in_reply_to_id: null,
+    in_reply_to_id: options.inReplyToId ?? null,
     replies_count: 0,
     reblogs_count: 0,
     favourites_count: 0,

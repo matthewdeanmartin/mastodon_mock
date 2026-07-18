@@ -441,12 +441,29 @@ export class StatusCard {
   }
 
   /**
-   * True when the thread page can render this post's conversation. Bluesky
-   * threads load via `getPostThread`; RSS items have no thread at all.
+   * True when the thread page can render this post in a conversation view.
+   * Bluesky threads load via `getPostThread`; RSS items open a reader view of
+   * the article (plus a comment feed when the publisher declares one).
    */
   protected get threadable(): boolean {
     const provider = this.display.provider ?? 'mastodon';
-    return provider === 'mastodon' || provider === 'bluesky';
+    return provider === 'mastodon' || provider === 'bluesky' || provider === 'rss';
+  }
+
+  /**
+   * The account link for this card's author, or null when there's no profile to
+   * open. RSS feeds get a synthetic "feed = profile" page (`/accounts/rss:<url>`);
+   * per-comment author accounts (`rss:<url>::author::<name>`) have no page.
+   */
+  protected get accountLink(): (string | number)[] | null {
+    const id = this.display.account.id;
+    if (!this.foreign) {
+      return ['/accounts', id];
+    }
+    if (this.display.provider === 'rss' && id.startsWith('rss:') && !id.includes('::')) {
+      return ['/accounts', id];
+    }
+    return null;
   }
 
   protected get providerBadge(): string | null {

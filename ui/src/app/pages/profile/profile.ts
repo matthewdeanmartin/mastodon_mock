@@ -11,6 +11,8 @@ import { ReportDialog } from '../../report-dialog/report-dialog';
 import { ListDialog } from '../../list-dialog/list-dialog';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
 import { HumanCountPipe } from '../../human-count.pipe';
+import { RssProvider } from '../../providers/rss/rss-provider';
+import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 
 @Component({
   selector: 'app-profile',
@@ -24,6 +26,31 @@ export class Profile implements OnInit {
   protected words = inject(Terminology).words;
   private auth = inject(Auth);
   private location = inject(Location);
+  private rss = inject(RssProvider);
+  private rssSubs = inject(RssSubscriptions);
+
+  /** True when this "profile" is a synthetic RSS feed (id `rss:<feedUrl>`). */
+  protected isRss = signal(false);
+  /** The feed URL behind an RSS profile, for the subscribe toggle. */
+  private rssFeedUrl = signal<string | null>(null);
+  /** Whether the viewer is currently subscribed to this feed. */
+  protected rssSubscribed = computed(() => {
+    const url = this.rssFeedUrl();
+    return !!url && this.rssSubs.has(url) && this.rssSubs.enabledFeeds().some((f) => f.url === url);
+  });
+
+  toggleRssSubscription(): void {
+    const url = this.rssFeedUrl();
+    const account = this.account();
+    if (!url) {
+      return;
+    }
+    if (this.rssSubs.has(url)) {
+      this.rssSubs.remove(url);
+    } else {
+      this.rssSubs.add(url, account?.display_name || url);
+    }
+  }
 
   protected account = signal<Account | null>(null);
   protected statuses = signal<Status[]>([]);
@@ -89,6 +116,12 @@ export class Profile implements OnInit {
     this.loading.set(true);
     this.relationship.set(null);
     this.reportDone.set(false);
+    this.isRss.set(false);
+    this.rssFeedUrl.set(null);
+    if (id.startsWith('rss:')) {
+      this.loadRss(id);
+      return;
+    }
     this.api.getAccount(id).subscribe((a) => {
       this.account.set(a);
       this.loading.set(false);
@@ -97,6 +130,42 @@ export class Profile implements OnInit {
     this.loadPinned(id);
     this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null));
     this.loadFeatured(id);
+  }
+
+  /**
+   * An RSS feed as a synthetic profile: the feed's account plus its items as the
+   * timeline. No relationships, pinned, or featured — those are Mastodon-only.
+   * Feeds have no pagination, so the whole feed loads at once (exhausted).
+   */
+  private loadRss(id: string): void {
+    this.isRss.set(true);
+    const feedUrl = id.slice('rss:'.length);
+    this.rssFeedUrl.set(feedUrl);
+    this.statuses.set([]);
+    this.pinnedStatuses.set([]);
+    this.featured.set([]);
+    this.statusesLoading.set(true);
+    this.exhausted.set(true);
+    const seq = ++this.loadSeq;
+    this.rss.getFeed(feedUrl).subscribe({
+      next: ({ account, statuses }) => {
+        if (seq !== this.loadSeq) {
+          return;
+        }
+        this.account.set(account);
+        this.statuses.set(statuses);
+        this.loading.set(false);
+        this.statusesLoading.set(false);
+      },
+      error: () => {
+        if (seq !== this.loadSeq) {
+          return;
+        }
+        // No account to show; the template falls back to "Account not found".
+        this.loading.set(false);
+        this.statusesLoading.set(false);
+      },
+    });
   }
 
   toggleBoosts(): void {

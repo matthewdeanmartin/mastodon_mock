@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { feedToStatuses, itemToStatus, feedAccount, sanitizeFeedHtml } from './rss-adapter';
+import {
+  commentAccount,
+  feedToStatuses,
+  itemToStatus,
+  feedAccount,
+  sanitizeFeedHtml,
+} from './rss-adapter';
 import { ParsedFeed, ParsedItem } from './rss-parser';
 
 const FETCHED_AT = '2026-07-14T12:00:00.000Z';
@@ -12,6 +18,10 @@ function makeItem(overrides: Partial<ParsedItem> = {}): ParsedItem {
     publishedAt: '2026-07-13T10:00:00.000Z',
     html: '<p>Body text</p>',
     enclosures: [],
+    categories: [],
+    author: null,
+    commentsFeedUrl: null,
+    commentCount: null,
     ...overrides,
   };
 }
@@ -104,6 +114,52 @@ describe('itemToStatus', () => {
       'https://x.example/b.jpg',
     ]);
     expect(status.media_attachments[0].type).toBe('image');
+  });
+
+  it('appends feed categories as a trailing tag line', () => {
+    const status = itemToStatus(
+      makeItem({ categories: ['Machine Learning', 'News'] }),
+      'https://blog.example.com/feed.xml',
+      account,
+      FETCHED_AT,
+    );
+    expect(status.content).toContain('class="rss-categories"');
+    // Whitespace is squeezed out so the tag stays a single #token.
+    expect(status.content).toContain('#MachineLearning');
+    expect(status.content).toContain('#News');
+  });
+
+  it('adapts a comment item as a reply: namespaced id, in_reply_to_id, no title heading', () => {
+    const parentId = 'rss:https://blog.example.com/feed.xml::g1';
+    const status = itemToStatus(
+      makeItem({ guid: 'c1', title: 'Comment on Post by Dana', html: '<p>Nice write-up!</p>' }),
+      'https://blog.example.com/feed.xml',
+      account,
+      FETCHED_AT,
+      { inReplyToId: parentId, isComment: true },
+    );
+    expect(status.in_reply_to_id).toBe(parentId);
+    expect(status.id).toBe(`${parentId}::comment::c1`);
+    // Comments don't get the synthetic bold-title heading.
+    expect(status.content).toBe('<p>Nice write-up!</p>');
+  });
+
+  it('builds a per-author account for authored comments, else the channel account', () => {
+    const channel = feedAccount('https://blog.example.com/post/feed', makeFeed([]));
+    const authored = commentAccount(
+      makeItem({ author: 'Dana' }),
+      'https://blog.example.com/post/feed',
+      channel,
+    );
+    expect(authored.display_name).toBe('Dana');
+    expect(authored.id).toContain('::author::Dana');
+
+    const anon = commentAccount(
+      makeItem({ author: null }),
+      'https://blog.example.com/post/feed',
+      channel,
+    );
+    expect(anon).toBe(channel);
   });
 
   it('falls back to fetch time for undated items', () => {

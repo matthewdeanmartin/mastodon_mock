@@ -33,8 +33,10 @@
           <div>
             <div class="reader-author">{{ author.display_name || author.username }}</div>
             <div class="muted">
-              &#64;{{ author.acct }} · {{ chain()[0].created_at | humanTime }} ·
-              {{ chain().length }} posts
+              &#64;{{ author.acct }} · {{ chain()[0].created_at | humanTime }}
+              @if (!isRss()) {
+                · {{ chain().length }} posts
+              }
             </div>
           </div>
         </header>
@@ -44,52 +46,65 @@
         @for (m of post.media_attachments; track m.id) {
           <img class="reader-media" [src]="m.preview_url || m.url" [alt]="m.description || ''" />
         }
-        <div class="reader-actions">
-          <button
-            class="raction"
-            [class.on]="replyingTo() === post.id"
-            (click)="toggleReaderReply(post.id)"
-            title="Reply"
-          >
-            💬 {{ post.replies_count }}
-          </button>
-          <button
-            class="raction"
-            [class.on]="post.reblogged"
-            (click)="toggleReblog(post)"
-            [title]="post.reblogged ? words().UndoBoost : words().Boost"
-          >
-            🔁 {{ post.reblogs_count }}
-          </button>
-          <button
-            class="raction"
-            [class.on]="post.favourited"
-            (click)="toggleFavourite(post)"
-            [title]="post.favourited ? 'Undo favourite' : 'Favourite'"
-          >
-            ⭐ {{ post.favourites_count }}
-          </button>
-          <button
-            class="raction"
-            [class.on]="post.bookmarked"
-            (click)="toggleBookmark(post)"
-            [title]="post.bookmarked ? 'Remove bookmark' : 'Bookmark'"
-          >
-            🔖
-          </button>
-        </div>
-        @if (replyingTo() === post.id) {
-          <div class="reader-reply">
-            @if (isBluesky(post)) {
-              <app-bsky-reply [replyTo]="post" (posted)="onReaderReplied($event)" />
-            } @else {
-              <app-compose
-                [inReplyToId]="post.id"
-                placeholder="Post your reply"
-                (posted)="onReaderReplied($event)"
-              />
-            }
+        @if (isRss()) {
+          @if (post.url) {
+            <a
+              class="btn btn-outline btn-sm reader-original"
+              [href]="post.url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ↗ Read on the original site
+            </a>
+          }
+        } @else {
+          <div class="reader-actions">
+            <button
+              class="raction"
+              [class.on]="replyingTo() === post.id"
+              (click)="toggleReaderReply(post.id)"
+              title="Reply"
+            >
+              💬 {{ post.replies_count }}
+            </button>
+            <button
+              class="raction"
+              [class.on]="post.reblogged"
+              (click)="toggleReblog(post)"
+              [title]="post.reblogged ? words().UndoBoost : words().Boost"
+            >
+              🔁 {{ post.reblogs_count }}
+            </button>
+            <button
+              class="raction"
+              [class.on]="post.favourited"
+              (click)="toggleFavourite(post)"
+              [title]="post.favourited ? 'Undo favourite' : 'Favourite'"
+            >
+              ⭐ {{ post.favourites_count }}
+            </button>
+            <button
+              class="raction"
+              [class.on]="post.bookmarked"
+              (click)="toggleBookmark(post)"
+              [title]="post.bookmarked ? 'Remove bookmark' : 'Bookmark'"
+            >
+              🔖
+            </button>
           </div>
+          @if (replyingTo() === post.id) {
+            <div class="reader-reply">
+              @if (isBluesky(post)) {
+                <app-bsky-reply [replyTo]="post" (posted)="onReaderReplied($event)" />
+              } @else {
+                <app-compose
+                  [inReplyToId]="post.id"
+                  placeholder="Post your reply"
+                  (posted)="onReaderReplied($event)"
+                />
+              }
+            </div>
+          }
         }
       }
 
@@ -113,6 +128,19 @@
           }
         </section>
       }
+
+      @if (isRss() && !comments().length) {
+        <p class="muted reader-comments-note">
+          @if (rssHasCommentFeed() && !rssCommentsUnavailable()) {
+            Loading comments…
+          } @else if (rssHasCommentFeed()) {
+            Comments couldn't be loaded from this feed. Read and join the discussion on the original
+            site.
+          } @else {
+            This feed doesn't publish comments. Read the discussion on the original site.
+          }
+        </p>
+      }
     </article>
   } @else {
     @for (a of ancestors(); track a.id) {
@@ -135,7 +163,7 @@
     />
     @if (isBluesky(s)) {
       <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
-    } @else {
+    } @else if (!isRss()) {
       <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
     }
     @for (d of descendants(); track d.id) {

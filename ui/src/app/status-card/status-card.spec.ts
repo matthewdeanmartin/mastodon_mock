@@ -823,6 +823,12 @@ describe('StatusCard', () => {
         id: 'rss:https://blog.example/feed::g1',
         provider: 'rss',
         url: 'https://blog.example/post',
+        account: {
+          id: 'rss:https://blog.example/feed',
+          username: 'blog.example',
+          acct: 'blog.example',
+          display_name: 'Example Blog',
+        } as never,
       });
     }
 
@@ -845,12 +851,26 @@ describe('StatusCard', () => {
       expect(el.textContent).not.toContain('⭐');
     });
 
-    it('does not link the author or timestamp to in-app routes', () => {
+    it('links the author to the synthetic feed profile and the timestamp to the article thread', () => {
       const f = setUp(makeRssStatus());
       const el = f.nativeElement as HTMLElement;
-      expect(el.querySelector('a.name')?.getAttribute('href')).toBeNull();
-      const time = el.querySelector<HTMLAnchorElement>('a.post-time')!;
-      expect(time.href).toBe('https://blog.example/post');
+      // Feed = profile: the author name routes to /accounts/rss:<feedUrl>.
+      const name = el.querySelector('a.name')?.getAttribute('href') ?? '';
+      expect(decodeURIComponent(name)).toBe('/accounts/rss:https://blog.example/feed');
+      // RSS items are threadable now: the timestamp opens the in-app reader/thread.
+      const time = el.querySelector<HTMLAnchorElement>('a.post-time')?.getAttribute('href') ?? '';
+      expect(decodeURIComponent(time)).toBe('/statuses/rss:https://blog.example/feed::g1');
+    });
+
+    it('offers an in-app "View thread" link for the article and its comments', () => {
+      const f = setUp(makeRssStatus());
+      const el = f.nativeElement as HTMLElement;
+      const view = Array.from(el.querySelectorAll<HTMLAnchorElement>('a.action')).find((a) =>
+        a.textContent?.includes('View thread'),
+      );
+      expect(decodeURIComponent(view?.getAttribute('href') ?? '')).toBe(
+        '/statuses/rss:https://blog.example/feed::g1',
+      );
     });
 
     it('keeps normal in-app links for Mastodon statuses', () => {

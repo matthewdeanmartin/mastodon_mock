@@ -13,6 +13,7 @@ import { adaptPost } from '../../providers/bluesky/bluesky-adapter';
 import { BskyThreadNode } from '../../providers/bluesky/bluesky-types';
 import { BskyReply } from '../../providers/bluesky/bluesky-reply';
 import { StatusActions } from '../../providers/status-actions';
+import { RssProvider } from '../../providers/rss/rss-provider';
 
 @Component({
   selector: 'app-thread',
@@ -23,6 +24,7 @@ import { StatusActions } from '../../providers/status-actions';
 export class Thread implements OnInit {
   private api = inject(Api);
   private bsky = inject(BlueskyApi);
+  private rss = inject(RssProvider);
   private actions = inject(StatusActions);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -37,6 +39,13 @@ export class Thread implements OnInit {
 
   /** Reader mode: distraction-free article view of the author's own chain. */
   protected readerMode = signal(false);
+
+  /** True while viewing an RSS article: interactions are read-only, comments come from a feed. */
+  protected isRss = signal(false);
+  /** Whether the RSS item declared a comment feed we could load (informs the empty state). */
+  protected rssHasCommentFeed = signal(false);
+  /** True once a declared RSS comment feed came back empty or failed to load. */
+  protected rssCommentsUnavailable = signal(false);
 
   /** The whole thread in display order. */
   private thread = computed<Status[]>(() => {
@@ -86,23 +95,44 @@ export class Thread implements OnInit {
     call.subscribe((updated) => this.patch(updated));
   }
 
+  /** Latest route id and `?reader` value, tracked so either stream can recompute reader mode. */
+  private currentId = '';
+  private readerParam: string | null = null;
+
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
+        this.currentId = id;
+        this.applyReaderMode();
         this.load(id);
       }
     });
-    // Deep link: status cards link here with ?reader=1 to open straight into reader mode.
+    // Deep link: status cards link here with ?reader=1 to open straight into
+    // reader mode. RSS items are articles, so they default to reader ON unless
+    // the link explicitly opts out with ?reader=0.
     this.route.queryParamMap.subscribe((params) => {
-      this.readerMode.set(params.get('reader') === '1');
+      this.readerParam = params.get('reader');
+      this.applyReaderMode();
     });
+  }
+
+  private applyReaderMode(): void {
+    const rssDefault = this.currentId.startsWith('rss:') && this.readerParam !== '0';
+    this.readerMode.set(this.readerParam === '1' || rssDefault);
   }
 
   load(id: string): void {
     this.loading.set(true);
+    this.isRss.set(false);
+    this.rssHasCommentFeed.set(false);
+    this.rssCommentsUnavailable.set(false);
     if (id.startsWith('bsky:')) {
       this.loadBsky(id.slice('bsky:'.length));
+      return;
+    }
+    if (id.startsWith('rss:')) {
+      this.loadRss(id);
       return;
     }
     this.api.getStatus(id).subscribe((s) => {
@@ -135,6 +165,46 @@ export class Thread implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  /**
+   * RSS article: resolve the item from its feed, then (if the publisher declares
+   * a comment feed) load the comments as descendants. Ids are `rss:<feedUrl>::<guid>`.
+   */
+  private loadRss(id: string): void {
+    this.isRss.set(true);
+    const body = id.slice('rss:'.length);
+    const sep = body.indexOf('::');
+    if (sep === -1) {
+      this.loading.set(false);
+      return;
+    }
+    const feedUrl = body.slice(0, sep);
+    const guid = body.slice(sep + 2);
+    this.ancestors.set([]);
+    this.descendants.set([]);
+    this.rss.getFeedItem(feedUrl, guid).subscribe({
+      next: (view) => {
+        this.status.set(view.status);
+        this.loading.set(false);
+        if (view.commentsFeedUrl) {
+          this.rssHasCommentFeed.set(true);
+          this.loadRssComments(view.commentsFeedUrl, feedUrl, view.status.id);
+        }
+      },
+      error: () => this.loading.set(false),
+    });
+  }
+
+  private loadRssComments(commentsFeedUrl: string, feedUrl: string, parentId: string): void {
+    this.rss.getComments(commentsFeedUrl, feedUrl, parentId).subscribe({
+      next: (comments) => {
+        this.descendants.set(comments);
+        this.rssCommentsUnavailable.set(comments.length === 0);
+      },
+      // A declared comment feed that won't load (CORS, 404) is common; note it.
+      error: () => this.rssCommentsUnavailable.set(true),
     });
   }
 

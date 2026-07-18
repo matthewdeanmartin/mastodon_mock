@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { parseFeed } from './rss-parser';
 
 const RSS2 = `<?xml version="1.0"?>
-<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<rss version="2.0"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+     xmlns:slash="http://purl.org/rss/1.0/modules/slash/">
   <channel>
     <title>My Blog</title>
     <link>https://blog.example.com</link>
@@ -14,6 +17,11 @@ const RSS2 = `<?xml version="1.0"?>
       <description>Short summary</description>
       <content:encoded><![CDATA[<p>Full <b>HTML</b> body</p>]]></content:encoded>
       <enclosure url="https://blog.example.com/pic.jpg" type="image/jpeg" length="1"/>
+      <category>Tech</category>
+      <category>Rambling</category>
+      <comments>https://blog.example.com/first#comments</comments>
+      <wfw:commentRss>https://blog.example.com/first/feed</wfw:commentRss>
+      <slash:comments>7</slash:comments>
     </item>
     <item>
       <title>No guid, no date</title>
@@ -24,7 +32,7 @@ const RSS2 = `<?xml version="1.0"?>
 </rss>`;
 
 const ATOM = `<?xml version="1.0"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:thr="http://purl.org/syndication/thread/1.0">
   <title>Atom Feed</title>
   <link rel="self" href="https://atom.example.com/feed.xml"/>
   <link rel="alternate" href="https://atom.example.com"/>
@@ -32,6 +40,9 @@ const ATOM = `<?xml version="1.0"?>
     <title>Entry one</title>
     <id>urn:uuid:1</id>
     <link rel="alternate" href="https://atom.example.com/one"/>
+    <link rel="replies" href="https://atom.example.com/one/replies"/>
+    <thr:total>3</thr:total>
+    <category term="Notes"/>
     <published>2026-07-12T08:30:00Z</published>
     <content type="html">&lt;p&gt;Atom body&lt;/p&gt;</content>
   </entry>
@@ -55,6 +66,20 @@ describe('parseFeed', () => {
     ]);
   });
 
+  it('reads categories, wfw:commentRss and slash:comments from RSS items', () => {
+    const first = parseFeed(RSS2).items[0];
+    expect(first.categories).toEqual(['Tech', 'Rambling']);
+    expect(first.commentsFeedUrl).toBe('https://blog.example.com/first/feed');
+    expect(first.commentCount).toBe(7);
+  });
+
+  it('leaves comment fields null when the item declares none', () => {
+    const second = parseFeed(RSS2).items[1];
+    expect(second.categories).toEqual([]);
+    expect(second.commentsFeedUrl).toBeNull();
+    expect(second.commentCount).toBeNull();
+  });
+
   it('falls back to link for missing guid and null for missing dates', () => {
     const second = parseFeed(RSS2).items[1];
     expect(second.guid).toBe('https://blog.example.com/second');
@@ -71,6 +96,13 @@ describe('parseFeed', () => {
     expect(entry.link).toBe('https://atom.example.com/one');
     expect(entry.publishedAt).toBe('2026-07-12T08:30:00Z'.replace('Z', '.000Z'));
     expect(entry.html).toBe('<p>Atom body</p>');
+  });
+
+  it('reads Atom threading: rel="replies", thr:total and category term', () => {
+    const entry = parseFeed(ATOM).items[0];
+    expect(entry.categories).toEqual(['Notes']);
+    expect(entry.commentsFeedUrl).toBe('https://atom.example.com/one/replies');
+    expect(entry.commentCount).toBe(3);
   });
 
   it('rejects non-XML with a human-readable message', () => {

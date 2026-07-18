@@ -304,4 +304,76 @@ describe('Thread', () => {
     expect(el.querySelector('.reader-reply app-bsky-reply')).not.toBeNull();
     expect(el.querySelector('.reader-reply app-compose')).toBeNull();
   });
+
+  // ---------------------------------------------------------------------- RSS
+
+  const RSS_FEED = `<?xml version="1.0"?>
+<rss version="2.0" xmlns:wfw="http://wellformedweb.org/CommentAPI/">
+  <channel>
+    <title>Test Blog</title>
+    <link>https://blog.example.com</link>
+    <item>
+      <title>Hello world</title>
+      <link>https://blog.example.com/hello</link>
+      <guid>g1</guid>
+      <description>&lt;p&gt;The article body&lt;/p&gt;</description>
+      <wfw:commentRss>https://blog.example.com/hello/comments</wfw:commentRss>
+    </item>
+  </channel>
+</rss>`;
+
+  const COMMENT_FEED = `<?xml version="1.0"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Comments on Hello world</title>
+    <item>
+      <title>Comment by Dana</title>
+      <guid>c1</guid>
+      <dc:creator>Dana</dc:creator>
+      <description>&lt;p&gt;Great post!&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>`;
+
+  it('opens an RSS item in reader mode by default and loads its comment feed as replies', () => {
+    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
+
+    httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
+    httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
+    fixture.detectChanges();
+
+    const parentId = 'rss:https://blog.example.com/feed.xml::g1';
+    expect(internals(fixture).status()?.id).toBe(parentId);
+    // RSS defaults straight into reader mode.
+    expect(fixture.componentInstance['readerMode']()).toBe(true);
+    // The comment became a descendant reply attributed to its author.
+    const descendants = internals(fixture).descendants();
+    expect(descendants).toHaveLength(1);
+    expect(descendants[0].in_reply_to_id).toBe(parentId);
+    expect(descendants[0].account.display_name).toBe('Dana');
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.reader-comments')).not.toBeNull();
+    // Read-only: no reply composer or action buttons in the RSS reader.
+    expect(el.querySelector('.reader-actions')).toBeNull();
+    expect(el.querySelector('.reader-original')).not.toBeNull();
+  });
+
+  it('shows the no-comment-feed note for RSS items without one', () => {
+    const feedNoComments = `<?xml version="1.0"?>
+<rss version="2.0"><channel><title>B</title>
+  <item><title>Post</title><link>https://b.example/p</link><guid>g9</guid>
+  <description>&lt;p&gt;Body&lt;/p&gt;</description></item>
+</channel></rss>`;
+    const fixture = setUpWithId('rss:https://b.example/feed::g9');
+
+    httpMock.expectOne('https://b.example/feed').flush(feedNoComments);
+    fixture.detectChanges();
+
+    expect(internals(fixture).descendants()).toHaveLength(0);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.reader-comments-note')?.textContent).toContain(
+      "doesn't publish comments",
+    );
+  });
 });

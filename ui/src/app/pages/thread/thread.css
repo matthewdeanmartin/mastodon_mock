@@ -60,6 +60,18 @@
   margin: 0 0 1em;
 }
 
+/* RSS reader: read-only "open the source" link and the comments empty-state. */
+.reader-original {
+  display: inline-flex;
+  margin: 0 0 1.5em;
+}
+
+.reader-comments-note {
+  margin-top: 1.5em;
+  padding-top: 1.5em;
+  border-top: 1px solid var(--border);
+}
+
 /* Compact per-post action bar: same scale as the normal feed, so it stays
    unobtrusive against the larger reader type. */
 .reader-actions {

@@ -9,7 +9,22 @@
     ></div>
     <div class="profile-top">
       <img class="avatar" [src]="a.avatar" [alt]="a.username" />
-      @if (!isSelf()) {
+      @if (isRss()) {
+        <div class="profile-buttons">
+          @if (a.url) {
+            <a class="btn btn-outline" [href]="a.url" target="_blank" rel="noopener noreferrer">
+              ↗ Visit site
+            </a>
+          }
+          <button
+            class="btn"
+            [class.btn-outline]="rssSubscribed()"
+            (click)="toggleRssSubscription()"
+          >
+            {{ rssSubscribed() ? '📡 Subscribed' : '📡 Subscribe' }}
+          </button>
+        </div>
+      } @else if (!isSelf()) {
         <div class="profile-buttons">
           <button class="btn btn-outline" (click)="showLists.set(true)">
             Lists &amp; collections
@@ -68,14 +83,17 @@
     }
     <div class="stats muted">
       <span
-        ><strong>{{ a.statuses_count | humanCount }}</strong> {{ words().posts }}</span
+        ><strong>{{ a.statuses_count | humanCount }}</strong>
+        {{ isRss() ? 'items' : words().posts }}</span
       >
-      <span
-        ><strong>{{ a.following_count | humanCount }}</strong> following</span
-      >
-      <span
-        ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
-      >
+      @if (!isRss()) {
+        <span
+          ><strong>{{ a.following_count | humanCount }}</strong> following</span
+        >
+        <span
+          ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
+        >
+      }
     </div>
   </header>
 
@@ -118,35 +136,37 @@
     </section>
   }
 
-  <div class="profile-filters" role="group" aria-label="Timeline filters">
-    <button
-      type="button"
-      class="btn btn-outline btn-sm"
-      [class.active]="showBoosts()"
-      [attr.aria-pressed]="showBoosts()"
-      (click)="toggleBoosts()"
-    >
-      🔁 {{ words().Boosts }}
-    </button>
-    <button
-      type="button"
-      class="btn btn-outline btn-sm"
-      [class.active]="showReplies()"
-      [attr.aria-pressed]="showReplies()"
-      (click)="toggleReplies()"
-    >
-      💬 Replies
-    </button>
-    <button
-      type="button"
-      class="btn btn-outline btn-sm"
-      [class.active]="showPinned()"
-      [attr.aria-pressed]="showPinned()"
-      (click)="togglePinned()"
-    >
-      📌 Pinned
-    </button>
-  </div>
+  @if (!isRss()) {
+    <div class="profile-filters" role="group" aria-label="Timeline filters">
+      <button
+        type="button"
+        class="btn btn-outline btn-sm"
+        [class.active]="showBoosts()"
+        [attr.aria-pressed]="showBoosts()"
+        (click)="toggleBoosts()"
+      >
+        🔁 {{ words().Boosts }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-outline btn-sm"
+        [class.active]="showReplies()"
+        [attr.aria-pressed]="showReplies()"
+        (click)="toggleReplies()"
+      >
+        💬 Replies
+      </button>
+      <button
+        type="button"
+        class="btn btn-outline btn-sm"
+        [class.active]="showPinned()"
+        [attr.aria-pressed]="showPinned()"
+        (click)="togglePinned()"
+      >
+        📌 Pinned
+      </button>
+    </div>
+  }
 
   @if (showPinned()) {
     @for (s of pinnedStatuses(); track s.id) {

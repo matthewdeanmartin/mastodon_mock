@@ -11,6 +11,18 @@ export interface ParsedItem {
   html: string;
   /** Enclosure/media URLs with their MIME type when declared. */
   enclosures: { url: string; type: string | null }[];
+  /** Category/tag labels (RSS <category>, Atom <category term>). */
+  categories: string[];
+  /** Author name (dc:creator, RSS <author>, or Atom <author><name>), when present. */
+  author: string | null;
+  /**
+   * URL of a secondary feed carrying this item's comments, when the publisher
+   * declares one — WordPress's `wfw:commentRss` or Atom RFC 4685 `rel="replies"`.
+   * The one comment-consumption path feed readers ever really supported.
+   */
+  commentsFeedUrl: string | null;
+  /** Declared comment count (slash:comments / Atom thr:total), or null. */
+  commentCount: number | null;
 }
 
 export interface ParsedFeed {
@@ -55,6 +67,45 @@ function atomLink(parent: Element): string | null {
   return (alternate ?? links[0])?.getAttribute('href')?.trim() || null;
 }
 
+/** The first Atom `<link rel="replies">` href (RFC 4685 threading), or null. */
+function atomRepliesLink(parent: Element): string | null {
+  const replies = children(parent, 'link').find((l) => l.getAttribute('rel') === 'replies');
+  return replies?.getAttribute('href')?.trim() || null;
+}
+
+/** Parse a `<category>` list: RSS uses text content, Atom uses a `term` attribute. */
+function categories(parent: Element): string[] {
+  return children(parent, 'category')
+    .map((c) => (c.getAttribute('term') || c.textContent || '').trim())
+    .filter((c) => c.length > 0);
+}
+
+function toCount(raw: string): number | null {
+  const n = Number.parseInt(raw, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+/** RSS item author: dc:creator (common in comment feeds) or the plain <author>. */
+function rssAuthor(item: Element): string | null {
+  return childText(item, 'creator') || childText(item, 'author') || null;
+}
+
+/** Atom entry author: the <author><name>. */
+function atomAuthor(entry: Element): string | null {
+  const author = children(entry, 'author')[0];
+  return (author && childText(author, 'name')) || null;
+}
+
+/**
+ * The `slash:comments` count. RSS 2.0's core `<comments>` (a URL to the HTML
+ * comments page) and the slash module's `<slash:comments>` (an integer count)
+ * share a local name, so match on the `slash` prefix to read the right one.
+ */
+function slashCommentCount(item: Element): number | null {
+  const el = children(item, 'comments').find((c) => c.prefix === 'slash');
+  return el ? toCount(el.textContent?.trim() ?? '') : null;
+}
+
 function parseRssItem(item: Element): ParsedItem {
   const title = childText(item, 'title');
   const link = childText(item, 'link') || null;
@@ -72,6 +123,11 @@ function parseRssItem(item: Element): ParsedItem {
     publishedAt: toIso(childText(item, 'pubDate')) ?? toIso(childText(item, 'date')),
     html,
     enclosures,
+    categories: categories(item),
+    author: rssAuthor(item),
+    // wfw:commentRss / wfw:commentRSS — WordPress's per-post comment feed.
+    commentsFeedUrl: childText(item, 'commentRss') || childText(item, 'commentRSS') || null,
+    commentCount: slashCommentCount(item),
   };
 }
 
@@ -86,6 +142,11 @@ function parseAtomEntry(entry: Element): ParsedItem {
     publishedAt: toIso(childText(entry, 'published')) ?? toIso(childText(entry, 'updated')),
     html,
     enclosures: [],
+    categories: categories(entry),
+    author: atomAuthor(entry),
+    commentsFeedUrl: atomRepliesLink(entry),
+    // Atom threading (RFC 4685) exposes the reply count as thr:total.
+    commentCount: toCount(childText(entry, 'total')),
   };
 }
 
