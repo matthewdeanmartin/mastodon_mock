@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { Status } from './models';
-import { HEATED_THRESHOLD, isHeated, rageScore, stripHtml } from './sentiment';
+import {
+  HEATED_THRESHOLD,
+  RATIO_FACTOR,
+  RATIO_MIN_REPLIES,
+  isCalmHidden,
+  isDunk,
+  isHeated,
+  isRatioed,
+  rageScore,
+  stripHtml,
+} from './sentiment';
 
 function makeStatus(content: string, overrides: Partial<Status> = {}): Status {
   return {
@@ -139,5 +149,127 @@ describe('isHeated', () => {
       ],
     });
     expect(isHeated(filtered)).toBe(true);
+  });
+});
+
+describe('isRatioed', () => {
+  it('flags heavy replies over few endorsements — the classic ratio', () => {
+    // 20 replies vs 3 favs + 2 boosts = 5 endorsements: 20 ≥ 2×5.
+    const ratioed = makeStatus('<p>take</p>', {
+      replies_count: 20,
+      favourites_count: 3,
+      reblogs_count: 2,
+    });
+    expect(isRatioed(ratioed)).toBe(true);
+  });
+
+  it('passes a well-liked post even with many replies', () => {
+    // 20 replies vs 30 favs + 10 boosts: lively, not a pile-on.
+    const liked = makeStatus('<p>take</p>', {
+      replies_count: 20,
+      favourites_count: 30,
+      reblogs_count: 10,
+    });
+    expect(isRatioed(liked)).toBe(false);
+  });
+
+  it('never fires below the minimum reply floor', () => {
+    // 3 replies over 0 endorsements is just a small conversation.
+    const small = makeStatus('<p>hi</p>', {
+      replies_count: RATIO_MIN_REPLIES - 1,
+      favourites_count: 0,
+      reblogs_count: 0,
+    });
+    expect(isRatioed(small)).toBe(false);
+  });
+
+  it('fires exactly at the factor boundary', () => {
+    const endorsements = 5;
+    const atBoundary = makeStatus('<p>take</p>', {
+      replies_count: RATIO_FACTOR * endorsements,
+      favourites_count: endorsements,
+      reblogs_count: 0,
+    });
+    const justUnder = makeStatus('<p>take</p>', {
+      replies_count: RATIO_FACTOR * endorsements - 1,
+      favourites_count: endorsements,
+      reblogs_count: 0,
+    });
+    expect(isRatioed(atBoundary)).toBe(true);
+    expect(isRatioed(justUnder)).toBe(false);
+  });
+
+  it('reads the boost target, not the wrapper', () => {
+    const ratioed = makeStatus('<p>take</p>', {
+      replies_count: 40,
+      favourites_count: 1,
+      reblogs_count: 0,
+    });
+    expect(isRatioed(makeStatus('', { reblog: ratioed }))).toBe(true);
+  });
+});
+
+describe('isDunk', () => {
+  const quoted = makeStatus('<p>my honest opinion</p>');
+
+  it('flags a quote with hostile commentary', () => {
+    const dunk = makeStatus('<p>imagine being this dumb</p>', {
+      quote: { state: 'accepted', quoted_status: quoted },
+    });
+    expect(isDunk(dunk)).toBe(true);
+  });
+
+  it('passes a quote with friendly commentary', () => {
+    const share = makeStatus('<p>great thread, worth your time</p>', {
+      quote: { state: 'accepted', quoted_status: quoted },
+    });
+    expect(isDunk(share)).toBe(false);
+  });
+
+  it('is never a dunk without a quote, however rude the words', () => {
+    expect(isDunk(makeStatus('<p>you absolute clowns</p>'))).toBe(false);
+  });
+
+  it('reads the boost target, not the wrapper', () => {
+    const dunk = makeStatus('<p>pathetic take</p>', {
+      quote: { state: 'accepted', quoted_status: quoted },
+    });
+    expect(isDunk(makeStatus('', { reblog: dunk }))).toBe(true);
+  });
+});
+
+describe('isCalmHidden', () => {
+  it('hides heated, ratioed, and dunking posts alike', () => {
+    const heated = makeStatus('<p>MORONS and LIARS everywhere!!!</p>');
+    const ratioed = makeStatus('<p>politely worded but wrong</p>', {
+      replies_count: 50,
+      favourites_count: 2,
+      reblogs_count: 1,
+    });
+    const dunk = makeStatus('<p>what a clown</p>', {
+      quote: { state: 'accepted', quoted_status: makeStatus('<p>original</p>') },
+    });
+    expect(isCalmHidden(heated)).toBe(true);
+    expect(isCalmHidden(ratioed)).toBe(true);
+    expect(isCalmHidden(dunk)).toBe(true);
+  });
+
+  it('passes a liked, calm, quote-free post', () => {
+    const fine = makeStatus('<p>sourdough starter day 4: bubbles!</p>', {
+      replies_count: 4,
+      favourites_count: 60,
+      reblogs_count: 12,
+    });
+    expect(isCalmHidden(fine)).toBe(false);
+  });
+
+  it('passes a calm quote share of a well-received post', () => {
+    const share = makeStatus('<p>lovely photos in here</p>', {
+      quote: { state: 'accepted', quoted_status: makeStatus('<p>photos</p>') },
+      replies_count: 2,
+      favourites_count: 9,
+      reblogs_count: 3,
+    });
+    expect(isCalmHidden(share)).toBe(false);
   });
 });

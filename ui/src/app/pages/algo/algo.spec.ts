@@ -175,6 +175,29 @@ describe('Algo page', () => {
     expect(TestBed.inject(ClientPrefs).algoCalm()).toBe(true);
   });
 
+  it('calm mode also hides ratioed posts and quote-dunks', () => {
+    // Politely worded, but 40 replies over 2 favs: a pile-on, not a hit.
+    const ratioed = makePost('ratioed', 'original', true, '<p>my measured hot take</p>');
+    ratioed.status.replies_count = 40;
+    ratioed.status.favourites_count = 2;
+    // Mildly negative ("dumb" scores 1, below the heated threshold) — but on a
+    // quote it's a dunk, so only the dunk rule can be what hides it.
+    const dunk = makePost('dunk', 'original', true, '<p>what a dumb take</p>');
+    dunk.status.quote = { state: 'accepted', quoted_status: null };
+    feed.posts.set([
+      makePost('nice', 'original', true, '<p>lovely garden update</p>'),
+      ratioed,
+      dunk,
+    ]);
+    TestBed.inject(ClientPrefs).setAlgoCalm(true);
+    fixture.detectChanges();
+
+    expect(text()).toContain('lovely garden');
+    expect(text()).not.toContain('measured hot take');
+    expect(text()).not.toContain('dumb take');
+    expect(text()).toContain('calm mode hid 2');
+  });
+
   it('refresh button rebuilds; loading and error states render', () => {
     fixture.detectChanges();
     chip('Refresh').click();

@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnInit } from '@angular/core';
 import { AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
-import { isHeated } from '../../sentiment';
+import { isCalmHidden } from '../../sentiment';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 
@@ -43,7 +43,7 @@ export class Algo implements OnInit {
   protected visible = computed(() =>
     this.feed
       .posts()
-      .filter((p) => this.passesChips(p) && !(this.prefs.algoCalm() && isHeated(p.status))),
+      .filter((p) => this.passesChips(p) && !(this.prefs.algoCalm() && isCalmHidden(p.status))),
   );
 
   /** How many posts calm mode is currently hiding, for the chip hint. */
@@ -51,7 +51,7 @@ export class Algo implements OnInit {
     if (!this.prefs.algoCalm()) {
       return 0;
     }
-    return this.feed.posts().filter((p) => this.passesChips(p) && isHeated(p.status)).length;
+    return this.feed.posts().filter((p) => this.passesChips(p) && isCalmHidden(p.status)).length;
   });
 
   ngOnInit(): void {

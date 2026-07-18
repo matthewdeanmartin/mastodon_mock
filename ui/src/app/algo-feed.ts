@@ -12,7 +12,7 @@ export interface AlgoPost {
   source: AlgoSource;
   /** True when the author (or booster) is someone the user follows. */
   friend: boolean;
-  /** Smoothed engagement: (favs+1) × (boosts+1) × (replies+1) of the boost target. */
+  /** Smoothed engagement of the boost target — see {@link engagementScore}. */
   score: number;
 }
 
@@ -37,9 +37,22 @@ const HASHTAG_RESERVE = 3;
 /** A metered fetch: counts against the build's call budget, never throws. */
 type BudgetFetch = <T>(fallback: T, fetch: () => Observable<T>) => Observable<T>;
 
-function engagementScore(status: Status): number {
+/**
+ * Smoothed engagement: (favs+1) × (boosts+1) × √(replies+1).
+ *
+ * Replies are square-rooted on purpose: reply pile-ons are how anger shows up
+ * in the metrics (a "ratio" is exactly many replies over few likes), so a
+ * full-weight reply factor pushes fights to the top of the ranking — and past
+ * the {@link ALGO_TARGET_POSTS} cutoff at the expense of genuinely liked
+ * posts. Favs and boosts are endorsements; replies are merely attention.
+ */
+export function engagementScore(status: Status): number {
   const target = status.reblog ?? status;
-  return (target.favourites_count + 1) * (target.reblogs_count + 1) * (target.replies_count + 1);
+  return (
+    (target.favourites_count + 1) *
+    (target.reblogs_count + 1) *
+    Math.sqrt(target.replies_count + 1)
+  );
 }
 
 function shuffle<T>(items: T[]): T[] {

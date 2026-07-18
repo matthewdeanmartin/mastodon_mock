@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AlgoFeed } from './algo-feed';
+import { AlgoFeed, engagementScore } from './algo-feed';
 import { Api } from './api';
 import { Auth } from './auth';
 import { Account, Status } from './models';
@@ -103,7 +103,7 @@ describe('AlgoFeed', () => {
     const boostTarget = withEngagement(makeStatus('target'), 9, 0, 0); // score 10
     const home = [
       makeStatus('boost', { reblog: boostTarget, account: makeAccount('f1') }),
-      withEngagement(makeStatus('orig', { account: makeAccount('f1') }), 1, 1, 1), // 8
+      withEngagement(makeStatus('orig', { account: makeAccount('f1') }), 1, 1, 1), // ≈5.7
       makeStatus('reply', { in_reply_to_id: 'x', account: makeAccount('f1') }),
       makeStatus('mine', { account: makeAccount('me') }),
     ];
@@ -255,5 +255,32 @@ describe('AlgoFeed', () => {
 
     feed.removeStatus('h2');
     expect(feed.posts()).toHaveLength(1);
+  });
+});
+
+describe('engagementScore', () => {
+  it('weights endorsements (favs, boosts) fully and replies at √', () => {
+    // 3 favs + 3 boosts + 3 replies: replies contribute √4 = 2, not 4.
+    expect(engagementScore(withEngagement(makeStatus('s'), 3, 3, 3))).toBe(4 * 4 * 2);
+  });
+
+  it('ranks a liked-and-boosted post above a reply-storm of equal raw volume', () => {
+    // Same 30 interactions each way; the ratio shape must lose.
+    const likedAndBoosted = withEngagement(makeStatus('nice'), 20, 10, 0); // 21×11×1 = 231
+    const replyStorm = withEngagement(makeStatus('fight'), 2, 1, 27); // 3×2×√28 ≈ 31.7
+    expect(engagementScore(likedAndBoosted)).toBeGreaterThan(engagementScore(replyStorm));
+  });
+
+  it('keeps a pure pile-on from outranking modest genuine approval', () => {
+    // 100 angry replies on an unliked post vs a post with 15 favs and a boost.
+    const pileOn = withEngagement(makeStatus('ratioed'), 1, 0, 100); // 2×1×√101 ≈ 20.1
+    const modest = withEngagement(makeStatus('modest'), 15, 1, 2); // 16×2×√3 ≈ 55.4
+    expect(engagementScore(modest)).toBeGreaterThan(engagementScore(pileOn));
+  });
+
+  it('scores the boost target, not the wrapper', () => {
+    const target = withEngagement(makeStatus('t'), 5, 2, 0);
+    const wrapper = makeStatus('w', { reblog: target });
+    expect(engagementScore(wrapper)).toBe(engagementScore(target));
   });
 });
