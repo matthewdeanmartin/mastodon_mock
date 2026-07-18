@@ -178,7 +178,7 @@ export class Home implements OnInit, OnDestroy {
     this.autoLoading.set(true);
     this.aggregator.nextPage().subscribe({
       next: (more) => {
-        this.statuses.update((s) => [...s, ...more]);
+        this.mergeStatuses(more);
         this.publishMastodon(more);
         this.fillToMinimum();
       },
@@ -198,9 +198,16 @@ export class Home implements OnInit, OnDestroy {
       return;
     }
     this.aggregator.nextPage().subscribe((more) => {
-      this.statuses.update((s) => [...s, ...more]);
+      this.mergeStatuses(more);
       this.publishMastodon(more);
     });
+  }
+
+  /** Later source rounds can overlap by date, so keep the accumulated feed merged. */
+  private mergeStatuses(more: Status[]): void {
+    this.statuses.update((statuses) =>
+      [...statuses, ...more].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)),
+    );
   }
 
   /** Fetch the bookmark tail once per cap; a failure just means no tail. */

@@ -3,8 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from '../api';
+import { ClientPrefs } from '../client-prefs';
 import { Status } from '../models';
 import { FeedAggregator } from './feed-aggregator';
+import { BlueskyProvider } from './bluesky/bluesky-provider';
 import { RssProvider } from './rss/rss-provider';
 
 function makeStatus(id: string, createdAt: string, overrides: Partial<Status> = {}): Status {
@@ -43,6 +45,10 @@ function rssStatus(id: string, createdAt: string, feedAccountId = 'rss:feed'): S
   });
 }
 
+function blueskyStatus(id: string, createdAt: string): Status {
+  return makeStatus(id, createdAt, { provider: 'bluesky' });
+}
+
 /** Minute-spaced mastodon statuses, newest first, on 2026-07-14. */
 function mastodonPage(startMinute: number, count: number): Status[] {
   return Array.from({ length: count }, (_, i) => {
@@ -51,21 +57,42 @@ function mastodonPage(startMinute: number, count: number): Status[] {
   });
 }
 
-interface FakeRss {
+interface FakeProvider {
   linked: ReturnType<typeof signal<boolean>>;
   pages: Status[][];
+  fetchPage: ReturnType<typeof vi.fn>;
 }
 
 describe('FeedAggregator', () => {
   let homeTimeline: ReturnType<typeof vi.fn>;
-  let fakeRss: FakeRss;
+  let fakeRss: FakeProvider;
+  let fakeBluesky: FakeProvider;
 
   beforeEach(() => {
+    localStorage.clear();
     homeTimeline = vi.fn();
-    fakeRss = { linked: signal(false), pages: [] };
+    const fakeProvider = (): FakeProvider => {
+      const fake: FakeProvider = { linked: signal(false), pages: [], fetchPage: vi.fn() };
+      fake.fetchPage.mockImplementation(() => of(fake.pages.shift() ?? []));
+      return fake;
+    };
+    fakeRss = fakeProvider();
+    fakeBluesky = fakeProvider();
     TestBed.configureTestingModule({
       providers: [
         { provide: Api, useValue: { homeTimeline } },
+        {
+          provide: BlueskyProvider,
+          useValue: {
+            id: 'bluesky',
+            label: 'Bluesky',
+            badge: '🦋 Bsky',
+            linked: fakeBluesky.linked,
+            errors: signal<string[]>([]),
+            reset: vi.fn(),
+            fetchPage: fakeBluesky.fetchPage,
+          },
+        },
         {
           provide: RssProvider,
           useValue: {
@@ -75,7 +102,7 @@ describe('FeedAggregator', () => {
             linked: fakeRss.linked,
             errors: signal<string[]>([]),
             reset: vi.fn(),
-            fetchPage: vi.fn(() => of(fakeRss.pages.shift() ?? [])),
+            fetchPage: fakeRss.fetchPage,
           },
         },
       ],
@@ -115,45 +142,84 @@ describe('FeedAggregator', () => {
     expect(page.map((s) => s.id)).toEqual(['m2', 'r1', 'm1']);
   });
 
-  it('holds back RSS items older than the last fetched Mastodon post until it exhausts', async () => {
+  it('does not let a full Mastodon page squeeze out an older RSS page', async () => {
     const aggregator = TestBed.inject(FeedAggregator);
     fakeRss.linked.set(true);
-    // A full mastodon page (not exhausted) spanning 10:59..10:40; one ancient RSS item.
-    homeTimeline.mockReturnValueOnce(of(mastodonPage(59, 20))).mockReturnValueOnce(of([]));
+    homeTimeline.mockReturnValueOnce(of(mastodonPage(59, 20)));
     fakeRss.pages = [[rssStatus('r-old', '2026-07-01T00:00:00.000Z')]];
 
     aggregator.reset();
     const page1 = await firstValueFrom(aggregator.nextPage());
-    expect(page1.map((s) => s.id)).not.toContain('r-old');
-
-    // Mastodon exhausts on the next page; now the old RSS item may flow.
-    const page2 = await firstValueFrom(aggregator.nextPage());
-    expect(page2.map((s) => s.id)).toEqual(['r-old']);
-    expect(aggregator.hasMore()).toBe(false);
+    expect(page1).toHaveLength(21);
+    expect(page1.at(-1)?.id).toBe('r-old');
   });
 
-  it('caps a single feed to 5 items per page (flood control), deferring the rest', async () => {
+  it('loads 20 posts from each of two active sources', async () => {
     const aggregator = TestBed.inject(FeedAggregator);
     fakeRss.linked.set(true);
-    homeTimeline.mockReturnValue(of([]));
+    homeTimeline.mockReturnValue(of(mastodonPage(59, 20)));
     fakeRss.pages = [
-      Array.from({ length: 8 }, (_, i) => rssStatus(`r${i}`, `2026-07-14T10:0${7 - i}:00.000Z`)),
+      Array.from({ length: 20 }, (_, i) =>
+        rssStatus(`r${i}`, `2026-07-14T09:${String(59 - i).padStart(2, '0')}:00.000Z`),
+      ),
     ];
 
     aggregator.reset();
-    const page1 = await firstValueFrom(aggregator.nextPage());
-    expect(page1.map((s) => s.id)).toEqual(['r0', 'r1', 'r2', 'r3', 'r4']);
-
-    const page2 = await firstValueFrom(aggregator.nextPage());
-    expect(page2.map((s) => s.id)).toEqual(['r5', 'r6', 'r7']);
+    const page = await firstValueFrom(aggregator.nextPage());
+    expect(page).toHaveLength(40);
+    expect(page.filter((s) => !s.provider)).toHaveLength(20);
+    expect(page.filter((s) => s.provider === 'rss')).toHaveLength(20);
   });
 
-  it('does not cap items from different feeds', async () => {
+  it('loads a foreign source until it reaches 20 and keeps the whole crossing page', async () => {
     const aggregator = TestBed.inject(FeedAggregator);
     fakeRss.linked.set(true);
     homeTimeline.mockReturnValue(of([]));
     fakeRss.pages = [
       Array.from({ length: 12 }, (_, i) =>
+        rssStatus(`r${i}`, `2026-07-14T10:${String(59 - i).padStart(2, '0')}:00.000Z`),
+      ),
+      Array.from({ length: 11 }, (_, i) =>
+        rssStatus(`r${i + 12}`, `2026-07-14T09:${String(59 - i).padStart(2, '0')}:00.000Z`),
+      ),
+    ];
+
+    aggregator.reset();
+    const page1 = await firstValueFrom(aggregator.nextPage());
+    expect(page1).toHaveLength(23);
+    expect(fakeRss.fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads 20 posts for each of Mastodon, Bluesky, and RSS', async () => {
+    const aggregator = TestBed.inject(FeedAggregator);
+    fakeRss.linked.set(true);
+    fakeBluesky.linked.set(true);
+    homeTimeline.mockReturnValue(of(mastodonPage(59, 20)));
+    fakeBluesky.pages = [
+      Array.from({ length: 20 }, (_, i) =>
+        blueskyStatus(`b${i}`, `2026-07-14T09:${String(59 - i).padStart(2, '0')}:00.000Z`),
+      ),
+    ];
+    fakeRss.pages = [
+      Array.from({ length: 20 }, (_, i) =>
+        rssStatus(`r${i}`, `2026-07-14T08:${String(59 - i).padStart(2, '0')}:00.000Z`),
+      ),
+    ];
+
+    aggregator.reset();
+    const page = await firstValueFrom(aggregator.nextPage());
+    expect(page).toHaveLength(60);
+    expect(page.filter((s) => !s.provider)).toHaveLength(20);
+    expect(page.filter((s) => s.provider === 'bluesky')).toHaveLength(20);
+    expect(page.filter((s) => s.provider === 'rss')).toHaveLength(20);
+  });
+
+  it('treats all RSS subscriptions as one source quota', async () => {
+    const aggregator = TestBed.inject(FeedAggregator);
+    TestBed.inject(ClientPrefs).toggleProvider('mastodon');
+    fakeRss.linked.set(true);
+    fakeRss.pages = [
+      Array.from({ length: 20 }, (_, i) =>
         rssStatus(
           `r${i}`,
           `2026-07-14T10:${String(30 - i).padStart(2, '0')}:00.000Z`,
@@ -164,6 +230,8 @@ describe('FeedAggregator', () => {
 
     aggregator.reset();
     const page = await firstValueFrom(aggregator.nextPage());
-    expect(page).toHaveLength(10);
+    expect(page).toHaveLength(20);
+    expect(fakeRss.fetchPage).toHaveBeenCalledTimes(1);
+    expect(homeTimeline).not.toHaveBeenCalled();
   });
 });

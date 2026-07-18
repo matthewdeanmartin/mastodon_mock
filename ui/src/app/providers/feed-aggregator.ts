@@ -1,130 +1,104 @@
 import { inject, Injectable } from '@angular/core';
-import { forkJoin, map, Observable, of } from 'rxjs';
+import { forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { Api } from '../api';
+import { ClientPrefs } from '../client-prefs';
 import { Status } from '../models';
 import { FeedProvider } from './provider';
 import { ProviderRegistry } from './provider-registry';
 
-const PAGE_SIZE = 20;
-/** Flood control: at most this many items per RSS feed per page. */
-const RSS_FEED_CAP_PER_PAGE = 5;
+/** Each active source earns at least this many posts in one loading round. */
+const SOURCE_PAGE_SIZE = 20;
 
 interface ForeignSource {
   provider: FeedProvider;
-  buffer: Status[];
   exhausted: boolean;
 }
 
-function time(s: Status): number {
-  const ms = Date.parse(s.created_at);
+function time(status: Status): number {
+  const ms = Date.parse(status.created_at);
   return Number.isNaN(ms) ? 0 : ms;
 }
 
 /**
- * Merges the Mastodon home timeline with every linked provider into one
- * newest-first feed, paged like the plain home timeline. With no providers
- * linked it degenerates to exactly `api.homeTimeline()` paging.
+ * Loads the home feed in per-source rounds, then merges each round newest-first.
  *
- * Correctness rule: while Mastodon still has unfetched pages, foreign items
- * older than the oldest buffered Mastodon item stay buffered — the next
- * Mastodon page may contain items that belong between them.
+ * Every visible active source contributes at least 20 posts when available:
+ * Mastodon first, then each linked foreign provider. Provider pages are kept
+ * whole, so a page that crosses 20 may make the round larger. This prevents a
+ * busy Mastodon timeline from squeezing RSS or Bluesky out of the loaded feed.
  */
 @Injectable({ providedIn: 'root' })
 export class FeedAggregator {
   private api = inject(Api);
+  private prefs = inject(ClientPrefs);
   private registry = inject(ProviderRegistry);
 
-  private mastodonBuffer: Status[] = [];
   private mastodonMaxId: string | undefined;
   private mastodonExhausted = false;
   private foreign: ForeignSource[] = [];
 
-  /** Start over from the top: next `nextPage()` returns the newest page. */
+  /** Start over from the top using the providers currently visible to the user. */
   reset(): void {
-    this.mastodonBuffer = [];
     this.mastodonMaxId = undefined;
-    this.mastodonExhausted = false;
-    this.foreign = this.registry.linked().map((provider) => {
-      provider.reset();
-      return { provider, buffer: [], exhausted: false };
-    });
+    this.mastodonExhausted = !this.prefs.isProviderVisible('mastodon');
+    this.foreign = this.registry
+      .linked()
+      .filter((provider) => this.prefs.isProviderVisible(provider.id))
+      .map((provider) => {
+        provider.reset();
+        return { provider, exhausted: false };
+      });
   }
 
   hasMore(): boolean {
-    return (
-      !this.mastodonExhausted ||
-      this.mastodonBuffer.length > 0 ||
-      this.foreign.some((f) => !f.exhausted || f.buffer.length > 0)
-    );
+    return !this.mastodonExhausted || this.foreign.some((source) => !source.exhausted);
   }
 
+  /** Fetch one quota-sized round from every active source and merge it by date. */
   nextPage(): Observable<Status[]> {
-    const refills: Observable<unknown>[] = [];
-    if (!this.mastodonExhausted && this.mastodonBuffer.length < PAGE_SIZE) {
-      refills.push(
+    const sourcePages: Observable<Status[]>[] = [];
+
+    if (!this.mastodonExhausted) {
+      sourcePages.push(
         this.api.homeTimeline(this.mastodonMaxId).pipe(
           map((items) => {
-            this.mastodonBuffer.push(...items);
             this.mastodonMaxId = items.at(-1)?.id ?? this.mastodonMaxId;
-            if (items.length < PAGE_SIZE) {
+            if (items.length < SOURCE_PAGE_SIZE) {
               this.mastodonExhausted = true;
             }
+            return items;
           }),
         ),
       );
     }
-    for (const f of this.foreign) {
-      if (!f.exhausted && f.buffer.length < PAGE_SIZE) {
-        refills.push(
-          f.provider.fetchPage().pipe(
-            map((items) => {
-              if (items.length) {
-                f.buffer.push(...items);
-              } else {
-                f.exhausted = true;
-              }
-            }),
-          ),
-        );
-      }
+
+    sourcePages.push(
+      ...this.foreign
+        .filter((source) => !source.exhausted)
+        .map((source) => this.fetchForeignPage(source)),
+    );
+
+    if (!sourcePages.length) {
+      return of([]);
     }
-    const refill$: Observable<unknown> = refills.length ? forkJoin(refills) : of(null);
-    return refill$.pipe(map(() => this.assemblePage()));
+    return forkJoin(sourcePages).pipe(
+      map((pages) => pages.flat().sort((a, b) => time(b) - time(a))),
+    );
   }
 
-  private assemblePage(): Status[] {
-    // Foreign items may not outrun Mastodon's unfetched pages.
-    const boundary =
-      this.mastodonExhausted || !this.mastodonBuffer.length
-        ? Number.NEGATIVE_INFINITY
-        : time(this.mastodonBuffer[this.mastodonBuffer.length - 1]);
-
-    const candidates = [this.mastodonBuffer, ...this.foreign.map((f) => f.buffer)]
-      .flat()
-      .sort((a, b) => time(b) - time(a));
-
-    const page: Status[] = [];
-    const perFeed = new Map<string, number>();
-    const taken = new Set<Status>();
-    for (const s of candidates) {
-      if (page.length >= PAGE_SIZE || time(s) < boundary) {
-        break;
-      }
-      if (s.provider === 'rss') {
-        const n = perFeed.get(s.account.id) ?? 0;
-        if (n >= RSS_FEED_CAP_PER_PAGE) {
-          continue; // deferred to a later page, still buffered
+  /** Keep paging one foreign source until its round reaches the quota or exhausts. */
+  private fetchForeignPage(source: ForeignSource, collected: Status[] = []): Observable<Status[]> {
+    if (source.exhausted || collected.length >= SOURCE_PAGE_SIZE) {
+      return of(collected);
+    }
+    return source.provider.fetchPage().pipe(
+      switchMap((items) => {
+        if (!items.length) {
+          source.exhausted = true;
+          return of(collected);
         }
-        perFeed.set(s.account.id, n + 1);
-      }
-      page.push(s);
-      taken.add(s);
-    }
-
-    this.mastodonBuffer = this.mastodonBuffer.filter((s) => !taken.has(s));
-    for (const f of this.foreign) {
-      f.buffer = f.buffer.filter((s) => !taken.has(s));
-    }
-    return page;
+        return this.fetchForeignPage(source, [...collected, ...items]);
+      }),
+    );
   }
 }

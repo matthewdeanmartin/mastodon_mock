@@ -80,6 +80,8 @@ describe('CommandBar', () => {
     const rssChip = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
       (b) => b.textContent?.includes('RSS'),
     )!;
+    const changed = vi.fn();
+    fixture.componentInstance.providerVisibilityChanged.subscribe(changed);
 
     expect(prefs.isProviderVisible('rss')).toBe(true);
     rssChip.click();
@@ -87,6 +89,7 @@ describe('CommandBar', () => {
     expect(prefs.isProviderVisible('rss')).toBe(false);
     rssChip.click();
     expect(prefs.isProviderVisible('rss')).toBe(true);
+    expect(changed).toHaveBeenCalledTimes(2);
   });
 
   it('emits toggleLive without owning the live state', () => {

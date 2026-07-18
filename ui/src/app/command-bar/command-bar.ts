@@ -1,5 +1,6 @@
 import { Component, inject, input, output } from '@angular/core';
 import { ClientPrefs } from '../client-prefs';
+import { ProviderId } from '../models';
 import { ProviderRegistry } from '../providers/provider-registry';
 
 /**
@@ -46,7 +47,7 @@ import { ProviderRegistry } from '../providers/provider-registry';
         <button
           class="btn btn-outline"
           [class.active]="prefs.isProviderVisible('mastodon')"
-          (click)="prefs.toggleProvider('mastodon')"
+          (click)="toggleProvider('mastodon')"
           title="Show or hide Mastodon posts"
         >
           🦣 Fedi
@@ -55,7 +56,7 @@ import { ProviderRegistry } from '../providers/provider-registry';
           <button
             class="btn btn-outline"
             [class.active]="prefs.isProviderVisible(p.id)"
-            (click)="prefs.toggleProvider(p.id)"
+            (click)="toggleProvider(p.id)"
             [title]="'Show or hide ' + p.label + ' posts'"
           >
             {{ p.badge }}
@@ -118,4 +119,11 @@ export class CommandBar {
   readonly providerChips = input(false);
   readonly toggleLive = output<void>();
   readonly refresh = output<void>();
+  /** A source filter changed; merged feeds need to refetch their active sources. */
+  readonly providerVisibilityChanged = output<void>();
+
+  protected toggleProvider(id: ProviderId): void {
+    this.prefs.toggleProvider(id);
+    this.providerVisibilityChanged.emit();
+  }
 }

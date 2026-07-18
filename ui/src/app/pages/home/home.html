@@ -24,6 +24,7 @@
   [showRefresh]="!live()"
   (refresh)="load()"
   (toggleLive)="toggleLive()"
+  (providerVisibilityChanged)="load()"
 />
 
 @if (loading()) {
