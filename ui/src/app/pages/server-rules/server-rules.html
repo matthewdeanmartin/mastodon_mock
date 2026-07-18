@@ -1,0 +1,21 @@
+<header class="page-head">
+  <h1>Server rules</h1>
+  <p>Rules published by this Mastodon server.</p>
+</header>
+
+@if (loading()) {
+  <p class="empty muted">Loading server rules…</p>
+} @else if (!rules().length) {
+  <p class="empty muted">This server has not published any rules.</p>
+} @else {
+  <ol class="rules">
+    @for (rule of rules(); track rule.id) {
+      <li>
+        <strong>{{ rule.text }}</strong>
+        @if (rule.hint) {
+          <span class="muted">{{ rule.hint }}</span>
+        }
+      </li>
+    }
+  </ol>
+}

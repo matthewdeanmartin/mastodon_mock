@@ -1,32 +1,86 @@
-<h1 class="page-title">About this server</h1>
+<main class="about-page">
+  <a class="back-link" routerLink="/login">← Back to sign in</a>
+  <article class="about-card">
+    <header>
+      <p class="eyebrow">About Mawkingbird</p>
+      <h1>Why I asked a bot to create this</h1>
+    </header>
 
-<section class="card">
-  <h2>Server rules</h2>
-  @if (!rules().length) {
-    <p class="muted">No rules configured.</p>
-  } @else {
-    <ol class="rules">
-      @for (r of rules(); track r.id) {
-        <li>
-          <span class="rule-text">{{ r.text }}</span>
-          @if (r.hint) {
-            <span class="muted small">{{ r.hint }}</span>
-          }
-        </li>
-      }
-    </ol>
-  }
-</section>
+    <p>
+      I miss 2018 twitter. It was before the redesign that still is on the renamed twitter. So goal
+      one is to bring back the proper design. You use to be able to do that with a browser plugin,
+      but eventually Twitter broke that. This first of all, fixes that.
+    </p>
 
-<section class="card">
-  <h2>Terms of service</h2>
-  @if (tos(); as t) {
-    <div class="tos" [innerHTML]="t.content"></div>
-  } @else {
-    <p class="muted">No terms of service configured.</p>
-  }
-</section>
+    <h2>Other things this client has</h2>
+    <ul>
+      <li>
+        Twitter Blue features, but for free. It was only a few features, but I didn’t like that
+        those features were held back. I don’t know what it would have taken to get me to give
+        twitter money. They should have monetized businesses.
+      </li>
+      <li>
+        You can give everyone a blue check, or a check to everyone with more follower than you
+      </li>
+      <li>
+        No infinite feed. It will eventually stop. You have to click to get to the next page. Your
+        behavioral additions do not profit me, why should my free client keep you from friends and
+        family and touching grass?
+      </li>
+      <li>
+        Bookmarks tacked on to end of the finite feed. All clients give too little attention to the
+        bookmark workflow. Bookmarks are to be revisited.
+      </li>
+      <li>
+        The algorithm isn’t evil, meaning no injecting rage or strangers content that I didn’t ask
+        for. It is basically your tags and feed but sorted by the product of likes, replies and
+        retweets
+      </li>
+      <li>
+        Not trying to be TweetDeck. I never got used to tweetdeck, a product can’t be all things to
+        all people.
+      </li>
+      <li>
+        Failwhale is back. Failwhale was a cultural icon and Twitter decided to take that good will
+        and shit it out because, I don’t know, some PM probably didn’t like that it brought
+        attention to operational failures at twitter.
+      </li>
+      <li>
+        You can follow everyone on a collection. Because the APIs are there and no one can stop me.
+      </li>
+      <li>
+        House ads. I want to promote my other projects. I don’t see a way to monetize this, but I
+        hope to monetize a hosted freemium/premium client called “Mastodon is my Blog” which is a
+        much more ambitious project that doesn’t work great until you have a 1GB cache.
+      </li>
+      <li>Cyber begging for the mastodon network and the instance. This stuff isn’t free.</li>
+      <li>Pretty much all Mastodon features are supported or will be soon.</li>
+      <li>
+        Bsky integration as a feed provider. Friends I made over a period of a decade went to Bsky
+        instead of Mastodon. Bsky isn’t evil, I have no incentive to make them switch to Mastodon.
+      </li>
+      <li>RSS as a provider has basic support, I want to expand it.</li>
+      <li>
+        I miss Twitter Analytics. This version has to work of just a little bit of data and we have
+        very little info about friends and follows and views. So it’s only similar.
+      </li>
+    </ul>
 
-<p class="see-credits muted">
-  Looking for the software this client is built on? See <a routerLink="/credits">Credits</a>.
-</p>
+    <p>
+      Why is it called mawkingbird? Because mockingbird as a domain is taken. I started this project
+      while working on a mock mastodon server to be used for integration testing my other mastodon
+      projects.
+    </p>
+
+    <h2>Is this safe?</h2>
+    <p>This is a client side app, nothing dials home.</p>
+
+    <h2>Implementation</h2>
+    <p>
+      It is written in Angular.<br />Uses latest signals patterns<br />Tested against a mock
+      mastodon instance and real instances.<br />I’ve been using it as my daily driver and I now
+      like it better than my previous favorite, elk.zone which I still recommend over modern day
+      twitter or the default mastodon client.
+    </p>
+  </article>
+</main>

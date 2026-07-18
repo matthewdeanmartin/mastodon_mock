@@ -19,7 +19,7 @@ import { Server } from '../../server';
       <a [href]="aboutUrl()" target="_blank" rel="noopener noreferrer">
         {{ host() || 'Server' }} rules &amp; terms
       </a>
-      <span aria-hidden="true">·</span>
+      <span class="footer-separator" aria-hidden="true">·</span>
       <a
         href="https://github.com/matthewdeanmartin/mastodon_mock"
         target="_blank"
@@ -27,11 +27,11 @@ import { Server } from '../../server';
       >
         Mockingbird source
       </a>
-      <span aria-hidden="true">·</span>
+      <span class="footer-separator" aria-hidden="true">·</span>
       <button class="link" type="button" (click)="reporting.set(true)">Report a bug</button>
-      <span aria-hidden="true">·</span>
+      <span class="footer-separator" aria-hidden="true">·</span>
       <a routerLink="/fail-whale">Fail whale</a>
-      <span aria-hidden="true">·</span>
+      <span class="footer-separator" aria-hidden="true">·</span>
       <button
         class="link"
         type="button"
@@ -45,13 +45,13 @@ import { Server } from '../../server';
         <p class="build-info">
           Built {{ build.builtAt | date: 'yyyy-MM-dd HH:mm' : 'UTC' }} UTC
           @if (build.commitUrl) {
-            <span aria-hidden="true">·</span>
+            <span class="footer-separator" aria-hidden="true">·</span>
             <a [href]="build.commitUrl" target="_blank" rel="noopener noreferrer">
               {{ build.commit!.slice(0, 7) }}
             </a>
           }
           @if (build.runUrl) {
-            <span aria-hidden="true">·</span>
+            <span class="footer-separator" aria-hidden="true">·</span>
             <a [href]="build.runUrl" target="_blank" rel="noopener noreferrer">build log</a>
           }
         </p>
@@ -71,6 +71,10 @@ import { Server } from '../../server';
     .app-footer a,
     .app-footer .link {
       color: var(--muted);
+    }
+    .footer-separator {
+      display: inline-block;
+      margin: 0 0.55em;
     }
     .app-footer a:hover,
     .app-footer .link:hover {

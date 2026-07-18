@@ -1,0 +1,12 @@
+<header class="page-head">
+  <h1>Terms of Service</h1>
+  <p>Terms published by this Mastodon server.</p>
+</header>
+
+@if (loading()) {
+  <p class="empty muted">Loading terms…</p>
+} @else if (terms(); as terms) {
+  <article class="terms-content" [innerHTML]="terms.content"></article>
+} @else {
+  <p class="empty muted">This server has not published terms of service.</p>
+}

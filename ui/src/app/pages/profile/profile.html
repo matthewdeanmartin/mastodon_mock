@@ -43,7 +43,7 @@
     @if (a.note) {
       <div class="note" [innerHTML]="a.note"></div>
     }
-    @if (a.fields?.length) {
+    @if (a.fields.length) {
       <div class="profile-fields">
         @for (f of a.fields; track f.name) {
           <div class="profile-field" [class.verified]="f.verified_at">

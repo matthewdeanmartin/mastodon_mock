@@ -12,6 +12,13 @@ export const routes: Routes = [
   },
   // One-click, logged-out demo: read-only live posts from a public instance.
   { path: 'demo', loadComponent: () => import('./pages/demo/demo').then((m) => m.Demo) },
+  // The project story should be available before a visitor has an account.
+  { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
+  {
+    path: 'fail-whale',
+    loadComponent: () =>
+      import('./pages/fail-whale-demo/fail-whale-demo').then((m) => m.FailWhaleDemo),
+  },
   {
     path: '',
     canActivate: [authGuard],
@@ -20,11 +27,6 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'home' },
       { path: 'home', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
       { path: 'algo', loadComponent: () => import('./pages/algo/algo').then((m) => m.Algo) },
-      {
-        path: 'fail-whale',
-        loadComponent: () =>
-          import('./pages/fail-whale-demo/fail-whale-demo').then((m) => m.FailWhaleDemo),
-      },
       {
         path: 'public',
         loadComponent: () =>
@@ -184,7 +186,14 @@ export const routes: Routes = [
         path: 'analytics',
         loadComponent: () => import('./pages/analytics/analytics').then((m) => m.Analytics),
       },
-      { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
+      {
+        path: 'server-rules',
+        loadComponent: () => import('./pages/server-rules/server-rules').then((m) => m.ServerRules),
+      },
+      {
+        path: 'terms',
+        loadComponent: () => import('./pages/terms/terms').then((m) => m.Terms),
+      },
       {
         path: 'credits',
         loadComponent: () => import('./pages/credits/credits').then((m) => m.Credits),

@@ -3,8 +3,15 @@ import { RouterLink } from '@angular/router';
 import { DemoFeed, DEMO_SERVER } from '../../demo/demo-feed';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { Status, Tag } from '../../models';
+import { feedToStatuses } from '../../providers/rss/rss-adapter';
+import { RssFetch } from '../../providers/rss/rss-fetch';
+import { HOUSE_ADS } from '../../house-ads';
 
-type DemoTab = 'trending' | 'live';
+type DemoTab = 'profile' | 'trending' | 'live';
+
+const MISTER_SQL_RSS = 'https://mastodon.social/@mistersql.rss';
+const MISTER_SQL_AVATAR =
+  'https://files.mastodon.social/accounts/avatars/000/301/226/original/a6774f4a14f7c900.jpg';
 
 /**
  * One-click, logged-out demo: a read-only feed of live public posts pulled
@@ -22,10 +29,12 @@ type DemoTab = 'trending' | 'live';
 })
 export class Demo implements OnInit {
   private feed = inject(DemoFeed);
+  private rss = inject(RssFetch);
 
   protected readonly demoHost = DEMO_SERVER.replace(/^https?:\/\//, '');
 
-  protected tab = signal<DemoTab>('trending');
+  protected tab = signal<DemoTab>('profile');
+  protected profilePosts = signal<Status[]>([]);
   protected trending = signal<Status[]>([]);
   protected live = signal<Status[]>([]);
   protected tags = signal<Tag[]>([]);
@@ -35,17 +44,41 @@ export class Demo implements OnInit {
   protected error = signal(false);
   /** Sensitive media the viewer chose to reveal, by status id. */
   protected revealed = signal<Set<string>>(new Set());
+  protected readonly ads = HOUSE_ADS;
+  protected readonly profileUrl = 'https://mastodon.social/@mistersql';
+  protected readonly rssUrl = MISTER_SQL_RSS;
 
   ngOnInit(): void {
-    this.feed.trendingStatuses().subscribe({
-      next: (posts) => {
-        this.trending.set(posts);
+    this.rss.fetchFeed(MISTER_SQL_RSS).subscribe({
+      next: (feed) => {
+        this.profilePosts.set(
+          feedToStatuses(MISTER_SQL_RSS, feed, new Date().toISOString()).map((post) => ({
+            ...post,
+            account: {
+              ...post.account,
+              username: 'mistersql',
+              acct: 'mistersql@mastodon.social',
+              display_name: 'Matthew Martin',
+              url: this.profileUrl,
+              avatar: MISTER_SQL_AVATAR,
+              avatar_static: MISTER_SQL_AVATAR,
+            },
+          })),
+        );
         this.loading.set(false);
       },
       error: () => {
         this.error.set(true);
         this.loading.set(false);
       },
+    });
+    this.feed.trendingStatuses().subscribe({
+      next: (posts) => {
+        this.trending.set(posts);
+      },
+      // The profile is the default view; a trending-feed failure should not
+      // make a healthy RSS profile look unavailable.
+      error: () => undefined,
     });
   }
 
@@ -96,10 +129,16 @@ export class Demo implements OnInit {
   }
 
   posts(): Status[] {
+    if (this.tab() === 'profile') {
+      return this.profilePosts();
+    }
     return this.tab() === 'trending' ? this.trending() : this.live();
   }
 
   loadMore(): void {
+    if (this.tab() === 'profile') {
+      return;
+    }
     this.loadingMore.set(true);
     if (this.tab() === 'trending') {
       this.feed.trendingStatuses(this.trending().length).subscribe({

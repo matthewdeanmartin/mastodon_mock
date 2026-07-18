@@ -1,9 +1,11 @@
 .login-wrap {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 0;
+  padding: 24px 0 0;
+  box-sizing: border-box;
 }
 
 .login-card {
@@ -99,9 +101,14 @@ h1 {
 
 .hero {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.hero > div {
+  min-width: 0;
 }
 
 .hero-logo {
@@ -125,6 +132,46 @@ h1 {
   white-space: nowrap;
   flex-shrink: 0;
   text-align: center;
+}
+
+.source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  color: var(--accent);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.source-link:hover {
+  text-decoration: underline;
+}
+
+.about-link {
+  font-size: 18px;
+}
+
+.hero-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+
+app-app-footer {
+  display: block;
+  width: min(960px, 94vw);
+  margin-top: 8px;
+}
+
+@media (max-width: 520px) {
+  .hero {
+    align-items: flex-start;
+  }
+  .demo-btn {
+    margin-left: 64px;
+  }
 }
 
 .btn-hero {

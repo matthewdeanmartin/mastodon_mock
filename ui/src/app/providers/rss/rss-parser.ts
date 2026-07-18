@@ -60,7 +60,9 @@ function parseRssItem(item: Element): ParsedItem {
   const link = childText(item, 'link') || null;
   // content:encoded (full HTML) beats description (often a summary).
   const html = childText(item, 'encoded') || childText(item, 'description');
-  const enclosures = children(item, 'enclosure')
+  // Mastodon profile feeds use Media RSS <media:content>, while many classic
+  // feeds use <enclosure>. Treat both as attachments.
+  const enclosures = [...children(item, 'enclosure'), ...children(item, 'content')]
     .map((e) => ({ url: e.getAttribute('url') ?? '', type: e.getAttribute('type') }))
     .filter((e) => e.url);
   return {

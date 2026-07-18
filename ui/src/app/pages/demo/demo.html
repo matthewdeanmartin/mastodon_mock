@@ -1,94 +1,214 @@
-<div class="demo">
-  <header class="demo-banner">
-    <div class="demo-banner-text">
-      <h1>Demo mode</h1>
-      <p class="muted">
-        You're browsing live public posts from <strong>{{ demoHost }}</strong> — read-only, no
-        account needed. Sign in to reply, boost, favourite and follow.
-      </p>
+<div class="demo-layout">
+  <aside class="demo-left-rail" aria-label="Demo account and discovery">
+    <section class="demo-identity rail-card">
+      <div class="demo-identity-banner"></div>
+      <div class="demo-identity-body">
+        <div class="demo-avatar" aria-hidden="true">D</div>
+        <strong>Demo Demoson</strong>
+        <span class="muted">&#64;demodemoson&#64;mastodon.social</span>
+        <div class="demo-stats">
+          <span><b>42</b> Posts</span><span><b>128</b> Following</span
+          ><span><b>2,018</b> Followers</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="rail-card discovery-card">
+      <h2>Who to follow</h2>
+      <a
+        class="demo-person"
+        href="https://mastodon.social/@Gargron"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span class="person-avatar">E</span
+        ><span><strong>Eugen Rochko</strong><small>&#64;Gargron&#64;mastodon.social</small></span
+        ><em>Follow</em>
+      </a>
+      <a
+        class="demo-person"
+        href="https://mastodon.social/@mistersql"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span class="person-avatar person-avatar-blue">M</span
+        ><span
+          ><strong>Matthew Martin</strong><small>&#64;mistersql&#64;mastodon.social</small></span
+        ><em>Follow</em>
+      </a>
+    </section>
+
+    <section class="rail-card discovery-card">
+      <h2>Trending tags</h2>
+      <a
+        class="demo-trend"
+        href="https://mastodon.social/tags/mastodon"
+        target="_blank"
+        rel="noopener noreferrer"
+        >#mastodon <small>Talking about the Fediverse</small></a
+      >
+      <a
+        class="demo-trend"
+        href="https://mastodon.social/tags/opensource"
+        target="_blank"
+        rel="noopener noreferrer"
+        >#opensource <small>Software without the nonsense</small></a
+      >
+      <a
+        class="demo-trend"
+        href="https://mastodon.social/tags/tech"
+        target="_blank"
+        rel="noopener noreferrer"
+        >#tech <small>What people are building</small></a
+      >
+    </section>
+  </aside>
+
+  <main class="demo">
+    <header class="demo-banner">
+      <div class="demo-banner-text">
+        <h1>Demo mode</h1>
+        <p class="muted">
+          You're browsing live public posts from <strong>{{ demoHost }}</strong> — read-only, no
+          account needed. Sign in to reply, boost, favourite and follow.
+        </p>
+      </div>
+      <a class="btn btn-primary" routerLink="/login">Sign in / Sign up</a>
+    </header>
+
+    <div class="feed-tabs" role="tablist">
+      <button
+        role="tab"
+        [class.active]="tab() === 'profile'"
+        [attr.aria-selected]="tab() === 'profile'"
+        (click)="selectTab('profile')"
+      >
+        Matthew Martin
+      </button>
+      <button
+        role="tab"
+        [class.active]="tab() === 'trending'"
+        [attr.aria-selected]="tab() === 'trending'"
+        (click)="selectTab('trending')"
+      >
+        Trending
+      </button>
+      <button
+        role="tab"
+        [class.active]="tab() === 'live'"
+        [attr.aria-selected]="tab() === 'live'"
+        (click)="selectTab('live')"
+      >
+        Live hashtags
+      </button>
     </div>
-    <a class="btn btn-primary" routerLink="/login">Sign in / Sign up</a>
-  </header>
 
-  <div class="feed-tabs" role="tablist">
-    <button
-      role="tab"
-      [class.active]="tab() === 'trending'"
-      [attr.aria-selected]="tab() === 'trending'"
-      (click)="selectTab('trending')"
-    >
-      Trending
-    </button>
-    <button
-      role="tab"
-      [class.active]="tab() === 'live'"
-      [attr.aria-selected]="tab() === 'live'"
-      (click)="selectTab('live')"
-    >
-      Live hashtags
-    </button>
-  </div>
+    @if (tab() === 'profile') {
+      <section class="profile-card">
+        <div class="profile-cover"></div>
+        <img
+          class="profile-avatar"
+          src="https://files.mastodon.social/accounts/avatars/000/301/226/original/a6774f4a14f7c900.jpg"
+          alt=""
+        />
+        <div class="profile-copy">
+          <a class="profile-name" [href]="profileUrl" target="_blank" rel="noopener noreferrer"
+            >Matthew Martin</a
+          >
+          <a class="profile-handle" [href]="profileUrl" target="_blank" rel="noopener noreferrer"
+            >&#64;mistersql&#64;mastodon.social</a
+          >
+          <p>Public posts from the RSS feed, rendered by Mockingbird.</p>
+          <a class="rss-link" [href]="rssUrl" target="_blank" rel="noopener noreferrer"
+            >RSS feed ↗</a
+          >
+        </div>
+      </section>
+    }
 
-  @if (tab() === 'live' && tags().length) {
-    <div class="tag-chips">
-      @for (t of tags(); track t.name) {
-        <button class="chip" [class.active]="activeTag() === t.name" (click)="selectTag(t.name)">
-          #{{ t.name }}
+    @if (tab() === 'live' && tags().length) {
+      <div class="tag-chips">
+        @for (t of tags(); track t.name) {
+          <button class="chip" [class.active]="activeTag() === t.name" (click)="selectTag(t.name)">
+            #{{ t.name }}
+          </button>
+        }
+      </div>
+    }
+
+    @if (loading()) {
+      <p class="muted pad">Loading posts from {{ demoHost }}…</p>
+    } @else if (error() && !posts().length) {
+      <p class="muted pad">
+        Couldn't reach {{ demoHost }} — check your connection and reload to try again.
+      </p>
+    } @else {
+      @for (status of posts(); track status.id) {
+        <article class="post">
+          <div class="post-head">
+            <img
+              class="avatar"
+              [src]="status.account.avatar_static || status.account.avatar"
+              alt=""
+              loading="lazy"
+            />
+            <div class="who">
+              <span class="name">{{ status.account.display_name || status.account.username }}</span>
+              <span class="acct muted">&#64;{{ status.account.acct }}</span>
+            </div>
+            <span class="when muted">{{ status.created_at | humanTime }}</span>
+          </div>
+          @if (status.spoiler_text) {
+            <div class="spoiler">CW: {{ status.spoiler_text }}</div>
+          }
+          <div class="post-body" [innerHTML]="status.content"></div>
+          @if (status.media_attachments.length) {
+            @if (mediaHidden(status)) {
+              <button class="media-hidden" (click)="reveal(status)">
+                Marked sensitive by the author — click to show
+              </button>
+            } @else {
+              <div class="media">
+                @for (m of status.media_attachments; track m.id) {
+                  <img [src]="m.preview_url || m.url" [alt]="m.description || ''" loading="lazy" />
+                }
+              </div>
+            }
+          }
+          <div class="post-meta muted">
+            <span>{{ status.replies_count }} replies</span>
+            <span>{{ status.reblogs_count }} boosts</span>
+            <span>{{ status.favourites_count }} favourites</span>
+          </div>
+        </article>
+      }
+      @if (posts().length && tab() !== 'profile') {
+        <button class="btn btn-outline load-more" [disabled]="loadingMore()" (click)="loadMore()">
+          {{ loadingMore() ? 'Loading…' : 'Show more' }}
         </button>
       }
-    </div>
-  }
+    }
+  </main>
 
-  @if (loading()) {
-    <p class="muted pad">Loading posts from {{ demoHost }}…</p>
-  } @else if (error() && !posts().length) {
-    <p class="muted pad">
-      Couldn't reach {{ demoHost }} — check your connection and reload to try again.
-    </p>
-  } @else {
-    @for (status of posts(); track status.id) {
-      <article class="post">
-        <div class="post-head">
-          <img
-            class="avatar"
-            [src]="status.account.avatar_static || status.account.avatar"
-            alt=""
-            loading="lazy"
-          />
-          <div class="who">
-            <span class="name">{{ status.account.display_name || status.account.username }}</span>
-            <span class="acct muted">&#64;{{ status.account.acct }}</span>
-          </div>
-          <span class="when muted">{{ status.created_at | humanTime }}</span>
-        </div>
-        @if (status.spoiler_text) {
-          <div class="spoiler">CW: {{ status.spoiler_text }}</div>
-        }
-        <div class="post-body" [innerHTML]="status.content"></div>
-        @if (status.media_attachments.length) {
-          @if (mediaHidden(status)) {
-            <button class="media-hidden" (click)="reveal(status)">
-              Marked sensitive by the author — click to show
-            </button>
-          } @else {
-            <div class="media">
-              @for (m of status.media_attachments; track m.id) {
-                <img [src]="m.preview_url || m.url" [alt]="m.description || ''" loading="lazy" />
-              }
-            </div>
-          }
-        }
-        <div class="post-meta muted">
-          <span>{{ status.replies_count }} replies</span>
-          <span>{{ status.reblogs_count }} boosts</span>
-          <span>{{ status.favourites_count }} favourites</span>
-        </div>
-      </article>
+  <aside class="demo-rail" aria-label="Demo information">
+    @for (ad of ads; track ad.url) {
+      <section class="rail-card spotlight-card">
+        <a [href]="ad.url" target="_blank" rel="noopener noreferrer">
+          <strong>{{ ad.title }}</strong>
+          <span>{{ ad.text }}</span>
+          <em>{{ ad.cta }}</em>
+        </a>
+        <small class="muted">House ad</small>
+      </section>
     }
-    @if (posts().length) {
-      <button class="btn btn-outline load-more" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ loadingMore() ? 'Loading…' : 'Show more' }}
-      </button>
-    }
-  }
+    <section class="rail-card donate-card">
+      <h2>Keep the network running</h2>
+      <a href="https://mastodon.social/about" target="_blank" rel="noopener noreferrer"
+        >💙 Donate to mastodon.social</a
+      >
+      <a href="https://joinmastodon.org/sponsors" target="_blank" rel="noopener noreferrer"
+        >🐘 Donate to Mastodon</a
+      >
+    </section>
+  </aside>
 </div>

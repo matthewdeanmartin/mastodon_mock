@@ -7,6 +7,7 @@ import { Auth } from '../../auth';
 import { DevUser } from '../../models';
 import { Server, SERVER_PRESETS } from '../../server';
 import { environment } from '../../../environments/environment';
+import { AppFooter } from '../../shell/app-footer/app-footer';
 
 const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
 
@@ -38,7 +39,7 @@ type ServerStatus = 'idle' | 'checking' | 'ok' | 'unreachable';
 
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, AppFooter],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
