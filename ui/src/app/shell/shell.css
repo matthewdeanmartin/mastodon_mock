@@ -342,6 +342,15 @@
   display: none;
 }
 
+/* Profile hover cards in the left rail must paint over the center column. */
+.rail-left {
+  z-index: 2;
+}
+
+.rail-left:has(.hover-anchor:hover) {
+  overflow: visible;
+}
+
 .column {
   min-height: calc(100vh - 65px);
   border-right: 1px solid var(--border);

@@ -10,10 +10,11 @@ import { StatusCard } from '../../status-card/status-card';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { ListDialog } from '../../list-dialog/list-dialog';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
+import { HumanCountPipe } from '../../human-count.pipe';
 
 @Component({
   selector: 'app-profile',
-  imports: [RouterLink, StatusCard, ReportDialog, ListDialog, VerifiedBadge],
+  imports: [RouterLink, StatusCard, ReportDialog, ListDialog, VerifiedBadge, HumanCountPipe],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })

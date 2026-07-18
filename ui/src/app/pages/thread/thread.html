@@ -80,11 +80,15 @@
         </div>
         @if (replyingTo() === post.id) {
           <div class="reader-reply">
-            <app-compose
-              [inReplyToId]="post.id"
-              placeholder="Post your reply"
-              (posted)="onReaderReplied($event)"
-            />
+            @if (isBluesky(post)) {
+              <app-bsky-reply [replyTo]="post" (posted)="onReaderReplied($event)" />
+            } @else {
+              <app-compose
+                [inReplyToId]="post.id"
+                placeholder="Post your reply"
+                (posted)="onReaderReplied($event)"
+              />
+            }
           </div>
         }
       }
@@ -129,7 +133,11 @@
       (deleted)="onFocusedDeleted()"
       (replied)="onReply($event)"
     />
-    <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
+    @if (isBluesky(s)) {
+      <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
+    } @else {
+      <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
+    }
     @for (d of descendants(); track d.id) {
       <app-status-card
         [status]="d"

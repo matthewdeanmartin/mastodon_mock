@@ -68,13 +68,13 @@
     }
     <div class="stats muted">
       <span
-        ><strong>{{ a.statuses_count }}</strong> {{ words().posts }}</span
+        ><strong>{{ a.statuses_count | humanCount }}</strong> {{ words().posts }}</span
       >
       <span
-        ><strong>{{ a.following_count }}</strong> following</span
+        ><strong>{{ a.following_count | humanCount }}</strong> following</span
       >
       <span
-        ><strong>{{ a.followers_count }}</strong> followers</span
+        ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
       >
     </div>
   </header>

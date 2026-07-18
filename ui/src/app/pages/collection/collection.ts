@@ -8,6 +8,7 @@ import { Account, CollectionWithAccounts, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
+import { ListCollectionConverter } from '../../list-collection-converter';
 
 /** How many statuses to pull per member when synthesizing the feed. */
 const FEED_PER_MEMBER = 20;
@@ -38,6 +39,7 @@ export class CollectionPage implements OnInit {
   private auth = inject(Auth);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private converter = inject(ListCollectionConverter);
 
   protected data = signal<CollectionWithAccounts | null>(null);
   protected loading = signal(true);
@@ -57,6 +59,8 @@ export class CollectionPage implements OnInit {
   protected showBulk = signal(false);
   protected showDeleteConfirm = signal(false);
   protected memberToRemove = signal<Member | null>(null);
+  protected converting = signal(false);
+  protected conversionMessage = signal('');
 
   protected members = computed<Member[]>(() => {
     const d = this.data();
@@ -236,6 +240,28 @@ export class CollectionPage implements OnInit {
   onBulkAdded(): void {
     this.showBulk.set(false);
     this.reload();
+  }
+
+  convertToList(): void {
+    const d = this.data();
+    if (!d || this.converting()) {
+      return;
+    }
+    this.converting.set(true);
+    this.conversionMessage.set('');
+    this.converter.convertCollectionToList(d).subscribe({
+      next: (result) => {
+        this.converting.set(false);
+        const parts = [`${result.added} added`];
+        if (result.existing) parts.push(`${result.existing} already present`);
+        if (result.failed) parts.push(`${result.failed} skipped`);
+        this.conversionMessage.set(`Converted to list: ${parts.join(', ')}.`);
+      },
+      error: () => {
+        this.converting.set(false);
+        this.conversionMessage.set('Could not convert this collection.');
+      },
+    });
   }
 
   private reload(): void {

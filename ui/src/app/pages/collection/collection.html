@@ -5,7 +5,15 @@
   <div class="page-head">Collection</div>
   <p class="muted center">{{ error() }}</p>
 } @else if (data(); as d) {
-  <div class="page-head">{{ d.collection.name }}</div>
+  <div class="page-head page-head-actions">
+    <span>{{ d.collection.name }}</span>
+    <button class="btn btn-outline btn-sm" [disabled]="converting()" (click)="convertToList()">
+      {{ converting() ? 'Converting…' : 'Convert to list' }}
+    </button>
+  </div>
+  @if (conversionMessage()) {
+    <p class="conversion-message muted" role="status">{{ conversionMessage() }}</p>
+  }
 
   <div class="coll-head">
     @if (d.collection.description) {

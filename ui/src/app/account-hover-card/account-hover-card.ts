@@ -1,5 +1,6 @@
 import { Component, input } from '@angular/core';
 import { Account } from '../models';
+import { HumanCountPipe } from '../human-count.pipe';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
 
 /**
@@ -11,7 +12,7 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
  */
 @Component({
   selector: 'app-account-hover-card',
-  imports: [VerifiedBadge],
+  imports: [VerifiedBadge, HumanCountPipe],
   template: `
     <div class="hover-card">
       <img class="hc-avatar" [src]="account().avatar" alt="" />
@@ -26,13 +27,13 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
       @if (hasStats) {
         <div class="hc-stats muted">
           <span
-            ><strong>{{ account().statuses_count }}</strong> posts</span
+            ><strong>{{ account().statuses_count | humanCount }}</strong> posts</span
           >
           <span
-            ><strong>{{ account().following_count }}</strong> following</span
+            ><strong>{{ account().following_count | humanCount }}</strong> following</span
           >
           <span
-            ><strong>{{ account().followers_count }}</strong> followers</span
+            ><strong>{{ account().followers_count | humanCount }}</strong> followers</span
           >
         </div>
       }

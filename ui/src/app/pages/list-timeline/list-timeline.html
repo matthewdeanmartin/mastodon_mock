@@ -1,4 +1,12 @@
-<div class="page-head">{{ title() || 'List' }}</div>
+<div class="page-head page-head-actions">
+  <span>{{ title() || 'List' }}</span>
+  <button class="btn btn-outline btn-sm" [disabled]="converting()" (click)="convertToCollection()">
+    {{ converting() ? 'Converting…' : 'Convert to collection' }}
+  </button>
+</div>
+@if (conversionMessage()) {
+  <p class="conversion-message muted" role="status">{{ conversionMessage() }}</p>
+}
 
 <div class="tabs">
   <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Posts</button>

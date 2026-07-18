@@ -5,6 +5,7 @@ import { Account, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
+import { ListCollectionConverter } from '../../list-collection-converter';
 
 @Component({
   selector: 'app-list-timeline',
@@ -15,6 +16,7 @@ import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 export class ListTimeline implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
+  private converter = inject(ListCollectionConverter);
 
   protected title = signal('');
   protected statuses = signal<Status[]>([]);
@@ -31,6 +33,8 @@ export class ListTimeline implements OnInit {
   // Dialog state
   protected showBulk = signal(false);
   protected memberToRemove = signal<Account | null>(null);
+  protected converting = signal(false);
+  protected conversionMessage = signal('');
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
@@ -98,4 +102,36 @@ export class ListTimeline implements OnInit {
   onDeleted(removed: Status): void {
     this.statuses.update((list) => list.filter((s) => s.id !== removed.id));
   }
+
+  convertToCollection(): void {
+    if (this.converting() || !this.title()) {
+      return;
+    }
+    this.converting.set(true);
+    this.conversionMessage.set('');
+    this.converter.convertListToCollection(this.listId(), this.title()).subscribe({
+      next: (result) => {
+        this.converting.set(false);
+        this.conversionMessage.set(
+          conversionSummary('collection', result.added, result.existing, result.failed),
+        );
+      },
+      error: () => {
+        this.converting.set(false);
+        this.conversionMessage.set('Could not convert this list.');
+      },
+    });
+  }
+}
+
+function conversionSummary(
+  target: string,
+  added: number,
+  existing: number,
+  failed: number,
+): string {
+  const parts = [`${added} added`];
+  if (existing) parts.push(`${existing} already present`);
+  if (failed) parts.push(`${failed} skipped`);
+  return `Converted to ${target}: ${parts.join(', ')}.`;
 }

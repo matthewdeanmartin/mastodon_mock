@@ -5,6 +5,7 @@ import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, Tag } from '../../models';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
+import { HumanCountPipe } from '../../human-count.pipe';
 import { Terminology } from '../../terminology';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
 
@@ -16,7 +17,7 @@ import { VerifiedBadge } from '../../verified-badge/verified-badge';
  */
 @Component({
   selector: 'app-left-rail',
-  imports: [RouterLink, VerifiedBadge, AccountHoverCard],
+  imports: [RouterLink, VerifiedBadge, AccountHoverCard, HumanCountPipe],
   templateUrl: './left-rail.html',
   styleUrl: './left-rail.css',
 })

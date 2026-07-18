@@ -11,16 +11,19 @@ import { readerChain } from './reader-chain';
 import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
 import { adaptPost } from '../../providers/bluesky/bluesky-adapter';
 import { BskyThreadNode } from '../../providers/bluesky/bluesky-types';
+import { BskyReply } from '../../providers/bluesky/bluesky-reply';
+import { StatusActions } from '../../providers/status-actions';
 
 @Component({
   selector: 'app-thread',
-  imports: [StatusCard, Compose, HumanTimePipe],
+  imports: [StatusCard, Compose, BskyReply, HumanTimePipe],
   templateUrl: './thread.html',
   styleUrl: './thread.css',
 })
 export class Thread implements OnInit {
   private api = inject(Api);
   private bsky = inject(BlueskyApi);
+  private actions = inject(StatusActions);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -71,13 +74,11 @@ export class Thread implements OnInit {
   }
 
   toggleFavourite(post: Status): void {
-    const call = post.favourited ? this.api.unfavourite(post.id) : this.api.favourite(post.id);
-    call.subscribe((updated) => this.patch(updated));
+    this.actions.toggleFavourite(post).subscribe((updated) => this.patch(updated));
   }
 
   toggleReblog(post: Status): void {
-    const call = post.reblogged ? this.api.unreblog(post.id) : this.api.reblog(post.id);
-    call.subscribe((updated) => this.patch(updated.reblog ?? updated));
+    this.actions.toggleReblog(post).subscribe((updated) => this.patch(updated.reblog ?? updated));
   }
 
   toggleBookmark(post: Status): void {
@@ -168,6 +169,10 @@ export class Thread implements OnInit {
   /** The focused status was deleted: leave the thread. */
   onFocusedDeleted(): void {
     this.router.navigateByUrl('/home');
+  }
+
+  protected isBluesky(post: Status): boolean {
+    return post.provider === 'bluesky';
   }
 }
 

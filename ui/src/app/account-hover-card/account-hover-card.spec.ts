@@ -38,7 +38,7 @@ describe('AccountHoverCard', () => {
     expect(el.querySelector('.hc-acct')?.textContent).toContain('@kay@example.social');
     expect(el.querySelector('.hc-note')?.textContent).toContain('photographs of bridges');
     const stats = el.querySelector('.hc-stats')?.textContent ?? '';
-    expect(stats).toContain('6789');
+    expect(stats).toContain('6,789');
     expect(stats).toContain('45');
     expect(stats).toContain('321');
   });

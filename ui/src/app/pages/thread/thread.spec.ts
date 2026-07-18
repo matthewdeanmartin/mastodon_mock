@@ -48,6 +48,19 @@ function makeStatus(id: string): Status {
   };
 }
 
+function makeBskyStatus(id = 'bsky:at://did:plc:x/app.bsky.feed.post/1'): Status {
+  return {
+    ...makeStatus(id),
+    provider: 'bluesky',
+    providerRef: {
+      uri: 'at://did:plc:x/app.bsky.feed.post/1',
+      cid: 'cid-1',
+      indexedAt: '2026-01-01T00:00:00Z',
+      replyRoot: { uri: 'at://did:plc:x/app.bsky.feed.post/1', cid: 'cid-1' },
+    },
+  };
+}
+
 function makeContext(ancestors: Status[] = [], descendants: Status[] = []): Context {
   return { ancestors, descendants };
 }
@@ -261,5 +274,34 @@ describe('Thread', () => {
     const before = prefs.readerFontSize();
     fixture.componentInstance.bumpReaderFont(2);
     expect(prefs.readerFontSize()).toBe(before + 2);
+  });
+
+  it('uses the Bluesky reply composer beneath a Bluesky thread', () => {
+    const fixture = setUpWithId('1');
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+
+    internals(fixture).status.set(makeBskyStatus());
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-bsky-reply')).not.toBeNull();
+    expect(el.querySelector('app-compose')).toBeNull();
+  });
+
+  it('uses the Bluesky reply composer in reader mode too', () => {
+    const fixture = setUpWithId('1');
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+
+    const post = makeBskyStatus();
+    internals(fixture).status.set(post);
+    fixture.componentInstance.toggleReader();
+    fixture.componentInstance.toggleReaderReply(post.id);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.reader-reply app-bsky-reply')).not.toBeNull();
+    expect(el.querySelector('.reader-reply app-compose')).toBeNull();
   });
 });
