@@ -33,34 +33,87 @@
 } @else if (!visible().length) {
   <p class="muted center">No notifications match the filters.</p>
 } @else {
-  @for (n of visible(); track n.id) {
-    <div class="notif">
-      <a [routerLink]="['/accounts', n.account.id]">
-        <img class="notif-avatar" [src]="n.account.avatar" [alt]="n.account.username" />
-      </a>
-      <div class="notif-body">
-        <a class="who" [routerLink]="['/accounts', n.account.id]">{{
-          n.account.display_name || n.account.username
-        }}</a>
-        <span class="what muted">{{ label(n.type) }}</span>
-        @if (n.status) {
-          <a class="excerpt" [routerLink]="['/statuses', n.status.id]">
-            <span class="excerpt-content" [innerHTML]="n.status.content"></span>
-            @if (n.status.media_attachments.length && showImages()) {
+  @for (row of rows(); track row.key) {
+    @if (row.kind === 'group') {
+      <div class="notif notif-group">
+        <div class="group-avatars">
+          @for (g of row.sample; track g.account.id) {
+            <a [routerLink]="['/accounts', g.account.id]" [attr.aria-label]="g.account.acct">
+              <img class="notif-avatar" [src]="g.account.avatar" [alt]="g.account.username" />
+            </a>
+          }
+        </div>
+        <div class="notif-body">
+          <span class="group-summary">
+            @for (g of row.sample; track g.account.id; let last = $last) {
+              <a class="who" [routerLink]="['/accounts', g.account.id]">{{
+                g.account.display_name || g.account.username
+              }}</a
+              >{{ last ? '' : ', ' }}
+            }
+            @if (listMode(row.type)) {
+              <button
+                class="others-link"
+                (click)="openGroupList(row)"
+                [title]="label(row.type) + ' — see everyone'"
+              >
+                {{ othersLabel(row) }}
+              </button>
+            } @else {
+              <span class="who">{{ othersLabel(row) }}</span>
+            }
+            <span class="what muted">{{ label(row.type) }}</span>
+          </span>
+          <a class="excerpt" [routerLink]="['/statuses', row.status.id]">
+            <span class="excerpt-content" [innerHTML]="row.status.content"></span>
+            @if (row.status.media_attachments.length && showImages()) {
               <span class="excerpt-media">
-                @for (m of n.status.media_attachments; track m.id) {
+                @for (m of row.status.media_attachments; track m.id) {
                   <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
                 }
               </span>
             }
           </a>
-          @if (n.type === 'mention') {
-            <div class="mention-reply">
-              <app-compose [inReplyToId]="n.status.id" placeholder="Post your reply" />
-            </div>
-          }
-        }
+        </div>
       </div>
-    </div>
+    } @else {
+      @let n = row.notif;
+      <div class="notif">
+        <a [routerLink]="['/accounts', n.account.id]">
+          <img class="notif-avatar" [src]="n.account.avatar" [alt]="n.account.username" />
+        </a>
+        <div class="notif-body">
+          <a class="who" [routerLink]="['/accounts', n.account.id]">{{
+            n.account.display_name || n.account.username
+          }}</a>
+          <span class="what muted">{{ label(n.type) }}</span>
+          @if (n.status) {
+            <a class="excerpt" [routerLink]="['/statuses', n.status.id]">
+              <span class="excerpt-content" [innerHTML]="n.status.content"></span>
+              @if (n.status.media_attachments.length && showImages()) {
+                <span class="excerpt-media">
+                  @for (m of n.status.media_attachments; track m.id) {
+                    <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                  }
+                </span>
+              }
+            </a>
+            @if (n.type === 'mention') {
+              <div class="mention-reply">
+                <app-compose [inReplyToId]="n.status.id" placeholder="Post your reply" />
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
   }
+}
+
+@if (listTarget(); as target) {
+  <app-account-list-dialog
+    [statusId]="target.statusId"
+    [mode]="target.mode"
+    (closed)="listTarget.set(null)"
+  />
 }

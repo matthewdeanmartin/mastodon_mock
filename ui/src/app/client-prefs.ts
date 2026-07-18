@@ -14,7 +14,7 @@ export type ReaderTextAlign = 'left' | 'justify';
 
 // Chat-list filters (the toggles above the conversation list).
 export type ChatAudience = 'everyone' | 'mutuals';
-export type ChatKindFilter = 'all' | 'private' | 'public';
+export type ChatKindFilter = 'all' | 'private' | 'public' | 'bsky';
 
 /** Algo-feed audience chip: everything, or only posts authored by follows. */
 export type AlgoAudience = 'all' | 'friends';
@@ -251,7 +251,7 @@ export class ClientPrefs {
   }
 
   setChatKind(kind: ChatKindFilter): void {
-    if (kind === 'all' || kind === 'private' || kind === 'public') {
+    if (kind === 'all' || kind === 'private' || kind === 'public' || kind === 'bsky') {
       this.chatKind.set(kind);
     }
   }
@@ -357,7 +357,8 @@ export class ClientPrefs {
     if (
       stored.chatKind === 'all' ||
       stored.chatKind === 'private' ||
-      stored.chatKind === 'public'
+      stored.chatKind === 'public' ||
+      stored.chatKind === 'bsky'
     ) {
       this.chatKind.set(stored.chatKind);
     }

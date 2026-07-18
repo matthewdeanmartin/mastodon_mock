@@ -165,6 +165,16 @@
   color: #402c00;
 }
 
+.kind-bsky {
+  background: #1185fe;
+  color: #fff;
+}
+
+.bsky-scope-hint {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
 /* ------------------------------------------------------------------ thread */
 
 .chat-pane {
@@ -403,6 +413,23 @@
 
 .compose-public {
   border-top: 3px solid #ffb300;
+}
+
+.bsky-compose {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.bsky-compose textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--col-bg);
+  color: inherit;
+  font: inherit;
 }
 
 .chat-empty {

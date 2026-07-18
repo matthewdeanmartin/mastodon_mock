@@ -66,6 +66,34 @@
   flex: 1;
   min-width: 0;
 }
+
+/* Grouped rows: overlapping avatar stack for the first few actors. */
+.group-avatars {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.group-avatars a + a {
+  margin-left: -14px;
+}
+
+.group-avatars .notif-avatar {
+  border: 2px solid var(--col-bg);
+}
+
+.others-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.others-link:hover {
+  text-decoration: underline;
+}
 .mention-reply {
   margin-top: 10px;
 }

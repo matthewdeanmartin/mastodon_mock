@@ -50,7 +50,6 @@
   } @else {
     <p class="muted">No feeds yet.</p>
   }
-
 </section>
 
 <section class="conn-section">
@@ -71,7 +70,9 @@
   } @else {
     <p class="muted">
       Link with an <strong>app password</strong> — made at bsky.app → Settings → Privacy and
-      security → App Passwords. It's revocable and is never your real password.
+      security → App Passwords. It's revocable and is never your real password. Check
+      <em>"Allow access to your direct messages"</em> when creating it if you want your Bluesky DMs
+      in Chat.
     </p>
     <form class="bsky-form" (ngSubmit)="linkBluesky()">
       <input

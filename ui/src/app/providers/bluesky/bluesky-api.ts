@@ -99,20 +99,36 @@ export class BlueskyApi {
     });
   }
 
-  private get<T>(nsid: string, params: HttpParams): Observable<T> {
+  /**
+   * Authenticated XRPC GET. Extra headers support service proxying (chat),
+   * which also needs `serviceUrl`: proxied calls only work against the
+   * account's real PDS host, not the bsky.social entryway.
+   */
+  get<T>(
+    nsid: string,
+    params: HttpParams,
+    extraHeaders: Record<string, string> = {},
+    serviceUrl?: string,
+  ): Observable<T> {
     return this.withRefresh((jwt) =>
-      this.http.get<T>(`${this.service()}/xrpc/${nsid}`, {
+      this.http.get<T>(`${serviceUrl ?? this.service()}/xrpc/${nsid}`, {
         params,
-        headers: { Authorization: `Bearer ${jwt}` },
+        headers: { Authorization: `Bearer ${jwt}`, ...extraHeaders },
         context: externalFetch(),
       }),
     );
   }
 
-  private request<T>(nsid: string, body: unknown): Observable<T> {
+  /** Authenticated XRPC procedure call (POST). */
+  request<T>(
+    nsid: string,
+    body: unknown,
+    extraHeaders: Record<string, string> = {},
+    serviceUrl?: string,
+  ): Observable<T> {
     return this.withRefresh((jwt) =>
-      this.http.post<T>(`${this.service()}/xrpc/${nsid}`, body, {
-        headers: { Authorization: `Bearer ${jwt}` },
+      this.http.post<T>(`${serviceUrl ?? this.service()}/xrpc/${nsid}`, body, {
+        headers: { Authorization: `Bearer ${jwt}`, ...extraHeaders },
         context: externalFetch(),
       }),
     );

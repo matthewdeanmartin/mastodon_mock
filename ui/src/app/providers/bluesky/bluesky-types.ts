@@ -83,6 +83,48 @@ export interface BskyThreadNode {
   replies?: BskyThreadNode[];
 }
 
+// ---------------------------------------------------------------- chat (DMs)
+
+export interface BskyChatMember {
+  did: string;
+  handle: string;
+  displayName?: string;
+  avatar?: string;
+}
+
+/** chat.bsky.convo.defs#messageView (deleted messages arrive with no text). */
+export interface BskyMessageView {
+  $type?: string;
+  id: string;
+  rev: string;
+  text?: string;
+  facets?: BskyFacet[];
+  sender: { did: string };
+  sentAt: string;
+}
+
+export interface BskyConvoView {
+  id: string;
+  rev: string;
+  members: BskyChatMember[];
+  lastMessage?: BskyMessageView;
+  muted?: boolean;
+  unreadCount: number;
+}
+
+export interface BskyConvoList {
+  convos: BskyConvoView[];
+  cursor?: string;
+}
+
+/** chat.bsky.convo.getLog entry; `$type` ends in #logCreateMessage etc. */
+export interface BskyChatLogEntry {
+  $type: string;
+  rev: string;
+  convoId: string;
+  message?: BskyMessageView;
+}
+
 /** What the provider stashes in `Status.providerRef` for later interactions. */
 export interface BskyRef {
   uri: string;

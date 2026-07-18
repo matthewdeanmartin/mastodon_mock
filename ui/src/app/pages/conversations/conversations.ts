@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { FormsModule } from '@angular/forms';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { ClientPrefs } from '../../client-prefs';
@@ -19,6 +20,13 @@ import { HumanTimePipe } from '../../human-time.pipe';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { Streaming } from '../../streaming';
 import { Account, Conversation, MastodonNotification, Relationship, Status } from '../../models';
+import { BlueskyChatApi, isChatScopeError } from '../../providers/bluesky/bluesky-chat-api';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
+import {
+  BskyChatMember,
+  BskyConvoView,
+  BskyMessageView,
+} from '../../providers/bluesky/bluesky-types';
 
 /** localStorage map of chat key → ISO timestamp of the newest message seen there. */
 const READ_KEY = 'mockingbird_chat_read';
@@ -32,7 +40,7 @@ const READ_KEY = 'mockingbird_chat_read';
  */
 export interface Chat {
   key: string;
-  kind: 'private' | 'public';
+  kind: 'private' | 'public' | 'bsky';
   /** Ids of the merged conversations (private chats only; used for mark-read). */
   convIds: string[];
   /** Participants we hold full Account records for (avatars, moderation menu). */
@@ -41,6 +49,12 @@ export interface Chat {
   handles: string[];
   lastStatus: Status | null;
   unread: boolean;
+  /** Bluesky chats only: the convo id and the other participants. */
+  convoId?: string;
+  members?: BskyChatMember[];
+  /** Bluesky chats only: plain-text preview + timestamp (no Status to lean on). */
+  previewText?: string;
+  lastAt?: string;
 }
 
 function readMap(): Record<string, string> {
@@ -94,7 +108,7 @@ export function stripLeadingMentions(html: string): string {
 
 @Component({
   selector: 'app-conversations',
-  imports: [Compose, HumanTimePipe, ReportDialog, RouterLink],
+  imports: [Compose, FormsModule, HumanTimePipe, ReportDialog, RouterLink],
   templateUrl: './conversations.html',
   styleUrl: './conversations.css',
 })
@@ -102,10 +116,19 @@ export class Conversations implements OnInit, OnDestroy {
   private api = inject(Api);
   private auth = inject(Auth);
   private streaming = inject(Streaming);
+  private bskyChat = inject(BlueskyChatApi);
+  protected bsky = inject(BlueskySession);
   protected prefs = inject(ClientPrefs);
 
   protected loading = signal(true);
   protected privateConvs = signal<Conversation[]>([]);
+  protected bskyConvos = signal<BskyConvoView[]>([]);
+  /** The linked app password can't read DMs; show the relink hint. */
+  protected bskyScopeError = signal(false);
+  protected bskyMessages = signal<BskyMessageView[]>([]);
+  protected bskyDraft = signal('');
+  protected bskySending = signal(false);
+  private bskyPoll: ReturnType<typeof setInterval> | null = null;
   /** Statuses known per public chat key (from notifications + streaming). */
   private publicStatuses = signal<Map<string, Status[]>>(new Map());
   /** Full accounts observed per public chat key. */
@@ -203,9 +226,24 @@ export class Conversations implements OnInit, OnDestroy {
         unread: !!last && last.account.id !== me?.id && (!read[key] || last.created_at > read[key]),
       });
     }
-    return rows.sort((a, b) =>
-      (b.lastStatus?.created_at ?? '').localeCompare(a.lastStatus?.created_at ?? ''),
-    );
+    const myDid = this.bsky.session()?.did;
+    for (const convo of this.bskyConvos()) {
+      const others = convo.members.filter((m) => m.did !== myDid);
+      rows.push({
+        key: `bsky:${convo.id}`,
+        kind: 'bsky',
+        convIds: [],
+        accounts: [],
+        handles: others.map((m) => m.handle),
+        lastStatus: null,
+        unread: convo.unreadCount > 0,
+        convoId: convo.id,
+        members: others,
+        previewText: convo.lastMessage?.text ?? '',
+        lastAt: convo.lastMessage?.sentAt,
+      });
+    }
+    return rows.sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)));
   });
 
   /** The chat list after the audience (mutuals) and kind (🔒/📢) toggles. */
@@ -297,22 +335,42 @@ export class Conversations implements OnInit, OnDestroy {
         }
       }),
     );
+    // Bluesky chat has no client-reachable stream; poll the convo list gently.
+    if (this.bsky.linked()) {
+      this.bskyPoll = setInterval(() => this.refreshBskyConvos(), 20_000);
+    }
   }
 
   ngOnDestroy(): void {
     for (const sub of this.subs) {
       sub.unsubscribe();
     }
+    if (this.bskyPoll) {
+      clearInterval(this.bskyPoll);
+    }
   }
 
   load(): void {
     this.loading.set(true);
-    let pending = 2;
+    let pending = this.bsky.linked() ? 3 : 2;
     const done = () => {
       if (--pending === 0) {
         this.loading.set(false);
       }
     };
+    if (this.bsky.linked()) {
+      this.bskyChat.listConvos().subscribe({
+        next: (list) => {
+          this.bskyConvos.set(list.convos);
+          this.bskyScopeError.set(false);
+          done();
+        },
+        error: (err: unknown) => {
+          this.bskyScopeError.set(isChatScopeError(err));
+          done();
+        },
+      });
+    }
     this.api.conversations().subscribe({
       next: (convs) => {
         this.privateConvs.set(convs);
@@ -335,11 +393,19 @@ export class Conversations implements OnInit, OnDestroy {
 
   select(chat: Chat): void {
     this.selectedKey.set(chat.key);
+    if (chat.kind === 'bsky') {
+      this.loadBskyThread(chat);
+      return;
+    }
     this.markRead(chat);
     this.loadThread(chat);
   }
 
   title(chat: Chat): string {
+    if (chat.kind === 'bsky') {
+      const named = (chat.members ?? []).map((m) => m.displayName || m.handle);
+      return named.join(', ') || 'Bluesky chat';
+    }
     if (!chat.accounts.length && !chat.handles.some((h) => h !== '')) {
       // A self-conversation (direct message to yourself).
       return this.auth.account()?.display_name || 'You';
@@ -421,6 +487,84 @@ export class Conversations implements OnInit, OnDestroy {
       // My own reply can't be keyed by author; it belongs to the open chat.
       this.addPublicStatus(status, status.account, chat.key);
     }
+  }
+
+  // ---------------------------------------------------------------- bluesky
+
+  protected bskyIsMine(m: BskyMessageView): boolean {
+    return m.sender.did === this.bsky.session()?.did;
+  }
+
+  /** The sender's profile bits, for avatars/names on their bubbles. */
+  protected bskyAuthor(chat: Chat, did: string): BskyChatMember | null {
+    return (chat.members ?? []).find((m) => m.did === did) ?? null;
+  }
+
+  private loadBskyThread(chat: Chat): void {
+    if (!chat.convoId) {
+      return;
+    }
+    this.threadLoading.set(true);
+    this.bskyMessages.set([]);
+    this.bskyChat.getMessages(chat.convoId).subscribe({
+      next: ({ messages }) => {
+        // Newest-first from the API; deleted messages arrive without text.
+        const chronological = messages.filter((m) => m.text !== undefined).reverse();
+        this.bskyMessages.set(chronological);
+        this.threadLoading.set(false);
+        this.scrollToBottom();
+        const newest = chronological.at(-1);
+        if (newest) {
+          // Best-effort: a failed read-receipt shouldn't surface anywhere.
+          this.bskyChat.updateRead(chat.convoId!, newest.id).subscribe({ error: () => undefined });
+        }
+        this.bskyConvos.update((list) =>
+          list.map((c) => (c.id === chat.convoId ? { ...c, unreadCount: 0 } : c)),
+        );
+      },
+      error: () => this.threadLoading.set(false),
+    });
+  }
+
+  sendBskyMessage(): void {
+    const chat = this.selected();
+    const text = this.bskyDraft().trim();
+    if (!chat?.convoId || !text || this.bskySending()) {
+      return;
+    }
+    this.bskySending.set(true);
+    this.bskyChat.sendMessage(chat.convoId, text).subscribe({
+      next: (message) => {
+        this.bskySending.set(false);
+        this.bskyDraft.set('');
+        this.bskyMessages.update((list) => [...list, message]);
+        this.bskyConvos.update((list) =>
+          list.map((c) => (c.id === chat.convoId ? { ...c, lastMessage: message } : c)),
+        );
+        this.scrollToBottom();
+      },
+      error: () => this.bskySending.set(false),
+    });
+  }
+
+  private refreshBskyConvos(): void {
+    this.bskyChat.listConvos().subscribe({
+      next: (list) => {
+        const before = this.bskyConvos();
+        this.bskyConvos.set(list.convos);
+        const chat = this.selected();
+        if (chat?.kind !== 'bsky' || !chat.convoId) {
+          return;
+        }
+        // Reload the open thread only when its convo actually advanced.
+        const prev = before.find((c) => c.id === chat.convoId);
+        const next = list.convos.find((c) => c.id === chat.convoId);
+        if (next && next.rev !== prev?.rev) {
+          this.loadBskyThread(chat);
+        }
+      },
+      error: () => undefined, // polling silently tolerates a flaky network
+    });
   }
 
   // ---------------------------------------------------------------- read state
@@ -557,6 +701,11 @@ export class Conversations implements OnInit, OnDestroy {
       this.moderated.update((m) => ({ ...m, [acc.id]: 'blocked' }));
     });
   }
+}
+
+/** Newest-activity stamp for sorting; bsky rows carry it outside lastStatus. */
+function lastActivity(c: Chat): string {
+  return c.lastStatus?.created_at ?? c.lastAt ?? '';
 }
 
 /** Private chats group by participant set (matching how public ones group by author). */

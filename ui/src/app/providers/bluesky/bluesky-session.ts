@@ -16,6 +16,8 @@ export interface BskySession {
   refreshJwt: string;
   displayName?: string;
   avatar?: string;
+  /** The account's real PDS host (resolved lazily); chat calls must hit it, not the entryway. */
+  pdsUrl?: string;
 }
 
 interface SessionResponse {
@@ -106,6 +108,14 @@ export class BlueskySession {
         map((res) => ({ ...current, accessJwt: res.accessJwt, refreshJwt: res.refreshJwt })),
         tap((session) => this.persist(session)),
       );
+  }
+
+  /** Remember the resolved PDS host so chat calls skip the DID lookup next time. */
+  setPdsUrl(url: string): void {
+    const current = this.session();
+    if (current && current.pdsUrl !== url) {
+      this.persist({ ...current, pdsUrl: url });
+    }
   }
 
   /** Forget the linked account (tokens dropped; revoke the app password on bsky.app). */

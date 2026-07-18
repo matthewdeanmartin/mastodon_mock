@@ -4,10 +4,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MastodonNotification } from '../../models';
+import { MastodonNotification, Status } from '../../models';
 import { Streaming } from '../../streaming';
 import { FakeStreaming } from '../../testing/fake-streaming';
-import { Notifications } from './notifications';
+import { groupNotifications, Notifications } from './notifications';
 
 interface NotificationsInternals {
   items: Signal<MastodonNotification[]>;
@@ -109,6 +109,72 @@ describe('Notifications', () => {
     const img = el.querySelector<HTMLImageElement>('.excerpt-media img');
     expect(img?.getAttribute('src')).toBe('https://x/prev.png');
     expect(el.querySelector('.excerpt-content')?.textContent).toContain('look at this');
+  });
+
+  describe('groupNotifications', () => {
+    function notif(
+      id: string,
+      type: string,
+      accountId: string,
+      statusId?: string,
+    ): MastodonNotification {
+      const n = makeNotification(id, type);
+      n.account = { ...n.account, id: accountId, username: `u${accountId}` };
+      if (statusId) {
+        n.status = { id: statusId, content: '', media_attachments: [] } as unknown as Status;
+      }
+      return n;
+    }
+
+    it('leaves buckets at or under the threshold expanded', () => {
+      const rows = groupNotifications([
+        notif('1', 'favourite', 'a', 's1'),
+        notif('2', 'favourite', 'b', 's1'),
+        notif('3', 'favourite', 'c', 's1'),
+      ]);
+      expect(rows.map((r) => r.kind)).toEqual(['single', 'single', 'single']);
+    });
+
+    it('collapses 4+ same-status notifications into one group at the newest position', () => {
+      const rows = groupNotifications([
+        notif('0', 'follow', 'z'),
+        notif('1', 'reblog', 'a', 's1'),
+        notif('2', 'reblog', 'b', 's1'),
+        notif('3', 'reblog', 'c', 's1'),
+        notif('4', 'reblog', 'd', 's1'),
+        notif('5', 'follow', 'y'),
+      ]);
+      expect(rows.map((r) => r.kind)).toEqual(['single', 'group', 'single']);
+      const group = rows[1] as Extract<(typeof rows)[number], { kind: 'group' }>;
+      expect(group.count).toBe(4);
+      expect(group.sample.map((n) => n.account.id)).toEqual(['a', 'b', 'c']);
+      expect(group.status.id).toBe('s1');
+    });
+
+    it('groups per (type, status): favourites and reblogs of one post stay apart', () => {
+      const rows = groupNotifications([
+        ...['a', 'b', 'c', 'd'].map((who, i) => notif(`f${i}`, 'favourite', who, 's1')),
+        ...['a', 'b', 'c', 'd'].map((who, i) => notif(`r${i}`, 'reblog', who, 's1')),
+      ]);
+      expect(rows.map((r) => r.kind)).toEqual(['group', 'group']);
+    });
+
+    it('never groups mentions', () => {
+      const rows = groupNotifications(
+        ['a', 'b', 'c', 'd', 'e'].map((who, i) => notif(`${i}`, 'mention', who, 's1')),
+      );
+      expect(rows.every((r) => r.kind === 'single')).toBe(true);
+    });
+
+    it('counts each account once, so repeats do not trip the threshold', () => {
+      const rows = groupNotifications([
+        notif('1', 'favourite', 'a', 's1'),
+        notif('2', 'favourite', 'a', 's1'),
+        notif('3', 'favourite', 'b', 's1'),
+        notif('4', 'favourite', 'c', 's1'),
+      ]);
+      expect(rows.every((r) => r.kind === 'single')).toBe(true);
+    });
   });
 
   it('toggling live off closes the stream', () => {

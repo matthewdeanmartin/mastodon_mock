@@ -34,8 +34,24 @@
         >
           📢 Public
         </button>
+        @if (bsky.linked()) {
+          <button
+            [class.active]="prefs.chatKind() === 'bsky'"
+            (click)="prefs.setChatKind('bsky')"
+            title="Bluesky DMs"
+          >
+            🦋 Bluesky
+          </button>
+        }
       </div>
     </div>
+    @if (bskyScopeError()) {
+      <p class="muted small bsky-scope-hint">
+        🦋 Your Bluesky app password can't read DMs. Create a new app password at bsky.app with
+        "Allow access to your direct messages" checked, then relink in
+        <a routerLink="/settings/connections">Settings → Connections</a>.
+      </p>
+    }
     @if (loading()) {
       <p class="muted center">Loading…</p>
     } @else if (!chats().length) {
@@ -53,11 +69,24 @@
         (click)="select(c)"
       >
         <div class="conv-avatars">
-          @for (a of c.accounts.slice(0, 3); track a.id) {
-            <img [src]="a.avatar_static || a.avatar" alt="" />
-          }
-          @if (!c.accounts.length) {
-            <span class="avatar-fallback">💬</span>
+          @if (c.kind === 'bsky') {
+            @for (m of (c.members ?? []).slice(0, 3); track m.did) {
+              @if (m.avatar) {
+                <img [src]="m.avatar" alt="" />
+              } @else {
+                <span class="avatar-fallback">🦋</span>
+              }
+            }
+            @if (!(c.members ?? []).length) {
+              <span class="avatar-fallback">🦋</span>
+            }
+          } @else {
+            @for (a of c.accounts.slice(0, 3); track a.id) {
+              <img [src]="a.avatar_static || a.avatar" alt="" />
+            }
+            @if (!c.accounts.length) {
+              <span class="avatar-fallback">💬</span>
+            }
           }
         </div>
         <div class="conv-body">
@@ -68,12 +97,16 @@
             }
             @if (c.kind === 'public') {
               <span class="kind-badge kind-public">📢 PUBLIC</span>
+            } @else if (c.kind === 'bsky') {
+              <span class="kind-badge kind-bsky">🦋 Bluesky</span>
             } @else {
               <span class="kind-badge kind-private">🔒 Private</span>
             }
           </div>
           @if (c.lastStatus) {
             <div class="conv-preview muted" [innerHTML]="stripped(c.lastStatus)"></div>
+          } @else if (c.previewText) {
+            <div class="conv-preview muted">{{ c.previewText }}</div>
           }
         </div>
       </button>
@@ -84,10 +117,18 @@
     @if (selected(); as chat) {
       <header class="chat-head">
         <div class="head-avatars">
-          @for (a of chat.accounts.slice(0, 4); track a.id) {
-            <a [routerLink]="['/accounts', a.id]" [attr.aria-label]="a.display_name"
-              ><img [src]="a.avatar_static || a.avatar" alt=""
-            /></a>
+          @if (chat.kind === 'bsky') {
+            @for (m of (chat.members ?? []).slice(0, 4); track m.did) {
+              @if (m.avatar) {
+                <img [src]="m.avatar" [attr.aria-label]="m.handle" alt="" />
+              }
+            }
+          } @else {
+            @for (a of chat.accounts.slice(0, 4); track a.id) {
+              <a [routerLink]="['/accounts', a.id]" [attr.aria-label]="a.display_name"
+                ><img [src]="a.avatar_static || a.avatar" alt=""
+              /></a>
+            }
           }
         </div>
         <div class="head-identity">
@@ -100,6 +141,8 @@
         </div>
         @if (chat.kind === 'public') {
           <span class="kind-badge kind-public">📢 PUBLIC</span>
+        } @else if (chat.kind === 'bsky') {
+          <span class="kind-badge kind-bsky">🦋 Bluesky</span>
         } @else {
           <span class="kind-badge kind-private">🔒 Private</span>
         }
@@ -139,7 +182,37 @@
         @if (threadLoading()) {
           <p class="muted center small">Loading thread…</p>
         }
-        @for (m of messages(); track m.id) {
+        @if (chat.kind === 'bsky') {
+          @for (m of bskyMessages(); track m.id) {
+            <div class="bubble-row" [class.mine]="bskyIsMine(m)">
+              @if (!bskyIsMine(m)) {
+                <span
+                  class="bubble-avatar"
+                  [attr.aria-label]="bskyAuthor(chat, m.sender.did)?.handle"
+                >
+                  @if (bskyAuthor(chat, m.sender.did)?.avatar; as av) {
+                    <img [src]="av" alt="" />
+                  }
+                </span>
+              }
+              <div class="bubble" [class.bubble-mine]="bskyIsMine(m)">
+                @if (!bskyIsMine(m) && (chat.members ?? []).length > 1) {
+                  <div class="bubble-author small">
+                    {{
+                      bskyAuthor(chat, m.sender.did)?.displayName ||
+                        bskyAuthor(chat, m.sender.did)?.handle
+                    }}
+                  </div>
+                }
+                <div class="bubble-content">{{ m.text }}</div>
+                <div class="bubble-meta muted">
+                  <span>{{ m.sentAt | humanTime }}</span>
+                </div>
+              </div>
+            </div>
+          }
+        }
+        @for (m of chat.kind === 'bsky' ? [] : messages(); track m.id) {
           <div class="bubble-row" [class.mine]="isMine(m)">
             @if (!isMine(m)) {
               <a
@@ -210,17 +283,36 @@
         </div>
       }
 
-      <div class="chat-compose" [class.compose-public]="chat.kind === 'public'">
-        <app-compose
-          [compact]="true"
-          [inReplyToId]="replyToId()"
-          [initialText]="replyMentions()"
-          [initialVisibility]="replyVisibility()"
-          [lockVisibility]="chat.kind === 'private'"
-          [placeholder]="chat.kind === 'public' ? 'Reply publicly…' : 'Reply privately…'"
-          (posted)="onReplyPosted($event)"
-        />
-      </div>
+      @if (chat.kind === 'bsky') {
+        <div class="chat-compose bsky-compose">
+          <textarea
+            rows="2"
+            [ngModel]="bskyDraft()"
+            (ngModelChange)="bskyDraft.set($event)"
+            (keydown.enter)="$event.preventDefault(); sendBskyMessage()"
+            placeholder="Message on Bluesky…"
+          ></textarea>
+          <button
+            class="btn"
+            (click)="sendBskyMessage()"
+            [disabled]="bskySending() || !bskyDraft().trim()"
+          >
+            Send
+          </button>
+        </div>
+      } @else {
+        <div class="chat-compose" [class.compose-public]="chat.kind === 'public'">
+          <app-compose
+            [compact]="true"
+            [inReplyToId]="replyToId()"
+            [initialText]="replyMentions()"
+            [initialVisibility]="replyVisibility()"
+            [lockVisibility]="chat.kind === 'private'"
+            [placeholder]="chat.kind === 'public' ? 'Reply publicly…' : 'Reply privately…'"
+            (posted)="onReplyPosted($event)"
+          />
+        </div>
+      }
     } @else {
       <div class="chat-empty muted center">
         <p>Select a conversation.</p>
