@@ -48,7 +48,13 @@
         <div class="group-avatars">
           @for (g of row.sample; track g.account.id) {
             <a [routerLink]="['/accounts', g.account.id]" [attr.aria-label]="g.account.acct">
-              <img class="notif-avatar" [src]="g.account.avatar" [alt]="g.account.username" />
+              <img
+                class="notif-avatar"
+                [ngSrc]="g.account.avatar_static || g.account.avatar || 'favicon-32x32.png'"
+                [alt]="g.account.username"
+                width="40"
+                height="40"
+              />
             </a>
           }
         </div>
@@ -78,7 +84,12 @@
             @if (row.status.media_attachments.length && showImages()) {
               <span class="excerpt-media">
                 @for (m of row.status.media_attachments; track m.id) {
-                  <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                  <img
+                    [src]="m.preview_url || m.url"
+                    [alt]="m.description || ''"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 }
               </span>
             }
@@ -89,7 +100,13 @@
       @let n = row.notif;
       <div class="notif">
         <a [routerLink]="['/accounts', n.account.id]">
-          <img class="notif-avatar" [src]="n.account.avatar" [alt]="n.account.username" />
+          <img
+            class="notif-avatar"
+            [ngSrc]="n.account.avatar_static || n.account.avatar || 'favicon-32x32.png'"
+            [alt]="n.account.username"
+            width="40"
+            height="40"
+          />
         </a>
         <div class="notif-body">
           <a class="who" [routerLink]="['/accounts', n.account.id]">{{
@@ -109,7 +126,12 @@
                 @if (n.status.media_attachments.length && showImages()) {
                   <span class="excerpt-media">
                     @for (m of n.status.media_attachments; track m.id) {
-                      <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                      <img
+                        [src]="m.preview_url || m.url"
+                        [alt]="m.description || ''"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     }
                   </span>
                 }
@@ -132,7 +154,12 @@
                 @if (n.status.media_attachments.length && showImages()) {
                   <span class="excerpt-media">
                     @for (m of n.status.media_attachments; track m.id) {
-                      <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                      <img
+                        [src]="m.preview_url || m.url"
+                        [alt]="m.description || ''"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     }
                   </span>
                 }

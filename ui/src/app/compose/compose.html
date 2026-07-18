@@ -66,7 +66,12 @@
     <div class="media-previews">
       @for (m of media(); track m.media.id; let i = $index) {
         <div class="media-preview">
-          <img [src]="m.media.preview_url || m.media.url" [alt]="m.description" />
+          <img
+            [src]="m.media.preview_url || m.media.url"
+            [alt]="m.description"
+            loading="lazy"
+            decoding="async"
+          />
           <input
             type="text"
             class="alt-input"

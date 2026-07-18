@@ -18,7 +18,7 @@
           <dd>
             @if (inst.contact.account; as admin) {
               <a [routerLink]="['/accounts', admin.id]" class="admin">
-                <img [src]="admin.avatar_static || admin.avatar" alt="" />
+                <img [src]="admin.avatar_static || admin.avatar" alt="" decoding="async" />
                 <span>
                   {{ admin.display_name || admin.username }}
                   <small>&#64;{{ admin.username }}</small>
@@ -82,6 +82,8 @@
                 class="avatar"
                 [src]="status.account.avatar_static || status.account.avatar"
                 alt=""
+                loading="lazy"
+                decoding="async"
               />
               <div class="who">
                 <span class="name">{{
@@ -94,7 +96,12 @@
             @if (status.media_attachments.length) {
               <div class="media">
                 @for (m of status.media_attachments; track m.id) {
-                  <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                  <img
+                    [src]="m.preview_url || m.url"
+                    [alt]="m.description || ''"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 }
               </div>
             }

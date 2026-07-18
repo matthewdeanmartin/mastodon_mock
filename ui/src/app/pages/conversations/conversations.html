@@ -72,7 +72,7 @@
           @if (c.kind === 'bsky') {
             @for (m of (c.members ?? []).slice(0, 3); track m.did) {
               @if (m.avatar) {
-                <img [src]="m.avatar" alt="" />
+                <img [src]="m.avatar" alt="" loading="lazy" decoding="async" />
               } @else {
                 <span class="avatar-fallback">🦋</span>
               }
@@ -82,7 +82,7 @@
             }
           } @else {
             @for (a of c.accounts.slice(0, 3); track a.id) {
-              <img [src]="a.avatar_static || a.avatar" alt="" />
+              <img [src]="a.avatar_static || a.avatar" alt="" loading="lazy" decoding="async" />
             }
             @if (!c.accounts.length) {
               <span class="avatar-fallback">💬</span>
@@ -136,13 +136,19 @@
           @if (chat.kind === 'bsky') {
             @for (m of (chat.members ?? []).slice(0, 4); track m.did) {
               @if (m.avatar) {
-                <img [src]="m.avatar" [attr.aria-label]="m.handle" alt="" />
+                <img
+                  [src]="m.avatar"
+                  [attr.aria-label]="m.handle"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
               }
             }
           } @else {
             @for (a of chat.accounts.slice(0, 4); track a.id) {
               <a [routerLink]="['/accounts', a.id]" [attr.aria-label]="a.display_name"
-                ><img [src]="a.avatar_static || a.avatar" alt=""
+                ><img [src]="a.avatar_static || a.avatar" alt="" loading="lazy" decoding="async"
               /></a>
             }
           }
@@ -207,7 +213,7 @@
                   [attr.aria-label]="bskyAuthor(chat, m.sender.did)?.handle"
                 >
                   @if (bskyAuthor(chat, m.sender.did)?.avatar; as av) {
-                    <img [src]="av" alt="" />
+                    <img [src]="av" alt="" loading="lazy" decoding="async" />
                   }
                 </span>
               }
@@ -236,7 +242,12 @@
                 class="bubble-avatar"
                 [attr.aria-label]="m.account.acct"
               >
-                <img [src]="m.account.avatar_static || m.account.avatar" alt="" />
+                <img
+                  [src]="m.account.avatar_static || m.account.avatar"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
               </a>
             }
             <div class="bubble" [class.bubble-mine]="isMine(m)">
@@ -251,6 +262,8 @@
                   class="bubble-media"
                   [src]="media.preview_url || media.url"
                   [alt]="media.description || ''"
+                  loading="lazy"
+                  decoding="async"
                 />
               }
               <div class="bubble-meta muted">

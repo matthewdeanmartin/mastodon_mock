@@ -56,7 +56,7 @@
   <h2>🦋 Bluesky</h2>
   @if (bsky.session(); as session) {
     <div class="bsky-linked">
-      <img class="bsky-avatar" [src]="session.avatar || ''" alt="" />
+      <img class="bsky-avatar" [src]="session.avatar || ''" alt="" decoding="async" />
       <span class="names">
         <span class="name">{{ session.displayName || session.handle }}</span>
         <span class="muted small">&#64;{{ session.handle }}</span>

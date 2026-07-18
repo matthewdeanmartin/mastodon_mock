@@ -12,7 +12,13 @@
     @for (a of accounts(); track a.id) {
       <li class="account-row">
         <a class="account-link" [routerLink]="['/accounts', a.id]">
-          <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+          <img
+            class="avatar"
+            [src]="a.avatar_static || a.avatar"
+            [alt]="a.username"
+            loading="lazy"
+            decoding="async"
+          />
           <span class="names">
             <span class="name">{{ a.display_name || a.username }}</span>
             <span class="acct muted">&#64;{{ a.acct }}</span>

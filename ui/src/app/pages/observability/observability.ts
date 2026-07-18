@@ -1,5 +1,11 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ApiMetrics, BUCKET_MS, EndpointStat, TimeBucket } from '../../observability/api-metrics';
+import {
+  ApiError,
+  ApiMetrics,
+  BUCKET_MS,
+  EndpointStat,
+  TimeBucket,
+} from '../../observability/api-metrics';
 import {
   StorageEntry,
   StorageReport,
@@ -107,6 +113,17 @@ export class Observability {
 
   protected time(at: number): string {
     return new Date(at).toLocaleTimeString();
+  }
+
+  /** Full, multi-line error detail for the row's hover tooltip. */
+  protected errorDetail(e: ApiError): string {
+    const status = e.status === 0 ? 'Network failure (no response)' : `HTTP ${e.status}`;
+    return [
+      `${e.method} ${e.endpoint}`,
+      status,
+      e.message,
+      `at ${new Date(e.at).toLocaleString()}`,
+    ].join('\n');
   }
 
   setSort(key: SortKey): void {

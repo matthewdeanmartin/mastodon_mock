@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, EMPTY } from 'rxjs';
+import { catchError, EMPTY, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { SearchResults, Status, Tag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
@@ -23,6 +24,8 @@ export class Search implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
+  private activeSearch: Subscription | null = null;
 
   protected query = signal('');
   protected results = signal<SearchResults | null>(null);
@@ -46,7 +49,7 @@ export class Search implements OnInit {
     // Restore the query/type from the URL so that returning here (e.g. via the
     // browser back button after visiting a result) re-runs the same search
     // instead of showing an empty page.
-    this.route.queryParamMap.subscribe((params) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const q = params.get('q') ?? '';
       const t = (params.get('type') as SearchType) ?? 'accounts';
       this.query.set(q);
@@ -54,6 +57,8 @@ export class Search implements OnInit {
       if (q.trim()) {
         this.fetch(q.trim(), t);
       } else {
+        this.activeSearch?.unsubscribe();
+        this.searching.set(false);
         this.results.set(null);
         this.loadTrends();
       }
@@ -69,10 +74,12 @@ export class Search implements OnInit {
     this.api
       .trendingStatuses()
       .pipe(catchError(() => EMPTY))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((posts) => this.trendingPosts.set(posts));
     this.api
       .trendingTags()
       .pipe(catchError(() => EMPTY))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((tags) => this.trendingTags.set(tags));
   }
 
@@ -129,18 +136,21 @@ export class Search implements OnInit {
   }
 
   private fetch(q: string, type: SearchType): void {
+    this.activeSearch?.unsubscribe();
     this.searching.set(true);
     // Handle- or URL-shaped queries get resolve=true so the server webfingers
     // accounts it hasn't federated with yet (how you find someone by address).
     const resolve =
       type === 'accounts' && (/^@?[\w.-]+@[\w.-]+\.\w+$/.test(q) || /^https?:\/\//.test(q));
-    this.api.search(q, type, resolve ? { resolve: true } : undefined).subscribe({
-      next: (r) => {
-        this.results.set(r);
-        this.searching.set(false);
-      },
-      error: () => this.searching.set(false),
-    });
+    this.activeSearch = this.api
+      .search(q, type, resolve ? { resolve: true } : undefined)
+      .subscribe({
+        next: (r) => {
+          this.results.set(r);
+          this.searching.set(false);
+        },
+        error: () => this.searching.set(false),
+      });
   }
 
   onChanged(updated: Status): void {

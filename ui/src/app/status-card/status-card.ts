@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgOptimizedImage } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { AccountHoverCard } from '../account-hover-card/account-hover-card';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
@@ -36,6 +37,7 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
     HumanTimePipe,
     Lightbox,
     VerifiedBadge,
+    NgOptimizedImage,
   ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',

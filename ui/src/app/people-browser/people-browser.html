@@ -9,7 +9,12 @@
     @for (a of accounts(); track a.id) {
       <div class="person-card">
         <a class="person-avatar" [routerLink]="['/accounts', a.id]" [attr.aria-label]="a.acct">
-          <img [src]="a.avatar_static || a.avatar" [alt]="a.username" />
+          <img
+            [src]="a.avatar_static || a.avatar"
+            [alt]="a.username"
+            loading="lazy"
+            decoding="async"
+          />
         </a>
         <div class="person-body">
           <a class="person-name-row" [routerLink]="['/accounts', a.id]">

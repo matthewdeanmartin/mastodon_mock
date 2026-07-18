@@ -15,7 +15,13 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
   imports: [VerifiedBadge, HumanCountPipe],
   template: `
     <div class="hover-card">
-      <img class="hc-avatar" [src]="account().avatar" alt="" />
+      <img
+        class="hc-avatar"
+        [src]="account().avatar_static || account().avatar"
+        alt=""
+        loading="lazy"
+        decoding="async"
+      />
       <div class="hc-name">
         {{ account().display_name || account().username }}
         <app-verified-badge [account]="account()" />
@@ -27,11 +33,14 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
       @if (hasStats) {
         <div class="hc-stats muted">
           <span
-            ><strong>{{ account().statuses_count | humanCount }}</strong> posts</span>
+            ><strong>{{ account().statuses_count | humanCount }}</strong> posts</span
+          >
           <span
-            ><strong>{{ account().following_count | humanCount }}</strong> following</span>
+            ><strong>{{ account().following_count | humanCount }}</strong> following</span
+          >
           <span
-            ><strong>{{ account().followers_count | humanCount }}</strong> followers</span>
+            ><strong>{{ account().followers_count | humanCount }}</strong> followers</span
+          >
         </div>
       }
     </div>

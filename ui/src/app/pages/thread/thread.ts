@@ -1,4 +1,5 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../../api';
 import { Terminology } from '../../terminology';
@@ -14,6 +15,7 @@ import { BskyThreadNode } from '../../providers/bluesky/bluesky-types';
 import { BskyReply } from '../../providers/bluesky/bluesky-reply';
 import { StatusActions } from '../../providers/status-actions';
 import { RssProvider } from '../../providers/rss/rss-provider';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-thread',
@@ -28,6 +30,8 @@ export class Thread implements OnInit {
   private actions = inject(StatusActions);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
+  private loadSub = new Subscription();
 
   protected readonly prefs = inject(ClientPrefs);
   protected words = inject(Terminology).words;
@@ -100,7 +104,7 @@ export class Thread implements OnInit {
   private readerParam: string | null = null;
 
   ngOnInit(): void {
-    this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) {
         this.currentId = id;
@@ -111,7 +115,7 @@ export class Thread implements OnInit {
     // Deep link: status cards link here with ?reader=1 to open straight into
     // reader mode. RSS items are articles, so they default to reader ON unless
     // the link explicitly opts out with ?reader=0.
-    this.route.queryParamMap.subscribe((params) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.readerParam = params.get('reader');
       this.applyReaderMode();
     });
@@ -123,6 +127,8 @@ export class Thread implements OnInit {
   }
 
   load(id: string): void {
+    this.loadSub.unsubscribe();
+    this.loadSub = new Subscription();
     this.loading.set(true);
     this.isRss.set(false);
     this.rssHasCommentFeed.set(false);
@@ -135,37 +141,43 @@ export class Thread implements OnInit {
       this.loadRss(id);
       return;
     }
-    this.api.getStatus(id).subscribe((s) => {
-      this.status.set(s);
-      this.loading.set(false);
-    });
-    this.api.getContext(id).subscribe((ctx) => {
-      this.ancestors.set(ctx.ancestors);
-      this.descendants.set(ctx.descendants);
-    });
+    this.loadSub.add(
+      this.api.getStatus(id).subscribe((s) => {
+        this.status.set(s);
+        this.loading.set(false);
+      }),
+    );
+    this.loadSub.add(
+      this.api.getContext(id).subscribe((ctx) => {
+        this.ancestors.set(ctx.ancestors);
+        this.descendants.set(ctx.descendants);
+      }),
+    );
   }
 
   /** Bluesky thread: `getPostThread` mapped onto the same ancestors/descendants shape. */
   private loadBsky(uri: string): void {
-    this.bsky.getPostThread(uri).subscribe({
-      next: ({ thread }) => {
-        if (!thread.post) {
-          this.loading.set(false);
-          return;
-        }
-        this.status.set(adaptPost(thread.post));
-        const ancestors: Status[] = [];
-        for (let node = thread.parent; node; node = node.parent) {
-          if (node.post) {
-            ancestors.unshift(adaptPost(node.post));
+    this.loadSub.add(
+      this.bsky.getPostThread(uri).subscribe({
+        next: ({ thread }) => {
+          if (!thread.post) {
+            this.loading.set(false);
+            return;
           }
-        }
-        this.ancestors.set(ancestors);
-        this.descendants.set(flattenReplies(thread.replies ?? []));
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+          this.status.set(adaptPost(thread.post));
+          const ancestors: Status[] = [];
+          for (let node = thread.parent; node; node = node.parent) {
+            if (node.post) {
+              ancestors.unshift(adaptPost(node.post));
+            }
+          }
+          this.ancestors.set(ancestors);
+          this.descendants.set(flattenReplies(thread.replies ?? []));
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      }),
+    );
   }
 
   /**
@@ -184,28 +196,32 @@ export class Thread implements OnInit {
     const guid = body.slice(sep + 2);
     this.ancestors.set([]);
     this.descendants.set([]);
-    this.rss.getFeedItem(feedUrl, guid).subscribe({
-      next: (view) => {
-        this.status.set(view.status);
-        this.loading.set(false);
-        if (view.commentsFeedUrl) {
-          this.rssHasCommentFeed.set(true);
-          this.loadRssComments(view.commentsFeedUrl, feedUrl, view.status.id);
-        }
-      },
-      error: () => this.loading.set(false),
-    });
+    this.loadSub.add(
+      this.rss.getFeedItem(feedUrl, guid).subscribe({
+        next: (view) => {
+          this.status.set(view.status);
+          this.loading.set(false);
+          if (view.commentsFeedUrl) {
+            this.rssHasCommentFeed.set(true);
+            this.loadRssComments(view.commentsFeedUrl, feedUrl, view.status.id);
+          }
+        },
+        error: () => this.loading.set(false),
+      }),
+    );
   }
 
   private loadRssComments(commentsFeedUrl: string, feedUrl: string, parentId: string): void {
-    this.rss.getComments(commentsFeedUrl, feedUrl, parentId).subscribe({
-      next: (comments) => {
-        this.descendants.set(comments);
-        this.rssCommentsUnavailable.set(comments.length === 0);
-      },
-      // A declared comment feed that won't load (CORS, 404) is common; note it.
-      error: () => this.rssCommentsUnavailable.set(true),
-    });
+    this.loadSub.add(
+      this.rss.getComments(commentsFeedUrl, feedUrl, parentId).subscribe({
+        next: (comments) => {
+          this.descendants.set(comments);
+          this.rssCommentsUnavailable.set(comments.length === 0);
+        },
+        // A declared comment feed that won't load (CORS, 404) is common; note it.
+        error: () => this.rssCommentsUnavailable.set(true),
+      }),
+    );
   }
 
   toggleReader(): void {

@@ -156,6 +156,7 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
             "X-RateLimit-Reset",
             "X-RateLimit-Limit",
             "X-RateLimit-Remaining",
+            "Retry-After",
             "X-Request-Id",
         ],
     )

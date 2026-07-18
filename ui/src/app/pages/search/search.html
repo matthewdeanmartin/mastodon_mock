@@ -99,7 +99,13 @@
     <div class="page-head">People</div>
     @for (a of r.accounts; track a.id) {
       <a class="result-account" [routerLink]="['/accounts', a.id]">
-        <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+        <img
+          class="avatar"
+          [src]="a.avatar_static || a.avatar"
+          [alt]="a.username"
+          loading="lazy"
+          decoding="async"
+        />
         <span>
           <strong>{{ a.display_name || a.username }}</strong>
           <span class="muted">&#64;{{ a.acct }}</span>

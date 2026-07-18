@@ -21,6 +21,7 @@ export class PublicTimeline implements OnInit, OnDestroy {
   protected live = signal(false);
 
   private liveSub: Subscription | null = null;
+  private loadSub: Subscription | null = null;
 
   ngOnInit(): void {
     this.load();
@@ -28,6 +29,7 @@ export class PublicTimeline implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.liveSub?.unsubscribe();
+    this.loadSub?.unsubscribe();
   }
 
   setLocal(local: boolean): void {
@@ -69,8 +71,9 @@ export class PublicTimeline implements OnInit, OnDestroy {
   }
 
   load(): void {
+    this.loadSub?.unsubscribe();
     this.loading.set(true);
-    this.api.publicTimeline(this.local()).subscribe({
+    this.loadSub = this.api.publicTimeline(this.local()).subscribe({
       next: (s) => {
         this.statuses.set(s);
         this.loading.set(false);

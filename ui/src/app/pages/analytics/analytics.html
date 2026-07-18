@@ -58,7 +58,13 @@
         <h2>Top follower</h2>
         <p class="muted small">Your follower with the biggest audience of their own.</p>
         <a class="fan" [routerLink]="['/accounts', fan.id]">
-          <img class="fan-avatar" [src]="fan.avatar_static || fan.avatar" alt="" />
+          <img
+            class="fan-avatar"
+            [src]="fan.avatar_static || fan.avatar"
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
           <span class="fan-name">
             {{ fan.display_name || fan.username }}
             <small class="muted">&#64;{{ fan.acct }}</small>

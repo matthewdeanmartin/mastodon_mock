@@ -1,7 +1,8 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { Location } from '@angular/common';
+import { Component, computed, DestroyRef, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Location, NgOptimizedImage } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
@@ -28,11 +29,12 @@ type ProfileTab = 'posts' | 'following' | 'followers';
     VerifiedBadge,
     HumanCountPipe,
     PeopleBrowser,
+    NgOptimizedImage,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
 })
-export class Profile implements OnInit {
+export class Profile implements OnInit, OnDestroy {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   protected words = inject(Terminology).words;
@@ -40,6 +42,9 @@ export class Profile implements OnInit {
   private location = inject(Location);
   private rss = inject(RssProvider);
   private rssSubs = inject(RssSubscriptions);
+  private destroyRef = inject(DestroyRef);
+  private routeLoadSub = new Subscription();
+  private statusLoadSub = new Subscription();
 
   /** True when this "profile" is a synthetic RSS feed (id `rss:<feedUrl>`). */
   protected isRss = signal(false);
@@ -122,7 +127,7 @@ export class Profile implements OnInit {
   }
 
   ngOnInit(): void {
-    this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) {
         this.load(id);
@@ -130,7 +135,15 @@ export class Profile implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.routeLoadSub.unsubscribe();
+    this.statusLoadSub.unsubscribe();
+  }
+
   load(id: string): void {
+    this.routeLoadSub.unsubscribe();
+    this.routeLoadSub = new Subscription();
+    this.statusLoadSub.unsubscribe();
     this.loading.set(true);
     this.relationship.set(null);
     this.reportDone.set(false);
@@ -141,13 +154,17 @@ export class Profile implements OnInit {
       this.loadRss(id);
       return;
     }
-    this.api.getAccount(id).subscribe((a) => {
-      this.account.set(a);
-      this.loading.set(false);
-    });
+    this.routeLoadSub.add(
+      this.api.getAccount(id).subscribe((a) => {
+        this.account.set(a);
+        this.loading.set(false);
+      }),
+    );
     this.loadStatuses(id);
     this.loadPinned(id);
-    this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null));
+    this.routeLoadSub.add(
+      this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null)),
+    );
     this.loadFeatured(id);
   }
 
@@ -166,7 +183,7 @@ export class Profile implements OnInit {
     this.statusesLoading.set(true);
     this.exhausted.set(true);
     const seq = ++this.loadSeq;
-    this.rss.getFeed(feedUrl).subscribe({
+    this.statusLoadSub = this.rss.getFeed(feedUrl).subscribe({
       next: ({ account, statuses }) => {
         if (seq !== this.loadSeq) {
           return;
@@ -220,6 +237,8 @@ export class Profile implements OnInit {
    * the account runs out, or MAX_PAGES is hit.
    */
   private loadStatuses(id: string): void {
+    this.statusLoadSub.unsubscribe();
+    this.statusLoadSub = new Subscription();
     const seq = ++this.loadSeq;
     this.statuses.set([]);
     this.statusesLoading.set(true);
@@ -230,26 +249,28 @@ export class Profile implements OnInit {
       limit: Profile.TARGET_COUNT,
     };
     const fetchPage = (maxId: string | undefined, acc: Status[], page: number): void => {
-      this.api.getAccountStatuses(id, { ...opts, maxId }).subscribe({
-        next: (batch) => {
-          if (seq !== this.loadSeq) {
-            return; // A newer load superseded this one.
-          }
-          const all = [...acc, ...batch];
-          if (batch.length > 0 && all.length < Profile.TARGET_COUNT && page < Profile.MAX_PAGES) {
-            fetchPage(batch[batch.length - 1].id, all, page + 1);
-            return;
-          }
-          this.statuses.set(all);
-          this.statusesLoading.set(false);
-        },
-        error: () => {
-          if (seq === this.loadSeq) {
-            this.statuses.set(acc);
+      this.statusLoadSub.add(
+        this.api.getAccountStatuses(id, { ...opts, maxId }).subscribe({
+          next: (batch) => {
+            if (seq !== this.loadSeq) {
+              return; // A newer load superseded this one.
+            }
+            const all = [...acc, ...batch];
+            if (batch.length > 0 && all.length < Profile.TARGET_COUNT && page < Profile.MAX_PAGES) {
+              fetchPage(batch[batch.length - 1].id, all, page + 1);
+              return;
+            }
+            this.statuses.set(all);
             this.statusesLoading.set(false);
-          }
-        },
-      });
+          },
+          error: () => {
+            if (seq === this.loadSeq) {
+              this.statuses.set(acc);
+              this.statusesLoading.set(false);
+            }
+          },
+        }),
+      );
     };
     fetchPage(undefined, [], 1);
   }
@@ -289,37 +310,43 @@ export class Profile implements OnInit {
 
   private loadPinned(id: string): void {
     this.pinnedStatuses.set([]);
-    this.api.getAccountStatuses(id, { pinned: true }).subscribe({
-      next: (pinned) => this.pinnedStatuses.set(pinned),
-      error: () => {
-        // No pinned strip, the rest of the profile still works.
-      },
-    });
+    this.routeLoadSub.add(
+      this.api.getAccountStatuses(id, { pinned: true }).subscribe({
+        next: (pinned) => this.pinnedStatuses.set(pinned),
+        error: () => {
+          // No pinned strip, the rest of the profile still works.
+        },
+      }),
+    );
   }
 
   private loadFeatured(id: string): void {
     this.featured.set([]);
     this.featuredFollowing.set(new Set());
-    this.api.accountEndorsements(id).subscribe({
-      next: (accounts) => {
-        this.featured.set(accounts);
-        if (!accounts.length) {
-          return;
-        }
-        this.api.relationships(accounts.map((a) => a.id)).subscribe({
-          next: (rels) =>
-            this.featuredFollowing.set(
-              new Set(rels.filter((r) => r.following || r.requested).map((r) => r.id)),
-            ),
-          error: () => {
-            // Follow buttons just show for everyone; following again is harmless.
-          },
-        });
-      },
-      error: () => {
-        // Older servers (pre-4.4) 404 here; the section simply doesn't render.
-      },
-    });
+    this.routeLoadSub.add(
+      this.api.accountEndorsements(id).subscribe({
+        next: (accounts) => {
+          this.featured.set(accounts);
+          if (!accounts.length) {
+            return;
+          }
+          this.routeLoadSub.add(
+            this.api.relationships(accounts.map((a) => a.id)).subscribe({
+              next: (rels) =>
+                this.featuredFollowing.set(
+                  new Set(rels.filter((r) => r.following || r.requested).map((r) => r.id)),
+                ),
+              error: () => {
+                // Follow buttons just show for everyone; following again is harmless.
+              },
+            }),
+          );
+        },
+        error: () => {
+          // Older servers (pre-4.4) 404 here; the section simply doesn't render.
+        },
+      }),
+    );
   }
 
   followFeatured(target: Account): void {

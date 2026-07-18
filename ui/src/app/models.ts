@@ -40,6 +40,7 @@ export interface Account {
   avatar: string;
   avatar_static: string;
   header: string;
+  header_static?: string;
   followers_count: number;
   following_count: number;
   statuses_count: number;

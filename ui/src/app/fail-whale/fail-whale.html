@@ -1,5 +1,13 @@
 <div class="fail-whale" role="alertdialog" aria-labelledby="fail-whale-title">
-  <img class="whale-img" src="insufficient_whale.png" alt="" />
+  <img
+    class="whale-img"
+    src="insufficient_whale_640.png"
+    alt=""
+    width="640"
+    height="480"
+    loading="eager"
+    fetchpriority="high"
+  />
   @if (status.currentDomain(); as domain) {
     <h1 id="fail-whale-title">{{ domain }} appears to be unavailable</h1>
   } @else {

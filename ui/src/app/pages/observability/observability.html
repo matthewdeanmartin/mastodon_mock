@@ -2,8 +2,8 @@
   <div class="obs-head">
     <h1>Observability</h1>
     <p class="muted">
-      API traffic, errors, and local storage for this device. Everything here is captured in your
-      browser and stored compactly in <code>localStorage</code> — nothing is sent anywhere.
+      API traffic, errors, and local storage for this device. The metrics themselves are captured
+      in your browser and stored compactly in <code>localStorage</code>.
     </p>
   </div>
 
@@ -157,7 +157,7 @@
     @if (errors().length) {
       <ul class="error-list">
         @for (e of errors(); track e.at) {
-          <li class="error-row">
+          <li class="error-row" [title]="errorDetail(e)">
             <span class="err-status" [class.net]="e.status === 0">
               {{ e.status === 0 ? 'NET' : e.status }}
             </span>

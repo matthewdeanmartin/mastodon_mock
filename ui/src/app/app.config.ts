@@ -9,6 +9,8 @@ import { serverInterceptor } from './server.interceptor';
 import { metricsInterceptor } from './observability/metrics.interceptor';
 import { GlobalErrorHandler } from './global-error-handler';
 import { SettingsPreloading } from './pages/settings/settings-preloading';
+import { dedupeInterceptor } from './dedupe.interceptor';
+import { rateLimitInterceptor } from './rate-limit.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -20,7 +22,14 @@ export const appConfig: ApplicationConfig = {
     // metricsInterceptor is outermost so it times the full round-trip (including
     // the server/auth rewrites) and sees the final response/error.
     provideHttpClient(
-      withInterceptors([metricsInterceptor, serverInterceptor, healthInterceptor, authInterceptor]),
+      withInterceptors([
+        metricsInterceptor,
+        serverInterceptor,
+        dedupeInterceptor,
+        rateLimitInterceptor,
+        healthInterceptor,
+        authInterceptor,
+      ]),
     ),
   ],
 };

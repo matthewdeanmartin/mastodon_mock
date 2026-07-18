@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { NgOptimizedImage } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { Api } from '../api';
@@ -26,6 +27,7 @@ function isWideUrl(url: string): boolean {
     RightRail,
     AppFooter,
     ShortcutHelp,
+    NgOptimizedImage,
   ],
   templateUrl: './shell.html',
   styleUrl: './shell.css',

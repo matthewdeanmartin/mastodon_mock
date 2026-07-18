@@ -15,7 +15,13 @@
   <article class="status" tabindex="-1" (keydown)="onCardKeydown($event)">
     <span class="hover-anchor avatar-anchor">
       <a class="avatar-link" [routerLink]="accountLink">
-        <img class="avatar" [src]="display.account.avatar" [alt]="display.account.username" />
+        <img
+          class="avatar"
+          [ngSrc]="display.account.avatar_static || display.account.avatar || 'favicon-32x32.png'"
+          [alt]="display.account.username"
+          width="48"
+          height="48"
+        />
       </a>
       <app-account-hover-card [account]="display.account" />
     </span>
@@ -164,7 +170,13 @@
       @if (!cwCollapsed() && quotedStatus(); as q) {
         <a class="quote-card" [routerLink]="['/statuses', q.id]" (click)="$event.stopPropagation()">
           <div class="quote-meta">
-            <img class="quote-avatar" [src]="q.account.avatar" [alt]="q.account.username" />
+            <img
+              class="quote-avatar"
+              [ngSrc]="q.account.avatar_static || q.account.avatar || 'favicon-32x32.png'"
+              [alt]="q.account.username"
+              width="20"
+              height="20"
+            />
             <span class="quote-name">{{ q.account.display_name || q.account.username }}</span>
             <span class="acct muted">&#64;{{ q.account.acct }}</span>
           </div>
@@ -188,7 +200,12 @@
                 (click)="openLightbox(i, $event)"
                 [attr.aria-label]="'View image' + (m.description ? ': ' + m.description : '')"
               >
-                <img [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+                <img
+                  [src]="m.preview_url || m.url"
+                  [alt]="m.description || ''"
+                  loading="lazy"
+                  decoding="async"
+                />
               </button>
             }
             @if (mediaBlurred()) {

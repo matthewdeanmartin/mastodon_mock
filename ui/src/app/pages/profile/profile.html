@@ -8,7 +8,14 @@
       [style.background-image]="a.header ? 'url(' + a.header + ')' : ''"
     ></div>
     <div class="profile-top">
-      <img class="avatar" [src]="a.avatar" [alt]="a.username" />
+      <img
+        class="avatar"
+        [ngSrc]="a.avatar_static || a.avatar || 'favicon-32x32.png'"
+        [alt]="a.username"
+        width="80"
+        height="80"
+        loading="eager"
+      />
       @if (isRss()) {
         <div class="profile-buttons">
           @if (a.url) {
@@ -113,7 +120,12 @@
       @for (f of featured(); track f.id) {
         <div class="featured-row">
           <a class="featured-avatar" [routerLink]="['/accounts', f.id]">
-            <img [src]="f.avatar_static || f.avatar" alt="" />
+            <img
+              [ngSrc]="f.avatar_static || f.avatar || 'favicon-32x32.png'"
+              alt=""
+              width="36"
+              height="36"
+            />
           </a>
           <a class="featured-name" [routerLink]="['/accounts', f.id]">
             <span class="featured-display">{{ f.display_name || f.username }}</span>
@@ -138,7 +150,12 @@
 
   @if (!isRss()) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
-      <button type="button" class="ptab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">
+      <button
+        type="button"
+        class="ptab"
+        [class.active]="tab() === 'posts'"
+        (click)="setTab('posts')"
+      >
         {{ words().Posts }}
       </button>
       <button
@@ -161,81 +178,84 @@
   }
 
   @if (!isRss() && tab() !== 'posts') {
-    <app-people-browser [accountId]="a.id" [mode]="tab() === 'followers' ? 'followers' : 'following'" />
+    <app-people-browser
+      [accountId]="a.id"
+      [mode]="tab() === 'followers' ? 'followers' : 'following'"
+    />
   }
 
   @if (tab() === 'posts') {
     @if (!isRss()) {
-    <div class="profile-filters" role="group" aria-label="Timeline filters">
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        [class.active]="showBoosts()"
-        [attr.aria-pressed]="showBoosts()"
-        (click)="toggleBoosts()"
-      >
-        🔁 {{ words().Boosts }}
-      </button>
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        [class.active]="showReplies()"
-        [attr.aria-pressed]="showReplies()"
-        (click)="toggleReplies()"
-      >
-        💬 Replies
-      </button>
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        [class.active]="showPinned()"
-        [attr.aria-pressed]="showPinned()"
-        (click)="togglePinned()"
-      >
-        📌 Pinned
-      </button>
-    </div>
-  }
-
-  @if (showPinned()) {
-    @for (s of pinnedStatuses(); track s.id) {
-      <div class="pinned-label muted">📌 Pinned</div>
-      <app-status-card
-        [status]="s"
-        filterContext="account"
-        (changed)="onChanged($event)"
-        (deleted)="onDeleted($event)"
-      />
-    }
-  }
-
-  @if (statusesLoading()) {
-    <p class="muted center">Loading posts…</p>
-  } @else {
-    @for (s of visibleStatuses(); track s.id) {
-      <app-status-card
-        [status]="s"
-        filterContext="account"
-        (changed)="onChanged($event)"
-        (deleted)="onDeleted($event)"
-      />
-    } @empty {
-      @if (!showPinned() || !pinnedStatuses().length) {
-        <p class="muted center">No posts match these filters.</p>
-      }
-    }
-    @if (statuses().length) {
-      <div class="load-more-row">
-        @if (exhausted()) {
-          <span class="muted small">No older posts.</span>
-        } @else {
-          <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
-            {{ loadingMore() ? 'Loading…' : 'Load more' }}
-          </button>
-        }
+      <div class="profile-filters" role="group" aria-label="Timeline filters">
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          [class.active]="showBoosts()"
+          [attr.aria-pressed]="showBoosts()"
+          (click)="toggleBoosts()"
+        >
+          🔁 {{ words().Boosts }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          [class.active]="showReplies()"
+          [attr.aria-pressed]="showReplies()"
+          (click)="toggleReplies()"
+        >
+          💬 Replies
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          [class.active]="showPinned()"
+          [attr.aria-pressed]="showPinned()"
+          (click)="togglePinned()"
+        >
+          📌 Pinned
+        </button>
       </div>
     }
-  }
+
+    @if (showPinned()) {
+      @for (s of pinnedStatuses(); track s.id) {
+        <div class="pinned-label muted">📌 Pinned</div>
+        <app-status-card
+          [status]="s"
+          filterContext="account"
+          (changed)="onChanged($event)"
+          (deleted)="onDeleted($event)"
+        />
+      }
+    }
+
+    @if (statusesLoading()) {
+      <p class="muted center">Loading posts…</p>
+    } @else {
+      @for (s of visibleStatuses(); track s.id) {
+        <app-status-card
+          [status]="s"
+          filterContext="account"
+          (changed)="onChanged($event)"
+          (deleted)="onDeleted($event)"
+        />
+      } @empty {
+        @if (!showPinned() || !pinnedStatuses().length) {
+          <p class="muted center">No posts match these filters.</p>
+        }
+      }
+      @if (statuses().length) {
+        <div class="load-more-row">
+          @if (exhausted()) {
+            <span class="muted small">No older posts.</span>
+          } @else {
+            <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+              {{ loadingMore() ? 'Loading…' : 'Load more' }}
+            </button>
+          }
+        </div>
+      }
+    }
   }
 
   @if (showReport()) {

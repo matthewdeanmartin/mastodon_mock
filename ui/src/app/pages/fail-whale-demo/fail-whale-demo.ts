@@ -14,7 +14,15 @@ import { InstanceStatus } from '../../instance-status';
   imports: [RouterLink],
   template: `
     <div class="whale-page center">
-      <img class="whale-img" src="insufficient_whale.png" alt="The fail whale" />
+      <img
+        class="whale-img"
+        src="insufficient_whale_640.png"
+        alt="The fail whale"
+        width="640"
+        height="480"
+        loading="eager"
+        fetchpriority="high"
+      />
       <h1>The Fail Whale</h1>
       <p class="muted">
         Too many tweets... please wait a moment and try again. (Don't worry — nothing is actually

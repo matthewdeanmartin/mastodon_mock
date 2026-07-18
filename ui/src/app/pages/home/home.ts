@@ -111,6 +111,8 @@ export class Home implements OnInit, OnDestroy {
   }
 
   private liveSub: Subscription | null = null;
+  private pageSub: Subscription | null = null;
+  private bookmarkSub: Subscription | null = null;
 
   ngOnInit(): void {
     this.load();
@@ -120,6 +122,8 @@ export class Home implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.liveSub?.unsubscribe();
+    this.pageSub?.unsubscribe();
+    this.bookmarkSub?.unsubscribe();
     if (this.clock) {
       clearInterval(this.clock);
     }
@@ -146,11 +150,13 @@ export class Home implements OnInit, OnDestroy {
   }
 
   load(): void {
+    this.pageSub?.unsubscribe();
+    this.autoLoading.set(false);
     this.loading.set(true);
     this.maxHitAt.set(null);
     this.bookmarkTail.set([]);
     this.aggregator.reset();
-    this.aggregator.nextPage().subscribe({
+    this.pageSub = this.aggregator.nextPage().subscribe({
       next: (s) => {
         this.statuses.set(s);
         this.publishMastodon(s);
@@ -176,7 +182,7 @@ export class Home implements OnInit, OnDestroy {
       return;
     }
     this.autoLoading.set(true);
-    this.aggregator.nextPage().subscribe({
+    this.pageSub = this.aggregator.nextPage().subscribe({
       next: (more) => {
         this.mergeStatuses(more);
         this.publishMastodon(more);
@@ -197,9 +203,14 @@ export class Home implements OnInit, OnDestroy {
     if (!this.canLoadMore()) {
       return;
     }
-    this.aggregator.nextPage().subscribe((more) => {
-      this.mergeStatuses(more);
-      this.publishMastodon(more);
+    this.autoLoading.set(true);
+    this.pageSub = this.aggregator.nextPage().subscribe({
+      next: (more) => {
+        this.mergeStatuses(more);
+        this.publishMastodon(more);
+        this.autoLoading.set(false);
+      },
+      error: () => this.autoLoading.set(false),
     });
   }
 
@@ -215,7 +226,7 @@ export class Home implements OnInit, OnDestroy {
     if (this.bookmarkTail().length) {
       return;
     }
-    this.api.bookmarks(undefined, BOOKMARK_TAIL_SIZE).subscribe({
+    this.bookmarkSub = this.api.bookmarks(undefined, BOOKMARK_TAIL_SIZE).subscribe({
       next: (marks) => this.bookmarkTail.set(marks),
       error: () => undefined,
     });

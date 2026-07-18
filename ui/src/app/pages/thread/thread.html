@@ -29,7 +29,13 @@
     <article class="reader">
       @if (chain()[0].account; as author) {
         <header class="reader-head">
-          <img class="reader-avatar" [src]="author.avatar" [alt]="author.username" />
+          <img
+            class="reader-avatar"
+            [src]="author.avatar_static || author.avatar"
+            [alt]="author.username"
+            loading="lazy"
+            decoding="async"
+          />
           <div>
             <div class="reader-author">{{ author.display_name || author.username }}</div>
             <div class="muted">
@@ -44,7 +50,13 @@
       @for (post of chain(); track post.id) {
         <section class="reader-post" [innerHTML]="post.content"></section>
         @for (m of post.media_attachments; track m.id) {
-          <img class="reader-media" [src]="m.preview_url || m.url" [alt]="m.description || ''" />
+          <img
+            class="reader-media"
+            [src]="m.preview_url || m.url"
+            [alt]="m.description || ''"
+            loading="lazy"
+            decoding="async"
+          />
         }
         @if (isRss()) {
           @if (post.url) {
@@ -113,7 +125,13 @@
           <h2 class="comments-title">{{ comments().length }} comments</h2>
           @for (c of comments(); track c.id) {
             <div class="comment">
-              <img class="comment-avatar" [src]="c.account.avatar" [alt]="c.account.username" />
+              <img
+                class="comment-avatar"
+                [src]="c.account.avatar_static || c.account.avatar"
+                [alt]="c.account.username"
+                loading="lazy"
+                decoding="async"
+              />
               <div class="comment-body">
                 <div class="comment-meta">
                   <span class="comment-author">

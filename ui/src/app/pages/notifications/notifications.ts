@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { NgOptimizedImage } from '@angular/common';
 import { Api } from '../../api';
 import { ClientPrefs } from '../../client-prefs';
 import { MastodonNotification, Relationship, Status } from '../../models';
@@ -90,7 +91,7 @@ function dedupeByAccount(bucket: MastodonNotification[]): MastodonNotification[]
 
 @Component({
   selector: 'app-notifications',
-  imports: [RouterLink, FormsModule, AccountListDialog],
+  imports: [RouterLink, FormsModule, AccountListDialog, NgOptimizedImage],
   templateUrl: './notifications.html',
   styleUrl: './notifications.css',
 })

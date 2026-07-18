@@ -1,7 +1,16 @@
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
-      <img class="brand-mark" src="mockigbird_logo.png" alt="" aria-hidden="true" />
+      <img
+        class="brand-mark"
+        src="mockigbird_logo_104.png"
+        alt=""
+        aria-hidden="true"
+        width="36"
+        height="36"
+        loading="eager"
+        fetchpriority="high"
+      />
       <span class="brand-name">{{ brand }}</span>
     </a>
 
@@ -88,7 +97,12 @@
       @if (auth.account(); as acc) {
         <details class="account-menu">
           <summary class="account-pill" [attr.aria-label]="'Account menu for ' + acc.display_name">
-            <img [src]="acc.avatar_static || acc.avatar" alt="" />
+            <img
+              [ngSrc]="acc.avatar_static || acc.avatar || 'favicon-32x32.png'"
+              alt=""
+              width="32"
+              height="32"
+            />
             <span>{{ acc.display_name }}</span>
             <svg class="caret" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m6 9 6 6 6-6" />
@@ -96,7 +110,12 @@
           </summary>
           <div class="menu-panel account-panel">
             <a [routerLink]="['/accounts', acc.id]" class="menu-current">
-              <img [src]="acc.avatar_static || acc.avatar" alt="" />
+              <img
+                [ngSrc]="acc.avatar_static || acc.avatar || 'favicon-32x32.png'"
+                alt=""
+                width="36"
+                height="36"
+              />
               <span class="menu-current-name">
                 {{ acc.display_name }}
                 <small class="muted">&#64;{{ acc.username }}</small>
@@ -108,7 +127,14 @@
               <p class="menu-label">Switch account</p>
               @for (s of auth.otherSessions(); track s.token) {
                 <button type="button" class="switch-row" (click)="switchTo(s)">
-                  <img [src]="s.account?.avatar_static || s.account?.avatar || ''" alt="" />
+                  <img
+                    [src]="s.account?.avatar_static || s.account?.avatar || ''"
+                    alt=""
+                    width="36"
+                    height="36"
+                    loading="lazy"
+                    decoding="async"
+                  />
                   <span class="switch-name">
                     {{ s.account?.display_name || 'Saved account' }}
                     @if (s.account?.username) {

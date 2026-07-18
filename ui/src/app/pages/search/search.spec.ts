@@ -231,4 +231,20 @@ describe('Search', () => {
 
     expect(internals(fixture).query()).toBe('cats');
   });
+
+  it('cancels an obsolete search when query parameters change', () => {
+    queryParams$.next(convertToParamMap({ q: 'cats', type: 'accounts' }));
+    const fixture = setUp();
+    const cats = httpMock.expectOne(
+      (r) => r.url === '/api/v2/search' && r.params.get('q') === 'cats',
+    );
+
+    queryParams$.next(convertToParamMap({ q: 'dogs', type: 'accounts' }));
+    expect(cats.cancelled).toBe(true);
+    httpMock
+      .expectOne((r) => r.url === '/api/v2/search' && r.params.get('q') === 'dogs')
+      .flush(makeResults());
+
+    expect(internals(fixture).searching()).toBe(false);
+  });
 });
