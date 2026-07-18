@@ -49,16 +49,19 @@ export const routes: Routes = [
           { path: '', pathMatch: 'full', redirectTo: 'profile' },
           {
             path: 'profile',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/profile/settings-profile').then((m) => m.SettingsProfile),
           },
           {
             path: 'blue',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/blue/settings-blue').then((m) => m.SettingsBlue),
           },
           {
             path: 'connections',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/connections/settings-connections').then(
                 (m) => m.SettingsConnections,
@@ -66,11 +69,13 @@ export const routes: Routes = [
           },
           {
             path: 'privacy',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/privacy/settings-privacy').then((m) => m.SettingsPrivacy),
           },
           {
             path: 'appearance',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/appearance/settings-appearance').then(
                 (m) => m.SettingsAppearance,
@@ -78,11 +83,13 @@ export const routes: Routes = [
           },
           {
             path: 'posting',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/posting/settings-posting').then((m) => m.SettingsPosting),
           },
           {
             path: 'notifications',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/notifications/settings-notifications').then(
                 (m) => m.SettingsNotifications,
@@ -90,12 +97,13 @@ export const routes: Routes = [
           },
           {
             path: 'follows',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/follows/settings-follows').then((m) => m.SettingsFollows),
           },
           {
             path: 'mutes',
-            data: { kind: 'mutes' },
+            data: { kind: 'mutes', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/account-list/settings-account-list').then(
                 (m) => m.SettingsAccountList,
@@ -103,7 +111,7 @@ export const routes: Routes = [
           },
           {
             path: 'blocks',
-            data: { kind: 'blocks' },
+            data: { kind: 'blocks', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/account-list/settings-account-list').then(
                 (m) => m.SettingsAccountList,
@@ -111,11 +119,13 @@ export const routes: Routes = [
           },
           {
             path: 'filters',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/filters/settings-filters').then((m) => m.SettingsFilters),
           },
           {
             path: 'filters/new',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/filters/settings-filter-edit').then(
                 (m) => m.SettingsFilterEdit,
@@ -123,6 +133,7 @@ export const routes: Routes = [
           },
           {
             path: 'filters/:id',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/filters/settings-filter-edit').then(
                 (m) => m.SettingsFilterEdit,
@@ -130,16 +141,19 @@ export const routes: Routes = [
           },
           {
             path: 'deletion',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/deletion/settings-deletion').then((m) => m.SettingsDeletion),
           },
           {
             path: 'account',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/account/settings-account').then((m) => m.SettingsAccount),
           },
           {
             path: 'import-export',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/import-export/settings-import-export').then(
                 (m) => m.SettingsImportExport,
@@ -147,11 +161,13 @@ export const routes: Routes = [
           },
           {
             path: 'invites',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/invites/settings-invites').then((m) => m.SettingsInvites),
           },
           {
             path: 'development',
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/development/settings-development').then(
                 (m) => m.SettingsDevelopment,

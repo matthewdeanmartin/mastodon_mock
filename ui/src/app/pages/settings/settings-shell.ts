@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../../auth';
 import { environment } from '../../../environments/environment';
+import { SettingsPreloading } from './settings-preloading';
 
 interface SettingsNavItem {
   label: string;
@@ -25,6 +26,13 @@ interface SettingsNavItem {
 })
 export class SettingsShell {
   protected auth = inject(Auth);
+  private readonly preloading = inject(SettingsPreloading);
+
+  constructor() {
+    // The router preloader runs after navigation completes. Enabling it while
+    // entering Settings makes the sibling page bundles available for later clicks.
+    this.preloading.enable();
+  }
 
   protected readonly nav: SettingsNavItem[] = [
     { label: 'Public profile', path: 'profile', exact: true },

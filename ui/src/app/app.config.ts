@@ -1,5 +1,5 @@
 import { ApplicationConfig, ErrorHandler, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withPreloading } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
 import { routes } from './app.routes';
@@ -7,6 +7,7 @@ import { authInterceptor } from './auth.interceptor';
 import { healthInterceptor } from './health.interceptor';
 import { serverInterceptor } from './server.interceptor';
 import { GlobalErrorHandler } from './global-error-handler';
+import { SettingsPreloading } from './pages/settings/settings-preloading';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -14,7 +15,7 @@ export const appConfig: ApplicationConfig = {
     // so a failed dynamic import (a rejected promise) reaches GlobalErrorHandler.
     provideBrowserGlobalErrorListeners(),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
-    provideRouter(routes),
+    provideRouter(routes, withPreloading(SettingsPreloading)),
     provideHttpClient(withInterceptors([serverInterceptor, healthInterceptor, authInterceptor])),
   ],
 };
