@@ -29,6 +29,10 @@
           <span class="stat-label">Followers</span>
           <span class="stat-value">{{ acc.followers_count | humanCount }}</span>
         </a>
+        <a routerLink="/tags">
+          <span class="stat-label">Hashtags</span>
+          <span class="stat-value">{{ hashtagCount() | humanCount }}</span>
+        </a>
       </div>
     </div>
   </section>

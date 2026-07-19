@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
@@ -32,6 +32,12 @@ export class Lists implements OnInit {
   // Pending deletions awaiting confirmation.
   protected listToDelete = signal<UserList | null>(null);
   protected collectionToDelete = signal<Collection | null>(null);
+  protected showStarterCollection = computed(
+    () =>
+      !this.collectionsLoading() &&
+      !this.collections().length &&
+      (this.auth.isAnonymous || (this.auth.account()?.following_count ?? 0) === 0),
+  );
 
   ngOnInit(): void {
     this.load();

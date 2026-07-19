@@ -3,6 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { concatMap, from, Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { Api } from '../api';
+import { Auth } from '../auth';
+import { Account, SearchResults } from '../models';
+import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
+import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
+import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
+import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
 
 /** One line of the bulk add-by-name result. */
 interface BulkResult {
@@ -23,6 +29,11 @@ interface BulkResult {
 })
 export class BulkAddDialog {
   private api = inject(Api);
+  private auth = inject(Auth);
+  private anonymous = inject(AnonymousAccount);
+  private anonymousFollows = inject(AnonymousFollows);
+  private anonymousLists = inject(AnonymousLists);
+  private anonymousPublic = inject(AnonymousPublicApi);
 
   readonly targetId = input.required<string>();
   readonly targetKind = input.required<'list' | 'collection'>();
@@ -56,14 +67,8 @@ export class BulkAddDialog {
     this.busy.set(true);
     this.results.set([]);
 
-    const id = this.targetId();
-    const addOne = (accountId: string): Observable<unknown> =>
-      this.targetKind() === 'list'
-        ? this.api.addToList(id, accountId)
-        : this.api.addCollectionAccount(id, accountId);
-
     from(handles)
-      .pipe(concatMap((handle) => this.resolveAndAdd(handle, addOne)))
+      .pipe(concatMap((handle) => this.resolveAndAdd(handle)))
       .subscribe({
         next: (result) => this.results.update((r) => [...r, result]),
         complete: () => {
@@ -75,22 +80,48 @@ export class BulkAddDialog {
   }
 
   /** Resolve one handle to an account and add it; never errors the outer stream. */
-  private resolveAndAdd(
-    handle: string,
-    addOne: (accountId: string) => Observable<unknown>,
-  ): Observable<BulkResult> {
-    return this.api.search(handle, 'accounts', { resolve: true, limit: 1 }).pipe(
+  private resolveAndAdd(handle: string): Observable<BulkResult> {
+    return this.search(handle).pipe(
       switchMap((res) => {
         const account = res.accounts[0];
         if (!account) {
           return of<BulkResult>({ handle, status: 'notfound' });
         }
-        return addOne(account.id).pipe(
+        return this.addAccount(account, handle).pipe(
           map(() => ({ handle, status: 'added' }) as BulkResult),
           catchError(() => of<BulkResult>({ handle, status: 'error' })),
         );
       }),
       catchError(() => of<BulkResult>({ handle, status: 'error' })),
     );
+  }
+
+  private search(handle: string): Observable<SearchResults> {
+    return this.auth.isAnonymous
+      ? this.anonymousPublic.search(this.serverFor(handle), handle.split('@')[0], 'accounts')
+      : this.api.search(handle, 'accounts', { resolve: true, limit: 1 });
+  }
+
+  private addAccount(account: Account, handle: string): Observable<unknown> {
+    if (!this.auth.isAnonymous) {
+      return this.targetKind() === 'list'
+        ? this.api.addToList(this.targetId(), account.id)
+        : this.api.addCollectionAccount(this.targetId(), account.id);
+    }
+    if (this.targetKind() !== 'list') {
+      throw new Error('Anonymous collections are read-only.');
+    }
+    const result = this.anonymousFollows.follow(account, this.serverFor(handle));
+    const follow = this.anonymousFollows.findByAccountId(account.id);
+    if (!result.ok || !follow) {
+      throw new Error(result.ok ? 'Could not save the account.' : result.error);
+    }
+    this.anonymousLists.setMember(this.targetId(), follow.key, true);
+    return of({});
+  }
+
+  private serverFor(handle: string): string {
+    const host = handle.includes('@') ? handle.split('@').at(-1) : null;
+    return host ? `https://${host}` : this.anonymous.server();
   }
 }

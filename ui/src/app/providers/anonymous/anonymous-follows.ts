@@ -3,7 +3,8 @@ import { Account, Relationship } from '../../models';
 
 const STORAGE_KEY = 'mockingbird_anonymous_follows';
 const STATE_VERSION = 2;
-export const ANONYMOUS_FOLLOW_LIMIT = 20;
+// Large enough for the shipped starter collection, while still bounding browser-local work.
+export const ANONYMOUS_FOLLOW_LIMIT = 50;
 
 export type AnonymousReadRoute = 'read-api' | 'canonical-api' | 'rss';
 

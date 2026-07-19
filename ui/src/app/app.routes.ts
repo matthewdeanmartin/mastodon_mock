@@ -205,8 +205,6 @@ export const routes: Routes = [
       ...mockOnlyChildren,
       {
         path: 'find-people',
-        canActivate: [anonymousUnavailableGuard],
-        data: { anonymousFeature: 'Find people' },
         loadComponent: () => import('./pages/find-people/find-people').then((m) => m.FindPeople),
       },
       {
@@ -267,6 +265,11 @@ export const routes: Routes = [
         path: 'lists/:id',
         loadComponent: () =>
           import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),
+      },
+      {
+        path: 'collections/starter',
+        loadComponent: () =>
+          import('./pages/starter-collection/starter-collection').then((m) => m.StarterCollection),
       },
       {
         path: 'collections/:id',

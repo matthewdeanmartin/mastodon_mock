@@ -10,6 +10,7 @@ import { Terminology } from '../../terminology';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
+import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 
 interface SuggestionCandidate {
   account: Account;
@@ -42,6 +43,7 @@ export class LeftRail implements OnInit {
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private anonymousFollows = inject(AnonymousFollows);
   private anonymous = inject(AnonymousAccount);
+  private anonymousTags = inject(AnonymousTags);
   protected words = inject(Terminology).words;
   private candidates = new Map<string, SuggestionCandidate>();
 
@@ -54,6 +56,7 @@ export class LeftRail implements OnInit {
       ? this.anonymousFollows.count()
       : (this.auth.account()?.following_count ?? 0),
   );
+  protected hashtagCount = signal(0);
 
   /** Most recent day's use count for a trending tag, if the server provides one. */
   uses(tag: Tag): string | null {
@@ -61,6 +64,14 @@ export class LeftRail implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.auth.isAnonymous) {
+      this.hashtagCount.set(this.anonymousTags.count());
+    } else {
+      this.api.followedTags().subscribe({
+        next: (tags) => this.hashtagCount.set(tags.length),
+        error: () => this.hashtagCount.set(0),
+      });
+    }
     this.api.trendingTags().subscribe({
       next: (tags) => this.trends.set(tags),
       error: () => {

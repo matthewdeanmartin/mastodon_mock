@@ -5,6 +5,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { Api } from './api';
 import { ImportFollows, normalizeHandle, parseHandles } from './import-follows';
 import { Account } from './models';
+import { Auth } from './auth';
+import { AnonymousAccount } from './providers/anonymous/anonymous-account';
+import { AnonymousFollows } from './providers/anonymous/anonymous-follows';
+import { AnonymousPublicApi } from './providers/anonymous/anonymous-public-api';
 
 function acct(id: string, acctName: string): Account {
   return { id, acct: acctName, username: acctName.split('@')[0] } as Account;
@@ -110,5 +114,30 @@ describe('ImportFollows', () => {
 
     expect(importer.rows()[0].status).toBe('followed');
     expect(importer.rows()[1].status).toBe('pending');
+  });
+
+  it('resolves on the handle server and saves anonymous follows locally', async () => {
+    const search = vi
+      .fn()
+      .mockReturnValue(of({ accounts: [acct('1', 'alice@b.social')], statuses: [], hashtags: [] }));
+    const follow = vi.fn().mockReturnValue({ ok: true, relationship: { id: '1' } });
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: Api, useValue: {} },
+        { provide: Auth, useValue: { isAnonymous: true } },
+        { provide: AnonymousAccount, useValue: { server: () => 'https://home.social' } },
+        { provide: AnonymousPublicApi, useValue: { search } },
+        { provide: AnonymousFollows, useValue: { follow } },
+      ],
+    });
+    const importer = TestBed.inject(ImportFollows);
+    importer.delayMs = 0;
+    importer.load(['alice@b.social']);
+
+    await importer.start();
+
+    expect(search).toHaveBeenCalledWith('https://b.social', 'alice', 'accounts');
+    expect(follow).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), 'https://b.social');
+    expect(importer.rows()[0].status).toBe('followed');
   });
 });

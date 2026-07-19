@@ -1,0 +1,48 @@
+.intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.intro h1,
+.intro p {
+  margin: 0;
+}
+.intro p {
+  margin-top: 6px;
+  max-width: 620px;
+}
+.intro .btn {
+  flex: none;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.member > span:first-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.success {
+  color: var(--accent);
+}
+.note {
+  padding: 16px 20px;
+}
+
+@media (max-width: 620px) {
+  .intro {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

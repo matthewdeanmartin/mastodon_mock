@@ -64,7 +64,7 @@ describe('AnonymousFollows', () => {
     expect(follows.count()).toBe(0);
   });
 
-  it('rejects the twenty-first unique follow with a useful error', () => {
+  it('rejects the first follow above the configured limit with a useful error', () => {
     const follows = TestBed.inject(AnonymousFollows);
     for (let index = 0; index < ANONYMOUS_FOLLOW_LIMIT; index += 1) {
       follows.follow(account(`user${index}`), 'https://mastodon.social');
@@ -76,7 +76,7 @@ describe('AnonymousFollows', () => {
     if (result.ok) {
       throw new Error('Expected the follow limit to reject this account.');
     }
-    expect(result.error).toContain('up to 20');
+    expect(result.error).toContain(`up to ${ANONYMOUS_FOLLOW_LIMIT}`);
     expect(follows.count()).toBe(ANONYMOUS_FOLLOW_LIMIT);
   });
 

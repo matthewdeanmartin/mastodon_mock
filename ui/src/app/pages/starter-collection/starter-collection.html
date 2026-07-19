@@ -1,0 +1,58 @@
+<div class="page-head">Starter collection</div>
+
+<section class="intro">
+  <div>
+    <h1>A timeline in one click</h1>
+    <p class="muted">
+      A built-in mix of Fediverse projects, public-interest reporting, art, history, science, and
+      delightful bots.
+    </p>
+  </div>
+  <button
+    class="btn"
+    [disabled]="importer.running() || completed() === accounts.length"
+    (click)="followAll()"
+  >
+    @if (importer.running()) {
+      Following… {{ completed() }}/{{ accounts.length }}
+    } @else if (completed() === accounts.length) {
+      Followed {{ followed() }} accounts
+    } @else {
+      Follow all {{ accounts.length }}
+    }
+  </button>
+</section>
+
+<div class="members" aria-label="Starter collection accounts">
+  @for (item of accounts; track item.handle) {
+    <div class="member">
+      <span>
+        <strong>{{ item.name }}</strong>
+        <span class="muted">&#64;{{ item.handle }}</span>
+      </span>
+      @switch (status(item.handle)) {
+        @case ('resolving') {
+          <span class="muted small">Looking up…</span>
+        }
+        @case ('following') {
+          <span class="muted small">Following…</span>
+        }
+        @case ('followed') {
+          <span class="success small">Following ✓</span>
+        }
+        @case ('not_found') {
+          <span class="muted small">Not found</span>
+        }
+        @case ('failed') {
+          <span class="muted small">Could not follow</span>
+        }
+      }
+    </div>
+  }
+</div>
+
+<p class="muted small note">
+  Accounts are resolved when you press the button, so the collection stays useful across Mastodon
+  servers.
+  <a routerLink="/find-people">Import your own list instead</a>.
+</p>

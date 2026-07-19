@@ -51,7 +51,12 @@ describe('Shell account switching', () => {
 
   /** The rendered rails fetch trends/instance metadata; account for those requests. */
   function drainRailRequests() {
-    httpMock.match((r) => r.url.includes('/api/v1/trends/') || r.url.includes('/api/v2/instance'));
+    httpMock.match(
+      (r) =>
+        r.url.includes('/api/v1/trends/') ||
+        r.url.includes('/api/v2/instance') ||
+        r.url.includes('/api/v1/followed_tags'),
+    );
   }
 
   // Rendering the full Shell (rails and all) can exceed the default 5s timeout

@@ -2,7 +2,11 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Api } from './api';
+import { Auth } from './auth';
 import { Account } from './models';
+import { AnonymousAccount } from './providers/anonymous/anonymous-account';
+import { AnonymousFollows } from './providers/anonymous/anonymous-follows';
+import { AnonymousPublicApi } from './providers/anonymous/anonymous-public-api';
 
 export type ImportRowStatus =
   | 'pending'
@@ -90,6 +94,10 @@ export function normalizeHandle(raw: string): string | null {
 @Injectable({ providedIn: 'root' })
 export class ImportFollows {
   private api = inject(Api);
+  private auth = inject(Auth);
+  private anonymous = inject(AnonymousAccount);
+  private anonymousFollows = inject(AnonymousFollows);
+  private anonymousPublic = inject(AnonymousPublicApi);
 
   readonly rows = signal<ImportRow[]>([]);
   readonly running = signal(false);
@@ -145,9 +153,7 @@ export class ImportFollows {
     this.patch(i, { status: 'resolving' });
     let account: Account | undefined;
     try {
-      const results = await this.withRateLimitRetry(() =>
-        firstValueFrom(this.api.search(handle, 'accounts', { resolve: true, limit: 5 })),
-      );
+      const results = await this.withRateLimitRetry(() => firstValueFrom(this.search(handle)));
       account = pickAccount(handle, results.accounts ?? []);
     } catch (err) {
       this.patch(i, { status: 'failed', error: describeHttpError(err) });
@@ -159,12 +165,28 @@ export class ImportFollows {
     }
     this.patch(i, { status: 'following', account });
     try {
-      // Following an already-followed account is a harmless no-op server-side.
-      await this.withRateLimitRetry(() => firstValueFrom(this.api.follow(account.id)));
+      if (this.auth.isAnonymous) {
+        const result = this.anonymousFollows.follow(account, this.serverFor(handle));
+        if (!result.ok) throw new Error(result.error);
+      } else {
+        // Following an already-followed account is a harmless no-op server-side.
+        await this.withRateLimitRetry(() => firstValueFrom(this.api.follow(account.id)));
+      }
       this.patch(i, { status: 'followed' });
     } catch (err) {
       this.patch(i, { status: 'failed', error: describeHttpError(err) });
     }
+  }
+
+  private search(handle: string) {
+    return this.auth.isAnonymous
+      ? this.anonymousPublic.search(this.serverFor(handle), handle.split('@')[0], 'accounts')
+      : this.api.search(handle, 'accounts', { resolve: true, limit: 5 });
+  }
+
+  private serverFor(handle: string): string {
+    const host = handle.includes('@') ? handle.split('@').at(-1) : null;
+    return host ? `https://${host}` : this.anonymous.server();
   }
 
   private async withRateLimitRetry<T>(request: () => Promise<T>): Promise<T> {

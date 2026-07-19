@@ -59,17 +59,13 @@
   </div>
 }
 
-@if (!results() && type() === 'accounts' && !capabilities.active) {
+@if (!results() && type() === 'accounts') {
   <!-- Nothing searched yet and looking for people: offer follow-list import &
        directories. Irrelevant noise for tag / post searches, so hidden there. -->
   <div class="search-idle">
     <div class="page-head">Find people to follow</div>
     <app-find-people [embedded]="true" />
   </div>
-}
-
-@if (!results() && type() === 'accounts' && capabilities.active) {
-  <p class="muted center">Search for a public account by handle or profile URL.</p>
 }
 
 @if (!results() && type() === 'statuses') {
