@@ -37,7 +37,7 @@
         @if (auth.isAnonymous && followFor(a); as follow) {
           <span class="req-actions">
             <span class="muted small">{{ sourceStatus(follow) }}</span>
-            @if (follow.apiRetryAfter) {
+            @if (anonymousFollows.hasBackoff(follow)) {
               <button class="btn btn-outline btn-sm" (click)="retry(follow)">Retry API</button>
             }
             <button class="btn btn-outline btn-sm" (click)="unfollow(follow)">Unfollow</button>

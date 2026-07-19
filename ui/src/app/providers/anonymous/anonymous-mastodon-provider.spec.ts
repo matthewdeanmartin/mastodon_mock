@@ -70,9 +70,11 @@ describe('AnonymousMastodonProvider', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('looks up a followed account on its own instance and fetches public posts', () => {
-    const server = 'https://social.example';
-    const target = account('alice', server, 'remote-copy');
+  it('uses the instance-local account reference that already discovered the follow', () => {
+    const target = {
+      ...account('alice', 'https://social.example', 'remote-copy'),
+      acct: 'alice@social.example',
+    };
     TestBed.inject(AnonymousFollows).follow(target, 'https://mastodon.social');
     const provider = TestBed.inject(AnonymousMastodonProvider);
     provider.reset();
@@ -80,67 +82,62 @@ describe('AnonymousMastodonProvider', () => {
 
     provider.fetchPage().subscribe((items) => (received = items));
 
-    const lookup = httpMock.expectOne(
-      (request) => request.url === `${server}/api/v1/accounts/lookup`,
-    );
-    expect(lookup.request.params.get('acct')).toBe('alice');
-    lookup.flush(account('alice', server, 'native-id'));
     const posts = httpMock.expectOne(
-      `${server}/api/v1/accounts/native-id/statuses?limit=20&exclude_replies=true`,
+      'https://mastodon.social/api/v1/accounts/remote-copy/statuses?limit=20&exclude_replies=true',
     );
-    posts.flush([status(account('alice', server, 'native-id'))]);
+    posts.flush([status(target)]);
+    httpMock.expectNone('https://social.example/api/v1/accounts/lookup?acct=alice');
 
     expect(received).toHaveLength(1);
     expect(received[0].provider).toBe('anonymous-mastodon');
-    expect(received[0].id).toBe('anonymous-mastodon:social.example:10');
+    expect(received[0].id).toBe('anonymous-mastodon:mastodon.social:10');
     expect(received[0].account.acct).toBe('alice@social.example');
   });
 
   it('keeps successful sources when another followed instance fails', () => {
     const follows = TestBed.inject(AnonymousFollows);
-    follows.follow(account('alice', 'https://one.example'), 'https://mastodon.social');
-    follows.follow(account('bob', 'https://two.example'), 'https://mastodon.social');
+    follows.follow(account('alice', 'https://one.example', 'a-copy'), 'https://mastodon.social');
+    follows.follow(account('bob', 'https://two.example', 'b-copy'), 'https://mastodon.social');
     const provider = TestBed.inject(AnonymousMastodonProvider);
     provider.reset();
     let received: Status[] = [];
 
     provider.fetchPage().subscribe((items) => (received = items));
     httpMock
-      .expectOne((request) => request.url === 'https://one.example/api/v1/accounts/lookup')
-      .flush(account('alice', 'https://one.example', 'a1'));
+      .expectOne((request) => request.url.includes('/api/v1/accounts/a-copy/statuses'))
+      .flush([status(account('alice', 'https://one.example', 'a-copy'))]);
     httpMock
-      .expectOne((request) => request.url === 'https://two.example/api/v1/accounts/lookup')
+      .expectOne((request) => request.url.includes('/api/v1/accounts/b-copy/statuses'))
+      .flush(null, { status: 429, statusText: 'Limited' });
+    httpMock
+      .expectOne('https://two.example/api/v1/accounts/lookup?acct=bob')
       .flush(null, { status: 429, statusText: 'Limited' });
     httpMock
       .expectOne('https://two.example/@bob.rss')
       .flush(null, { status: 404, statusText: 'Missing' });
-    httpMock
-      .expectOne('https://one.example/api/v1/accounts/a1/statuses?limit=20&exclude_replies=true')
-      .flush([status(account('alice', 'https://one.example', 'a1'))]);
-
     expect(received).toHaveLength(1);
     expect(provider.errors()).toEqual(['Could not load @bob@two.example.']);
   });
 
   it('keeps API posts when another follow fails both API and RSS CORS', () => {
     const follows = TestBed.inject(AnonymousFollows);
-    follows.follow(account('alice', 'https://one.example'), 'https://mastodon.social');
-    follows.follow(account('bob', 'https://two.example'), 'https://mastodon.social');
+    follows.follow(account('alice', 'https://one.example', 'a-copy'), 'https://mastodon.social');
+    follows.follow(account('bob', 'https://two.example', 'b-copy'), 'https://mastodon.social');
     const provider = TestBed.inject(AnonymousMastodonProvider);
     provider.reset();
     let received: Status[] = [];
 
     provider.fetchPage().subscribe((items) => (received = items));
     httpMock
-      .expectOne((request) => request.url === 'https://one.example/api/v1/accounts/lookup')
-      .flush(account('alice', 'https://one.example', 'a1'));
+      .expectOne((request) => request.url.includes('/api/v1/accounts/a-copy/statuses'))
+      .flush([status(account('alice', 'https://one.example', 'a-copy'))]);
     httpMock
-      .expectOne((request) => request.url === 'https://two.example/api/v1/accounts/lookup')
+      .expectOne((request) => request.url.includes('/api/v1/accounts/b-copy/statuses'))
+      .error(new ProgressEvent('error'));
+    httpMock
+      .expectOne('https://two.example/api/v1/accounts/lookup?acct=bob')
       .error(new ProgressEvent('error'));
     httpMock.expectOne('https://two.example/@bob.rss').error(new ProgressEvent('error'));
-    httpMock
-      .expectOne('https://one.example/api/v1/accounts/a1/statuses?limit=20&exclude_replies=true')
-      .flush([status(account('alice', 'https://one.example', 'a1'))]);
 
     expect(received.map((item) => item.account.username)).toEqual(['alice']);
     expect(provider.errors()).toEqual(['Could not load @bob@two.example.']);
@@ -151,22 +148,33 @@ describe('AnonymousMastodonProvider', () => {
     received = [];
     provider.fetchPage().subscribe((items) => (received = items));
     httpMock
-      .expectOne((request) => request.url === 'https://one.example/api/v1/accounts/a1/statuses')
-      .flush([status(account('alice', 'https://one.example', 'a1'), '11')]);
+      .expectOne((request) => request.url.includes('/api/v1/accounts/a-copy/statuses'))
+      .flush([status(account('alice', 'https://one.example', 'a-copy'), '11')]);
     expect(received.map((item) => item.account.username)).toEqual(['alice']);
   });
 
   it('falls back to the public profile RSS feed after an anonymous API failure', () => {
     const follows = TestBed.inject(AnonymousFollows);
-    follows.follow(account('alice', 'https://one.example'), 'https://mastodon.social');
+    follows.follow(
+      account('alice', 'https://one.example', 'remote-copy'),
+      'https://mastodon.social',
+    );
     const provider = TestBed.inject(AnonymousMastodonProvider);
     provider.reset();
     let received: Status[] = [];
 
     provider.fetchPage().subscribe((items) => (received = items));
     httpMock
-      .expectOne((request) => request.url === 'https://one.example/api/v1/accounts/lookup')
+      .expectOne((request) => request.url.includes('/api/v1/accounts/remote-copy/statuses'))
       .flush(null, { status: 429, statusText: 'Limited' });
+    httpMock
+      .expectOne('https://one.example/api/v1/accounts/lookup?acct=alice')
+      .flush(account('alice', 'https://one.example', 'native-id'));
+    httpMock
+      .expectOne(
+        'https://one.example/api/v1/accounts/native-id/statuses?limit=20&exclude_replies=true',
+      )
+      .flush(null, { status: 503, statusText: 'Unavailable' });
     httpMock.expectOne('https://one.example/@alice.rss').flush(`
       <rss version="2.0"><channel><title>Alice</title><link>https://one.example/@alice</link>
       <item><guid>post-1</guid><title>Hello</title><link>https://one.example/@alice/1</link>
@@ -199,19 +207,18 @@ describe('AnonymousMastodonProvider', () => {
 
   it('keeps per-follow cursors in an independent list session and pages only on demand', () => {
     const follows = TestBed.inject(AnonymousFollows);
-    follows.follow(account('alice', 'https://one.example'), 'https://mastodon.social');
+    follows.follow(account('alice', 'https://one.example', 'a-copy'), 'https://mastodon.social');
     const session = TestBed.inject(AnonymousMastodonProvider).createFollowFeed(follows.follows());
     const pages: Status[][] = [];
 
     session.fetchPage().subscribe((page) => pages.push(page.statuses));
     httpMock
-      .expectOne('https://one.example/api/v1/accounts/lookup?acct=alice')
-      .flush(account('alice', 'https://one.example', 'a1'));
-    httpMock
-      .expectOne('https://one.example/api/v1/accounts/a1/statuses?limit=20&exclude_replies=true')
+      .expectOne(
+        'https://mastodon.social/api/v1/accounts/a-copy/statuses?limit=20&exclude_replies=true',
+      )
       .flush(
         Array.from({ length: 20 }, (_, index) =>
-          status(account('alice', 'https://one.example', 'a1'), String(index)),
+          status(account('alice', 'https://one.example', 'a-copy'), String(index)),
         ),
       );
 
@@ -221,14 +228,14 @@ describe('AnonymousMastodonProvider', () => {
     session.fetchPage().subscribe((page) => pages.push(page.statuses));
     httpMock
       .expectOne(
-        'https://one.example/api/v1/accounts/a1/statuses?limit=20&exclude_replies=true&max_id=19',
+        'https://mastodon.social/api/v1/accounts/a-copy/statuses?limit=20&exclude_replies=true&max_id=19',
       )
-      .flush([status(account('alice', 'https://one.example', 'a1'), 'older')]);
+      .flush([status(account('alice', 'https://one.example', 'a-copy'), 'older')]);
 
     expect(pages[1].map((item) => item.providerRef)).toContainEqual({
-      server: 'https://one.example',
+      server: 'https://mastodon.social',
       statusId: 'older',
-      accountId: 'a1',
+      accountId: 'a-copy',
     });
   });
 });

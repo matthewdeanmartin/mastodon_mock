@@ -2,7 +2,7 @@ import { computed, Injectable, signal } from '@angular/core';
 import { UserList } from '../../models';
 
 const STORAGE_KEY = 'mockingbird_anonymous_lists';
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
 
 export interface AnonymousList extends UserList {
   memberKeys: string[];

@@ -2,8 +2,17 @@ import { computed, Injectable, signal } from '@angular/core';
 import { Account, Relationship } from '../../models';
 
 const STORAGE_KEY = 'mockingbird_anonymous_follows';
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
 export const ANONYMOUS_FOLLOW_LIMIT = 20;
+
+export type AnonymousReadRoute = 'read-api' | 'canonical-api' | 'rss';
+
+export interface AnonymousReadRef {
+  server: string;
+  accountId: string;
+}
+
+type RouteRetryAfter = Record<AnonymousReadRoute, string | null>;
 
 export interface AnonymousFollow {
   key: string;
@@ -12,8 +21,8 @@ export interface AnonymousFollow {
   profileUrl: string;
   account: Account;
   followedAt: string;
-  preferredSource: 'api' | 'rss';
-  apiRetryAfter: string | null;
+  readRef: AnonymousReadRef;
+  routeRetryAfter: RouteRetryAfter;
 }
 
 interface AnonymousFollowState {
@@ -55,6 +64,27 @@ function serverFor(host: string, account: Account): string {
   return `https://${host}`;
 }
 
+function origin(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function emptyRetryState(): RouteRetryAfter {
+  return { 'read-api': null, 'canonical-api': null, rss: null };
+}
+
+function validRetryState(value: unknown): value is RouteRetryAfter {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Partial<RouteRetryAfter>;
+  return [state['read-api'], state['canonical-api'], state.rss].every(
+    (retryAfter) => retryAfter === null || typeof retryAfter === 'string',
+  );
+}
+
 function keyFor(account: Account, fallbackServer: string): string {
   return `${account.username.toLowerCase()}@${hostFromAccount(account, fallbackServer)}`;
 }
@@ -83,6 +113,10 @@ function loadState(): AnonymousFollowState {
         typeof item?.key === 'string' &&
         typeof item.server === 'string' &&
         typeof item.profileUrl === 'string' &&
+        typeof item.readRef?.server === 'string' &&
+        typeof item.readRef?.accountId === 'string' &&
+        !!origin(item.readRef.server) &&
+        validRetryState(item.routeRetryAfter) &&
         typeof item.account?.username === 'string',
     );
     return { version: STATE_VERSION, follows: follows.slice(0, ANONYMOUS_FOLLOW_LIMIT) };
@@ -112,39 +146,41 @@ export class AnonymousFollows {
     return this.follows().find((follow) => follow.account.id === accountId) ?? null;
   }
 
-  shouldDefer(follow: AnonymousFollow): boolean {
-    return (
-      follow.preferredSource === 'api' &&
-      !!follow.apiRetryAfter &&
-      Date.parse(follow.apiRetryAfter) > Date.now()
+  routeDeferred(follow: AnonymousFollow, route: AnonymousReadRoute): boolean {
+    const retryAfter = follow.routeRetryAfter[route];
+    return !!retryAfter && Date.parse(retryAfter) > Date.now();
+  }
+
+  hasBackoff(follow: AnonymousFollow): boolean {
+    return (Object.keys(follow.routeRetryAfter) as AnonymousReadRoute[]).some((route) =>
+      this.routeDeferred(follow, route),
     );
   }
 
-  prefersRss(follow: AnonymousFollow): boolean {
-    return (
-      follow.preferredSource === 'rss' &&
-      !!follow.apiRetryAfter &&
-      Date.parse(follow.apiRetryAfter) > Date.now()
-    );
+  markApiSuccess(key: string, readRef: AnonymousReadRef): void {
+    this.updateFollow(key, (follow) => ({
+      ...follow,
+      readRef,
+      routeRetryAfter: { ...follow.routeRetryAfter, 'read-api': null, 'canonical-api': null },
+    }));
   }
 
-  markApiSuccess(key: string): void {
-    this.updateSource(key, 'api', null);
-  }
-
-  markRssFallback(key: string): void {
-    this.updateSource(key, 'rss', new Date(Date.now() + 15 * 60_000).toISOString());
-  }
-
-  markUnavailable(key: string): void {
-    const follow = this.follows().find((item) => item.key === key);
-    if (follow?.apiRetryAfter && Date.parse(follow.apiRetryAfter) > Date.now()) return;
-    this.updateSource(key, 'api', new Date(Date.now() + 15 * 60_000).toISOString());
+  markRouteFailure(key: string, route: AnonymousReadRoute): void {
+    this.updateFollow(key, (follow) => {
+      if (this.routeDeferred(follow, route)) return follow;
+      return {
+        ...follow,
+        routeRetryAfter: {
+          ...follow.routeRetryAfter,
+          [route]: new Date(Date.now() + 15 * 60_000).toISOString(),
+        },
+      };
+    });
   }
 
   /** User-requested, one-shot retry. The next page load will try the public API again. */
   clearBackoff(key: string): void {
-    this.updateSource(key, 'api', null);
+    this.updateFollow(key, (follow) => ({ ...follow, routeRetryAfter: emptyRetryState() }));
   }
 
   follow(account: Account, fallbackServer: string): FollowResult {
@@ -161,6 +197,7 @@ export class AnonymousFollows {
     }
     const host = hostFromAccount(account, fallbackServer);
     const server = serverFor(host, account);
+    const readServer = origin(fallbackServer) ?? server;
     const follow: AnonymousFollow = {
       key,
       handle: `${account.username}@${host}`,
@@ -168,8 +205,8 @@ export class AnonymousFollows {
       profileUrl: account.url || `${server}/@${account.username}`,
       account: { ...account, acct: `${account.username}@${host}` },
       followedAt: new Date().toISOString(),
-      preferredSource: 'api',
-      apiRetryAfter: null,
+      readRef: { server: readServer, accountId: account.id },
+      routeRetryAfter: emptyRetryState(),
     };
     this.persist([...this.follows(), follow]);
     return { ok: true, relationship: relationship(account.id, true) };
@@ -187,15 +224,7 @@ export class AnonymousFollows {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  private updateSource(
-    key: string,
-    preferredSource: AnonymousFollow['preferredSource'],
-    apiRetryAfter: string | null,
-  ): void {
-    this.persist(
-      this.follows().map((follow) =>
-        follow.key === key ? { ...follow, preferredSource, apiRetryAfter } : follow,
-      ),
-    );
+  private updateFollow(key: string, update: (follow: AnonymousFollow) => AnonymousFollow): void {
+    this.persist(this.follows().map((follow) => (follow.key === key ? update(follow) : follow)));
   }
 }

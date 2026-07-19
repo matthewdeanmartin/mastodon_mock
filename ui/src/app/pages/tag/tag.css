@@ -13,3 +13,8 @@
   padding: 4px 10px;
   font-size: 0.85em;
 }
+
+.more {
+  display: block;
+  margin: 16px auto;
+}

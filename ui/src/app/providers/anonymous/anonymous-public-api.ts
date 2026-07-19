@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable, timeout } from 'rxjs';
 import { AccountStatusesOptions } from '../../api';
-import { Account, Context, Status } from '../../models';
+import { Account, Context, SearchResults, Status, Tag } from '../../models';
 import { externalFetch } from '../external-fetch';
 import { adaptAnonymousAccount, adaptAnonymousStatus } from './anonymous-mastodon-provider';
 import { AnonymousPublicRef } from './anonymous-route-ref';
@@ -69,6 +69,46 @@ export class AnonymousPublicApi {
           descendants: context.descendants.map((status) =>
             adaptAnonymousStatus(status, ref.server),
           ),
+        })),
+      );
+  }
+
+  getTag(server: string, name: string): Observable<Tag> {
+    return this.http
+      .get<Tag>(`${server}/api/v1/tags/${encodeURIComponent(name)}`, {
+        context: externalFetch(),
+      })
+      .pipe(timeout(REQUEST_TIMEOUT_MS));
+  }
+
+  getTagTimeline(server: string, name: string, maxId?: string): Observable<Status[]> {
+    let params = new HttpParams().set('limit', '20');
+    if (maxId) params = params.set('max_id', maxId);
+    return this.http
+      .get<Status[]>(`${server}/api/v1/timelines/tag/${encodeURIComponent(name)}`, {
+        params,
+        context: externalFetch(),
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((statuses) => statuses.map((status) => adaptAnonymousStatus(status, server))),
+      );
+  }
+
+  search(
+    server: string,
+    query: string,
+    type: 'accounts' | 'statuses' | 'hashtags',
+  ): Observable<SearchResults> {
+    const params = new HttpParams().set('q', query).set('type', type);
+    return this.http
+      .get<SearchResults>(`${server}/api/v2/search`, { params, context: externalFetch() })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((results) => ({
+          accounts: results.accounts.map((account) => adaptAnonymousAccount(account, server)),
+          statuses: results.statuses.map((status) => adaptAnonymousStatus(status, server)),
+          hashtags: results.hashtags,
         })),
       );
   }

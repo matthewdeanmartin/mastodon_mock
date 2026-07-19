@@ -37,6 +37,10 @@ describe('AnonymousFollows', () => {
     expect(follows.relationship(target, 'https://mastodon.social').following).toBe(true);
     expect(follows.follows()[0].key).toBe('alice@social.example');
     expect(follows.follows()[0].server).toBe('https://social.example');
+    expect(follows.follows()[0].readRef).toEqual({
+      server: 'https://mastodon.social',
+      accountId: 'social.example:Alice',
+    });
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
@@ -84,25 +88,30 @@ describe('AnonymousFollows', () => {
     expect(TestBed.inject(AnonymousFollows).follows()).toEqual([]);
   });
 
-  it('persists API/RSS source backoff without extending an active failure window', () => {
+  it('replaces incompatible older storage instead of migrating it', () => {
+    localStorage.setItem(
+      'mockingbird_anonymous_follows',
+      JSON.stringify({ version: 1, follows: [{ key: 'alice@example.social' }] }),
+    );
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+
+    expect(TestBed.inject(AnonymousFollows).follows()).toEqual([]);
+  });
+
+  it('persists route-specific backoff without extending an active failure window', () => {
     const follows = TestBed.inject(AnonymousFollows);
     follows.follow(account('alice'), 'https://mastodon.social');
     const key = follows.follows()[0].key;
 
-    follows.markRssFallback(key);
-    expect(follows.prefersRss(follows.follows()[0])).toBe(true);
-
-    follows.markApiSuccess(key);
-    expect(follows.follows()[0].apiRetryAfter).toBeNull();
-
-    follows.markUnavailable(key);
-    const retryAfter = follows.follows()[0].apiRetryAfter;
-    follows.markUnavailable(key);
-    expect(follows.shouldDefer(follows.follows()[0])).toBe(true);
-    expect(follows.follows()[0].apiRetryAfter).toBe(retryAfter);
+    follows.markRouteFailure(key, 'canonical-api');
+    const retryAfter = follows.follows()[0].routeRetryAfter['canonical-api'];
+    follows.markRouteFailure(key, 'canonical-api');
+    expect(follows.routeDeferred(follows.follows()[0], 'canonical-api')).toBe(true);
+    expect(follows.routeDeferred(follows.follows()[0], 'read-api')).toBe(false);
+    expect(follows.follows()[0].routeRetryAfter['canonical-api']).toBe(retryAfter);
 
     follows.clearBackoff(key);
-    expect(follows.follows()[0].preferredSource).toBe('api');
-    expect(follows.follows()[0].apiRetryAfter).toBeNull();
+    expect(follows.hasBackoff(follows.follows()[0])).toBe(false);
   });
 });

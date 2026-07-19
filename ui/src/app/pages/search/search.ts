@@ -4,10 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, EMPTY, Subscription } from 'rxjs';
 import { Api } from '../../api';
-import { SearchResults, Status, Tag } from '../../models';
+import { Account, SearchResults, Status, Tag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { FindPeople } from '../find-people/find-people';
 import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
+import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
+import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
+import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
@@ -24,6 +27,8 @@ type DateOperator = (typeof DATE_OPERATORS)[number];
 export class Search implements OnInit {
   protected capabilities = inject(AnonymousCapabilities);
   private api = inject(Api);
+  private anonymous = inject(AnonymousAccount);
+  private anonymousPublic = inject(AnonymousPublicApi);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
@@ -144,15 +149,29 @@ export class Search implements OnInit {
     // accounts it hasn't federated with yet (how you find someone by address).
     const resolve =
       type === 'accounts' && (/^@?[\w.-]+@[\w.-]+\.\w+$/.test(q) || /^https?:\/\//.test(q));
-    this.activeSearch = this.api
-      .search(q, type, resolve ? { resolve: true } : undefined)
-      .subscribe({
-        next: (r) => {
-          this.results.set(r);
-          this.searching.set(false);
-        },
-        error: () => this.searching.set(false),
-      });
+    const request = this.capabilities.active
+      ? this.anonymousPublic.search(this.anonymous.server(), q, type)
+      : this.api.search(q, type, resolve ? { resolve: true } : undefined);
+    this.activeSearch = request.subscribe({
+      next: (r) => {
+        this.results.set(r);
+        this.searching.set(false);
+      },
+      error: () => this.searching.set(false),
+    });
+  }
+
+  accountLink(account: Account): (string | number)[] {
+    return this.capabilities.active
+      ? [
+          '/accounts',
+          anonymousAccountRouteRef({
+            server: this.anonymous.server(),
+            id: account.id,
+            originalUrl: account.url || undefined,
+          }),
+        ]
+      : ['/accounts', account.id];
   }
 
   onChanged(updated: Status): void {

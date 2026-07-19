@@ -102,7 +102,7 @@
   @if (r.accounts.length) {
     <div class="page-head">People</div>
     @for (a of r.accounts; track a.id) {
-      <a class="result-account" [routerLink]="['/accounts', a.id]">
+      <a class="result-account" [routerLink]="accountLink(a)">
         <img
           class="avatar"
           [src]="a.avatar_static || a.avatar"

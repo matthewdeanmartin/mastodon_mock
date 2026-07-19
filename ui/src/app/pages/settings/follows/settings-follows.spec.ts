@@ -82,16 +82,18 @@ describe('SettingsFollows', () => {
     const follows = TestBed.inject(AnonymousFollows);
     const target = { ...makeAccount('5'), url: 'https://social.example/@user5' };
     follows.follow(target, 'https://home.example');
-    follows.markUnavailable(follows.follows()[0].key);
+    follows.markRouteFailure(follows.follows()[0].key, 'read-api');
 
     const fixture = TestBed.createComponent(SettingsFollows);
     fixture.detectChanges();
     expect(internals(fixture).requests()).toEqual([follows.follows()[0].account]);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Temporarily deferred');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Retrying around: read-api',
+    );
 
     internals(fixture).retry(follows.follows()[0]);
     fixture.detectChanges();
-    expect(follows.follows()[0].apiRetryAfter).toBeNull();
+    expect(follows.hasBackoff(follows.follows()[0])).toBe(false);
     httpMock.expectNone(() => true);
   });
 });

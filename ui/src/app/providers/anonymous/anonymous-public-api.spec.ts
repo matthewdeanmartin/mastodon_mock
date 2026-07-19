@@ -101,4 +101,41 @@ describe('AnonymousPublicApi', () => {
     expect(request.request.params.get('limit')).toBe('20');
     request.flush([]);
   });
+
+  it('loads and adapts a public hashtag timeline with native-id pagination', () => {
+    let received: Status[] = [];
+    api
+      .getTagTimeline('https://social.example', 'cats', '80')
+      .subscribe((statuses) => (received = statuses));
+
+    const request = http.expectOne(
+      (candidate) => candidate.url === 'https://social.example/api/v1/timelines/tag/cats',
+    );
+    expect(request.request.params.get('limit')).toBe('20');
+    expect(request.request.params.get('max_id')).toBe('80');
+    request.flush([status('79')]);
+
+    expect(received[0].provider).toBe('anonymous-mastodon');
+    expect(received[0].providerRef).toEqual({
+      server: 'https://social.example',
+      statusId: '79',
+      accountId: '7',
+    });
+  });
+
+  it('adapts anonymous search results to stable public source references', () => {
+    let received: Status[] = [];
+    api.search('https://social.example', 'cats', 'statuses').subscribe((results) => {
+      received = results.statuses;
+    });
+
+    const request = http.expectOne(
+      (candidate) =>
+        candidate.url === 'https://social.example/api/v2/search' &&
+        candidate.params.get('type') === 'statuses',
+    );
+    request.flush({ accounts: [account()], statuses: [status('10')], hashtags: [] });
+
+    expect(received[0].id).toBe('anonymous-mastodon:social.example:10');
+  });
 });

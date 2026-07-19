@@ -276,8 +276,6 @@ export const routes: Routes = [
       },
       {
         path: 'tags/:tag',
-        canActivate: [anonymousUnavailableGuard],
-        data: { anonymousFeature: 'Tag search' },
         loadComponent: () => import('./pages/tag/tag').then((m) => m.Tag),
       },
       {

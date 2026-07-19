@@ -5,6 +5,10 @@ import { Status, Tag as TagEntity } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { Auth } from '../../auth';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
+import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
+import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
+import { AnonymousProviderRef } from '../../providers/anonymous/anonymous-mastodon-provider';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-tag',
@@ -17,12 +21,16 @@ export class Tag implements OnInit {
   private route = inject(ActivatedRoute);
   protected auth = inject(Auth);
   private anonymousTags = inject(AnonymousTags);
+  private anonymous = inject(AnonymousAccount);
+  private anonymousPublic = inject(AnonymousPublicApi);
 
   protected tag = signal('');
   protected tagInfo = signal<TagEntity | null>(null);
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
   protected followError = signal<string | null>(null);
+  protected loadingMore = signal(false);
+  protected exhausted = signal(false);
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
@@ -36,7 +44,9 @@ export class Tag implements OnInit {
 
   load(tag: string): void {
     this.loading.set(true);
-    this.api.getTag(tag).subscribe({
+    this.statuses.set([]);
+    this.exhausted.set(false);
+    this.getTag(tag).subscribe({
       next: (info) =>
         this.tagInfo.set({
           ...info,
@@ -55,13 +65,51 @@ export class Tag implements OnInit {
         }
       },
     });
-    this.api.tagTimeline(tag).subscribe({
+    this.getTimeline(tag).subscribe({
       next: (s) => {
         this.statuses.set(s);
+        this.exhausted.set(s.length < 20);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  loadMore(): void {
+    const last = this.statuses().at(-1);
+    if (!last || this.loadingMore() || this.exhausted()) return;
+    this.loadingMore.set(true);
+    this.getTimeline(this.tag(), this.nativeStatusId(last)).subscribe({
+      next: (statuses) => {
+        const seen = new Set(this.statuses().map((status) => status.id));
+        this.statuses.update((current) => [
+          ...current,
+          ...statuses.filter((status) => !seen.has(status.id)),
+        ]);
+        this.exhausted.set(statuses.length < 20);
+        this.loadingMore.set(false);
+      },
+      error: () => this.loadingMore.set(false),
+    });
+  }
+
+  private getTag(name: string): Observable<TagEntity> {
+    return this.auth.isAnonymous
+      ? this.anonymousPublic.getTag(this.anonymous.server(), name)
+      : this.api.getTag(name);
+  }
+
+  private getTimeline(name: string, maxId?: string): Observable<Status[]> {
+    return this.auth.isAnonymous
+      ? this.anonymousPublic.getTagTimeline(this.anonymous.server(), name, maxId)
+      : this.api.tagTimeline(name, maxId);
+  }
+
+  private nativeStatusId(status: Status): string {
+    const ref = status.providerRef as Partial<AnonymousProviderRef> | undefined;
+    return status.provider === 'anonymous-mastodon' && typeof ref?.statusId === 'string'
+      ? ref.statusId
+      : status.id;
   }
 
   toggleFollow(): void {

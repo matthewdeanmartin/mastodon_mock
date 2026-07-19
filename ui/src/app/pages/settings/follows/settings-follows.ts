@@ -54,8 +54,8 @@ export class SettingsFollows implements OnInit {
       ? [
           '/accounts',
           anonymousAccountRouteRef({
-            server: follow.server,
-            id: follow.account.id,
+            server: follow.readRef.server,
+            id: follow.readRef.accountId,
             originalUrl: follow.profileUrl,
           }),
         ]
@@ -63,11 +63,10 @@ export class SettingsFollows implements OnInit {
   }
 
   protected sourceStatus(follow: AnonymousFollow): string {
-    if (!follow.apiRetryAfter || Date.parse(follow.apiRetryAfter) <= Date.now())
-      return 'Public API';
-    return follow.preferredSource === 'rss'
-      ? 'Using RSS fallback temporarily'
-      : 'Temporarily deferred after API and RSS failed';
+    const deferred = Object.entries(follow.routeRetryAfter)
+      .filter(([, retryAfter]) => !!retryAfter && Date.parse(retryAfter) > Date.now())
+      .map(([route]) => route);
+    return deferred.length ? `Retrying around: ${deferred.join(', ')}` : 'Public API first';
   }
 
   retry(follow: AnonymousFollow): void {

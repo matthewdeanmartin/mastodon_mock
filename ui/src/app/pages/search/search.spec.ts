@@ -13,6 +13,7 @@ import { BehaviorSubject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchResults, Status, Tag } from '../../models';
 import { Search } from './search';
+import { Auth } from '../../auth';
 
 /** Exposes Search's protected signals for white-box testing. */
 interface SearchInternals {
@@ -68,6 +69,7 @@ describe('Search', () => {
   let queryParams$: BehaviorSubject<ParamMap>;
 
   beforeEach(() => {
+    localStorage.clear();
     queryParams$ = new BehaviorSubject<ParamMap>(convertToParamMap({}));
 
     TestBed.configureTestingModule({
@@ -154,6 +156,21 @@ describe('Search', () => {
 
     expect(internals(fixture).searching()).toBe(false);
     expect(internals(fixture).results()).toEqual(makeResults([s1]));
+  });
+
+  it('uses the selected instance public API for anonymous hashtag search', () => {
+    TestBed.inject(Auth).enterAnonymous('https://home.example');
+    queryParams$.next(convertToParamMap({ q: 'cats', type: 'hashtags' }));
+    const fixture = setUp();
+
+    const request = httpMock.expectOne(
+      (candidate) =>
+        candidate.url === 'https://home.example/api/v2/search' &&
+        candidate.params.get('type') === 'hashtags',
+    );
+    request.flush({ accounts: [], statuses: [], hashtags: [{ name: 'cats' }] });
+
+    expect(internals(fixture).results()?.hashtags[0].name).toBe('cats');
   });
 
   it('run() clears searching on HTTP error', () => {

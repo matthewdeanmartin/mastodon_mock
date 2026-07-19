@@ -138,8 +138,8 @@ export class ListTimeline implements OnInit {
       ? [
           '/accounts',
           anonymousAccountRouteRef({
-            server: follow.server,
-            id: follow.account.id,
+            server: follow.readRef.server,
+            id: follow.readRef.accountId,
             originalUrl: follow.profileUrl,
           }),
         ]

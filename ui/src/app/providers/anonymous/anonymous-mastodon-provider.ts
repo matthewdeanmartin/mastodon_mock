@@ -4,7 +4,12 @@ import { catchError, map, mergeMap, Observable, of, throwError, timeout, toArray
 import { Auth } from '../../auth';
 import { Account, Status } from '../../models';
 import { FeedProvider } from '../provider';
-import { AnonymousFollow, AnonymousFollows } from './anonymous-follows';
+import {
+  AnonymousFollow,
+  AnonymousFollows,
+  AnonymousReadRef,
+  AnonymousReadRoute,
+} from './anonymous-follows';
 import { RssFetch } from '../rss/rss-fetch';
 import { feedToStatuses } from '../rss/rss-adapter';
 import { AnonymousAccount } from './anonymous-account';
@@ -18,6 +23,7 @@ const REQUEST_TIMEOUT_MS = 8_000;
 interface SourceCursor {
   follow: AnonymousFollow;
   maxId?: string;
+  routeKey?: string;
   exhausted: boolean;
 }
 
@@ -31,7 +37,6 @@ interface ActiveSource {
   label: string;
   cursor: { exhausted: boolean };
   fetch: () => Observable<Status[]>;
-  followKey?: string;
 }
 
 export interface AnonymousFollowFeedPage {
@@ -103,7 +108,6 @@ export class AnonymousMastodonProvider implements FeedProvider {
 
   private cursors: SourceCursor[] = [];
   private tagCursors: TagCursor[] = [];
-  private accountIds = new Map<string, string>();
   private rssFallbacks = new Set<string>();
   private seen = new Set<string>();
 
@@ -123,7 +127,6 @@ export class AnonymousMastodonProvider implements FeedProvider {
           label: `@${source.follow.handle}`,
           cursor: source,
           fetch: () => this.fetchSource(source),
-          followKey: source.follow.key,
         })),
       ...this.tagCursors
         .filter((source) => !source.exhausted)
@@ -143,7 +146,6 @@ export class AnonymousMastodonProvider implements FeedProvider {
           source.fetch().pipe(
             catchError(() => {
               source.cursor.exhausted = true;
-              if (source.followKey) this.followStore.markUnavailable(source.followKey);
               failures.push(`Could not load ${source.label}.`);
               return of<Status[]>([]);
             }),
@@ -198,7 +200,6 @@ export class AnonymousMastodonProvider implements FeedProvider {
           this.fetchSource(source).pipe(
             catchError(() => {
               source.exhausted = true;
-              this.followStore.markUnavailable(source.follow.key);
               warnings.push(`Could not load @${source.follow.handle}.`);
               return of<Status[]>([]);
             }),
@@ -223,54 +224,69 @@ export class AnonymousMastodonProvider implements FeedProvider {
   }
 
   private fetchSource(source: SourceCursor): Observable<Status[]> {
-    if (this.followStore.shouldDefer(source.follow)) {
-      return throwError(() => new Error('Source is temporarily deferred.'));
-    }
-    if (this.followStore.prefersRss(source.follow)) {
-      return this.fetchRss(source);
-    }
-    const cachedId = this.accountIds.get(source.follow.key);
-    const account$ = cachedId
-      ? of(cachedId)
-      : this.lookupAccount(source.follow).pipe(
-          map((account) => {
-            this.accountIds.set(source.follow.key, account.id);
-            return account.id;
-          }),
-        );
-    return account$.pipe(
-      mergeMap((accountId) => {
-        let params = new HttpParams()
-          .set('limit', String(PAGE_SIZE))
-          .set('exclude_replies', 'true');
-        if (source.maxId) {
-          params = params.set('max_id', source.maxId);
-        }
-        return this.http
-          .get<Status[]>(`${source.follow.server}/api/v1/accounts/${accountId}/statuses`, {
-            params,
-            context: externalFetch(),
-          })
-          .pipe(timeout(REQUEST_TIMEOUT_MS));
-      }),
-      map((statuses) => {
-        this.followStore.markApiSuccess(source.follow.key);
-        source.maxId = statuses.at(-1)?.id ?? source.maxId;
-        if (statuses.length < PAGE_SIZE) {
-          source.exhausted = true;
-        }
-        return statuses.map((status) => adaptAnonymousStatus(status, source.follow.server));
-      }),
+    return this.fetchApi(source, source.follow.readRef, 'read-api').pipe(
+      catchError(() => this.fetchCanonicalApi(source)),
       catchError(() => this.fetchRss(source)),
     );
   }
 
+  private fetchCanonicalApi(source: SourceCursor): Observable<Status[]> {
+    if (this.followStore.routeDeferred(source.follow, 'canonical-api')) {
+      return throwError(() => new Error('Canonical public API is temporarily deferred.'));
+    }
+    return this.lookupAccount(source.follow).pipe(
+      mergeMap((account) =>
+        this.fetchApi(
+          source,
+          { server: source.follow.server, accountId: account.id },
+          'canonical-api',
+        ),
+      ),
+      catchError((error: unknown) => {
+        this.followStore.markRouteFailure(source.follow.key, 'canonical-api');
+        return throwError(() => error);
+      }),
+    );
+  }
+
+  private fetchApi(
+    source: SourceCursor,
+    ref: AnonymousReadRef,
+    route: Exclude<AnonymousReadRoute, 'rss'>,
+  ): Observable<Status[]> {
+    if (this.followStore.routeDeferred(source.follow, route)) {
+      return throwError(() => new Error('Public API route is temporarily deferred.'));
+    }
+    const routeKey = `${ref.server}:${ref.accountId}`;
+    let params = new HttpParams().set('limit', String(PAGE_SIZE)).set('exclude_replies', 'true');
+    if (source.maxId && source.routeKey === routeKey) {
+      params = params.set('max_id', source.maxId);
+    }
+    const url = `${ref.server}/api/v1/accounts/${encodeURIComponent(ref.accountId)}/statuses`;
+    return this.http.get<Status[]>(url, { params, context: externalFetch() }).pipe(
+      timeout(REQUEST_TIMEOUT_MS),
+      map((statuses) => {
+        source.routeKey = routeKey;
+        source.maxId = statuses.at(-1)?.id ?? source.maxId;
+        if (statuses.length < PAGE_SIZE) source.exhausted = true;
+        this.followStore.markApiSuccess(source.follow.key, ref);
+        return statuses.map((status) => adaptAnonymousStatus(status, ref.server));
+      }),
+      catchError((error: unknown) => {
+        this.followStore.markRouteFailure(source.follow.key, route);
+        return throwError(() => error);
+      }),
+    );
+  }
+
   private fetchRss(source: SourceCursor): Observable<Status[]> {
+    if (this.followStore.routeDeferred(source.follow, 'rss')) {
+      return throwError(() => new Error('RSS route is temporarily deferred.'));
+    }
     const feedUrl = `${source.follow.profileUrl.replace(/\/$/, '')}.rss`;
     return this.rss.fetchFeed(feedUrl).pipe(
       map((feed) => {
         source.exhausted = true;
-        this.followStore.markRssFallback(source.follow.key);
         this.rssFallbacks.add(source.follow.handle);
         const fetchedAt = new Date().toISOString();
         return feedToStatuses(feedUrl, feed, fetchedAt).map((status) => ({
@@ -284,6 +300,10 @@ export class AnonymousMastodonProvider implements FeedProvider {
           },
           account: adaptAnonymousAccount(source.follow.account, source.follow.server),
         }));
+      }),
+      catchError((error: unknown) => {
+        this.followStore.markRouteFailure(source.follow.key, 'rss');
+        return throwError(() => error);
       }),
     );
   }

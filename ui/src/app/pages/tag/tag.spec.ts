@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Status, Tag as TagEntity } from '../../models';
 import { Tag } from './tag';
+import { Auth } from '../../auth';
 
 interface TagInternals {
   tag: WritableSignal<string>;
@@ -61,10 +62,11 @@ function makeTagEntity(name: string, overrides: Partial<TagEntity> = {}): TagEnt
 
 let httpMock: HttpTestingController;
 
-function setUpWithTag(tagName: string): ComponentFixture<Tag> {
+function setUpWithTag(tagName: string, prepare?: () => void): ComponentFixture<Tag> {
   TestBed.overrideProvider(ActivatedRoute, {
     useValue: { paramMap: of(convertToParamMap({ tag: tagName })) },
   });
+  prepare?.();
   httpMock = TestBed.inject(HttpTestingController);
   const fixture = TestBed.createComponent(Tag);
   fixture.detectChanges();
@@ -73,6 +75,7 @@ function setUpWithTag(tagName: string): ComponentFixture<Tag> {
 
 describe('Tag (timeline)', () => {
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
@@ -95,6 +98,20 @@ describe('Tag (timeline)', () => {
     expect(internals(fixture).tag()).toBe('cats');
     expect(internals(fixture).tagInfo()?.name).toBe('cats');
     expect(internals(fixture).statuses()).toHaveLength(1);
+    expect(internals(fixture).loading()).toBe(false);
+  });
+
+  it('loads an anonymous tag timeline from the selected public instance', () => {
+    const fixture = setUpWithTag('cats', () =>
+      TestBed.inject(Auth).enterAnonymous('https://home.example'),
+    );
+
+    httpMock.expectOne('https://home.example/api/v1/tags/cats').flush(makeTagEntity('cats'));
+    httpMock
+      .expectOne('https://home.example/api/v1/timelines/tag/cats?limit=20')
+      .flush([makeStatus('1')]);
+
+    expect(internals(fixture).statuses()[0].provider).toBe('anonymous-mastodon');
     expect(internals(fixture).loading()).toBe(false);
   });
 

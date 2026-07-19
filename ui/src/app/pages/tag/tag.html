@@ -32,4 +32,9 @@
       (deleted)="onDeleted($event)"
     />
   }
+  @if (!exhausted()) {
+    <button class="btn btn-outline more" [disabled]="loadingMore()" (click)="loadMore()">
+      {{ loadingMore() ? 'Loading…' : 'Load more' }}
+    </button>
+  }
 }

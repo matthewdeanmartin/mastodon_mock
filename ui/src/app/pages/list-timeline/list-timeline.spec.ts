@@ -7,6 +7,8 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Account, Status, UserList } from '../../models';
 import { ListTimeline } from './list-timeline';
+import { Auth } from '../../auth';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 
 interface ListTimelineInternals {
   title: WritableSignal<string>;
@@ -60,10 +62,11 @@ function makeList(id: string, title: string): UserList {
 
 let httpMock: HttpTestingController;
 
-function setUpWithList(listId: string): ComponentFixture<ListTimeline> {
+function setUpWithList(listId: string, prepare?: () => void): ComponentFixture<ListTimeline> {
   TestBed.overrideProvider(ActivatedRoute, {
     useValue: { paramMap: of(convertToParamMap({ id: listId })) },
   });
+  prepare?.();
   httpMock = TestBed.inject(HttpTestingController);
   const fixture = TestBed.createComponent(ListTimeline);
   fixture.detectChanges();
@@ -72,6 +75,7 @@ function setUpWithList(listId: string): ComponentFixture<ListTimeline> {
 
 describe('ListTimeline', () => {
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
@@ -82,6 +86,40 @@ describe('ListTimeline', () => {
   });
 
   // ---------------------------------------------------------------- initial load
+
+  it('blends posts from browser-local list members through their saved public read refs', () => {
+    let follows!: AnonymousFollows;
+    let target!: Account;
+    const fixture = setUpWithList('anonymous-list', () => {
+      localStorage.setItem(
+        'mockingbird_anonymous_lists',
+        JSON.stringify({
+          version: 2,
+          lists: [{ id: 'anonymous-list', title: 'Readers', memberKeys: ['alice@social.example'] }],
+        }),
+      );
+      TestBed.inject(Auth).enterAnonymous('https://home.example');
+      follows = TestBed.inject(AnonymousFollows);
+      target = {
+        ...makeAccount('local-alice'),
+        username: 'alice',
+        acct: 'alice@social.example',
+        url: 'https://social.example/@alice',
+      };
+      follows.follow(target, 'https://home.example');
+    });
+    httpMock
+      .expectOne(
+        'https://home.example/api/v1/accounts/local-alice/statuses?limit=20&exclude_replies=true',
+      )
+      .flush([{ ...makeStatus('post-1'), account: target }]);
+
+    expect(internals(fixture).members()).toEqual([follows.follows()[0].account]);
+    expect(internals(fixture).statuses()).toHaveLength(1);
+    expect(internals(fixture).statuses()[0].provider).toBe('anonymous-mastodon');
+    expect(internals(fixture).title()).toBe('Readers');
+    httpMock.expectNone((request) => request.url.startsWith('/api/v1/lists/'));
+  });
 
   it('fetches list metadata and timeline on init for the route param', () => {
     const fixture = setUpWithList('42');
