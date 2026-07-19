@@ -10,7 +10,6 @@ export const STARTER_COLLECTION: readonly StarterAccount[] = [
   { name: 'Mastodon Engineering', handle: 'MastodonEngineering@mastodon.social' },
   { name: 'Foone', handle: 'foone@digipres.club' },
   { name: 'The Retroist', handle: 'retroist@mastodon.social' },
-  { name: 'Possum Every Hour', handle: 'possumeveryhour@botsin.space' },
   { name: 'FediTips', handle: 'FediTips@social.growyourown.services' },
   { name: 'Electronic Frontier Foundation', handle: 'eff@mastodon.social' },
   { name: 'Cory Doctorow / Pluralistic', handle: 'pluralistic@mamot.fr' },

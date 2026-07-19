@@ -27,7 +27,7 @@
   [showLive]="!auth.isAnonymous"
   [providerChips]="true"
   [showRefresh]="!live()"
-  (refresh)="load()"
+  (refresh)="load(true)"
   (toggleLive)="toggleLive()"
   (providerVisibilityChanged)="load()"
 />
@@ -44,15 +44,30 @@
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!visible().length) {
-  <p class="muted center">
-    @if (auth.isAnonymous) {
-      Follow a public Mastodon account from Search or its profile to build this feed. Posts are
-      fetched only when you load or refresh this page.
-    } @else {
-      Your home timeline is empty.
-      <a routerLink="/find-people">Find people to follow</a>, or post something.
-    }
-  </p>
+  @if (auth.isAnonymous && anonymousFollows.count() === 0) {
+    <article class="starter-pack-post">
+      <div class="starter-pack-avatar" aria-hidden="true">M</div>
+      <div class="starter-pack-content">
+        <div class="starter-pack-author">
+          <strong>Mawkingbird</strong>
+          <span class="muted">&#64;mawkingbird</span>
+        </div>
+        <a routerLink="/collections/starter">
+          Get your account started with the universal starter pack
+        </a>
+      </div>
+    </article>
+  } @else {
+    <p class="muted center">
+      @if (auth.isAnonymous) {
+        Follow a public Mastodon account from Search or its profile to build this feed. Posts are
+        fetched only when you load or refresh this page.
+      } @else {
+        Your home timeline is empty.
+        <a routerLink="/find-people">Find people to follow</a>, or post something.
+      }
+    </p>
+  }
 } @else {
   @for (s of visible(); track s.id) {
     <app-status-card

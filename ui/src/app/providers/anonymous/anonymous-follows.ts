@@ -1,5 +1,6 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { Account, Relationship } from '../../models';
+import { AnonymousHomeFeedCache } from './anonymous-home-feed-cache';
 
 const STORAGE_KEY = 'mockingbird_anonymous_follows';
 const STATE_VERSION = 2;
@@ -130,6 +131,7 @@ function loadState(): AnonymousFollowState {
 @Injectable({ providedIn: 'root' })
 export class AnonymousFollows {
   private state = signal(loadState());
+  private homeFeedCache = inject(AnonymousHomeFeedCache);
 
   readonly follows = computed(() => this.state().follows);
   readonly count = computed(() => this.follows().length);
@@ -209,12 +211,14 @@ export class AnonymousFollows {
       readRef: { server: readServer, accountId: account.id },
       routeRetryAfter: emptyRetryState(),
     };
+    this.homeFeedCache.invalidate();
     this.persist([...this.follows(), follow]);
     return { ok: true, relationship: relationship(account.id, true) };
   }
 
   unfollow(account: Account, fallbackServer: string): Relationship {
     const key = keyFor(account, fallbackServer);
+    if (this.follows().some((follow) => follow.key === key)) this.homeFeedCache.invalidate();
     this.persist(this.follows().filter((follow) => follow.key !== key));
     return relationship(account.id, false);
   }

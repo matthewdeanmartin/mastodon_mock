@@ -23,6 +23,8 @@ import {
 } from '../../providers/anonymous/anonymous-feed-corpus';
 import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmarks';
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
+import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home-feed-cache';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 
 /** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -49,6 +51,8 @@ export class Home implements OnInit, OnDestroy {
   private anonymousCorpus = inject(AnonymousFeedCorpus);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   protected anonymousProvider = inject(AnonymousMastodonProvider);
+  private anonymousHomeCache = inject(AnonymousHomeFeedCache);
+  protected anonymousFollows = inject(AnonymousFollows);
   private route = inject(ActivatedRoute);
   private drafts = inject(Drafts);
 
@@ -165,12 +169,21 @@ export class Home implements OnInit, OnDestroy {
     });
   }
 
-  load(): void {
+  load(forceRefresh = false): void {
     this.pageSub?.unsubscribe();
     this.autoLoading.set(false);
     this.loading.set(true);
     this.maxHitAt.set(null);
     this.bookmarkTail.set([]);
+    this.aggregator.reset();
+    if (this.auth.isAnonymous && !forceRefresh && this.anonymousHomeCache.populated()) {
+      const cached = this.anonymousHomeCache.statuses();
+      this.statuses.set(cached);
+      this.publishMastodon(cached);
+      this.loading.set(false);
+      this.diagnostics.info('load:anonymous-cache-hit', { stored: cached.length });
+      return;
+    }
     this.diagnostics.info('load:start', {
       mode: this.auth.mode() ?? 'unauthenticated',
       server: this.server.baseUrl() || 'same-origin',
@@ -181,7 +194,6 @@ export class Home implements OnInit, OnDestroy {
       feedMin: this.prefs.feedMin(),
       feedMax: this.prefs.feedMax(),
     });
-    this.aggregator.reset();
     this.pageSub = this.aggregator.nextPage().subscribe({
       next: (s) => {
         this.statuses.set(this.auth.isAnonymous ? this.dedupeAnonymous(s) : s);
@@ -198,6 +210,7 @@ export class Home implements OnInit, OnDestroy {
           this.diagnostics.warn('load:first-page-empty', details);
         }
         this.publishMastodon(s);
+        this.cacheAnonymousHome();
         this.loading.set(false);
         // Auto-load further pages until the feed reaches the configured minimum.
         this.fillToMinimum();
@@ -241,6 +254,7 @@ export class Home implements OnInit, OnDestroy {
           visible: this.visible().length,
         });
         this.publishMastodon(more);
+        this.cacheAnonymousHome();
         this.fillToMinimum();
       },
       error: (error: unknown) => {
@@ -271,6 +285,7 @@ export class Home implements OnInit, OnDestroy {
           visible: this.visible().length,
         });
         this.publishMastodon(more);
+        this.cacheAnonymousHome();
         this.autoLoading.set(false);
       },
       error: (error: unknown) => {
@@ -344,6 +359,10 @@ export class Home implements OnInit, OnDestroy {
     this.homeTimelineFeed.publish(
       statuses.filter((status) => !status.provider || status.provider === 'anonymous-mastodon'),
     );
+  }
+
+  private cacheAnonymousHome(): void {
+    if (this.auth.isAnonymous) this.anonymousHomeCache.store(this.statuses());
   }
 
   onPosted(status: Status): void {

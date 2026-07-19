@@ -10,6 +10,8 @@ import { Status } from '../../models';
 import { Streaming } from '../../streaming';
 import { FakeStreaming } from '../../testing/fake-streaming';
 import { Home } from './home';
+import { Auth } from '../../auth';
+import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home-feed-cache';
 
 /** Exposes Home's protected signals for white-box testing. */
 interface HomeInternals {
@@ -100,6 +102,36 @@ describe('Home', () => {
       'load:first-page-empty',
       expect.objectContaining({ received: 0, stored: 0, visible: 0 }),
     );
+  });
+
+  it('reuses a populated Anonymous feed until the user explicitly refreshes', () => {
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const cached = { ...makeStatus('cached'), provider: 'anonymous-mastodon' } as Status;
+    TestBed.inject(AnonymousHomeFeedCache).store([cached]);
+
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+
+    expect(
+      internals(fixture)
+        .statuses()
+        .map((status) => status.id),
+    ).toEqual(['cached']);
+    httpMock.expectNone((request) => request.url.includes('/statuses'));
+
+    fixture.componentInstance.load(true);
+    expect(internals(fixture).statuses()).toEqual([]);
+  });
+
+  it('offers the universal starter pack in an empty zero-follow Anonymous feed', () => {
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.starter-pack-post a') as HTMLAnchorElement;
+    expect(link.textContent).toContain('Get your account started with the universal starter pack');
+    expect(link.getAttribute('href')).toBe('/collections/starter');
   });
 
   it('toggleLive() opens a user stream and flips the live flag', () => {

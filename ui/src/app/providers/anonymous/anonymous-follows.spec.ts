@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Account } from '../../models';
 import { ANONYMOUS_FOLLOW_LIMIT, AnonymousFollows } from './anonymous-follows';
+import { AnonymousHomeFeedCache } from './anonymous-home-feed-cache';
 
 function account(username: string, host = 'example.social'): Account {
   return {
@@ -53,6 +54,20 @@ describe('AnonymousFollows', () => {
     follows.follow({ ...account('alice'), id: 'another-server-id' }, 'https://other.example');
 
     expect(follows.count()).toBe(1);
+  });
+
+  it('invalidates the populated home feed when following or unfollowing', () => {
+    const cache = TestBed.inject(AnonymousHomeFeedCache);
+    const follows = TestBed.inject(AnonymousFollows);
+    const target = account('alice');
+    cache.store([{ id: 'cached', account: target } as never]);
+
+    follows.follow(target, 'https://mastodon.social');
+    expect(cache.populated()).toBe(false);
+
+    cache.store([{ id: 'cached-again', account: target } as never]);
+    follows.unfollow(target, 'https://mastodon.social');
+    expect(cache.populated()).toBe(false);
   });
 
   it('unfollows locally', () => {

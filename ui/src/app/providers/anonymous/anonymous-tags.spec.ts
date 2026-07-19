@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ANONYMOUS_TAG_LIMIT, AnonymousTags } from './anonymous-tags';
+import { AnonymousHomeFeedCache } from './anonymous-home-feed-cache';
 
 describe('AnonymousTags', () => {
   beforeEach(() => {
@@ -24,5 +25,18 @@ describe('AnonymousTags', () => {
     const result = tags.follow('one-too-many');
     expect(result.ok).toBe(false);
     expect(tags.count()).toBe(ANONYMOUS_TAG_LIMIT);
+  });
+
+  it('invalidates the populated home feed when following or unfollowing a hashtag', () => {
+    const cache = TestBed.inject(AnonymousHomeFeedCache);
+    const tags = TestBed.inject(AnonymousTags);
+    cache.store([{ id: 'cached', account: { username: 'alice' } } as never]);
+
+    tags.follow('cats');
+    expect(cache.populated()).toBe(false);
+
+    cache.store([{ id: 'cached-again', account: { username: 'alice' } } as never]);
+    tags.unfollow('cats');
+    expect(cache.populated()).toBe(false);
   });
 });

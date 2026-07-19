@@ -1,4 +1,5 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { AnonymousHomeFeedCache } from './anonymous-home-feed-cache';
 
 const STORAGE_KEY = 'mockingbird_anonymous_tags';
 const STATE_VERSION = 1;
@@ -36,6 +37,7 @@ function loadState(): AnonymousTagState {
 @Injectable({ providedIn: 'root' })
 export class AnonymousTags {
   private state = signal(loadState());
+  private homeFeedCache = inject(AnonymousHomeFeedCache);
 
   readonly tags = computed(() => this.state().tags);
   readonly count = computed(() => this.tags().length);
@@ -55,12 +57,14 @@ export class AnonymousTags {
         error: `Anonymous accounts can follow up to ${ANONYMOUS_TAG_LIMIT} hashtags.`,
       };
     }
+    this.homeFeedCache.invalidate();
     this.persist([...this.tags(), tag]);
     return { ok: true };
   }
 
   unfollow(name: string): void {
     const tag = normalize(name);
+    if (this.has(tag)) this.homeFeedCache.invalidate();
     this.persist(this.tags().filter((saved) => saved !== tag));
   }
 

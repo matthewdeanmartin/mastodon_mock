@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { STARTER_COLLECTION } from './starter-collection';
 
 describe('STARTER_COLLECTION', () => {
-  it('ships the complete, unique 25-account starter set', () => {
-    expect(STARTER_COLLECTION).toHaveLength(25);
+  it('ships the complete, unique 24-account starter set without the retired botsin.space account', () => {
+    expect(STARTER_COLLECTION).toHaveLength(24);
     expect(new Set(STARTER_COLLECTION.map((account) => account.handle.toLowerCase())).size).toBe(
-      25,
+      24,
+    );
+    expect(STARTER_COLLECTION.some((account) => account.handle.endsWith('@botsin.space'))).toBe(
+      false,
     );
     expect(STARTER_COLLECTION).toContainEqual({
       name: 'Eugen Rochko',
