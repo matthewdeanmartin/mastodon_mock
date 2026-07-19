@@ -136,8 +136,9 @@ Home without authenticated mutations.
 - Full coverage-enabled `npm run test:ci`: passed.
 - `npm run lint`: passed with zero warnings.
 - TypeScript application compilation: passed.
-- Production and Mockingbird builds: see final Sprint 4 close verification.
-- `git diff --check`: see final Sprint 4 close verification.
+- `npm run build`: passed.
+- `npm run build:mockingbird`: passed.
+- `git diff --check`: passed.
 
 ## Handoff
 
