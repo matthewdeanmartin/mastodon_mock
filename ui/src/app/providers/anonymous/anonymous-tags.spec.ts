@@ -18,7 +18,7 @@ describe('AnonymousTags', () => {
     ]);
   });
 
-  it('rejects the sixth followed tag', () => {
+  it('rejects an eleventh followed tag', () => {
     const tags = TestBed.inject(AnonymousTags);
     for (let index = 0; index < ANONYMOUS_TAG_LIMIT; index += 1) tags.follow(`tag${index}`);
     const result = tags.follow('one-too-many');

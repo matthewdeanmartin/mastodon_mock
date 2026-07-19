@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { RssSubscriptions } from '../providers/rss/rss-subscriptions';
 import { CommandBar } from './command-bar';
@@ -67,10 +68,16 @@ describe('CommandBar', () => {
     expect(el.textContent).toContain('📡 RSS');
   });
 
-  it('hides the chips when no provider is linked', () => {
+  it('keeps the authenticated Fedi control available when no foreign provider is linked', () => {
+    const el = setUp(true).nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Fedi');
+    expect(el.textContent).not.toContain('RSS');
+  });
+
+  it('does not show an irrelevant Fedi control for Anonymous with no local source', () => {
+    TestBed.inject(Auth).enterAnonymous('https://social.example');
     const el = setUp(true).nativeElement as HTMLElement;
     expect(el.textContent).not.toContain('Fedi');
-    expect(el.textContent).not.toContain('RSS');
   });
 
   it('chips toggle provider visibility in ClientPrefs', () => {

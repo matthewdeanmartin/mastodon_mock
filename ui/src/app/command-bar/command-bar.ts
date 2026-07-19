@@ -1,4 +1,5 @@
 import { Component, inject, input, output } from '@angular/core';
+import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { ProviderId } from '../models';
 import { ProviderRegistry } from '../providers/provider-registry';
@@ -43,15 +44,17 @@ import { ProviderRegistry } from '../providers/provider-registry';
       >
         🖼️ {{ prefs.showImages() ? 'Images' : 'No images' }}
       </button>
-      @if (providerChips() && registry.linked().length) {
-        <button
-          class="btn btn-outline"
-          [class.active]="prefs.isProviderVisible('mastodon')"
-          (click)="toggleProvider('mastodon')"
-          title="Show or hide Mastodon posts"
-        >
-          🦣 Fedi
-        </button>
+      @if (providerChips() && (!auth.isAnonymous || registry.linked().length)) {
+        @if (!auth.isAnonymous) {
+          <button
+            class="btn btn-outline"
+            [class.active]="prefs.isProviderVisible('mastodon')"
+            (click)="toggleProvider('mastodon')"
+            title="Show or hide Mastodon posts"
+          >
+            🦣 Fedi
+          </button>
+        }
         @for (p of registry.linked(); track p.id) {
           <button
             class="btn btn-outline"
@@ -103,6 +106,7 @@ import { ProviderRegistry } from '../providers/provider-registry';
   `,
 })
 export class CommandBar {
+  protected readonly auth = inject(Auth);
   protected readonly prefs = inject(ClientPrefs);
   protected readonly registry = inject(ProviderRegistry);
 

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Account, Context, Status } from '../../models';
+import { Account, Context, SearchResults, Status } from '../../models';
 import { AnonymousPublicApi } from './anonymous-public-api';
 
 function account(): Account {
@@ -121,6 +121,25 @@ describe('AnonymousPublicApi', () => {
       statusId: '79',
       accountId: '7',
     });
+  });
+
+  it('approximates anonymous post search by merging each query-word hashtag timeline', () => {
+    let received: SearchResults | undefined;
+    api
+      .searchPostsByHashtags('https://social.example', 'Cats, DOGS cats')
+      .subscribe((results) => (received = results));
+
+    const cats = http.expectOne('https://social.example/api/v1/timelines/tag/cats?limit=20');
+    const dogs = http.expectOne('https://social.example/api/v1/timelines/tag/dogs?limit=20');
+    cats.flush([status('10')]);
+    dogs.flush([status('10'), status('11')]);
+
+    expect(received?.statuses.map((item) => item.providerRef)).toEqual([
+      { server: 'https://social.example', statusId: '10', accountId: '7' },
+      { server: 'https://social.example', statusId: '11', accountId: '7' },
+    ]);
+    expect(received?.hashtags.map((tag) => tag.name)).toEqual(['cats', 'dogs']);
+    http.expectNone((request) => request.url.includes('/api/v2/search'));
   });
 
   it('adapts anonymous search results to stable public source references', () => {

@@ -2,7 +2,7 @@ import { computed, Injectable, signal } from '@angular/core';
 
 const STORAGE_KEY = 'mockingbird_anonymous_tags';
 const STATE_VERSION = 1;
-export const ANONYMOUS_TAG_LIMIT = 5;
+export const ANONYMOUS_TAG_LIMIT = 10;
 
 interface AnonymousTagState {
   version: typeof STATE_VERSION;

@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { map, Observable, timeout } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, timeout } from 'rxjs';
 import { AccountStatusesOptions } from '../../api';
 import { Account, Context, SearchResults, Status, Tag } from '../../models';
 import { externalFetch } from '../external-fetch';
@@ -8,6 +8,13 @@ import { adaptAnonymousAccount, adaptAnonymousStatus } from './anonymous-mastodo
 import { AnonymousPublicRef } from './anonymous-route-ref';
 
 const REQUEST_TIMEOUT_MS = 8_000;
+const ANONYMOUS_POST_SEARCH_TAG_LIMIT = 10;
+
+function searchTags(query: string): string[] {
+  return [
+    ...new Set((query.match(/[\p{L}\p{N}_]+/gu) ?? []).map((word) => word.toLocaleLowerCase())),
+  ].slice(0, ANONYMOUS_POST_SEARCH_TAG_LIMIT);
+}
 
 /** Read-only public Mastodon API calls used by Anonymous profile and thread routes. */
 @Injectable({ providedIn: 'root' })
@@ -93,6 +100,35 @@ export class AnonymousPublicApi {
         timeout(REQUEST_TIMEOUT_MS),
         map((statuses) => statuses.map((status) => adaptAnonymousStatus(status, server))),
       );
+  }
+
+  /** Approximate anonymous post search by merging one public hashtag timeline per query word. */
+  searchPostsByHashtags(server: string, query: string): Observable<SearchResults> {
+    const tags = searchTags(query);
+    if (!tags.length) {
+      return of({ accounts: [], statuses: [], hashtags: [] });
+    }
+    return forkJoin(
+      tags.map((tag) => this.getTagTimeline(server, tag).pipe(catchError(() => of<Status[]>([])))),
+    ).pipe(
+      map((pages) => {
+        const byUrl = new Map<string, Status>();
+        for (const status of pages.flat()) {
+          const key = status.url || status.id;
+          if (!byUrl.has(key)) byUrl.set(key, status);
+        }
+        return {
+          accounts: [],
+          statuses: [...byUrl.values()].sort(
+            (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+          ),
+          hashtags: tags.map((name) => ({
+            name,
+            url: `${server}/tags/${encodeURIComponent(name)}`,
+          })),
+        };
+      }),
+    );
   }
 
   search(

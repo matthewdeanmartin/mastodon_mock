@@ -150,7 +150,9 @@ export class Search implements OnInit {
     const resolve =
       type === 'accounts' && (/^@?[\w.-]+@[\w.-]+\.\w+$/.test(q) || /^https?:\/\//.test(q));
     const request = this.capabilities.active
-      ? this.anonymousPublic.search(this.anonymous.server(), q, type)
+      ? type === 'statuses'
+        ? this.anonymousPublic.searchPostsByHashtags(this.anonymous.server(), q)
+        : this.anonymousPublic.search(this.anonymous.server(), q, type)
       : this.api.search(q, type, resolve ? { resolve: true } : undefined);
     this.activeSearch = request.subscribe({
       next: (r) => {

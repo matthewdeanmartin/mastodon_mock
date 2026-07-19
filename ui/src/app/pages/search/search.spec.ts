@@ -173,6 +173,27 @@ describe('Search', () => {
     expect(internals(fixture).results()?.hashtags[0].name).toBe('cats');
   });
 
+  it('fakes anonymous post search by fetching a public hashtag timeline for each word', () => {
+    TestBed.inject(Auth).enterAnonymous('https://home.example');
+    queryParams$.next(convertToParamMap({ q: 'good dogs', type: 'statuses' }));
+    const fixture = setUp();
+
+    httpMock
+      .expectOne('https://home.example/api/v1/timelines/tag/good?limit=20')
+      .flush([makeStatus('1')]);
+    httpMock
+      .expectOne('https://home.example/api/v1/timelines/tag/dogs?limit=20')
+      .flush([makeStatus('2')]);
+
+    expect(internals(fixture).results()?.statuses).toHaveLength(2);
+    expect(
+      internals(fixture)
+        .results()
+        ?.hashtags.map((tag) => tag.name),
+    ).toEqual(['good', 'dogs']);
+    httpMock.expectNone((request) => request.url.includes('/api/v2/search'));
+  });
+
   it('run() clears searching on HTTP error', () => {
     const fixture = setUp();
     search(fixture, 'dogs');
