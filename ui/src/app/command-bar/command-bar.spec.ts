@@ -56,6 +56,28 @@ describe('CommandBar', () => {
     expect(el.textContent).toContain('A+');
   });
 
+  it('recovers images from reader mode with one click (turning reader off)', () => {
+    const fixture = setUp();
+    const prefs = TestBed.inject(ClientPrefs);
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Reader mode on: images are effectively hidden, button reads "No images".
+    prefs.setFeedReader(true);
+    fixture.detectChanges();
+    const imagesBtn = [...el.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('images'),
+    )!;
+    expect(imagesBtn.textContent).toContain('No images');
+    expect(imagesBtn.hasAttribute('disabled')).toBe(false);
+
+    // One click brings images back AND leaves reader mode — always recoverable.
+    imagesBtn.click();
+    fixture.detectChanges();
+    expect(prefs.showImages()).toBe(true);
+    expect(prefs.feedReader()).toBe(false);
+    expect(document.documentElement.getAttribute('data-images')).toBe('on');
+  });
+
   it('shows provider filter chips only on provider pages with a linked provider', () => {
     // No chips without the input, even with feeds configured.
     TestBed.inject(RssSubscriptions).add('https://a.example/feed', 'A');

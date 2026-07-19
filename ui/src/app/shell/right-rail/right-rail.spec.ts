@@ -57,23 +57,27 @@ describe('RightRail', () => {
     expect(internals(fixture).donateServerUrl()).toBe('https://mastodon.social/about');
   });
 
-  it('renders the donate links and all three house ads', () => {
+  it('renders the donate links and three house ads', () => {
     TestBed.inject(Auth).account.set({ id: '1', acct: 'matt@elekk.xyz' } as Account);
     const fixture = setUp();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
+    // Donate links are computed from the account/instance, so assert them.
     const hrefs = [...el.querySelectorAll<HTMLAnchorElement>('a[href]')].map((a) =>
       a.getAttribute('href'),
     );
     expect(hrefs).toContain('https://elekk.xyz/about');
     expect(hrefs).toContain('https://joinmastodon.org/sponsors');
-    expect(hrefs).toContain('https://github.com/matthewdeanmartin/mastodon_is_my_blog/');
-    expect(hrefs).toContain(
-      'https://matthewdeanmartin.github.io/mastodon_is_my_blog/mimb_lite/index.html',
-    );
-    expect(hrefs).toContain('https://matthewdeanmartin.github.io/youtuberfinder/');
-    expect(el.querySelectorAll('.spotlight-card')).toHaveLength(3);
+
+    // House-ad *content* is editorial and changes freely — assert structure, not
+    // specific URLs: three cards, each linking out over https.
+    const cards = [...el.querySelectorAll('.spotlight-card')];
+    expect(cards).toHaveLength(3);
+    for (const card of cards) {
+      const link = card.querySelector<HTMLAnchorElement>('a[href^="https://"]');
+      expect(link).not.toBeNull();
+    }
   });
 
   it('house-ad markup carries no ad-* classes (ad blockers hide those cosmetically)', () => {

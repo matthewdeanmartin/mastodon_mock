@@ -38,18 +38,13 @@ import { ProviderRegistry } from '../providers/provider-registry';
       </button>
       <button
         class="btn btn-outline"
-        [class.active]="!prefs.showImages()"
-        [disabled]="prefs.feedReader()"
-        (click)="prefs.setShowImages(!prefs.showImages())"
+        [class.active]="imagesHidden()"
+        (click)="toggleImages()"
         [title]="
-          prefs.feedReader()
-            ? 'Reader mode hides images — turn off Reader to control images'
-            : prefs.showImages()
-              ? 'Hide images (show 🖼️ chips instead)'
-              : 'Show images'
+          imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'
         "
       >
-        🖼️ {{ prefs.showImages() ? 'Images' : 'No images' }}
+        🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
       </button>
       @if (providerChips() && (!auth.isAnonymous || registry.linked().length)) {
         @if (!auth.isAnonymous) {
@@ -136,5 +131,31 @@ export class CommandBar {
   protected toggleProvider(id: ProviderId): void {
     this.prefs.toggleProvider(id);
     this.providerVisibilityChanged.emit();
+  }
+
+  /**
+   * Images are effectively hidden when the viewer turned them off OR reader mode
+   * is on (reader mode suppresses pictures). The button reflects reality so it
+   * never looks inert.
+   */
+  protected imagesHidden(): boolean {
+    return !this.prefs.showImages() || this.prefs.feedReader();
+  }
+
+  /**
+   * One button, always recoverable: if images are hidden for any reason, reveal
+   * them — turning images on AND leaving reader mode (whose whole point is no
+   * pictures). Otherwise hide them. This avoids the trap where reader mode
+   * silently overrode the images toggle, leaving no obvious way back.
+   */
+  protected toggleImages(): void {
+    if (this.imagesHidden()) {
+      this.prefs.setShowImages(true);
+      if (this.prefs.feedReader()) {
+        this.prefs.setFeedReader(false);
+      }
+    } else {
+      this.prefs.setShowImages(false);
+    }
   }
 }
