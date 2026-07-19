@@ -1,6 +1,6 @@
 # Anonymous Mastodon — Sprint 4: local collections, tags, and RSS limits
 
-Status: READY (written 2026-07-19 at the close of Sprint 3)
+Status: COMPLETE (completed 2026-07-19)
 
 ## Starting point
 
@@ -99,3 +99,49 @@ Home without authenticated mutations.
 - Additional Who to follow ranking beyond the boost-derived candidates already
   supported by the sidebar.
 - Local-data export/import.
+
+## Outcome
+
+- Hardened the shared feed aggregator so an RSS/CORS or other browser-source
+  failure exhausts only that source. Healthy Mastodon follows and other
+  providers still render; the Anonymous provider also contains API-plus-RSS
+  failure per followed account.
+- Confirmed and regression-tested API-first acquisition: each followed account
+  is resolved and fetched anonymously from its own Mastodon instance. RSS is
+  attempted only after the public API path fails.
+- Added a real local Following browser on the Anonymous profile, linked from
+  the sidebar count, with immediate local Unfollow and no relationship API
+  mutations.
+- Added versioned provider-owned stores for bookmarks, lists, and followed
+  hashtags. Canonical post URLs, follow keys, and normalized tag names prevent
+  duplicate local entries.
+- Anonymous bookmarks use the shared StatusCard button and existing bookmark
+  library, retain renderable post snapshots across reloads, and never call
+  Mastodon's bookmark endpoints.
+- Anonymous lists can be created/deleted, accept only locally followed
+  accounts through the existing profile dialog, expose member management, and
+  demand-load a merged public timeline for their members.
+- Anonymous hashtag Follow uses local saved searches with a five-tag maximum.
+  The followed-tags page is available, and Home fetches/mixes those public tag
+  timelines from the selected Anonymous instance only on load/refresh/load
+  more.
+- Enforced the ten-feed maximum for user-managed RSS subscriptions at the
+  store boundary. Automatic Mastodon-account RSS fallback remains separate.
+- After Sprint 4, reduced Anonymous prominence on `/login`: it now occupies
+  the former secondary third path, while API-token login is nested under
+  “I have an account.”
+
+## Verification
+
+- Full coverage-enabled `npm run test:ci`: passed.
+- `npm run lint`: passed with zero warnings.
+- TypeScript application compilation: passed.
+- Production and Mockingbird builds: see final Sprint 4 close verification.
+- `git diff --check`: see final Sprint 4 close verification.
+
+## Handoff
+
+Continue with `anonymous-mastodon-sprint05.md`. The provider-owned local
+collections and pull-only acquisition paths are now the substrate for an
+Anonymous Algo corpus. Do not reintroduce authenticated Home calls, streaming,
+or background polling when enabling Algo.

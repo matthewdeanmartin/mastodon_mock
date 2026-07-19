@@ -140,28 +140,6 @@
   align-items: start;
 }
 
-.anonymous-path {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 14px 16px;
-  border: 1px solid var(--accent);
-  border-radius: 12px;
-}
-
-.anonymous-path h2,
-.anonymous-path p {
-  margin: 0;
-}
-
-.anonymous-btn {
-  width: auto;
-  min-width: 210px;
-  margin: 0;
-}
-
 .path {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -192,15 +170,6 @@
   .login-card {
     width: 480px;
     padding: 20px;
-  }
-
-  .anonymous-path {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .anonymous-btn {
-    width: 100%;
   }
 }
 
@@ -312,6 +281,22 @@ app-app-footer {
 /* Keep the heading inline with the disclosure marker instead of dropping to a new line. */
 .token-path > summary h2 {
   display: inline;
+}
+
+.account-token-path {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.account-token-path > summary {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.anonymous-option .btn {
+  margin-top: 8px;
 }
 
 .tabs {

@@ -66,19 +66,6 @@
       }
     </div>
 
-    <section class="anonymous-path" aria-labelledby="anonymous-heading">
-      <div>
-        <h2 id="anonymous-heading">Browse anonymously</h2>
-        <p class="muted small">
-          Use the full app with a local-only identity on {{ anonymousServerHostLabel() }}. Your
-          signed-in accounts stay saved.
-        </p>
-      </div>
-      <button class="btn btn-hero anonymous-btn" type="button" (click)="continueAnonymously()">
-        Continue anonymously
-      </button>
-    </section>
-
     <!-- ====================== Sign in / Register ====================== -->
     @if (tab() === 'signin') {
       <!-- ---------- Server combo: pick a common one or type your own ---------- -->
@@ -179,6 +166,31 @@
               <strong>We never see your password.</strong>
             </p>
           }
+          <details class="token-path account-token-path">
+            <summary>I have an API token</summary>
+            <p class="muted small">
+              For developers and power users: paste an access token for
+              {{ serverHostLabel() }} (create one under Preferences → Development on your server).
+            </p>
+            <input
+              type="text"
+              [ngModel]="token()"
+              (ngModelChange)="token.set($event)"
+              (keyup.enter)="submit()"
+              placeholder="access token"
+              [disabled]="needsInstance()"
+            />
+            @if (error()) {
+              <p class="error">{{ error() }}</p>
+            }
+            <button
+              class="btn btn-outline"
+              [disabled]="!token().trim() || checking() || needsInstance()"
+              (click)="submit()"
+            >
+              {{ checking() ? 'Checking…' : 'Sign in with token' }}
+            </button>
+          </details>
         </section>
 
         <!-- Path 2: no account yet -->
@@ -261,33 +273,16 @@
           }
         </section>
 
-        <!-- Path 3: developers with a token (tucked behind a toggle — power-user path) -->
-        <section class="path">
-          <details class="token-path">
-            <summary><h2>I have an API token</h2></summary>
-            <p class="muted small">
-              For developers and power users: paste an access token for
-              {{ serverHostLabel() }} (create one under Preferences → Development on your server).
-            </p>
-            <input
-              type="text"
-              [ngModel]="token()"
-              (ngModelChange)="token.set($event)"
-              (keyup.enter)="submit()"
-              placeholder="access token"
-              [disabled]="needsInstance()"
-            />
-            @if (error()) {
-              <p class="error">{{ error() }}</p>
-            }
-            <button
-              class="btn btn-outline"
-              [disabled]="!token().trim() || checking() || needsInstance()"
-              (click)="submit()"
-            >
-              {{ checking() ? 'Checking…' : 'Sign in with token' }}
-            </button>
-          </details>
+        <!-- Path 3: local-only Anonymous account, kept visually secondary. -->
+        <section class="path anonymous-option" aria-labelledby="anonymous-heading">
+          <h2 id="anonymous-heading">Browse anonymously</h2>
+          <p class="muted small">
+            Use the full app with a local-only identity on {{ anonymousServerHostLabel() }}. Your
+            signed-in accounts stay saved.
+          </p>
+          <button class="btn btn-outline" type="button" (click)="continueAnonymously()">
+            Continue anonymously
+          </button>
         </section>
       </div>
     }

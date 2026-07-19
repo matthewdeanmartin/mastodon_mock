@@ -31,7 +31,7 @@ describe('AnonymousCapabilities', () => {
     expect(capabilities.canManageRelationships).toBe(false);
     expect(capabilities.canFollow).toBe(true);
     expect(capabilities.canUseServerActions).toBe(false);
-    expect(capabilities.canBookmark).toBe(false);
+    expect(capabilities.canBookmark).toBe(true);
     expect(capabilities.canUseBluesky).toBe(false);
     expect(capabilities.statusCaps('mastodon')).toEqual({
       reply: false,
