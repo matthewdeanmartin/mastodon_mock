@@ -481,6 +481,56 @@
                 </div>
               </details>
             }
+          } @else if (!isOwn()) {
+            <!-- Providers without server actions (Anonymous, foreign feeds) still
+                 get a ••• menu for client-side mute/block + open-original. -->
+            <details class="danger-menu" (click)="$event.stopPropagation()">
+              <summary class="action" aria-label="More post actions">•••</summary>
+              <div class="danger-menu-panel">
+                @if (display.url) {
+                  <a
+                    [href]="display.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    (click)="$event.stopPropagation()"
+                  >
+                    Open post on original site ↗
+                  </a>
+                }
+                @if (display.account.url) {
+                  <a
+                    [href]="display.account.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    (click)="$event.stopPropagation()"
+                  >
+                    Open profile on original site ↗
+                  </a>
+                }
+                <button type="button" (click)="mutePost($event)" title="Hide this post for 30 days">
+                  Mute this post
+                </button>
+                @if (authorBlockedLocally() || authorMutedLocally()) {
+                  <button type="button" (click)="unsuppressAuthorLocally($event)">
+                    {{ authorBlockedLocally() ? 'Unblock' : 'Unmute' }} &#64;{{
+                      display.account.acct
+                    }}
+                  </button>
+                } @else {
+                  <div class="menu-note muted small">Mute &#64;{{ display.account.acct }} for…</div>
+                  <div class="mute-durations">
+                    @for (d of muteDurations; track d.label) {
+                      <button type="button" (click)="muteAuthorLocally($event, d.seconds)">
+                        {{ d.label }}
+                      </button>
+                    }
+                  </div>
+                  <button type="button" (click)="blockAuthorLocally($event)">
+                    Block &#64;{{ display.account.acct }}
+                  </button>
+                }
+              </div>
+            </details>
           }
         }
       </div>

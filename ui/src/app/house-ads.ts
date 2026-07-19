@@ -17,20 +17,20 @@ export interface HouseAd {
 
 export const HOUSE_ADS: HouseAd[] = [
   {
-    title: '📝 MIMB — Mastodon Is My Blog',
-    text: 'An advanced desktop Mastodon client with more of a blog interface.',
-    url: 'https://github.com/matthewdeanmartin/mastodon_is_my_blog/',
+    title: '🦣 Mastodon Mock',
+    text: 'Mock Mastodon server, mock the REST API for testing. MIT',
+    url: 'https://github.com/matthewdeanmartin/mastodon_mock/',
     cta: 'Get it on GitHub ↗',
   },
   {
     title: '🪶 MIMB lite',
-    text: 'The blog-style Mastodon reader, right in your browser. No install, no build.',
+    text: 'The blog-style Mastodon reader, right in your browser.',
     url: 'https://matthewdeanmartin.github.io/mastodon_is_my_blog/mimb_lite/index.html',
     cta: 'Open MIMB lite ↗',
   },
   {
     title: '📺 YouTuber Finder',
-    text: 'Find the YouTube channels behind the people you follow.',
+    text: 'Find people that are big on YouTube and Mastodon.',
     url: 'https://matthewdeanmartin.github.io/youtuberfinder/',
     cta: 'Try YouTuber Finder ↗',
   },

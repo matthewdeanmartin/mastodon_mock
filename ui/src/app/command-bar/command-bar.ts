@@ -39,8 +39,15 @@ import { ProviderRegistry } from '../providers/provider-registry';
       <button
         class="btn btn-outline"
         [class.active]="!prefs.showImages()"
+        [disabled]="prefs.feedReader()"
         (click)="prefs.setShowImages(!prefs.showImages())"
-        [title]="prefs.showImages() ? 'Hide images (show 🖼️ chips instead)' : 'Show images'"
+        [title]="
+          prefs.feedReader()
+            ? 'Reader mode hides images — turn off Reader to control images'
+            : prefs.showImages()
+              ? 'Hide images (show 🖼️ chips instead)'
+              : 'Show images'
+        "
       >
         🖼️ {{ prefs.showImages() ? 'Images' : 'No images' }}
       </button>
