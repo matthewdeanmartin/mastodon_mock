@@ -1,6 +1,6 @@
 # Anonymous Mastodon — Sprint 5: local corpus and Algo
 
-Status: READY (written 2026-07-19 at the close of Sprint 4)
+Status: COMPLETE (completed 2026-07-19)
 
 ## Starting point
 
@@ -79,3 +79,48 @@ boost-derived Who to follow without a curated directory.
 - Local-data export/import.
 - Multiple Anonymous virtual accounts.
 - Bluesky anonymous acquisition.
+
+## Outcome
+
+- Added a provider-owned, versioned Anonymous feed corpus with canonical URL /
+  provider-reference deduplication, malformed-state recovery, chronological
+  ordering, and a hard 500-status retention bound.
+- Home, explicit Algo acquisition, and local-list timelines ingest already
+  acquired public Mastodon/RSS statuses into the corpus. Ingestion never causes
+  a network request itself.
+- Enabled the real Algo route for Anonymous. Its explicit build/refresh path
+  reuses the pull-only feed aggregator, then ranks the local corpus without
+  calling authenticated following, followers, Home, bookmark, favourite, or
+  mutation endpoints.
+- Anonymous Algo includes zero-engagement RSS/public posts instead of applying
+  the signed-in feed's one-like floor, identifies followed authors locally, and
+  labels followed-account, boost, hashtag, and RSS reasons in the existing UI.
+- Added local bookmark-tail behavior at Home's feed cap so Anonymous never
+  calls the server bookmark endpoint.
+- Added global canonical status deduplication to accumulated Home pages.
+- Who to follow remains derived only from boosts found in acquired content and
+  now ranks candidates by distinct boosters, source diversity, recurrence, and
+  recency before excluding the local identity and local follows.
+- Persisted per-follow source behavior: successful public APIs clear backoff,
+  working RSS fallbacks are preferred briefly, and an account whose API and RSS
+  both fail is deferred for 15 minutes without extending that window on every
+  explicit refresh.
+- No interval, background refresh, streaming connection, visibility listener,
+  or automatic network poll was introduced.
+
+## Verification
+
+- Full coverage-enabled Angular suite: 804 tests passed.
+- `npm run lint`: passed with zero warnings.
+- TypeScript application compilation: passed.
+- `npm run build`: passed.
+- `npm run build:mockingbird`: passed.
+- `git diff --check`: passed.
+
+## Handoff
+
+Continue with `anonymous-mastodon-sprint06.md`. The major remaining usability
+gap is public navigation: `anonymous-mastodon` cards still cannot open a usable
+cross-instance author profile or thread inside the app because native ids are
+currently scoped to their source instance. Preserve absolute, token-free API
+resolution when addressing that gap.
