@@ -1,8 +1,9 @@
 import { inject, Injectable } from '@angular/core';
-import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
+import { HomeDiagnostics } from '../home-diagnostics';
 import { Status } from '../models';
 import { FeedProvider } from './provider';
 import { ProviderRegistry } from './provider-registry';
@@ -34,6 +35,7 @@ export class FeedAggregator {
   private auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private registry = inject(ProviderRegistry);
+  private diagnostics = inject(HomeDiagnostics);
 
   private mastodonMaxId: string | undefined;
   private mastodonExhausted = false;
@@ -50,6 +52,13 @@ export class FeedAggregator {
         provider.reset();
         return { provider, exhausted: false };
       });
+    this.diagnostics.info('aggregator:reset', {
+      mode: this.auth.mode() ?? 'unauthenticated',
+      mastodonVisible: this.prefs.isProviderVisible('mastodon'),
+      mastodonEnabled: !this.mastodonExhausted,
+      linkedProviders: this.registry.linked().map((provider) => provider.id),
+      enabledForeignProviders: this.foreign.map((source) => source.provider.id),
+    });
   }
 
   hasMore(): boolean {
@@ -59,6 +68,12 @@ export class FeedAggregator {
   /** Fetch one quota-sized round from every active source and merge it by date. */
   nextPage(): Observable<Status[]> {
     const sourcePages: Observable<Status[]>[] = [];
+    this.diagnostics.info('aggregator:round-start', {
+      mastodonEnabled: !this.mastodonExhausted,
+      foreignProviders: this.foreign
+        .filter((source) => !source.exhausted)
+        .map((source) => source.provider.id),
+    });
 
     if (!this.mastodonExhausted) {
       sourcePages.push(
@@ -69,6 +84,14 @@ export class FeedAggregator {
               this.mastodonExhausted = true;
             }
             return items;
+          }),
+          tap({
+            next: (items) =>
+              this.diagnostics.info('mastodon:page-success', {
+                posts: items.length,
+                exhausted: this.mastodonExhausted,
+              }),
+            error: (error: unknown) => this.diagnostics.error('mastodon:page-error', error),
           }),
         ),
       );
@@ -81,10 +104,18 @@ export class FeedAggregator {
     );
 
     if (!sourcePages.length) {
+      this.diagnostics.warn('aggregator:no-enabled-sources');
       return of([]);
     }
     return forkJoin(sourcePages).pipe(
       map((pages) => pages.flat().sort((a, b) => time(b) - time(a))),
+      tap((items) =>
+        this.diagnostics.info('aggregator:round-success', {
+          posts: items.length,
+          providerCounts: this.providerCounts(items),
+          hasMore: this.hasMore(),
+        }),
+      ),
     );
   }
 
@@ -97,8 +128,9 @@ export class FeedAggregator {
       // A browser-only source can fail for reasons outside our control (most
       // commonly an RSS server without CORS headers). One unavailable source
       // must never reject forkJoin and discard every healthy Home source.
-      catchError(() => {
+      catchError((error: unknown) => {
         source.exhausted = true;
+        this.diagnostics.error('foreign:page-error', error, { provider: source.provider.id });
         return of<Status[]>([]);
       }),
       switchMap((items) => {
@@ -109,5 +141,13 @@ export class FeedAggregator {
         return this.fetchForeignPage(source, [...collected, ...items]);
       }),
     );
+  }
+
+  private providerCounts(statuses: Status[]): Record<string, number> {
+    return statuses.reduce<Record<string, number>>((counts, status) => {
+      const provider = status.provider ?? 'mastodon';
+      counts[provider] = (counts[provider] ?? 0) + 1;
+      return counts;
+    }, {});
   }
 }

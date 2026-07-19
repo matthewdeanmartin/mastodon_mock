@@ -13,7 +13,10 @@ import { StatusCard } from '../../status-card/status-card';
 import { Announcements } from '../../announcements/announcements';
 import { Streaming } from '../../streaming';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
+import { HomeDiagnostics } from '../../home-diagnostics';
 import { FeedAggregator } from '../../providers/feed-aggregator';
+import { ProviderRegistry } from '../../providers/provider-registry';
+import { Server } from '../../server';
 import {
   AnonymousFeedCorpus,
   canonicalStatusKey,
@@ -39,7 +42,10 @@ export class Home implements OnInit, OnDestroy {
   private prefs = inject(ClientPrefs);
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);
+  private diagnostics = inject(HomeDiagnostics);
   private aggregator = inject(FeedAggregator);
+  private registry = inject(ProviderRegistry);
+  private server = inject(Server);
   private anonymousCorpus = inject(AnonymousFeedCorpus);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   protected anonymousProvider = inject(AnonymousMastodonProvider);
@@ -165,16 +171,44 @@ export class Home implements OnInit, OnDestroy {
     this.loading.set(true);
     this.maxHitAt.set(null);
     this.bookmarkTail.set([]);
+    this.diagnostics.info('load:start', {
+      mode: this.auth.mode() ?? 'unauthenticated',
+      server: this.server.baseUrl() || 'same-origin',
+      tokenPresent: this.auth.token() !== null,
+      mastodonVisible: this.prefs.isProviderVisible('mastodon'),
+      hiddenProviders: this.prefs.hiddenProviders(),
+      linkedProviders: this.registry.linked().map((provider) => provider.id),
+      feedMin: this.prefs.feedMin(),
+      feedMax: this.prefs.feedMax(),
+    });
     this.aggregator.reset();
     this.pageSub = this.aggregator.nextPage().subscribe({
       next: (s) => {
         this.statuses.set(this.auth.isAnonymous ? this.dedupeAnonymous(s) : s);
+        const details = {
+          received: s.length,
+          stored: this.statuses().length,
+          visible: this.visible().length,
+          providerCounts: this.providerCounts(this.statuses()),
+          hasMore: this.aggregator.hasMore(),
+        };
+        if (this.visible().length) {
+          this.diagnostics.info('load:first-page-success', details);
+        } else {
+          this.diagnostics.warn('load:first-page-empty', details);
+        }
         this.publishMastodon(s);
         this.loading.set(false);
         // Auto-load further pages until the feed reaches the configured minimum.
         this.fillToMinimum();
       },
-      error: () => this.loading.set(false),
+      error: (error: unknown) => {
+        this.diagnostics.error('load:first-page-error', error, {
+          mode: this.auth.mode() ?? 'unauthenticated',
+          server: this.server.baseUrl() || 'same-origin',
+        });
+        this.loading.set(false);
+      },
     });
   }
 
@@ -188,6 +222,12 @@ export class Home implements OnInit, OnDestroy {
       this.statuses().length >= this.prefs.feedMax() ||
       !this.aggregator.hasMore()
     ) {
+      this.diagnostics.info('autoload:stop', {
+        stored: this.statuses().length,
+        feedMin: this.prefs.feedMin(),
+        feedMax: this.prefs.feedMax(),
+        hasMore: this.aggregator.hasMore(),
+      });
       this.autoLoading.set(false);
       return;
     }
@@ -195,10 +235,18 @@ export class Home implements OnInit, OnDestroy {
     this.pageSub = this.aggregator.nextPage().subscribe({
       next: (more) => {
         this.mergeStatuses(more);
+        this.diagnostics.info('autoload:page-success', {
+          received: more.length,
+          stored: this.statuses().length,
+          visible: this.visible().length,
+        });
         this.publishMastodon(more);
         this.fillToMinimum();
       },
-      error: () => this.autoLoading.set(false),
+      error: (error: unknown) => {
+        this.diagnostics.error('autoload:page-error', error);
+        this.autoLoading.set(false);
+      },
     });
   }
 
@@ -217,10 +265,18 @@ export class Home implements OnInit, OnDestroy {
     this.pageSub = this.aggregator.nextPage().subscribe({
       next: (more) => {
         this.mergeStatuses(more);
+        this.diagnostics.info('load-more:page-success', {
+          received: more.length,
+          stored: this.statuses().length,
+          visible: this.visible().length,
+        });
         this.publishMastodon(more);
         this.autoLoading.set(false);
       },
-      error: () => this.autoLoading.set(false),
+      error: (error: unknown) => {
+        this.diagnostics.error('load-more:page-error', error);
+        this.autoLoading.set(false);
+      },
     });
   }
 
@@ -247,6 +303,14 @@ export class Home implements OnInit, OnDestroy {
       seen.add(key);
       return true;
     });
+  }
+
+  private providerCounts(statuses: Status[]): Record<string, number> {
+    return statuses.reduce<Record<string, number>>((counts, status) => {
+      const provider = status.provider ?? 'mastodon';
+      counts[provider] = (counts[provider] ?? 0) + 1;
+      return counts;
+    }, {});
   }
 
   /** Fetch the bookmark tail once per cap; a failure just means no tail. */

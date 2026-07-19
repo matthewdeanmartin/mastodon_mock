@@ -3,8 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../../client-prefs';
+import { HomeDiagnostics } from '../../home-diagnostics';
 import { Status } from '../../models';
 import { Streaming } from '../../streaming';
 import { FakeStreaming } from '../../testing/fake-streaming';
@@ -56,15 +57,18 @@ function makeStatus(id: string): Status {
 describe('Home', () => {
   let httpMock: HttpTestingController;
   let fakeStreaming: FakeStreaming;
+  let diagnostics: Pick<HomeDiagnostics, 'info' | 'warn' | 'error'>;
 
   beforeEach(() => {
     fakeStreaming = new FakeStreaming();
+    diagnostics = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: Streaming, useValue: fakeStreaming },
+        { provide: HomeDiagnostics, useValue: diagnostics },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);
@@ -88,6 +92,15 @@ describe('Home', () => {
     internals(fixture).toggleLive();
     httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([]);
   }
+
+  it('reports an empty first page with enough context to diagnose filtering', () => {
+    setUp();
+
+    expect(diagnostics.warn).toHaveBeenCalledWith(
+      'load:first-page-empty',
+      expect.objectContaining({ received: 0, stored: 0, visible: 0 }),
+    );
+  });
 
   it('toggleLive() opens a user stream and flips the live flag', () => {
     const fixture = setUp();

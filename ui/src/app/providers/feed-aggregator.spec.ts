@@ -4,6 +4,7 @@ import { firstValueFrom, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from '../api';
 import { ClientPrefs } from '../client-prefs';
+import { HomeDiagnostics } from '../home-diagnostics';
 import { Status } from '../models';
 import { FeedAggregator } from './feed-aggregator';
 import { BlueskyProvider } from './bluesky/bluesky-provider';
@@ -67,6 +68,7 @@ describe('FeedAggregator', () => {
   let homeTimeline: ReturnType<typeof vi.fn>;
   let fakeRss: FakeProvider;
   let fakeBluesky: FakeProvider;
+  let diagnostics: Pick<HomeDiagnostics, 'info' | 'warn' | 'error'>;
 
   beforeEach(() => {
     localStorage.clear();
@@ -78,9 +80,11 @@ describe('FeedAggregator', () => {
     };
     fakeRss = fakeProvider();
     fakeBluesky = fakeProvider();
+    diagnostics = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         { provide: Api, useValue: { homeTimeline } },
+        { provide: HomeDiagnostics, useValue: diagnostics },
         {
           provide: BlueskyProvider,
           useValue: {
@@ -123,6 +127,10 @@ describe('FeedAggregator', () => {
     expect(page2).toEqual([]);
     expect(homeTimeline).toHaveBeenLastCalledWith('m40');
     expect(aggregator.hasMore()).toBe(false);
+    expect(diagnostics.info).toHaveBeenCalledWith('mastodon:page-success', {
+      posts: 20,
+      exhausted: false,
+    });
   });
 
   it('interleaves RSS items chronologically among Mastodon posts', async () => {
@@ -248,5 +256,8 @@ describe('FeedAggregator', () => {
 
     expect(page.map((status) => status.id)).toEqual(['healthy']);
     expect(aggregator.hasMore()).toBe(false);
+    expect(diagnostics.error).toHaveBeenCalledWith('foreign:page-error', expect.any(Error), {
+      provider: 'rss',
+    });
   });
 });
