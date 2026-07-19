@@ -243,6 +243,29 @@ describe('FeedAggregator', () => {
     expect(homeTimeline).not.toHaveBeenCalled();
   });
 
+  it('falls back to Mastodon when persisted filters hide every source', async () => {
+    // A shared prefs blob can leave mastodon + all linked providers hidden. A
+    // non-anonymous reader would otherwise get an empty home feed with no chip
+    // to recover; the aggregator keeps Mastodon (their primary network) on.
+    const aggregator = TestBed.inject(FeedAggregator);
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.toggleProvider('mastodon');
+    prefs.toggleProvider('rss');
+    prefs.toggleProvider('bluesky');
+    fakeRss.linked.set(true);
+    fakeBluesky.linked.set(true);
+    homeTimeline.mockReturnValueOnce(of(mastodonPage(59, 20))).mockReturnValueOnce(of([]));
+
+    aggregator.reset();
+    const page = await firstValueFrom(aggregator.nextPage());
+
+    expect(page).toHaveLength(20);
+    expect(homeTimeline).toHaveBeenCalled();
+    expect(fakeRss.fetchPage).not.toHaveBeenCalled();
+    expect(fakeBluesky.fetchPage).not.toHaveBeenCalled();
+    expect(diagnostics.warn).toHaveBeenCalledWith('aggregator:all-sources-hidden-fallback');
+  });
+
   it('keeps healthy sources when a browser-only provider fails', async () => {
     const aggregator = TestBed.inject(FeedAggregator);
     fakeRss.linked.set(true);

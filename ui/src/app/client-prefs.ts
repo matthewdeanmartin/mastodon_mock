@@ -1,7 +1,16 @@
 import { effect, Injectable, signal, WritableSignal } from '@angular/core';
+import { scopedKey } from './account-scope';
 import { ProviderId } from './models';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
+
+/**
+ * Which feed sources are hidden is per-account, not global: one account may have
+ * a Bluesky chip toggled off that another account doesn't even have. Kept in its
+ * own account-scoped key (see {@link scopedKey}) rather than the shared prefs
+ * blob so a filter set on one login never follows the user to another.
+ */
+const HIDDEN_PROVIDERS_KEY_BASE = 'mockingbird_hidden_providers';
 
 const PROVIDER_IDS: ProviderId[] = ['mastodon', 'anonymous-mastodon', 'bluesky', 'rss'];
 
@@ -412,9 +421,7 @@ export class ClientPrefs {
     if (stored.readerTextAlign === 'left' || stored.readerTextAlign === 'justify') {
       this.readerTextAlign.set(stored.readerTextAlign);
     }
-    if (Array.isArray(stored.hiddenProviders)) {
-      this.hiddenProviders.set(stored.hiddenProviders.filter((p) => PROVIDER_IDS.includes(p)));
-    }
+    this.loadHiddenProviders(stored);
     if (stored.chatAudience === 'everyone' || stored.chatAudience === 'mutuals') {
       this.chatAudience.set(stored.chatAudience);
     }
@@ -474,7 +481,6 @@ export class ClientPrefs {
       readerTextAlign: this.readerTextAlign(),
       feedReader: this.feedReader(),
       showImages: this.showImages(),
-      hiddenProviders: this.hiddenProviders(),
       chatAudience: this.chatAudience(),
       chatKind: this.chatKind(),
       feedMin: this.feedMin(),
@@ -491,6 +497,39 @@ export class ClientPrefs {
       customSidebar: this.customSidebar(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    // Hidden providers live in their own account-scoped key, not the global blob.
+    localStorage.setItem(scopedKey(HIDDEN_PROVIDERS_KEY_BASE), JSON.stringify(this.hiddenProviders()));
+  }
+
+  /**
+   * Load the per-account hidden-provider filter. Prefers the account-scoped key;
+   * falls back once to a legacy `hiddenProviders` still sitting in the global
+   * prefs blob (migrating pre-scope installs so their current filter isn't lost),
+   * then leaves the blob's copy to be dropped on the next persist.
+   */
+  private loadHiddenProviders(stored: StoredPrefs): void {
+    const valid = (list: unknown): ProviderId[] =>
+      Array.isArray(list) ? (list as ProviderId[]).filter((p) => PROVIDER_IDS.includes(p)) : [];
+    const scoped = localStorage.getItem(scopedKey(HIDDEN_PROVIDERS_KEY_BASE));
+    if (scoped !== null) {
+      try {
+        this.hiddenProviders.set(valid(JSON.parse(scoped)));
+        return;
+      } catch {
+        // Corrupt scoped value: fall through to the legacy blob / default.
+      }
+    }
+    if (Array.isArray(stored.hiddenProviders)) {
+      this.hiddenProviders.set(valid(stored.hiddenProviders));
+      // Consume the legacy blob copy for this account only, then strip it so no
+      // other account inherits it on their first (unscoped) load.
+      delete stored.hiddenProviders;
+      try {
+        localStorage.setItem(PREFS_KEY, JSON.stringify(stored));
+      } catch {
+        // If storage write fails, the next persist() still drops it.
+      }
+    }
   }
 
   private apply(): void {

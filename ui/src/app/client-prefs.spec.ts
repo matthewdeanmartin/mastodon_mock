@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ACCENT_PRESETS, ClientPrefs } from './client-prefs';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
+const TOKEN_KEY = 'mastodon_mock_token';
+const HIDDEN_BASE = 'mockingbird_hidden_providers';
 
 describe('ClientPrefs', () => {
   beforeEach(() => {
@@ -132,5 +134,64 @@ describe('ClientPrefs', () => {
     const prefs = create();
     expect(prefs.feedMin()).toBe(30);
     expect(prefs.feedMax()).toBe(300);
+  });
+
+  // ------------------------------------------------ hidden providers (scoped)
+
+  /** Rebuild ClientPrefs from scratch, as an account switch's hard reload would. */
+  function recreate(): ClientPrefs {
+    TestBed.resetTestingModule();
+    return create();
+  }
+
+  it('persists hidden providers to an account-scoped key, not the global blob', () => {
+    localStorage.setItem(TOKEN_KEY, 'token-one');
+    const prefs = create();
+    prefs.toggleProvider('bluesky');
+    TestBed.tick();
+
+    // Not in the shared prefs blob anymore.
+    const blob = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+    expect(blob.hiddenProviders).toBeUndefined();
+    // In a key scoped to this account's token.
+    const scoped = Object.keys(localStorage).find(
+      (k) => k.startsWith(HIDDEN_BASE + '_') && k !== HIDDEN_BASE,
+    );
+    expect(scoped).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem(scoped!) ?? '[]')).toEqual(['bluesky']);
+  });
+
+  it('does not leak one account\'s hidden providers to another', () => {
+    localStorage.setItem(TOKEN_KEY, 'token-one');
+    const one = create();
+    one.toggleProvider('bluesky');
+    TestBed.tick();
+
+    // Switch accounts (hard reload rebuilds ClientPrefs under the new token).
+    localStorage.setItem(TOKEN_KEY, 'token-two');
+    const two = recreate();
+    expect(two.hiddenProviders()).toEqual([]);
+    expect(two.isProviderVisible('bluesky')).toBe(true);
+
+    // Switching back restores the first account's filter.
+    localStorage.setItem(TOKEN_KEY, 'token-one');
+    const oneAgain = recreate();
+    expect(oneAgain.hiddenProviders()).toEqual(['bluesky']);
+  });
+
+  it('migrates a legacy blob hiddenProviders once, then strips it from the blob', () => {
+    localStorage.setItem(TOKEN_KEY, 'token-one');
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ hiddenProviders: ['mastodon', 'rss'] }));
+    const prefs = create();
+    expect(prefs.hiddenProviders()).toEqual(['mastodon', 'rss']);
+
+    // The legacy copy is removed from the shared blob so other accounts can't inherit it.
+    const blob = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+    expect(blob.hiddenProviders).toBeUndefined();
+
+    // A different account loading afterward starts clean.
+    localStorage.setItem(TOKEN_KEY, 'token-two');
+    const other = recreate();
+    expect(other.hiddenProviders()).toEqual([]);
   });
 });

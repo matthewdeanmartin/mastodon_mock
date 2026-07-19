@@ -52,6 +52,15 @@ export class FeedAggregator {
         provider.reset();
         return { provider, exhausted: false };
       });
+    // Safety net: an authenticated reader whose persisted filters hide *every*
+    // source (e.g. mastodon + all linked providers toggled off, from a shared
+    // localStorage prefs blob) would otherwise get a permanently empty home
+    // feed with no visible chip to recover — Mastodon is their primary network,
+    // so keep it enabled rather than honour a filter that shows nothing.
+    if (!this.auth.isAnonymous && this.mastodonExhausted && !this.foreign.length) {
+      this.mastodonExhausted = false;
+      this.diagnostics.warn('aggregator:all-sources-hidden-fallback');
+    }
     this.diagnostics.info('aggregator:reset', {
       mode: this.auth.mode() ?? 'unauthenticated',
       mastodonVisible: this.prefs.isProviderVisible('mastodon'),
