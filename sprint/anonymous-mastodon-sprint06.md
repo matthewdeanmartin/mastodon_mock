@@ -1,6 +1,6 @@
 # Anonymous Mastodon — Sprint 6: public navigation and hardening
 
-Status: READY (written 2026-07-19 at the close of Sprint 5)
+Status: COMPLETE (implemented and verified 2026-07-19)
 
 ## Starting point
 
@@ -71,3 +71,40 @@ all Anonymous requests absolute, public, token-free, and demand-driven.
 - Local-data export/import.
 - Multiple Anonymous virtual accounts.
 - Bluesky anonymous acquisition.
+
+## Delivered
+
+- Added validated, URL-safe public account/status route references carrying the
+  source origin, native object id, and optional original URL.
+- Anonymous Mastodon avatars, author names, timestamps, post bodies, keyboard
+  open, and keyboard profile navigation now enter the shared Profile and Thread
+  UI without confusing namespaced ids with ids on the selected home instance.
+- Added a provider-owned, read-only public Mastodon API client. All calls are
+  absolute, token-free external fetches with bounded timeouts.
+- Public profiles load account data, posts, pinned posts, filtered paging, and
+  explicit older pages from their source instance. Follow/unfollow remains
+  browser-local and uses canonical federated identity.
+- Public thread view loads the focused status and context independently. A
+  blocked/failed context endpoint leaves the focused post readable, explains
+  the limitation, and links to the original. Reply boxes and server mutations
+  stay absent; local bookmarks work in reader mode.
+- RSS-fallback posts do not claim a Mastodon thread endpoint, but their author
+  can still open as a public profile when a native account id is available.
+- Local list timelines now own independent per-member cursors, merge/dedupe
+  each explicitly requested page, ingest those pages into the Anonymous corpus,
+  isolate failed members, and expose Load more only while sources have depth.
+- Home and list timelines surface non-blocking source warnings. Anonymous
+  Follows settings lists local follows, distinguishes public API/RSS fallback/
+  temporary deferral, supports unfollow, and offers a one-shot API retry that
+  clears only local backoff state.
+- Public feed acquisition was also marked as external fetch throughout the
+  Anonymous provider so signed-in credentials and same-origin health handling
+  cannot leak to arbitrary Mastodon instances.
+
+## Verification
+
+- `npm run lint` — pass.
+- `npm test -- --no-watch` — 814 tests passed across 101 files.
+- `npm run build` — pass.
+- `npm run build:mockingbird` — pass.
+- `git diff --check` — pass.
