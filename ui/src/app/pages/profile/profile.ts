@@ -140,11 +140,6 @@ export class Profile implements OnInit, OnDestroy {
         this.load(id);
       }
     });
-    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      if (this.auth.isAnonymous && this.isSelf()) {
-        this.tab.set(params.get('tab') === 'following' ? 'following' : 'posts');
-      }
-    });
   }
 
   ngOnDestroy(): void {
