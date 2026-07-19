@@ -8,6 +8,7 @@ import { Account, Relationship, Status } from '../../models';
 import { Profile } from './profile';
 import { Auth } from '../../auth';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
+import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 
 /** n bare statuses with descending ids starting at s<base> (timeline order). */
 function makeStatuses(n: number, base: number): Status[] {
@@ -137,6 +138,96 @@ describe('Profile block/unblock', () => {
     expect(TestBed.inject(AnonymousFollows).count()).toBe(1);
     expect((fixture.componentInstance as any).relationship().following).toBe(true);
     httpMock.expectNone((request) => /\/(follow|unfollow)$/.test(request.url));
+  });
+
+  it('loads a public profile and posts from the referenced instance in Anonymous', () => {
+    const routeId = anonymousAccountRouteRef({ server: 'https://social.example', id: '900' });
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: routeId })) },
+        },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    TestBed.inject(Auth).enterAnonymous('https://home.example');
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    const target = {
+      id: '900',
+      username: 'eve',
+      acct: 'eve',
+      display_name: 'Eve',
+      note: '',
+      url: 'https://social.example/@eve',
+      avatar: '',
+      avatar_static: '',
+      header: '',
+      followers_count: 0,
+      following_count: 0,
+      statuses_count: 1,
+      bot: false,
+      locked: false,
+      fields: [],
+    } as Account;
+    const post = {
+      id: '50',
+      created_at: '2026-01-01T00:00:00Z',
+      edited_at: null,
+      content: '<p>Public</p>',
+      spoiler_text: '',
+      visibility: 'public',
+      url: 'https://social.example/@eve/50',
+      account: target,
+      reblog: null,
+      quote: null,
+      in_reply_to_id: null,
+      replies_count: 0,
+      reblogs_count: 0,
+      favourites_count: 0,
+      favourited: false,
+      reblogged: false,
+      bookmarked: false,
+      muted: false,
+      pinned: false,
+      sensitive: false,
+      poll: null,
+      quote_approval_policy: null,
+      media_attachments: [],
+    } as Status;
+
+    httpMock.expectOne('https://social.example/api/v1/accounts/900').flush(target);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === 'https://social.example/api/v1/accounts/900/statuses' &&
+          !request.params.has('pinned'),
+      )
+      .flush([post]);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === 'https://social.example/api/v1/accounts/900/statuses' &&
+          request.params.get('max_id') === '50',
+      )
+      .flush([]);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === 'https://social.example/api/v1/accounts/900/statuses' &&
+          request.params.get('pinned') === 'true',
+      )
+      .flush([]);
+    fixture.detectChanges();
+
+    expect((fixture.componentInstance as any).account().acct).toBe('eve@social.example');
+    expect((fixture.componentInstance as any).statuses()[0].id).toBe(
+      'anonymous-mastodon:social.example:50',
+    );
+    httpMock.expectNone((request) => request.url.startsWith('/api/'));
   });
 
   it('keeps paging older statuses until 20 accumulate (filtered pages come back short)', () => {

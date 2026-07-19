@@ -9,8 +9,12 @@ import { ListCollectionConverter } from '../../list-collection-converter';
 import { Auth } from '../../auth';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
-import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
+import {
+  AnonymousFollowFeedSession,
+  AnonymousMastodonProvider,
+} from '../../providers/anonymous/anonymous-mastodon-provider';
 import { AnonymousFeedCorpus } from '../../providers/anonymous/anonymous-feed-corpus';
+import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 
 @Component({
   selector: 'app-list-timeline',
@@ -31,6 +35,10 @@ export class ListTimeline implements OnInit {
   protected title = signal('');
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
+  protected loadingMore = signal(false);
+  protected exhausted = signal(true);
+  protected warnings = signal<string[]>([]);
+  private anonymousFeed: AnonymousFollowFeedSession | null = null;
   protected tab = signal<'posts' | 'members'>('posts');
 
   // Members are fetched lazily, the first time the tab is opened.
@@ -60,6 +68,10 @@ export class ListTimeline implements OnInit {
 
   load(id: string): void {
     this.loading.set(true);
+    this.statuses.set([]);
+    this.warnings.set([]);
+    this.exhausted.set(true);
+    this.anonymousFeed = null;
     if (this.auth.isAnonymous) {
       const list = this.anonymousLists.get(id);
       this.title.set(list?.title ?? 'List');
@@ -69,14 +81,8 @@ export class ListTimeline implements OnInit {
         .filter((follow) => memberKeys.has(follow.key));
       this.members.set(follows.map((follow) => follow.account));
       this.membersLoadedFor = id;
-      this.anonymousProvider.fetchFollows(follows).subscribe({
-        next: (statuses) => {
-          this.anonymousCorpus.ingest(statuses);
-          this.statuses.set(statuses);
-          this.loading.set(false);
-        },
-        error: () => this.loading.set(false),
-      });
+      this.anonymousFeed = this.anonymousProvider.createFollowFeed(follows);
+      this.fetchAnonymousPage(false);
       return;
     }
     this.api.getList(id).subscribe((l) => this.title.set(l.title));
@@ -87,6 +93,57 @@ export class ListTimeline implements OnInit {
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  loadMore(): void {
+    if (!this.auth.isAnonymous || this.loadingMore() || this.exhausted()) return;
+    this.fetchAnonymousPage(true);
+  }
+
+  private fetchAnonymousPage(append: boolean): void {
+    const feed = this.anonymousFeed;
+    if (!feed) {
+      this.loading.set(false);
+      return;
+    }
+    this.loadingMore.set(append);
+    feed.fetchPage().subscribe({
+      next: (page) => {
+        this.anonymousCorpus.ingest(page.statuses);
+        this.statuses.update((current) =>
+          append ? [...current, ...page.statuses] : page.statuses,
+        );
+        this.warnings.update((current) => [...new Set([...current, ...page.warnings])]);
+        this.exhausted.set(!page.hasMore);
+        this.loading.set(false);
+        this.loadingMore.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.loadingMore.set(false);
+        this.exhausted.set(true);
+      },
+    });
+  }
+
+  protected memberLink(account: Account): (string | number)[] {
+    const follow = this.anonymousFollows
+      .follows()
+      .find(
+        (item) =>
+          item.account === account ||
+          (item.account.id === account.id && item.account.acct === account.acct),
+      );
+    return this.auth.isAnonymous && follow
+      ? [
+          '/accounts',
+          anonymousAccountRouteRef({
+            server: follow.server,
+            id: follow.account.id,
+            originalUrl: follow.profileUrl,
+          }),
+        ]
+      : ['/accounts', account.id];
   }
 
   setTab(tab: 'posts' | 'members'): void {

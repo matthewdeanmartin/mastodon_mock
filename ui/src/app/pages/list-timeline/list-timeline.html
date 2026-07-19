@@ -13,6 +13,13 @@
 @if (conversionMessage()) {
   <p class="conversion-message muted" role="status">{{ conversionMessage() }}</p>
 }
+@if (warnings().length) {
+  <aside class="muted" role="status">
+    @for (warning of warnings(); track warning) {
+      <div>{{ warning }}</div>
+    }
+  </aside>
+}
 
 <div class="tabs">
   <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Posts</button>
@@ -34,6 +41,11 @@
         (deleted)="onDeleted($event)"
       />
     }
+    @if (auth.isAnonymous && !exhausted()) {
+      <button class="btn btn-outline more" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+      </button>
+    }
   }
 } @else {
   @if (!auth.isAnonymous) {
@@ -51,7 +63,7 @@
   } @else {
     @for (a of members(); track a.id) {
       <div class="member-row">
-        <a class="member-link" [routerLink]="['/accounts', a.id]">
+        <a class="member-link" [routerLink]="memberLink(a)">
           <img
             class="avatar"
             [src]="a.avatar_static || a.avatar"

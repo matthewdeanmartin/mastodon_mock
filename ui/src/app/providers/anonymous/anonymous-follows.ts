@@ -142,6 +142,11 @@ export class AnonymousFollows {
     this.updateSource(key, 'api', new Date(Date.now() + 15 * 60_000).toISOString());
   }
 
+  /** User-requested, one-shot retry. The next page load will try the public API again. */
+  clearBackoff(key: string): void {
+    this.updateSource(key, 'api', null);
+  }
+
   follow(account: Account, fallbackServer: string): FollowResult {
     const key = keyFor(account, fallbackServer);
     if (this.follows().some((follow) => follow.key === key)) {

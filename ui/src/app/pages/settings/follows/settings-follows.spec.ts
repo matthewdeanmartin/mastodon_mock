@@ -6,11 +6,14 @@ import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Account } from '../../../models';
 import { SettingsFollows } from './settings-follows';
+import { Auth } from '../../../auth';
+import { AnonymousFollows } from '../../../providers/anonymous/anonymous-follows';
 
 interface SettingsFollowsInternals {
   requests: WritableSignal<Account[]>;
   authorize(acc: Account): void;
   reject(acc: Account): void;
+  retry(follow: ReturnType<AnonymousFollows['follows']>[number]): void;
 }
 
 function internals(fixture: ComponentFixture<SettingsFollows>): SettingsFollowsInternals {
@@ -71,5 +74,24 @@ describe('SettingsFollows', () => {
     expect(req.request.method).toBe('POST');
     req.flush({});
     expect(internals(fixture).requests()).toEqual([]);
+  });
+
+  it('shows local Anonymous follows and clears backoff without a server request', () => {
+    const auth = TestBed.inject(Auth);
+    auth.enterAnonymous('https://home.example');
+    const follows = TestBed.inject(AnonymousFollows);
+    const target = { ...makeAccount('5'), url: 'https://social.example/@user5' };
+    follows.follow(target, 'https://home.example');
+    follows.markUnavailable(follows.follows()[0].key);
+
+    const fixture = TestBed.createComponent(SettingsFollows);
+    fixture.detectChanges();
+    expect(internals(fixture).requests()).toEqual([follows.follows()[0].account]);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Temporarily deferred');
+
+    internals(fixture).retry(follows.follows()[0]);
+    fixture.detectChanges();
+    expect(follows.follows()[0].apiRetryAfter).toBeNull();
+    httpMock.expectNone(() => true);
   });
 });

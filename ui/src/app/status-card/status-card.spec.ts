@@ -8,6 +8,10 @@ import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { Status, Translation } from '../models';
 import { StatusCard } from './status-card';
+import {
+  parseAnonymousAccountRouteRef,
+  parseAnonymousStatusRouteRef,
+} from '../providers/anonymous/anonymous-route-ref';
 
 /** Expose protected signals/methods for white-box testing. */
 interface StatusCardInternals {
@@ -123,6 +127,45 @@ describe('StatusCard', () => {
     expect(el.textContent).not.toContain('Report');
     expect(el.textContent).toContain('2');
     expect(el.textContent).toContain('3');
+  });
+
+  it('links Anonymous Mastodon avatars and posts to public in-app routes', () => {
+    TestBed.inject(Auth).enterAnonymous('https://home.example');
+    const fixture = setUp(
+      makeStatus({
+        id: 'anonymous-mastodon:social.example:100',
+        provider: 'anonymous-mastodon',
+        url: 'https://social.example/@user1/100',
+        account: { ...makeAccount('7'), url: 'https://social.example/@user1' },
+        providerRef: {
+          server: 'https://social.example',
+          statusId: '100',
+          accountId: '7',
+        },
+      }),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    const accountSegment = element
+      .querySelector<HTMLAnchorElement>('a.avatar-link')!
+      .getAttribute('href')!
+      .split('/')
+      .at(-1)!;
+    const statusSegment = element
+      .querySelector<HTMLAnchorElement>('a.post-time')!
+      .getAttribute('href')!
+      .split('/')
+      .at(-1)!;
+
+    expect(parseAnonymousAccountRouteRef(decodeURIComponent(accountSegment))).toEqual({
+      server: 'https://social.example',
+      id: '7',
+      originalUrl: 'https://social.example/@user1',
+    });
+    expect(parseAnonymousStatusRouteRef(decodeURIComponent(statusSegment))).toEqual({
+      server: 'https://social.example',
+      id: '100',
+      originalUrl: 'https://social.example/@user1/100',
+    });
   });
 
   // ---------------------------------------------------------------- action errors

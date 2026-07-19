@@ -1,17 +1,27 @@
 <div class="spage-head">
   <h1>Follows and followers</h1>
-  <p>Pending follow requests. Requests only appear when your account requires follow approval.</p>
+  @if (auth.isAnonymous) {
+    <p>Accounts followed by Anonymous. Sources are fetched only when you explicitly load a feed.</p>
+  } @else {
+    <p>Pending follow requests. Requests only appear when your account requires follow approval.</p>
+  }
 </div>
 
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!requests().length) {
-  <p class="muted center">No pending follow requests.</p>
+  <p class="muted center">
+    {{
+      auth.isAnonymous
+        ? 'You are not following any Mastodon accounts yet.'
+        : 'No pending follow requests.'
+    }}
+  </p>
 } @else {
   <ul class="account-list">
     @for (a of requests(); track a.id) {
       <li class="account-row">
-        <a class="account-link" [routerLink]="['/accounts', a.id]">
+        <a class="account-link" [routerLink]="accountLink(a)">
           <img
             class="avatar"
             [src]="a.avatar_static || a.avatar"
@@ -24,10 +34,20 @@
             <span class="acct muted">&#64;{{ a.acct }}</span>
           </span>
         </a>
-        <span class="req-actions">
-          <button class="btn btn-sm" (click)="authorize(a)">Accept</button>
-          <button class="btn btn-outline btn-sm" (click)="reject(a)">Reject</button>
-        </span>
+        @if (auth.isAnonymous && followFor(a); as follow) {
+          <span class="req-actions">
+            <span class="muted small">{{ sourceStatus(follow) }}</span>
+            @if (follow.apiRetryAfter) {
+              <button class="btn btn-outline btn-sm" (click)="retry(follow)">Retry API</button>
+            }
+            <button class="btn btn-outline btn-sm" (click)="unfollow(follow)">Unfollow</button>
+          </span>
+        } @else {
+          <span class="req-actions">
+            <button class="btn btn-sm" (click)="authorize(a)">Accept</button>
+            <button class="btn btn-outline btn-sm" (click)="reject(a)">Reject</button>
+          </span>
+        }
       </li>
     }
   </ul>

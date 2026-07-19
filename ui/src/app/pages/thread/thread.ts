@@ -16,6 +16,12 @@ import { BskyReply } from '../../providers/bluesky/bluesky-reply';
 import { StatusActions } from '../../providers/status-actions';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { Subscription } from 'rxjs';
+import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
+import {
+  AnonymousPublicRef,
+  parseAnonymousStatusRouteRef,
+} from '../../providers/anonymous/anonymous-route-ref';
+import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmarks';
 
 @Component({
   selector: 'app-thread',
@@ -27,6 +33,8 @@ export class Thread implements OnInit {
   private api = inject(Api);
   private bsky = inject(BlueskyApi);
   private rss = inject(RssProvider);
+  private anonymousPublic = inject(AnonymousPublicApi);
+  private anonymousBookmarks = inject(AnonymousBookmarks);
   private actions = inject(StatusActions);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -40,6 +48,9 @@ export class Thread implements OnInit {
   protected ancestors = signal<Status[]>([]);
   protected descendants = signal<Status[]>([]);
   protected loading = signal(true);
+  protected isAnonymousPublic = signal(false);
+  protected publicContextUnavailable = signal(false);
+  protected publicOriginalUrl = signal<string | null>(null);
 
   /** Reader mode: distraction-free article view of the author's own chain. */
   protected readerMode = signal(false);
@@ -95,6 +106,10 @@ export class Thread implements OnInit {
   }
 
   toggleBookmark(post: Status): void {
+    if (post.provider === 'anonymous-mastodon') {
+      this.patch(this.anonymousBookmarks.toggle(post));
+      return;
+    }
     const call = post.bookmarked ? this.api.unbookmark(post.id) : this.api.bookmark(post.id);
     call.subscribe((updated) => this.patch(updated));
   }
@@ -130,7 +145,13 @@ export class Thread implements OnInit {
     this.loadSub.unsubscribe();
     this.loadSub = new Subscription();
     this.loading.set(true);
+    this.status.set(null);
+    this.ancestors.set([]);
+    this.descendants.set([]);
     this.isRss.set(false);
+    this.isAnonymousPublic.set(false);
+    this.publicContextUnavailable.set(false);
+    this.publicOriginalUrl.set(null);
     this.rssHasCommentFeed.set(false);
     this.rssCommentsUnavailable.set(false);
     if (id.startsWith('bsky:')) {
@@ -139,6 +160,11 @@ export class Thread implements OnInit {
     }
     if (id.startsWith('rss:')) {
       this.loadRss(id);
+      return;
+    }
+    const publicRef = parseAnonymousStatusRouteRef(id);
+    if (publicRef) {
+      this.loadAnonymousPublic(publicRef);
       return;
     }
     this.loadSub.add(
@@ -151,6 +177,32 @@ export class Thread implements OnInit {
       this.api.getContext(id).subscribe((ctx) => {
         this.ancestors.set(ctx.ancestors);
         this.descendants.set(ctx.descendants);
+      }),
+    );
+  }
+
+  /** Public Mastodon status and context; a blocked context endpoint never hides the post itself. */
+  private loadAnonymousPublic(ref: AnonymousPublicRef): void {
+    this.isAnonymousPublic.set(true);
+    this.publicOriginalUrl.set(ref.originalUrl ?? null);
+    this.loadSub.add(
+      this.anonymousPublic.getStatus(ref).subscribe({
+        next: (status) => {
+          const saved = this.anonymousBookmarks.has(status);
+          this.status.set(saved ? { ...status, bookmarked: true } : status);
+          this.publicOriginalUrl.set(status.url ?? ref.originalUrl ?? null);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      }),
+    );
+    this.loadSub.add(
+      this.anonymousPublic.getContext(ref).subscribe({
+        next: (context) => {
+          this.ancestors.set(context.ancestors);
+          this.descendants.set(context.descendants);
+        },
+        error: () => this.publicContextUnavailable.set(true),
       }),
     );
   }

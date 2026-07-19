@@ -9,6 +9,7 @@ import { RssFetch } from '../rss/rss-fetch';
 import { feedToStatuses } from '../rss/rss-adapter';
 import { AnonymousAccount } from './anonymous-account';
 import { AnonymousTags } from './anonymous-tags';
+import { externalFetch } from '../external-fetch';
 
 const PAGE_SIZE = 20;
 const MAX_CONCURRENCY = 4;
@@ -33,7 +34,17 @@ interface ActiveSource {
   followKey?: string;
 }
 
-interface AnonymousProviderRef {
+export interface AnonymousFollowFeedPage {
+  statuses: Status[];
+  warnings: string[];
+  hasMore: boolean;
+}
+
+export interface AnonymousFollowFeedSession {
+  fetchPage(): Observable<AnonymousFollowFeedPage>;
+}
+
+export interface AnonymousProviderRef {
   server: string;
   statusId: string;
   accountId: string;
@@ -47,7 +58,7 @@ function host(server: string): string {
   }
 }
 
-function adaptAccount(account: Account, server: string): Account {
+export function adaptAnonymousAccount(account: Account, server: string): Account {
   const accountHost = host(server);
   return {
     ...account,
@@ -55,9 +66,9 @@ function adaptAccount(account: Account, server: string): Account {
   };
 }
 
-function adaptStatus(status: Status, server: string): Status {
+export function adaptAnonymousStatus(status: Status, server: string): Status {
   const rawId = status.id;
-  const account = adaptAccount(status.account, server);
+  const account = adaptAnonymousAccount(status.account, server);
   return {
     ...status,
     id: `anonymous-mastodon:${host(server)}:${rawId}`,
@@ -68,7 +79,7 @@ function adaptStatus(status: Status, server: string): Status {
       accountId: status.account.id,
     } satisfies AnonymousProviderRef,
     account,
-    reblog: status.reblog ? adaptStatus(status.reblog, server) : null,
+    reblog: status.reblog ? adaptAnonymousStatus(status.reblog, server) : null,
   };
 }
 
@@ -162,18 +173,41 @@ export class AnonymousMastodonProvider implements FeedProvider {
 
   /** Fetch one public page for an explicit set of follows (used by local lists). */
   fetchFollows(follows: AnonymousFollow[]): Observable<Status[]> {
-    if (!follows.length) {
-      return of([]);
-    }
-    return of(...follows.map((follow) => ({ follow, exhausted: false }))).pipe(
+    return this.createFollowFeed(follows)
+      .fetchPage()
+      .pipe(map((page) => page.statuses));
+  }
+
+  /** Independent, demand-driven cursor set for a local list timeline. */
+  createFollowFeed(follows: AnonymousFollow[]): AnonymousFollowFeedSession {
+    const cursors: SourceCursor[] = follows.map((follow) => ({ follow, exhausted: false }));
+    const seen = new Set<string>();
+    return { fetchPage: () => this.fetchFollowFeedPage(cursors, seen) };
+  }
+
+  private fetchFollowFeedPage(
+    cursors: SourceCursor[],
+    seen: Set<string>,
+  ): Observable<AnonymousFollowFeedPage> {
+    const active = cursors.filter((source) => !source.exhausted);
+    if (!active.length) return of({ statuses: [], warnings: [], hasMore: false });
+    const warnings: string[] = [];
+    return of(...active).pipe(
       mergeMap(
-        (source) => this.fetchSource(source).pipe(catchError(() => of<Status[]>([]))),
+        (source) =>
+          this.fetchSource(source).pipe(
+            catchError(() => {
+              source.exhausted = true;
+              this.followStore.markUnavailable(source.follow.key);
+              warnings.push(`Could not load @${source.follow.handle}.`);
+              return of<Status[]>([]);
+            }),
+          ),
         MAX_CONCURRENCY,
       ),
       toArray(),
-      map((pages) => {
-        const seen = new Set<string>();
-        return pages
+      map((pages) => ({
+        statuses: pages
           .flat()
           .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
           .filter((status) => {
@@ -181,8 +215,10 @@ export class AnonymousMastodonProvider implements FeedProvider {
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
-          });
-      }),
+          }),
+        warnings,
+        hasMore: cursors.some((source) => !source.exhausted),
+      })),
     );
   }
 
@@ -211,9 +247,10 @@ export class AnonymousMastodonProvider implements FeedProvider {
           params = params.set('max_id', source.maxId);
         }
         return this.http
-          .get<
-            Status[]
-          >(`${source.follow.server}/api/v1/accounts/${accountId}/statuses`, { params })
+          .get<Status[]>(`${source.follow.server}/api/v1/accounts/${accountId}/statuses`, {
+            params,
+            context: externalFetch(),
+          })
           .pipe(timeout(REQUEST_TIMEOUT_MS));
       }),
       map((statuses) => {
@@ -222,7 +259,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
         if (statuses.length < PAGE_SIZE) {
           source.exhausted = true;
         }
-        return statuses.map((status) => adaptStatus(status, source.follow.server));
+        return statuses.map((status) => adaptAnonymousStatus(status, source.follow.server));
       }),
       catchError(() => this.fetchRss(source)),
     );
@@ -240,8 +277,12 @@ export class AnonymousMastodonProvider implements FeedProvider {
           ...status,
           id: `anonymous-mastodon:rss:${status.id}`,
           provider: 'anonymous-mastodon' as const,
-          providerRef: { server: source.follow.server, statusId: status.id, accountId: '' },
-          account: adaptAccount(source.follow.account, source.follow.server),
+          providerRef: {
+            server: source.follow.server,
+            statusId: status.id,
+            accountId: source.follow.account.id,
+          },
+          account: adaptAnonymousAccount(source.follow.account, source.follow.server),
         }));
       }),
     );
@@ -254,7 +295,10 @@ export class AnonymousMastodonProvider implements FeedProvider {
     }
     const server = this.anonymous.server();
     return this.http
-      .get<Status[]>(`${server}/api/v1/timelines/tag/${encodeURIComponent(source.tag)}`, { params })
+      .get<Status[]>(`${server}/api/v1/timelines/tag/${encodeURIComponent(source.tag)}`, {
+        params,
+        context: externalFetch(),
+      })
       .pipe(
         timeout(REQUEST_TIMEOUT_MS),
         map((statuses) => {
@@ -262,7 +306,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
           if (statuses.length < PAGE_SIZE) {
             source.exhausted = true;
           }
-          return statuses.map((status) => adaptStatus(status, server));
+          return statuses.map((status) => adaptAnonymousStatus(status, server));
         }),
       );
   }
@@ -270,7 +314,10 @@ export class AnonymousMastodonProvider implements FeedProvider {
   private lookupAccount(follow: AnonymousFollow): Observable<Account> {
     const params = new HttpParams().set('acct', follow.account.username);
     return this.http
-      .get<Account>(`${follow.server}/api/v1/accounts/lookup`, { params })
+      .get<Account>(`${follow.server}/api/v1/accounts/lookup`, {
+        params,
+        context: externalFetch(),
+      })
       .pipe(timeout(REQUEST_TIMEOUT_MS));
   }
 }

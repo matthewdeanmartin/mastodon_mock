@@ -32,6 +32,15 @@
   (providerVisibilityChanged)="load()"
 />
 
+@if (auth.isAnonymous && anonymousProvider.errors().length) {
+  <aside class="muted" role="status">
+    @for (warning of anonymousProvider.errors(); track warning) {
+      <div>{{ warning }}</div>
+    }
+    <a routerLink="/settings/follows">Review followed sources or retry the public API</a>
+  </aside>
+}
+
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!visible().length) {

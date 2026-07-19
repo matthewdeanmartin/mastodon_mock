@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../../client-prefs';
 import { Context, Status } from '../../models';
 import { Thread } from './thread';
+import { anonymousStatusRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 
 interface ThreadInternals {
   status: WritableSignal<Status | null>;
@@ -117,6 +118,47 @@ describe('Thread', () => {
         .map((s) => s.id),
     ).toEqual(['child1', 'child2']);
     expect(internals(fixture).loading()).toBe(false);
+  });
+
+  it('loads an anonymous public thread from the source instance', () => {
+    const id = anonymousStatusRouteRef({
+      server: 'https://social.example',
+      id: '100',
+      originalUrl: 'https://social.example/@user/100',
+    });
+    const fixture = setUpWithId(id);
+
+    const raw = makeStatus('100');
+    raw.url = 'https://social.example/@user/100';
+    raw.account.acct = 'user';
+    httpMock.expectOne('https://social.example/api/v1/statuses/100').flush(raw);
+    httpMock
+      .expectOne('https://social.example/api/v1/statuses/100/context')
+      .flush(makeContext([makeStatus('99')], [makeStatus('101')]));
+    fixture.detectChanges();
+
+    expect(internals(fixture).status()?.id).toBe('anonymous-mastodon:social.example:100');
+    expect(internals(fixture).ancestors()[0].id).toBe('anonymous-mastodon:social.example:99');
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-compose')).toBeNull();
+    httpMock.expectNone((request) => request.url.startsWith('/api/'));
+  });
+
+  it('keeps an anonymous public post readable when its context endpoint rejects anonymous access', () => {
+    const id = anonymousStatusRouteRef({ server: 'https://social.example', id: '100' });
+    const fixture = setUpWithId(id);
+    const raw = makeStatus('100');
+    raw.account.acct = 'user';
+
+    httpMock.expectOne('https://social.example/api/v1/statuses/100').flush(raw);
+    httpMock
+      .expectOne('https://social.example/api/v1/statuses/100/context')
+      .flush('nope', { status: 401, statusText: 'Unauthorized' });
+    fixture.detectChanges();
+
+    expect(internals(fixture).status()).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'did not make the surrounding conversation available anonymously',
+    );
   });
 
   it('starts in loading state', () => {

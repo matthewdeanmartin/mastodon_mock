@@ -100,5 +100,9 @@ describe('AnonymousFollows', () => {
     follows.markUnavailable(key);
     expect(follows.shouldDefer(follows.follows()[0])).toBe(true);
     expect(follows.follows()[0].apiRetryAfter).toBe(retryAfter);
+
+    follows.clearBackoff(key);
+    expect(follows.follows()[0].preferredSource).toBe('api');
+    expect(follows.follows()[0].apiRetryAfter).toBeNull();
   });
 });

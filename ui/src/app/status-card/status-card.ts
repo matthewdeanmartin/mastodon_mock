@@ -22,6 +22,11 @@ import { StatusActions } from '../providers/status-actions';
 import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
+import { AnonymousProviderRef } from '../providers/anonymous/anonymous-mastodon-provider';
+import {
+  anonymousAccountRouteRef,
+  anonymousStatusRouteRef,
+} from '../providers/anonymous/anonymous-route-ref';
 
 const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
 
@@ -272,13 +277,13 @@ export class StatusCard {
         return true;
       case 'enter':
       case 'o':
-        if (this.threadable) {
-          void this.router.navigate(['/statuses', this.display.id]);
+        if (this.threadLink) {
+          void this.router.navigate(this.threadLink);
         }
         return true;
       case 'p':
-        if (!this.foreign) {
-          void this.router.navigate(['/accounts', this.display.account.id]);
+        if (this.accountLink) {
+          void this.router.navigate(this.accountLink);
         }
         return true;
       case 'e':
@@ -490,7 +495,28 @@ export class StatusCard {
    */
   protected get threadable(): boolean {
     const provider = this.display.provider ?? 'mastodon';
+    if (provider === 'anonymous-mastodon') {
+      const ref = this.anonymousRef;
+      return !!ref && !ref.statusId.startsWith('rss:');
+    }
     return provider === 'mastodon' || provider === 'bluesky' || provider === 'rss';
+  }
+
+  protected get threadLink(): (string | number)[] | null {
+    if (!this.threadable) return null;
+    const ref = this.anonymousRef;
+    if (this.display.provider === 'anonymous-mastodon') {
+      if (!ref?.statusId) return null;
+      return [
+        '/statuses',
+        anonymousStatusRouteRef({
+          server: ref.server,
+          id: ref.statusId,
+          originalUrl: this.display.url ?? undefined,
+        }),
+      ];
+    }
+    return ['/statuses', this.display.id];
   }
 
   /**
@@ -503,10 +529,39 @@ export class StatusCard {
     if (!this.foreign) {
       return ['/accounts', id];
     }
+    const ref = this.anonymousRef;
+    if (this.display.provider === 'anonymous-mastodon' && ref?.accountId) {
+      return [
+        '/accounts',
+        anonymousAccountRouteRef({
+          server: ref.server,
+          id: ref.accountId,
+          originalUrl: this.display.account.url || undefined,
+        }),
+      ];
+    }
     if (this.display.provider === 'rss' && id.startsWith('rss:') && !id.includes('::')) {
       return ['/accounts', id];
     }
     return null;
+  }
+
+  private get anonymousRef(): AnonymousProviderRef | null {
+    const ref = this.display.providerRef as Partial<AnonymousProviderRef> | undefined;
+    if (
+      !ref ||
+      typeof ref.server !== 'string' ||
+      typeof ref.statusId !== 'string' ||
+      typeof ref.accountId !== 'string'
+    ) {
+      return null;
+    }
+    try {
+      const protocol = new URL(ref.server).protocol;
+      return protocol === 'https:' || protocol === 'http:' ? (ref as AnonymousProviderRef) : null;
+    } catch {
+      return null;
+    }
   }
 
   protected get providerBadge(): string | null {

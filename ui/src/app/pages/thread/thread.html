@@ -58,7 +58,7 @@
             decoding="async"
           />
         }
-        @if (isRss()) {
+        @if (isRss() || isAnonymousPublic()) {
           @if (post.url) {
             <a
               class="btn btn-outline btn-sm reader-original"
@@ -68,6 +68,15 @@
             >
               ↗ Read on the original site
             </a>
+          }
+          @if (isAnonymousPublic()) {
+            <button
+              class="btn btn-outline btn-sm reader-original"
+              [class.active]="post.bookmarked"
+              (click)="toggleBookmark(post)"
+            >
+              {{ post.bookmarked ? '🔖 Bookmarked' : '🔖 Bookmark' }}
+            </button>
           }
         } @else {
           <div class="reader-actions">
@@ -161,6 +170,15 @@
       }
     </article>
   } @else {
+    @if (isAnonymousPublic() && publicContextUnavailable()) {
+      <p class="muted center">
+        This server did not make the surrounding conversation available anonymously. The post is
+        still readable below.
+        @if (publicOriginalUrl(); as originalUrl) {
+          <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">Open the original</a>.
+        }
+      </p>
+    }
     @for (a of ancestors(); track a.id) {
       <app-status-card
         [status]="a"
@@ -181,7 +199,7 @@
     />
     @if (isBluesky(s)) {
       <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
-    } @else if (!isRss()) {
+    } @else if (!isRss() && !isAnonymousPublic()) {
       <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
     }
     @for (d of descendants(); track d.id) {
@@ -196,5 +214,10 @@
     }
   }
 } @else {
-  <p class="muted center">Status not found.</p>
+  <p class="muted center">
+    Status not found.
+    @if (publicOriginalUrl(); as originalUrl) {
+      <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">Open the original post</a>.
+    }
+  </p>
 }

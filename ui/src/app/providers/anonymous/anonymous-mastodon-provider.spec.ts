@@ -196,4 +196,39 @@ describe('AnonymousMastodonProvider', () => {
     expect(received).toHaveLength(1);
     expect(received[0].provider).toBe('anonymous-mastodon');
   });
+
+  it('keeps per-follow cursors in an independent list session and pages only on demand', () => {
+    const follows = TestBed.inject(AnonymousFollows);
+    follows.follow(account('alice', 'https://one.example'), 'https://mastodon.social');
+    const session = TestBed.inject(AnonymousMastodonProvider).createFollowFeed(follows.follows());
+    const pages: Status[][] = [];
+
+    session.fetchPage().subscribe((page) => pages.push(page.statuses));
+    httpMock
+      .expectOne('https://one.example/api/v1/accounts/lookup?acct=alice')
+      .flush(account('alice', 'https://one.example', 'a1'));
+    httpMock
+      .expectOne('https://one.example/api/v1/accounts/a1/statuses?limit=20&exclude_replies=true')
+      .flush(
+        Array.from({ length: 20 }, (_, index) =>
+          status(account('alice', 'https://one.example', 'a1'), String(index)),
+        ),
+      );
+
+    expect(pages[0]).toHaveLength(20);
+    httpMock.expectNone((request) => request.params.get('max_id') === '19');
+
+    session.fetchPage().subscribe((page) => pages.push(page.statuses));
+    httpMock
+      .expectOne(
+        'https://one.example/api/v1/accounts/a1/statuses?limit=20&exclude_replies=true&max_id=19',
+      )
+      .flush([status(account('alice', 'https://one.example', 'a1'), 'older')]);
+
+    expect(pages[1].map((item) => item.providerRef)).toContainEqual({
+      server: 'https://one.example',
+      statusId: 'older',
+      accountId: 'a1',
+    });
+  });
 });

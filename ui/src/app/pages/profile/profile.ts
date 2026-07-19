@@ -18,6 +18,14 @@ import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
+import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
+import {
+  AnonymousPublicRef,
+  parseAnonymousAccountRouteRef,
+} from '../../providers/anonymous/anonymous-route-ref';
+import { AnonymousProviderRef } from '../../providers/anonymous/anonymous-mastodon-provider';
+import { AccountStatusesOptions } from '../../api';
+import { Observable } from 'rxjs';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers';
@@ -44,6 +52,7 @@ export class Profile implements OnInit, OnDestroy {
   protected auth = inject(Auth);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymous = inject(AnonymousAccount);
+  private anonymousPublic = inject(AnonymousPublicApi);
   protected anonymousFollows = inject(AnonymousFollows);
   private location = inject(Location);
   private rss = inject(RssProvider);
@@ -51,6 +60,7 @@ export class Profile implements OnInit, OnDestroy {
   private destroyRef = inject(DestroyRef);
   private routeLoadSub = new Subscription();
   private statusLoadSub = new Subscription();
+  private publicProfileRef: AnonymousPublicRef | null = null;
 
   /** True when this "profile" is a synthetic RSS feed (id `rss:<feedUrl>`). */
   protected isRss = signal(false);
@@ -156,6 +166,7 @@ export class Profile implements OnInit, OnDestroy {
     this.reportDone.set(false);
     this.followError.set(null);
     this.isRss.set(false);
+    this.publicProfileRef = null;
     this.rssFeedUrl.set(null);
     this.tab.set('posts');
     if (id.startsWith('rss:')) {
@@ -175,6 +186,11 @@ export class Profile implements OnInit, OnDestroy {
       );
       return;
     }
+    const publicRef = parseAnonymousAccountRouteRef(id);
+    if (publicRef) {
+      this.loadAnonymousPublicProfile(publicRef);
+      return;
+    }
     this.routeLoadSub.add(
       this.api.getAccount(id).subscribe((a) => {
         this.account.set(a);
@@ -192,6 +208,23 @@ export class Profile implements OnInit, OnDestroy {
       );
     }
     this.loadFeatured(id);
+  }
+
+  private loadAnonymousPublicProfile(ref: AnonymousPublicRef): void {
+    this.publicProfileRef = ref;
+    this.featured.set([]);
+    this.routeLoadSub.add(
+      this.anonymousPublic.getAccount(ref).subscribe({
+        next: (account) => {
+          this.account.set(account);
+          this.relationship.set(this.anonymousFollows.relationship(account, ref.server));
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      }),
+    );
+    this.loadStatuses(ref.id);
+    this.loadPinned(ref.id);
   }
 
   /**
@@ -245,7 +278,7 @@ export class Profile implements OnInit, OnDestroy {
   }
 
   private reloadStatuses(): void {
-    const id = this.account()?.id;
+    const id = this.publicProfileRef?.id ?? this.account()?.id;
     if (id) {
       this.loadStatuses(id);
     }
@@ -276,14 +309,14 @@ export class Profile implements OnInit, OnDestroy {
     };
     const fetchPage = (maxId: string | undefined, acc: Status[], page: number): void => {
       this.statusLoadSub.add(
-        this.api.getAccountStatuses(id, { ...opts, maxId }).subscribe({
+        this.getAccountStatuses(id, { ...opts, maxId }).subscribe({
           next: (batch) => {
             if (seq !== this.loadSeq) {
               return; // A newer load superseded this one.
             }
             const all = [...acc, ...batch];
             if (batch.length > 0 && all.length < Profile.TARGET_COUNT && page < Profile.MAX_PAGES) {
-              fetchPage(batch[batch.length - 1].id, all, page + 1);
+              fetchPage(this.nativeStatusId(batch[batch.length - 1]), all, page + 1);
               return;
             }
             this.statuses.set(all);
@@ -303,47 +336,58 @@ export class Profile implements OnInit, OnDestroy {
 
   /** Fetch one older page below the current list ("Load more" at the bottom). */
   loadMore(): void {
-    const id = this.account()?.id;
+    const id = this.publicProfileRef?.id ?? this.account()?.id;
     const last = this.statuses().at(-1);
     if (!id || !last || this.loadingMore() || this.exhausted()) {
       return;
     }
     const seq = this.loadSeq;
     this.loadingMore.set(true);
-    this.api
-      .getAccountStatuses(id, {
-        excludeReblogs: !this.showBoosts(),
-        excludeReplies: !this.showReplies(),
-        limit: Profile.TARGET_COUNT,
-        maxId: last.id,
-      })
-      .subscribe({
-        next: (batch) => {
-          this.loadingMore.set(false);
-          if (seq !== this.loadSeq) {
-            return; // Filters changed or the route moved mid-flight.
-          }
-          if (!batch.length) {
-            this.exhausted.set(true);
-            return;
-          }
-          const seen = new Set(this.statuses().map((s) => s.id));
-          this.statuses.update((list) => [...list, ...batch.filter((s) => !seen.has(s.id))]);
-        },
-        error: () => this.loadingMore.set(false),
-      });
+    this.getAccountStatuses(id, {
+      excludeReblogs: !this.showBoosts(),
+      excludeReplies: !this.showReplies(),
+      limit: Profile.TARGET_COUNT,
+      maxId: this.nativeStatusId(last),
+    }).subscribe({
+      next: (batch) => {
+        this.loadingMore.set(false);
+        if (seq !== this.loadSeq) {
+          return; // Filters changed or the route moved mid-flight.
+        }
+        if (!batch.length) {
+          this.exhausted.set(true);
+          return;
+        }
+        const seen = new Set(this.statuses().map((s) => s.id));
+        this.statuses.update((list) => [...list, ...batch.filter((s) => !seen.has(s.id))]);
+      },
+      error: () => this.loadingMore.set(false),
+    });
   }
 
   private loadPinned(id: string): void {
     this.pinnedStatuses.set([]);
     this.routeLoadSub.add(
-      this.api.getAccountStatuses(id, { pinned: true }).subscribe({
+      this.getAccountStatuses(id, { pinned: true }).subscribe({
         next: (pinned) => this.pinnedStatuses.set(pinned),
         error: () => {
           // No pinned strip, the rest of the profile still works.
         },
       }),
     );
+  }
+
+  private getAccountStatuses(id: string, opts: AccountStatusesOptions): Observable<Status[]> {
+    return this.publicProfileRef
+      ? this.anonymousPublic.getAccountStatuses({ ...this.publicProfileRef, id }, opts)
+      : this.api.getAccountStatuses(id, opts);
+  }
+
+  private nativeStatusId(status: Status): string {
+    const ref = status.providerRef as Partial<AnonymousProviderRef> | undefined;
+    return status.provider === 'anonymous-mastodon' && typeof ref?.statusId === 'string'
+      ? ref.statusId
+      : status.id;
   }
 
   private loadFeatured(id: string): void {
@@ -392,7 +436,10 @@ export class Profile implements OnInit, OnDestroy {
 
   followFeatured(target: Account): void {
     if (this.auth.isAnonymous) {
-      const result = this.anonymousFollows.follow(target, this.anonymous.server());
+      const result = this.anonymousFollows.follow(
+        target,
+        this.publicProfileRef?.server ?? this.anonymous.server(),
+      );
       if (result.ok) {
         this.featuredFollowing.update((set) => new Set(set).add(target.id));
         this.followError.set(null);
@@ -449,10 +496,18 @@ export class Profile implements OnInit, OnDestroy {
     this.followError.set(null);
     if (this.auth.isAnonymous) {
       if (rel?.following) {
-        this.relationship.set(this.anonymousFollows.unfollow(acc, this.anonymous.server()));
+        this.relationship.set(
+          this.anonymousFollows.unfollow(
+            acc,
+            this.publicProfileRef?.server ?? this.anonymous.server(),
+          ),
+        );
         return;
       }
-      const result = this.anonymousFollows.follow(acc, this.anonymous.server());
+      const result = this.anonymousFollows.follow(
+        acc,
+        this.publicProfileRef?.server ?? this.anonymous.server(),
+      );
       this.relationship.set(result.relationship);
       if (!result.ok) {
         this.followError.set(result.error);

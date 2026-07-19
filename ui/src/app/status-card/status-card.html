@@ -46,11 +46,7 @@
             · {{ display.created_at | humanTime }}
           </a>
         } @else {
-          <a
-            class="post-time muted"
-            [routerLink]="['/statuses', display.id]"
-            [title]="display.created_at"
-          >
+          <a class="post-time muted" [routerLink]="threadLink" [title]="display.created_at">
             · {{ display.created_at | humanTime }}
           </a>
         }
@@ -110,11 +106,7 @@
           </div>
         }
         @if (!cwCollapsed()) {
-          <a
-            class="content-link"
-            [routerLink]="threadable ? ['/statuses', display.id] : null"
-            (click)="onContentClick($event)"
-          >
+          <a class="content-link" [routerLink]="threadLink" (click)="onContentClick($event)">
             @if (translation(); as t) {
               <div class="content" [innerHTML]="md(t.content)"></div>
             } @else {
@@ -244,7 +236,7 @@
         @if (!foreign && (display.replies_count > 0 || display.in_reply_to_id)) {
           <a
             class="action"
-            [routerLink]="['/statuses', display.id]"
+            [routerLink]="threadLink"
             [queryParams]="{ reader: 1 }"
             (click)="$event.stopPropagation()"
             title="Read thread as article"
@@ -255,7 +247,7 @@
         @if (display.provider === 'rss' && threadable) {
           <a
             class="action"
-            [routerLink]="['/statuses', display.id]"
+            [routerLink]="threadLink"
             (click)="$event.stopPropagation()"
             title="Read article and comments"
           >

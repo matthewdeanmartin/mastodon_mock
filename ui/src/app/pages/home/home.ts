@@ -19,6 +19,7 @@ import {
   canonicalStatusKey,
 } from '../../providers/anonymous/anonymous-feed-corpus';
 import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmarks';
+import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
 
 /** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -41,6 +42,7 @@ export class Home implements OnInit, OnDestroy {
   private aggregator = inject(FeedAggregator);
   private anonymousCorpus = inject(AnonymousFeedCorpus);
   private anonymousBookmarks = inject(AnonymousBookmarks);
+  protected anonymousProvider = inject(AnonymousMastodonProvider);
   private route = inject(ActivatedRoute);
   private drafts = inject(Drafts);
 
