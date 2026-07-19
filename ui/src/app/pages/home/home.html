@@ -1,4 +1,6 @@
-<app-announcements />
+@if (!auth.isAnonymous) {
+  <app-announcements />
+}
 
 @if (showFollowNudge()) {
   <aside class="follow-nudge">
@@ -16,10 +18,13 @@
   </aside>
 }
 
-<app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
+@if (!auth.isAnonymous) {
+  <app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
+}
 
 <app-command-bar
   [live]="live()"
+  [showLive]="!auth.isAnonymous"
   [providerChips]="true"
   [showRefresh]="!live()"
   (refresh)="load()"
@@ -32,7 +37,11 @@
 } @else if (!visible().length) {
   <p class="muted center">
     Your home timeline is empty.
-    <a routerLink="/find-people">Find people to follow</a>, or post something.
+    <a routerLink="/find-people">Find people to follow</a>
+    @if (!auth.isAnonymous) {
+      , or post something
+    }
+    .
   </p>
 } @else {
   @for (s of visible(); track s.id) {

@@ -140,6 +140,28 @@
   align-items: start;
 }
 
+.anonymous-path {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+}
+
+.anonymous-path h2,
+.anonymous-path p {
+  margin: 0;
+}
+
+.anonymous-btn {
+  width: auto;
+  min-width: 210px;
+  margin: 0;
+}
+
 .path {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -170,6 +192,15 @@
   .login-card {
     width: 480px;
     padding: 20px;
+  }
+
+  .anonymous-path {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .anonymous-btn {
+    width: 100%;
   }
 }
 

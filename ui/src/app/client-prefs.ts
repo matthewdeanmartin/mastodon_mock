@@ -3,7 +3,7 @@ import { ProviderId } from './models';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
 
-const PROVIDER_IDS: ProviderId[] = ['mastodon', 'bluesky', 'rss'];
+const PROVIDER_IDS: ProviderId[] = ['mastodon', 'anonymous-mastodon', 'bluesky', 'rss'];
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 

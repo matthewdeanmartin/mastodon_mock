@@ -5,7 +5,7 @@
  * Foreign providers (`providers/`) adapt their content into these same Mastodon
  * shapes and tag it, so the rest of the app renders everything identically.
  */
-export type ProviderId = 'mastodon' | 'bluesky' | 'rss';
+export type ProviderId = 'mastodon' | 'anonymous-mastodon' | 'bluesky' | 'rss';
 
 export interface Role {
   id: string;

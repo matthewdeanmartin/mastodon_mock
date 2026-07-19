@@ -125,7 +125,7 @@
             @if (auth.otherSessions().length) {
               <div class="menu-divider"></div>
               <p class="menu-label">Switch account</p>
-              @for (s of auth.otherSessions(); track s.token) {
+              @for (s of auth.otherSessions(); track s.key) {
                 <button type="button" class="switch-row" (click)="switchTo(s)">
                   <img
                     [src]="s.account?.avatar_static || s.account?.avatar || ''"
@@ -136,7 +136,10 @@
                     decoding="async"
                   />
                   <span class="switch-name">
-                    {{ s.account?.display_name || 'Saved account' }}
+                    {{
+                      s.account?.display_name ||
+                        (s.kind === 'anonymous' ? 'Anonymous' : 'Saved account')
+                    }}
                     @if (s.account?.username) {
                       <small class="muted">&#64;{{ s.account?.username }}</small>
                     }

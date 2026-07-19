@@ -1,9 +1,13 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
 import { Account } from './models';
+import { AnonymousAccount } from './providers/anonymous/anonymous-account';
 import { Server } from './server';
 
 const TOKEN_KEY = 'mastodon_mock_token';
 const SESSIONS_KEY = 'mastodon_mock_sessions';
+export const ACCOUNT_MODE_KEY = 'mastodon_mock_account_mode';
+
+export type AccountMode = 'mastodon' | 'anonymous';
 
 /** A saved login: a token plus a snapshot of the account it belongs to. */
 export interface Session {
@@ -16,6 +20,15 @@ export interface Session {
    */
   server?: string;
   /** Account snapshot for the switcher UI (avatar, name). Refreshed on verify. */
+  account: Account | null;
+}
+
+/** One row in the account switcher, including the permanent virtual account. */
+export interface AccountChoice {
+  key: string;
+  kind: AccountMode;
+  token: string | null;
+  server: string;
   account: Account | null;
 }
 
@@ -37,18 +50,56 @@ function loadSessions(): Session[] {
 @Injectable({ providedIn: 'root' })
 export class Auth {
   private server = inject(Server);
+  private anonymous = inject(AnonymousAccount);
 
-  readonly token = signal<string | null>(localStorage.getItem(TOKEN_KEY));
-  readonly account = signal<Account | null>(null);
+  readonly mode = signal<AccountMode | null>(
+    localStorage.getItem(ACCOUNT_MODE_KEY) === 'anonymous'
+      ? 'anonymous'
+      : localStorage.getItem(TOKEN_KEY)
+        ? 'mastodon'
+        : null,
+  );
+
+  readonly token = signal<string | null>(
+    this.mode() === 'mastodon' ? localStorage.getItem(TOKEN_KEY) : null,
+  );
+  private mastodonAccount = signal<Account | null>(null);
+  readonly account = linkedSignal(() =>
+    this.mode() === 'anonymous' ? this.anonymous.account() : this.mastodonAccount(),
+  );
 
   /** Every account the tester has logged into and not removed. */
   readonly sessions = signal<Session[]>(loadSessions());
 
   /** Saved sessions other than the active one (for the "switch to" menu). */
-  readonly otherSessions = computed(() => this.sessions().filter((s) => s.token !== this.token()));
+  readonly otherSessions = computed<AccountChoice[]>(() => {
+    const choices: AccountChoice[] = this.sessions()
+      .filter((s) => this.mode() !== 'mastodon' || s.token !== this.token())
+      .map((s) => ({
+        key: `mastodon:${s.token}`,
+        kind: 'mastodon' as const,
+        token: s.token,
+        server: s.server ?? '',
+        account: s.account,
+      }));
+    if (this.mode() !== 'anonymous') {
+      choices.push({
+        key: 'anonymous',
+        kind: 'anonymous',
+        token: null,
+        server: this.anonymous.server(),
+        account: this.anonymous.account(),
+      });
+    }
+    return choices;
+  });
 
   get isAuthenticated(): boolean {
-    return this.token() !== null;
+    return this.mode() !== null;
+  }
+
+  get isAnonymous(): boolean {
+    return this.mode() === 'anonymous';
   }
 
   /**
@@ -57,6 +108,8 @@ export class Auth {
    */
   setToken(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(ACCOUNT_MODE_KEY, 'mastodon');
+    this.mode.set('mastodon');
     this.token.set(token);
     const server = this.server.baseUrl();
     const existing = this.sessions().find((s) => s.token === token);
@@ -70,6 +123,13 @@ export class Auth {
 
   /** Record the verified account for the active token (updates the switcher snapshot). */
   setAccount(account: Account | null): void {
+    if (this.isAnonymous) {
+      if (account) {
+        this.anonymous.updateAccount(account);
+      }
+      return;
+    }
+    this.mastodonAccount.set(account);
     this.account.set(account);
     const token = this.token();
     if (account && token) {
@@ -90,9 +150,31 @@ export class Auth {
       this.server.setBaseUrl(session.server);
     }
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(ACCOUNT_MODE_KEY, 'mastodon');
+    this.mode.set('mastodon');
     this.token.set(token);
-    this.account.set(session.account);
+    this.mastodonAccount.set(session.account);
     return true;
+  }
+
+  /** Enter the permanent local account without deleting any saved logins. */
+  enterAnonymous(server?: string): void {
+    this.anonymous.activate(server);
+    this.server.setBaseUrl(this.anonymous.server());
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.setItem(ACCOUNT_MODE_KEY, 'anonymous');
+    this.token.set(null);
+    this.mastodonAccount.set(null);
+    this.mode.set('anonymous');
+  }
+
+  /** Switch either to the virtual account or to a saved Mastodon token. */
+  switchAccount(choice: AccountChoice): boolean {
+    if (choice.kind === 'anonymous') {
+      this.enterAnonymous();
+      return true;
+    }
+    return choice.token !== null && this.switchTo(choice.token);
   }
 
   /** Forget one saved session. If it was active, fall back to another (or sign out). */
@@ -111,6 +193,18 @@ export class Auth {
 
   /** Sign out of the active account only, keeping the rest of the stable. */
   logout(): void {
+    if (this.isAnonymous) {
+      const next = this.sessions()[0];
+      if (next) {
+        this.switchTo(next.token);
+        return;
+      }
+      localStorage.removeItem(ACCOUNT_MODE_KEY);
+      this.mode.set(null);
+      this.token.set(null);
+      this.mastodonAccount.set(null);
+      return;
+    }
     const remaining = this.sessions().filter((s) => s.token !== this.token());
     this.persistSessions(remaining);
     const next = remaining[0];
@@ -119,16 +213,20 @@ export class Auth {
       return;
     }
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ACCOUNT_MODE_KEY);
+    this.mode.set(null);
     this.token.set(null);
-    this.account.set(null);
+    this.mastodonAccount.set(null);
   }
 
   /** Forget every saved session and sign out entirely. */
   logoutAll(): void {
     this.persistSessions([]);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ACCOUNT_MODE_KEY);
+    this.mode.set(null);
     this.token.set(null);
-    this.account.set(null);
+    this.mastodonAccount.set(null);
   }
 
   private persistSessions(sessions: Session[]): void {

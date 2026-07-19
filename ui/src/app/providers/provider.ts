@@ -11,6 +11,7 @@ export interface ProviderCapabilities {
 
 export const PROVIDER_CAPS: Record<ProviderId, ProviderCapabilities> = {
   mastodon: { reply: true, favourite: true, reblog: true },
+  'anonymous-mastodon': { reply: false, favourite: false, reblog: false },
   bluesky: { reply: true, favourite: true, reblog: true },
   rss: { reply: false, favourite: false, reblog: false },
 };

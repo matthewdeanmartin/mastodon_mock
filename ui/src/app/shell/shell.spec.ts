@@ -92,4 +92,23 @@ describe('Shell account switching', () => {
       expect(cmp.toast()).toContain("Couldn't switch");
     },
   );
+
+  it(
+    'boots Anonymous without verifying credentials and preserves saved sessions',
+    { timeout: 20_000 },
+    () => {
+      auth.enterAnonymous('https://mastodon.social');
+
+      const fixture = TestBed.createComponent(Shell);
+      fixture.detectChanges();
+
+      httpMock.expectNone('https://mastodon.social/api/v1/accounts/verify_credentials');
+      drainRailRequests();
+      expect(auth.sessions().map((session) => session.token)).toEqual([
+        'art-token',
+        'social-token',
+      ]);
+      expect(auth.account()?.display_name).toBe('Anonymous');
+    },
+  );
 });

@@ -18,6 +18,7 @@ describe('Login', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    localStorage.clear();
     sessionStorage.clear();
   });
 
@@ -172,6 +173,23 @@ describe('Login', () => {
     httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
 
     fixture.componentInstance.submit();
+    httpMock.expectNone('/api/v1/accounts/verify_credentials');
+  });
+
+  it('continues anonymously without verifying credentials', () => {
+    const fixture = setUp();
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
+
+    fixture.componentInstance.continueAnonymously();
+
+    const auth = TestBed.inject(Auth);
+    expect(auth.isAnonymous).toBe(true);
+    expect(auth.token()).toBeNull();
+    expect(auth.sessions()).toEqual([]);
+    expect(navigateSpy).toHaveBeenCalledWith('/home');
     httpMock.expectNone('/api/v1/accounts/verify_credentials');
   });
 

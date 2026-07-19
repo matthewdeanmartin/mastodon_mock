@@ -29,7 +29,7 @@ const BOOKMARK_TAIL_SIZE = 40;
 })
 export class Home implements OnInit, OnDestroy {
   private api = inject(Api);
-  private auth = inject(Auth);
+  protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);

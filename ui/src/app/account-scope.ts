@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'mastodon_mock_token';
+const ACCOUNT_MODE_KEY = 'mastodon_mock_account_mode';
 
 /**
  * A short, stable, non-secret suffix identifying the currently-active account,
@@ -10,13 +11,19 @@ const TOKEN_KEY = 'mastodon_mock_token';
  * nothing is stored server-side), we scope their storage keys by the active
  * account here.
  *
- * The active token is the only account identifier guaranteed present in
- * localStorage at service-construction time, so the scope derives from it — but
- * a raw bearer token must never appear in a storage key, so we fold it into a
- * short non-reversible hash. No token, no suffix (a logged-out shell shares one
- * anonymous namespace, which is fine — there's no account to attribute to).
+ * Authenticated scopes derive from the active token — but a raw bearer token
+ * must never appear in a storage key, so we fold it into a short non-reversible
+ * hash. The one local Anonymous account uses a fixed `_anonymous` suffix. With
+ * neither account mode active there is no suffix.
  */
 export function accountScopeSuffix(): string {
+  try {
+    if (localStorage.getItem(ACCOUNT_MODE_KEY) === 'anonymous') {
+      return '_anonymous';
+    }
+  } catch {
+    // Fall through to the logged-out namespace when storage is unavailable.
+  }
   let token: string | null;
   try {
     token = localStorage.getItem(TOKEN_KEY);

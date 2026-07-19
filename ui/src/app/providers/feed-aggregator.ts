@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { Api } from '../api';
+import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { Status } from '../models';
 import { FeedProvider } from './provider';
@@ -30,6 +31,7 @@ function time(status: Status): number {
 @Injectable({ providedIn: 'root' })
 export class FeedAggregator {
   private api = inject(Api);
+  private auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private registry = inject(ProviderRegistry);
 
@@ -40,7 +42,7 @@ export class FeedAggregator {
   /** Start over from the top using the providers currently visible to the user. */
   reset(): void {
     this.mastodonMaxId = undefined;
-    this.mastodonExhausted = !this.prefs.isProviderVisible('mastodon');
+    this.mastodonExhausted = this.auth.isAnonymous || !this.prefs.isProviderVisible('mastodon');
     this.foreign = this.registry
       .linked()
       .filter((provider) => this.prefs.isProviderVisible(provider.id))

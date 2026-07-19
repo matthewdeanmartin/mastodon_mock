@@ -66,6 +66,19 @@
       }
     </div>
 
+    <section class="anonymous-path" aria-labelledby="anonymous-heading">
+      <div>
+        <h2 id="anonymous-heading">Browse anonymously</h2>
+        <p class="muted small">
+          Use the full app with a local-only identity on {{ anonymousServerHostLabel() }}. Your
+          signed-in accounts stay saved.
+        </p>
+      </div>
+      <button class="btn btn-hero anonymous-btn" type="button" (click)="continueAnonymously()">
+        Continue anonymously
+      </button>
+    </section>
+
     <!-- ====================== Sign in / Register ====================== -->
     @if (tab() === 'signin') {
       <!-- ---------- Server combo: pick a common one or type your own ---------- -->
@@ -93,12 +106,8 @@
             @if (suggestOpen() && serverSuggestions().length) {
               <ul id="server-suggest-list" class="server-suggest" role="listbox">
                 @for (s of serverSuggestions(); track s.domain) {
-                  <li role="option">
-                    <button
-                      type="button"
-                      class="suggest-row"
-                      (mousedown)="chooseSuggestion(s)"
-                    >
+                  <li role="option" [attr.aria-selected]="false">
+                    <button type="button" class="suggest-row" (mousedown)="chooseSuggestion(s)">
                       <span class="suggest-top">
                         <span class="suggest-domain">{{ s.domain }}</span>
                         @if (s.category) {

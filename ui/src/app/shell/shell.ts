@@ -4,7 +4,7 @@ import { NgOptimizedImage } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { Api } from '../api';
-import { Auth, Session } from '../auth';
+import { AccountChoice, Auth, Session } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { environment } from '../../environments/environment';
 import { Hotkeys } from '../hotkeys';
@@ -77,6 +77,9 @@ export class Shell implements OnInit {
 
   ngOnInit(): void {
     this.hotkeys.start();
+    if (this.auth.isAnonymous) {
+      return;
+    }
     if (!this.auth.account()) {
       this.api.verifyCredentials().subscribe({
         next: (acc) => this.auth.setAccount(acc),
@@ -99,9 +102,28 @@ export class Shell implements OnInit {
    * do a full page reload — the cleanest way to invalidate everything and
    * re-bootstrap against the new identity.
    */
-  switchTo(session: Session): void {
+  switchTo(target: AccountChoice | Session): void {
+    const session: AccountChoice =
+      'kind' in target
+        ? target
+        : {
+            key: `mastodon:${target.token}`,
+            kind: 'mastodon',
+            token: target.token,
+            server: target.server ?? '',
+            account: target.account,
+          };
+    if (session.kind === 'anonymous') {
+      this.auth.switchAccount(session);
+      location.reload();
+      return;
+    }
     const previous = this.auth.token();
+    const previousWasAnonymous = this.auth.isAnonymous;
     if (session.token === previous) {
+      return;
+    }
+    if (!session.token) {
       return;
     }
     this.auth.switchTo(session.token);
@@ -115,7 +137,9 @@ export class Shell implements OnInit {
         // The token was rejected by its instance. Don't silently delete the account —
         // revert to where we were and tell the user (non-blocking toast).
         const name = session.account?.display_name || session.account?.username || 'that account';
-        if (previous) {
+        if (previousWasAnonymous) {
+          this.auth.enterAnonymous();
+        } else if (previous) {
           this.auth.switchTo(previous);
         }
         this.showToast(
@@ -133,7 +157,9 @@ export class Shell implements OnInit {
   /** Sign out of just the active account; fall back to another if one remains. */
   logout(): void {
     this.auth.logout();
-    if (!this.auth.isAuthenticated) {
+    if (this.auth.isAuthenticated) {
+      location.reload();
+    } else {
       location.assign('login');
     }
   }

@@ -35,4 +35,11 @@ describe('account-scope', () => {
     const two = scopedKey('base');
     expect(one).not.toBe(two);
   });
+
+  it('uses a stable namespace for the one Anonymous account', () => {
+    localStorage.setItem('mastodon_mock_account_mode', 'anonymous');
+
+    expect(accountScopeSuffix()).toBe('_anonymous');
+    expect(scopedKey('mockingbird_rss_feeds')).toBe('mockingbird_rss_feeds_anonymous');
+  });
 });

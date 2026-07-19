@@ -22,6 +22,15 @@ describe('authGuard', () => {
     expect(result).toBe(true);
   });
 
+  it('returns true for the local Anonymous account', () => {
+    const auth = TestBed.inject(Auth);
+    auth.enterAnonymous('https://mastodon.social');
+
+    const result = TestBed.runInInjectionContext(() => authGuard({} as any, {} as any));
+
+    expect(result).toBe(true);
+  });
+
   it('returns a UrlTree for /login when not authenticated', () => {
     // Ensure no token is set (localStorage cleared in beforeEach)
     const auth = TestBed.inject(Auth);

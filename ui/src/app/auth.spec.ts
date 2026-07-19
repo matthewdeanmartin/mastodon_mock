@@ -58,4 +58,33 @@ describe('Auth + Server linkage', () => {
     const session = auth.sessions().find((s) => s.token === 'legacy');
     expect(session?.server).toBe('https://mastodon.social');
   });
+
+  it('enters Anonymous without removing authenticated sessions', () => {
+    server.setBaseUrl('https://mastodon.art');
+    auth.setToken('art-token');
+
+    auth.enterAnonymous('https://hachyderm.io');
+
+    expect(auth.isAuthenticated).toBe(true);
+    expect(auth.isAnonymous).toBe(true);
+    expect(auth.token()).toBeNull();
+    expect(auth.account()?.display_name).toBe('Anonymous');
+    expect(server.baseUrl()).toBe('https://hachyderm.io');
+    expect(auth.sessions().map((s) => s.token)).toEqual(['art-token']);
+  });
+
+  it('always offers Anonymous in the switcher and restores a saved login', () => {
+    server.setBaseUrl('https://mastodon.art');
+    auth.setToken('art-token');
+
+    expect(auth.otherSessions().some((choice) => choice.kind === 'anonymous')).toBe(true);
+
+    auth.enterAnonymous();
+    const saved = auth.otherSessions().find((choice) => choice.kind === 'mastodon')!;
+    expect(auth.switchAccount(saved)).toBe(true);
+
+    expect(auth.isAnonymous).toBe(false);
+    expect(auth.token()).toBe('art-token');
+    expect(server.baseUrl()).toBe('https://mastodon.art');
+  });
 });

@@ -78,6 +78,11 @@ export class Login implements OnInit, OnDestroy {
     return base ? base.replace(/^https?:\/\//, '') : 'this server';
   });
 
+  /** Anonymous always targets a real instance, even in the embedded mock build. */
+  protected anonymousServerHostLabel = computed(() =>
+    this.server.baseUrl() ? this.serverHostLabel() : 'mastodon.social',
+  );
+
   // --- Sign in (token) ---
   protected token = signal('');
   protected error = signal<string | null>(null);
@@ -122,6 +127,10 @@ export class Login implements OnInit, OnDestroy {
     // a dead token just leaves the user here.
     const params = this.route.snapshot.queryParamMap;
     if (!params.get('code') && !params.get('add') && this.auth.isAuthenticated) {
+      if (this.auth.isAnonymous) {
+        void this.router.navigateByUrl('/home');
+        return;
+      }
       this.api.verifyCredentials().subscribe({
         next: (acc) => {
           this.auth.setAccount(acc);
@@ -151,6 +160,13 @@ export class Login implements OnInit, OnDestroy {
 
   selectTab(tab: Tab): void {
     this.tab.set(tab);
+  }
+
+  /** Enter the real application as the one browser-local Anonymous account. */
+  continueAnonymously(): void {
+    const selected = this.server.baseUrl() || 'https://mastodon.social';
+    this.auth.enterAnonymous(selected);
+    void this.router.navigateByUrl('/home');
   }
 
   ngOnDestroy(): void {
