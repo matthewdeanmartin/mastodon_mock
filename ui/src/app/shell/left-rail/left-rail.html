@@ -14,7 +14,10 @@
       /></a>
       <span class="profile-handle muted">&#64;{{ acc.username }}</span>
       <div class="profile-stats">
-        <a [routerLink]="['/accounts', acc.id]">
+        <a
+          [routerLink]="['/accounts', acc.id]"
+          [queryParams]="auth.isAnonymous ? { tab: 'following' } : null"
+        >
           <span class="stat-label">{{ words().Posts }}</span>
           <span class="stat-value">{{ acc.statuses_count | humanCount }}</span>
         </a>

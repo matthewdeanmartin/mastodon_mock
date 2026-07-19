@@ -7,6 +7,8 @@ import { FeedProvider } from '../provider';
 import { AnonymousFollow, AnonymousFollows } from './anonymous-follows';
 import { RssFetch } from '../rss/rss-fetch';
 import { feedToStatuses } from '../rss/rss-adapter';
+import { AnonymousAccount } from './anonymous-account';
+import { AnonymousTags } from './anonymous-tags';
 
 const PAGE_SIZE = 20;
 const MAX_CONCURRENCY = 4;
@@ -16,6 +18,18 @@ interface SourceCursor {
   follow: AnonymousFollow;
   maxId?: string;
   exhausted: boolean;
+}
+
+interface TagCursor {
+  tag: string;
+  maxId?: string;
+  exhausted: boolean;
+}
+
+interface ActiveSource {
+  label: string;
+  cursor: { exhausted: boolean };
+  fetch: () => Observable<Status[]>;
 }
 
 interface AnonymousProviderRef {
@@ -63,15 +77,20 @@ export class AnonymousMastodonProvider implements FeedProvider {
   private http = inject(HttpClient);
   private auth = inject(Auth);
   private followStore = inject(AnonymousFollows);
+  private tagStore = inject(AnonymousTags);
+  private anonymous = inject(AnonymousAccount);
   private rss = inject(RssFetch);
 
   readonly id = 'anonymous-mastodon' as const;
   readonly label = 'Anonymous Mastodon';
   readonly badge = '🐘 Mastodon';
-  readonly linked = computed(() => this.auth.isAnonymous && this.followStore.count() > 0);
+  readonly linked = computed(
+    () => this.auth.isAnonymous && (this.followStore.count() > 0 || this.tagStore.count() > 0),
+  );
   readonly errors = signal<string[]>([]);
 
   private cursors: SourceCursor[] = [];
+  private tagCursors: TagCursor[] = [];
   private accountIds = new Map<string, string>();
   private rssFallbacks = new Set<string>();
   private seen = new Set<string>();
@@ -81,10 +100,26 @@ export class AnonymousMastodonProvider implements FeedProvider {
     this.rssFallbacks.clear();
     this.seen.clear();
     this.cursors = this.followStore.follows().map((follow) => ({ follow, exhausted: false }));
+    this.tagCursors = this.tagStore.tags().map((tag) => ({ tag, exhausted: false }));
   }
 
   fetchPage(): Observable<Status[]> {
-    const active = this.cursors.filter((source) => !source.exhausted);
+    const active: ActiveSource[] = [
+      ...this.cursors
+        .filter((source) => !source.exhausted)
+        .map((source) => ({
+          label: `@${source.follow.handle}`,
+          cursor: source,
+          fetch: () => this.fetchSource(source),
+        })),
+      ...this.tagCursors
+        .filter((source) => !source.exhausted)
+        .map((source) => ({
+          label: `#${source.tag}`,
+          cursor: source,
+          fetch: () => this.fetchTag(source),
+        })),
+    ];
     if (!active.length) {
       return of([]);
     }
@@ -92,10 +127,10 @@ export class AnonymousMastodonProvider implements FeedProvider {
     return of(...active).pipe(
       mergeMap(
         (source) =>
-          this.fetchSource(source).pipe(
+          source.fetch().pipe(
             catchError(() => {
-              source.exhausted = true;
-              failures.push(`Could not load @${source.follow.handle}.`);
+              source.cursor.exhausted = true;
+              failures.push(`Could not load ${source.label}.`);
               return of<Status[]>([]);
             }),
           ),
@@ -116,6 +151,32 @@ export class AnonymousMastodonProvider implements FeedProvider {
               return false;
             }
             this.seen.add(key);
+            return true;
+          });
+      }),
+    );
+  }
+
+  /** Fetch one public page for an explicit set of follows (used by local lists). */
+  fetchFollows(follows: AnonymousFollow[]): Observable<Status[]> {
+    if (!follows.length) {
+      return of([]);
+    }
+    return of(...follows.map((follow) => ({ follow, exhausted: false }))).pipe(
+      mergeMap(
+        (source) => this.fetchSource(source).pipe(catchError(() => of<Status[]>([]))),
+        MAX_CONCURRENCY,
+      ),
+      toArray(),
+      map((pages) => {
+        const seen = new Set<string>();
+        return pages
+          .flat()
+          .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+          .filter((status) => {
+            const key = status.url || status.id;
+            if (seen.has(key)) return false;
+            seen.add(key);
             return true;
           });
       }),
@@ -173,6 +234,26 @@ export class AnonymousMastodonProvider implements FeedProvider {
         }));
       }),
     );
+  }
+
+  private fetchTag(source: TagCursor): Observable<Status[]> {
+    let params = new HttpParams().set('limit', String(PAGE_SIZE));
+    if (source.maxId) {
+      params = params.set('max_id', source.maxId);
+    }
+    const server = this.anonymous.server();
+    return this.http
+      .get<Status[]>(`${server}/api/v1/timelines/tag/${encodeURIComponent(source.tag)}`, { params })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((statuses) => {
+          source.maxId = statuses.at(-1)?.id ?? source.maxId;
+          if (statuses.length < PAGE_SIZE) {
+            source.exhausted = true;
+          }
+          return statuses.map((status) => adaptStatus(status, server));
+        }),
+      );
   }
 
   private lookupAccount(follow: AnonymousFollow): Observable<Account> {

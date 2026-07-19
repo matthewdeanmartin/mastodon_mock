@@ -336,14 +336,14 @@
             ↗ Open original
           </a>
         }
-        @if (!foreign) {
+        @if (!foreign || auth.isAnonymous) {
           @if (capabilities.canBookmark) {
             <button
               class="action"
-              [class.on]="display.bookmarked"
+              [class.on]="bookmarkActive()"
               (click)="toggleBookmark($event)"
-              [title]="display.bookmarked ? 'Remove bookmark' : 'Bookmark'"
-              [attr.aria-pressed]="display.bookmarked"
+              [title]="bookmarkActive() ? 'Remove bookmark' : 'Bookmark'"
+              [attr.aria-pressed]="bookmarkActive()"
             >
               🔖
             </button>

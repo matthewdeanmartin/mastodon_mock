@@ -1,8 +1,14 @@
 <div class="page-head page-head-actions">
   <span>{{ title() || 'List' }}</span>
-  <button class="btn btn-outline btn-sm" [disabled]="converting()" (click)="convertToCollection()">
-    {{ converting() ? 'Converting…' : 'Convert to collection' }}
-  </button>
+  @if (!auth.isAnonymous) {
+    <button
+      class="btn btn-outline btn-sm"
+      [disabled]="converting()"
+      (click)="convertToCollection()"
+    >
+      {{ converting() ? 'Converting…' : 'Convert to collection' }}
+    </button>
+  }
 </div>
 @if (conversionMessage()) {
   <p class="conversion-message muted" role="status">{{ conversionMessage() }}</p>
@@ -30,9 +36,11 @@
     }
   }
 } @else {
-  <div class="members-actions">
-    <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
-  </div>
+  @if (!auth.isAnonymous) {
+    <div class="members-actions">
+      <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
+    </div>
+  }
   @if (membersLoading()) {
     <p class="muted center">Loading…</p>
   } @else if (!members().length) {

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { RssSubscriptions } from './rss-subscriptions';
+import { RSS_SUBSCRIPTION_LIMIT, RssSubscriptions } from './rss-subscriptions';
 
 describe('RssSubscriptions', () => {
   beforeEach(() => {
@@ -31,5 +31,14 @@ describe('RssSubscriptions', () => {
     localStorage.setItem('mockingbird_rss_feeds', '{nonsense');
     const subs = TestBed.inject(RssSubscriptions);
     expect(subs.feeds()).toEqual([]);
+  });
+
+  it('rejects subscriptions beyond the browser-local maximum', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    for (let index = 0; index < RSS_SUBSCRIPTION_LIMIT; index += 1) {
+      expect(subs.add(`https://${index}.example/feed`, `Feed ${index}`)).toBeNull();
+    }
+    expect(subs.add('https://overflow.example/feed', 'Overflow')).toContain('up to 10');
+    expect(subs.feeds()).toHaveLength(RSS_SUBSCRIPTION_LIMIT);
   });
 });

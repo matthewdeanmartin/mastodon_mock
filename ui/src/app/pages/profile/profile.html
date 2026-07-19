@@ -37,10 +37,12 @@
         </div>
       } @else if (!isSelf()) {
         <div class="profile-buttons">
-          @if (capabilities.canManageRelationships) {
+          @if (capabilities.canManageLists && (!auth.isAnonymous || relationship()?.following)) {
             <button class="btn btn-outline" (click)="showLists.set(true)">
               Lists &amp; collections
             </button>
+          }
+          @if (capabilities.canManageRelationships) {
             <details class="account-danger-menu">
               <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
               <div class="account-danger-panel">
@@ -104,10 +106,15 @@
         ><strong>{{ a.statuses_count | humanCount }}</strong>
         {{ isRss() ? 'items' : words().posts }}</span
       >
-      @if (!isRss() && !auth.isAnonymous) {
+      @if (!isRss() && (!auth.isAnonymous || isSelf())) {
         <button type="button" class="count-btn" (click)="setTab('following')">
-          <strong>{{ a.following_count | humanCount }}</strong> following
+          <strong>{{
+            auth.isAnonymous ? anonymousFollows.count() : (a.following_count | humanCount)
+          }}</strong>
+          following
         </button>
+      }
+      @if (!isRss() && !auth.isAnonymous) {
         <button type="button" class="count-btn" (click)="setTab('followers')">
           <strong>{{ a.followers_count | humanCount }}</strong> followers
         </button>
@@ -159,7 +166,7 @@
     </section>
   }
 
-  @if (!isRss() && !auth.isAnonymous) {
+  @if (!isRss() && (!auth.isAnonymous || isSelf())) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
       <button
         type="button"
@@ -177,18 +184,20 @@
       >
         Following
       </button>
-      <button
-        type="button"
-        class="ptab"
-        [class.active]="tab() === 'followers'"
-        (click)="setTab('followers')"
-      >
-        Followers
-      </button>
+      @if (!auth.isAnonymous) {
+        <button
+          type="button"
+          class="ptab"
+          [class.active]="tab() === 'followers'"
+          (click)="setTab('followers')"
+        >
+          Followers
+        </button>
+      }
     </div>
   }
 
-  @if (!isRss() && !auth.isAnonymous && tab() !== 'posts') {
+  @if (!isRss() && tab() !== 'posts' && (!auth.isAnonymous || isSelf())) {
     <app-people-browser
       [accountId]="a.id"
       [mode]="tab() === 'followers' ? 'followers' : 'following'"

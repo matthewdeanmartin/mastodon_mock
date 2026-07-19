@@ -18,18 +18,20 @@
     </ul>
   </section>
 
-  <section>
-    <h3 class="section-head">Featured on your profile</h3>
-    @if (!featured().length) {
-      <p class="muted center small">No featured hashtags.</p>
-    }
-    <ul class="tag-list">
-      @for (t of featured(); track t.id) {
-        <li class="tag-row">
-          <a class="tag-name" [routerLink]="['/tags', t.name]">#{{ t.name }}</a>
-          <span class="muted small">{{ t.statuses_count }} posts</span>
-        </li>
+  @if (!auth.isAnonymous) {
+    <section>
+      <h3 class="section-head">Featured on your profile</h3>
+      @if (!featured().length) {
+        <p class="muted center small">No featured hashtags.</p>
       }
-    </ul>
-  </section>
+      <ul class="tag-list">
+        @for (t of featured(); track t.id) {
+          <li class="tag-row">
+            <a class="tag-name" [routerLink]="['/tags', t.name]">#{{ t.name }}</a>
+            <span class="muted small">{{ t.statuses_count }} posts</span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
 }

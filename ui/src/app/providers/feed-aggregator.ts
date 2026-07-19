@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { forkJoin, map, Observable, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
@@ -94,6 +94,13 @@ export class FeedAggregator {
       return of(collected);
     }
     return source.provider.fetchPage().pipe(
+      // A browser-only source can fail for reasons outside our control (most
+      // commonly an RSS server without CORS headers). One unavailable source
+      // must never reject forkJoin and discard every healthy Home source.
+      catchError(() => {
+        source.exhausted = true;
+        return of<Status[]>([]);
+      }),
       switchMap((items) => {
         if (!items.length) {
           source.exhausted = true;

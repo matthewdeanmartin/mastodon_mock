@@ -4,6 +4,7 @@ import { Auth } from '../../auth';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { BookmarkGroup, groupByAuthor, groupByHashtag, withMedia } from './bookmark-groups';
+import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmarks';
 
 type LibraryView = 'all' | 'authors' | 'hashtags' | 'media';
 
@@ -20,6 +21,7 @@ type LibraryView = 'all' | 'authors' | 'hashtags' | 'media';
 export class Bookmarks implements OnInit {
   private api = inject(Api);
   protected auth = inject(Auth);
+  private anonymousBookmarks = inject(AnonymousBookmarks);
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
@@ -50,7 +52,9 @@ export class Bookmarks implements OnInit {
 
   ngOnInit(): void {
     if (this.auth.isAnonymous) {
+      this.statuses.set(this.anonymousBookmarks.bookmarks());
       this.loading.set(false);
+      this.exhausted.set(true);
       return;
     }
     this.api.bookmarks().subscribe({
@@ -88,6 +92,10 @@ export class Bookmarks implements OnInit {
   }
 
   onChanged(updated: Status): void {
+    if (this.auth.isAnonymous && !updated.bookmarked) {
+      this.statuses.update((list) => list.filter((status) => status.id !== updated.id));
+      return;
+    }
     this.statuses.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
   }
 

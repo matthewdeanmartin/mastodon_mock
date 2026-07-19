@@ -77,7 +77,12 @@ export class SettingsConnections {
     // and captures the feed's title in one go.
     this.rssFetch.fetchFeed(url).subscribe({
       next: (feed) => {
-        this.subs.add(url, feed.title);
+        const limitError = this.subs.add(url, feed.title);
+        if (limitError) {
+          this.error.set(limitError);
+          this.adding.set(false);
+          return;
+        }
         this.feedUrl.set('');
         this.adding.set(false);
       },

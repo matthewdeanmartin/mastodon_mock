@@ -3,6 +3,8 @@ import { ActivatedRoute } from '@angular/router';
 import { Api } from '../../api';
 import { Status, Tag as TagEntity } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
+import { Auth } from '../../auth';
+import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 
 @Component({
   selector: 'app-tag',
@@ -13,11 +15,14 @@ import { StatusCard } from '../../status-card/status-card';
 export class Tag implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
+  protected auth = inject(Auth);
+  private anonymousTags = inject(AnonymousTags);
 
   protected tag = signal('');
   protected tagInfo = signal<TagEntity | null>(null);
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
+  protected followError = signal<string | null>(null);
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
@@ -31,7 +36,25 @@ export class Tag implements OnInit {
 
   load(tag: string): void {
     this.loading.set(true);
-    this.api.getTag(tag).subscribe((info) => this.tagInfo.set(info));
+    this.api.getTag(tag).subscribe({
+      next: (info) =>
+        this.tagInfo.set({
+          ...info,
+          following: this.auth.isAnonymous ? this.anonymousTags.has(info.name) : info.following,
+        }),
+      error: () => {
+        if (this.auth.isAnonymous) {
+          this.tagInfo.set({
+            id: tag,
+            name: tag,
+            url: '',
+            history: [],
+            following: this.anonymousTags.has(tag),
+            featuring: false,
+          });
+        }
+      },
+    });
     this.api.tagTimeline(tag).subscribe({
       next: (s) => {
         this.statuses.set(s);
@@ -44,6 +67,21 @@ export class Tag implements OnInit {
   toggleFollow(): void {
     const info = this.tagInfo();
     if (!info) {
+      return;
+    }
+    this.followError.set(null);
+    if (this.auth.isAnonymous) {
+      if (info.following) {
+        this.anonymousTags.unfollow(info.name);
+        this.tagInfo.set({ ...info, following: false });
+        return;
+      }
+      const result = this.anonymousTags.follow(info.name);
+      if (!result.ok) {
+        this.followError.set(result.error);
+        return;
+      }
+      this.tagInfo.set({ ...info, following: true });
       return;
     }
     const call = info.following ? this.api.unfollowTag(info.name) : this.api.followTag(info.name);

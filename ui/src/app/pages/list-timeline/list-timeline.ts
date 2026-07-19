@@ -6,6 +6,10 @@ import { StatusCard } from '../../status-card/status-card';
 import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { ListCollectionConverter } from '../../list-collection-converter';
+import { Auth } from '../../auth';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
+import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
+import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
 
 @Component({
   selector: 'app-list-timeline',
@@ -17,6 +21,10 @@ export class ListTimeline implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   private converter = inject(ListCollectionConverter);
+  protected auth = inject(Auth);
+  private anonymousFollows = inject(AnonymousFollows);
+  private anonymousLists = inject(AnonymousLists);
+  private anonymousProvider = inject(AnonymousMastodonProvider);
 
   protected title = signal('');
   protected statuses = signal<Status[]>([]);
@@ -50,6 +58,24 @@ export class ListTimeline implements OnInit {
 
   load(id: string): void {
     this.loading.set(true);
+    if (this.auth.isAnonymous) {
+      const list = this.anonymousLists.get(id);
+      this.title.set(list?.title ?? 'List');
+      const memberKeys = new Set(list?.memberKeys ?? []);
+      const follows = this.anonymousFollows
+        .follows()
+        .filter((follow) => memberKeys.has(follow.key));
+      this.members.set(follows.map((follow) => follow.account));
+      this.membersLoadedFor = id;
+      this.anonymousProvider.fetchFollows(follows).subscribe({
+        next: (statuses) => {
+          this.statuses.set(statuses);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      });
+      return;
+    }
     this.api.getList(id).subscribe((l) => this.title.set(l.title));
     this.api.listTimeline(id).subscribe({
       next: (s) => {
@@ -68,6 +94,10 @@ export class ListTimeline implements OnInit {
   }
 
   loadMembers(): void {
+    if (this.auth.isAnonymous) {
+      this.membersLoading.set(false);
+      return;
+    }
     this.membersLoading.set(true);
     this.membersLoadedFor = this.listId();
     this.api.listAccounts(this.listId()).subscribe({
@@ -81,6 +111,12 @@ export class ListTimeline implements OnInit {
 
   removeMember(account: Account): void {
     this.memberToRemove.set(null);
+    if (this.auth.isAnonymous) {
+      const follow = this.anonymousFollows.findByAccountId(account.id);
+      if (follow) this.anonymousLists.setMember(this.listId(), follow.key, false);
+      this.members.update((members) => members.filter((member) => member.id !== account.id));
+      return;
+    }
     this.api.removeFromList(this.listId(), account.id).subscribe(() => {
       this.members.update((m) => m.filter((a) => a.id !== account.id));
     });

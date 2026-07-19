@@ -2,6 +2,7 @@ import { computed, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
 
 const FEEDS_KEY_BASE = 'mockingbird_rss_feeds';
+export const RSS_SUBSCRIPTION_LIMIT = 10;
 
 /** One subscribed feed. `title` is captured when the feed is first fetched. */
 export interface RssFeedSub {
@@ -13,7 +14,7 @@ export interface RssFeedSub {
 function loadFeeds(key: string): RssFeedSub[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(key) ?? '[]');
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.slice(0, RSS_SUBSCRIPTION_LIMIT) : [];
   } catch {
     return [];
   }
@@ -39,11 +40,15 @@ export class RssSubscriptions {
     return this.feeds().some((f) => f.url === url);
   }
 
-  add(url: string, title: string): void {
+  add(url: string, title: string): string | null {
     if (this.has(url)) {
-      return;
+      return null;
+    }
+    if (this.feeds().length >= RSS_SUBSCRIPTION_LIMIT) {
+      return `You can subscribe to up to ${RSS_SUBSCRIPTION_LIMIT} RSS feeds.`;
     }
     this.persist([...this.feeds(), { url, title, enabled: true }]);
+    return null;
   }
 
   remove(url: string): void {

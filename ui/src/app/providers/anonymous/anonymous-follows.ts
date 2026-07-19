@@ -108,6 +108,10 @@ export class AnonymousFollows {
     return relationship(account.id, this.isFollowing(account, fallbackServer));
   }
 
+  findByAccountId(accountId: string): AnonymousFollow | null {
+    return this.follows().find((follow) => follow.account.id === accountId) ?? null;
+  }
+
   follow(account: Account, fallbackServer: string): FollowResult {
     const key = keyFor(account, fallbackServer);
     if (this.follows().some((follow) => follow.key === key)) {

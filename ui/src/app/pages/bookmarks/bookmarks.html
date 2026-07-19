@@ -1,9 +1,4 @@
-@if (auth.isAnonymous) {
-  <div class="muted center">
-    <p>Your bookmarks will be saved locally in this browser.</p>
-    <p class="small">Local bookmark collection arrives with the client-side lists and tags work.</p>
-  </div>
-} @else if (loading()) {
+@if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!statuses().length) {
   <p class="muted center">You haven't bookmarked anything yet.</p>

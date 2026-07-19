@@ -4,6 +4,8 @@ import { Api } from '../api';
 import { Auth } from '../auth';
 import { Account, Relationship } from '../models';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
+import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
+import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 
 /** Which list this widget pages through. */
 export type PeopleMode = 'followers' | 'following';
@@ -27,6 +29,8 @@ type FollowState = 'idle' | 'busy';
 export class PeopleBrowser {
   private api = inject(Api);
   private auth = inject(Auth);
+  private anonymous = inject(AnonymousAccount);
+  private anonymousFollows = inject(AnonymousFollows);
 
   /** Whose followers/following to show. */
   readonly accountId = input.required<string>();
@@ -76,6 +80,24 @@ export class PeopleBrowser {
   }
 
   private loadFirst(): void {
+    if (this.isLocalAnonymousList()) {
+      const accounts =
+        this.mode() === 'following'
+          ? this.anonymousFollows.follows().map((follow) => follow.account)
+          : [];
+      this.accounts.set(accounts);
+      this.rels.set(
+        new Map(
+          accounts.map((account) => [
+            account.id,
+            this.anonymousFollows.relationship(account, this.anonymous.server()),
+          ]),
+        ),
+      );
+      this.loading.set(false);
+      this.exhausted.set(true);
+      return;
+    }
     this.fetch().subscribe({
       next: (page) => {
         this.loading.set(false);
@@ -166,6 +188,24 @@ export class PeopleBrowser {
       return;
     }
     this.setPending(a.id, 'busy');
+    if (this.isLocalAnonymousList()) {
+      if (this.anonymousFollows.isFollowing(a, this.anonymous.server())) {
+        this.anonymousFollows.unfollow(a, this.anonymous.server());
+        this.accounts.update((accounts) => accounts.filter((account) => account.id !== a.id));
+        this.rels.update((rels) => {
+          const next = new Map(rels);
+          next.delete(a.id);
+          return next;
+        });
+      } else {
+        const result = this.anonymousFollows.follow(a, this.anonymous.server());
+        if (result.ok) {
+          this.rels.update((rels) => new Map(rels).set(a.id, result.relationship));
+        }
+      }
+      this.clearPending(a.id);
+      return;
+    }
     const following = this.isFollowing(a);
     const call = following ? this.api.unfollow(a.id) : this.api.follow(a.id);
     call.subscribe({
@@ -192,4 +232,8 @@ export class PeopleBrowser {
   protected emptyLabel = computed(() =>
     this.mode() === 'followers' ? 'No followers yet.' : 'Not following anyone yet.',
   );
+
+  private isLocalAnonymousList(): boolean {
+    return this.auth.isAnonymous && this.accountId() === this.anonymous.account().id;
+  }
 }

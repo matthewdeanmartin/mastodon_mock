@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from '../api';
 import { ClientPrefs } from '../client-prefs';
@@ -233,5 +233,20 @@ describe('FeedAggregator', () => {
     expect(page).toHaveLength(20);
     expect(fakeRss.fetchPage).toHaveBeenCalledTimes(1);
     expect(homeTimeline).not.toHaveBeenCalled();
+  });
+
+  it('keeps healthy sources when a browser-only provider fails', async () => {
+    const aggregator = TestBed.inject(FeedAggregator);
+    fakeRss.linked.set(true);
+    homeTimeline.mockReturnValueOnce(of([makeStatus('healthy', '2026-07-14T10:00:00.000Z')]));
+    fakeRss.fetchPage.mockReturnValueOnce(
+      throwError(() => new Error('RSS server blocked this browser with CORS')),
+    );
+
+    aggregator.reset();
+    const page = await firstValueFrom(aggregator.nextPage());
+
+    expect(page.map((status) => status.id)).toEqual(['healthy']);
+    expect(aggregator.hasMore()).toBe(false);
   });
 });

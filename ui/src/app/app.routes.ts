@@ -213,8 +213,6 @@ export const routes: Routes = [
       },
       {
         path: 'tags',
-        canActivate: [anonymousUnavailableGuard],
-        data: { anonymousFeature: 'Followed tags' },
         loadComponent: () =>
           import('./pages/followed-tags/followed-tags').then((m) => m.FollowedTags),
       },
@@ -234,8 +232,6 @@ export const routes: Routes = [
       },
       {
         path: 'lists',
-        canActivate: [anonymousUnavailableGuard],
-        data: { anonymousFeature: 'Lists' },
         loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
       },
       {
@@ -271,8 +267,6 @@ export const routes: Routes = [
       },
       {
         path: 'lists/:id',
-        canActivate: [anonymousUnavailableGuard],
-        data: { anonymousFeature: 'Lists' },
         loadComponent: () =>
           import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),
       },

@@ -5,6 +5,7 @@ import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Collection, UserList } from '../../models';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
+import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 
 @Component({
   selector: 'app-lists',
@@ -14,7 +15,8 @@ import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 })
 export class Lists implements OnInit {
   private api = inject(Api);
-  private auth = inject(Auth);
+  protected auth = inject(Auth);
+  private anonymousLists = inject(AnonymousLists);
 
   protected lists = signal<UserList[]>([]);
   protected loading = signal(true);
@@ -38,6 +40,11 @@ export class Lists implements OnInit {
 
   load(): void {
     this.loading.set(true);
+    if (this.auth.isAnonymous) {
+      this.lists.set(this.anonymousLists.lists());
+      this.loading.set(false);
+      return;
+    }
     this.api.lists().subscribe({
       next: (l) => {
         this.lists.set(l);
@@ -48,6 +55,10 @@ export class Lists implements OnInit {
   }
 
   loadCollections(): void {
+    if (this.auth.isAnonymous) {
+      this.collectionsLoading.set(false);
+      return;
+    }
     const me = this.auth.account();
     if (!me) {
       // Auth snapshot not verified yet; fetch it, then retry.
@@ -82,6 +93,11 @@ export class Lists implements OnInit {
     if (!title) {
       return;
     }
+    if (this.auth.isAnonymous) {
+      this.lists.update((lists) => [...lists, this.anonymousLists.create(title)]);
+      this.newTitle.set('');
+      return;
+    }
     this.api.createList(title).subscribe((list) => {
       this.lists.update((l) => [...l, list]);
       this.newTitle.set('');
@@ -97,6 +113,11 @@ export class Lists implements OnInit {
 
   remove(list: UserList): void {
     this.listToDelete.set(null);
+    if (this.auth.isAnonymous) {
+      this.anonymousLists.remove(list.id);
+      this.lists.update((lists) => lists.filter((item) => item.id !== list.id));
+      return;
+    }
     this.api.deleteList(list.id).subscribe(() => {
       this.lists.update((l) => l.filter((x) => x.id !== list.id));
     });

@@ -5,6 +5,8 @@ import { catchError, map } from 'rxjs/operators';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { Collection, UserList } from '../models';
+import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
+import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
 
 interface ListRow {
   list: UserList;
@@ -34,6 +36,8 @@ interface CollectionRow {
 export class ListDialog implements OnInit {
   private api = inject(Api);
   private auth = inject(Auth);
+  private anonymousFollows = inject(AnonymousFollows);
+  private anonymousLists = inject(AnonymousLists);
 
   readonly username = input.required<string>();
   readonly accountId = input.required<string>();
@@ -55,6 +59,19 @@ export class ListDialog implements OnInit {
 
   private load(): void {
     this.loading.set(true);
+    if (this.auth.isAnonymous) {
+      const follow = this.anonymousFollows.findByAccountId(this.accountId());
+      this.rows.set(
+        follow
+          ? this.anonymousLists.lists().map((list) => ({
+              list,
+              member: this.anonymousLists.hasMember(list.id, follow.key),
+            }))
+          : [],
+      );
+      this.loading.set(false);
+      return;
+    }
     this.api.lists().subscribe((lists) => {
       if (!lists.length) {
         this.rows.set([]);
@@ -79,6 +96,10 @@ export class ListDialog implements OnInit {
   }
 
   private loadCollections(): void {
+    if (this.auth.isAnonymous) {
+      this.collectionsSupported.set(false);
+      return;
+    }
     const me = this.auth.account();
     if (!me) {
       this.collectionsSupported.set(false);
@@ -107,6 +128,17 @@ export class ListDialog implements OnInit {
   }
 
   toggle(row: ListRow): void {
+    if (this.auth.isAnonymous) {
+      const follow = this.anonymousFollows.findByAccountId(this.accountId());
+      if (!follow) return;
+      this.anonymousLists.setMember(row.list.id, follow.key, !row.member);
+      this.rows.update((rows) =>
+        rows.map((item) =>
+          item.list.id === row.list.id ? { ...item, member: !item.member } : item,
+        ),
+      );
+      return;
+    }
     const call = row.member
       ? this.api.removeFromList(row.list.id, this.accountId())
       : this.api.addToList(row.list.id, this.accountId());
@@ -120,6 +152,15 @@ export class ListDialog implements OnInit {
   createAndAdd(): void {
     const title = this.newTitle().trim();
     if (!title) {
+      return;
+    }
+    if (this.auth.isAnonymous) {
+      const follow = this.anonymousFollows.findByAccountId(this.accountId());
+      if (!follow) return;
+      const list = this.anonymousLists.create(title);
+      this.anonymousLists.setMember(list.id, follow.key, true);
+      this.newTitle.set('');
+      this.rows.update((rows) => [...rows, { list, member: true }]);
       return;
     }
     this.api.createList(title).subscribe((list) => {

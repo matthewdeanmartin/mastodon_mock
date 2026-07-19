@@ -28,15 +28,13 @@ export class AnonymousCapabilities {
 
   /** Follow/Unfollow has a complete browser-local implementation in Anonymous. */
   readonly canFollow = true;
+  readonly canManageLists = true;
 
   get canUseServerActions(): boolean {
     return !this.active;
   }
 
-  get canBookmark(): boolean {
-    // The route remains visible; the local bookmark store lands in Sprint 4.
-    return !this.active;
-  }
+  readonly canBookmark = true;
 
   get canUseBluesky(): boolean {
     return !this.active;

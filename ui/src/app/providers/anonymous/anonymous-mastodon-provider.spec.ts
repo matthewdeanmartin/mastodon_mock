@@ -6,6 +6,7 @@ import { Auth } from '../../auth';
 import { Account, Status } from '../../models';
 import { AnonymousFollows } from './anonymous-follows';
 import { AnonymousMastodonProvider } from './anonymous-mastodon-provider';
+import { AnonymousTags } from './anonymous-tags';
 
 function account(username: string, server: string, id = '1'): Account {
   return {
@@ -121,6 +122,30 @@ describe('AnonymousMastodonProvider', () => {
     expect(provider.errors()).toEqual(['Could not load @bob@two.example.']);
   });
 
+  it('keeps API posts when another follow fails both API and RSS CORS', () => {
+    const follows = TestBed.inject(AnonymousFollows);
+    follows.follow(account('alice', 'https://one.example'), 'https://mastodon.social');
+    follows.follow(account('bob', 'https://two.example'), 'https://mastodon.social');
+    const provider = TestBed.inject(AnonymousMastodonProvider);
+    provider.reset();
+    let received: Status[] = [];
+
+    provider.fetchPage().subscribe((items) => (received = items));
+    httpMock
+      .expectOne((request) => request.url === 'https://one.example/api/v1/accounts/lookup')
+      .flush(account('alice', 'https://one.example', 'a1'));
+    httpMock
+      .expectOne((request) => request.url === 'https://two.example/api/v1/accounts/lookup')
+      .error(new ProgressEvent('error'));
+    httpMock.expectOne('https://two.example/@bob.rss').error(new ProgressEvent('error'));
+    httpMock
+      .expectOne('https://one.example/api/v1/accounts/a1/statuses?limit=20&exclude_replies=true')
+      .flush([status(account('alice', 'https://one.example', 'a1'))]);
+
+    expect(received.map((item) => item.account.username)).toEqual(['alice']);
+    expect(provider.errors()).toEqual(['Could not load @bob@two.example.']);
+  });
+
   it('falls back to the public profile RSS feed after an anonymous API failure', () => {
     const follows = TestBed.inject(AnonymousFollows);
     follows.follow(account('alice', 'https://one.example'), 'https://mastodon.social');
@@ -143,5 +168,22 @@ describe('AnonymousMastodonProvider', () => {
     expect(received[0].provider).toBe('anonymous-mastodon');
     expect(received[0].account.acct).toBe('alice@one.example');
     expect(provider.errors()).toEqual(['Using RSS fallback for @alice@one.example.']);
+  });
+
+  it('fetches followed hashtag searches from the selected instance on demand', () => {
+    TestBed.inject(AnonymousTags).follow('cats');
+    const provider = TestBed.inject(AnonymousMastodonProvider);
+    provider.reset();
+    let received: Status[] = [];
+
+    provider.fetchPage().subscribe((items) => (received = items));
+    const request = httpMock.expectOne(
+      (candidate) => candidate.url === 'https://mastodon.social/api/v1/timelines/tag/cats',
+    );
+    expect(request.request.params.get('limit')).toBe('20');
+    request.flush([status(account('alice', 'https://mastodon.social'))]);
+
+    expect(received).toHaveLength(1);
+    expect(received[0].provider).toBe('anonymous-mastodon');
   });
 });

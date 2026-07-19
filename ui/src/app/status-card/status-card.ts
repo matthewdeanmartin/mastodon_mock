@@ -17,6 +17,7 @@ import { MutedPosts } from '../muted-posts';
 import { ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
+import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
 import { StatusActions } from '../providers/status-actions';
 import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
@@ -45,12 +46,13 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
 })
 export class StatusCard {
   private api = inject(Api);
-  private auth = inject(Auth);
+  protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private actions = inject(StatusActions);
   private router = inject(Router);
   private mutedPosts = inject(MutedPosts);
   protected capabilities = inject(AnonymousCapabilities);
+  private anonymousBookmarks = inject(AnonymousBookmarks);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
@@ -466,6 +468,12 @@ export class StatusCard {
     return s.reblog ?? s;
   }
 
+  protected bookmarkActive(): boolean {
+    return this.auth.isAnonymous
+      ? this.anonymousBookmarks.has(this.display)
+      : this.display.bookmarked;
+  }
+
   /**
    * True for posts from a foreign provider (RSS, Bluesky, …). Foreign posts
    * have no server-side account/thread to link to, and their interactions are
@@ -623,6 +631,10 @@ export class StatusCard {
       return;
     }
     const s = this.display;
+    if (this.auth.isAnonymous) {
+      this.changed.emit(this.anonymousBookmarks.toggle(s));
+      return;
+    }
     const call = s.bookmarked ? this.api.unbookmark(s.id) : this.api.bookmark(s.id);
     call.subscribe((updated) => this.changed.emit(updated));
   }

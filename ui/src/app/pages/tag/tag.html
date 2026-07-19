@@ -6,12 +6,18 @@
       <button class="btn btn-sm" [class.btn-outline]="!info.following" (click)="toggleFollow()">
         {{ info.following ? 'Following' : 'Follow' }}
       </button>
-      <button class="btn btn-sm" [class.btn-outline]="!info.featuring" (click)="toggleFeature()">
-        {{ info.featuring ? 'Featured' : 'Feature' }}
-      </button>
+      @if (!auth.isAnonymous) {
+        <button class="btn btn-sm" [class.btn-outline]="!info.featuring" (click)="toggleFeature()">
+          {{ info.featuring ? 'Featured' : 'Feature' }}
+        </button>
+      }
     </span>
   }
 </div>
+
+@if (followError(); as error) {
+  <p class="muted center" role="alert">{{ error }}</p>
+}
 
 @if (loading()) {
   <p class="muted center">Loading…</p>

@@ -44,7 +44,7 @@ export class Profile implements OnInit, OnDestroy {
   protected auth = inject(Auth);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymous = inject(AnonymousAccount);
-  private anonymousFollows = inject(AnonymousFollows);
+  protected anonymousFollows = inject(AnonymousFollows);
   private location = inject(Location);
   private rss = inject(RssProvider);
   private rssSubs = inject(RssSubscriptions);
@@ -71,7 +71,7 @@ export class Profile implements OnInit, OnDestroy {
     if (this.rssSubs.has(url)) {
       this.rssSubs.remove(url);
     } else {
-      this.rssSubs.add(url, account?.display_name || url);
+      this.followError.set(this.rssSubs.add(url, account?.display_name || url));
     }
   }
 
@@ -140,6 +140,11 @@ export class Profile implements OnInit, OnDestroy {
         this.load(id);
       }
     });
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      if (this.auth.isAnonymous && this.isSelf()) {
+        this.tab.set(params.get('tab') === 'following' ? 'following' : 'posts');
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -170,6 +175,9 @@ export class Profile implements OnInit, OnDestroy {
       this.loading.set(false);
       this.statusesLoading.set(false);
       this.exhausted.set(true);
+      this.tab.set(
+        this.route.snapshot.queryParamMap.get('tab') === 'following' ? 'following' : 'posts',
+      );
       return;
     }
     this.routeLoadSub.add(
