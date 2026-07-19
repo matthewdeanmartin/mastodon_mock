@@ -6,6 +6,7 @@ import { firstValueFrom, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
+import { LocalModeration } from '../../local-moderation';
 import { Account, Relationship, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { ReportDialog } from '../../report-dialog/report-dialog';
@@ -50,6 +51,7 @@ export class Profile implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   protected words = inject(Terminology).words;
   protected auth = inject(Auth);
+  private localMod = inject(LocalModeration);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymous = inject(AnonymousAccount);
   private anonymousPublic = inject(AnonymousPublicApi);
@@ -526,9 +528,34 @@ export class Profile implements OnInit, OnDestroy {
     { label: 'forever', seconds: null },
   ];
 
+  /**
+   * Whether relationship actions go through the local client-side store instead
+   * of the server API: always for Anonymous (no write scope, read-only public
+   * API), and for any viewer the server can't manage relationships for.
+   */
+  protected get useLocalModeration(): boolean {
+    return this.auth.isAnonymous || !this.capabilities.canManageRelationships;
+  }
+
+  /** Local block/mute state, re-read through the moderation signal. */
+  protected localBlocked = computed(() => {
+    this.localMod.entries();
+    const acc = this.account();
+    return !!acc && this.localMod.isBlocked(acc);
+  });
+  protected localMuted = computed(() => {
+    this.localMod.entries();
+    const acc = this.account();
+    return !!acc && this.localMod.isMuted(acc);
+  });
+
   mute(seconds: number | null): void {
     const acc = this.account();
     if (!acc) {
+      return;
+    }
+    if (this.useLocalModeration) {
+      this.localMod.mute(acc, seconds);
       return;
     }
     this.api
@@ -541,6 +568,10 @@ export class Profile implements OnInit, OnDestroy {
     if (!acc) {
       return;
     }
+    if (this.useLocalModeration) {
+      this.localMod.clear(acc);
+      return;
+    }
     this.api.unmuteAccount(acc.id).subscribe((updated) => this.relationship.set(updated));
   }
 
@@ -550,12 +581,23 @@ export class Profile implements OnInit, OnDestroy {
     if (!acc) {
       return;
     }
+    if (this.useLocalModeration) {
+      if (this.localMod.isBlocked(acc)) {
+        this.localMod.clear(acc);
+      } else {
+        this.localMod.block(acc);
+      }
+      return;
+    }
     const call = rel?.blocking ? this.api.unblockAccount(acc.id) : this.api.block(acc.id);
     call.subscribe((updated) => this.relationship.set(updated));
   }
 
   requestBlock(): void {
-    if (this.relationship()?.blocking) {
+    const alreadyBlocked = this.useLocalModeration
+      ? this.localBlocked()
+      : this.relationship()?.blocking;
+    if (alreadyBlocked) {
       this.toggleBlock();
       return;
     }

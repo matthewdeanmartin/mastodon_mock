@@ -454,23 +454,28 @@
                   >
                     Mute this post
                   </button>
+                  <!-- Client-side mute/block: works for every provider (incl.
+                       read-only Anonymous), stored locally with timed expiry. -->
+                  @if (authorBlockedLocally() || authorMutedLocally()) {
+                    <button type="button" (click)="unsuppressAuthorLocally($event)">
+                      {{ authorBlockedLocally() ? 'Unblock' : 'Unmute' }} &#64;{{
+                        display.account.acct
+                      }}
+                    </button>
+                  } @else {
+                    <div class="menu-note muted small">Mute &#64;{{ display.account.acct }} for…</div>
+                    <div class="mute-durations">
+                      @for (d of muteDurations; track d.label) {
+                        <button type="button" (click)="muteAuthorLocally($event, d.seconds)">
+                          {{ d.label }}
+                        </button>
+                      }
+                    </div>
+                    <button type="button" (click)="blockAuthorLocally($event)">
+                      Block &#64;{{ display.account.acct }}
+                    </button>
+                  }
                   @if (capabilities.canManageRelationships) {
-                    @if (mutedAuthor()) {
-                      <span class="muted small menu-note"
-                        >&#64;{{ display.account.acct }} muted</span
-                      >
-                    } @else {
-                      <div class="menu-note muted small">
-                        Mute &#64;{{ display.account.acct }} for…
-                      </div>
-                      <div class="mute-durations">
-                        @for (d of muteDurations; track d.label) {
-                          <button type="button" (click)="muteAuthor($event, d.seconds)">
-                            {{ d.label }}
-                          </button>
-                        }
-                      </div>
-                    }
                     <button type="button" (click)="openReport($event)">Report post</button>
                   }
                 </div>

@@ -14,6 +14,7 @@ import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, Poll, Status, Translation } from '../models';
 import { MutedPosts } from '../muted-posts';
+import { LocalModeration } from '../local-moderation';
 import { ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
@@ -56,6 +57,7 @@ export class StatusCard {
   private actions = inject(StatusActions);
   private router = inject(Router);
   private mutedPosts = inject(MutedPosts);
+  private localMod = inject(LocalModeration);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymousBookmarks = inject(AnonymousBookmarks);
 
@@ -68,12 +70,34 @@ export class StatusCard {
   /** post/boost vs tweet/retweet wording, per the Mockingbird Blue preference. */
   protected words = inject(Terminology).words;
 
-  /** The viewer hid this post ("mute this post"); renders as nothing. */
+  /**
+   * The card renders as nothing when the viewer hid this specific post ("mute
+   * this post") or has locally blocked/muted its author. Reading the moderation
+   * signals here means the card disappears the moment the viewer acts.
+   */
   protected mutedLocally = computed(() => {
     const map = this.mutedPosts.muted();
     const s = this.status();
     const shown = s.reblog ?? s;
-    return (map[shown.id] ?? 0) > Date.now();
+    if ((map[shown.id] ?? 0) > Date.now()) {
+      return true;
+    }
+    // Re-read the moderation map so this recomputes when it changes, then test
+    // both the post's author and (for a boost) whoever boosted it.
+    this.localMod.entries();
+    return this.localMod.isSuppressed(shown.account) || this.localMod.isSuppressed(s.account);
+  });
+
+  /** Whether the viewer has locally blocked this card's author. */
+  protected authorBlockedLocally = computed(() => {
+    this.localMod.entries();
+    return this.localMod.isBlocked(this.display.account);
+  });
+
+  /** Whether the viewer has locally muted this card's author. */
+  protected authorMutedLocally = computed(() => {
+    this.localMod.entries();
+    return this.localMod.isMuted(this.display.account);
   });
 
   /** Minimal markdown (bold/italic/code/headers) applied to the body HTML. */
@@ -323,24 +347,47 @@ export class StatusCard {
     { label: 'forever', seconds: null },
   ];
 
-  /** Set once the viewer mutes the author from this card (flips the menu row). */
-  protected mutedAuthor = signal(false);
-
-  muteAuthor(event: Event, seconds: number | null): void {
-    event.stopPropagation();
-    if (!this.capabilities.canManageRelationships) {
-      return;
-    }
-    this.api.muteAccount(this.display.account.id, seconds ?? undefined).subscribe({
-      next: () => this.mutedAuthor.set(true),
-      error: () => this.actionError.set('Could not mute this account.'),
-    });
-  }
-
   /** Hide this post locally for 30 days (there is no server-side per-post hide). */
   mutePost(event: Event): void {
     event.stopPropagation();
     this.mutedPosts.mute(this.display.id);
+  }
+
+  /**
+   * Mute this card's author for `seconds` (null = indefinitely). Always records
+   * a client-side mute (works for every provider, including read-only
+   * Anonymous), and additionally issues the real server-side mute when the
+   * viewer has that capability, so an authenticated account stays in sync.
+   */
+  muteAuthorLocally(event: Event, seconds: number | null): void {
+    event.stopPropagation();
+    this.localMod.mute(this.display.account, seconds);
+    if (this.capabilities.canManageRelationships && !this.foreign) {
+      this.api.muteAccount(this.display.account.id, seconds ?? undefined).subscribe({
+        error: () => this.actionError.set('Muted locally, but the server mute failed.'),
+      });
+    }
+  }
+
+  /**
+   * Block this card's author. Always records a client-side block (hides them
+   * everywhere, works for every provider); also issues the real server-side
+   * block when the viewer can, keeping an authenticated account in sync.
+   */
+  blockAuthorLocally(event: Event): void {
+    event.stopPropagation();
+    this.localMod.block(this.display.account);
+    if (this.capabilities.canManageRelationships && !this.foreign) {
+      this.api.block(this.display.account.id).subscribe({
+        error: () => this.actionError.set('Blocked locally, but the server block failed.'),
+      });
+    }
+  }
+
+  /** Lift a local block/mute on this card's author (client-side only). */
+  unsuppressAuthorLocally(event: Event): void {
+    event.stopPropagation();
+    this.localMod.clear(this.display.account);
   }
 
   startEdit(event: Event): void {

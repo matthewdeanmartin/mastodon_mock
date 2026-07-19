@@ -42,27 +42,31 @@
               Lists &amp; collections
             </button>
           }
-          @if (capabilities.canManageRelationships) {
-            <details class="account-danger-menu">
-              <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
-              <div class="account-danger-panel">
+          <details class="account-danger-menu">
+            <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
+            <div class="account-danger-panel">
+              @if (capabilities.canManageRelationships) {
                 <button type="button" (click)="showReport.set(true)">Report account</button>
-                @if (relationship()?.muting) {
-                  <button type="button" (click)="unmute()">Unmute account</button>
-                } @else {
-                  <div class="menu-note muted small">Mute for…</div>
-                  <div class="mute-durations">
-                    @for (d of muteDurations; track d.label) {
-                      <button type="button" (click)="mute(d.seconds)">{{ d.label }}</button>
-                    }
-                  </div>
-                }
-                <button type="button" (click)="requestBlock()">
-                  {{ relationship()?.blocking ? 'Unblock account' : 'Block account' }}
-                </button>
-              </div>
-            </details>
-          }
+              }
+              @if (useLocalModeration ? localMuted() : relationship()?.muting) {
+                <button type="button" (click)="unmute()">Unmute account</button>
+              } @else {
+                <div class="menu-note muted small">Mute for…</div>
+                <div class="mute-durations">
+                  @for (d of muteDurations; track d.label) {
+                    <button type="button" (click)="mute(d.seconds)">{{ d.label }}</button>
+                  }
+                </div>
+              }
+              <button type="button" (click)="requestBlock()">
+                {{
+                  (useLocalModeration ? localBlocked() : relationship()?.blocking)
+                    ? 'Unblock account'
+                    : 'Block account'
+                }}
+              </button>
+            </div>
+          </details>
           @if (capabilities.canFollow) {
             <button
               class="btn"
@@ -106,18 +110,27 @@
         ><strong>{{ a.statuses_count | humanCount }}</strong>
         {{ isRss() ? 'items' : words().posts }}</span
       >
-      @if (!isRss() && (!auth.isAnonymous || isSelf())) {
-        <button type="button" class="count-btn" (click)="setTab('following')">
-          <strong>{{
-            auth.isAnonymous ? anonymousFollows.count() : (a.following_count | humanCount)
-          }}</strong>
-          following
-        </button>
-      }
-      @if (!isRss() && !auth.isAnonymous) {
-        <button type="button" class="count-btn" (click)="setTab('followers')">
-          <strong>{{ a.followers_count | humanCount }}</strong> followers
-        </button>
+      @if (!isRss()) {
+        @if (!auth.isAnonymous || isSelf()) {
+          <button type="button" class="count-btn" (click)="setTab('following')">
+            <strong>{{
+              auth.isAnonymous ? anonymousFollows.count() : (a.following_count | humanCount)
+            }}</strong>
+            following
+          </button>
+        } @else if (a.following_count > 0) {
+          <!-- Anonymous view of someone else's profile: the public account
+               object still carries counts, so show them (read-only — the
+               following/followers *lists* aren't reliably public anonymously). -->
+          <span><strong>{{ a.following_count | humanCount }}</strong> following</span>
+        }
+        @if (!auth.isAnonymous) {
+          <button type="button" class="count-btn" (click)="setTab('followers')">
+            <strong>{{ a.followers_count | humanCount }}</strong> followers
+          </button>
+        } @else if (!isSelf() && a.followers_count > 0) {
+          <span><strong>{{ a.followers_count | humanCount }}</strong> followers</span>
+        }
       }
     </div>
   </header>
