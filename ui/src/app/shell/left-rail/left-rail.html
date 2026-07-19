@@ -20,7 +20,7 @@
         </a>
         <a [routerLink]="['/accounts', acc.id]">
           <span class="stat-label">Following</span>
-          <span class="stat-value">{{ acc.following_count | humanCount }}</span>
+          <span class="stat-value">{{ followingCount() | humanCount }}</span>
         </a>
         <a [routerLink]="['/accounts', acc.id]">
           <span class="stat-label">Followers</span>
@@ -65,7 +65,11 @@
     }
     <p class="card-hint muted">{{ words().Boosted }} by people across the network</p>
   }
-  <a class="find-people-link" routerLink="/find-people">Find people to follow →</a>
+  @if (auth.isAnonymous) {
+    <a class="find-people-link" routerLink="/search">Search for people →</a>
+  } @else {
+    <a class="find-people-link" routerLink="/find-people">Find people to follow →</a>
+  }
 </section>
 
 @if (trends().length) {

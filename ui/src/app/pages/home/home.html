@@ -37,7 +37,8 @@
 } @else if (!visible().length) {
   <p class="muted center">
     @if (auth.isAnonymous) {
-      Your anonymous timeline is ready. Public follows arrive in the next sprint.
+      Follow a public Mastodon account from Search or its profile to build this feed. Posts are
+      fetched only when you load or refresh this page.
     } @else {
       Your home timeline is empty.
       <a routerLink="/find-people">Find people to follow</a>, or post something.

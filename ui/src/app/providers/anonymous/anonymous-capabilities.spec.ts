@@ -29,6 +29,7 @@ describe('AnonymousCapabilities', () => {
     expect(capabilities.active).toBe(true);
     expect(capabilities.canCompose).toBe(false);
     expect(capabilities.canManageRelationships).toBe(false);
+    expect(capabilities.canFollow).toBe(true);
     expect(capabilities.canUseServerActions).toBe(false);
     expect(capabilities.canBookmark).toBe(false);
     expect(capabilities.canUseBluesky).toBe(false);

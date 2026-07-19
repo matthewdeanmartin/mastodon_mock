@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AccountHoverCard } from '../../account-hover-card/account-hover-card';
 import { Api } from '../../api';
@@ -8,6 +8,8 @@ import { HomeTimelineFeed } from '../../home-timeline-feed';
 import { HumanCountPipe } from '../../human-count.pipe';
 import { Terminology } from '../../terminology';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
+import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 
 /**
  * Left sidebar: the signed-in user's profile card (2018-Twitter style), a
@@ -25,6 +27,8 @@ export class LeftRail implements OnInit {
   protected auth = inject(Auth);
   private api = inject(Api);
   private homeTimelineFeed = inject(HomeTimelineFeed);
+  private anonymousFollows = inject(AnonymousFollows);
+  private anonymous = inject(AnonymousAccount);
   protected words = inject(Terminology).words;
   private candidates = new Map<string, Account>();
 
@@ -32,6 +36,11 @@ export class LeftRail implements OnInit {
   /** Ids the user followed from this widget (flips the button to "Following"). */
   protected followed = signal<Set<string>>(new Set());
   protected trends = signal<Tag[]>([]);
+  protected followingCount = computed(() =>
+    this.auth.isAnonymous
+      ? this.anonymousFollows.count()
+      : (this.auth.account()?.following_count ?? 0),
+  );
 
   /** Most recent day's use count for a trending tag, if the server provides one. */
   uses(tag: Tag): string | null {
@@ -58,6 +67,16 @@ export class LeftRail implements OnInit {
         return;
       }
       const ids = [...this.candidates.keys()];
+      if (this.auth.isAnonymous) {
+        this.suggestions.set(
+          ids
+            .map((id) => this.candidates.get(id)!)
+            .filter(
+              (account) => !this.anonymousFollows.isFollowing(account, this.anonymous.server()),
+            ),
+        );
+        return;
+      }
       this.api.relationships(ids).subscribe({
         next: (rels) => {
           const excluded = new Set(
@@ -73,6 +92,14 @@ export class LeftRail implements OnInit {
   }
 
   follow(account: Account): void {
+    if (this.auth.isAnonymous) {
+      const result = this.anonymousFollows.follow(account, this.anonymous.server());
+      if (result.ok) {
+        this.followed.update((set) => new Set(set).add(account.id));
+        this.suggestions.update((items) => items.filter((item) => item.id !== account.id));
+      }
+      return;
+    }
     this.api.follow(account.id).subscribe({
       next: () => this.followed.update((set) => new Set(set).add(account.id)),
       error: () => {

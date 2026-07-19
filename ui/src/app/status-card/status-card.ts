@@ -507,6 +507,8 @@ export class StatusCard {
         return '📡 RSS';
       case 'bluesky':
         return '🦋 Bluesky';
+      case 'anonymous-mastodon':
+        return '🐘 Mastodon';
       default:
         return null;
     }

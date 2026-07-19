@@ -17,6 +17,7 @@ import { RssProvider } from '../../providers/rss/rss-provider';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers';
@@ -43,6 +44,7 @@ export class Profile implements OnInit, OnDestroy {
   protected auth = inject(Auth);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymous = inject(AnonymousAccount);
+  private anonymousFollows = inject(AnonymousFollows);
   private location = inject(Location);
   private rss = inject(RssProvider);
   private rssSubs = inject(RssSubscriptions);
@@ -110,6 +112,7 @@ export class Profile implements OnInit, OnDestroy {
   protected showLists = signal(false);
   protected reportDone = signal(false);
   protected showBlockConfirm = signal(false);
+  protected followError = signal<string | null>(null);
 
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
 
@@ -151,6 +154,7 @@ export class Profile implements OnInit, OnDestroy {
     this.loading.set(true);
     this.relationship.set(null);
     this.reportDone.set(false);
+    this.followError.set(null);
     this.isRss.set(false);
     this.rssFeedUrl.set(null);
     this.tab.set('posts');
@@ -171,6 +175,9 @@ export class Profile implements OnInit, OnDestroy {
     this.routeLoadSub.add(
       this.api.getAccount(id).subscribe((a) => {
         this.account.set(a);
+        if (this.auth.isAnonymous) {
+          this.relationship.set(this.anonymousFollows.relationship(a, this.anonymous.server()));
+        }
         this.loading.set(false);
       }),
     );
@@ -346,6 +353,18 @@ export class Profile implements OnInit, OnDestroy {
           if (!accounts.length) {
             return;
           }
+          if (this.auth.isAnonymous) {
+            this.featuredFollowing.set(
+              new Set(
+                accounts
+                  .filter((account) =>
+                    this.anonymousFollows.isFollowing(account, this.anonymous.server()),
+                  )
+                  .map((account) => account.id),
+              ),
+            );
+            return;
+          }
           if (!this.capabilities.canManageRelationships) {
             return;
           }
@@ -369,6 +388,16 @@ export class Profile implements OnInit, OnDestroy {
   }
 
   followFeatured(target: Account): void {
+    if (this.auth.isAnonymous) {
+      const result = this.anonymousFollows.follow(target, this.anonymous.server());
+      if (result.ok) {
+        this.featuredFollowing.update((set) => new Set(set).add(target.id));
+        this.followError.set(null);
+      } else {
+        this.followError.set(result.error);
+      }
+      return;
+    }
     this.api.follow(target.id).subscribe((rel) => {
       if (rel.following || rel.requested) {
         this.featuredFollowing.update((s) => new Set(s).add(target.id));
@@ -384,6 +413,15 @@ export class Profile implements OnInit, OnDestroy {
     this.featuredBusy.set(true);
     try {
       for (const target of this.featuredToFollow()) {
+        if (this.auth.isAnonymous) {
+          const result = this.anonymousFollows.follow(target, this.anonymous.server());
+          if (!result.ok) {
+            this.followError.set(result.error);
+            break;
+          }
+          this.featuredFollowing.update((set) => new Set(set).add(target.id));
+          continue;
+        }
         try {
           const rel = await firstValueFrom(this.api.follow(target.id));
           if (rel.following || rel.requested) {
@@ -403,6 +441,19 @@ export class Profile implements OnInit, OnDestroy {
     const acc = this.account();
     const rel = this.relationship();
     if (!acc) {
+      return;
+    }
+    this.followError.set(null);
+    if (this.auth.isAnonymous) {
+      if (rel?.following) {
+        this.relationship.set(this.anonymousFollows.unfollow(acc, this.anonymous.server()));
+        return;
+      }
+      const result = this.anonymousFollows.follow(acc, this.anonymous.server());
+      this.relationship.set(result.relationship);
+      if (!result.ok) {
+        this.followError.set(result.error);
+      }
       return;
     }
     const call = rel?.following ? this.api.unfollow(acc.id) : this.api.follow(acc.id);

@@ -1,6 +1,6 @@
 # Anonymous Mastodon — Sprint 2: local profile and capability-aware real UI
 
-Status: READY (written 2026-07-19 at the close of Sprint 1)
+Status: COMPLETE (2026-07-19)
 
 ## Starting point
 
@@ -85,3 +85,50 @@ bookmark work does not scatter `isAnonymous` checks through feature code.
 - The 20-account store and relationship facade.
 - API-first public account resolution and status acquisition.
 - Feed merging, caching, timeouts, and RSS fallback.
+
+## Outcome
+
+- Added a central `AnonymousCapabilities` policy for compose, relationships,
+  status interactions, server mutations, bookmarks, and Bluesky. Shared UI now
+  asks this policy instead of duplicating provider rules.
+- Added an Anonymous route guard and a friendly unavailable page. Direct links
+  to authenticated-only features are intercepted before their components can
+  issue API calls.
+- Hid Inbox, Chat, Favourites, Drafts, Analytics, and Observability navigation,
+  and reduced Settings to local-safe pages.
+- Removed reply, quote, boost, favourite, bookmark, poll, report, edit, delete,
+  mute, translate, and history actions from Anonymous status cards. Defensive
+  method guards also prevent calls from keyboard/programmatic entry points.
+- Disabled compose and authenticated navigation shortcuts in Anonymous mode.
+- Kept Search available and token-free. Its authenticated bulk-follow prompt is
+  suppressed until local follows land.
+- Kept Bookmarks visible with a safe local placeholder; the store remains part
+  of the local collections sprint.
+- Adapted the real Public profile settings page for the provider-owned local
+  identity. Display name, handle, bio, avatar, header, and four metadata fields
+  persist locally; text is size-limited and HTML-escaped. Reset retains the
+  selected home instance.
+- Adapted the real profile page to render `_anonymous` locally without calling
+  `/api/v1/accounts/anonymous`. Remote profiles remain anonymously readable,
+  but relationship controls are withheld until Sprint 3.
+- Anonymous Connections exposes RSS but not Bluesky.
+- The legacy `/demo` remains independent.
+
+## Verification
+
+- TypeScript application compilation: passed.
+- Focused Anonymous/UI suite: 6 files, 77 tests passed.
+- Search/provider regression suite: 4 files, 22 tests passed.
+- Full `npm run test:ci` coverage-enabled Angular suite: passed.
+- `npm run lint`: passed with zero warnings.
+- `npm run build`: passed.
+- `npm run build:mockingbird`: passed.
+- Repository-wide format check remains red on seven pre-existing/unrelated
+  files; every Sprint 2 file was formatted and `git diff --check` passed.
+
+## Handoff
+
+Continue with `anonymous-mastodon-sprint03.md`. The capability policy currently
+reports relationships as unavailable. Sprint 3 should turn that one capability
+on only after local follow storage and the API-first feed provider are wired
+through the existing relationship and feed facades.

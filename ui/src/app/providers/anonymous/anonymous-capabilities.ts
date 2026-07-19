@@ -26,6 +26,9 @@ export class AnonymousCapabilities {
     return !this.active;
   }
 
+  /** Follow/Unfollow has a complete browser-local implementation in Anonymous. */
+  readonly canFollow = true;
+
   get canUseServerActions(): boolean {
     return !this.active;
   }

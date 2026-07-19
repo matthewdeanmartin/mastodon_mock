@@ -243,7 +243,9 @@ export class Home implements OnInit, OnDestroy {
 
   /** Timeline-derived widgets (who-to-follow) only understand Mastodon posts. */
   private publishMastodon(statuses: Status[]): void {
-    this.homeTimelineFeed.publish(statuses.filter((s) => !s.provider));
+    this.homeTimelineFeed.publish(
+      statuses.filter((status) => !status.provider || status.provider === 'anonymous-mastodon'),
+    );
   }
 
   onPosted(status: Status): void {

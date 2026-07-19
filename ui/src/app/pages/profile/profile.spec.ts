@@ -3,9 +3,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Account, Relationship, Status } from '../../models';
 import { Profile } from './profile';
+import { Auth } from '../../auth';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 
 /** n bare statuses with descending ids starting at s<base> (timeline order). */
 function makeStatuses(n: number, base: number): Status[] {
@@ -28,6 +30,8 @@ function makeStatuses(n: number, base: number): Status[] {
  */
 describe('Profile block/unblock', () => {
   let httpMock: HttpTestingController;
+
+  beforeEach(() => localStorage.clear());
 
   function setUp() {
     TestBed.configureTestingModule({
@@ -76,6 +80,63 @@ describe('Profile block/unblock', () => {
     req.flush({ id: '900', blocking: true } as Relationship);
 
     expect(cmp.relationship().blocking).toBe(true);
+  });
+
+  it('follows locally in Anonymous without relationship mutation requests', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: '900' })) },
+        },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    const target = {
+      id: '900',
+      username: 'eve',
+      acct: 'eve@example.social',
+      display_name: 'Eve',
+      note: '',
+      url: 'https://example.social/@eve',
+      avatar: '',
+      avatar_static: '',
+      header: '',
+      followers_count: 0,
+      following_count: 0,
+      statuses_count: 0,
+      bot: false,
+      locked: false,
+      fields: [],
+    } as Account;
+
+    httpMock.expectOne('/api/v1/accounts/900').flush(target);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/900/statuses' && !request.params.has('pinned'),
+      )
+      .flush([]);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/900/statuses' &&
+          request.params.get('pinned') === 'true',
+      )
+      .flush([]);
+    httpMock.expectOne('/api/v1/accounts/900/endorsements').flush([]);
+    httpMock.expectNone((request) => request.url.includes('/relationships'));
+
+    (fixture.componentInstance as any).toggleFollow();
+
+    expect(TestBed.inject(AnonymousFollows).count()).toBe(1);
+    expect((fixture.componentInstance as any).relationship().following).toBe(true);
+    httpMock.expectNone((request) => /\/(follow|unfollow)$/.test(request.url));
   });
 
   it('keeps paging older statuses until 20 accumulate (filtered pages come back short)', () => {

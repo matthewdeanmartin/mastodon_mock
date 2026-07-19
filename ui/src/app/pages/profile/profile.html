@@ -35,42 +35,49 @@
         <div class="profile-buttons">
           <a class="btn btn-outline" routerLink="/settings/profile">Edit local profile</a>
         </div>
-      } @else if (!isSelf() && capabilities.canManageRelationships) {
+      } @else if (!isSelf()) {
         <div class="profile-buttons">
-          <button class="btn btn-outline" (click)="showLists.set(true)">
-            Lists &amp; collections
-          </button>
-          <details class="account-danger-menu">
-            <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
-            <div class="account-danger-panel">
-              <button type="button" (click)="showReport.set(true)">Report account</button>
-              @if (relationship()?.muting) {
-                <button type="button" (click)="unmute()">Unmute account</button>
-              } @else {
-                <div class="menu-note muted small">Mute for…</div>
-                <div class="mute-durations">
-                  @for (d of muteDurations; track d.label) {
-                    <button type="button" (click)="mute(d.seconds)">{{ d.label }}</button>
-                  }
-                </div>
-              }
-              <button type="button" (click)="requestBlock()">
-                {{ relationship()?.blocking ? 'Unblock account' : 'Block account' }}
-              </button>
-            </div>
-          </details>
-          <button
-            class="btn"
-            [class.btn-outline]="relationship()?.following"
-            (click)="toggleFollow()"
-          >
-            {{ relationship()?.following ? 'Following' : 'Follow' }}
-          </button>
+          @if (capabilities.canManageRelationships) {
+            <button class="btn btn-outline" (click)="showLists.set(true)">
+              Lists &amp; collections
+            </button>
+            <details class="account-danger-menu">
+              <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
+              <div class="account-danger-panel">
+                <button type="button" (click)="showReport.set(true)">Report account</button>
+                @if (relationship()?.muting) {
+                  <button type="button" (click)="unmute()">Unmute account</button>
+                } @else {
+                  <div class="menu-note muted small">Mute for…</div>
+                  <div class="mute-durations">
+                    @for (d of muteDurations; track d.label) {
+                      <button type="button" (click)="mute(d.seconds)">{{ d.label }}</button>
+                    }
+                  </div>
+                }
+                <button type="button" (click)="requestBlock()">
+                  {{ relationship()?.blocking ? 'Unblock account' : 'Block account' }}
+                </button>
+              </div>
+            </details>
+          }
+          @if (capabilities.canFollow) {
+            <button
+              class="btn"
+              [class.btn-outline]="relationship()?.following"
+              (click)="toggleFollow()"
+            >
+              {{ relationship()?.following ? 'Following' : 'Follow' }}
+            </button>
+          }
         </div>
       }
     </div>
     <h2>{{ a.display_name || a.username }} <app-verified-badge [account]="a" /></h2>
     <div class="acct muted">&#64;{{ a.acct }}</div>
+    @if (followError(); as error) {
+      <div class="action-error" role="alert">{{ error }}</div>
+    }
     @if (reportDone()) {
       <div class="report-done">
         Report submitted. A moderator will review it; reports cannot be undone.
@@ -112,7 +119,7 @@
     <section class="featured-card">
       <div class="featured-head">
         <h3>⭐ Featured by {{ a.display_name || a.username }}</h3>
-        @if (!isSelf() && capabilities.canManageRelationships && featuredToFollow().length) {
+        @if (!isSelf() && capabilities.canFollow && featuredToFollow().length) {
           <button class="btn" [disabled]="featuredBusy()" (click)="followAllFeatured()">
             {{ featuredBusy() ? 'Following…' : 'Follow all (' + featuredToFollow().length + ')' }}
           </button>
@@ -137,7 +144,7 @@
           </a>
           @if (featuredFollowing().has(f.id)) {
             <button type="button" class="btn featured-follow" disabled>Following</button>
-          } @else if (!isSelf() && capabilities.canManageRelationships) {
+          } @else if (!isSelf() && capabilities.canFollow) {
             <button
               type="button"
               class="btn btn-outline featured-follow"
