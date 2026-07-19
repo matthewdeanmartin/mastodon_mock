@@ -91,7 +91,14 @@ export class Shell implements OnInit {
     }
   }
 
-  /** Switch to a saved account, then re-verify it (refreshes the role/snapshot). */
+  /**
+   * Switch to a saved account, then re-verify it before committing. A soft route
+   * refresh isn't enough: nearly every widget (feeds, prefs, RSS/Bluesky, the
+   * observability metrics) is scoped to the active account, and some read their
+   * account-scoped storage at construction. So once the new token verifies, we
+   * do a full page reload — the cleanest way to invalidate everything and
+   * re-bootstrap against the new identity.
+   */
   switchTo(session: Session): void {
     const previous = this.auth.token();
     if (session.token === previous) {
@@ -101,7 +108,8 @@ export class Shell implements OnInit {
     this.api.verifyCredentials().subscribe({
       next: (acc) => {
         this.auth.setAccount(acc);
-        this.reloadCurrentRoute();
+        // Hard reload: rebuild the whole app under the new account.
+        location.reload();
       },
       error: () => {
         // The token was rejected by its instance. Don't silently delete the account —
@@ -114,19 +122,6 @@ export class Shell implements OnInit {
           `Couldn't switch to ${name} — its session may have expired. Sign in again to refresh it.`,
         );
       },
-    });
-  }
-
-  /** Recreate the active routed page so every account-scoped request runs with the new token. */
-  private reloadCurrentRoute(): void {
-    // The bare root is only a transient bootstrap URL; there is no account page to refresh yet.
-    if (!this.router.url || this.router.url === '/' || this.router.url.startsWith('/explore')) {
-      return;
-    }
-    const shouldReuseRoute = this.router.routeReuseStrategy.shouldReuseRoute;
-    this.router.routeReuseStrategy.shouldReuseRoute = () => false;
-    void this.router.navigateByUrl(this.router.url, { replaceUrl: true }).finally(() => {
-      this.router.routeReuseStrategy.shouldReuseRoute = shouldReuseRoute;
     });
   }
 

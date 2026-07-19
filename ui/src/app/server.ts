@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { environment } from '../environments/environment';
+import { normalizeHostUrl } from './host-url';
 
 const SERVER_KEY = 'mastodon_mock_server';
 
@@ -42,10 +43,6 @@ export class Server {
   }
 
   private normalize(value: string): string {
-    const trimmed = value.trim().replace(/\/+$/, '');
-    if (!trimmed) {
-      return '';
-    }
-    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    return normalizeHostUrl(value);
   }
 }

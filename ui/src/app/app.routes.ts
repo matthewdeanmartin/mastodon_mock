@@ -6,6 +6,12 @@ import { mockOnlyChildren } from './mock-routes';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
+  // New-user landing: bookmark this, sign up on your instance, come back and sign in.
+  {
+    path: 'welcome-back',
+    loadComponent: () =>
+      import('./pages/welcome-back/welcome-back').then((m) => m.WelcomeBack),
+  },
   {
     path: 'explore',
     loadComponent: () => import('./pages/explore/explore').then((m) => m.Explore),

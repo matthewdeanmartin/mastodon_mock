@@ -1,6 +1,7 @@
 import { computed, Injectable, signal } from '@angular/core';
+import { scopedKey } from '../../account-scope';
 
-const FEEDS_KEY = 'mockingbird_rss_feeds';
+const FEEDS_KEY_BASE = 'mockingbird_rss_feeds';
 
 /** One subscribed feed. `title` is captured when the feed is first fetched. */
 export interface RssFeedSub {
@@ -9,9 +10,9 @@ export interface RssFeedSub {
   enabled: boolean;
 }
 
-function loadFeeds(): RssFeedSub[] {
+function loadFeeds(key: string): RssFeedSub[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(FEEDS_KEY) ?? '[]');
+    const parsed = JSON.parse(localStorage.getItem(key) ?? '[]');
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -21,10 +22,16 @@ function loadFeeds(): RssFeedSub[] {
 /**
  * The user's RSS subscriptions, persisted in localStorage like every other
  * Mockingbird preference (client-side only; works against any instance).
+ *
+ * The storage key is scoped to the active account (see {@link scopedKey}) so one
+ * account's feeds don't bleed into another's. The key is resolved once at
+ * construction; switching accounts hard-reloads the app, which reconstructs this
+ * service against the new account's key.
  */
 @Injectable({ providedIn: 'root' })
 export class RssSubscriptions {
-  readonly feeds = signal<RssFeedSub[]>(loadFeeds());
+  private readonly storageKey = scopedKey(FEEDS_KEY_BASE);
+  readonly feeds = signal<RssFeedSub[]>(loadFeeds(this.storageKey));
 
   readonly enabledFeeds = computed(() => this.feeds().filter((f) => f.enabled));
 
@@ -49,6 +56,6 @@ export class RssSubscriptions {
 
   private persist(feeds: RssFeedSub[]): void {
     this.feeds.set(feeds);
-    localStorage.setItem(FEEDS_KEY, JSON.stringify(feeds));
+    localStorage.setItem(this.storageKey, JSON.stringify(feeds));
   }
 }

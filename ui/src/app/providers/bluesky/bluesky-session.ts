@@ -2,8 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { map, Observable, switchMap, tap } from 'rxjs';
 import { externalFetch } from '../external-fetch';
+import { scopedKey } from '../../account-scope';
 
-const SESSION_KEY = 'mockingbird_bsky_session';
+const SESSION_KEY_BASE = 'mockingbird_bsky_session';
 
 /** The default PDS; personal PDSes could be supported later via the login form. */
 export const BSKY_SERVICE = 'https://bsky.social';
@@ -32,9 +33,9 @@ interface ProfileResponse {
   avatar?: string;
 }
 
-function loadSession(): BskySession | null {
+function loadSession(key: string): BskySession | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as BskySession) : null;
   } catch {
     return null;
@@ -51,7 +52,13 @@ function loadSession(): BskySession | null {
 export class BlueskySession {
   private http = inject(HttpClient);
 
-  readonly session = signal<BskySession | null>(loadSession());
+  /**
+   * Scoped to the active account so a Bluesky link set up under one account
+   * isn't visible under another. Resolved once at construction; account switches
+   * hard-reload the app, reconstructing this against the new account's key.
+   */
+  private readonly storageKey = scopedKey(SESSION_KEY_BASE);
+  readonly session = signal<BskySession | null>(loadSession(this.storageKey));
   readonly linked = computed(() => this.session() !== null);
 
   login(identifier: string, appPassword: string): Observable<BskySession> {
@@ -120,12 +127,12 @@ export class BlueskySession {
 
   /** Forget the linked account (tokens dropped; revoke the app password on bsky.app). */
   unlink(): void {
-    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(this.storageKey);
     this.session.set(null);
   }
 
   private persist(session: BskySession): void {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    localStorage.setItem(this.storageKey, JSON.stringify(session));
     this.session.set(session);
   }
 }

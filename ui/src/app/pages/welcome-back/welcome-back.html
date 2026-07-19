@@ -1,0 +1,55 @@
+<div class="wb-wrap">
+  <div class="wb-card">
+    <p class="eyebrow muted">Almost there</p>
+    <h1>Create your account on <strong>{{ serverHost() }}</strong></h1>
+
+    <p class="lead">
+      Your account is created on the server itself — a client like this should never handle
+      your email or password. That means <strong>{{ serverHost() }}</strong> won't send you
+      back here automatically. Here's the two-step plan:
+    </p>
+
+    <ol class="steps">
+      <li>
+        <span class="step-num">1</span>
+        <div>
+          <h2>Bookmark this page</h2>
+          <p class="muted">
+            Press <kbd>{{ bookmarkHint }}</kbd> now so you can find your way back after signing
+            up. This is the page you'll return to.
+          </p>
+        </div>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <div>
+          <h2>Sign up on {{ serverHost() }}</h2>
+          <p class="muted">
+            We'll open its sign-up page in a new tab. Finish creating and confirming your
+            account there, then come back to this tab.
+          </p>
+          @if (signupUrl(); as url) {
+            <a class="btn btn-outline" [href]="url" target="_blank" rel="noopener">
+              Open {{ serverHost() }} sign-up ↗
+            </a>
+          }
+        </div>
+      </li>
+    </ol>
+
+    <div class="done">
+      <p>Account created and confirmed? Come back here and sign in:</p>
+      <button class="btn btn-hero" (click)="goSignIn()">
+        I'm signed up — sign in
+      </button>
+    </div>
+
+    <p class="muted small helper">
+      Still choosing a server?
+      <a href="https://joinmastodon.org/servers" target="_blank" rel="noopener">
+        Browse servers on joinmastodon.org ↗
+      </a>
+    </p>
+  </div>
+  <app-app-footer />
+</div>

@@ -6,6 +6,8 @@ import { MockApi } from '../../mock-api';
 import { Auth } from '../../auth';
 import { DevUser } from '../../models';
 import { Server, SERVER_PRESETS } from '../../server';
+import { MastodonServers, ServerSuggestion } from '../../mastodon-servers';
+import { normalizeHostUrl } from '../../host-url';
 import { environment } from '../../../environments/environment';
 import { AppFooter } from '../../shell/app-footer/app-footer';
 
@@ -19,20 +21,12 @@ interface StoredApp {
 
 type Tab = 'signin' | 'mock' | 'init';
 
-/** Well-known instances offered in the server combo's suggestion list. */
-const COMMON_SERVERS = [
-  'mastodon.social',
-  'mastodon.online',
-  'fosstodon.org',
-  'hachyderm.io',
-  'mstdn.social',
-  'mas.to',
-  'techhub.social',
-  'mastodon.art',
-];
-
-/** Something that could plausibly be an instance host (with or without scheme). */
-const DOMAIN_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}$/i;
+/**
+ * Something that could plausibly be an instance host (with or without scheme): a dotted
+ * domain, or a local dev target (localhost / *.localhost / bare IP), each optionally :port.
+ */
+const DOMAIN_RE =
+  /^(https?:\/\/)?(([a-z0-9-]+\.)+[a-z]{2,}|localhost|([a-z0-9-]+\.)*localhost|(\d{1,3}\.){3}\d{1,3})(:\d+)?$/i;
 
 /** How the current server-combo text relates to a reachable instance. */
 type ServerStatus = 'idle' | 'checking' | 'ok' | 'unreachable';
@@ -50,6 +44,7 @@ export class Login implements OnInit, OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   protected server = inject(Server);
+  private mastodonServers = inject(MastodonServers);
 
   protected tab = signal<Tab>('signin');
 
@@ -58,8 +53,11 @@ export class Login implements OnInit, OnDestroy {
   protected mockTooling = environment.mockTooling;
 
   protected serverPresets = SERVER_PRESETS;
-  protected readonly commonServers = COMMON_SERVERS;
   protected customServer = signal('');
+  /** Curated instances matching the combo text; drives the suggestion dropdown. */
+  protected serverSuggestions = signal<ServerSuggestion[]>([]);
+  /** Whether the suggestion dropdown is open (focused + has results). */
+  protected suggestOpen = signal(false);
   /** Reachability of what's typed in the server combo (drives the ✓/⚠ hint). */
   protected serverStatus = signal<ServerStatus>('idle');
   /** The reached instance's self-reported title ("Mastodon", …). */
@@ -78,15 +76,6 @@ export class Login implements OnInit, OnDestroy {
   protected serverHostLabel = computed(() => {
     const base = this.server.baseUrl();
     return base ? base.replace(/^https?:\/\//, '') : 'this server';
-  });
-
-  /**
-   * The selected instance's own signup page. Only offered for remote instances —
-   * the embedded mock has its own inline register form instead.
-   */
-  protected signupUrl = computed<string | null>(() => {
-    const base = this.server.baseUrl();
-    return base ? `${base}/auth/sign_up` : null;
   });
 
   // --- Sign in (token) ---
@@ -149,6 +138,9 @@ export class Login implements OnInit, OnDestroy {
       this.server.setBaseUrl('https://mastodon.social');
     }
     this.customServer.set(this.server.isMock ? '' : this.server.baseUrl());
+    // Warm the curated joinmastodon index (cached; weekly refresh) so the picker can
+    // suggest real, described instances the moment the user focuses the field.
+    this.mastodonServers.ensureLoaded();
     // The dev-user stable is mock-server-only. In Mocking Bird the MockApi is a stub that
     // throws, so only poll it when the mock tooling is actually present.
     if (this.mockTooling && this.server.isMock) {
@@ -188,6 +180,7 @@ export class Login implements OnInit, OnDestroy {
     this.customServer.set(value);
     this.serverStatus.set('idle');
     this.serverTitle.set(null);
+    this.refreshSuggestions(value);
     if (this.serverDebounce) {
       clearTimeout(this.serverDebounce);
     }
@@ -195,6 +188,42 @@ export class Login implements OnInit, OnDestroy {
       return;
     }
     this.serverDebounce = setTimeout(() => this.probeAndApply(value), 500);
+  }
+
+  /** Recompute the curated-instance suggestions for the current combo text. */
+  private refreshSuggestions(value: string): void {
+    const matches = this.mastodonServers.search(value);
+    // Don't show a one-item list that just echoes an exact domain the user already typed.
+    const echo = matches.length === 1 && matches[0].domain === value.trim().toLowerCase();
+    this.serverSuggestions.set(echo ? [] : matches);
+  }
+
+  /** Field focused: open the dropdown with default (or current-query) suggestions. */
+  onServerFocus(): void {
+    this.refreshSuggestions(this.customServer());
+    this.suggestOpen.set(true);
+  }
+
+  /** Blur closes the dropdown, but not before a click on an option can register. */
+  onServerBlur(): void {
+    setTimeout(() => this.suggestOpen.set(false), 150);
+  }
+
+  /** Pick a suggested instance: fill the field and probe it immediately. */
+  chooseSuggestion(s: ServerSuggestion): void {
+    this.customServer.set(s.domain);
+    this.serverSuggestions.set([]);
+    this.suggestOpen.set(false);
+    void this.probeAndApply(s.domain);
+  }
+
+  /** A rough "big / mid / cozy" size label for a suggestion row. */
+  sizeLabel(users: number): string {
+    if (users >= 100_000) return 'very large';
+    if (users >= 10_000) return 'large';
+    if (users >= 1_000) return 'mid-size';
+    if (users > 0) return 'cozy';
+    return '';
   }
 
   /** Enter in the combo: don't wait for the debounce. */
@@ -210,8 +239,10 @@ export class Login implements OnInit, OnDestroy {
     if (!DOMAIN_RE.test(trimmed)) {
       return;
     }
-    const base = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    // Quietly supply the scheme: https for real hosts, http for localhost / IPs.
+    const base = normalizeHostUrl(trimmed);
     const seq = ++this.probeSeq;
+    this.suggestOpen.set(false);
     this.serverStatus.set('checking');
     try {
       const res = await fetch(`${base}/api/v1/instance`, { signal: AbortSignal.timeout(6000) });
@@ -248,7 +279,13 @@ export class Login implements OnInit, OnDestroy {
     this.auth.setToken(value);
     this.api.verifyCredentials().subscribe({
       next: (acc) => {
-        this.auth.setAccount(acc);
+        // If this identity is already in the stable under a different token
+        // (e.g. re-running OAuth for an account you're already signed into),
+        // don't pile up a duplicate session — drop the fresh token and switch to
+        // the existing one. Otherwise commit the new session.
+        if (!this.adoptExistingSession(acc, value)) {
+          this.auth.setAccount(acc);
+        }
         this.checking.set(false);
         this.router.navigateByUrl('/home');
       },
@@ -258,6 +295,25 @@ export class Login implements OnInit, OnDestroy {
         this.error.set('That token was rejected. Check it and try again.');
       },
     });
+  }
+
+  /**
+   * If another saved session is the *same account on the same instance* as the
+   * one we just verified, discard the newly-minted token and switch back to the
+   * existing session. Returns true when an existing identity was adopted.
+   */
+  private adoptExistingSession(acc: { id: string }, newToken: string): boolean {
+    const server = this.server.baseUrl();
+    const existing = this.auth
+      .sessions()
+      .find((s) => s.token !== newToken && s.account?.id === acc.id && (s.server ?? '') === server);
+    if (!existing) {
+      return false;
+    }
+    // Forget the duplicate token, then re-activate the account we already had.
+    this.auth.removeSession(newToken);
+    this.auth.switchTo(existing.token);
+    return true;
   }
 
   // ---------- Register (mock-server-only signup) ----------

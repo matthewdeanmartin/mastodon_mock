@@ -384,9 +384,10 @@ export class Conversations implements OnInit, OnDestroy {
         }
       }),
     );
-    // Bluesky chat has no client-reachable stream; poll the convo list gently.
+    // Bluesky chat has no client-reachable stream; poll the convo list gently —
+    // once every 10 minutes, to keep third-party API traffic light.
     if (this.bsky.linked()) {
-      this.bskyPoll = setInterval(() => this.refreshBskyConvos(), 20_000);
+      this.bskyPoll = setInterval(() => this.refreshBskyConvos(), 10 * 60_000);
     }
   }
 
