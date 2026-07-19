@@ -94,6 +94,51 @@ describe('AnonymousMastodonProvider', () => {
     expect(received[0].account.acct).toBe('alice@social.example');
   });
 
+  it('streams a growing snapshot as each source lands, not one batch at the end', () => {
+    const follows = TestBed.inject(AnonymousFollows);
+    follows.follow(account('alice', 'https://one.example', 'a-copy'), 'https://mastodon.social');
+    follows.follow(account('bob', 'https://two.example', 'b-copy'), 'https://mastodon.social');
+    const provider = TestBed.inject(AnonymousMastodonProvider);
+    provider.reset();
+    const snapshots: number[] = [];
+
+    provider.fetchPageStreaming().subscribe((items) => snapshots.push(items.length));
+
+    // First source resolves — a snapshot appears before the second is in.
+    httpMock
+      .expectOne((request) => request.url.includes('/api/v1/accounts/a-copy/statuses'))
+      .flush([status(account('alice', 'https://one.example', 'a-copy'), '10')]);
+    expect(snapshots).toEqual([1]);
+
+    // Second source resolves — the snapshot grows to include both.
+    httpMock
+      .expectOne((request) => request.url.includes('/api/v1/accounts/b-copy/statuses'))
+      .flush([status(account('bob', 'https://two.example', 'b-copy'), '20')]);
+    expect(snapshots).toEqual([1, 2]);
+  });
+
+  it('does not re-emit posts already seen across streamed sources', () => {
+    const follows = TestBed.inject(AnonymousFollows);
+    follows.follow(account('alice', 'https://one.example', 'a-copy'), 'https://mastodon.social');
+    follows.follow(account('bob', 'https://two.example', 'b-copy'), 'https://mastodon.social');
+    const provider = TestBed.inject(AnonymousMastodonProvider);
+    provider.reset();
+    let last: Status[] = [];
+
+    provider.fetchPageStreaming().subscribe((items) => (last = items));
+
+    const shared = status(account('alice', 'https://one.example', 'a-copy'), '10');
+    httpMock
+      .expectOne((request) => request.url.includes('/api/v1/accounts/a-copy/statuses'))
+      .flush([shared]);
+    // Bob's instance happens to surface the very same post (boost/crosspost).
+    httpMock
+      .expectOne((request) => request.url.includes('/api/v1/accounts/b-copy/statuses'))
+      .flush([shared]);
+
+    expect(last).toHaveLength(1);
+  });
+
   it('keeps successful sources when another followed instance fails', () => {
     const follows = TestBed.inject(AnonymousFollows);
     follows.follow(account('alice', 'https://one.example', 'a-copy'), 'https://mastodon.social');

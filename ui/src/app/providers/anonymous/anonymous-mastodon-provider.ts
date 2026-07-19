@@ -1,6 +1,16 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, map, mergeMap, Observable, of, throwError, timeout, toArray } from 'rxjs';
+import {
+  catchError,
+  map,
+  mergeMap,
+  Observable,
+  of,
+  scan,
+  throwError,
+  timeout,
+  toArray,
+} from 'rxjs';
 import { Auth } from '../../auth';
 import { Account, Status } from '../../models';
 import { FeedProvider } from '../provider';
@@ -170,6 +180,70 @@ export class AnonymousMastodonProvider implements FeedProvider {
             return true;
           });
       }),
+    );
+  }
+
+  /**
+   * Like {@link fetchPage}, but emits progressively: a fresh, growing snapshot
+   * after *each* source resolves rather than one array once every source is in.
+   *
+   * The anonymous home can span ~25 slow RSS/API sources; waiting for all of
+   * them (as `fetchPage`'s `toArray` does) leaves the page looking dead for
+   * seconds. Streaming lets Home paint posts as they trickle in. Each snapshot
+   * appends the newly-arrived source's posts in arrival order (no full re-sort
+   * per emission — Home does one final newest-first sort on completion), and
+   * carries forward the running dedupe so a post never appears twice.
+   */
+  fetchPageStreaming(): Observable<Status[]> {
+    const active: ActiveSource[] = [
+      ...this.cursors
+        .filter((source) => !source.exhausted)
+        .map((source) => ({
+          label: `@${source.follow.handle}`,
+          cursor: source,
+          fetch: () => this.fetchSource(source),
+        })),
+      ...this.tagCursors
+        .filter((source) => !source.exhausted)
+        .map((source) => ({
+          label: `#${source.tag}`,
+          cursor: source,
+          fetch: () => this.fetchTag(source),
+        })),
+    ];
+    if (!active.length) {
+      return of([]);
+    }
+    const failures: string[] = [];
+    return of(...active).pipe(
+      mergeMap(
+        (source) =>
+          source.fetch().pipe(
+            catchError(() => {
+              source.cursor.exhausted = true;
+              failures.push(`Could not load ${source.label}.`);
+              return of<Status[]>([]);
+            }),
+          ),
+        MAX_CONCURRENCY,
+      ),
+      // Append each source's posts to the running feed, skipping ones already
+      // seen; surface any accumulated warnings alongside every snapshot.
+      scan((feed: Status[], page: Status[]) => {
+        const additions = page.filter((status) => {
+          const key = status.url || status.id;
+          if (this.seen.has(key)) {
+            return false;
+          }
+          this.seen.add(key);
+          return true;
+        });
+        this.errors.set([
+          ...[...this.rssFallbacks].map((handle) => `Using RSS fallback for @${handle}.`),
+          ...failures,
+        ]);
+        return additions.length ? [...feed, ...additions] : feed;
+      }, [] as Status[]),
     );
   }
 

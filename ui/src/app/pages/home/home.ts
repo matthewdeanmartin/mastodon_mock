@@ -194,9 +194,13 @@ export class Home implements OnInit, OnDestroy {
       feedMin: this.prefs.feedMin(),
       feedMax: this.prefs.feedMax(),
     });
+    if (this.auth.isAnonymous) {
+      this.loadAnonymousStreaming();
+      return;
+    }
     this.pageSub = this.aggregator.nextPage().subscribe({
       next: (s) => {
-        this.statuses.set(this.auth.isAnonymous ? this.dedupeAnonymous(s) : s);
+        this.statuses.set(s);
         const details = {
           received: s.length,
           stored: this.statuses().length,
@@ -210,7 +214,6 @@ export class Home implements OnInit, OnDestroy {
           this.diagnostics.warn('load:first-page-empty', details);
         }
         this.publishMastodon(s);
-        this.cacheAnonymousHome();
         this.loading.set(false);
         // Auto-load further pages until the feed reaches the configured minimum.
         this.fillToMinimum();
@@ -221,6 +224,52 @@ export class Home implements OnInit, OnDestroy {
           server: this.server.baseUrl() || 'same-origin',
         });
         this.loading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Anonymous home spans many slow RSS/API sources. Rather than block on all of
+   * them, paint posts as each source lands: every streamed snapshot is shown in
+   * arrival order (loading clears on the first one so the page feels alive), and
+   * a single newest-first sort runs once the stream completes.
+   */
+  private loadAnonymousStreaming(): void {
+    let sawFirst = false;
+    this.pageSub = this.anonymousProvider.fetchPageStreaming().subscribe({
+      next: (snapshot) => {
+        // Snapshots are already deduped and grow monotonically; show as-is
+        // (arrival order) mid-stream — the final sort happens on completion.
+        this.statuses.set(snapshot);
+        this.publishMastodon(snapshot);
+        if (!sawFirst) {
+          sawFirst = true;
+          this.loading.set(false);
+        }
+        this.diagnostics.info('load:anonymous-stream-snapshot', {
+          stored: snapshot.length,
+          visible: this.visible().length,
+          providerCounts: this.providerCounts(snapshot),
+        });
+      },
+      error: (error: unknown) => {
+        this.diagnostics.error('load:first-page-error', error, {
+          mode: this.auth.mode() ?? 'unauthenticated',
+          server: this.server.baseUrl() || 'same-origin',
+        });
+        this.loading.set(false);
+      },
+      complete: () => {
+        // Everything's in: sort newest-first once, cache, and top up to the min.
+        this.statuses.update((list) => this.dedupeAnonymous(list));
+        this.publishMastodon(this.statuses());
+        this.cacheAnonymousHome();
+        this.loading.set(false);
+        this.diagnostics.info('load:anonymous-stream-complete', {
+          stored: this.statuses().length,
+          visible: this.visible().length,
+        });
+        this.fillToMinimum();
       },
     });
   }
