@@ -1,6 +1,6 @@
 # Anonymous Mastodon — Sprint 3: local follows and API-first home feed
 
-Status: READY (written 2026-07-19 at the close of Sprint 2)
+Status: COMPLETE (2026-07-19)
 
 ## Starting point
 
@@ -118,3 +118,50 @@ public posts using anonymous Mastodon APIs first.
 - Followed tag store (maximum 5) and tag-feed mixing.
 - Enforcing the maximum 10 user-managed RSS subscriptions if not required in
   Sprint 3.
+
+## Outcome
+
+- Added a versioned, provider-owned Anonymous follow store with canonical
+  `username@host` identity, cross-instance profile metadata, malformed-state
+  recovery, deduplication, and an atomic 20-account maximum.
+- The real profile Follow/Following button now reads and writes that local
+  store in Anonymous mode. Unfollow is immediate, reload-safe, and never calls
+  Mastodon's relationship mutation endpoints.
+- Kept Lists, Report, Mute, and Block separate from local Follow so enabling
+  follows did not accidentally expose unsupported server actions.
+- Featured-profile Follow and Follow all use the same local relationship path.
+- Added an `anonymous-mastodon` feed provider to the existing aggregator. It
+  resolves each followed account on that account's own instance and requests
+  its public statuses without credentials.
+- Acquisition is pull-only: Home load, manual refresh, and Load more drive the
+  provider. No timer, stream, visibility refresh, or background network poll
+  was introduced.
+- Requests use four-source bounded concurrency, eight-second timeouts,
+  per-session account-id caching, source cursors, chronological merging, URL
+  deduplication, and partial-failure isolation.
+- Anonymous API failure falls back to the account's public profile RSS feed.
+  The UI reports fallback/failure through the provider error surface.
+- Anonymous Mastodon posts use namespaced provider ids and remain read-only in
+  the shared status card.
+- Home's empty state now directs users to Search/Profile to follow accounts.
+- The sidebar shows the real local following count. Boost-derived Who to follow
+  candidates use local relationships and local Follow in Anonymous mode.
+- Authenticated Mastodon, Bluesky, user-managed RSS, and `/demo` behavior remain
+  separate.
+
+## Verification
+
+- Focused Sprint 3 suite: 8 files, 40 tests passed.
+- Full `npm run test:ci` coverage-enabled Angular suite: passed.
+- `npm run lint`: passed with zero warnings.
+- TypeScript application compilation: passed.
+- `npm run build`: passed.
+- `npm run build:mockingbird`: passed.
+- `git diff --check`: passed.
+
+## Handoff
+
+Continue with `anonymous-mastodon-sprint04.md`. Local follows and an API-first
+Home feed are now the stable substrate. Sprint 4 should reuse the same
+provider-owned storage boundary for bookmarks, lists, followed tags, and the
+user-managed RSS limit rather than introducing page-owned localStorage keys.
