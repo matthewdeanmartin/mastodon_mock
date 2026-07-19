@@ -1,6 +1,10 @@
 <div class="spage-head">
   <h1>Public profile</h1>
-  <p>How you appear to other people on this server.</p>
+  @if (auth.isAnonymous) {
+    <p>Your browser-local identity. Nothing here is published to {{ anonymous.server() }}.</p>
+  } @else {
+    <p>How you appear to other people on this server.</p>
+  }
 </div>
 
 <form class="spage-body" (ngSubmit)="saveProfile()">
@@ -17,6 +21,22 @@
         />
       </div>
     </div>
+
+    @if (auth.isAnonymous) {
+      <div class="srow">
+        <span class="slabel">Local handle</span>
+        <div class="scontrol">
+          <input
+            type="text"
+            [ngModel]="username()"
+            (ngModelChange)="username.set($event)"
+            name="username"
+            maxlength="64"
+          />
+          <span class="hint">Shown only in this browser. It does not create an account.</span>
+        </div>
+      </div>
+    }
 
     <div class="srow">
       <span class="slabel">Bio</span>
@@ -99,8 +119,16 @@
   </div>
 
   <div class="sactions">
+    @if (saveError(); as error) {
+      <span class="error">{{ error }}</span>
+    }
     @if (saved()) {
       <span class="saved-note">Saved ✓</span>
+    }
+    @if (auth.isAnonymous) {
+      <button class="btn btn-outline" type="button" (click)="resetAnonymousProfile()">
+        Reset local profile
+      </button>
     }
     <button class="btn" type="submit" [disabled]="saving()">
       {{ saving() ? 'Saving…' : 'Save changes' }}

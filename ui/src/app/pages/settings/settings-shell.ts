@@ -11,6 +11,8 @@ interface SettingsNavItem {
   exact: boolean;
   /** True for pages backed by /api/v1/_mock endpoints; hidden against real servers. */
   mockOnly?: boolean;
+  /** Safe and useful for the one browser-local Anonymous account. */
+  anonymous?: boolean;
 }
 
 /**
@@ -35,15 +37,15 @@ export class SettingsShell {
   }
 
   protected readonly nav: SettingsNavItem[] = [
-    { label: 'Public profile', path: 'profile', exact: true },
+    { label: 'Public profile', path: 'profile', exact: true, anonymous: true },
     // Client-side premium-style features; the same controls also live in Appearance.
-    { label: 'Mockingbird Blue', path: 'blue', exact: true },
+    { label: 'Mockingbird Blue', path: 'blue', exact: true, anonymous: true },
     // Client-side (localStorage): RSS feeds now, Bluesky next. Works anywhere.
-    { label: 'Connections', path: 'connections', exact: true },
+    { label: 'Connections', path: 'connections', exact: true, anonymous: true },
     { label: 'Privacy and reach', path: 'privacy', exact: true },
     // Appearance is client-side (theme/accent/undo-send in localStorage) and works
     // against any instance; the page hides its server-backed rows off-mock itself.
-    { label: 'Appearance', path: 'appearance', exact: true },
+    { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },
     { label: 'Posting defaults', path: 'posting', exact: true },
     { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
     { label: 'Follows and followers', path: 'follows', exact: true },
@@ -55,5 +57,8 @@ export class SettingsShell {
     { label: 'Import and export', path: 'import-export', exact: true, mockOnly: true },
     { label: 'Invite people', path: 'invites', exact: true, mockOnly: true },
     { label: 'Development', path: 'development', exact: true, mockOnly: true },
-  ].filter((item) => environment.mockTooling || !item.mockOnly);
+  ].filter(
+    (item) =>
+      (environment.mockTooling || !item.mockOnly) && (!this.auth.isAnonymous || item.anonymous),
+  );
 }

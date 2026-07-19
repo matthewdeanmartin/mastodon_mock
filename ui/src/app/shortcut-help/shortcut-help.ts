@@ -1,4 +1,5 @@
-import { Component, output } from '@angular/core';
+import { Component, computed, inject, output } from '@angular/core';
+import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
 
 interface ShortcutRow {
   keys: string[];
@@ -78,7 +79,7 @@ const GROUPS: ShortcutGroup[] = [
         <h3 id="shortcut-help-title">Keyboard shortcuts</h3>
         <p class="muted note">Same bindings as mastodon.social — nothing new to memorize.</p>
         <div class="groups">
-          @for (group of groups; track group.title) {
+          @for (group of groups(); track group.title) {
             <section>
               <h4>{{ group.title }}</h4>
               <table>
@@ -175,5 +176,26 @@ const GROUPS: ShortcutGroup[] = [
 })
 export class ShortcutHelp {
   readonly closed = output<void>();
-  protected readonly groups = GROUPS;
+  private capabilities = inject(AnonymousCapabilities);
+  protected readonly groups = computed(() => {
+    if (!this.capabilities.active) {
+      return GROUPS;
+    }
+    const hidden = new Set([
+      'Reply to focused post',
+      'Mention the author',
+      'Favourite focused post',
+      'Boost focused post',
+      'Quote focused post',
+      'Notifications',
+      'Direct messages',
+      'Favourites',
+      'Blocked users',
+      'Muted users',
+    ]);
+    return GROUPS.filter((group) => group.title !== 'Composing').map((group) => ({
+      ...group,
+      rows: group.rows.filter((row) => !hidden.has(row.label)),
+    }));
+  });
 }

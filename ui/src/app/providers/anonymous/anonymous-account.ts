@@ -12,6 +12,13 @@ interface AnonymousAccountState {
   account: Account;
 }
 
+export interface AnonymousProfileUpdate {
+  displayName: string;
+  username: string;
+  note: string;
+  fields: { name: string; value: string }[];
+}
+
 function host(server: string): string {
   try {
     return new URL(server).host;
@@ -49,6 +56,32 @@ function defaultAccount(server: string): Account {
       fields: [],
     },
   };
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function readImage(file: File, maxBytes: number): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    return Promise.reject(new Error('Choose an image file.'));
+  }
+  if (file.size > maxBytes) {
+    return Promise.reject(
+      new Error(`Image is too large (maximum ${Math.floor(maxBytes / 1_000_000)} MB).`),
+    );
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error('Could not read that image.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function loadState(): AnonymousAccountState | null {
@@ -113,6 +146,68 @@ export class AnonymousAccount {
       version: STATE_VERSION,
       server: this.server(),
       account: { ...account, id: 'anonymous' },
+    });
+  }
+
+  /** Validate and persist every locally editable profile field. */
+  async updateProfile(
+    update: AnonymousProfileUpdate,
+    avatar: File | null,
+    header: File | null,
+  ): Promise<Account> {
+    const current = this.account();
+    const username = update.username.trim().replace(/^@/, '').slice(0, 64) || host(this.server());
+    const displayName = update.displayName.trim().slice(0, 30) || 'Anonymous';
+    const rawNote = update.note.slice(0, 500);
+    const sourceFields = update.fields
+      .filter((field) => field.name.trim() || field.value.trim())
+      .slice(0, 4)
+      .map((field) => ({
+        name: field.name.trim().slice(0, 255),
+        value: field.value.trim().slice(0, 255),
+      }));
+    const [avatarUrl, headerUrl] = await Promise.all([
+      avatar ? readImage(avatar, 2_000_000) : Promise.resolve(current.avatar),
+      header ? readImage(header, 4_000_000) : Promise.resolve(current.header),
+    ]);
+    const renderedFields = sourceFields.map((field) => ({
+      name: escapeHtml(field.name),
+      value: escapeHtml(field.value),
+    }));
+    const renderedNote = rawNote ? `<p>${escapeHtml(rawNote).replaceAll('\n', '<br>')}</p>` : '';
+    const account: Account = {
+      ...current,
+      username,
+      acct: username,
+      display_name: displayName,
+      note: renderedNote,
+      avatar: avatarUrl,
+      avatar_static: avatarUrl,
+      header: headerUrl,
+      header_static: headerUrl,
+      fields: renderedFields,
+      source: {
+        ...(current.source ?? {
+          privacy: 'public',
+          sensitive: false,
+          language: null,
+          note: '',
+          fields: [],
+        }),
+        note: rawNote,
+        fields: sourceFields,
+      },
+    };
+    this.updateAccount(account);
+    return account;
+  }
+
+  /** Reset profile presentation while retaining the selected home instance. */
+  resetIdentity(): void {
+    this.persist({
+      version: STATE_VERSION,
+      server: this.server(),
+      account: defaultAccount(this.server()),
     });
   }
 

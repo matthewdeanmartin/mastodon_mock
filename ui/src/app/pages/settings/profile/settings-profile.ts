@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Api } from '../../../api';
 import { Auth } from '../../../auth';
 import { AccountField } from '../../../models';
+import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
 
 /** Public profile: display name, bio, metadata fields, avatar/header. */
 @Component({
@@ -14,15 +15,18 @@ import { AccountField } from '../../../models';
 })
 export class SettingsProfile implements OnInit {
   private api = inject(Api);
-  private auth = inject(Auth);
+  protected auth = inject(Auth);
+  protected anonymous = inject(AnonymousAccount);
 
   protected displayName = signal('');
+  protected username = signal('');
   protected note = signal('');
   protected fields = signal<AccountField[]>([]);
   protected avatar = signal<File | null>(null);
   protected header = signal<File | null>(null);
   protected saving = signal(false);
   protected saved = signal(false);
+  protected saveError = signal<string | null>(null);
   /**
    * Field label → rel=me verification date. Only the rendered `fields` (not the
    * editable `source.fields`) carry `verified_at`, so match them up by name.
@@ -30,23 +34,29 @@ export class SettingsProfile implements OnInit {
   protected verifiedAt = signal<Record<string, string>>({});
 
   ngOnInit(): void {
-    this.api.verifyCredentials().subscribe((acc) => {
-      this.displayName.set(acc.display_name);
-      this.note.set(acc.source?.note ?? acc.note ?? '');
-      const fields = (acc.source?.fields ?? acc.fields ?? []).map((f) => ({
-        name: f.name,
-        value: f.value,
-      }));
-      // Always offer one empty row to add a new field.
-      this.fields.set(fields.length ? fields : [{ name: '', value: '' }]);
-      const verified: Record<string, string> = {};
-      for (const f of acc.fields ?? []) {
-        if (f.verified_at) {
-          verified[f.name] = f.verified_at;
-        }
+    if (this.auth.isAnonymous) {
+      this.loadAccount(this.anonymous.account());
+      return;
+    }
+    this.api.verifyCredentials().subscribe((acc) => this.loadAccount(acc));
+  }
+
+  private loadAccount(acc: import('../../../models').Account): void {
+    this.displayName.set(acc.display_name);
+    this.username.set(acc.username);
+    this.note.set(acc.source?.note ?? acc.note ?? '');
+    const fields = (acc.source?.fields ?? acc.fields ?? []).map((f) => ({
+      name: f.name,
+      value: f.value,
+    }));
+    this.fields.set(fields.length ? fields : [{ name: '', value: '' }]);
+    const verified: Record<string, string> = {};
+    for (const f of acc.fields ?? []) {
+      if (f.verified_at) {
+        verified[f.name] = f.verified_at;
       }
-      this.verifiedAt.set(verified);
-    });
+    }
+    this.verifiedAt.set(verified);
   }
 
   setField(index: number, key: 'name' | 'value', value: string): void {
@@ -77,6 +87,12 @@ export class SettingsProfile implements OnInit {
     }
     this.saving.set(true);
     this.saved.set(false);
+    this.saveError.set(null);
+
+    if (this.auth.isAnonymous) {
+      void this.saveAnonymousProfile();
+      return;
+    }
 
     const form = new FormData();
     form.append('display_name', this.displayName());
@@ -104,5 +120,40 @@ export class SettingsProfile implements OnInit {
       },
       error: () => this.saving.set(false),
     });
+  }
+
+  private async saveAnonymousProfile(): Promise<void> {
+    try {
+      const acc = await this.anonymous.updateProfile(
+        {
+          displayName: this.displayName(),
+          username: this.username(),
+          note: this.note(),
+          fields: this.fields(),
+        },
+        this.avatar(),
+        this.header(),
+      );
+      this.auth.setAccount(acc);
+      this.loadAccount(acc);
+      this.avatar.set(null);
+      this.header.set(null);
+      this.saved.set(true);
+    } catch (error) {
+      this.saveError.set(
+        error instanceof Error ? error.message : 'Could not save the local profile.',
+      );
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  resetAnonymousProfile(): void {
+    this.anonymous.resetIdentity();
+    const acc = this.anonymous.account();
+    this.auth.setAccount(acc);
+    this.loadAccount(acc);
+    this.saved.set(true);
+    this.saveError.set(null);
   }
 }

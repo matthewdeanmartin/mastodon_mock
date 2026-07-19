@@ -4,9 +4,11 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SettingsShell } from './settings-shell';
+import { Auth } from '../../auth';
 
 describe('SettingsShell', () => {
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
@@ -24,5 +26,16 @@ describe('SettingsShell', () => {
     expect(labels).toContain('Muted accounts');
     // Mock build shows the _mock-backed pages too.
     expect(labels).toContain('Invite people');
+  });
+
+  it('shows only browser-local settings in Anonymous', () => {
+    TestBed.inject(Auth).enterAnonymous();
+    const fixture = TestBed.createComponent(SettingsShell);
+    fixture.detectChanges();
+    const labels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.settings-nav a span:first-child'),
+    ).map((node) => node.textContent?.trim());
+
+    expect(labels).toEqual(['Public profile', 'Mockingbird Blue', 'Connections', 'Appearance']);
   });
 });

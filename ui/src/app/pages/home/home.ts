@@ -101,6 +101,7 @@ export class Home implements OnInit, OnDestroy {
   protected showFollowNudge = computed(
     () =>
       !this.nudgeDismissed() &&
+      !this.auth.isAnonymous &&
       this.auth.account() !== null &&
       this.followingCount() < FOLLOW_NUDGE_THRESHOLD,
   );

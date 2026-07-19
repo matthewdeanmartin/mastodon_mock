@@ -15,6 +15,8 @@ import { HumanCountPipe } from '../../human-count.pipe';
 import { PeopleBrowser } from '../../people-browser/people-browser';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
+import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
+import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers';
@@ -38,7 +40,9 @@ export class Profile implements OnInit, OnDestroy {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   protected words = inject(Terminology).words;
-  private auth = inject(Auth);
+  protected auth = inject(Auth);
+  protected capabilities = inject(AnonymousCapabilities);
+  private anonymous = inject(AnonymousAccount);
   private location = inject(Location);
   private rss = inject(RssProvider);
   private rssSubs = inject(RssSubscriptions);
@@ -154,6 +158,16 @@ export class Profile implements OnInit, OnDestroy {
       this.loadRss(id);
       return;
     }
+    if (this.auth.isAnonymous && id === 'anonymous') {
+      this.account.set(this.anonymous.account());
+      this.statuses.set([]);
+      this.pinnedStatuses.set([]);
+      this.featured.set([]);
+      this.loading.set(false);
+      this.statusesLoading.set(false);
+      this.exhausted.set(true);
+      return;
+    }
     this.routeLoadSub.add(
       this.api.getAccount(id).subscribe((a) => {
         this.account.set(a);
@@ -162,9 +176,11 @@ export class Profile implements OnInit, OnDestroy {
     );
     this.loadStatuses(id);
     this.loadPinned(id);
-    this.routeLoadSub.add(
-      this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null)),
-    );
+    if (this.capabilities.canManageRelationships) {
+      this.routeLoadSub.add(
+        this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null)),
+      );
+    }
     this.loadFeatured(id);
   }
 
@@ -328,6 +344,9 @@ export class Profile implements OnInit, OnDestroy {
         next: (accounts) => {
           this.featured.set(accounts);
           if (!accounts.length) {
+            return;
+          }
+          if (!this.capabilities.canManageRelationships) {
             return;
           }
           this.routeLoadSub.add(

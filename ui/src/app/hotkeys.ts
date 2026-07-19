@@ -1,6 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Auth } from './auth';
+import { AnonymousCapabilities } from './providers/anonymous/anonymous-capabilities';
 
 /**
  * Global keyboard shortcuts, matching mastodon.social's bindings so nobody
@@ -19,6 +20,7 @@ import { Auth } from './auth';
 export class Hotkeys {
   private router = inject(Router);
   private auth = inject(Auth);
+  private capabilities = inject(AnonymousCapabilities);
 
   /** The "?" keyboard-shortcut help dialog. */
   readonly helpOpen = signal(false);
@@ -127,6 +129,7 @@ export class Hotkeys {
       case 's': // "start" — home is the closest thing we have
         return '/home';
       case 'n':
+        if (this.capabilities.active) return null;
         return '/notifications';
       case 'e':
         return '/explore';
@@ -134,12 +137,16 @@ export class Hotkeys {
       case 't':
         return '/public';
       case 'd':
+        if (this.capabilities.active) return null;
         return '/conversations';
       case 'f':
+        if (this.capabilities.active) return null;
         return '/favourites';
       case 'b':
+        if (this.capabilities.active) return null;
         return '/settings/blocks';
       case 'm':
+        if (this.capabilities.active) return null;
         return '/settings/mutes';
       case 'u':
       case 'p': // pinned posts live on the profile
@@ -151,6 +158,9 @@ export class Hotkeys {
 
   /** Focus the page's composer; from pages without one, go home first. */
   private async newPost(force: boolean): Promise<void> {
+    if (!this.capabilities.canCompose) {
+      return;
+    }
     if (!this.focusComposer() || force) {
       if (!document.querySelector('.compose textarea')) {
         await this.router.navigateByUrl('/home');

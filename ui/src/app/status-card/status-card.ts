@@ -14,8 +14,9 @@ import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, Poll, Status, Translation } from '../models';
 import { MutedPosts } from '../muted-posts';
-import { PROVIDER_CAPS, ProviderCapabilities } from '../providers/provider';
+import { ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
+import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
 import { StatusActions } from '../providers/status-actions';
 import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
@@ -49,6 +50,7 @@ export class StatusCard {
   private actions = inject(StatusActions);
   private router = inject(Router);
   private mutedPosts = inject(MutedPosts);
+  protected capabilities = inject(AnonymousCapabilities);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
@@ -204,13 +206,18 @@ export class StatusCard {
   protected lightboxIndex = signal<number | null>(null);
 
   /** Whether the logged-in user owns the displayed status (can edit/delete). */
-  protected isOwn = computed(() => this.display.account.id === this.auth.account()?.id);
+  protected isOwn = computed(
+    () => !this.capabilities.active && this.display.account.id === this.auth.account()?.id,
+  );
 
   /** True when this status quotes one of the viewer's own statuses (revocable). */
   protected canRevokeQuote = computed(() => {
     const q = this.display.quote?.quoted_status;
     return (
-      !!q && q.account.id === this.auth.account()?.id && this.display.quote?.state === 'accepted'
+      !this.capabilities.active &&
+      !!q &&
+      q.account.id === this.auth.account()?.id &&
+      this.display.quote?.state === 'accepted'
     );
   });
 
@@ -257,7 +264,7 @@ export class StatusCard {
         }
         return true;
       case 'q':
-        if (!this.foreign) {
+        if (!this.foreign && this.capabilities.canCompose) {
           this.toggleQuote(event);
         }
         return true;
@@ -290,6 +297,9 @@ export class StatusCard {
 
   openReport(event: Event): void {
     event.stopPropagation();
+    if (!this.capabilities.canUseServerActions) {
+      return;
+    }
     this.showReport.set(true);
   }
 
@@ -311,6 +321,9 @@ export class StatusCard {
 
   muteAuthor(event: Event, seconds: number | null): void {
     event.stopPropagation();
+    if (!this.capabilities.canManageRelationships) {
+      return;
+    }
     this.api.muteAccount(this.display.account.id, seconds ?? undefined).subscribe({
       next: () => this.mutedAuthor.set(true),
       error: () => this.actionError.set('Could not mute this account.'),
@@ -501,7 +514,7 @@ export class StatusCard {
 
   /** Which interactions this post's network supports (buttons hide per provider). */
   protected get caps(): ProviderCapabilities {
-    return PROVIDER_CAPS[this.display.provider ?? 'mastodon'];
+    return this.capabilities.statusCaps(this.display.provider ?? 'mastodon');
   }
 
   get boostedBy(): string | null {
@@ -521,12 +534,18 @@ export class StatusCard {
   // --- inline reply / quote ---
   toggleReply(event: Event): void {
     event.stopPropagation();
+    if (!this.capabilities.canCompose) {
+      return;
+    }
     this.quoting.set(false);
     this.replying.update((v) => !v);
   }
 
   toggleQuote(event: Event): void {
     event.stopPropagation();
+    if (!this.capabilities.canCompose) {
+      return;
+    }
     this.replying.set(false);
     this.quoting.update((v) => !v);
   }
@@ -551,6 +570,9 @@ export class StatusCard {
 
   toggleFavourite(event: Event): void {
     event.stopPropagation();
+    if (!this.caps.favourite) {
+      return;
+    }
     // Routed by provider (Mastodon API vs Bluesky like records). Foreign calls
     // cross the network to another service, so show pending + surface failures
     // (a silently dead Bluesky session used to make this button "do nothing").
@@ -570,6 +592,9 @@ export class StatusCard {
 
   toggleReblog(event: Event): void {
     event.stopPropagation();
+    if (!this.caps.reblog) {
+      return;
+    }
     this.actionBusy.set(true);
     this.actionError.set(null);
     this.actions.toggleReblog(this.display).subscribe({
@@ -592,6 +617,9 @@ export class StatusCard {
 
   toggleBookmark(event: Event): void {
     event.stopPropagation();
+    if (!this.capabilities.canBookmark) {
+      return;
+    }
     const s = this.display;
     const call = s.bookmarked ? this.api.unbookmark(s.id) : this.api.bookmark(s.id);
     call.subscribe((updated) => this.changed.emit(updated));
@@ -633,7 +661,7 @@ export class StatusCard {
 
   protected pollClosed = computed<boolean>(() => {
     const p = this.poll();
-    return !p || p.expired || p.voted;
+    return this.capabilities.active || !p || p.expired || p.voted;
   });
 
   pollPercent(option: { votes_count: number }): number {
@@ -657,6 +685,9 @@ export class StatusCard {
 
   submitVote(event: Event): void {
     event.stopPropagation();
+    if (!this.capabilities.canUseServerActions) {
+      return;
+    }
     const p = this.poll();
     if (!p || !this.pollSelection().length) {
       return;

@@ -52,56 +52,59 @@
   }
 </section>
 
-<section class="conn-section">
-  <h2>🦋 Bluesky</h2>
-  @if (bsky.session(); as session) {
-    <div class="bsky-linked">
-      <img class="bsky-avatar" [src]="session.avatar || ''" alt="" decoding="async" />
-      <span class="names">
-        <span class="name">{{ session.displayName || session.handle }}</span>
-        <span class="muted small">&#64;{{ session.handle }}</span>
-      </span>
-      <button class="btn btn-outline btn-sm" (click)="unlinkBluesky()">Unlink</button>
-    </div>
-    <p class="muted small">
-      Your Bluesky timeline is merged into home; replies, likes and reposts on 🦋 posts go back to
-      Bluesky. Unlinking forgets the tokens here — you can also revoke the app password on bsky.app.
-    </p>
-  } @else {
-    <p class="muted">
-      Link with an <strong>app password</strong> — made at bsky.app → Settings → Privacy and
-      security → App Passwords. It's revocable and is never your real password. Check
-      <em>"Allow access to your direct messages"</em> when creating it if you want your Bluesky DMs
-      in Chat.
-    </p>
-    <form class="bsky-form" (ngSubmit)="linkBluesky()">
-      <input
-        type="text"
-        name="bskyHandle"
-        placeholder="you.bsky.social"
-        [ngModel]="bskyHandle()"
-        (ngModelChange)="bskyHandle.set($event)"
-        [disabled]="bskyLinking()"
-      />
-      <input
-        type="password"
-        name="bskyPassword"
-        placeholder="app password"
-        autocomplete="off"
-        [ngModel]="bskyPassword()"
-        (ngModelChange)="bskyPassword.set($event)"
-        [disabled]="bskyLinking()"
-      />
-      <button
-        class="btn"
-        type="submit"
-        [disabled]="!bskyHandle().trim() || !bskyPassword() || bskyLinking()"
-      >
-        {{ bskyLinking() ? 'Linking…' : 'Link Bluesky' }}
-      </button>
-    </form>
-    @if (bskyError(); as msg) {
-      <p class="feed-error">{{ msg }}</p>
+@if (capabilities.canUseBluesky) {
+  <section class="conn-section">
+    <h2>🦋 Bluesky</h2>
+    @if (bsky.session(); as session) {
+      <div class="bsky-linked">
+        <img class="bsky-avatar" [src]="session.avatar || ''" alt="" decoding="async" />
+        <span class="names">
+          <span class="name">{{ session.displayName || session.handle }}</span>
+          <span class="muted small">&#64;{{ session.handle }}</span>
+        </span>
+        <button class="btn btn-outline btn-sm" (click)="unlinkBluesky()">Unlink</button>
+      </div>
+      <p class="muted small">
+        Your Bluesky timeline is merged into home; replies, likes and reposts on 🦋 posts go back to
+        Bluesky. Unlinking forgets the tokens here — you can also revoke the app password on
+        bsky.app.
+      </p>
+    } @else {
+      <p class="muted">
+        Link with an <strong>app password</strong> — made at bsky.app → Settings → Privacy and
+        security → App Passwords. It's revocable and is never your real password. Check
+        <em>"Allow access to your direct messages"</em> when creating it if you want your Bluesky
+        DMs in Chat.
+      </p>
+      <form class="bsky-form" (ngSubmit)="linkBluesky()">
+        <input
+          type="text"
+          name="bskyHandle"
+          placeholder="you.bsky.social"
+          [ngModel]="bskyHandle()"
+          (ngModelChange)="bskyHandle.set($event)"
+          [disabled]="bskyLinking()"
+        />
+        <input
+          type="password"
+          name="bskyPassword"
+          placeholder="app password"
+          autocomplete="off"
+          [ngModel]="bskyPassword()"
+          (ngModelChange)="bskyPassword.set($event)"
+          [disabled]="bskyLinking()"
+        />
+        <button
+          class="btn"
+          type="submit"
+          [disabled]="!bskyHandle().trim() || !bskyPassword() || bskyLinking()"
+        >
+          {{ bskyLinking() ? 'Linking…' : 'Link Bluesky' }}
+        </button>
+      </form>
+      @if (bskyError(); as msg) {
+        <p class="feed-error">{{ msg }}</p>
+      }
     }
-  }
-</section>
+  </section>
+}

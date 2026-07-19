@@ -36,12 +36,12 @@
   <p class="muted center">Loading…</p>
 } @else if (!visible().length) {
   <p class="muted center">
-    Your home timeline is empty.
-    <a routerLink="/find-people">Find people to follow</a>
-    @if (!auth.isAnonymous) {
-      , or post something
+    @if (auth.isAnonymous) {
+      Your anonymous timeline is ready. Public follows arrive in the next sprint.
+    } @else {
+      Your home timeline is empty.
+      <a routerLink="/find-people">Find people to follow</a>, or post something.
     }
-    .
   </p>
 } @else {
   @for (s of visible(); track s.id) {

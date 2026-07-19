@@ -31,7 +31,11 @@
             {{ rssSubscribed() ? '📡 Subscribed' : '📡 Subscribe' }}
           </button>
         </div>
-      } @else if (!isSelf()) {
+      } @else if (isSelf() && auth.isAnonymous) {
+        <div class="profile-buttons">
+          <a class="btn btn-outline" routerLink="/settings/profile">Edit local profile</a>
+        </div>
+      } @else if (!isSelf() && capabilities.canManageRelationships) {
         <div class="profile-buttons">
           <button class="btn btn-outline" (click)="showLists.set(true)">
             Lists &amp; collections
@@ -93,7 +97,7 @@
         ><strong>{{ a.statuses_count | humanCount }}</strong>
         {{ isRss() ? 'items' : words().posts }}</span
       >
-      @if (!isRss()) {
+      @if (!isRss() && !auth.isAnonymous) {
         <button type="button" class="count-btn" (click)="setTab('following')">
           <strong>{{ a.following_count | humanCount }}</strong> following
         </button>
@@ -108,7 +112,7 @@
     <section class="featured-card">
       <div class="featured-head">
         <h3>⭐ Featured by {{ a.display_name || a.username }}</h3>
-        @if (!isSelf() && featuredToFollow().length) {
+        @if (!isSelf() && capabilities.canManageRelationships && featuredToFollow().length) {
           <button class="btn" [disabled]="featuredBusy()" (click)="followAllFeatured()">
             {{ featuredBusy() ? 'Following…' : 'Follow all (' + featuredToFollow().length + ')' }}
           </button>
@@ -133,7 +137,7 @@
           </a>
           @if (featuredFollowing().has(f.id)) {
             <button type="button" class="btn featured-follow" disabled>Following</button>
-          } @else if (!isSelf()) {
+          } @else if (!isSelf() && capabilities.canManageRelationships) {
             <button
               type="button"
               class="btn btn-outline featured-follow"
@@ -148,7 +152,7 @@
     </section>
   }
 
-  @if (!isRss()) {
+  @if (!isRss() && !auth.isAnonymous) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
       <button
         type="button"
@@ -177,7 +181,7 @@
     </div>
   }
 
-  @if (!isRss() && tab() !== 'posts') {
+  @if (!isRss() && !auth.isAnonymous && tab() !== 'posts') {
     <app-people-browser
       [accountId]="a.id"
       [mode]="tab() === 'followers' ? 'followers' : 'following'"
@@ -185,7 +189,7 @@
   }
 
   @if (tab() === 'posts') {
-    @if (!isRss()) {
+    @if (!isRss() && !auth.isAnonymous) {
       <div class="profile-filters" role="group" aria-label="Timeline filters">
         <button
           type="button"

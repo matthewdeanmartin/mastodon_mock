@@ -5,10 +5,12 @@ import { WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Account, AccountField } from '../../../models';
+import { Auth } from '../../../auth';
 import { SettingsProfile } from './settings-profile';
 
 interface SettingsProfileInternals {
   displayName: WritableSignal<string>;
+  username: WritableSignal<string>;
   note: WritableSignal<string>;
   fields: WritableSignal<AccountField[]>;
   saving: WritableSignal<boolean>;
@@ -51,6 +53,7 @@ describe('SettingsProfile', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
@@ -87,6 +90,27 @@ describe('SettingsProfile', () => {
     const body = req.request.body as FormData;
     expect(body.get('display_name')).toBe('Alice B.');
     req.flush(makeAccount());
+    expect(c.saved()).toBe(true);
+    expect(c.saving()).toBe(false);
+  });
+
+  it('loads and saves Anonymous profiles locally without authenticated API calls', async () => {
+    const auth = TestBed.inject(Auth);
+    auth.enterAnonymous('https://mastodon.art');
+    const fixture = TestBed.createComponent(SettingsProfile);
+    fixture.detectChanges();
+    const c = internals(fixture);
+
+    expect(c.displayName()).toBe('Anonymous');
+    expect(c.username()).toBe('mastodon.art');
+    c.displayName.set('Demo Demoson');
+    c.username.set('demo');
+    c.note.set('Local profile');
+    c.saveProfile();
+    await fixture.whenStable();
+
+    expect(auth.account()?.display_name).toBe('Demo Demoson');
+    expect(auth.account()?.username).toBe('demo');
     expect(c.saved()).toBe(true);
     expect(c.saving()).toBe(false);
   });

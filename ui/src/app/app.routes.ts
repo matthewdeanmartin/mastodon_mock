@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { adminGuard } from './admin/admin.guard';
+import { anonymousUnavailableGuard } from './providers/anonymous/anonymous-route.guard';
 // Mock-only routes; file-replaced with an empty list in the Mocking Bird build.
 import { mockOnlyChildren } from './mock-routes';
 
@@ -9,8 +10,7 @@ export const routes: Routes = [
   // New-user landing: bookmark this, sign up on your instance, come back and sign in.
   {
     path: 'welcome-back',
-    loadComponent: () =>
-      import('./pages/welcome-back/welcome-back').then((m) => m.WelcomeBack),
+    loadComponent: () => import('./pages/welcome-back/welcome-back').then((m) => m.WelcomeBack),
   },
   {
     path: 'explore',
@@ -32,7 +32,12 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'home' },
       { path: 'home', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
-      { path: 'algo', loadComponent: () => import('./pages/algo/algo').then((m) => m.Algo) },
+      {
+        path: 'algo',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Algo' },
+        loadComponent: () => import('./pages/algo/algo').then((m) => m.Algo),
+      },
       {
         path: 'public',
         loadComponent: () =>
@@ -40,11 +45,15 @@ export const routes: Routes = [
       },
       {
         path: 'notifications',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Inbox' },
         loadComponent: () =>
           import('./pages/notifications/notifications').then((m) => m.Notifications),
       },
       {
         path: 'conversations',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Chat' },
         loadComponent: () =>
           import('./pages/conversations/conversations').then((m) => m.Conversations),
       },
@@ -75,7 +84,8 @@ export const routes: Routes = [
           },
           {
             path: 'privacy',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Privacy and reach settings', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/privacy/settings-privacy').then((m) => m.SettingsPrivacy),
           },
@@ -89,13 +99,15 @@ export const routes: Routes = [
           },
           {
             path: 'posting',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Posting defaults', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/posting/settings-posting').then((m) => m.SettingsPosting),
           },
           {
             path: 'notifications',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Email notifications', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/notifications/settings-notifications').then(
                 (m) => m.SettingsNotifications,
@@ -103,13 +115,15 @@ export const routes: Routes = [
           },
           {
             path: 'follows',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Follows and followers settings', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/follows/settings-follows').then((m) => m.SettingsFollows),
           },
           {
             path: 'mutes',
-            data: { kind: 'mutes', preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Muted accounts', kind: 'mutes', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/account-list/settings-account-list').then(
                 (m) => m.SettingsAccountList,
@@ -117,7 +131,8 @@ export const routes: Routes = [
           },
           {
             path: 'blocks',
-            data: { kind: 'blocks', preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Blocked accounts', kind: 'blocks', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/account-list/settings-account-list').then(
                 (m) => m.SettingsAccountList,
@@ -125,13 +140,15 @@ export const routes: Routes = [
           },
           {
             path: 'filters',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Content filters', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/filters/settings-filters').then((m) => m.SettingsFilters),
           },
           {
             path: 'filters/new',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Content filters', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/filters/settings-filter-edit').then(
                 (m) => m.SettingsFilterEdit,
@@ -139,7 +156,8 @@ export const routes: Routes = [
           },
           {
             path: 'filters/:id',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Content filters', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/filters/settings-filter-edit').then(
                 (m) => m.SettingsFilterEdit,
@@ -147,19 +165,22 @@ export const routes: Routes = [
           },
           {
             path: 'deletion',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Automatic post deletion', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/deletion/settings-deletion').then((m) => m.SettingsDeletion),
           },
           {
             path: 'account',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Account settings', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/account/settings-account').then((m) => m.SettingsAccount),
           },
           {
             path: 'import-export',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Import and export', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/import-export/settings-import-export').then(
                 (m) => m.SettingsImportExport,
@@ -167,13 +188,15 @@ export const routes: Routes = [
           },
           {
             path: 'invites',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Invites', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/invites/settings-invites').then((m) => m.SettingsInvites),
           },
           {
             path: 'development',
-            data: { preloadSettings: true },
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Development settings', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/development/settings-development').then(
                 (m) => m.SettingsDevelopment,
@@ -184,10 +207,14 @@ export const routes: Routes = [
       ...mockOnlyChildren,
       {
         path: 'find-people',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Find people' },
         loadComponent: () => import('./pages/find-people/find-people').then((m) => m.FindPeople),
       },
       {
         path: 'tags',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Followed tags' },
         loadComponent: () =>
           import('./pages/followed-tags/followed-tags').then((m) => m.FollowedTags),
       },
@@ -197,19 +224,30 @@ export const routes: Routes = [
       },
       {
         path: 'favourites',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Favourites' },
         loadComponent: () => import('./pages/favourites/favourites').then((m) => m.Favourites),
       },
       {
         path: 'bookmarks',
         loadComponent: () => import('./pages/bookmarks/bookmarks').then((m) => m.Bookmarks),
       },
-      { path: 'lists', loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists) },
+      {
+        path: 'lists',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Lists' },
+        loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
+      },
       {
         path: 'analytics',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Analytics' },
         loadComponent: () => import('./pages/analytics/analytics').then((m) => m.Analytics),
       },
       {
         path: 'observability',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Observability' },
         loadComponent: () =>
           import('./pages/observability/observability').then((m) => m.Observability),
       },
@@ -227,18 +265,33 @@ export const routes: Routes = [
       },
       {
         path: 'drafts',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Drafts' },
         loadComponent: () => import('./pages/drafts/drafts-page').then((m) => m.DraftsPage),
       },
       {
         path: 'lists/:id',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Lists' },
         loadComponent: () =>
           import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),
       },
       {
         path: 'collections/:id',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Collections' },
         loadComponent: () => import('./pages/collection/collection').then((m) => m.CollectionPage),
       },
-      { path: 'tags/:tag', loadComponent: () => import('./pages/tag/tag').then((m) => m.Tag) },
+      {
+        path: 'tags/:tag',
+        canActivate: [anonymousUnavailableGuard],
+        data: { anonymousFeature: 'Tag search' },
+        loadComponent: () => import('./pages/tag/tag').then((m) => m.Tag),
+      },
+      {
+        path: 'unavailable',
+        loadComponent: () => import('./pages/unavailable/unavailable').then((m) => m.Unavailable),
+      },
       {
         path: 'statuses/:id',
         loadComponent: () => import('./pages/thread/thread').then((m) => m.Thread),

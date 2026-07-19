@@ -110,6 +110,21 @@ describe('StatusCard', () => {
     return fixture;
   }
 
+  it('hides write actions and menus in Anonymous', () => {
+    TestBed.inject(Auth).enterAnonymous();
+    const f = setUp(makeStatus({ reblogs_count: 2, favourites_count: 3 }));
+    const el = f.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[aria-label="Reply"]')).toBeNull();
+    expect(el.querySelector('[aria-label="Boost"]')).toBeNull();
+    expect(el.querySelector('[aria-label="Favourite"]')).toBeNull();
+    expect(el.querySelector('[aria-label="Bookmark"]')).toBeNull();
+    expect(el.textContent).not.toContain('Translate');
+    expect(el.textContent).not.toContain('Report');
+    expect(el.textContent).toContain('2');
+    expect(el.textContent).toContain('3');
+  });
+
   // ---------------------------------------------------------------- action errors
 
   it('a failed favourite surfaces an error instead of failing silently', () => {

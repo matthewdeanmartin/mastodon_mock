@@ -29,18 +29,20 @@
         </svg>
         <span>Algo</span>
       </a>
-      <a routerLink="/notifications" routerLinkActive="active">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5" />
-        </svg>
-        <span>Inbox</span>
-      </a>
-      <a routerLink="/conversations" routerLinkActive="active">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 5h16v12H8l-4 4z" />
-        </svg>
-        <span>Chat</span>
-      </a>
+      @if (!auth.isAnonymous) {
+        <a routerLink="/notifications" routerLinkActive="active">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5" />
+          </svg>
+          <span>Inbox</span>
+        </a>
+        <a routerLink="/conversations" routerLinkActive="active">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h16v12H8l-4 4z" />
+          </svg>
+          <span>Chat</span>
+        </a>
+      }
       <a routerLink="/search" routerLinkActive="active">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="10.5" cy="10.5" r="6.5" />
@@ -73,11 +75,15 @@
           <span>More</span>
         </summary>
         <div class="menu-panel">
-          <a routerLink="/favourites">Favourites</a>
+          @if (!auth.isAnonymous) {
+            <a routerLink="/favourites">Favourites</a>
+          }
           <a routerLink="/bookmarks">Bookmarks</a>
-          <a routerLink="/drafts">Drafts</a>
-          <a routerLink="/analytics">Analytics</a>
-          <a routerLink="/observability">Observability</a>
+          @if (!auth.isAnonymous) {
+            <a routerLink="/drafts">Drafts</a>
+            <a routerLink="/analytics">Analytics</a>
+            <a routerLink="/observability">Observability</a>
+          }
           <a routerLink="/about">Design</a>
           <a routerLink="/server-rules">Server rules</a>
           <a routerLink="/terms">Terms of Service</a>
@@ -152,7 +158,9 @@
             <button type="button" class="menu-action" (click)="addAccount()">
               + Add an account
             </button>
-            <button type="button" class="menu-action danger" (click)="logout()">Log out</button>
+            <button type="button" class="menu-action danger" (click)="logout()">
+              {{ auth.isAnonymous ? 'Exit anonymous' : 'Log out' }}
+            </button>
           </div>
         </details>
       } @else {

@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
+import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
 
 /**
  * Connections: the other places your people post. Mastodon is home; everything
@@ -17,6 +18,7 @@ import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscri
   styleUrl: './settings-connections.css',
 })
 export class SettingsConnections {
+  protected capabilities = inject(AnonymousCapabilities);
   private rssFetch = inject(RssFetch);
   protected subs = inject(RssSubscriptions);
   protected bsky = inject(BlueskySession);

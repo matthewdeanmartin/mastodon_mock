@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Api } from '../../api';
+import { Auth } from '../../auth';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { BookmarkGroup, groupByAuthor, groupByHashtag, withMedia } from './bookmark-groups';
@@ -18,6 +19,7 @@ type LibraryView = 'all' | 'authors' | 'hashtags' | 'media';
 })
 export class Bookmarks implements OnInit {
   private api = inject(Api);
+  protected auth = inject(Auth);
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
@@ -47,6 +49,10 @@ export class Bookmarks implements OnInit {
   });
 
   ngOnInit(): void {
+    if (this.auth.isAnonymous) {
+      this.loading.set(false);
+      return;
+    }
     this.api.bookmarks().subscribe({
       next: (s) => {
         this.statuses.set(s);

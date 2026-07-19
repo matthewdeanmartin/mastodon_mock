@@ -7,6 +7,7 @@ import { Api } from '../../api';
 import { SearchResults, Status, Tag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { FindPeople } from '../find-people/find-people';
+import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
@@ -21,6 +22,7 @@ type DateOperator = (typeof DATE_OPERATORS)[number];
   styleUrl: './search.css',
 })
 export class Search implements OnInit {
+  protected capabilities = inject(AnonymousCapabilities);
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
