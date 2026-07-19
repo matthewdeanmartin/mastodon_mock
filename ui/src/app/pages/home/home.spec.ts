@@ -171,6 +171,26 @@ describe('Home', () => {
     httpMock.expectNone((r) => r.url === '/api/v1/timelines/home');
   });
 
+  it('does not apply Anonymous canonical deduplication to authenticated Home', () => {
+    const firstBoost = makeStatus('boost-1');
+    const secondBoost = makeStatus('boost-2');
+    const sharedOriginal = makeStatus('original');
+    sharedOriginal.url = 'https://social.example/@author/original';
+    firstBoost.reblog = sharedOriginal;
+    secondBoost.reblog = { ...sharedOriginal };
+
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([firstBoost, secondBoost]);
+
+    expect(
+      internals(fixture)
+        .statuses()
+        .map((status) => status.id),
+    ).toEqual(['boost-1', 'boost-2']);
+  });
+
   it('loadMore stops at the maximum and activates the cap', () => {
     // Min 20 (default), max 20 → first page already hits the cap boundary.
     TestBed.inject(ClientPrefs).setFeedMax(20);

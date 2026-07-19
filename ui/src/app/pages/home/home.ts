@@ -168,7 +168,7 @@ export class Home implements OnInit, OnDestroy {
     this.aggregator.reset();
     this.pageSub = this.aggregator.nextPage().subscribe({
       next: (s) => {
-        this.statuses.set(this.dedupe(s));
+        this.statuses.set(this.auth.isAnonymous ? this.dedupeAnonymous(s) : s);
         this.publishMastodon(s);
         this.loading.set(false);
         // Auto-load further pages until the feed reaches the configured minimum.
@@ -226,19 +226,27 @@ export class Home implements OnInit, OnDestroy {
 
   /** Later source rounds can overlap by date, so keep the accumulated feed merged. */
   private mergeStatuses(more: Status[]): void {
-    this.statuses.update((statuses) => this.dedupe([...statuses, ...more]));
+    this.statuses.update((statuses) =>
+      this.auth.isAnonymous
+        ? this.dedupeAnonymous([...statuses, ...more])
+        : [...statuses, ...more].sort(
+            (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+          ),
+    );
   }
 
-  private dedupe(statuses: Status[]): Status[] {
+  /** Collapse duplicate public posts acquired through different Anonymous read routes. */
+  private dedupeAnonymous(statuses: Status[]): Status[] {
+    const newestFirst = statuses.sort(
+      (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+    );
     const seen = new Set<string>();
-    return statuses
-      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
-      .filter((status) => {
-        const key = canonicalStatusKey(status);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+    return newestFirst.filter((status) => {
+      const key = canonicalStatusKey(status);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   /** Fetch the bookmark tail once per cap; a failure just means no tail. */
