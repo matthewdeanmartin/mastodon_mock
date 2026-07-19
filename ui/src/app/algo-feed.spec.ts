@@ -6,6 +6,9 @@ import { AlgoFeed, engagementScore } from './algo-feed';
 import { Api } from './api';
 import { Auth } from './auth';
 import { Account, Status } from './models';
+import { AnonymousAccount } from './providers/anonymous/anonymous-account';
+import { AnonymousAlgoSource } from './providers/anonymous/anonymous-algo-source';
+import { AnonymousFollows } from './providers/anonymous/anonymous-follows';
 
 function makeAccount(id: string): Account {
   return { id, username: `u${id}`, acct: `u${id}`, display_name: `User ${id}` } as Account;
@@ -255,6 +258,51 @@ describe('AlgoFeed', () => {
 
     feed.removeStatus('h2');
     expect(feed.posts()).toHaveLength(1);
+  });
+});
+
+describe('AlgoFeed Anonymous corpus path', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    const account = signal<Account | null>(makeAccount('anonymous'));
+    const friend = makeAccount('friend');
+    friend.url = 'https://social.example/@friend';
+    const rss = makeStatus('rss', {
+      provider: 'rss',
+      url: 'https://blog.example/post',
+      account: makeAccount('publisher'),
+      favourites_count: 0,
+    });
+    const publicPost = makeStatus('public', {
+      provider: 'anonymous-mastodon',
+      account: friend,
+      favourites_count: 0,
+    });
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: Api, useValue: {} },
+        { provide: Auth, useValue: { account, isAnonymous: true } },
+        {
+          provide: AnonymousAlgoSource,
+          useValue: { refresh: () => of({ statuses: [rss, publicPost], acquired: true }) },
+        },
+        {
+          provide: AnonymousFollows,
+          useValue: { isFollowing: (candidate: Account) => candidate.id === friend.id },
+        },
+        { provide: AnonymousAccount, useValue: { server: () => 'https://mastodon.social' } },
+      ],
+    });
+  });
+
+  it('builds from public/RSS snapshots without authenticated API calls or a like floor', () => {
+    const feed = TestBed.inject(AlgoFeed);
+    feed.refresh();
+
+    expect(new Set(feed.posts().map((post) => post.source))).toEqual(new Set(['original', 'rss']));
+    expect(feed.posts().every((post) => post.status.favourites_count === 0)).toBe(true);
+    expect(feed.callsUsed()).toBe(1);
+    expect(feed.loading()).toBe(false);
   });
 });
 

@@ -14,6 +14,11 @@ import { Announcements } from '../../announcements/announcements';
 import { Streaming } from '../../streaming';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
 import { FeedAggregator } from '../../providers/feed-aggregator';
+import {
+  AnonymousFeedCorpus,
+  canonicalStatusKey,
+} from '../../providers/anonymous/anonymous-feed-corpus';
+import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmarks';
 
 /** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -34,6 +39,8 @@ export class Home implements OnInit, OnDestroy {
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private aggregator = inject(FeedAggregator);
+  private anonymousCorpus = inject(AnonymousFeedCorpus);
+  private anonymousBookmarks = inject(AnonymousBookmarks);
   private route = inject(ActivatedRoute);
   private drafts = inject(Drafts);
 
@@ -159,7 +166,7 @@ export class Home implements OnInit, OnDestroy {
     this.aggregator.reset();
     this.pageSub = this.aggregator.nextPage().subscribe({
       next: (s) => {
-        this.statuses.set(s);
+        this.statuses.set(this.dedupe(s));
         this.publishMastodon(s);
         this.loading.set(false);
         // Auto-load further pages until the feed reaches the configured minimum.
@@ -217,14 +224,28 @@ export class Home implements OnInit, OnDestroy {
 
   /** Later source rounds can overlap by date, so keep the accumulated feed merged. */
   private mergeStatuses(more: Status[]): void {
-    this.statuses.update((statuses) =>
-      [...statuses, ...more].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)),
-    );
+    this.statuses.update((statuses) => this.dedupe([...statuses, ...more]));
+  }
+
+  private dedupe(statuses: Status[]): Status[] {
+    const seen = new Set<string>();
+    return statuses
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .filter((status) => {
+        const key = canonicalStatusKey(status);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
   }
 
   /** Fetch the bookmark tail once per cap; a failure just means no tail. */
   private loadBookmarkTail(): void {
     if (this.bookmarkTail().length) {
+      return;
+    }
+    if (this.auth.isAnonymous) {
+      this.bookmarkTail.set(this.anonymousBookmarks.bookmarks().slice(0, BOOKMARK_TAIL_SIZE));
       return;
     }
     this.bookmarkSub = this.api.bookmarks(undefined, BOOKMARK_TAIL_SIZE).subscribe({
@@ -243,6 +264,9 @@ export class Home implements OnInit, OnDestroy {
 
   /** Timeline-derived widgets (who-to-follow) only understand Mastodon posts. */
   private publishMastodon(statuses: Status[]): void {
+    if (this.auth.isAnonymous) {
+      this.anonymousCorpus.ingest(statuses);
+    }
     this.homeTimelineFeed.publish(
       statuses.filter((status) => !status.provider || status.provider === 'anonymous-mastodon'),
     );

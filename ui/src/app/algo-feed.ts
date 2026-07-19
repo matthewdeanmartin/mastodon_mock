@@ -1,11 +1,14 @@
-import { effect, inject, Injectable, signal } from '@angular/core';
+import { effect, inject, Injectable, Injector, signal } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { Api } from './api';
 import { Auth } from './auth';
 import { Account, Status, Tag } from './models';
+import { AnonymousAccount } from './providers/anonymous/anonymous-account';
+import { AnonymousAlgoSource } from './providers/anonymous/anonymous-algo-source';
+import { AnonymousFollows } from './providers/anonymous/anonymous-follows';
 
 /** Which bucket found the post — shown as the "why you're seeing this" line. */
-export type AlgoSource = 'mutual' | 'boost' | 'original' | 'hashtag';
+export type AlgoSource = 'mutual' | 'boost' | 'original' | 'hashtag' | 'rss';
 
 export interface AlgoPost {
   status: Status;
@@ -79,6 +82,7 @@ function shuffle<T>(items: T[]): T[] {
 export class AlgoFeed {
   private api = inject(Api);
   private auth = inject(Auth);
+  private injector = inject(Injector);
 
   readonly posts = signal<AlgoPost[]>([]);
   readonly loading = signal(false);
@@ -121,6 +125,11 @@ export class AlgoFeed {
     }
     this.loading.set(true);
     this.error.set(false);
+
+    if (this.auth.isAnonymous) {
+      this.refreshAnonymous();
+      return;
+    }
 
     let calls = 0;
     const budget: BudgetFetch = (fallback, fetch) => {
@@ -211,6 +220,46 @@ export class AlgoFeed {
 
   removeStatus(id: string): void {
     this.posts.update((list) => list.filter((p) => p.status.id !== id));
+  }
+
+  private refreshAnonymous(): void {
+    const source = this.injector.get(AnonymousAlgoSource);
+    source.refresh().subscribe(({ statuses, acquired }) => {
+      this.assembleAnonymous(statuses);
+      this.hashtag.set(null);
+      this.callsUsed.set(acquired ? 1 : 0);
+      this.builtAt.set(Date.now());
+      this.loading.set(false);
+    });
+  }
+
+  private assembleAnonymous(statuses: Status[]): void {
+    const follows = this.injector.get(AnonymousFollows);
+    const anonymous = this.injector.get(AnonymousAccount);
+    const pool = new Map<string, AlgoPost>();
+    for (const status of statuses) {
+      const target = status.reblog ?? status;
+      const key = target.url || `${target.provider ?? 'mastodon'}:${target.id}`;
+      if (pool.has(key)) continue;
+      const friend = follows.isFollowing(target.account, anonymous.server());
+      const source: AlgoSource =
+        target.provider === 'rss'
+          ? 'rss'
+          : status.reblog
+            ? 'boost'
+            : friend
+              ? 'original'
+              : 'hashtag';
+      pool.set(key, { status, source, friend, score: engagementScore(status) });
+    }
+    this.posts.set(
+      [...pool.values()]
+        .sort(
+          (a, b) =>
+            b.score - a.score || Date.parse(b.status.created_at) - Date.parse(a.status.created_at),
+        )
+        .slice(0, ALGO_TARGET_POSTS),
+    );
   }
 
   /** Up to `remaining` consecutive pages, chained on max_id, budget permitting. */

@@ -112,6 +112,36 @@ export class AnonymousFollows {
     return this.follows().find((follow) => follow.account.id === accountId) ?? null;
   }
 
+  shouldDefer(follow: AnonymousFollow): boolean {
+    return (
+      follow.preferredSource === 'api' &&
+      !!follow.apiRetryAfter &&
+      Date.parse(follow.apiRetryAfter) > Date.now()
+    );
+  }
+
+  prefersRss(follow: AnonymousFollow): boolean {
+    return (
+      follow.preferredSource === 'rss' &&
+      !!follow.apiRetryAfter &&
+      Date.parse(follow.apiRetryAfter) > Date.now()
+    );
+  }
+
+  markApiSuccess(key: string): void {
+    this.updateSource(key, 'api', null);
+  }
+
+  markRssFallback(key: string): void {
+    this.updateSource(key, 'rss', new Date(Date.now() + 15 * 60_000).toISOString());
+  }
+
+  markUnavailable(key: string): void {
+    const follow = this.follows().find((item) => item.key === key);
+    if (follow?.apiRetryAfter && Date.parse(follow.apiRetryAfter) > Date.now()) return;
+    this.updateSource(key, 'api', new Date(Date.now() + 15 * 60_000).toISOString());
+  }
+
   follow(account: Account, fallbackServer: string): FollowResult {
     const key = keyFor(account, fallbackServer);
     if (this.follows().some((follow) => follow.key === key)) {
@@ -150,5 +180,17 @@ export class AnonymousFollows {
     const state: AnonymousFollowState = { version: STATE_VERSION, follows };
     this.state.set(state);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  private updateSource(
+    key: string,
+    preferredSource: AnonymousFollow['preferredSource'],
+    apiRetryAfter: string | null,
+  ): void {
+    this.persist(
+      this.follows().map((follow) =>
+        follow.key === key ? { ...follow, preferredSource, apiRetryAfter } : follow,
+      ),
+    );
   }
 }

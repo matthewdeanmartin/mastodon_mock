@@ -4,12 +4,14 @@ import { AlgoAudience, ClientPrefs } from '../../client-prefs';
 import { isCalmHidden } from '../../sentiment';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
+import { Auth } from '../../auth';
 
 const SOURCE_LABELS: Record<AlgoSource, string> = {
   mutual: 'Top post from a mutual',
   boost: 'Boosted into your feed',
   original: 'Top post from your feed',
   hashtag: 'From a hashtag you follow',
+  rss: 'From an RSS feed you follow',
 };
 
 /** Friends means posts *authored* by follows — boosts and hashtag finds are not it. */
@@ -30,6 +32,7 @@ const FRIEND_SOURCES: readonly AlgoSource[] = ['mutual', 'original'];
 export class Algo implements OnInit {
   protected feed = inject(AlgoFeed);
   protected prefs = inject(ClientPrefs);
+  protected auth = inject(Auth);
 
   /** Whether a post survives the audience + tags chips (calm applied separately). */
   private passesChips(p: AlgoPost): boolean {

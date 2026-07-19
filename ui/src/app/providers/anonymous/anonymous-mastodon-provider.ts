@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, map, mergeMap, Observable, of, timeout, toArray } from 'rxjs';
+import { catchError, map, mergeMap, Observable, of, throwError, timeout, toArray } from 'rxjs';
 import { Auth } from '../../auth';
 import { Account, Status } from '../../models';
 import { FeedProvider } from '../provider';
@@ -30,6 +30,7 @@ interface ActiveSource {
   label: string;
   cursor: { exhausted: boolean };
   fetch: () => Observable<Status[]>;
+  followKey?: string;
 }
 
 interface AnonymousProviderRef {
@@ -111,6 +112,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
           label: `@${source.follow.handle}`,
           cursor: source,
           fetch: () => this.fetchSource(source),
+          followKey: source.follow.key,
         })),
       ...this.tagCursors
         .filter((source) => !source.exhausted)
@@ -130,6 +132,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
           source.fetch().pipe(
             catchError(() => {
               source.cursor.exhausted = true;
+              if (source.followKey) this.followStore.markUnavailable(source.followKey);
               failures.push(`Could not load ${source.label}.`);
               return of<Status[]>([]);
             }),
@@ -184,6 +187,12 @@ export class AnonymousMastodonProvider implements FeedProvider {
   }
 
   private fetchSource(source: SourceCursor): Observable<Status[]> {
+    if (this.followStore.shouldDefer(source.follow)) {
+      return throwError(() => new Error('Source is temporarily deferred.'));
+    }
+    if (this.followStore.prefersRss(source.follow)) {
+      return this.fetchRss(source);
+    }
     const cachedId = this.accountIds.get(source.follow.key);
     const account$ = cachedId
       ? of(cachedId)
@@ -208,6 +217,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
           .pipe(timeout(REQUEST_TIMEOUT_MS));
       }),
       map((statuses) => {
+        this.followStore.markApiSuccess(source.follow.key);
         source.maxId = statuses.at(-1)?.id ?? source.maxId;
         if (statuses.length < PAGE_SIZE) {
           source.exhausted = true;
@@ -223,6 +233,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
     return this.rss.fetchFeed(feedUrl).pipe(
       map((feed) => {
         source.exhausted = true;
+        this.followStore.markRssFallback(source.follow.key);
         this.rssFallbacks.add(source.follow.handle);
         const fetchedAt = new Date().toISOString();
         return feedToStatuses(feedUrl, feed, fetchedAt).map((status) => ({

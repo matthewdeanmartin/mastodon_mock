@@ -11,6 +11,19 @@ import { VerifiedBadge } from '../../verified-badge/verified-badge';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 
+interface SuggestionCandidate {
+  account: Account;
+  boosters: Set<string>;
+  sources: Set<string>;
+  occurrences: number;
+  lastSeen: number;
+}
+
+function accountKey(account: Account): string {
+  if (account.url) return account.url.toLowerCase().replace(/\/$/, '');
+  return account.acct.toLowerCase();
+}
+
 /**
  * Left sidebar: the signed-in user's profile card (2018-Twitter style), a
  * "Who to follow" widget, and trending hashtags beneath it. Suggestions are
@@ -30,7 +43,7 @@ export class LeftRail implements OnInit {
   private anonymousFollows = inject(AnonymousFollows);
   private anonymous = inject(AnonymousAccount);
   protected words = inject(Terminology).words;
-  private candidates = new Map<string, Account>();
+  private candidates = new Map<string, SuggestionCandidate>();
 
   protected suggestions = signal<Account[]>([]);
   /** Ids the user followed from this widget (flips the button to "Following"). */
@@ -55,38 +68,61 @@ export class LeftRail implements OnInit {
       },
     });
     this.homeTimelineFeed.loaded.subscribe((statuses) => {
-      const me = this.auth.account()?.id;
+      const me = this.auth.account();
+      const meKey = me ? accountKey(me) : '';
       for (const s of statuses) {
         const boosted = s.reblog?.account;
-        if (boosted && boosted.id !== me && boosted.id !== s.account.id) {
-          this.candidates.set(boosted.id, boosted);
+        const key = boosted ? accountKey(boosted) : '';
+        if (boosted && key !== meKey && key !== accountKey(s.account)) {
+          const candidate = this.candidates.get(key) ?? {
+            account: boosted,
+            boosters: new Set<string>(),
+            sources: new Set<string>(),
+            occurrences: 0,
+            lastSeen: 0,
+          };
+          candidate.account = boosted;
+          candidate.boosters.add(accountKey(s.account));
+          candidate.sources.add(s.provider ?? 'mastodon');
+          candidate.occurrences += 1;
+          candidate.lastSeen = Math.max(candidate.lastSeen, Date.parse(s.created_at) || 0);
+          this.candidates.set(key, candidate);
         }
       }
       if (!this.candidates.size) {
         this.suggestions.set([]);
         return;
       }
-      const ids = [...this.candidates.keys()];
+      const ranked = [...this.candidates.values()].sort(
+        (a, b) =>
+          b.boosters.size - a.boosters.size ||
+          b.sources.size - a.sources.size ||
+          b.occurrences - a.occurrences ||
+          b.lastSeen - a.lastSeen,
+      );
       if (this.auth.isAnonymous) {
         this.suggestions.set(
-          ids
-            .map((id) => this.candidates.get(id)!)
+          ranked
+            .map((candidate) => candidate.account)
             .filter(
               (account) => !this.anonymousFollows.isFollowing(account, this.anonymous.server()),
             ),
         );
         return;
       }
+      const ids = ranked.map((candidate) => candidate.account.id);
       this.api.relationships(ids).subscribe({
         next: (rels) => {
           const excluded = new Set(
             rels.filter((r) => r.following || r.requested || r.blocking).map((r) => r.id),
           );
           this.suggestions.set(
-            ids.filter((id) => !excluded.has(id)).map((id) => this.candidates.get(id)!),
+            ranked
+              .map((candidate) => candidate.account)
+              .filter((account) => !excluded.has(account.id)),
           );
         },
-        error: () => this.suggestions.set([...this.candidates.values()]),
+        error: () => this.suggestions.set(ranked.map((candidate) => candidate.account)),
       });
     });
   }

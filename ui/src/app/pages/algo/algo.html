@@ -58,7 +58,8 @@
   </div>
   @if (feed.builtAt() !== null) {
     <p class="algo-meta muted small">
-      {{ feed.posts().length }} posts from {{ feed.callsUsed() }} API calls
+      {{ feed.posts().length }} posts from {{ feed.callsUsed() }}
+      {{ auth.isAnonymous ? 'public source loads' : 'API calls' }}
       @if (feed.hashtag(); as tag) {
         · sampled #{{ tag }}
       }
@@ -74,7 +75,12 @@
 } @else if (feed.error()) {
   <p class="muted center">Couldn’t build your Algo feed. Try refreshing.</p>
 } @else if (!visible().length) {
-  <p class="muted center">Nothing here yet — follow some people and hashtags, then refresh.</p>
+  <div class="muted center">
+    <p>Nothing here yet — follow some people and hashtags, or RSS feeds, then refresh.</p>
+    @if (auth.isAnonymous) {
+      <p class="small">Home and Algo only fetch when you ask them to.</p>
+    }
+  </div>
 } @else {
   @for (p of visible(); track p.status.id) {
     <div class="algo-item">

@@ -144,6 +144,16 @@ describe('AnonymousMastodonProvider', () => {
 
     expect(received.map((item) => item.account.username)).toEqual(['alice']);
     expect(provider.errors()).toEqual(['Could not load @bob@two.example.']);
+
+    // A manual refresh during the short backoff still loads healthy follows,
+    // but does not immediately repeat Bob's doomed API + cross-origin RSS calls.
+    provider.reset();
+    received = [];
+    provider.fetchPage().subscribe((items) => (received = items));
+    httpMock
+      .expectOne((request) => request.url === 'https://one.example/api/v1/accounts/a1/statuses')
+      .flush([status(account('alice', 'https://one.example', 'a1'), '11')]);
+    expect(received.map((item) => item.account.username)).toEqual(['alice']);
   });
 
   it('falls back to the public profile RSS feed after an anonymous API failure', () => {

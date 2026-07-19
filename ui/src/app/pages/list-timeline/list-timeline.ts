@@ -10,6 +10,7 @@ import { Auth } from '../../auth';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
+import { AnonymousFeedCorpus } from '../../providers/anonymous/anonymous-feed-corpus';
 
 @Component({
   selector: 'app-list-timeline',
@@ -25,6 +26,7 @@ export class ListTimeline implements OnInit {
   private anonymousFollows = inject(AnonymousFollows);
   private anonymousLists = inject(AnonymousLists);
   private anonymousProvider = inject(AnonymousMastodonProvider);
+  private anonymousCorpus = inject(AnonymousFeedCorpus);
 
   protected title = signal('');
   protected statuses = signal<Status[]>([]);
@@ -69,6 +71,7 @@ export class ListTimeline implements OnInit {
       this.membersLoadedFor = id;
       this.anonymousProvider.fetchFollows(follows).subscribe({
         next: (statuses) => {
+          this.anonymousCorpus.ingest(statuses);
           this.statuses.set(statuses);
           this.loading.set(false);
         },
