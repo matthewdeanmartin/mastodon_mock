@@ -219,6 +219,18 @@ export class Auth {
     this.mastodonAccount.set(null);
   }
 
+  /** Leave Anonymous for the login screen without activating or deleting a saved account. */
+  exitAnonymous(): void {
+    if (!this.isAnonymous) {
+      return;
+    }
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ACCOUNT_MODE_KEY);
+    this.mode.set(null);
+    this.token.set(null);
+    this.mastodonAccount.set(null);
+  }
+
   /** Forget every saved session and sign out entirely. */
   logoutAll(): void {
     this.persistSessions([]);

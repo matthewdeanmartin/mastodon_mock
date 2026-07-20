@@ -14,13 +14,16 @@
       /></a>
       <span class="profile-handle muted">&#64;{{ acc.username }}</span>
       <div class="profile-stats">
-        <a
-          [routerLink]="['/accounts', acc.id]"
-          [queryParams]="auth.isAnonymous ? { tab: 'following' } : null"
-        >
-          <span class="stat-label">{{ words().Posts }}</span>
-          <span class="stat-value">{{ acc.statuses_count | humanCount }}</span>
-        </a>
+        @if (auth.isAnonymous) {
+          <a class="anonymous-post-login" routerLink="/login" (click)="auth.exitAnonymous()">
+            To post content, login or create an account
+          </a>
+        } @else {
+          <a [routerLink]="['/accounts', acc.id]">
+            <span class="stat-label">{{ words().Posts }}</span>
+            <span class="stat-value">{{ acc.statuses_count | humanCount }}</span>
+          </a>
+        }
         <a [routerLink]="['/accounts', acc.id]">
           <span class="stat-label">Following</span>
           <span class="stat-value">{{ followingCount() | humanCount }}</span>

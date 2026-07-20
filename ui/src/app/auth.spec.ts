@@ -73,6 +73,18 @@ describe('Auth + Server linkage', () => {
     expect(auth.sessions().map((s) => s.token)).toEqual(['art-token']);
   });
 
+  it('exits Anonymous for login without activating or deleting a saved session', () => {
+    server.setBaseUrl('https://mastodon.art');
+    auth.setToken('art-token');
+    auth.enterAnonymous('https://mastodon.social');
+
+    auth.exitAnonymous();
+
+    expect(auth.isAuthenticated).toBe(false);
+    expect(auth.isAnonymous).toBe(false);
+    expect(auth.sessions().map((session) => session.token)).toEqual(['art-token']);
+  });
+
   it('always offers Anonymous in the switcher and restores a saved login', () => {
     server.setBaseUrl('https://mastodon.art');
     auth.setToken('art-token');

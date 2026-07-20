@@ -2,6 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn, HttpResponse } from '@angular/com
 import { inject } from '@angular/core';
 import { tap } from 'rxjs';
 import { EXTERNAL_FETCH } from '../providers/external-fetch';
+import { Server } from '../server';
 import { ApiMetrics } from './api-metrics';
 
 /**
@@ -12,7 +13,8 @@ import { ApiMetrics } from './api-metrics';
  * Uses `performance.now()` for a monotonic duration unaffected by clock changes.
  */
 export const metricsInterceptor: HttpInterceptorFn = (req, next) => {
-  if (req.context.get(EXTERNAL_FETCH)) {
+  const server = inject(Server);
+  if (req.context.get(EXTERNAL_FETCH) && !targetsActiveServer(req.url, server.baseUrl())) {
     return next(req);
   }
   const metrics = inject(ApiMetrics);
@@ -32,3 +34,17 @@ export const metricsInterceptor: HttpInterceptorFn = (req, next) => {
     }),
   );
 };
+
+function targetsActiveServer(url: string, baseUrl: string): boolean {
+  if (url.startsWith('/')) {
+    return true;
+  }
+  if (!baseUrl) {
+    return false;
+  }
+  try {
+    return new URL(url).origin === new URL(baseUrl).origin;
+  } catch {
+    return false;
+  }
+}

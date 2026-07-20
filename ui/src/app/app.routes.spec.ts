@@ -14,6 +14,10 @@ describe('application routes', () => {
     expect(tagRoute?.canActivate).toBeUndefined();
   });
 
+  it('keeps observability available to Anonymous', () => {
+    expect(shellChild('observability')?.canActivate).toBeUndefined();
+  });
+
   it('keeps interaction-only routes guarded from Anonymous', () => {
     expect(shellChild('favourites')?.canActivate).toHaveLength(1);
   });

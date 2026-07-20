@@ -238,8 +238,6 @@ export const routes: Routes = [
       },
       {
         path: 'observability',
-        canActivate: [anonymousUnavailableGuard],
-        data: { anonymousFeature: 'Observability' },
         loadComponent: () =>
           import('./pages/observability/observability').then((m) => m.Observability),
       },

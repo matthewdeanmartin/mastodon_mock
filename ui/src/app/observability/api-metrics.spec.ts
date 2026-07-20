@@ -1,8 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiMetrics, EndpointStat, normalizeEndpoint } from './api-metrics';
+import { Server } from '../server';
 
-const STORAGE_KEY = 'mockingbird_api_metrics';
+function storageKey(server: string): string {
+  return `mockingbird_api_metrics:${encodeURIComponent(server)}`;
+}
 
 describe('normalizeEndpoint', () => {
   it('collapses numeric id segments to :id', () => {
@@ -35,10 +38,13 @@ describe('normalizeEndpoint', () => {
 
 describe('ApiMetrics', () => {
   let metrics: ApiMetrics;
+  let server: Server;
 
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({ providers: [ApiMetrics] });
+    TestBed.configureTestingModule({ providers: [ApiMetrics, Server] });
+    server = TestBed.inject(Server);
+    server.setBaseUrl('https://mastodon.social');
     metrics = TestBed.inject(ApiMetrics);
   });
 
@@ -105,7 +111,7 @@ describe('ApiMetrics', () => {
     expect(metrics.totals().count).toBe(0);
 
     // reset() flushes synchronously — the stored blob is now empty.
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    const stored = JSON.parse(localStorage.getItem(storageKey('https://mastodon.social')) ?? '{}');
     expect(stored.e).toEqual([]);
   });
 
@@ -119,10 +125,11 @@ describe('ApiMetrics', () => {
       b: [[60000, 3, 1]],
       x: [[111, 'GET', '/api/v1/favourites', 500, 'HTTP 500 after 100ms']],
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(blob));
+    localStorage.setItem(storageKey('https://mastodon.social'), JSON.stringify(blob));
 
     TestBed.resetTestingModule();
-    TestBed.configureTestingModule({ providers: [ApiMetrics] });
+    TestBed.configureTestingModule({ providers: [ApiMetrics, Server] });
+    TestBed.inject(Server).setBaseUrl('https://mastodon.social');
     const reloaded = TestBed.inject(ApiMetrics);
 
     const r = reloaded.stats().find((s) => s.key === 'GET /api/v1/favourites');
@@ -130,5 +137,29 @@ describe('ApiMetrics', () => {
     expect(r?.errors).toBe(1);
     expect(reloaded.errors().length).toBe(1);
     expect(reloaded.timeline().length).toBe(1);
+  });
+
+  it('aggregates accounts on one server and isolates activity on another server', () => {
+    metrics.record('GET', '/api/v1/home', 10, 200, true);
+    metrics.record('GET', '/api/v1/home', 20, 200, true);
+    expect(metrics.totals().count).toBe(2);
+
+    server.setBaseUrl('https://msdn.social');
+    metrics.record('GET', '/api/v1/home', 30, 200, true);
+    expect(metrics.serverLabel()).toBe('https://msdn.social');
+    expect(metrics.totals().count).toBe(1);
+
+    server.setBaseUrl('https://mastodon.social');
+    expect(metrics.totals().count).toBe(2);
+  });
+
+  it('deletes the old global metrics blob instead of migrating it', () => {
+    localStorage.setItem('mockingbird_api_metrics', JSON.stringify({ v: 1, e: [], b: [], x: [] }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [ApiMetrics, Server] });
+
+    TestBed.inject(ApiMetrics);
+
+    expect(localStorage.getItem('mockingbird_api_metrics')).toBeNull();
   });
 });

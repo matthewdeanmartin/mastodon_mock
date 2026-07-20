@@ -45,6 +45,7 @@ export class Observability {
 
   protected readonly totals = this.metrics.totals;
   protected readonly errors = this.metrics.errors;
+  protected readonly serverLabel = this.metrics.serverLabel;
   protected readonly formatBytes = formatBytes;
 
   protected readonly sortKey = signal<SortKey>('count');
@@ -205,7 +206,7 @@ export class Observability {
 
   /** Human label for a known key, so the list isn't just opaque slugs. */
   keyNote(key: string): string {
-    if (key === 'mockingbird_api_metrics') {
+    if (key.startsWith('mockingbird_api_metrics:')) {
       return 'this page’s metrics';
     }
     if (key.startsWith('mockingbird_')) {

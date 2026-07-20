@@ -1,4 +1,5 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { Server } from '../server';
 
 /**
  * Persisted per-endpoint call metrics + a compact time series + an error ring,
@@ -71,7 +72,8 @@ interface StoredMetrics {
   x: [number, string, string, number, string][];
 }
 
-const STORAGE_KEY = 'mockingbird_api_metrics';
+const LEGACY_STORAGE_KEY = 'mockingbird_api_metrics';
+const STORAGE_PREFIX = 'mockingbird_api_metrics:';
 /** One minute per time bucket. */
 export const BUCKET_MS = 60_000;
 /** Keep two hours of buckets (120 × 1 min). */
@@ -82,6 +84,29 @@ const MAX_ERRORS = 50;
 const MAX_MSG_LEN = 300;
 /** Debounce window for persisting after activity. */
 const FLUSH_DEBOUNCE_MS = 1_500;
+
+interface MetricsState {
+  endpoints: Map<string, EndpointStat>;
+  buckets: TimeBucket[];
+  errorRing: ApiError[];
+}
+
+function emptyMetrics(): MetricsState {
+  return { endpoints: new Map<string, EndpointStat>(), buckets: [], errorRing: [] };
+}
+
+function serverScope(baseUrl: string): string {
+  if (!baseUrl) return 'this-server';
+  try {
+    return new URL(baseUrl).origin.toLowerCase();
+  } catch {
+    return baseUrl.toLowerCase().replace(/\/$/, '') || 'this-server';
+  }
+}
+
+function storageKey(scope: string): string {
+  return `${STORAGE_PREFIX}${encodeURIComponent(scope)}`;
+}
 
 /**
  * Collapse a request URL into an endpoint template: drop the query string and
@@ -127,21 +152,23 @@ function isIdSegment(seg: string): boolean {
 
 @Injectable({ providedIn: 'root' })
 export class ApiMetrics {
-  private endpoints = new Map<string, EndpointStat>();
-  private buckets: TimeBucket[] = [];
-  private errorRing: ApiError[] = [];
+  private server = inject(Server);
+  private states = new Map<string, MetricsState>();
 
   /** Bumped on every mutation so the page's computed views refresh. */
   private readonly version = signal(0);
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingFlushes = new Set<string>();
 
   constructor() {
-    this.load();
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
     // Best-effort final flush when the tab goes away.
     if (typeof window !== 'undefined') {
-      window.addEventListener('pagehide', () => this.flush());
+      window.addEventListener('pagehide', () => this.flushPending());
     }
   }
+
+  readonly serverLabel = computed(() => serverScope(this.server.baseUrl()));
 
   // ------------------------------------------------------------------ record
 
@@ -150,11 +177,13 @@ export class ApiMetrics {
    * failure); `ok` is false for status 0 or ≥ 400.
    */
   record(method: string, url: string, durationMs: number, status: number, ok: boolean): void {
+    const scope = this.activeScope();
+    const state = this.state(scope);
     const endpoint = normalizeEndpoint(url);
     const key = `${method.toUpperCase()} ${endpoint}`;
     const ms = Math.max(0, Math.round(durationMs));
 
-    const prev = this.endpoints.get(key);
+    const prev = state.endpoints.get(key);
     if (prev) {
       prev.count++;
       prev.totalMs += ms;
@@ -167,7 +196,7 @@ export class ApiMetrics {
         prev.errors++;
       }
     } else {
-      this.endpoints.set(key, {
+      state.endpoints.set(key, {
         key,
         count: 1,
         errors: ok ? 0 : 1,
@@ -180,35 +209,47 @@ export class ApiMetrics {
       });
     }
 
-    this.bumpBucket(!ok);
+    this.bumpBucket(state, !ok);
     if (!ok) {
-      this.pushError(method, endpoint, status, ms);
+      this.pushError(state, method, endpoint, status, ms);
     }
     this.version.update((v) => v + 1);
-    this.scheduleFlush();
+    this.scheduleFlush(scope);
   }
 
-  private bumpBucket(isError: boolean): void {
+  private bumpBucket(state: MetricsState, isError: boolean): void {
     const t = Math.floor(Date.now() / BUCKET_MS) * BUCKET_MS;
-    const last = this.buckets[this.buckets.length - 1];
+    const last = state.buckets[state.buckets.length - 1];
     if (last && last.t === t) {
       last.count++;
       if (isError) {
         last.errors++;
       }
     } else {
-      this.buckets.push({ t, count: 1, errors: isError ? 1 : 0 });
-      if (this.buckets.length > MAX_BUCKETS) {
-        this.buckets = this.buckets.slice(-MAX_BUCKETS);
+      state.buckets.push({ t, count: 1, errors: isError ? 1 : 0 });
+      if (state.buckets.length > MAX_BUCKETS) {
+        state.buckets = state.buckets.slice(-MAX_BUCKETS);
       }
     }
   }
 
-  private pushError(method: string, endpoint: string, status: number, ms: number): void {
+  private pushError(
+    state: MetricsState,
+    method: string,
+    endpoint: string,
+    status: number,
+    ms: number,
+  ): void {
     const message = this.statusMessage(status, ms).slice(0, MAX_MSG_LEN);
-    this.errorRing.push({ at: Date.now(), method: method.toUpperCase(), endpoint, status, message });
-    if (this.errorRing.length > MAX_ERRORS) {
-      this.errorRing = this.errorRing.slice(-MAX_ERRORS);
+    state.errorRing.push({
+      at: Date.now(),
+      method: method.toUpperCase(),
+      endpoint,
+      status,
+      message,
+    });
+    if (state.errorRing.length > MAX_ERRORS) {
+      state.errorRing = state.errorRing.slice(-MAX_ERRORS);
     }
   }
 
@@ -224,27 +265,28 @@ export class ApiMetrics {
   /** All endpoint rows, busiest first. Recomputed when metrics change. */
   readonly stats = computed<EndpointStat[]>(() => {
     this.version();
-    return [...this.endpoints.values()].sort((a, b) => b.count - a.count);
+    return [...this.activeState().endpoints.values()].sort((a, b) => b.count - a.count);
   });
 
   readonly errors = computed<ApiError[]>(() => {
     this.version();
     // Newest first for display.
-    return [...this.errorRing].reverse();
+    return [...this.activeState().errorRing].reverse();
   });
 
   readonly timeline = computed<TimeBucket[]>(() => {
     this.version();
-    return [...this.buckets];
+    return [...this.activeState().buckets];
   });
 
   /** Roll-up totals across every endpoint. */
   readonly totals = computed(() => {
     this.version();
+    const state = this.activeState();
     let count = 0;
     let errors = 0;
     let totalMs = 0;
-    for (const s of this.endpoints.values()) {
+    for (const s of state.endpoints.values()) {
       count += s.count;
       errors += s.errors;
       totalMs += s.totalMs;
@@ -252,7 +294,7 @@ export class ApiMetrics {
     return {
       count,
       errors,
-      endpoints: this.endpoints.size,
+      endpoints: state.endpoints.size,
       avgMs: count ? Math.round(totalMs / count) : 0,
       errorRate: count ? errors / count : 0,
     };
@@ -275,33 +317,39 @@ export class ApiMetrics {
   // ------------------------------------------------------------------- reset
 
   reset(): void {
-    this.endpoints.clear();
-    this.buckets = [];
-    this.errorRing = [];
+    const scope = this.activeScope();
+    this.states.set(scope, emptyMetrics());
     this.version.update((v) => v + 1);
-    this.flush();
+    this.flush(scope);
   }
 
   // ---------------------------------------------------------------- persist
 
-  private scheduleFlush(): void {
+  private scheduleFlush(scope: string): void {
+    this.pendingFlushes.add(scope);
     if (this.flushTimer !== null) {
       return;
     }
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
-      this.flush();
+      this.flushPending();
     }, FLUSH_DEBOUNCE_MS);
   }
 
-  private flush(): void {
+  private flushPending(): void {
     if (this.flushTimer !== null) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
+    for (const scope of this.pendingFlushes) this.flush(scope);
+    this.pendingFlushes.clear();
+  }
+
+  private flush(scope: string): void {
+    const state = this.state(scope);
     const blob: StoredMetrics = {
       v: 1,
-      e: [...this.endpoints.values()].map((s) => [
+      e: [...state.endpoints.values()].map((s) => [
         s.key,
         s.count,
         s.errors,
@@ -312,38 +360,56 @@ export class ApiMetrics {
         s.lastStatus,
         s.lastAt,
       ]),
-      b: this.buckets.map((b) => [b.t, b.count, b.errors]),
-      x: this.errorRing.map((e) => [e.at, e.method, e.endpoint, e.status, e.message]),
+      b: state.buckets.map((b) => [b.t, b.count, b.errors]),
+      x: state.errorRing.map((e) => [e.at, e.method, e.endpoint, e.status, e.message]),
     };
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(blob));
+      localStorage.setItem(storageKey(scope), JSON.stringify(blob));
     } catch {
       // Quota exceeded (or storage disabled): drop the oldest half of the
       // error ring and buckets and try once more; metrics are best-effort.
-      this.errorRing = this.errorRing.slice(-Math.floor(MAX_ERRORS / 2));
-      this.buckets = this.buckets.slice(-Math.floor(MAX_BUCKETS / 2));
+      state.errorRing = state.errorRing.slice(-Math.floor(MAX_ERRORS / 2));
+      state.buckets = state.buckets.slice(-Math.floor(MAX_BUCKETS / 2));
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...blob, b: [], x: [] }));
+        localStorage.setItem(storageKey(scope), JSON.stringify({ ...blob, b: [], x: [] }));
       } catch {
         // Give up silently; observability must never break the app.
       }
     }
   }
 
-  private load(): void {
+  private activeScope(): string {
+    return serverScope(this.server.baseUrl());
+  }
+
+  private activeState(): MetricsState {
+    return this.state(this.activeScope());
+  }
+
+  private state(scope: string): MetricsState {
+    const existing = this.states.get(scope);
+    if (existing) return existing;
+    const loaded = this.load(scope);
+    this.states.set(scope, loaded);
+    return loaded;
+  }
+
+  private load(scope: string): MetricsState {
     let blob: StoredMetrics | null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const key = storageKey(scope);
+      const raw = localStorage.getItem(key);
       blob = raw ? (JSON.parse(raw) as StoredMetrics) : null;
     } catch {
       blob = null;
     }
+    const state = emptyMetrics();
     if (!blob || blob.v !== 1) {
-      return;
+      return state;
     }
     for (const row of blob.e ?? []) {
       const [key, count, errors, totalMs, minMs, maxMs, sumSqMs, lastStatus, lastAt] = row;
-      this.endpoints.set(key, {
+      state.endpoints.set(key, {
         key,
         count,
         errors,
@@ -355,13 +421,14 @@ export class ApiMetrics {
         lastAt,
       });
     }
-    this.buckets = (blob.b ?? []).map(([t, count, errors]) => ({ t, count, errors }));
-    this.errorRing = (blob.x ?? []).map(([at, method, endpoint, status, message]) => ({
+    state.buckets = (blob.b ?? []).map(([t, count, errors]) => ({ t, count, errors }));
+    state.errorRing = (blob.x ?? []).map(([at, method, endpoint, status, message]) => ({
       at,
       method,
       endpoint,
       status,
       message,
     }));
+    return state;
   }
 }

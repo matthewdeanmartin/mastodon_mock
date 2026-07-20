@@ -18,7 +18,16 @@
   </aside>
 }
 
-@if (!auth.isAnonymous) {
+@if (auth.isAnonymous) {
+  <section class="anonymous-compose" aria-label="Create an account to post">
+    <div class="anonymous-compose-editor" aria-disabled="true">
+      To post content, create an account
+    </div>
+    <a class="btn anonymous-compose-login" routerLink="/login" (click)="auth.exitAnonymous()">
+      Login/create account
+    </a>
+  </section>
+} @else {
   <app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
 }
 

@@ -1,3 +1,39 @@
+.anonymous-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--col-bg);
+}
+
+.anonymous-compose-editor {
+  min-height: 82px;
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.anonymous-compose-login {
+  flex: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .anonymous-compose {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .anonymous-compose-login {
+    text-align: center;
+  }
+}
+
 .follow-nudge {
   display: flex;
   align-items: center;

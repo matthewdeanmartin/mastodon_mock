@@ -62,6 +62,14 @@
         </svg>
         <span>Tags</span>
       </a>
+      @if (auth.isAnonymous) {
+        <a class="login-nav" routerLink="/login" (click)="auth.exitAnonymous()">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
+          </svg>
+          <span>Login</span>
+        </a>
+      }
     </nav>
 
     <div class="header-actions">
@@ -82,8 +90,8 @@
           @if (!auth.isAnonymous) {
             <a routerLink="/drafts">Drafts</a>
             <a routerLink="/analytics">Analytics</a>
-            <a routerLink="/observability">Observability</a>
           }
+          <a routerLink="/observability">Observability</a>
           <a routerLink="/about">Design</a>
           <a routerLink="/server-rules">Server rules</a>
           <a routerLink="/terms">Terms of Service</a>

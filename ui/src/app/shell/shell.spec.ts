@@ -114,6 +114,11 @@ describe('Shell account switching', () => {
         'social-token',
       ]);
       expect(auth.account()?.display_name).toBe('Anonymous');
+      expect(fixture.nativeElement.textContent).toContain('Login');
+      expect(fixture.nativeElement.textContent).toContain('Observability');
+      expect(fixture.nativeElement.textContent).toContain(
+        'To post content, login or create an account',
+      );
     },
   );
 });
