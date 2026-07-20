@@ -1,0 +1,77 @@
+---
+name: Deploy Mawkingbird Canary
+# Publish every main-branch commit under /canary/ on the existing personal
+# GitHub Pages site: https://matthewdeanmartin.github.io/canary/.
+#
+# One-time credential setup:
+#   1. Create a fine-grained PAT with Contents: read/write access to only the
+#      matthewdeanmartin/matthewdeanmartin.github.io repository.
+#   2. Save it in this repository as the Actions secret CANARY_PAGES_TOKEN.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: pages-canary
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CANARY_REPOSITORY: matthewdeanmartin/matthewdeanmartin.github.io
+  CANARY_BRANCH: master
+
+jobs:
+  deploy:
+    name: Build and deploy Canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Stamp build info
+        run: node ui/scripts/gen-build-info.mjs
+      - name: Build Canary
+        run: make mockingbird MOCKINGBIRD_BASE_HREF=/canary/
+      - name: Add GitHub Pages files
+        run: |
+          cp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
+          touch ui/dist-mockingbird/browser/.nojekyll
+          printf '%s\n' "$GITHUB_SHA" > ui/dist-mockingbird/browser/canary-commit.txt
+      - name: Publish Canary directory
+        env:
+          CANARY_PAGES_TOKEN: ${{ secrets.CANARY_PAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CANARY_PAGES_TOKEN" ]; then
+            echo "::error::CANARY_PAGES_TOKEN is not configured"
+            exit 1
+          fi
+
+          site_dir="$RUNNER_TEMP/personal-pages"
+          git clone --depth 1 --branch "$CANARY_BRANCH" \
+            "https://github.com/${CANARY_REPOSITORY}.git" "$site_dir"
+
+          canary_dir="$site_dir/canary"
+          test "$canary_dir" = "$RUNNER_TEMP/personal-pages/canary"
+          rm -rf "$canary_dir"
+          mkdir "$canary_dir"
+          cp -R ui/dist-mockingbird/browser/. "$canary_dir/"
+
+          cd "$site_dir"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all canary
+          git commit -m "Deploy ${GITHUB_REPOSITORY}@${GITHUB_SHA}"
+          git remote set-url origin \
+            "https://x-access-token:${CANARY_PAGES_TOKEN}@github.com/${CANARY_REPOSITORY}.git"
+          git push origin "$CANARY_BRANCH"
