@@ -26,25 +26,34 @@
 <div class="members" aria-label="Starter collection accounts">
   @for (item of accounts; track item.handle) {
     <div class="member">
-      <span>
+      <button
+        type="button"
+        class="member-link"
+        [disabled]="opening() !== null"
+        (click)="openAccount(item)"
+      >
         <strong>{{ item.name }}</strong>
         <span class="muted">&#64;{{ item.handle }}</span>
-      </span>
-      @switch (status(item.handle)) {
-        @case ('resolving') {
-          <span class="muted small">Looking up…</span>
-        }
-        @case ('following') {
-          <span class="muted small">Following…</span>
-        }
-        @case ('followed') {
-          <span class="success small">Following ✓</span>
-        }
-        @case ('not_found') {
-          <span class="muted small">Not found</span>
-        }
-        @case ('failed') {
-          <span class="muted small">Could not follow</span>
+      </button>
+      @if (opening() === item.handle) {
+        <span class="muted small">Opening…</span>
+      } @else {
+        @switch (status(item.handle)) {
+          @case ('resolving') {
+            <span class="muted small">Looking up…</span>
+          }
+          @case ('following') {
+            <span class="muted small">Following…</span>
+          }
+          @case ('followed') {
+            <span class="success small">Following ✓</span>
+          }
+          @case ('not_found') {
+            <span class="muted small">Not found</span>
+          }
+          @case ('failed') {
+            <span class="muted small">Could not follow</span>
+          }
         }
       }
     </div>

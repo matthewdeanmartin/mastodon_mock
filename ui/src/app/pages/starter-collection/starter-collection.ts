@@ -1,7 +1,13 @@
-import { Component, computed, inject, OnInit } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { Api } from '../../api';
+import { Auth } from '../../auth';
 import { ImportFollows } from '../../import-follows';
-import { STARTER_COLLECTION } from '../../starter-collection';
+import { Account } from '../../models';
+import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
+import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
+import { STARTER_COLLECTION, StarterAccount } from '../../starter-collection';
 
 @Component({
   selector: 'app-starter-collection',
@@ -11,7 +17,12 @@ import { STARTER_COLLECTION } from '../../starter-collection';
 })
 export class StarterCollection implements OnInit {
   protected importer = inject(ImportFollows);
+  private api = inject(Api);
+  private auth = inject(Auth);
+  private anonymousPublic = inject(AnonymousPublicApi);
+  private router = inject(Router);
   protected accounts = STARTER_COLLECTION;
+  protected opening = signal<string | null>(null);
   protected completed = computed(
     () =>
       this.importer
@@ -33,5 +44,56 @@ export class StarterCollection implements OnInit {
 
   status(handle: string): string {
     return this.importer.rows().find((row) => row.handle === handle)?.status ?? 'pending';
+  }
+
+  async openAccount(item: StarterAccount): Promise<void> {
+    if (this.opening()) return;
+    this.opening.set(item.handle);
+    try {
+      const resolved = this.importer.rows().find((row) => row.handle === item.handle)?.account;
+      const account = resolved ?? (await this.resolveAccount(item.handle));
+      if (!account) return;
+      if (this.auth.isAnonymous) {
+        const server = this.serverFor(item.handle);
+        await this.router.navigate([
+          '/accounts',
+          anonymousAccountRouteRef({
+            server,
+            id: account.id,
+            ...(account.url ? { originalUrl: account.url } : {}),
+          }),
+        ]);
+      } else {
+        await this.router.navigate(['/accounts', account.id]);
+      }
+    } catch {
+      // Leave the row usable so a transient lookup failure can be retried.
+    } finally {
+      this.opening.set(null);
+    }
+  }
+
+  private async resolveAccount(handle: string): Promise<Account | null> {
+    const username = handle.split('@')[0];
+    const results = this.auth.isAnonymous
+      ? await firstValueFrom(
+          this.anonymousPublic.search(this.serverFor(handle), username, 'accounts'),
+        )
+      : await firstValueFrom(this.api.search(handle, 'accounts', { resolve: true, limit: 5 }));
+    const normalized = handle.toLowerCase();
+    return (
+      results.accounts.find(
+        (account) =>
+          account.acct.toLowerCase() === normalized ||
+          account.username.toLowerCase() === username.toLowerCase(),
+      ) ??
+      results.accounts[0] ??
+      null
+    );
+  }
+
+  private serverFor(handle: string): string {
+    const host = handle.split('@').at(-1);
+    return `https://${host}`;
   }
 }

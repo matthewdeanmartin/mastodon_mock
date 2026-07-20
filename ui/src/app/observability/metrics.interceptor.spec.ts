@@ -27,7 +27,10 @@ describe('metricsInterceptor', () => {
     metrics = TestBed.inject(ApiMetrics);
   });
 
-  afterEach(() => httpMock.verify());
+  afterEach(() => {
+    httpMock.verify();
+    localStorage.clear();
+  });
 
   it('counts Anonymous public requests to the selected server', () => {
     http

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ApiMetrics, EndpointStat, normalizeEndpoint } from './api-metrics';
 import { Server } from '../server';
 
@@ -47,6 +47,8 @@ describe('ApiMetrics', () => {
     server.setBaseUrl('https://mastodon.social');
     metrics = TestBed.inject(ApiMetrics);
   });
+
+  afterEach(() => localStorage.clear());
 
   function row(key: string): EndpointStat | undefined {
     return metrics.stats().find((s) => s.key === key);
