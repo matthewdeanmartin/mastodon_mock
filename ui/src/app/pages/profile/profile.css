@@ -365,3 +365,53 @@ h2 {
   font-size: 13px;
   padding: 8px 16px 0 56px;
 }
+
+.profile-login-post {
+  display: block;
+  border-bottom: 1px solid var(--border);
+  background: var(--col-bg);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.profile-login-post:hover {
+  background: var(--hover);
+}
+
+.profile-login-post-label {
+  padding: 8px 16px 0 64px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profile-login-post-body {
+  display: flex;
+  gap: 12px;
+  padding: 10px 16px 16px;
+}
+
+.profile-login-post-avatar {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.profile-login-post-author {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.profile-login-post-body p {
+  margin: 5px 0 0;
+  font-size: 16px;
+  line-height: 1.45;
+}

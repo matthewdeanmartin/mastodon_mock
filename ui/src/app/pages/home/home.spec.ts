@@ -135,8 +135,14 @@ describe('Home', () => {
     const link = fixture.nativeElement.querySelector('.starter-pack-post a') as HTMLAnchorElement;
     expect(link.textContent).toContain('Get your account started with the universal starter pack');
     expect(link.getAttribute('href')).toBe('/collections/starter');
-    expect(fixture.nativeElement.textContent).toContain('To post content, create an account');
-    expect(fixture.nativeElement.textContent).toContain('Login/create account');
+    const loginPost = fixture.nativeElement.querySelector(
+      '.anonymous-login-post',
+    ) as HTMLAnchorElement;
+    expect(loginPost.textContent).toContain(
+      'Login or create an account to post content, reply and more',
+    );
+    expect(loginPost.textContent).toContain('Pinned');
+    expect(loginPost.getAttribute('href')).toBe('/login');
   });
 
   it('toggleLive() opens a user stream and flips the live flag', () => {

@@ -84,25 +84,6 @@
   color: var(--accent);
 }
 
-.profile-stats .anonymous-post-login {
-  grid-column: 1 / -1;
-  display: block;
-  padding: 8px 10px;
-  border: 1px solid var(--accent);
-  border-radius: 9px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-  text-align: center;
-}
-
-.profile-stats .anonymous-post-login:hover {
-  background: var(--accent);
-  color: #fff;
-}
-
 .stat-label {
   font-size: 11px;
   font-weight: 700;

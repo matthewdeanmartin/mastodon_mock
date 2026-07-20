@@ -1,37 +1,55 @@
-.anonymous-compose {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 14px 16px;
+.anonymous-login-post {
+  display: block;
   border-bottom: 1px solid var(--border);
   background: var(--col-bg);
+  color: var(--text);
+  text-decoration: none;
 }
 
-.anonymous-compose-editor {
-  min-height: 82px;
-  flex: 1;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--muted);
-  cursor: not-allowed;
+.anonymous-login-post:hover {
+  background: var(--hover);
 }
 
-.anonymous-compose-login {
+.anonymous-login-post-label {
+  padding: 8px 16px 0 64px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.anonymous-login-post-body {
+  display: flex;
+  gap: 12px;
+  padding: 10px 16px 16px;
+}
+
+.anonymous-login-post-avatar {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
   flex: none;
-  white-space: nowrap;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
 }
 
-@media (max-width: 520px) {
-  .anonymous-compose {
-    align-items: stretch;
-    flex-direction: column;
-  }
+.anonymous-login-post-content {
+  min-width: 0;
+}
 
-  .anonymous-compose-login {
-    text-align: center;
-  }
+.anonymous-login-post-author {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.anonymous-login-post-content p {
+  margin: 5px 0 0;
+  font-size: 16px;
+  line-height: 1.45;
 }
 
 .follow-nudge {

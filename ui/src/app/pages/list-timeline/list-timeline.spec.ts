@@ -9,6 +9,7 @@ import { Account, Status, UserList } from '../../models';
 import { ListTimeline } from './list-timeline';
 import { Auth } from '../../auth';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
+import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 
 interface ListTimelineInternals {
   title: WritableSignal<string>;
@@ -18,6 +19,7 @@ interface ListTimelineInternals {
   members: WritableSignal<Account[]>;
   setTab(tab: 'posts' | 'members'): void;
   removeMember(account: Account): void;
+  onBulkAdded(): void;
 }
 
 function makeAccount(id: string): Account {
@@ -218,6 +220,39 @@ describe('ListTimeline', () => {
     internals(fixture).setTab('posts');
     internals(fixture).setTab('members');
     httpMock.expectNone('/api/v1/lists/11/accounts');
+  });
+
+  it('shows a person added by name to an Anonymous list without a page refresh', () => {
+    let follows!: AnonymousFollows;
+    let lists!: AnonymousLists;
+    const fixture = setUpWithList('anonymous-list', () => {
+      localStorage.setItem(
+        'mockingbird_anonymous_lists',
+        JSON.stringify({
+          version: 2,
+          lists: [{ id: 'anonymous-list', title: 'Readers', memberKeys: [] }],
+        }),
+      );
+      TestBed.inject(Auth).enterAnonymous('https://home.example');
+      follows = TestBed.inject(AnonymousFollows);
+      lists = TestBed.inject(AnonymousLists);
+    });
+    const added = {
+      ...makeAccount('bob'),
+      username: 'bob',
+      acct: 'bob@social.example',
+      url: 'https://social.example/@bob',
+    };
+    follows.follow(added, 'https://social.example');
+    const follow = follows.findByAccountId('bob');
+    expect(follow).not.toBeNull();
+    lists.setMember('anonymous-list', follow!.key, true);
+
+    internals(fixture).setTab('members');
+    internals(fixture).onBulkAdded();
+
+    expect(internals(fixture).members().map((member) => member.id)).toEqual(['bob']);
+    httpMock.expectNone((request) => request.url.startsWith('/api/v1/lists/'));
   });
 
   it('removeMember DELETEs /lists/:id/accounts and drops the row', () => {

@@ -155,6 +155,14 @@ export class ListTimeline implements OnInit {
 
   loadMembers(): void {
     if (this.auth.isAnonymous) {
+      const memberKeys = new Set(this.anonymousLists.get(this.listId())?.memberKeys ?? []);
+      this.members.set(
+        this.anonymousFollows
+          .follows()
+          .filter((follow) => memberKeys.has(follow.key))
+          .map((follow) => follow.account),
+      );
+      this.membersLoadedFor = this.listId();
       this.membersLoading.set(false);
       return;
     }

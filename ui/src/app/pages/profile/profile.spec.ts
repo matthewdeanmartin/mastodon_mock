@@ -233,6 +233,34 @@ describe('Profile block/unblock', () => {
     httpMock.expectNone((request) => request.url.startsWith('/api/'));
   });
 
+  it('places the Anonymous login-to-post prompt in the self profile timeline', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            paramMap: of(convertToParamMap({ id: 'anonymous' })),
+            snapshot: { queryParamMap: convertToParamMap({}) },
+          },
+        },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+
+    const loginPost = fixture.nativeElement.querySelector(
+      '.profile-login-post',
+    ) as HTMLAnchorElement;
+    expect(loginPost.textContent).toContain(
+      'Login or create an account to post content, reply and more',
+    );
+    expect(loginPost.getAttribute('href')).toBe('/login');
+  });
+
   it('keeps paging older statuses until 20 accumulate (filtered pages come back short)', () => {
     TestBed.configureTestingModule({
       providers: [
