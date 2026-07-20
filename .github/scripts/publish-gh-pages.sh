@@ -35,9 +35,10 @@ git clone --depth 1 --branch "$branch" "$remote" "$work" 2>/dev/null || {
 
 if [ "$subpath" = "root" ]; then
   # Production owns the branch root. Clear every top-level entry EXCEPT the
-  # canary subtree (and .git), then lay down the new production build.
+  # canary subtree and its root redirect shim (and .git), then lay down the new
+  # production build. canary.html lets bare /canary bounce to /canary/.
   find "$work" -mindepth 1 -maxdepth 1 \
-    ! -name '.git' ! -name 'canary' -exec rm -rf {} +
+    ! -name '.git' ! -name 'canary' ! -name 'canary.html' -exec rm -rf {} +
   cp -R "$source_dir/." "$work/"
 else
   # A named subpath (e.g. canary) owns only its own directory.
@@ -45,6 +46,20 @@ else
   rm -rf "$target"
   mkdir -p "$target"
   cp -R "$source_dir/." "$target/"
+
+  # Root redirect shim so a bare /<subpath> (no trailing slash) reaches the app.
+  # GitHub Pages serves /<subpath>.html for the extensionless path /<subpath>
+  # before falling back to the production SPA 404.html at root. Production's
+  # root-clear preserves this file by name.
+  cat > "$work/$subpath.html" <<HTML
+<!doctype html>
+<meta charset="utf-8">
+<title>Redirecting to /$subpath/</title>
+<meta http-equiv="refresh" content="0; url=/$subpath/">
+<link rel="canonical" href="/$subpath/">
+<script>location.replace("/$subpath/" + location.search + location.hash);</script>
+<a href="/$subpath/">Continue to /$subpath/</a>
+HTML
 fi
 
 cd "$work"
