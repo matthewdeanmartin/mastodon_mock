@@ -9,6 +9,7 @@ import { Server, SERVER_PRESETS } from '../../server';
 import { MastodonServers, ServerSuggestion } from '../../mastodon-servers';
 import { normalizeHostUrl } from '../../host-url';
 import { environment } from '../../../environments/environment';
+import { brandLogoSrc } from '../../build-flavor';
 import { AppFooter } from '../../shell/app-footer/app-footer';
 
 const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
@@ -51,6 +52,8 @@ export class Login implements OnInit, OnDestroy {
   /** Build flavor: brand text and whether mock-only login tabs are shown. */
   protected brand = environment.brand;
   protected mockTooling = environment.mockTooling;
+  /** Canary deployments (/canary/ base href) show a distinct brand mark. */
+  protected logoSrc = brandLogoSrc();
 
   protected serverPresets = SERVER_PRESETS;
   protected customServer = signal('');

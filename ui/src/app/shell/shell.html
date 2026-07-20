@@ -3,7 +3,7 @@
     <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
       <img
         class="brand-mark"
-        src="mockigbird_logo_104.png"
+        [src]="logoSrc"
         alt=""
         aria-hidden="true"
         width="36"
@@ -94,7 +94,7 @@
           <a routerLink="/observability">Observability</a>
           <a routerLink="/about">Design</a>
           <a
-            href="https://matthewdeanmartin.github.io/canary/"
+            href="https://mawkingbird.com/canary/"
             target="_blank"
             rel="noopener noreferrer"
             >Canary ↗</a

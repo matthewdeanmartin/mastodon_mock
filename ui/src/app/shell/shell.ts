@@ -7,6 +7,7 @@ import { Api } from '../api';
 import { AccountChoice, Auth, Session } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { environment } from '../../environments/environment';
+import { brandLogoSrc, isCanaryBuild } from '../build-flavor';
 import { Hotkeys } from '../hotkeys';
 import { ShortcutHelp } from '../shortcut-help/shortcut-help';
 import { AppFooter } from './app-footer/app-footer';
@@ -43,6 +44,9 @@ export class Shell implements OnInit {
   /** Build flavor: drives the brand and whether mock-only nav links are shown. */
   protected brand = environment.brand;
   protected mockTooling = environment.mockTooling;
+  /** Canary deployments (/canary/ base href) show a distinct brand mark. */
+  protected isCanary = isCanaryBuild();
+  protected logoSrc = brandLogoSrc();
 
   /** Whether the current account holds a staff role (drives the Admin nav link). */
   protected isStaff = computed(() => {
