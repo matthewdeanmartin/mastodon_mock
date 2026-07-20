@@ -29,7 +29,7 @@ import { AccountStatusesOptions } from '../../api';
 import { Observable } from 'rxjs';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
-type ProfileTab = 'posts' | 'following' | 'followers';
+type ProfileTab = 'posts' | 'following' | 'followers' | 'collections';
 
 @Component({
   selector: 'app-profile',

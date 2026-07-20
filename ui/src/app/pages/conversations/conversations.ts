@@ -174,6 +174,7 @@ export class Conversations implements OnInit, OnDestroy {
       const chat = this.chats().find((c) => c.key === want);
       if (chat) {
         this.openHandled = true;
+        this.prefs.setChatKind(chat.kind);
         this.select(chat);
       }
     });
@@ -253,6 +254,9 @@ export class Conversations implements OnInit, OnDestroy {
     }
     const myDid = this.bsky.session()?.did;
     for (const convo of this.bskyConvos()) {
+      if (hasMissingBlueskyMember(convo, myDid)) {
+        continue;
+      }
       const others = convo.members.filter((m) => m.did !== myDid);
       rows.push({
         key: `bsky:${convo.id}`,
@@ -802,6 +806,22 @@ function privateKey(accounts: Account[]): string {
       .sort()
       .join(',')
   );
+}
+
+/** A failed Bluesky identity lookup can leave a reserved placeholder handle in a DM. */
+function hasMissingBlueskyMember(convo: BskyConvoView, myDid: string | undefined): boolean {
+  return convo.members.some((member) => {
+    if (member.did === myDid) {
+      return false;
+    }
+    const handle = member.handle.trim().toLocaleLowerCase().replace(/^@/, '');
+    const displayName = member.displayName?.trim().toLocaleLowerCase() ?? '';
+    return (
+      handle === 'missing.invalid' ||
+      handle.endsWith('.missing.invalid') ||
+      displayName === 'missing.invalid'
+    );
+  });
 }
 
 function dedupeSort(statuses: Status[]): Status[] {

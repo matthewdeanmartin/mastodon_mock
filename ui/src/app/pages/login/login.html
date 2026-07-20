@@ -69,6 +69,12 @@
     <!-- ====================== Sign in / Register ====================== -->
     @if (tab() === 'signin') {
       <!-- ---------- Server combo: pick a common one or type your own ---------- -->
+      <p class="muted small">
+              Not sure which server?
+              <a href="https://joinmastodon.org/servers" target="_blank" rel="noopener">
+                Browse the full directory on joinmastodon.org ↗
+              </a>
+            </p>
       <div class="server-row">
         <label class="server-label muted" for="server-combo">Your server</label>
         <div class="server-combo">
@@ -196,10 +202,6 @@
         <!-- Path 2: no account yet -->
         <section class="path">
           <h2>I'm new here</h2>
-          <p class="muted small">
-            Your account lives on a server (an “instance”), but you can follow anyone anywhere.
-            <strong>mastodon.social</strong> is the biggest general-purpose one — a safe default.
-          </p>
           @if (server.isMock) {
             <!-- The embedded mock owns its accounts, so an inline signup is safe here. -->
             @if (pendingToken()) {
@@ -261,14 +263,8 @@
               Create an account on {{ serverHostLabel() }} →
             </a>
             <p class="muted small">
-              Sign-up happens on the server itself — a client like this should never handle your
+              Sign-up happens on the server itself — Mocking Bird will not get your
               email or password. We'll help you bookmark us so you can come back and sign in.
-            </p>
-            <p class="muted small">
-              Not sure which server?
-              <a href="https://joinmastodon.org/servers" target="_blank" rel="noopener">
-                Browse the full directory on joinmastodon.org ↗
-              </a>
             </p>
           }
         </section>

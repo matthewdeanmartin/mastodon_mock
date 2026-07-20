@@ -124,6 +124,15 @@
             <strong>{{ a.followers_count | humanCount }}</strong> followers
           </button>
         }
+        @if (collections().length > 0) {
+          <button
+            type="button"
+            class="count-btn collection-count-btn"
+            (click)="setTab('collections')"
+          >
+            <strong>Collections ({{ collections().length }})</strong>
+          </button>
+        }
       }
     </div>
   </header>
@@ -203,7 +212,7 @@
     </div>
   }
 
-  @if (!isRss() && tab() !== 'posts') {
+  @if (!isRss() && (tab() === 'following' || tab() === 'followers')) {
     <app-people-browser
       [accountId]="a.id"
       [mode]="tab() === 'followers' ? 'followers' : 'following'"
@@ -212,7 +221,7 @@
     />
   }
 
-  @if (collections().length) {
+  @if (tab() === 'collections' && collections().length) {
     <section class="profile-collections" aria-label="Collections">
       <h3>Collections by {{ a.display_name || a.username }}</h3>
       <div class="collection-list">

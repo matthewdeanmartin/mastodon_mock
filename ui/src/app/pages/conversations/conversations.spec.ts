@@ -10,10 +10,13 @@ import { ClientPrefs } from '../../client-prefs';
 import { Streaming, StreamEvent, StreamKind } from '../../streaming';
 import { Account, Conversation, MastodonNotification, Relationship, Status } from '../../models';
 import { Chat, Conversations, stripLeadingMentions } from './conversations';
+import { BskyConvoView } from '../../providers/bluesky/bluesky-types';
 
 interface ConversationsInternals {
   loading: WritableSignal<boolean>;
   privateConvs: WritableSignal<Conversation[]>;
+  bskyConvos: WritableSignal<BskyConvoView[]>;
+  pendingOpen: WritableSignal<string | null>;
   selectedKey: WritableSignal<string | null>;
   messages: WritableSignal<Status[]>;
   chats: Signal<Chat[]>;
@@ -197,6 +200,41 @@ describe('Conversations', () => {
     expect(chats).toHaveLength(1);
     expect(chats[0].kind).toBe('public');
     expect(chats[0].lastStatus?.id).toBe('s2');
+  });
+
+  it('switches the highlighted kind tab when a notification deep link opens a public reply', () => {
+    const alice = makeAccount('2', 'alice');
+    const status = makeStatus('s1', { visibility: 'public', account: alice });
+    const fixture = setUp([], [makeMention('n1', status)]);
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.setChatKind('bsky');
+
+    internals(fixture).pendingOpen.set('pub:alice');
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/statuses/s1/context').flush({ ancestors: [], descendants: [] });
+
+    expect(prefs.chatKind()).toBe('public');
+    expect(internals(fixture).selected()?.kind).toBe('public');
+  });
+
+  it('suppresses Bluesky chats whose participant resolved to missing.invalid', () => {
+    const fixture = setUp();
+    const convo = (id: string, handle: string): BskyConvoView => ({
+      id,
+      rev: '1',
+      members: [{ did: `did:plc:${id}`, handle }],
+      unreadCount: 0,
+    });
+
+    internals(fixture).bskyConvos.set([
+      convo('broken', 'missing.invalid'),
+      convo('also-broken', 'person.missing.invalid'),
+      convo('valid', 'alice.bsky.social'),
+    ]);
+
+    expect(internals(fixture).chats().filter((chat) => chat.kind === 'bsky')).toHaveLength(1);
+    expect(internals(fixture).chats().some((chat) => chat.key === 'bsky:valid')).toBe(true);
+    expect(internals(fixture).chats().some((chat) => chat.key === 'bsky:broken')).toBe(false);
   });
 
   it('different authors produce different public chats', () => {

@@ -70,7 +70,10 @@ describe('Profile block/unblock', () => {
     return fixture;
   }
 
-  afterEach(() => httpMock.verify());
+  afterEach(() => {
+    httpMock.verify();
+    localStorage.clear();
+  });
 
   it('blocks an un-blocked account via POST /block and stores the updated relationship', () => {
     const fixture = setUp();
@@ -255,12 +258,29 @@ describe('Profile block/unblock', () => {
     expect((fixture.componentInstance as any).statuses()[0].id).toBe(
       'anonymous-mastodon:social.example:50',
     );
+    const collectionCount = fixture.nativeElement.querySelector(
+      '.collection-count-btn',
+    ) as HTMLButtonElement;
+    expect(collectionCount.textContent).toContain('Collections (1)');
+    expect(collectionCount.querySelector('strong')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.collection-row')).toBeNull();
+
+    (fixture.componentInstance as any).setTab('collections');
+    fixture.detectChanges();
     const collection = fixture.nativeElement.querySelector('.collection-row') as HTMLAnchorElement;
     expect(collection.textContent).toContain('Video makers');
     expect(collection.getAttribute('href')).toBe(
       'https://social.example/collections/collection-1',
     );
     httpMock.expectNone((request) => request.url.startsWith('/api/'));
+  });
+
+  it('does not show the Collections profile count when the account has none', () => {
+    const fixture = setUp();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.collection-count-btn')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.profile-collections')).toBeNull();
   });
 
   it('places the Anonymous login-to-post prompt in the self profile timeline', () => {
