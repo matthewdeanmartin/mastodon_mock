@@ -208,7 +208,48 @@
       [accountId]="a.id"
       [mode]="tab() === 'followers' ? 'followers' : 'following'"
       [server]="peopleServer()"
+      [reportedCount]="tab() === 'followers' ? a.followers_count : a.following_count"
     />
+  }
+
+  @if (collections().length) {
+    <section class="profile-collections" aria-label="Collections">
+      <h3>Collections by {{ a.display_name || a.username }}</h3>
+      <div class="collection-list">
+        @for (collection of collections(); track collection.id) {
+          @if (auth.isAnonymous) {
+            <a
+              class="collection-row"
+              [href]="collection.url || collection.uri"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="collection-copy">
+                <strong>{{ collection.name }}</strong>
+                @if (collection.description) {
+                  <span>{{ collection.description }}</span>
+                }
+              </span>
+              <span class="collection-count muted">
+                {{ collection.item_count }} member{{ collection.item_count === 1 ? '' : 's' }} ↗
+              </span>
+            </a>
+          } @else {
+            <a class="collection-row" [routerLink]="['/collections', collection.id]">
+              <span class="collection-copy">
+                <strong>{{ collection.name }}</strong>
+                @if (collection.description) {
+                  <span>{{ collection.description }}</span>
+                }
+              </span>
+              <span class="collection-count muted">
+                {{ collection.item_count }} member{{ collection.item_count === 1 ? '' : 's' }}
+              </span>
+            </a>
+          }
+        }
+      </div>
+    </section>
   }
 
   @if (tab() === 'posts') {

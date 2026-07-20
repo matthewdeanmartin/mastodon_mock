@@ -50,7 +50,9 @@ describe('Profile block/unblock', () => {
     fixture.detectChanges();
 
     // load() fans out five requests; satisfy them so the component settles.
-    httpMock.expectOne('/api/v1/accounts/900').flush({ id: '900', username: 'eve' } as Account);
+    httpMock
+      .expectOne('/api/v1/accounts/900')
+      .flush({ id: '900', username: 'eve', fields: [] } as unknown as Account);
     httpMock
       .expectOne((r) => r.url === '/api/v1/accounts/900/statuses' && !r.params.has('pinned'))
       .flush([]);
@@ -63,6 +65,7 @@ describe('Profile block/unblock', () => {
       .expectOne((r) => r.url === '/api/v1/accounts/relationships')
       .flush([{ id: '900', blocking: false } as Relationship]);
     httpMock.expectOne('/api/v1/accounts/900/endorsements').flush([]);
+    httpMock.expectOne('/api/v1/accounts/900/collections').flush({ collections: [] });
 
     return fixture;
   }
@@ -131,6 +134,7 @@ describe('Profile block/unblock', () => {
       )
       .flush([]);
     httpMock.expectOne('/api/v1/accounts/900/endorsements').flush([]);
+    httpMock.expectOne('/api/v1/accounts/900/collections').flush({ collections: [] });
     httpMock.expectNone((request) => request.url.includes('/relationships'));
     fixture.detectChanges();
 
@@ -224,11 +228,37 @@ describe('Profile block/unblock', () => {
           request.params.get('pinned') === 'true',
       )
       .flush([]);
+    httpMock
+      .expectOne('https://social.example/api/v1/accounts/900/collections')
+      .flush({
+        collections: [
+          {
+            id: 'collection-1',
+            account_id: '900',
+            name: 'Video makers',
+            description: 'People making great videos.',
+            discoverable: true,
+            sensitive: false,
+            local: true,
+            item_count: 25,
+            items: [],
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+            uri: 'https://social.example/ap/collections/collection-1',
+            url: 'https://social.example/collections/collection-1',
+          },
+        ],
+      });
     fixture.detectChanges();
 
     expect((fixture.componentInstance as any).account().acct).toBe('eve@social.example');
     expect((fixture.componentInstance as any).statuses()[0].id).toBe(
       'anonymous-mastodon:social.example:50',
+    );
+    const collection = fixture.nativeElement.querySelector('.collection-row') as HTMLAnchorElement;
+    expect(collection.textContent).toContain('Video makers');
+    expect(collection.getAttribute('href')).toBe(
+      'https://social.example/collections/collection-1',
     );
     httpMock.expectNone((request) => request.url.startsWith('/api/'));
   });
@@ -274,10 +304,13 @@ describe('Profile block/unblock', () => {
     fixture.detectChanges();
     const cmp = fixture.componentInstance as any;
 
-    httpMock.expectOne('/api/v1/accounts/7').flush({ id: '7', username: 'kay' } as Account);
+    httpMock
+      .expectOne('/api/v1/accounts/7')
+      .flush({ id: '7', username: 'kay', fields: [] } as unknown as Account);
     httpMock.expectOne((r) => r.params.get('pinned') === 'true').flush([]);
     httpMock.expectOne((r) => r.url === '/api/v1/accounts/relationships').flush([]);
     httpMock.expectOne('/api/v1/accounts/7/endorsements').flush([]);
+    httpMock.expectOne('/api/v1/accounts/7/collections').flush({ collections: [] });
 
     // Page 1: defaults exclude replies but keep boosts; 5 of 20 requested survive.
     const first = httpMock.expectOne(

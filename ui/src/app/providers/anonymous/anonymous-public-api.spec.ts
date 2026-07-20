@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Account, Context, SearchResults, Status } from '../../models';
+import { Account, Collection, Context, SearchResults, Status } from '../../models';
 import { AnonymousPublicApi } from './anonymous-public-api';
 
 function account(): Account {
@@ -100,6 +100,19 @@ describe('AnonymousPublicApi', () => {
     expect(request.request.params.get('max_id')).toBe('80');
     expect(request.request.params.get('limit')).toBe('20');
     request.flush([]);
+  });
+
+  it('loads public account collections from the source instance', () => {
+    let received: Collection[] = [];
+    api
+      .getAccountCollections({ server: 'https://social.example', id: '7' })
+      .subscribe((collections) => (received = collections));
+
+    http.expectOne('https://social.example/api/v1/accounts/7/collections').flush({
+      collections: [{ id: 'c1', name: 'Creators', item_count: 4 }],
+    });
+
+    expect(received).toEqual([{ id: 'c1', name: 'Creators', item_count: 4 }]);
   });
 
   it('loads and adapts a public hashtag timeline with native-id pagination', () => {

@@ -65,6 +65,64 @@
   border-bottom: 1px solid var(--border);
 }
 
+.profile-collections {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-collections h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.collection-list {
+  display: grid;
+  gap: 8px;
+}
+
+.collection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.collection-row:hover {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+.collection-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.collection-copy span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.collection-count {
+  flex: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .collection-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .profile-header {
   padding: 0 16px 12px;
   border-bottom: 1px solid var(--border);

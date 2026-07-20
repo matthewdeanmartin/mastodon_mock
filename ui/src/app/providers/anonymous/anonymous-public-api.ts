@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, timeout } from 'rxjs';
 import { AccountStatusesOptions } from '../../api';
-import { Account, Context, SearchResults, Status, Tag } from '../../models';
+import { Account, Collection, Context, SearchResults, Status, Tag } from '../../models';
 import { externalFetch } from '../external-fetch';
 import { adaptAnonymousAccount, adaptAnonymousStatus } from './anonymous-mastodon-provider';
 import { AnonymousPublicRef } from './anonymous-route-ref';
@@ -38,6 +38,19 @@ export class AnonymousPublicApi {
 
   getAccountFollowing(ref: AnonymousPublicRef, maxId?: string): Observable<Account[]> {
     return this.getAccountPeople(ref, 'following', maxId);
+  }
+
+  /** Discoverable Collections curated by a public account (Mastodon 4.6+). */
+  getAccountCollections(ref: AnonymousPublicRef): Observable<Collection[]> {
+    return this.http
+      .get<{ collections: Collection[] }>(
+        `${ref.server}/api/v1/accounts/${encodeURIComponent(ref.id)}/collections`,
+        { context: externalFetch() },
+      )
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((response) => response.collections ?? []),
+      );
   }
 
   getAccountStatuses(

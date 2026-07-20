@@ -42,6 +42,8 @@ export class PeopleBrowser {
   readonly mode = input<PeopleMode>('followers');
   /** Public instance used when Anonymous browses another account's connections. */
   readonly server = input<string | null>(null);
+  /** Count advertised on the profile, used to distinguish private lists from genuinely empty ones. */
+  readonly reportedCount = input<number>(0);
 
   protected accounts = signal<Account[]>([]);
   protected loading = signal(true);
@@ -268,9 +270,14 @@ export class PeopleBrowser {
     });
   }
 
-  protected emptyLabel = computed(() =>
-    this.mode() === 'followers' ? 'No followers yet.' : 'Not following anyone yet.',
-  );
+  protected emptyLabel = computed(() => {
+    const count = this.reportedCount();
+    const kind = this.mode() === 'followers' ? 'followers' : 'following';
+    if (count > 0) {
+      return `This account’s ${kind} list isn’t available. Their profile reports ${count.toLocaleString()}, so the server may be hiding the list because of privacy settings.`;
+    }
+    return this.mode() === 'followers' ? 'No followers yet.' : 'Not following anyone yet.';
+  });
 
   private isLocalAnonymousList(): boolean {
     return this.auth.isAnonymous && this.accountId() === this.anonymous.account().id;

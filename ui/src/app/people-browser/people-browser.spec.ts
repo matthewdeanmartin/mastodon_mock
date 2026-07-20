@@ -61,4 +61,25 @@ describe('PeopleBrowser', () => {
       '/accounts/anonymous-account.',
     );
   });
+
+  it('explains a withheld list when the profile reports connections but the API returns none', () => {
+    const fixture = TestBed.createComponent(PeopleBrowser);
+    fixture.componentRef.setInput('accountId', '900');
+    fixture.componentRef.setInput('mode', 'following');
+    fixture.componentRef.setInput('reportedCount', 42);
+    fixture.componentRef.setInput('server', 'https://social.example');
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne(
+        (candidate) => candidate.url === 'https://social.example/api/v1/accounts/900/following',
+      )
+      .flush([]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('following list isn’t available');
+    expect(fixture.nativeElement.textContent).toContain('profile reports 42');
+    expect(fixture.nativeElement.textContent).toContain('privacy settings');
+    expect(fixture.nativeElement.textContent).not.toContain('Not following anyone');
+  });
 });

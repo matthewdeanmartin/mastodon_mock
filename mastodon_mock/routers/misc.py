@@ -97,8 +97,10 @@ def revoke_collection_item(collection_id: str, item_id: str) -> dict[str, Any]:
     return {}
 
 
-# Unlike most account-scoped Mastodon endpoints, Collections deliberately omit
-# the ``accounts`` path segment. Both responses use the extensible wrapper shape.
+# Mastodon 4.6 and the live mastodon.social API use the ``accounts`` segment.
+# The vendored comparison schema still describes the pre-release path without
+# it, so retain that alias in OpenAPI while serving the real path at runtime.
+@router.get("/api/v1/accounts/{account_id}/collections", include_in_schema=False)
 @router.get("/api/v1/{account_id}/collections")
 def account_collections(account_id: str) -> dict[str, Any]:
     """List collections for an account. The mock keeps no collections."""
@@ -106,6 +108,7 @@ def account_collections(account_id: str) -> dict[str, Any]:
     return {"collections": []}
 
 
+@router.get("/api/v1/accounts/{account_id}/in_collections", include_in_schema=False)
 @router.get("/api/v1/{account_id}/in_collections")
 def account_in_collections(account_id: str) -> dict[str, Any]:
     """List collections an account appears in. The mock keeps no collections."""

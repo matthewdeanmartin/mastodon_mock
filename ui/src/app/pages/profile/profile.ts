@@ -7,7 +7,7 @@ import { Api } from '../../api';
 import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
 import { LocalModeration } from '../../local-moderation';
-import { Account, Relationship, Status } from '../../models';
+import { Account, Collection, Relationship, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { ListDialog } from '../../list-dialog/list-dialog';
@@ -134,6 +134,9 @@ export class Profile implements OnInit, OnDestroy {
 
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
 
+  /** Discoverable Mastodon 4.6 Collections curated by this profile. */
+  protected collections = signal<Collection[]>([]);
+
   /** Accounts this profile features ("collections") — shown prominently up top. */
   protected featured = signal<Account[]>([]);
   /** Ids among featured() the viewer already follows (or has requested). */
@@ -175,6 +178,7 @@ export class Profile implements OnInit, OnDestroy {
     this.followError.set(null);
     this.isRss.set(false);
     this.publicProfileRef = null;
+    this.collections.set([]);
     this.rssFeedUrl.set(null);
     this.tab.set('posts');
     if (id.startsWith('rss:')) {
@@ -210,6 +214,7 @@ export class Profile implements OnInit, OnDestroy {
     );
     this.loadStatuses(id);
     this.loadPinned(id);
+    this.loadCollections(id);
     if (this.capabilities.canManageRelationships) {
       this.routeLoadSub.add(
         this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null)),
@@ -233,6 +238,7 @@ export class Profile implements OnInit, OnDestroy {
     );
     this.loadStatuses(ref.id);
     this.loadPinned(ref.id);
+    this.loadCollections(ref.id);
   }
 
   /**
@@ -437,6 +443,22 @@ export class Profile implements OnInit, OnDestroy {
         },
         error: () => {
           // Older servers (pre-4.4) 404 here; the section simply doesn't render.
+        },
+      }),
+    );
+  }
+
+  /** Load actual Mastodon Collections, distinct from legacy profile endorsements. */
+  private loadCollections(id: string): void {
+    this.collections.set([]);
+    const request = this.publicProfileRef
+      ? this.anonymousPublic.getAccountCollections({ ...this.publicProfileRef, id })
+      : this.api.accountCollections(id);
+    this.routeLoadSub.add(
+      request.subscribe({
+        next: (collections) => this.collections.set(collections),
+        error: () => {
+          // Collections were added in Mastodon 4.6; older and non-Mastodon servers may not support them.
         },
       }),
     );
