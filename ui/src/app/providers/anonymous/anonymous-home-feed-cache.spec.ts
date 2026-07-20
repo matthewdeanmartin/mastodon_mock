@@ -27,4 +27,22 @@ describe('AnonymousHomeFeedCache', () => {
     expect(restored.populated()).toBe(false);
     expect(localStorage.getItem('mockingbird_anonymous_home_feed')).toBeNull();
   });
+
+  it('rejects a stale write that finishes after invalidation', () => {
+    const cache = TestBed.inject(AnonymousHomeFeedCache);
+    const generation = cache.generation();
+
+    cache.invalidate();
+    cache.store([status('stale')], 'old-sources', generation);
+
+    expect(cache.populated()).toBe(false);
+  });
+
+  it('only matches the follow and tag sources used to build the snapshot', () => {
+    const cache = TestBed.inject(AnonymousHomeFeedCache);
+    cache.store([status('one')], 'alice');
+
+    expect(cache.matchesSources('alice')).toBe(true);
+    expect(cache.matchesSources('bob')).toBe(false);
+  });
 });

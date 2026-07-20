@@ -108,6 +108,12 @@ export class Profile implements OnInit, OnDestroy {
   setTab(tab: ProfileTab): void {
     this.tab.set(tab);
   }
+
+  protected peopleServer(): string | null {
+    return this.auth.isAnonymous
+      ? (this.publicProfileRef?.server ?? this.anonymous.server())
+      : null;
+  }
   /** Invalidates in-flight status fetches when filters change or the route moves. */
   private loadSeq = 0;
 

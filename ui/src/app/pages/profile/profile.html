@@ -37,9 +37,9 @@
         </div>
       } @else if (!isSelf()) {
         <div class="profile-buttons">
-          @if (capabilities.canManageLists && (!auth.isAnonymous || relationship()?.following)) {
+          @if (capabilities.canManageLists) {
             <button class="btn btn-outline" (click)="showLists.set(true)">
-              Lists &amp; collections
+              {{ auth.isAnonymous ? 'Local lists' : 'Lists & collections' }}
             </button>
           }
           <details class="account-danger-menu">
@@ -111,25 +111,18 @@
         {{ isRss() ? 'items' : words().posts }}</span
       >
       @if (!isRss()) {
-        @if (!auth.isAnonymous || isSelf()) {
-          <button type="button" class="count-btn" (click)="setTab('following')">
-            <strong>{{
-              auth.isAnonymous ? anonymousFollows.count() : (a.following_count | humanCount)
-            }}</strong>
-            following
-          </button>
-        } @else if (a.following_count > 0) {
-          <!-- Anonymous view of someone else's profile: the public account
-               object still carries counts, so show them (read-only — the
-               following/followers *lists* aren't reliably public anonymously). -->
-          <span><strong>{{ a.following_count | humanCount }}</strong> following</span>
-        }
-        @if (!auth.isAnonymous) {
+        <button type="button" class="count-btn" (click)="setTab('following')">
+          <strong>{{
+            auth.isAnonymous && isSelf()
+              ? anonymousFollows.count()
+              : (a.following_count | humanCount)
+          }}</strong>
+          following
+        </button>
+        @if (!auth.isAnonymous || !isSelf()) {
           <button type="button" class="count-btn" (click)="setTab('followers')">
             <strong>{{ a.followers_count | humanCount }}</strong> followers
           </button>
-        } @else if (!isSelf() && a.followers_count > 0) {
-          <span><strong>{{ a.followers_count | humanCount }}</strong> followers</span>
         }
       }
     </div>
@@ -179,7 +172,7 @@
     </section>
   }
 
-  @if (!isRss() && (!auth.isAnonymous || isSelf())) {
+  @if (!isRss()) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
       <button
         type="button"
@@ -197,7 +190,7 @@
       >
         Following
       </button>
-      @if (!auth.isAnonymous) {
+      @if (!auth.isAnonymous || !isSelf()) {
         <button
           type="button"
           class="ptab"
@@ -210,10 +203,11 @@
     </div>
   }
 
-  @if (!isRss() && tab() !== 'posts' && (!auth.isAnonymous || isSelf())) {
+  @if (!isRss() && tab() !== 'posts') {
     <app-people-browser
       [accountId]="a.id"
       [mode]="tab() === 'followers' ? 'followers' : 'following'"
+      [server]="peopleServer()"
     />
   }
 
@@ -300,7 +294,12 @@
     />
   }
   @if (showLists()) {
-    <app-list-dialog [username]="a.username" [accountId]="a.id" (closed)="showLists.set(false)" />
+    <app-list-dialog
+      [username]="a.username"
+      [accountId]="a.id"
+      [account]="a"
+      (closed)="showLists.set(false)"
+    />
   }
   @if (showBlockConfirm()) {
     <div

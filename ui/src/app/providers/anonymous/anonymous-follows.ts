@@ -149,6 +149,11 @@ export class AnonymousFollows {
     return this.follows().find((follow) => follow.account.id === accountId) ?? null;
   }
 
+  find(account: Account, fallbackServer: string): AnonymousFollow | null {
+    const key = keyFor(account, fallbackServer);
+    return this.follows().find((follow) => follow.key === key) ?? null;
+  }
+
   routeDeferred(follow: AnonymousFollow, route: AnonymousReadRoute): boolean {
     const retryAfter = follow.routeRetryAfter[route];
     return !!retryAfter && Date.parse(retryAfter) > Date.now();

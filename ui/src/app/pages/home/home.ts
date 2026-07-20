@@ -25,6 +25,7 @@ import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmark
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
 import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home-feed-cache';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
+import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 
 /** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -53,6 +54,7 @@ export class Home implements OnInit, OnDestroy {
   protected anonymousProvider = inject(AnonymousMastodonProvider);
   private anonymousHomeCache = inject(AnonymousHomeFeedCache);
   protected anonymousFollows = inject(AnonymousFollows);
+  private anonymousTags = inject(AnonymousTags);
   private route = inject(ActivatedRoute);
   private drafts = inject(Drafts);
 
@@ -133,6 +135,7 @@ export class Home implements OnInit, OnDestroy {
   private liveSub: Subscription | null = null;
   private pageSub: Subscription | null = null;
   private bookmarkSub: Subscription | null = null;
+  private anonymousCacheGeneration = 0;
 
   ngOnInit(): void {
     this.load();
@@ -176,7 +179,13 @@ export class Home implements OnInit, OnDestroy {
     this.maxHitAt.set(null);
     this.bookmarkTail.set([]);
     this.aggregator.reset();
-    if (this.auth.isAnonymous && !forceRefresh && this.anonymousHomeCache.populated()) {
+    this.anonymousCacheGeneration = this.anonymousHomeCache.generation();
+    const anonymousSourceKey = this.anonymousSourceKey();
+    if (
+      this.auth.isAnonymous &&
+      !forceRefresh &&
+      this.anonymousHomeCache.matchesSources(anonymousSourceKey)
+    ) {
       const cached = this.anonymousHomeCache.statuses();
       this.statuses.set(cached);
       this.publishMastodon(cached);
@@ -411,7 +420,23 @@ export class Home implements OnInit, OnDestroy {
   }
 
   private cacheAnonymousHome(): void {
-    if (this.auth.isAnonymous) this.anonymousHomeCache.store(this.statuses());
+    if (this.auth.isAnonymous) {
+      this.anonymousHomeCache.store(
+        this.statuses(),
+        this.anonymousSourceKey(),
+        this.anonymousCacheGeneration,
+      );
+    }
+  }
+
+  private anonymousSourceKey(): string {
+    return JSON.stringify({
+      follows: this.anonymousFollows
+        .follows()
+        .map((follow) => follow.key)
+        .sort(),
+      tags: [...this.anonymousTags.tags()].sort(),
+    });
   }
 
   onPosted(status: Status): void {

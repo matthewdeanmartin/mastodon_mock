@@ -6,6 +6,9 @@ import { Account, Relationship } from '../models';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
 import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
 import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
+import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
+import { anonymousAccountRouteRef } from '../providers/anonymous/anonymous-route-ref';
+import { Observable } from 'rxjs';
 
 /** Which list this widget pages through. */
 export type PeopleMode = 'followers' | 'following';
@@ -31,11 +34,14 @@ export class PeopleBrowser {
   private auth = inject(Auth);
   private anonymous = inject(AnonymousAccount);
   private anonymousFollows = inject(AnonymousFollows);
+  private anonymousPublic = inject(AnonymousPublicApi);
 
   /** Whose followers/following to show. */
   readonly accountId = input.required<string>();
   /** 'followers' (people who follow them) or 'following' (people they follow). */
   readonly mode = input<PeopleMode>('followers');
+  /** Public instance used when Anonymous browses another account's connections. */
+  readonly server = input<string | null>(null);
 
   protected accounts = signal<Account[]>([]);
   protected loading = signal(true);
@@ -72,8 +78,15 @@ export class PeopleBrowser {
     this.error.set(false);
   }
 
-  private fetch(maxId?: string) {
+  private fetch(maxId?: string): Observable<Account[]> {
     const id = this.accountId();
+    const server = this.server();
+    if (this.auth.isAnonymous && server && !this.isLocalAnonymousList()) {
+      const ref = { server, id };
+      return this.mode() === 'followers'
+        ? this.anonymousPublic.getAccountFollowers(ref, maxId)
+        : this.anonymousPublic.getAccountFollowing(ref, maxId);
+    }
     return this.mode() === 'followers'
       ? this.api.accountFollowers(id, maxId)
       : this.api.accountFollowing(id, maxId);
@@ -145,6 +158,19 @@ export class PeopleBrowser {
     if (!ids.length) {
       return;
     }
+    if (this.auth.isAnonymous) {
+      const server = this.server() ?? this.anonymous.server();
+      this.rels.update((map) => {
+        const next = new Map(map);
+        for (const account of page) {
+          if (account.id !== meId) {
+            next.set(account.id, this.anonymousFollows.relationship(account, server));
+          }
+        }
+        return next;
+      });
+      return;
+    }
     this.api.relationships(ids).subscribe((list) => {
       this.rels.update((map) => {
         const next = new Map(map);
@@ -175,6 +201,16 @@ export class PeopleBrowser {
     return a.id === this.me()?.id;
   }
 
+  accountLink(a: Account): (string | number)[] {
+    const server = this.server();
+    return this.auth.isAnonymous && server
+      ? [
+          '/accounts',
+          anonymousAccountRouteRef({ server, id: a.id, ...(a.url ? { originalUrl: a.url } : {}) }),
+        ]
+      : ['/accounts', a.id];
+  }
+
   /** The label for the toggle, given follow/request/hover state. */
   followLabel(a: Account): string {
     if (this.isRequested(a)) {
@@ -188,17 +224,20 @@ export class PeopleBrowser {
       return;
     }
     this.setPending(a.id, 'busy');
-    if (this.isLocalAnonymousList()) {
-      if (this.anonymousFollows.isFollowing(a, this.anonymous.server())) {
-        this.anonymousFollows.unfollow(a, this.anonymous.server());
-        this.accounts.update((accounts) => accounts.filter((account) => account.id !== a.id));
+    if (this.auth.isAnonymous) {
+      const server = this.server() ?? this.anonymous.server();
+      if (this.anonymousFollows.isFollowing(a, server)) {
+        this.anonymousFollows.unfollow(a, server);
+        if (this.isLocalAnonymousList() && this.mode() === 'following') {
+          this.accounts.update((accounts) => accounts.filter((account) => account.id !== a.id));
+        }
         this.rels.update((rels) => {
           const next = new Map(rels);
           next.delete(a.id);
           return next;
         });
       } else {
-        const result = this.anonymousFollows.follow(a, this.anonymous.server());
+        const result = this.anonymousFollows.follow(a, server);
         if (result.ok) {
           this.rels.update((rels) => new Map(rels).set(a.id, result.relationship));
         }

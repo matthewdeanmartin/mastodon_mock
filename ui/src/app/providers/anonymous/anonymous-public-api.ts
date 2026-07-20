@@ -32,6 +32,14 @@ export class AnonymousPublicApi {
       );
   }
 
+  getAccountFollowers(ref: AnonymousPublicRef, maxId?: string): Observable<Account[]> {
+    return this.getAccountPeople(ref, 'followers', maxId);
+  }
+
+  getAccountFollowing(ref: AnonymousPublicRef, maxId?: string): Observable<Account[]> {
+    return this.getAccountPeople(ref, 'following', maxId);
+  }
+
   getAccountStatuses(
     ref: AnonymousPublicRef,
     opts: AccountStatusesOptions = {},
@@ -146,6 +154,23 @@ export class AnonymousPublicApi {
           statuses: results.statuses.map((status) => adaptAnonymousStatus(status, server)),
           hashtags: results.hashtags,
         })),
+      );
+  }
+
+  private getAccountPeople(
+    ref: AnonymousPublicRef,
+    kind: 'followers' | 'following',
+    maxId?: string,
+  ): Observable<Account[]> {
+    let params = new HttpParams().set('limit', '80');
+    if (maxId) params = params.set('max_id', maxId);
+    return this.http
+      .get<
+        Account[]
+      >(`${ref.server}/api/v1/accounts/${encodeURIComponent(ref.id)}/${kind}`, { params, context: externalFetch() })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((accounts) => accounts.map((account) => adaptAnonymousAccount(account, ref.server))),
       );
   }
 }

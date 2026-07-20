@@ -1,6 +1,6 @@
 .people-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 4px 0;
 }

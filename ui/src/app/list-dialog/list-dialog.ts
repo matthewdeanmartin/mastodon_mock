@@ -7,6 +7,8 @@ import { Auth } from '../auth';
 import { Collection, UserList } from '../models';
 import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
+import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
+import { Account } from '../models';
 
 interface ListRow {
   list: UserList;
@@ -35,12 +37,14 @@ interface CollectionRow {
 })
 export class ListDialog implements OnInit {
   private api = inject(Api);
-  private auth = inject(Auth);
+  protected auth = inject(Auth);
+  private anonymous = inject(AnonymousAccount);
   private anonymousFollows = inject(AnonymousFollows);
   private anonymousLists = inject(AnonymousLists);
 
   readonly username = input.required<string>();
   readonly accountId = input.required<string>();
+  readonly account = input<Account | null>(null);
   readonly closed = output<void>();
 
   protected rows = signal<ListRow[]>([]);
@@ -60,14 +64,12 @@ export class ListDialog implements OnInit {
   private load(): void {
     this.loading.set(true);
     if (this.auth.isAnonymous) {
-      const follow = this.anonymousFollows.findByAccountId(this.accountId());
+      const follow = this.anonymousFollow();
       this.rows.set(
-        follow
-          ? this.anonymousLists.lists().map((list) => ({
-              list,
-              member: this.anonymousLists.hasMember(list.id, follow.key),
-            }))
-          : [],
+        this.anonymousLists.lists().map((list) => ({
+          list,
+          member: !!follow && this.anonymousLists.hasMember(list.id, follow.key),
+        })),
       );
       this.loading.set(false);
       return;
@@ -129,7 +131,7 @@ export class ListDialog implements OnInit {
 
   toggle(row: ListRow): void {
     if (this.auth.isAnonymous) {
-      const follow = this.anonymousFollows.findByAccountId(this.accountId());
+      const follow = row.member ? this.anonymousFollow() : this.ensureAnonymousFollow();
       if (!follow) return;
       this.anonymousLists.setMember(row.list.id, follow.key, !row.member);
       this.rows.update((rows) =>
@@ -155,7 +157,7 @@ export class ListDialog implements OnInit {
       return;
     }
     if (this.auth.isAnonymous) {
-      const follow = this.anonymousFollows.findByAccountId(this.accountId());
+      const follow = this.ensureAnonymousFollow();
       if (!follow) return;
       const list = this.anonymousLists.create(title);
       this.anonymousLists.setMember(list.id, follow.key, true);
@@ -246,5 +248,21 @@ export class ListDialog implements OnInit {
 
   private setCollectionBusy(id: string, busy: boolean): void {
     this.markCollection(id, { busy });
+  }
+
+  private anonymousFollow() {
+    const account = this.account();
+    return account
+      ? this.anonymousFollows.find(account, this.anonymous.server())
+      : this.anonymousFollows.findByAccountId(this.accountId());
+  }
+
+  private ensureAnonymousFollow() {
+    const existing = this.anonymousFollow();
+    if (existing) return existing;
+    const account = this.account();
+    if (!account) return null;
+    const result = this.anonymousFollows.follow(account, this.anonymous.server());
+    return result.ok ? this.anonymousFollows.find(account, this.anonymous.server()) : null;
   }
 }

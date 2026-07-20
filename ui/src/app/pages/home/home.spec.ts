@@ -107,7 +107,10 @@ describe('Home', () => {
   it('reuses a populated Anonymous feed until the user explicitly refreshes', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
     const cached = { ...makeStatus('cached'), provider: 'anonymous-mastodon' } as Status;
-    TestBed.inject(AnonymousHomeFeedCache).store([cached]);
+    TestBed.inject(AnonymousHomeFeedCache).store(
+      [cached],
+      JSON.stringify({ follows: [], tags: [] }),
+    );
 
     const fixture = TestBed.createComponent(Home);
     fixture.detectChanges();

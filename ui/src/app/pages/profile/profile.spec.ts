@@ -132,6 +132,9 @@ describe('Profile block/unblock', () => {
       .flush([]);
     httpMock.expectOne('/api/v1/accounts/900/endorsements').flush([]);
     httpMock.expectNone((request) => request.url.includes('/relationships'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Local lists');
 
     (fixture.componentInstance as any).toggleFollow();
 

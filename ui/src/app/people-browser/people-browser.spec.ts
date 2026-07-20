@@ -1,0 +1,64 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Auth } from '../auth';
+import { Account } from '../models';
+import { PeopleBrowser } from './people-browser';
+
+function account(id: string): Account {
+  return {
+    id,
+    username: `user${id}`,
+    acct: `user${id}`,
+    display_name: `User ${id}`,
+    note: '',
+    url: `https://social.example/@user${id}`,
+    avatar: '',
+    avatar_static: '',
+    header: '',
+    followers_count: 2,
+    following_count: 3,
+    statuses_count: 4,
+    bot: false,
+    locked: false,
+    fields: [],
+  };
+}
+
+describe('PeopleBrowser', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    TestBed.inject(Auth).enterAnonymous('https://home.example');
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it('loads another profile followers from its public server without relationship requests', () => {
+    const fixture = TestBed.createComponent(PeopleBrowser);
+    fixture.componentRef.setInput('accountId', '900');
+    fixture.componentRef.setInput('mode', 'followers');
+    fixture.componentRef.setInput('server', 'https://social.example');
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne(
+      (candidate) => candidate.url === 'https://social.example/api/v1/accounts/900/followers',
+    );
+    expect(request.request.params.get('limit')).toBe('80');
+    request.flush([account('10')]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('User 10');
+    httpMock.expectNone((candidate) => candidate.url.includes('/relationships'));
+    expect(fixture.nativeElement.querySelector('.person-name-row')?.getAttribute('href')).toContain(
+      '/accounts/anonymous-account.',
+    );
+  });
+});

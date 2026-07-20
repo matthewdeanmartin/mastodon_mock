@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from '../auth';
 import { Account, Collection, UserList } from '../models';
 import { ListDialog } from './list-dialog';
+import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
+import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 
 interface DialogInternals {
   rows: WritableSignal<{ list: UserList; member: boolean }[]>;
@@ -44,6 +46,7 @@ describe('ListDialog', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
@@ -114,6 +117,32 @@ describe('ListDialog', () => {
     httpMock.expectOne('/api/v1/accounts/T/in_collections').flush({ collections: [] });
 
     expect(internals(fixture).collectionsSupported()).toBe(false);
+  });
+
+  it('loads local Anonymous lists and follows an unfollowed profile when adding it', () => {
+    const auth = TestBed.inject(Auth);
+    auth.enterAnonymous('https://mastodon.social');
+    const lists = TestBed.inject(AnonymousLists);
+    const list = lists.create('Local friends');
+    const target = makeAccount('T');
+    target.url = 'https://example.social/@uT';
+
+    const fixture = TestBed.createComponent(ListDialog);
+    fixture.componentRef.setInput('username', target.username);
+    fixture.componentRef.setInput('accountId', target.id);
+    fixture.componentRef.setInput('account', target);
+    fixture.detectChanges();
+
+    const row = internals(fixture).rows()[0];
+    expect(row.list.title).toBe('Local friends');
+    expect(row.member).toBe(false);
+
+    fixture.componentInstance.toggle(row);
+
+    const follow = TestBed.inject(AnonymousFollows).find(target, 'https://mastodon.social');
+    expect(follow).not.toBeNull();
+    expect(lists.hasMember(list.id, follow!.key)).toBe(true);
+    httpMock.expectNone(() => true);
   });
 
   // ----------------------------------------------------------------- collection toggle
