@@ -1,7 +1,9 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Auth } from '../../auth';
 import { ImportFollows, parseHandles } from '../../import-follows';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 
 /**
  * Onboarding "Phase 1": a home timeline is only as good as who you follow, and a
@@ -17,9 +19,18 @@ import { ImportFollows, parseHandles } from '../../import-follows';
 })
 export class FindPeople {
   protected importer = inject(ImportFollows);
+  private auth = inject(Auth);
+  private anonymousFollows = inject(AnonymousFollows);
 
   /** True when hosted inside another page (e.g. search's empty state): no page title. */
   readonly embedded = input(false);
+
+  /** Search's account tab highlights the starter pack only for an empty follow graph. */
+  protected hasNoFollows = computed(() =>
+    this.auth.isAnonymous
+      ? this.anonymousFollows.count() === 0
+      : (this.auth.account()?.following_count ?? 0) === 0,
+  );
 
   protected pasted = signal('');
   protected fileName = signal<string | null>(null);

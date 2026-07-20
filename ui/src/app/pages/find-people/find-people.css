@@ -10,6 +10,51 @@
   overflow: hidden;
 }
 
+.starter-pack-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  background: var(--accent-soft, var(--col-bg));
+  color: var(--text);
+  text-decoration: none;
+}
+
+.starter-pack-card:hover {
+  background: var(--hover);
+  color: var(--accent);
+}
+
+.starter-pack-card > span:nth-child(2) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.starter-pack-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.starter-pack-arrow {
+  flex: none;
+  font-size: 20px;
+  font-weight: 700;
+}
+
 .card-title {
   margin: 0;
   padding: 12px 14px;

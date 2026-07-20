@@ -258,6 +258,11 @@ describe('Profile block/unblock', () => {
     expect((fixture.componentInstance as any).statuses()[0].id).toBe(
       'anonymous-mastodon:social.example:50',
     );
+    const filters = fixture.nativeElement.querySelectorAll('.profile-filters button');
+    expect(filters).toHaveLength(3);
+    expect(
+      Array.from(filters).map((button) => (button as HTMLButtonElement).textContent?.trim()),
+    ).toEqual(['🔁 Boosts', '💬 Replies', '📌 Pinned']);
     const collectionCount = fixture.nativeElement.querySelector(
       '.collection-count-btn',
     ) as HTMLButtonElement;

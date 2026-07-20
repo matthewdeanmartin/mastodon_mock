@@ -31,7 +31,7 @@ export class DraftsPage implements OnInit {
   protected pendingCancel = signal<ScheduledStatus | null>(null);
 
   ngOnInit(): void {
-    // Anonymous/demo sessions can't list scheduled posts — just show nothing.
+    // Anonymous sessions can't list scheduled posts — just show nothing.
     this.api.scheduledStatuses().subscribe({
       next: (rows) => {
         this.scheduled.set(rows);

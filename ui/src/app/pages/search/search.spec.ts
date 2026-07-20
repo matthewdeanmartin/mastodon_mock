@@ -11,7 +11,7 @@ import {
 } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SearchResults, Status, Tag } from '../../models';
+import { Account, SearchResults, Status, Tag } from '../../models';
 import { Search } from './search';
 import { Auth } from '../../auth';
 
@@ -112,6 +112,30 @@ describe('Search', () => {
     expect(internals(fixture).searching()).toBe(false);
     expect(internals(fixture).results()).toBeNull();
     expect(internals(fixture).query()).toBe('');
+  });
+
+  it('places the universal starter pack above follow-list import for an account with no follows', () => {
+    const auth = TestBed.inject(Auth);
+    auth.setToken('zero-follow-token');
+    auth.setAccount({ id: 'me', username: 'me', following_count: 0 } as Account);
+    const fixture = setUp();
+    const starter = fixture.nativeElement.querySelector('.starter-pack-card') as HTMLAnchorElement;
+    const importer = fixture.nativeElement.querySelector('.card') as HTMLElement;
+
+    expect(starter.textContent).toContain('Universal starter pack');
+    expect(starter.getAttribute('href')).toBe('/collections/starter');
+    expect(
+      starter.compareDocumentPosition(importer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('hides the universal starter pack when the account already follows someone', () => {
+    const auth = TestBed.inject(Auth);
+    auth.setToken('following-token');
+    auth.setAccount({ id: 'me', username: 'me', following_count: 1 } as Account);
+    const fixture = setUp();
+
+    expect(fixture.nativeElement.querySelector('.starter-pack-card')).toBeNull();
   });
 
   it('keeps optional idle trends empty when either trends request fails', () => {

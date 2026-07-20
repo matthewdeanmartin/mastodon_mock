@@ -277,7 +277,7 @@
         </div>
       </a>
     }
-    @if (!isRss() && !auth.isAnonymous) {
+    @if (!isRss() && (!auth.isAnonymous || !isSelf())) {
       <div class="profile-filters" role="group" aria-label="Timeline filters">
         <button
           type="button"

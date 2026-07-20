@@ -203,16 +203,6 @@ h1 {
   font-size: 13px;
 }
 
-/* "Try the demo" sits at the right edge of the hero, sized to its label. */
-.demo-btn {
-  width: auto;
-  margin-left: auto;
-  padding: 8px 14px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  text-align: center;
-}
-
 .source-link {
   display: inline-flex;
   align-items: center;
@@ -242,19 +232,6 @@ app-app-footer {
   display: block;
   width: min(960px, 94vw);
   margin-top: 8px;
-}
-
-@media (max-width: 520px) {
-  .hero {
-    align-items: flex-start;
-  }
-  /* On phones the demo button drops to its own row. A wide button + the old aligning
-     margin overflowed the card, so instead let it span the hero width and stay inside. */
-  .demo-btn {
-    width: 100%;
-    margin-left: 0;
-    box-sizing: border-box;
-  }
 }
 
 .btn-hero {

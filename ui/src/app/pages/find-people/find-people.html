@@ -6,6 +6,17 @@
   Import a follow list below, or browse a directory to find interesting accounts.
 </p>
 
+@if (embedded() && hasNoFollows()) {
+  <a class="starter-pack-card" routerLink="/collections/starter">
+    <span class="starter-pack-avatar" aria-hidden="true">M</span>
+    <span>
+      <strong>Universal starter pack</strong>
+      <span class="muted small">Start your timeline with a curated collection of accounts.</span>
+    </span>
+    <span class="starter-pack-arrow" aria-hidden="true">→</span>
+  </a>
+}
+
 <section class="card">
   <h2 class="card-title">Import a follow list</h2>
   <div class="card-body">
