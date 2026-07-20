@@ -42,10 +42,10 @@ export class Shell implements OnInit {
   protected prefs = inject(ClientPrefs);
 
   /** Build flavor: drives the brand and whether mock-only nav links are shown. */
-  protected brand = environment.brand;
   protected mockTooling = environment.mockTooling;
-  /** Canary deployments (/canary/ base href) show a distinct brand mark. */
+  /** Canary deployments (/canary/ base href) show a distinct name, mark, accent. */
   protected isCanary = isCanaryBuild();
+  protected brand = this.isCanary ? 'Canary' : environment.brand;
   protected logoSrc = brandLogoSrc();
 
   /** Whether the current account holds a staff role (drives the Admin nav link). */

@@ -1,5 +1,6 @@
 import { effect, Injectable, signal, WritableSignal } from '@angular/core';
 import { scopedKey } from './account-scope';
+import { isCanaryBuild } from './build-flavor';
 import { ProviderId } from './models';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
@@ -142,7 +143,12 @@ function clamp(value: number, min: number, max: number): number {
 @Injectable({ providedIn: 'root' })
 export class ClientPrefs {
   readonly themeMode = signal<ThemeMode>('auto');
-  readonly accentId = signal<string>('blue');
+  /**
+   * Accent defaults to blue, but canary builds (/canary/ base href) default to
+   * yellow so the two deployments look distinct. This is only the default: a
+   * stored user choice loaded in load() takes precedence.
+   */
+  readonly accentId = signal<string>(isCanaryBuild() ? 'yellow' : 'blue');
   /** Ask "do you really want to post that?" before sending. */
   readonly confirmBeforePost = signal<boolean>(false);
   /** Hold posts for 30 seconds with a cancel (and publish-now) option. */
