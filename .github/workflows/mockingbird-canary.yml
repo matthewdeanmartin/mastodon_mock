@@ -1,26 +1,26 @@
 ---
 name: Deploy Mawkingbird Canary
-# Publish every main-branch commit under /canary/ on the existing personal
-# GitHub Pages site: https://matthewdeanmartin.github.io/canary/.
+# Publish every main-branch commit to the /canary/ subpath of this repo's own
+# GitHub Pages site: https://mawkingbird.com/canary/.
 #
-# One-time credential setup:
-#   1. Create a fine-grained PAT with Contents: read/write access to only the
-#      matthewdeanmartin/matthewdeanmartin.github.io repository.
-#   2. Save it in this repository as the Actions secret CANARY_PAGES_TOKEN.
+# The published site lives on the gh-pages branch of THIS repository:
+#   /         -> production (updated manually by mockingbird-pages.yml)
+#   /canary/  -> canary     (updated by this workflow on every commit)
+#
+# Each workflow updates only its own subtree of gh-pages, so canary deploys
+# never disturb production and vice versa. No cross-repo PAT is needed: the
+# built-in GITHUB_TOKEN can push to this repo.
 on:
   push:
     branches: [main]
 
+# Serialize gh-pages writers so canary and prod never race on the branch.
 concurrency:
-  group: pages-canary
-  cancel-in-progress: true
+  group: gh-pages-branch
+  cancel-in-progress: false
 
 permissions:
-  contents: read
-
-env:
-  CANARY_REPOSITORY: matthewdeanmartin/matthewdeanmartin.github.io
-  CANARY_BRANCH: master
+  contents: write
 
 jobs:
   deploy:
@@ -41,37 +41,13 @@ jobs:
       - name: Stamp build info
         run: node ui/scripts/gen-build-info.mjs
       - name: Build Canary
+        # Served from the /canary/ sub-path, so build with a matching base href.
         run: make mockingbird MOCKINGBIRD_BASE_HREF=/canary/
-      - name: Add GitHub Pages files
+      - name: Add SPA 404 fallback and canary marker
         run: |
           cp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
-          touch ui/dist-mockingbird/browser/.nojekyll
           printf '%s\n' "$GITHUB_SHA" > ui/dist-mockingbird/browser/canary-commit.txt
-      - name: Publish Canary directory
+      - name: Publish /canary/ to gh-pages
         env:
-          CANARY_PAGES_TOKEN: ${{ secrets.CANARY_PAGES_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -z "$CANARY_PAGES_TOKEN" ]; then
-            echo "::error::CANARY_PAGES_TOKEN is not configured"
-            exit 1
-          fi
-
-          site_dir="$RUNNER_TEMP/personal-pages"
-          git clone --depth 1 --branch "$CANARY_BRANCH" \
-            "https://github.com/${CANARY_REPOSITORY}.git" "$site_dir"
-
-          canary_dir="$site_dir/canary"
-          test "$canary_dir" = "$RUNNER_TEMP/personal-pages/canary"
-          rm -rf "$canary_dir"
-          mkdir "$canary_dir"
-          cp -R ui/dist-mockingbird/browser/. "$canary_dir/"
-
-          cd "$site_dir"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add --all canary
-          git commit -m "Deploy ${GITHUB_REPOSITORY}@${GITHUB_SHA}"
-          git remote set-url origin \
-            "https://x-access-token:${CANARY_PAGES_TOKEN}@github.com/${CANARY_REPOSITORY}.git"
-          git push origin "$CANARY_BRANCH"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/publish-gh-pages.sh canary ui/dist-mockingbird/browser

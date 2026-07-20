@@ -1,8 +1,14 @@
 ---
 name: Deploy Mawkingbird production
 # Manually promote a commit to the production GitHub Pages site at mawkingbird.com.
-# Every main-branch commit is deployed separately to Canary by
-# mockingbird-canary.yml; production changes only when this workflow is run.
+#
+# Production and canary share ONE Pages site, served from this repo's gh-pages
+# branch:
+#   /         -> production (this workflow, run on demand)
+#   /canary/  -> canary     (mockingbird-canary.yml, every main commit)
+#
+# This workflow rewrites the branch root but preserves the /canary/ subtree, so
+# promoting prod never clobbers canary.
 on:
   workflow_dispatch:
     inputs:
@@ -11,21 +17,20 @@ on:
         required: true
         default: main
         type: string
-# Allow one concurrent deployment; let an in-progress run finish (don't cancel a deploy).
+# Share the gh-pages writer lock with canary so the two never race; let an
+# in-progress deploy finish rather than cancelling it.
 concurrency:
-  group: pages-production
+  group: gh-pages-branch
   cancel-in-progress: false
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
-    name: Build Mocking Bird
+    name: Build and deploy production
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       CUSTOM_DOMAIN: mawkingbird.com
-    permissions:
-      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -43,33 +48,18 @@ jobs:
         # (overwrites the checked-in placeholder ui/src/app/build-info.ts).
         run: node ui/scripts/gen-build-info.mjs
       - name: Build Mocking Bird
-        # The custom domain serves the site from the origin root, not a repository
-        # sub-path, so build the Angular app with a root base href.
+        # The custom domain serves the site from the origin root, not a sub-path,
+        # so build the Angular app with a root base href.
         run: make mockingbird MOCKINGBIRD_BASE_HREF=/
       - name: Add SPA 404 fallback
         # GitHub Pages serves 404.html for unknown paths; mirroring index.html lets the
         # Angular router handle deep links (e.g. /accounts/123) on reload.
         run: cp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
       - name: Add custom domain
-        # Publish a CNAME alongside the artifact so Pages binds the deployment to the
-        # production custom domain.
+        # The CNAME lives at the site root and binds the whole Pages site
+        # (production AND /canary/) to the production custom domain.
         run: printf '%s' "$CUSTOM_DOMAIN" > ui/dist-mockingbird/browser/CNAME
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3.0.1
-        with:
-          path: ui/dist-mockingbird/browser
-  deploy:
-    name: Deploy to Pages
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128  # v5.0.0
+      - name: Publish production to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/publish-gh-pages.sh root ui/dist-mockingbird/browser
