@@ -47,6 +47,15 @@
             <div class="account-danger-panel">
               @if (capabilities.canManageRelationships) {
                 <button type="button" (click)="showReport.set(true)">Report account</button>
+                @if (relationship()?.following) {
+                  <button class="menu-neutral" type="button" (click)="toggleAccountBoosts()">
+                    {{ relationship()?.showing_reblogs === false ? 'Show' : 'Hide' }}
+                    {{ words().boosts }}
+                  </button>
+                }
+                @if (relationship()?.followed_by) {
+                  <button type="button" (click)="requestRemoveFollower()">Remove follower</button>
+                }
               }
               @if (useLocalModeration ? localMuted() : relationship()?.muting) {
                 <button type="button" (click)="unmute()">Unmute account</button>
@@ -71,7 +80,7 @@
             <button
               class="btn"
               [class.btn-outline]="relationship()?.following"
-              (click)="toggleFollow()"
+              (click)="relationship()?.following ? requestUnfollow() : toggleFollow()"
             >
               {{ relationship()?.following ? 'Following' : 'Follow' }}
             </button>
@@ -392,6 +401,66 @@
           </button>
           <button class="btn btn-danger" type="button" (click)="confirmBlock()">
             Confirm block
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+  @if (showUnfollowConfirm()) {
+    <div
+      class="confirm-overlay"
+      role="presentation"
+      tabindex="-1"
+      (click)="showUnfollowConfirm.set(false)"
+      (keyup.escape)="showUnfollowConfirm.set(false)"
+    >
+      <div
+        class="confirm-dialog"
+        role="alertdialog"
+        aria-labelledby="unfollow-title"
+        (click)="$event.stopPropagation()"
+        (keyup)="$event.stopPropagation()"
+      >
+        <h3 id="unfollow-title">Unfollow &#64;{{ a.acct }}?</h3>
+        <p>Their posts will no longer appear in your home timeline.</p>
+        <div class="confirm-actions">
+          <button class="btn btn-outline" type="button" (click)="showUnfollowConfirm.set(false)">
+            Cancel
+          </button>
+          <button class="btn btn-danger" type="button" (click)="confirmUnfollow()">
+            Confirm unfollow
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+  @if (showRemoveFollowerConfirm()) {
+    <div
+      class="confirm-overlay"
+      role="presentation"
+      tabindex="-1"
+      (click)="showRemoveFollowerConfirm.set(false)"
+      (keyup.escape)="showRemoveFollowerConfirm.set(false)"
+    >
+      <div
+        class="confirm-dialog"
+        role="alertdialog"
+        aria-labelledby="remove-follower-title"
+        (click)="$event.stopPropagation()"
+        (keyup)="$event.stopPropagation()"
+      >
+        <h3 id="remove-follower-title">Remove &#64;{{ a.acct }} as a follower?</h3>
+        <p>They will stop following you, but they will not be blocked.</p>
+        <div class="confirm-actions">
+          <button
+            class="btn btn-outline"
+            type="button"
+            (click)="showRemoveFollowerConfirm.set(false)"
+          >
+            Cancel
+          </button>
+          <button class="btn btn-danger" type="button" (click)="confirmRemoveFollower()">
+            Remove follower
           </button>
         </div>
       </div>

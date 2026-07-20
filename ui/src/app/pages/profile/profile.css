@@ -192,6 +192,10 @@
   background: var(--border);
 }
 
+.account-danger-panel .menu-neutral {
+  color: var(--text);
+}
+
 .account-danger-panel .menu-note {
   display: block;
   padding: 4px 10px 0;

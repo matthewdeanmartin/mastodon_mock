@@ -224,6 +224,8 @@ export interface Relationship {
   requested: boolean;
   blocking: boolean;
   muting: boolean;
+  /** Whether boosts/retweets from this followed account appear in home. */
+  showing_reblogs?: boolean;
 }
 
 export interface MastodonNotification {

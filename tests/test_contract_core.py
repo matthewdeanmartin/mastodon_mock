@@ -60,6 +60,31 @@ def test_unfollow_removes_from_timeline(alice: Mastodon, bob: Mastodon) -> None:
     assert not any(s.id == new_status.id for s in alice.timeline_home())
 
 
+def test_follow_can_hide_reblogs_from_home(alice: Mastodon, bob: Mastodon, carol: Mastodon) -> None:
+    bob_id = bob.account_verify_credentials().id
+    alice.account_follow(bob_id, reblogs=False)
+    own_status = bob.status_post("bob original")
+    boosted_status = carol.status_post("carol original")
+    boost = bob.status_reblog(boosted_status.id)
+
+    home_ids = {status.id for status in alice.timeline_home()}
+    assert own_status.id in home_ids
+    assert boost.id not in home_ids
+    assert alice.account_relationships(bob_id)[0].showing_reblogs is False
+
+
+def test_remove_follower_does_not_block(alice: Mastodon, bob: Mastodon) -> None:
+    alice_id = alice.account_verify_credentials().id
+    bob_id = bob.account_verify_credentials().id
+    bob.account_follow(alice_id)
+
+    relationship = alice.account_remove_from_followers(bob_id)
+
+    assert relationship.followed_by is False
+    assert relationship.blocking is False
+    assert bob.account_relationships(alice_id)[0].following is False
+
+
 def test_follow_generates_notification(alice: Mastodon, bob: Mastodon) -> None:
     alice_id = alice.account_verify_credentials().id
     bob_id = bob.account_verify_credentials().id

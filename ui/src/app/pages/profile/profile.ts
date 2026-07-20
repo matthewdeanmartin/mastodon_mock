@@ -130,6 +130,8 @@ export class Profile implements OnInit, OnDestroy {
   protected showLists = signal(false);
   protected reportDone = signal(false);
   protected showBlockConfirm = signal(false);
+  protected showUnfollowConfirm = signal(false);
+  protected showRemoveFollowerConfirm = signal(false);
   protected followError = signal<string | null>(null);
 
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
@@ -546,6 +548,40 @@ export class Profile implements OnInit, OnDestroy {
     }
     const call = rel?.following ? this.api.unfollow(acc.id) : this.api.follow(acc.id);
     call.subscribe((updated) => this.relationship.set(updated));
+  }
+
+  requestUnfollow(): void {
+    this.showUnfollowConfirm.set(true);
+  }
+
+  confirmUnfollow(): void {
+    this.showUnfollowConfirm.set(false);
+    this.toggleFollow();
+  }
+
+  requestRemoveFollower(): void {
+    this.showRemoveFollowerConfirm.set(true);
+  }
+
+  confirmRemoveFollower(): void {
+    const acc = this.account();
+    if (!acc || !this.capabilities.canManageRelationships) {
+      return;
+    }
+    this.showRemoveFollowerConfirm.set(false);
+    this.api.removeFollower(acc.id).subscribe((updated) => this.relationship.set(updated));
+  }
+
+  toggleAccountBoosts(): void {
+    const acc = this.account();
+    const rel = this.relationship();
+    if (!acc || !rel?.following || !this.capabilities.canManageRelationships) {
+      return;
+    }
+    const show = rel.showing_reblogs === false;
+    this.api
+      .follow(acc.id, { reblogs: show })
+      .subscribe((updated) => this.relationship.set(updated));
   }
 
   /** Mute duration presets (seconds; null = until unmuted). */

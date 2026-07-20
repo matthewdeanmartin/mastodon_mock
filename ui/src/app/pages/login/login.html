@@ -12,18 +12,7 @@
       />
       <div>
         <h1>{{ brand }}</h1>
-        <p class="tagline muted">A fast web client for Mastodon and the Fediverse.</p>
-        <div class="hero-links">
-          <a
-            class="source-link"
-            href="https://github.com/matthewdeanmartin/mastodon_mock/tree/main/ui"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span aria-hidden="true">&lt;/&gt;</span> View the source code on GitHub
-          </a>
-        </div>
-        <a class="about-link" routerLink="/about">About Mawkingbird</a>
+        <p class="tagline muted">An opinionated client for Mastodon and the Fediverse.</p>
       </div>
     </div>
 
@@ -265,13 +254,12 @@
         <!-- Path 3: local-only Anonymous account, kept visually secondary. -->
         <section class="path anonymous-option" aria-labelledby="anonymous-heading">
           <h2 id="anonymous-heading">Browse anonymously</h2>
-          <p class="muted small">
-            Use the full app with a local-only identity on {{ anonymousServerHostLabel() }}. Your
-            signed-in accounts stay saved.
-          </p>
           <button class="btn btn-outline" type="button" (click)="continueAnonymously()">
             Continue anonymously
           </button>
+          <p class="muted small">
+            Try it out without any account at all! {{ anonymousServerHostLabel() }}.
+          </p>
         </section>
       </div>
     }

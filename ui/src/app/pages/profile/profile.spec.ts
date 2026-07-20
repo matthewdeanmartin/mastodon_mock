@@ -9,6 +9,7 @@ import { Profile } from './profile';
 import { Auth } from '../../auth';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
+import { ClientPrefs } from '../../client-prefs';
 
 /** n bare statuses with descending ids starting at s<base> (timeline order). */
 function makeStatuses(n: number, base: number): Status[] {
@@ -87,6 +88,63 @@ describe('Profile block/unblock', () => {
     req.flush({ id: '900', blocking: true } as Relationship);
 
     expect(cmp.relationship().blocking).toBe(true);
+  });
+
+  it('requires confirmation before unfollowing', () => {
+    const fixture = setUp();
+    const cmp = fixture.componentInstance as any;
+    cmp.relationship.set({ id: '900', following: true } as Relationship);
+
+    cmp.requestUnfollow();
+    expect(cmp.showUnfollowConfirm()).toBe(true);
+    httpMock.expectNone('/api/v1/accounts/900/unfollow');
+
+    cmp.confirmUnfollow();
+    const request = httpMock.expectOne('/api/v1/accounts/900/unfollow');
+    expect(request.request.method).toBe('POST');
+    request.flush({ id: '900', following: false } as Relationship);
+
+    expect(cmp.showUnfollowConfirm()).toBe(false);
+    expect(cmp.relationship().following).toBe(false);
+  });
+
+  it('removes a follower without blocking them', () => {
+    const fixture = setUp();
+    const cmp = fixture.componentInstance as any;
+    cmp.relationship.set({ id: '900', followed_by: true, blocking: false } as Relationship);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Remove follower');
+
+    cmp.requestRemoveFollower();
+    cmp.confirmRemoveFollower();
+    const request = httpMock.expectOne('/api/v1/accounts/900/remove_from_followers');
+    expect(request.request.method).toBe('POST');
+    request.flush({ id: '900', followed_by: false, blocking: false } as Relationship);
+
+    expect(cmp.relationship().followed_by).toBe(false);
+    expect(cmp.relationship().blocking).toBe(false);
+    httpMock.expectNone('/api/v1/accounts/900/block');
+  });
+
+  it('toggles boosts in the overflow menu and uses retweet terminology when configured', () => {
+    const fixture = setUp();
+    const cmp = fixture.componentInstance as any;
+    cmp.relationship.set({ id: '900', following: true, showing_reblogs: true } as Relationship);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.menu-neutral').textContent).toContain(
+      'Hide boosts',
+    );
+
+    cmp.toggleAccountBoosts();
+    const request = httpMock.expectOne('/api/v1/accounts/900/follow');
+    expect(request.request.body).toEqual({ reblogs: false });
+    request.flush({ id: '900', following: true, showing_reblogs: false } as Relationship);
+
+    TestBed.inject(ClientPrefs).setPostNoun('tweet');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.menu-neutral').textContent).toContain(
+      'Show retweets',
+    );
   });
 
   it('follows locally in Anonymous without relationship mutation requests', () => {
@@ -231,27 +289,25 @@ describe('Profile block/unblock', () => {
           request.params.get('pinned') === 'true',
       )
       .flush([]);
-    httpMock
-      .expectOne('https://social.example/api/v1/accounts/900/collections')
-      .flush({
-        collections: [
-          {
-            id: 'collection-1',
-            account_id: '900',
-            name: 'Video makers',
-            description: 'People making great videos.',
-            discoverable: true,
-            sensitive: false,
-            local: true,
-            item_count: 25,
-            items: [],
-            created_at: '2026-01-01T00:00:00Z',
-            updated_at: '2026-01-01T00:00:00Z',
-            uri: 'https://social.example/ap/collections/collection-1',
-            url: 'https://social.example/collections/collection-1',
-          },
-        ],
-      });
+    httpMock.expectOne('https://social.example/api/v1/accounts/900/collections').flush({
+      collections: [
+        {
+          id: 'collection-1',
+          account_id: '900',
+          name: 'Video makers',
+          description: 'People making great videos.',
+          discoverable: true,
+          sensitive: false,
+          local: true,
+          item_count: 25,
+          items: [],
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+          uri: 'https://social.example/ap/collections/collection-1',
+          url: 'https://social.example/collections/collection-1',
+        },
+      ],
+    });
     fixture.detectChanges();
 
     expect((fixture.componentInstance as any).account().acct).toBe('eve@social.example');
@@ -274,9 +330,7 @@ describe('Profile block/unblock', () => {
     fixture.detectChanges();
     const collection = fixture.nativeElement.querySelector('.collection-row') as HTMLAnchorElement;
     expect(collection.textContent).toContain('Video makers');
-    expect(collection.getAttribute('href')).toBe(
-      'https://social.example/collections/collection-1',
-    );
+    expect(collection.getAttribute('href')).toBe('https://social.example/collections/collection-1');
     httpMock.expectNone((request) => request.url.startsWith('/api/'));
   });
 

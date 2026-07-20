@@ -340,7 +340,7 @@ def account_identity_proofs(account_id: str, db: DbSession) -> list[Any]:
 
 
 @router.post("/api/v1/accounts/{account_id}/follow")
-def follow(
+async def follow(
     request: Request,
     account_id: str,
     db: DbSession,
@@ -350,6 +350,9 @@ def follow(
     """Follow an account (or send a follow request to a locked one)."""
     target = _get_account_or_404(db, account_id)
     rel = do_follow(db, account, target)
+    body = await read_body(request)
+    if "reblogs" in body:
+        rel.showing_reblogs = truthy(body["reblogs"])
     db.commit()
     flush_stream_notifications(request.app, db, config)
     return serialize_relationship(db, target.id, rel, source_id=account.id)

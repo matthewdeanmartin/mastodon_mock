@@ -93,8 +93,8 @@ export class Api {
     return this.http.get<Relationship[]>('/api/v1/accounts/relationships', { params });
   }
 
-  follow(id: string): Observable<Relationship> {
-    return this.http.post<Relationship>(`/api/v1/accounts/${id}/follow`, {});
+  follow(id: string, options?: { reblogs?: boolean }): Observable<Relationship> {
+    return this.http.post<Relationship>(`/api/v1/accounts/${id}/follow`, options ?? {});
   }
 
   /** Accounts this account features on its profile ("collections"; Mastodon 4.4+). */
@@ -122,6 +122,10 @@ export class Api {
 
   unfollow(id: string): Observable<Relationship> {
     return this.http.post<Relationship>(`/api/v1/accounts/${id}/unfollow`, {});
+  }
+
+  removeFollower(id: string): Observable<Relationship> {
+    return this.http.post<Relationship>(`/api/v1/accounts/${id}/remove_from_followers`, {});
   }
 
   // --- timelines ---

@@ -28,17 +28,21 @@ def timeline_home(
     params: PageQuery,
 ) -> list[dict[str, Any]]:
     """Statuses from followed accounts + own statuses, newest first."""
-    followed_ids = [
-        r.target_account_id
-        for r in db.scalars(
-            select(Relationship).where(Relationship.source_account_id == account.id, Relationship.following.is_(True))
-        ).all()
-    ]
+    follows = db.scalars(
+        select(Relationship).where(
+            Relationship.source_account_id == account.id,
+            Relationship.following.is_(True),
+        )
+    ).all()
+    followed_ids = [relationship.target_account_id for relationship in follows]
+    hidden_reblog_ids = [relationship.target_account_id for relationship in follows if not relationship.showing_reblogs]
     author_ids = [*followed_ids, account.id]
     query = select(Status).where(
         Status.account_id.in_(author_ids),
         Status.visibility != "direct",
     )
+    if hidden_reblog_ids:
+        query = query.where(or_(Status.reblog_of_id.is_(None), Status.account_id.not_in(hidden_reblog_ids)))
     page = paginate(
         db, query, Status.id, max_id=params.max_id, min_id=params.min_id, since_id=params.since_id, limit=params.limit
     )
