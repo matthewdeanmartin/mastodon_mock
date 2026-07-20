@@ -73,6 +73,16 @@ describe('Auth + Server linkage', () => {
     expect(auth.sessions().map((s) => s.token)).toEqual(['art-token']);
   });
 
+  it('offers login prompts only when Anonymous is the only local account', () => {
+    const auth = TestBed.inject(Auth);
+    auth.enterAnonymous();
+    expect(auth.shouldOfferLogin).toBe(true);
+
+    auth.setToken('saved-token');
+    auth.enterAnonymous();
+    expect(auth.shouldOfferLogin).toBe(false);
+  });
+
   it('exits Anonymous for login without activating or deleting a saved session', () => {
     server.setBaseUrl('https://mastodon.art');
     auth.setToken('art-token');

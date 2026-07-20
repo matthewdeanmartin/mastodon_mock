@@ -102,6 +102,11 @@ export class Auth {
     return this.mode() === 'anonymous';
   }
 
+  /** Whether Anonymous is the only account available in this browser. */
+  get shouldOfferLogin(): boolean {
+    return this.isAnonymous && this.sessions().length === 0;
+  }
+
   /**
    * Make ``token`` active, adding it to the saved stable if it's new. Captures the
    * currently-selected instance so the session can be restored to the right host later.

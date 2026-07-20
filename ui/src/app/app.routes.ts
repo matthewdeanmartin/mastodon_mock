@@ -6,6 +6,11 @@ import { anonymousUnavailableGuard } from './providers/anonymous/anonymous-route
 import { mockOnlyChildren } from './mock-routes';
 
 export const routes: Routes = [
+  {
+    path: 'anonymous',
+    loadComponent: () =>
+      import('./pages/anonymous-entry/anonymous-entry').then((m) => m.AnonymousEntry),
+  },
   { path: 'login', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
   // New-user landing: bookmark this, sign up on your instance, come back and sign in.
   {
@@ -92,6 +97,12 @@ export const routes: Routes = [
               import('./pages/settings/appearance/settings-appearance').then(
                 (m) => m.SettingsAppearance,
               ),
+          },
+          {
+            path: 'storage',
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/storage/settings-storage').then((m) => m.SettingsStorage),
           },
           {
             path: 'posting',

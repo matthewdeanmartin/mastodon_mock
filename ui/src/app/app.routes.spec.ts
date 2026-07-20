@@ -7,6 +7,10 @@ function shellChild(path: string): Route | undefined {
 }
 
 describe('application routes', () => {
+  it('provides a shareable Anonymous entry route', () => {
+    expect(routes.find((route) => route.path === 'anonymous')?.loadComponent).toBeDefined();
+  });
+
   it('keeps public hashtag timelines available to Anonymous', () => {
     const tagRoute = shellChild('tags/:tag');
 

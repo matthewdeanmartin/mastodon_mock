@@ -1,0 +1,43 @@
+<div class="settings-page">
+  <div class="page-head">
+    <div>
+      <h1>Local storage</h1>
+      <p class="muted">Data saved in this browser for the currently selected account.</p>
+    </div>
+    <button
+      class="btn btn-outline danger"
+      type="button"
+      [disabled]="!storage().entries.length"
+      (click)="clearAll()"
+    >
+      Clear all local storage
+    </button>
+  </div>
+
+  <p class="summary muted small">
+    {{ storage().entries.length }} keys · {{ formatBytes(storage().totalBytes) }}
+  </p>
+
+  @if (storage().entries.length) {
+    <div class="storage-list">
+      @for (entry of storage().entries; track entry.key) {
+        <div class="storage-row">
+          <div>
+            <code>{{ entry.key }}</code>
+            <span class="muted small">{{ formatBytes(entry.bytes) }}</span>
+          </div>
+          <button
+            class="btn btn-outline btn-sm danger"
+            type="button"
+            (click)="deleteKey(entry)"
+            [attr.aria-label]="'Delete ' + entry.key"
+          >
+            Delete
+          </button>
+        </div>
+      }
+    </div>
+  } @else {
+    <p class="empty muted">This account has no local storage.</p>
+  }
+</div>

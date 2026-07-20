@@ -36,6 +36,12 @@ describe('SettingsShell', () => {
       (fixture.nativeElement as HTMLElement).querySelectorAll('.settings-nav a span:first-child'),
     ).map((node) => node.textContent?.trim());
 
-    expect(labels).toEqual(['Public profile', 'Mockingbird Blue', 'Connections', 'Appearance']);
+    expect(labels).toEqual([
+      'Public profile',
+      'Mockingbird Blue',
+      'Connections',
+      'Appearance',
+      'Local storage',
+    ]);
   });
 });

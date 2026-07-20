@@ -114,7 +114,8 @@ describe('Shell account switching', () => {
         'social-token',
       ]);
       expect(auth.account()?.display_name).toBe('Anonymous');
-      expect(fixture.nativeElement.textContent).toContain('Login');
+      expect(fixture.nativeElement.querySelector('.login-nav')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('+ Add an account');
       expect(fixture.nativeElement.textContent).toContain('Observability');
       expect(fixture.nativeElement.querySelector('.anonymous-post-login')).toBeNull();
       expect(fixture.nativeElement.querySelector('.profile-stats')?.textContent).toContain('Posts');

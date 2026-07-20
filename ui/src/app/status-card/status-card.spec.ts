@@ -127,6 +127,35 @@ describe('StatusCard', () => {
     expect(el.textContent).not.toContain('Report');
     expect(el.textContent).toContain('2');
     expect(el.textContent).toContain('3');
+    expect(el.querySelector('[title="Replies"]')?.textContent).toContain('0');
+    expect(el.querySelector('[title="Reposts"]')?.textContent).toContain('2');
+    expect(el.querySelector('[title="Favourites"]')?.textContent).toContain('3');
+  });
+
+  it('loads public edit history from the post server in Anonymous', () => {
+    TestBed.inject(Auth).enterAnonymous('https://home.example');
+    const f = setUp(
+      makeStatus({
+        id: 'anonymous-mastodon:social.example:100',
+        provider: 'anonymous-mastodon',
+        edited_at: '2026-01-01T00:00:00.000Z',
+        providerRef: {
+          server: 'https://social.example',
+          statusId: '100',
+          accountId: '7',
+        },
+      }),
+    );
+
+    (f.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('[title="Edit history"]')!
+      .click();
+    f.detectChanges();
+
+    const req = httpMock.expectOne('https://social.example/api/v1/statuses/100/history');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush([]);
   });
 
   it('links Anonymous Mastodon avatars and posts to public in-app routes', () => {

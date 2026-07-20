@@ -62,7 +62,7 @@
         </svg>
         <span>Tags</span>
       </a>
-      @if (auth.isAnonymous) {
+      @if (auth.shouldOfferLogin) {
         <a class="login-nav" routerLink="/login" (click)="auth.exitAnonymous()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
@@ -163,9 +163,11 @@
             }
 
             <div class="menu-divider"></div>
-            <button type="button" class="menu-action" (click)="addAccount()">
-              + Add an account
-            </button>
+            @if (!auth.isAnonymous || auth.shouldOfferLogin) {
+              <button type="button" class="menu-action" (click)="addAccount()">
+                + Add an account
+              </button>
+            }
             <button type="button" class="menu-action danger" (click)="logout()">
               {{ auth.isAnonymous ? 'Exit anonymous' : 'Log out' }}
             </button>

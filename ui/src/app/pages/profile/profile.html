@@ -271,7 +271,7 @@
   }
 
   @if (tab() === 'posts') {
-    @if (!isRss() && auth.isAnonymous && isSelf()) {
+    @if (!isRss() && auth.shouldOfferLogin && isSelf()) {
       <a class="profile-login-post" routerLink="/login" (click)="auth.exitAnonymous()">
         <div class="profile-login-post-label muted">📌 Pinned</div>
         <div class="profile-login-post-body">

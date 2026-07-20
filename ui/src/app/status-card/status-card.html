@@ -232,6 +232,10 @@
           >
             💬 <span>{{ display.replies_count }}</span>
           </button>
+        } @else if (auth.isAnonymous) {
+          <span class="action" title="Replies"
+            >💬 <span>{{ display.replies_count }}</span></span
+          >
         }
         @if (!foreign && (display.replies_count > 0 || display.in_reply_to_id)) {
           <a
@@ -269,7 +273,11 @@
             }
           </button>
         }
-        @if (!foreign && capabilities.canCompose) {
+        @if (auth.isAnonymous) {
+          <span class="action" title="Reposts"
+            >🔁 <span>{{ display.reblogs_count }}</span></span
+          >
+        } @else if (!foreign && capabilities.canCompose) {
           <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
             ❝
           </button>
@@ -302,7 +310,11 @@
             }
           </button>
         }
-        @if (!foreign) {
+        @if (auth.isAnonymous) {
+          <span class="action" title="Favourites">
+            {{ favIcon() }} <span>{{ display.favourites_count }}</span>
+          </span>
+        } @else if (!foreign) {
           @if (capabilities.canUseServerActions) {
             <button
               class="action count-link"
@@ -463,7 +475,9 @@
                       }}
                     </button>
                   } @else {
-                    <div class="menu-note muted small">Mute &#64;{{ display.account.acct }} for…</div>
+                    <div class="menu-note muted small">
+                      Mute &#64;{{ display.account.acct }} for…
+                    </div>
                     <div class="mute-durations">
                       @for (d of muteDurations; track d.label) {
                         <button type="button" (click)="muteAuthorLocally($event, d.seconds)">
@@ -484,6 +498,9 @@
           } @else if (!isOwn()) {
             <!-- Providers without server actions (Anonymous, foreign feeds) still
                  get a ••• menu for client-side mute/block + open-original. -->
+            @if (canViewPublicHistory) {
+              <button class="action" (click)="openHistory($event)" title="Edit history">🕘</button>
+            }
             <details class="danger-menu" (click)="$event.stopPropagation()">
               <summary class="action" aria-label="More post actions">•••</summary>
               <div class="danger-menu-panel">
@@ -600,7 +617,11 @@
   }
 
   @if (showHistory()) {
-    <app-history-dialog [statusId]="display.id" (closed)="showHistory.set(false)" />
+    <app-history-dialog
+      [statusId]="historyStatusId"
+      [server]="historyServer"
+      (closed)="showHistory.set(false)"
+    />
   }
 
   @if (lightboxIndex() !== null) {

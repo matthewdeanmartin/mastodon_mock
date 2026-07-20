@@ -629,6 +629,24 @@ export class StatusCard {
     return this.capabilities.statusCaps(this.display.provider ?? 'mastodon');
   }
 
+  /** Public Mastodon edit history remains readable without a user token. */
+  protected get canViewPublicHistory(): boolean {
+    const ref = this.anonymousRef;
+    return (
+      this.auth.isAnonymous && !!this.display.edited_at && !!ref && !ref.statusId.startsWith('rss:')
+    );
+  }
+
+  protected get historyStatusId(): string {
+    return this.anonymousRef?.statusId ?? this.display.id;
+  }
+
+  protected get historyServer(): string | null {
+    return this.display.provider === 'anonymous-mastodon'
+      ? (this.anonymousRef?.server ?? null)
+      : null;
+  }
+
   get boostedBy(): string | null {
     const s = this.status();
     return s.reblog ? s.account.display_name : null;

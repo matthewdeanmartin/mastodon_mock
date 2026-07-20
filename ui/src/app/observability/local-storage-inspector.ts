@@ -27,12 +27,17 @@ function byteSize(s: string): number {
 }
 
 /** Snapshot every localStorage entry with its size, largest first. */
-export function inspectLocalStorage(): StorageReport {
+export function inspectLocalStorage(
+  predicate: (key: string) => boolean = () => true,
+): StorageReport {
   const entries: StorageEntry[] = [];
   let totalBytes = 0;
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key === null) {
+      continue;
+    }
+    if (!predicate(key)) {
       continue;
     }
     const value = localStorage.getItem(key) ?? '';

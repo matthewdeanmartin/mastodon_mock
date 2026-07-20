@@ -18,7 +18,7 @@
   </aside>
 }
 
-@if (auth.isAnonymous) {
+@if (auth.shouldOfferLogin) {
   <a
     class="anonymous-login-post"
     routerLink="/login"
@@ -37,7 +37,7 @@
       </div>
     </div>
   </a>
-} @else {
+} @else if (!auth.isAnonymous) {
   <app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
 }
 

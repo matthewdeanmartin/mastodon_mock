@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, timeout } from 'rxjs';
 import { AccountStatusesOptions } from '../../api';
-import { Account, Collection, Context, SearchResults, Status, Tag } from '../../models';
+import { Account, Collection, Context, SearchResults, Status, StatusEdit, Tag } from '../../models';
 import { externalFetch } from '../external-fetch';
 import { adaptAnonymousAccount, adaptAnonymousStatus } from './anonymous-mastodon-provider';
 import { AnonymousPublicRef } from './anonymous-route-ref';
@@ -43,10 +43,11 @@ export class AnonymousPublicApi {
   /** Discoverable Collections curated by a public account (Mastodon 4.6+). */
   getAccountCollections(ref: AnonymousPublicRef): Observable<Collection[]> {
     return this.http
-      .get<{ collections: Collection[] }>(
-        `${ref.server}/api/v1/accounts/${encodeURIComponent(ref.id)}/collections`,
-        { context: externalFetch() },
-      )
+      .get<{
+        collections: Collection[];
+      }>(`${ref.server}/api/v1/accounts/${encodeURIComponent(ref.id)}/collections`, {
+        context: externalFetch(),
+      })
       .pipe(
         timeout(REQUEST_TIMEOUT_MS),
         map((response) => response.collections ?? []),
@@ -99,6 +100,15 @@ export class AnonymousPublicApi {
           ),
         })),
       );
+  }
+
+  /** Edit history is public for public statuses. */
+  getStatusHistory(ref: AnonymousPublicRef): Observable<StatusEdit[]> {
+    return this.http
+      .get<StatusEdit[]>(`${ref.server}/api/v1/statuses/${encodeURIComponent(ref.id)}/history`, {
+        context: externalFetch(),
+      })
+      .pipe(timeout(REQUEST_TIMEOUT_MS));
   }
 
   getTag(server: string, name: string): Observable<Tag> {
