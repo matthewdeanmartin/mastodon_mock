@@ -30,6 +30,8 @@ import { Server } from '../../server';
       <span class="footer-separator" aria-hidden="true">·</span>
       <button class="link" type="button" (click)="reporting.set(true)">Report a bug</button>
       <span class="footer-separator" aria-hidden="true">·</span>
+      <a routerLink="/credits" fragment="privacy">Privacy</a>
+      <span class="footer-separator" aria-hidden="true">·</span>
       <a routerLink="/fail-whale">Fail whale</a>
       <span class="footer-separator" aria-hidden="true">·</span>
       <button

@@ -1,5 +1,5 @@
 import { ApplicationConfig, ErrorHandler, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter, withPreloading } from '@angular/router';
+import { provideRouter, withInMemoryScrolling, withPreloading } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
 import { routes } from './app.routes';
@@ -18,7 +18,12 @@ export const appConfig: ApplicationConfig = {
     // so a failed dynamic import (a rejected promise) reaches GlobalErrorHandler.
     provideBrowserGlobalErrorListeners(),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
-    provideRouter(routes, withPreloading(SettingsPreloading)),
+    provideRouter(
+      routes,
+      withPreloading(SettingsPreloading),
+      // Enables fragment scrolling (e.g. /credits#privacy from the footer).
+      withInMemoryScrolling({ anchorScrolling: 'enabled' }),
+    ),
     // metricsInterceptor is outermost so it times the full round-trip (including
     // the server/auth rewrites) and sees the final response/error.
     provideHttpClient(

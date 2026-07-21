@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { environment } from '../environments/environment';
+import { AnalyticsTracker } from './analytics-tracker';
 import { ClientPrefs } from './client-prefs';
 import { FailWhale } from './fail-whale/fail-whale';
 import { InstanceStatus } from './instance-status';
@@ -28,8 +29,11 @@ export class App {
   /** Instantiated eagerly so status-page discovery runs while the instance is healthy. */
   private readonly instanceStatus = inject(InstanceStatus);
   private readonly recovery = inject(UpdateRecovery);
+  private readonly analytics = inject(AnalyticsTracker);
 
   constructor() {
+    // Count page views on every router navigation (GoatCounter, no_onload).
+    this.analytics.start();
     // Set the tab title from the build flavor (mastodon_mock vs Mocking Bird).
     this.title.setTitle(environment.brand);
     // Arm the deployment-recovery loop guard: if we got here after an

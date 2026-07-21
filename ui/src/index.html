@@ -11,6 +11,20 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="manifest" href="/site.webmanifest" />
+
+    <!--
+      GoatCounter analytics. no_onload disables its built-in auto-count and
+      hashchange listener; this is a path-based Angular SPA, so page views are
+      counted on router NavigationEnd instead (see analytics-tracker.ts).
+    -->
+    <script>
+      window.goatcounter = { no_onload: true };
+    </script>
+    <script
+      data-goatcounter="https://mawkingbird.goatcounter.com/count"
+      async
+      src="//gc.zgo.at/count.js"
+    ></script>
   </head>
   <body>
     <app-root></app-root>
