@@ -7,17 +7,23 @@
 }
 
 .topbar-inner {
+  /* Mirror the body .layout grid exactly (same width, columns, gap, padding,
+     centering) so the header's three regions sit directly above the three body
+     columns: brand over the left rail, the tab nav over the center column, and
+     the more/account actions over the right rail. */
   width: min(1460px, 100%);
   min-height: 64px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 16px;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-columns: 290px minmax(0, var(--col-width)) 320px;
+  justify-content: center;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
 }
 
 .brand {
+  grid-column: 1;
   width: fit-content;
   display: inline-flex;
   align-items: center;
@@ -44,6 +50,7 @@
 }
 
 .primary-nav {
+  grid-column: 2;
   height: 64px;
   display: flex;
   justify-content: center;
@@ -53,8 +60,8 @@
 
 .primary-nav a {
   position: relative;
-  min-width: 72px;
-  padding: 0 13px;
+  min-width: 60px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -102,6 +109,7 @@
 }
 
 .header-actions {
+  grid-column: 3;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -394,11 +402,25 @@
   }
 }
 
-@media (max-width: 1320px) {
+/* ≤1240: body drops the right rail (290 | center). Keep brand over the rail and
+   the tab nav over the center column; actions collapse to the far right. */
+@media (max-width: 1240px) {
   .topbar-inner {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 290px minmax(0, var(--col-width)) max-content;
   }
+}
 
+/* ≤1000: body is a single centered column (no rails). Fall back to the original
+   flexible header so the tab nav stays centered over that lone column. */
+@media (max-width: 1000px) {
+  .topbar-inner {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    justify-content: stretch;
+  }
+}
+
+/* Independent of the column layout: below this the labels crowd, so drop them. */
+@media (max-width: 1320px) {
   .brand-name,
   .account-pill > span,
   .account-pill .caret,
@@ -407,8 +429,8 @@
   }
 
   .primary-nav a {
-    min-width: 60px;
-    padding-inline: 10px;
+    min-width: 56px;
+    padding-inline: 8px;
   }
 
   .account-pill {
