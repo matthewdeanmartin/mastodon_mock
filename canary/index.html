@@ -13,6 +13,27 @@
     <link rel="manifest" href="/site.webmanifest">
 
     <!--
+      SPA deep-link restore. GitHub Pages' single root 404.html
+      (404-subpath-redirect.html) bounces an unknown deep link to the owning
+      app's index with the original path stashed as ?spa=…; here we restore it
+      into history before Angular's router reads location, so refreshing or
+      chunk-reloading a deep URL lands back on that same route (and on the right
+      deployment — /canary/… stays under /canary/). Runs synchronously ahead of
+      the app bundle.
+    -->
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var target = params.get('spa');
+        // Same-origin absolute path only: leading "/" but not "//" (which would
+        // be a protocol-relative cross-origin URL).
+        if (target && target.charAt(0) === '/' && target.charAt(1) !== '/') {
+          history.replaceState(null, '', target);
+        }
+      })();
+    </script>
+
+    <!--
       GoatCounter analytics. no_onload disables its built-in auto-count and
       hashchange listener; this is a path-based Angular SPA, so page views are
       counted on router NavigationEnd instead (see analytics-tracker.ts).
@@ -24,5 +45,5 @@
   <style>:root{--bg:#f7f9f9;--col-bg:#ffffff;--border:#e1e8ed;--text:#14171a;--muted:#657786;--accent:#1da1f2;--accent-hover:#1a91da;--accent-soft:#e8f5fe;--hover:#eff3f4;--col-width:600px;color-scheme:light}*{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.4}</style><link rel="stylesheet" href="styles-V7L2IGSO.css" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="styles-V7L2IGSO.css"></noscript></head>
   <body>
     <app-root></app-root>
-  <link rel="modulepreload" href="chunk-EFL5XXTO.js"><link rel="modulepreload" href="chunk-32YN3BNR.js"><link rel="modulepreload" href="chunk-X464IL6Q.js"><link rel="modulepreload" href="chunk-2R56QEVP.js"><link rel="modulepreload" href="chunk-SPNHI25B.js"><link rel="modulepreload" href="chunk-I7CCCGOK.js"><link rel="modulepreload" href="chunk-6FZVBNBC.js"><link rel="modulepreload" href="chunk-NTJF3KZX.js"><link rel="modulepreload" href="chunk-FBAQKJPM.js"><link rel="modulepreload" href="chunk-4HY7NWU4.js"><script src="main-DXI5UKTV.js" type="module"></script></body>
+  <link rel="modulepreload" href="chunk-EFL5XXTO.js"><link rel="modulepreload" href="chunk-32YN3BNR.js"><link rel="modulepreload" href="chunk-X464IL6Q.js"><link rel="modulepreload" href="chunk-2R56QEVP.js"><link rel="modulepreload" href="chunk-SPNHI25B.js"><link rel="modulepreload" href="chunk-W7LZ76XZ.js"><link rel="modulepreload" href="chunk-6FZVBNBC.js"><link rel="modulepreload" href="chunk-NTJF3KZX.js"><link rel="modulepreload" href="chunk-FBAQKJPM.js"><link rel="modulepreload" href="chunk-4HY7NWU4.js"><script src="main-GFDLSAZ5.js" type="module"></script></body>
 </html>
