@@ -44,6 +44,14 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /** True when the search needs the compact blob (has richer post criteria than
  *  the flat params represent). Simple searches stay human-readable. */
 function needsBlob(s: MawkingbirdSearch): boolean {
+  if (s.target === 'accounts') {
+    const a = s.account;
+    // Anything beyond a plain text search needs the structured blob.
+    return !!(
+      a &&
+      ((a.source && a.source !== 'both') || a.followers || a.following || a.statuses)
+    );
+  }
   const p = s.post;
   if (s.target !== 'posts' || !p) {
     return false;
@@ -150,7 +158,16 @@ function decodeBlob(blob: string): MawkingbirdSearch {
     }
 
     if (target === 'accounts' && raw.account) {
-      out.account = { text: String(raw.account.text ?? '') };
+      const a = raw.account;
+      out.account = {
+        text: String(a.text ?? ''),
+        source: (['bio', 'posts', 'both'] as const).includes(a.source as never)
+          ? a.source
+          : undefined,
+        followers: cleanRange(a.followers),
+        following: cleanRange(a.following),
+        statuses: cleanRange(a.statuses),
+      };
     } else if (target === 'hashtags' && raw.hashtag) {
       out.hashtag = { text: String(raw.hashtag.text ?? '') };
     } else if (target === 'posts' && raw.post) {
@@ -182,6 +199,19 @@ function decodeBlob(blob: string): MawkingbirdSearch {
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v : undefined;
+}
+
+/** Coerce a decoded numeric range, keeping only finite non-negative bounds. */
+function cleanRange(r: unknown): { min?: number; max?: number } | undefined {
+  if (!r || typeof r !== 'object') {
+    return undefined;
+  }
+  const obj = r as { min?: unknown; max?: unknown };
+  const num = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
+  const min = num(obj.min);
+  const max = num(obj.max);
+  return min != null || max != null ? { min, max } : undefined;
 }
 
 function cleanDates(

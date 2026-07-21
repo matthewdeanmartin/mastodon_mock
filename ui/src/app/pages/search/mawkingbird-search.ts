@@ -58,12 +58,36 @@ export interface PostSearchCriteria extends SearchTextCriteria {
   scope?: 'all' | 'public' | 'library';
 }
 
+/**
+ * Where an account search looks for its query. Mastodon's account endpoint
+ * matches handle/display-name/bio; 'posts' instead runs a post search and
+ * condenses the matching statuses down to their distinct authors ("find me
+ * people who post about pycharm"). 'both' (the default) runs both and merges the
+ * authors, deduped by id.
+ */
+export type AccountSearchSource = 'bio' | 'posts' | 'both';
+
+/** A closed/open numeric range. Either bound may be undefined (unbounded). */
+export interface NumericRange {
+  min?: number;
+  max?: number;
+}
+
 export interface AccountSearchCriteria {
   text: string;
   location?: AccountLocation;
   bot?: Tristate;
   locked?: Tristate;
   domain?: string;
+
+  /** Where to look for the query. Defaults to 'both' when unset. */
+  source?: AccountSearchSource;
+
+  // Numeric gates applied to loaded results (client-side): filter in/out
+  // celebrities, dead accounts, etc. by follower/following/post counts.
+  followers?: NumericRange;
+  following?: NumericRange;
+  statuses?: NumericRange;
 }
 
 export interface HashtagSearchCriteria {

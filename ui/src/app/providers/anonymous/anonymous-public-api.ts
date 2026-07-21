@@ -184,8 +184,18 @@ export class AnonymousPublicApi {
     server: string,
     query: string,
     type: 'accounts' | 'statuses' | 'hashtags',
+    opts: { offset?: number; limit?: number } = {},
   ): Observable<SearchResults> {
-    const params = new HttpParams().set('q', query).set('type', type);
+    // Real mastodon.social paginates account search by offset/limit; thread them
+    // through so "load more" can page past the first batch (the endpoint returns
+    // a small unranked page otherwise).
+    let params = new HttpParams().set('q', query).set('type', type);
+    if (opts.offset) {
+      params = params.set('offset', String(opts.offset));
+    }
+    if (opts.limit) {
+      params = params.set('limit', String(opts.limit));
+    }
     return this.http
       .get<SearchResults>(`${server}/api/v2/search`, { params, context: externalFetch() })
       .pipe(

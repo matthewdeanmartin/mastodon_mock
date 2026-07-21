@@ -1,16 +1,39 @@
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  OnDestroy,
+  OnInit,
+  computed,
+  inject,
+  isDevMode,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, EMPTY, Subscription } from 'rxjs';
+import { catchError, EMPTY, Observable, of, Subscription } from 'rxjs';
 import { Api } from '../../api';
-import { Account, SearchResults, Status, Tag } from '../../models';
+import { Account, Relationship, SearchResults, Status, Tag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { FindPeople } from '../find-people/find-people';
 import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
+import { AccountResultCard } from './account-result-card';
+import { AccountSearchStore } from './account-search-store';
+import {
+  AccountFacet,
+  AccountFacetKind,
+  AccountWithMatches,
+  accountMatchesFacet,
+  accountMatchesNumeric,
+  buildAccountFacets,
+  condenseStatusesToAuthors,
+  filterAccounts,
+  mergeAuthors,
+} from './account-refine';
 import {
   buildFacets,
   Facet,
@@ -20,7 +43,10 @@ import {
   statusMatchesFacet,
 } from './search-refine';
 import {
+  AccountSearchCriteria,
+  AccountSearchSource,
   MawkingbirdSearch,
+  NumericRange,
   PostContentType,
   PostSearchCriteria,
   ResultGrouping,
@@ -47,20 +73,30 @@ const LOAD_MORE_HARD_CAP = 30;
 
 @Component({
   selector: 'app-search',
-  imports: [FormsModule, RouterLink, StatusCard, FindPeople],
+  imports: [FormsModule, RouterLink, StatusCard, FindPeople, AccountResultCard],
   templateUrl: './search.html',
   styleUrl: './search.css',
 })
-export class Search implements OnInit {
+export class Search implements OnInit, OnDestroy {
   protected capabilities = inject(AnonymousCapabilities);
   private api = inject(Api);
+  private accountStore = inject(AccountSearchStore);
   private anonymous = inject(AnonymousAccount);
+  private anonymousFollows = inject(AnonymousFollows);
   private anonymousPublic = inject(AnonymousPublicApi);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
   protected saved = inject(SavedSearches);
   private activeSearch: Subscription | null = null;
+
+  /** Dev-only structured logging. Silent in production builds. */
+  private debug(...args: unknown[]): void {
+    if (isDevMode()) {
+      // eslint-disable-next-line no-console
+      console.debug(...args);
+    }
+  }
 
   protected query = signal('');
   protected results = signal<SearchResults | null>(null);
@@ -137,6 +173,58 @@ export class Search implements OnInit {
   protected sensitive = signal<Tristate>('include');
   protected scope = signal<'all' | 'public' | 'library'>('all');
 
+  // --- Advanced account-search form (Phase 3) ---
+  // `accountSource` picks where the query is matched: bio (the plain account
+  // endpoint), posts (a post search condensed to its authors), or both merged.
+  // The six numeric fields gate loaded results by follower/following/post counts
+  // (the "real people vs celebrities vs dead accounts" tool) — client-side only.
+  protected accountSource = signal<AccountSearchSource>('both');
+  protected followersMin = signal('');
+  protected followersMax = signal('');
+  protected followingMin = signal('');
+  protected followingMax = signal('');
+  protected statusesMin = signal('');
+  protected statusesMax = signal('');
+
+  protected readonly accountSources: { value: AccountSearchSource; label: string }[] = [
+    { value: 'both', label: 'Bio and posts' },
+    { value: 'bio', label: 'Name & bio only' },
+    { value: 'posts', label: 'What they post' },
+  ];
+
+  /** Parse a numeric-field string into a bound, ignoring blanks/garbage. */
+  private numOrUndef(raw: string): number | undefined {
+    const n = Number(raw.trim());
+    return raw.trim() && Number.isFinite(n) && n >= 0 ? n : undefined;
+  }
+
+  private range(minRaw: string, maxRaw: string): NumericRange | undefined {
+    const min = this.numOrUndef(minRaw);
+    const max = this.numOrUndef(maxRaw);
+    return min != null || max != null ? { min, max } : undefined;
+  }
+
+  /** The account advanced form assembled into rich criteria. */
+  protected accountCriteria = computed<AccountSearchCriteria>(() => ({
+    text: this.query().trim(),
+    source: this.accountSource(),
+    followers: this.range(this.followersMin(), this.followersMax()),
+    following: this.range(this.followingMin(), this.followingMax()),
+    statuses: this.range(this.statusesMin(), this.statusesMax()),
+  }));
+
+  /** True when any account advanced field is set beyond the defaults. */
+  protected hasAccountAdvanced = computed(
+    () =>
+      this.accountSource() !== 'both' ||
+      !!this.followersMin() ||
+      !!this.followersMax() ||
+      !!this.followingMin() ||
+      !!this.followingMax() ||
+      !!this.statusesMin() ||
+      !!this.statusesMax(),
+  );
+
   /** Bundled language options (no API call — spec §6.4). */
   protected readonly languages = [
     { code: '', label: 'Any language' },
@@ -185,7 +273,7 @@ export class Search implements OnInit {
     return {
       version: 1,
       target,
-      account: target === 'accounts' ? { text: this.query().trim() } : undefined,
+      account: target === 'accounts' ? this.accountCriteria() : undefined,
       hashtag: target === 'hashtags' ? { text: this.query().trim() } : undefined,
       post: target === 'posts' ? this.postCriteria() : undefined,
       apiCallBudget: this.apiBudget(),
@@ -311,6 +399,11 @@ export class Search implements OnInit {
       this.query.set(q);
       this.type.set(t);
       if (q.trim()) {
+        // Returning to an account search (e.g. Back from a profile): restore the
+        // in-memory snapshot rather than re-running the whole fan-out.
+        if (t === 'accounts' && this.restoreAccountSnapshot(q.trim())) {
+          return;
+        }
         this.fetch(q.trim(), t);
       } else {
         this.activeSearch?.unsubscribe();
@@ -319,6 +412,58 @@ export class Search implements OnInit {
         this.loadTrends();
       }
     });
+  }
+
+  /** Save the current account result set so returning here restores it. */
+  ngOnDestroy(): void {
+    this.saveAccountSnapshot();
+  }
+
+  private saveAccountSnapshot(): void {
+    if (this.type() !== 'accounts' || !this.accountItems().length) {
+      return;
+    }
+    this.accountStore.save({
+      query: this.executedQuery,
+      items: this.accountItems(),
+      relationships: this.relationships(),
+      expanded: [...this.expandedAccounts()],
+      facets: this.selectedAccountFacets(),
+      filter: this.accountFilter(),
+      bounds: this.executedAccountBounds(),
+      callsUsed: this.callsUsed(),
+      // The results column doesn't scroll internally (overflow:hidden) — the page
+      // scrolls, so the window offset is what to restore.
+      scrollTop: typeof window !== 'undefined' ? window.scrollY : 0,
+    });
+  }
+
+  /** Restore a snapshot for `q` if one is stored; returns true when it did. */
+  private restoreAccountSnapshot(q: string): boolean {
+    const snap = this.accountStore.take(q);
+    if (!snap) {
+      return false;
+    }
+    this.debug('[search] restoring account snapshot', { q, items: snap.items.length });
+    this.activeSearch?.unsubscribe();
+    this.searching.set(false);
+    this.results.set(null);
+    this.executedQuery = snap.query;
+    this.executedType = 'accounts';
+    this.accountItems.set(snap.items);
+    this.relationships.set(snap.relationships);
+    this.expandedAccounts.set(new Set(snap.expanded));
+    this.selectedAccountFacets.set(snap.facets);
+    this.accountFilter.set(snap.filter);
+    this.executedAccountBounds.set(snap.bounds);
+    this.callsUsed.set(snap.callsUsed);
+    this.accountSearchRan.set(true);
+    // NOTE: scroll-offset restore is intentionally not attempted here. The
+    // router's in-memory scroller resets scroll to top on navigation *after* this
+    // runs, and racing it with timeouts proved unreliable. The result set itself
+    // is fully restored (the thing that was expensive to rebuild); `snap.scrollTop`
+    // is retained for a future fix that hooks the router's scroll event.
+    return true;
   }
 
   /** A shared link is one carrying structured search beyond a bare q/type: the
@@ -455,14 +600,45 @@ export class Search implements OnInit {
     this.sensitive.set(p.sensitive ?? 'include');
     this.scope.set(p.scope ?? 'all');
 
+    // Restore account advanced fields (source + numeric bounds).
+    const acc = search.account;
+    this.accountSource.set(acc?.source ?? 'both');
+    this.followersMin.set(acc?.followers?.min != null ? String(acc.followers.min) : '');
+    this.followersMax.set(acc?.followers?.max != null ? String(acc.followers.max) : '');
+    this.followingMin.set(acc?.following?.min != null ? String(acc.following.min) : '');
+    this.followingMax.set(acc?.following?.max != null ? String(acc.following.max) : '');
+    this.statusesMin.set(acc?.statuses?.min != null ? String(acc.statuses.min) : '');
+    this.statusesMax.set(acc?.statuses?.max != null ? String(acc.statuses.max) : '');
+
     if (search.target === 'posts') {
       // Run through the advanced path so the serializer/hashtag-transform apply.
       this.query.set(p.words ?? '');
       this.applyAdvanced();
     } else {
-      this.query.set((search.account?.text ?? search.hashtag?.text ?? '').trim());
+      this.query.set((acc?.text ?? search.hashtag?.text ?? '').trim());
       this.run();
     }
+  }
+
+  /** Run an account search from the advanced panel. The account form fields are
+   *  live signals that `fetchAccounts` reads directly, so this just ensures the
+   *  Accounts tab is active and (re-)runs. */
+  applyAccountAdvanced(): void {
+    this.type.set('accounts');
+    if (!this.query().trim()) {
+      return;
+    }
+    this.run();
+  }
+
+  clearAccountAdvanced(): void {
+    this.accountSource.set('both');
+    this.followersMin.set('');
+    this.followersMax.set('');
+    this.followingMin.set('');
+    this.followingMax.set('');
+    this.statusesMin.set('');
+    this.statusesMax.set('');
   }
 
   runSaved(id: string): void {
@@ -557,6 +733,14 @@ export class Search implements OnInit {
   private fetch(q: string, type: SearchType): void {
     this.activeSearch?.unsubscribe();
     this.resetRefinements();
+    // Account cards carry per-result state (relationships, expansion) that must
+    // not leak across searches.
+    this.relationships.set({});
+    this.expandedAccounts.set(new Set());
+    this.selectedAccountFacets.set([]);
+    this.accountFilter.set('');
+    this.accountItems.set([]);
+    this.accountSearchRan.set(false);
     // A new search resets the budget counters and pagination cursors (§7/§20).
     this.callsUsed.set(0);
     this.tagsDropped.set(0);
@@ -564,6 +748,12 @@ export class Search implements OnInit {
     this.oldestId = '';
     this.executedQuery = q;
     this.executedType = type;
+
+    // Accounts have their own orchestration (bio / posts→authors / both).
+    if (type === 'accounts') {
+      this.fetchAccounts(q);
+      return;
+    }
     // Snapshot the criteria that produced this search so chips/Explain describe
     // exactly what was run. Advanced searches stage full criteria in
     // `pendingCriteria`; a plain-box status search is just the words.
@@ -587,10 +777,7 @@ export class Search implements OnInit {
       this.firstPageTags = null;
     }
 
-    // Handle- or URL-shaped queries get resolve=true so the server webfingers
-    // accounts it hasn't federated with yet (how you find someone by address).
-    const resolve =
-      type === 'accounts' && (/^@?[\w.-]+@[\w.-]+\.\w+$/.test(q) || /^https?:\/\//.test(q));
+    // Only statuses/hashtags reach here (accounts early-return above).
     const cost = this.firstPageTags ? this.firstPageTags.length : 1;
     const request = this.capabilities.active
       ? type === 'statuses'
@@ -598,15 +785,7 @@ export class Search implements OnInit {
             maxTags: this.apiBudget(),
           })
         : this.anonymousPublic.search(this.anonymous.server(), q, type)
-      : this.api.search(
-          q,
-          type,
-          type === 'statuses'
-            ? { limit: PAGE_SIZE }
-            : resolve
-              ? { resolve: true }
-              : undefined,
-        );
+      : this.api.search(q, type, type === 'statuses' ? { limit: PAGE_SIZE } : undefined);
     this.activeSearch = request.subscribe({
       next: (r) => {
         this.results.set(r);
@@ -618,6 +797,143 @@ export class Search implements OnInit {
       },
       error: () => this.searching.set(false),
     });
+  }
+
+  /**
+   * Account orchestration (Phase 3). Depending on the chosen source:
+   *  - `bio`   → the plain account endpoint (handle/name/bio match), paginated;
+   *  - `posts` → a post search condensed to its distinct authors;
+   *  - `both`  → both, merged and deduped by account id.
+   * The rich numeric bounds are snapshotted so the client-side gates/facets
+   * describe exactly what was requested. Relationships batch-load once results
+   * are in. Post fan-out reuses the same hashtag transform as post search, so it
+   * respects the API-call budget the same way.
+   */
+  private fetchAccounts(q: string): void {
+    const criteria = this.accountCriteria();
+    const source = criteria.source ?? 'both';
+    this.executedAccountBounds.set(criteria);
+    this.executedCriteria.set(null);
+    this.pendingCriteria = null;
+    this.accountSearchRan.set(false);
+    this.searching.set(true);
+    // A fresh fetch supersedes any stored snapshot for back-nav restore.
+    this.accountStore.clear();
+
+    // A branch that fails must not sink the whole search: real mastodon.social
+    // authenticated *status* full-text search can 401/422 depending on server
+    // config, and forkJoin would otherwise blank the account hits too. Each
+    // branch degrades to an empty page (logged) so the other still shows.
+    const EMPTY_RESULTS: SearchResults = { accounts: [], statuses: [], hashtags: [] };
+    const resilient = (
+      obs: Observable<SearchResults>,
+      label: string,
+    ): Observable<SearchResults> =>
+      obs.pipe(
+        catchError((err) => {
+          // eslint-disable-next-line no-console
+          console.warn(`[search] account "${label}" branch failed — degrading to empty`, err);
+          return of(EMPTY_RESULTS);
+        }),
+      );
+
+    // Handle- or URL-shaped queries get resolve=true so the server webfingers
+    // accounts it hasn't federated with yet (how you find someone by address).
+    const resolve = /^@?[\w.-]+@[\w.-]+\.\w+$/.test(q) || /^https?:\/\//.test(q);
+    const bioReq: Observable<SearchResults> | null =
+      source === 'posts'
+        ? null
+        : resilient(
+            this.capabilities.active
+              ? this.anonymousPublic.search(this.anonymous.server(), q, 'accounts', {
+                  limit: PAGE_SIZE,
+                })
+              : this.api.search(
+                  q,
+                  'accounts',
+                  resolve ? { resolve: true, limit: PAGE_SIZE } : { limit: PAGE_SIZE },
+                ),
+            'bio',
+          );
+
+    // Posts→authors: fan out to the same hashtag/post search the post tab uses.
+    if (this.capabilities.active && source !== 'bio') {
+      const allTags = this.anonymousPublic.hashtagsForQuery(q);
+      const affordable = allTags.slice(0, this.apiBudget());
+      this.tagsDropped.set(allTags.length - affordable.length);
+      this.firstPageTags = affordable;
+    } else {
+      this.firstPageTags = null;
+    }
+    const postsReq: Observable<SearchResults> | null =
+      source === 'bio'
+        ? null
+        : resilient(
+            this.capabilities.active
+              ? this.anonymousPublic.searchPostsByHashtags(this.anonymous.server(), q, {
+                  maxTags: this.apiBudget(),
+                })
+              : this.api.search(q, 'statuses', { limit: PAGE_SIZE }),
+            'posts',
+          );
+
+    // Each request costs at least 1; anonymous post fan-out costs one per tag.
+    const postCost = this.firstPageTags ? this.firstPageTags.length : 1;
+
+    this.debug('[search] account fetch', {
+      q,
+      source,
+      anonymous: this.capabilities.active,
+      bioReq: !!bioReq,
+      postsReq: !!postsReq,
+      tags: this.firstPageTags,
+    });
+
+    // Merge each branch's results into the list AS THEY ARRIVE, rather than
+    // waiting for both (forkJoin) — real mastodon.social full-text status search
+    // takes several seconds, and holding the instant bio results hostage behind
+    // it made the search look broken. Each branch merges independently; the
+    // spinner clears once both have settled.
+    let pending = (bioReq ? 1 : 0) + (postsReq ? 1 : 0);
+    const settle = (): void => {
+      if (--pending <= 0) {
+        this.searching.set(false);
+        this.accountSearchRan.set(true);
+      }
+    };
+    const mergeIn = (authors: AccountWithMatches[], addedCost: number): void => {
+      if (authors.length) {
+        this.accountItems.update((cur) => mergeAuthors(cur, authors));
+        this.loadRelationships(authors.map((a) => a.account));
+      }
+      this.callsUsed.update((c) => c + addedCost);
+    };
+
+    const subs = new Subscription();
+    if (bioReq) {
+      subs.add(
+        bioReq.subscribe((page) => {
+          const authors = (page.accounts ?? []).map((account) => ({ account, matchingPosts: [] }));
+          this.debug('[search] account bio results', { accounts: authors.length });
+          mergeIn(authors, 1);
+          settle();
+        }),
+      );
+    }
+    if (postsReq) {
+      subs.add(
+        postsReq.subscribe((page) => {
+          const authors = condenseStatusesToAuthors(page.statuses ?? []);
+          this.debug('[search] account post-author results', {
+            statuses: page.statuses?.length ?? 0,
+            authors: authors.length,
+          });
+          mergeIn(authors, postCost);
+          settle();
+        }),
+      );
+    }
+    this.activeSearch = subs;
   }
 
   /**
@@ -705,6 +1021,177 @@ export class Search implements OnInit {
       return { ...cur, statuses: [...cur.statuses, ...fresh] };
     });
     return added;
+  }
+
+  // --- Account results (Phase 2) ---
+  // The account tab renders info-dense cards. Relationships for the whole loaded
+  // set are batch-fetched once (the endpoint takes many ids at a time), and
+  // follow/unfollow is owned here so the card stays presentational.
+  /** Relationship per account id, populated by `loadRelationships`. */
+  protected relationships = signal<Record<string, Relationship>>({});
+  /** Account ids with a follow/unfollow request in flight. */
+  protected followBusy = signal<Set<string>>(new Set());
+  /** Account ids whose card has its "more" section expanded. */
+  protected expandedAccounts = signal<Set<string>>(new Set());
+
+  /** The raw loaded account result set (bio hits + condensed post authors,
+   *  merged), before any client-side numeric/facet/text refinement. Set by the
+   *  account fetch path; the visible list derives from it. */
+  protected accountItems = signal<AccountWithMatches[]>([]);
+  /** True once an account search has completed (success or error), so the empty
+   *  state reads "no people found" instead of reverting to the idle import panel. */
+  protected accountSearchRan = signal(false);
+
+  // --- Account-result refinement (Phase 3, all client-side) ---
+  /** Selected account facet values, keyed by kind + value. */
+  protected selectedAccountFacets = signal<{ kind: AccountFacetKind; value: string }[]>([]);
+  /** The "filter these people" substring over loaded account cards. */
+  protected accountFilter = signal('');
+  /** Snapshot of the numeric bounds that the current results are gated by. */
+  private executedAccountBounds = signal<AccountSearchCriteria>({ text: '' });
+
+  /** Facets computed from all loaded accounts (counts reflect the full load). */
+  protected accountFacets = computed<AccountFacet[]>(() =>
+    buildAccountFacets(this.accountItems().map((i) => i.account)),
+  );
+
+  /** The loaded accounts after numeric gates, facet selection, and text filter. */
+  protected visibleAccounts = computed<AccountWithMatches[]>(() => {
+    const bounds = this.executedAccountBounds();
+    const facets = this.selectedAccountFacets();
+    const byKind = new Map<AccountFacetKind, string[]>();
+    for (const f of facets) {
+      byKind.set(f.kind, [...(byKind.get(f.kind) ?? []), f.value]);
+    }
+    const gated = this.accountItems().filter(
+      (item) =>
+        accountMatchesNumeric(item.account, {
+          followers: bounds.followers,
+          following: bounds.following,
+          statuses: bounds.statuses,
+        }) &&
+        [...byKind.entries()].every(([kind, values]) =>
+          values.some((v) => accountMatchesFacet(item.account, kind, v)),
+        ),
+    );
+    // Text filter reuses filterAccounts over the accounts, keeping matches attached.
+    const kept = new Set(filterAccounts(gated.map((i) => i.account), this.accountFilter()));
+    return gated.filter((i) => kept.has(i.account));
+  });
+
+  protected loadedAccountCount = computed(() => this.accountItems().length);
+  protected shownAccountCount = computed(() => this.visibleAccounts().length);
+
+  isAccountFacetSelected(kind: AccountFacetKind, value: string): boolean {
+    return this.selectedAccountFacets().some((f) => f.kind === kind && f.value === value);
+  }
+
+  toggleAccountFacet(kind: AccountFacetKind, value: string): void {
+    this.selectedAccountFacets.update((sel) =>
+      sel.some((f) => f.kind === kind && f.value === value)
+        ? sel.filter((f) => !(f.kind === kind && f.value === value))
+        : [...sel, { kind, value }],
+    );
+  }
+
+  clearAccountRefinements(): void {
+    this.selectedAccountFacets.set([]);
+    this.accountFilter.set('');
+  }
+
+  relationshipFor(id: string): Relationship | null {
+    return this.relationships()[id] ?? null;
+  }
+
+  isFollowBusy(id: string): boolean {
+    return this.followBusy().has(id);
+  }
+
+  isAccountExpanded(id: string): boolean {
+    return this.expandedAccounts().has(id);
+  }
+
+  toggleAccountExpand(id: string): void {
+    this.expandedAccounts.update((set) => {
+      const next = new Set(set);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  /** Batch-fetch relationships for every loaded account. Anonymous viewers read
+   *  the local follow store; authenticated viewers hit the relationships API
+   *  (which accepts many ids per call, so ~100 accounts is one request). */
+  private loadRelationships(accounts: Account[]): void {
+    if (!accounts.length) {
+      return;
+    }
+    if (this.capabilities.active) {
+      const server = this.anonymous.server();
+      const map: Record<string, Relationship> = {};
+      for (const a of accounts) {
+        map[a.id] = this.anonymousFollows.relationship(a, server);
+      }
+      this.relationships.update((cur) => ({ ...cur, ...map }));
+      return;
+    }
+    this.api
+      .relationships(accounts.map((a) => a.id))
+      .pipe(catchError(() => EMPTY))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((rels) => {
+        this.relationships.update((cur) => {
+          const next = { ...cur };
+          for (const r of rels) {
+            next[r.id] = r;
+          }
+          return next;
+        });
+      });
+  }
+
+  private setFollowBusy(id: string, busy: boolean): void {
+    this.followBusy.update((set) => {
+      const next = new Set(set);
+      busy ? next.add(id) : next.delete(id);
+      return next;
+    });
+  }
+
+  onFollow(account: Account): void {
+    if (this.capabilities.active) {
+      const result = this.anonymousFollows.follow(account, this.anonymous.server());
+      if (result.ok) {
+        this.relationships.update((cur) => ({ ...cur, [account.id]: result.relationship }));
+      }
+      return;
+    }
+    this.setFollowBusy(account.id, true);
+    this.api
+      .follow(account.id)
+      .pipe(catchError(() => EMPTY))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rel) => this.relationships.update((cur) => ({ ...cur, [account.id]: rel })),
+        complete: () => this.setFollowBusy(account.id, false),
+      });
+  }
+
+  onUnfollow(account: Account): void {
+    if (this.capabilities.active) {
+      const rel = this.anonymousFollows.unfollow(account, this.anonymous.server());
+      this.relationships.update((cur) => ({ ...cur, [account.id]: rel }));
+      return;
+    }
+    this.setFollowBusy(account.id, true);
+    this.api
+      .unfollow(account.id)
+      .pipe(catchError(() => EMPTY))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rel) => this.relationships.update((cur) => ({ ...cur, [account.id]: rel })),
+        complete: () => this.setFollowBusy(account.id, false),
+      });
   }
 
   accountLink(account: Account): (string | number)[] {

@@ -1,0 +1,93 @@
+@let a = account();
+
+<div class="acct-card" [class.expanded]="expanded()">
+  <div class="acct-main">
+    <a class="acct-avatar-link" [routerLink]="profileLink()" [attr.aria-label]="a.display_name || a.username">
+      <img
+        class="avatar"
+        [src]="a.avatar_static || a.avatar"
+        [alt]="a.username"
+        loading="lazy"
+        decoding="async"
+      />
+    </a>
+
+    <div class="acct-body">
+      <div class="acct-headline">
+        <a class="acct-name" [routerLink]="profileLink()">
+          <strong>{{ a.display_name || a.username }}</strong>
+          <app-verified-badge [account]="a" />
+        </a>
+        <span class="muted acct-handle">&#64;{{ a.acct }}</span>
+
+        @if (a.bot) {
+          <span class="badge-pill" title="Automated account">BOT</span>
+        }
+        @if (a.locked) {
+          <span class="badge-pill" title="Requires follow approval">🔒</span>
+        }
+        @if (followedBy() && !mutual()) {
+          <span class="badge-pill soft" title="Follows you">Follows you</span>
+        }
+      </div>
+
+      @if (a.note) {
+        <div class="acct-bio" [innerHTML]="a.note"></div>
+      }
+
+      <div class="acct-stats muted small">
+        <span title="Posts"><strong>{{ a.statuses_count | humanCount }}</strong> posts</span>
+        <span title="Following"><strong>{{ a.following_count | humanCount }}</strong> following</span>
+        <span title="Followers"><strong>{{ a.followers_count | humanCount }}</strong> followers</span>
+      </div>
+
+      @if (a.fields.length) {
+        <dl class="acct-fields">
+          @for (f of a.fields.slice(0, 4); track f.name) {
+            <div class="acct-field" [class.verified]="!!f.verified_at">
+              <dt [innerHTML]="f.name"></dt>
+              <dd [innerHTML]="f.value"></dd>
+            </div>
+          }
+        </dl>
+      }
+    </div>
+
+    <div class="acct-actions">
+      <button
+        class="btn btn-sm follow-btn"
+        [class.following]="isFollowingState()"
+        [class.mutual]="mutual()"
+        [disabled]="followBusy()"
+        (click)="onFollowClick()"
+      >
+        {{ followBusy() ? '…' : followLabel() }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Topic mode: the posts that made this account surface. Zero API cost —
+       they came back with the search — so they show inline, not behind expand. -->
+  @if (matchingPosts().length) {
+    <div class="acct-matches">
+      <div class="acct-matches-head muted small">Matched on</div>
+      @for (s of inlinePosts(); track s.id) {
+        <app-status-card [status]="s" />
+      }
+      @if (extraPostCount()) {
+        <button class="acct-more-posts muted small" (click)="toggleExpand.emit()">
+          @if (expanded()) {
+            Show fewer posts
+          } @else {
+            + {{ extraPostCount() }} more matching post{{ extraPostCount() === 1 ? '' : 's' }}
+          }
+        </button>
+      }
+      @if (expanded()) {
+        @for (s of matchingPosts().slice(inlinePosts().length); track s.id) {
+          <app-status-card [status]="s" />
+        }
+      }
+    </div>
+  }
+</div>

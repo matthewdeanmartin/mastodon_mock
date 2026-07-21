@@ -391,6 +391,46 @@
   font-size: 14px;
 }
 
+.adv-field select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Numeric account facets (followers / following / posts min–max). */
+.num-facet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 6px 0 4px;
+}
+
+.num-facet {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.num-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.num-range input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
 /* ---- API-call budget (sprint 3) ---- */
 
 .budget-row {

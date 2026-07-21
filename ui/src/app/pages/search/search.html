@@ -4,6 +4,8 @@
      the narrow left column overflowed it, so it lives up top spanning both. -->
 @let postSearchRan = !!results() && type() === 'statuses';
 @let postResults = (results()?.statuses?.length ?? 0) > 0 && type() === 'statuses';
+@let accountResultsRan = type() === 'accounts' && loadedAccountCount() > 0;
+@let twoBox = postSearchRan || accountResultsRan;
 
 <div class="search-shell">
   <div class="search-bar">
@@ -26,7 +28,7 @@
       <option value="hashtags">Hashtags</option>
     </select>
     <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
-    @if (type() === 'statuses') {
+    @if (type() === 'statuses' || type() === 'accounts') {
       <button
         class="btn btn-outline"
         [class.on]="advancedOpen()"
@@ -93,7 +95,7 @@
     <p class="saved-notice muted small">{{ savedNotice() }}</p>
   }
 
-  <div class="search-page" [class.two-box]="postSearchRan">
+  <div class="search-page" [class.two-box]="twoBox">
     <div class="search-form-box">
       @if (type() === 'statuses') {
       <div class="budget-row">
@@ -212,6 +214,63 @@
           <button class="btn btn-sm" (click)="applyAdvanced()">Apply &amp; search</button>
           @if (hasAdvanced()) {
             <button class="btn btn-outline btn-sm" (click)="clearAdvanced()">Clear</button>
+          }
+        </div>
+      </div>
+    }
+
+    @if (advancedOpen() && type() === 'accounts') {
+      <div class="advanced-panel">
+        <p class="muted small">
+          Mastodon's account search only matches names &amp; bios. "What they post" runs a post
+          search and condenses the results down to the people who posted — good for finding, say,
+          economists rather than one specific person.
+        </p>
+
+        <label class="adv-field">
+          <span class="muted small">Match on</span>
+          <select [ngModel]="accountSource()" (ngModelChange)="accountSource.set($event)">
+            @for (s of accountSources; track s.value) {
+              <option [value]="s.value">{{ s.label }}</option>
+            }
+          </select>
+        </label>
+
+        <div class="num-facet-grid">
+          <div class="num-facet">
+            <span class="muted small">Followers</span>
+            <div class="num-range">
+              <input type="number" min="0" placeholder="min" [ngModel]="followersMin()" (ngModelChange)="followersMin.set($event)" aria-label="Minimum followers" />
+              <span class="muted">–</span>
+              <input type="number" min="0" placeholder="max" [ngModel]="followersMax()" (ngModelChange)="followersMax.set($event)" aria-label="Maximum followers" />
+            </div>
+          </div>
+          <div class="num-facet">
+            <span class="muted small">Following</span>
+            <div class="num-range">
+              <input type="number" min="0" placeholder="min" [ngModel]="followingMin()" (ngModelChange)="followingMin.set($event)" aria-label="Minimum following" />
+              <span class="muted">–</span>
+              <input type="number" min="0" placeholder="max" [ngModel]="followingMax()" (ngModelChange)="followingMax.set($event)" aria-label="Maximum following" />
+            </div>
+          </div>
+          <div class="num-facet">
+            <span class="muted small">Posts</span>
+            <div class="num-range">
+              <input type="number" min="0" placeholder="min" [ngModel]="statusesMin()" (ngModelChange)="statusesMin.set($event)" aria-label="Minimum posts" />
+              <span class="muted">–</span>
+              <input type="number" min="0" placeholder="max" [ngModel]="statusesMax()" (ngModelChange)="statusesMax.set($event)" aria-label="Maximum posts" />
+            </div>
+          </div>
+        </div>
+        <p class="muted small">
+          Ranges filter the loaded results — e.g. cap followers to skip celebrities, or require a
+          minimum post count to skip dead accounts.
+        </p>
+
+        <div class="advanced-actions">
+          <button class="btn btn-sm" (click)="applyAccountAdvanced()">Apply &amp; search</button>
+          @if (hasAccountAdvanced()) {
+            <button class="btn btn-outline btn-sm" (click)="clearAccountAdvanced()">Clear</button>
           }
         </div>
       </div>
@@ -376,12 +435,63 @@
         </details>
       }
     }
+
+    <!-- Account refinement: numeric gates live in Advanced; here are the text
+         filter + categorical/bucket facets over the loaded people. -->
+    @if (type() === 'accounts' && loadedAccountCount()) {
+      <div class="refine-bar">
+        <input
+          type="search"
+          class="refine-filter"
+          [ngModel]="accountFilter()"
+          (ngModelChange)="accountFilter.set($event)"
+          placeholder="Filter these people"
+          aria-label="Filter loaded people"
+        />
+      </div>
+
+      @if (accountFacets().length) {
+        <details class="refine-facets" [open]="refineOpen()">
+          <summary (click)="refineOpen.set(!refineOpen())">
+            Refine loaded people
+            <span class="muted small">Based on {{ loadedAccountCount() }} loaded accounts</span>
+          </summary>
+          @for (facet of accountFacets(); track facet.kind) {
+            <div class="facet">
+              <div class="facet-label muted small">{{ facet.label }}</div>
+              @for (v of facet.values.slice(0, 5); track v.value) {
+                <label class="facet-value">
+                  <input
+                    type="checkbox"
+                    [checked]="isAccountFacetSelected(facet.kind, v.value)"
+                    (change)="toggleAccountFacet(facet.kind, v.value)"
+                  />
+                  <span>{{ v.label }}</span>
+                  <span class="muted facet-count">{{ v.count }}</span>
+                </label>
+              }
+            </div>
+          }
+          @if (selectedAccountFacets().length || accountFilter()) {
+            <button class="btn btn-outline btn-sm" (click)="clearAccountRefinements()">
+              Clear filters
+            </button>
+          }
+        </details>
+      }
+
+      <div class="result-status muted small">
+        Showing {{ shownAccountCount() }} of {{ loadedAccountCount() }} loaded accounts<br />
+        {{ callsUsed() }} of up to {{ apiBudget() }} API calls used
+      </div>
+    }
   </div>
 
   <div class="search-results-box">
-    @if (!results() && type() === 'accounts') {
+    @if (type() === 'accounts' && !accountResultsRan && !accountSearchRan() && !searching()) {
       <!-- Nothing searched yet and looking for people: offer follow-list import &
-           directories. Irrelevant noise for tag / post searches, so hidden there. -->
+           directories. Once a search has run (even to zero results) we show the
+           results block's empty state instead, so the button never looks inert. -->
       <div class="search-idle">
         <div class="page-head">Find people to follow</div>
         <app-find-people [embedded]="true" />
@@ -414,26 +524,38 @@
       }
     }
 
-    @if (results(); as r) {
-      @if (r.accounts.length) {
-        <div class="page-head">People</div>
-        @for (a of r.accounts; track a.id) {
-          <a class="result-account" [routerLink]="accountLink(a)">
-            <img
-              class="avatar"
-              [src]="a.avatar_static || a.avatar"
-              [alt]="a.username"
-              loading="lazy"
-              decoding="async"
-            />
-            <span>
-              <strong>{{ a.display_name || a.username }}</strong>
-              <span class="muted">&#64;{{ a.acct }}</span>
-            </span>
-          </a>
+    @if (type() === 'accounts' && (accountResultsRan || accountSearchRan() || searching())) {
+      @if (loadedAccountCount()) {
+        <div class="page-head">
+          People
+          @if (searching()) {
+            <span class="muted small">· searching posts…</span>
+          }
+        </div>
+        @for (item of visibleAccounts(); track item.account.id) {
+          <app-account-result-card
+            [item]="item"
+            [relationship]="relationshipFor(item.account.id)"
+            [profileLink]="accountLink(item.account)"
+            [expanded]="isAccountExpanded(item.account.id)"
+            [followBusy]="isFollowBusy(item.account.id)"
+            [anonymous]="capabilities.active"
+            (follow)="onFollow($event)"
+            (unfollow)="onUnfollow($event)"
+            (toggleExpand)="toggleAccountExpand(item.account.id)"
+          />
         }
+        @if (!shownAccountCount()) {
+          <p class="muted center">No loaded people match the current filters.</p>
+        }
+      } @else if (searching()) {
+        <p class="muted center">Searching…</p>
+      } @else {
+        <p class="muted center">No people found.</p>
       }
+    }
 
+    @if (results(); as r) {
       @if (r.hashtags.length) {
         <div class="page-head">Hashtags</div>
         @for (h of r.hashtags; track h.name) {
@@ -479,7 +601,7 @@
         </div>
       }
 
-      @if (!r.accounts.length && !r.hashtags.length && !r.statuses.length) {
+      @if (type() !== 'accounts' && !r.hashtags.length && !r.statuses.length) {
         <p class="muted center">No results.</p>
       }
     }

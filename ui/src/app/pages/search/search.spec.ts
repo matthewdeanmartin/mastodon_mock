@@ -18,13 +18,39 @@ import { Auth } from '../../auth';
 /** Exposes Search's protected signals for white-box testing. */
 interface SearchInternals {
   query: WritableSignal<string>;
+  type: WritableSignal<'accounts' | 'statuses' | 'hashtags'>;
   results: WritableSignal<SearchResults | null>;
   searching: WritableSignal<boolean>;
   trendingPosts: WritableSignal<Status[]>;
   trendingTags: WritableSignal<Tag[]>;
+  accountSource: WritableSignal<'bio' | 'posts' | 'both'>;
+  followersMax: WritableSignal<string>;
+  accountItems: WritableSignal<{ account: Account; matchingPosts: Status[] }[]>;
+  visibleAccounts(): { account: Account; matchingPosts: Status[] }[];
   run(): void;
   onChanged(updated: Status): void;
   onDeleted(removed: Status): void;
+}
+
+function makeAccount(over: Partial<Account> = {}): Account {
+  return {
+    id: Math.random().toString(36).slice(2),
+    username: 'user',
+    acct: 'user',
+    display_name: 'User',
+    note: '',
+    url: '',
+    avatar: '',
+    avatar_static: '',
+    header: '',
+    followers_count: 0,
+    following_count: 0,
+    statuses_count: 0,
+    bot: false,
+    locked: false,
+    fields: [],
+    ...over,
+  };
 }
 
 function internals(fixture: ComponentFixture<Search>): SearchInternals {
@@ -100,8 +126,16 @@ describe('Search', () => {
     return fixture;
   }
 
-  /** Type a query and run the search (navigation is synchronous in the stub). */
-  function search(fixture: ComponentFixture<Search>, query: string): void {
+  /** Type a query and run the search (navigation is synchronous in the stub).
+   *  Defaults to the Posts tab, whose single-request flow these generic tests
+   *  exercise; the Accounts tab fans out to two requests (bio + posts) and stores
+   *  results in `accountItems()`, covered separately. */
+  function search(
+    fixture: ComponentFixture<Search>,
+    query: string,
+    type: 'accounts' | 'statuses' | 'hashtags' = 'statuses',
+  ): void {
+    internals(fixture).type.set(type);
     internals(fixture).query.set(query);
     internals(fixture).run();
     fixture.detectChanges();
@@ -170,6 +204,8 @@ describe('Search', () => {
   it('run() calls GET /api/v2/search?q=... and populates results', () => {
     const fixture = setUp();
     const s1 = makeStatus('1');
+    // Budget 1 → no eager auto-fill second page, so the flow settles on one call.
+    (internals(fixture) as unknown as { apiBudget: WritableSignal<number> }).apiBudget.set(1);
 
     search(fixture, 'cats');
 
@@ -283,7 +319,7 @@ describe('Search', () => {
 
   it('restores the search when the URL already carries query params', () => {
     // Simulate arriving at /search?q=cats (e.g. via the browser back button).
-    queryParams$.next(convertToParamMap({ q: 'cats', type: 'accounts' }));
+    queryParams$.next(convertToParamMap({ q: 'cats', type: 'statuses' }));
     const fixture = setUp();
 
     const req = httpMock.expectOne(
@@ -295,18 +331,114 @@ describe('Search', () => {
   });
 
   it('cancels an obsolete search when query parameters change', () => {
-    queryParams$.next(convertToParamMap({ q: 'cats', type: 'accounts' }));
+    queryParams$.next(convertToParamMap({ q: 'cats', type: 'statuses' }));
     const fixture = setUp();
     const cats = httpMock.expectOne(
       (r) => r.url === '/api/v2/search' && r.params.get('q') === 'cats',
     );
 
-    queryParams$.next(convertToParamMap({ q: 'dogs', type: 'accounts' }));
+    queryParams$.next(convertToParamMap({ q: 'dogs', type: 'statuses' }));
     expect(cats.cancelled).toBe(true);
     httpMock
       .expectOne((r) => r.url === '/api/v2/search' && r.params.get('q') === 'dogs')
       .flush(makeResults());
 
     expect(internals(fixture).searching()).toBe(false);
+  });
+
+  describe('account search', () => {
+    it("'bio' source hits the account endpoint once and fills accountItems", () => {
+      const fixture = setUp();
+      internals(fixture).accountSource.set('bio');
+      search(fixture, 'economist', 'accounts');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v2/search' && r.params.get('type') === 'accounts',
+      );
+      req.flush({ accounts: [makeAccount({ id: 'a', display_name: 'Jane' })], statuses: [], hashtags: [] });
+      // Relationships batch-fetch for the loaded account.
+      httpMock.expectOne((r) => r.url === '/api/v1/accounts/relationships').flush([]);
+
+      expect(internals(fixture).accountItems().map((i) => i.account.id)).toEqual(['a']);
+    });
+
+    it("'both' source fans out to account + post search and merges authors", () => {
+      const fixture = setUp();
+      internals(fixture).accountSource.set('both');
+      search(fixture, 'pycharm', 'accounts');
+
+      const bio = httpMock.expectOne(
+        (r) => r.url === '/api/v2/search' && r.params.get('type') === 'accounts',
+      );
+      const posts = httpMock.expectOne(
+        (r) => r.url === '/api/v2/search' && r.params.get('type') === 'statuses',
+      );
+      const author = makeAccount({ id: 'poster', display_name: 'Poster' });
+      bio.flush({ accounts: [makeAccount({ id: 'bio' })], statuses: [], hashtags: [] });
+      posts.flush({
+        accounts: [],
+        statuses: [{ ...makeStatus('p1'), account: author }],
+        hashtags: [],
+      });
+      // Each branch merges independently as it arrives, so each batch-loads
+      // relationships for its own accounts (bio, then post-authors).
+      httpMock
+        .match((r) => r.url === '/api/v1/accounts/relationships')
+        .forEach((r) => r.flush([]));
+
+      const ids = internals(fixture).accountItems().map((i) => i.account.id);
+      expect(ids).toContain('bio');
+      expect(ids).toContain('poster');
+      // The condensed author carries its matching post.
+      const poster = internals(fixture).accountItems().find((i) => i.account.id === 'poster');
+      expect(poster?.matchingPosts.map((s) => s.id)).toEqual(['p1']);
+    });
+
+    it('a follower cap gates visibleAccounts after the search runs', () => {
+      const fixture = setUp();
+      internals(fixture).accountSource.set('bio');
+      internals(fixture).followersMax.set('10000');
+      search(fixture, 'writers', 'accounts');
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/v2/search' && r.params.get('type') === 'accounts',
+      );
+      req.flush({
+        accounts: [
+          makeAccount({ id: 'celeb', followers_count: 2_000_000 }),
+          makeAccount({ id: 'person', followers_count: 300 }),
+        ],
+        statuses: [],
+        hashtags: [],
+      });
+      httpMock.expectOne((r) => r.url === '/api/v1/accounts/relationships').flush([]);
+
+      // Both loaded; only the sub-10k account survives the numeric gate.
+      expect(internals(fixture).accountItems()).toHaveLength(2);
+      expect(internals(fixture).visibleAccounts().map((i) => i.account.id)).toEqual(['person']);
+    });
+
+    it('restores the result set from the store on return (no new request)', () => {
+      // First visit: a bio-only account search (single request) that settles.
+      const first = setUp();
+      internals(first).accountSource.set('bio');
+      search(first, 'economist', 'accounts');
+      httpMock
+        .match((r) => r.url === '/api/v2/search')
+        .forEach((r) =>
+          r.flush({ accounts: [makeAccount({ id: 'econ1' })], statuses: [], hashtags: [] }),
+        );
+      httpMock.match((r) => r.url === '/api/v1/accounts/relationships').forEach((r) => r.flush([]));
+      expect(internals(first).accountItems()).toHaveLength(1);
+
+      // Leaving the page snapshots the results.
+      first.destroy();
+
+      // Returning with the same URL restores from the store — no search HTTP.
+      queryParams$.next(convertToParamMap({ q: 'economist', type: 'accounts' }));
+      const second = setUp();
+      expect(internals(second).accountItems().map((i) => i.account.id)).toEqual(['econ1']);
+      httpMock.expectNone((r) => r.url === '/api/v2/search');
+    });
   });
 });
