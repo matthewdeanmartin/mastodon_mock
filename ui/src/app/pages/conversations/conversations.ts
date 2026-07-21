@@ -123,8 +123,20 @@ export class Conversations implements OnInit, OnDestroy {
 
   /** A chat key requested via `?open=…` (e.g. from a notification) to auto-select. */
   private pendingOpen = signal<string | null>(null);
+  /** Partner account id from `?with=…`, letting us draft a fresh 1:1 chat when no
+   *  history exists yet (the thread page's "open in chat" for a de-novo chat). */
+  private pendingWith = signal<string | null>(null);
   /** True once we've honoured a pending `?open=…` so it can't re-fire on re-select. */
   private openHandled = false;
+
+  /**
+   * A client-side chat stub for a 1:1 that has no message history yet. Created
+   * when "open in chat" targets someone you haven't exchanged messages with, so
+   * the chat still appears in the window with a live composer. It lives only in
+   * this signal: it vanishes when you leave the page, and is superseded by the
+   * real row the moment an actual message exists under the same key.
+   */
+  protected draftChat = signal<Chat | null>(null);
 
   protected loading = signal(true);
   /** Loading an older page of mention notifications (public-chat history). */
@@ -166,6 +178,9 @@ export class Conversations implements OnInit, OnDestroy {
   constructor() {
     // Honour `?open=<chat key>` (from a notification's "Open in chat") once the
     // matching chat row has loaded. Runs once, then leaves manual selection alone.
+    // When no such row exists but a `?with=<account id>` was supplied (a de-novo
+    // 1:1 from the thread page), draft a stub chat so it still appears and can be
+    // replied into — see `draftFor`.
     effect(() => {
       const want = this.pendingOpen();
       if (!want || this.openHandled) {
@@ -176,6 +191,14 @@ export class Conversations implements OnInit, OnDestroy {
         this.openHandled = true;
         this.prefs.setChatKind(chat.kind);
         this.select(chat);
+        return;
+      }
+      // No existing row. If we can draft one for the requested partner, do so
+      // (once the initial load has settled, so we don't race a real row in).
+      const withId = this.pendingWith();
+      if (withId && !this.loading() && !this.draftChat()) {
+        this.openHandled = true;
+        this.draftFor(want, withId);
       }
     });
     effect(() => {
@@ -272,6 +295,13 @@ export class Conversations implements OnInit, OnDestroy {
         lastAt: convo.lastMessage?.sentAt,
       });
     }
+    // A drafted 1:1 chat surfaces only until a real message exists under its key.
+    // The moment the conversations/mentions data grows a row with the same key,
+    // that real row wins and the stub drops out (no duplicate, no stale empty).
+    const draft = this.draftChat();
+    if (draft && !rows.some((r) => r.key === draft.key)) {
+      rows.push(draft);
+    }
     return rows.sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)));
   });
 
@@ -367,6 +397,7 @@ export class Conversations implements OnInit, OnDestroy {
     if (open) {
       this.pendingOpen.set(open);
     }
+    this.pendingWith.set(this.route.snapshot.queryParamMap.get('with'));
     this.load();
     // The IM feel: streams are live while this page is open, closed on leave.
     this.subs.push(
@@ -490,6 +521,49 @@ export class Conversations implements OnInit, OnDestroy {
     this.loadThread(chat);
   }
 
+  /**
+   * Draft a stub 1:1 chat for `key` with the account `withId`, when no real chat
+   * exists yet. Fetches the full account (for the avatar/title), builds an empty
+   * public chat row, and selects it. If the account can't be fetched we quietly
+   * do nothing — the empty state is better than a nameless placeholder.
+   *
+   * The key mirrors the public grouping (`pub:<acct>`), so the user's first reply
+   * — delivered as a public status mentioning them — lands under the same key and
+   * the real row transparently takes over from this stub (see `addPublicStatus`
+   * and `chats()`).
+   */
+  private draftFor(key: string, withId: string): void {
+    this.api.getAccount(withId).subscribe({
+      next: (account) => {
+        // Guard the race: a real row for this key may have arrived while the
+        // account request was in flight. If so, prefer it.
+        const existing = this.chats().find((c) => c.key === key);
+        if (existing) {
+          this.prefs.setChatKind(existing.kind);
+          this.select(existing);
+          return;
+        }
+        const draft: Chat = {
+          key,
+          kind: 'public',
+          convIds: [],
+          accounts: [account],
+          handles: [account.acct],
+          lastStatus: null,
+          unread: false,
+        };
+        this.draftChat.set(draft);
+        // Make sure the kind filter doesn't hide the freshly drafted row.
+        if (this.prefs.chatKind() !== 'all') {
+          this.prefs.setChatKind('public');
+        }
+        this.select(draft);
+      },
+      // A failed lookup leaves the normal "select a conversation" empty state.
+      error: () => undefined,
+    });
+  }
+
   title(chat: Chat): string {
     if (chat.kind === 'bsky') {
       const named = (chat.members ?? []).map((m) => m.displayName || m.handle);
@@ -575,6 +649,11 @@ export class Conversations implements OnInit, OnDestroy {
     } else {
       // My own reply can't be keyed by author; it belongs to the open chat.
       this.addPublicStatus(status, status.account, chat.key);
+      // A drafted chat has now earned a real message under its key — retire the
+      // stub so it's the real (promoted) row that carries on.
+      if (this.draftChat()?.key === chat.key) {
+        this.draftChat.set(null);
+      }
     }
   }
 

@@ -122,6 +122,18 @@ export class Thread implements OnInit {
     return partner ? `pub:${partner.acct}` : null;
   });
 
+  /**
+   * Query params for the "open in chat" link. `open` selects (or, on the chat
+   * page, seeds) the 1:1 chat by its public key; `with` carries the partner's
+   * account id so the chat page can fetch the full record and draft a fresh chat
+   * even when no message history exists yet. Null when not eligible.
+   */
+  protected chatQueryParams = computed<Record<string, string> | null>(() => {
+    const partner = this.chatPartner();
+    const key = this.chatKey();
+    return partner && key ? { open: key, with: partner.id } : null;
+  });
+
   /** Id of the chain post whose inline reply composer is open (reader mode). */
   protected replyingTo = signal<string | null>(null);
 

@@ -28,11 +28,11 @@
          exactly you and one other person — group threads stay disabled (chat's
          multi-person experience isn't ready, and we'd rather not tempt anyone
          into it). -->
-    @if (chatKey(); as key) {
+    @if (chatQueryParams(); as params) {
       <a
         class="btn btn-outline"
         [routerLink]="['/conversations']"
-        [queryParams]="{ open: key }"
+        [queryParams]="params"
         title="Continue this conversation in chat"
       >
         💬 Open in chat

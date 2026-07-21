@@ -17,6 +17,8 @@ interface ConversationsInternals {
   privateConvs: WritableSignal<Conversation[]>;
   bskyConvos: WritableSignal<BskyConvoView[]>;
   pendingOpen: WritableSignal<string | null>;
+  pendingWith: WritableSignal<string | null>;
+  draftChat: WritableSignal<Chat | null>;
   selectedKey: WritableSignal<string | null>;
   messages: WritableSignal<Status[]>;
   chats: Signal<Chat[]>;
@@ -215,6 +217,80 @@ describe('Conversations', () => {
 
     expect(prefs.chatKind()).toBe('public');
     expect(internals(fixture).selected()?.kind).toBe('public');
+  });
+
+  // ---------------------------------------------------------------- draft (de-novo) chat
+
+  it('drafts a stub chat for a partner with no history when ?open has no match', () => {
+    const alice = makeAccount('2', 'alice');
+    const fixture = setUp(); // no conversations, no notifications → no rows
+
+    internals(fixture).pendingOpen.set('pub:alice');
+    internals(fixture).pendingWith.set('2');
+    fixture.detectChanges();
+
+    // The stub is materialised by fetching the partner's full account.
+    httpMock.expectOne('/api/v1/accounts/2').flush(alice);
+
+    const draft = internals(fixture).draftChat();
+    expect(draft?.key).toBe('pub:alice');
+    expect(draft?.kind).toBe('public');
+    expect(draft?.accounts[0].id).toBe('2');
+    // It appears in the list and is auto-selected with an empty history.
+    expect(internals(fixture).chats().some((c) => c.key === 'pub:alice')).toBe(true);
+    expect(internals(fixture).selected()?.key).toBe('pub:alice');
+    expect(internals(fixture).messages()).toEqual([]);
+  });
+
+  it('prefers an existing chat over drafting when one already matches ?open', () => {
+    const alice = makeAccount('2', 'alice');
+    const status = makeStatus('s1', { visibility: 'public', account: alice });
+    const fixture = setUp([], [makeMention('n1', status)]);
+
+    internals(fixture).pendingOpen.set('pub:alice');
+    internals(fixture).pendingWith.set('2');
+    fixture.detectChanges();
+
+    // The real public row exists, so no account fetch and no draft.
+    httpMock.expectOne('/api/v1/statuses/s1/context').flush({ ancestors: [], descendants: [] });
+    httpMock.expectNone('/api/v1/accounts/2');
+    expect(internals(fixture).draftChat()).toBeNull();
+    expect(internals(fixture).selected()?.lastStatus?.id).toBe('s1');
+  });
+
+  it('does not draft (leaves empty state) when the partner account cannot be fetched', () => {
+    const fixture = setUp();
+
+    internals(fixture).pendingOpen.set('pub:alice');
+    internals(fixture).pendingWith.set('2');
+    fixture.detectChanges();
+
+    httpMock.expectOne('/api/v1/accounts/2').flush('', { status: 404, statusText: 'Not Found' });
+
+    expect(internals(fixture).draftChat()).toBeNull();
+    expect(internals(fixture).chats().some((c) => c.key === 'pub:alice')).toBe(false);
+  });
+
+  it('retires the draft once a real reply is posted under its key', () => {
+    const alice = makeAccount('2', 'alice');
+    const fixture = setUp();
+
+    internals(fixture).pendingOpen.set('pub:alice');
+    internals(fixture).pendingWith.set('2');
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/accounts/2').flush(alice);
+    expect(internals(fixture).draftChat()).not.toBeNull();
+
+    // Posting my first public reply promotes the stub into a real row.
+    const reply = makeStatus('r1', { visibility: 'public', account: ME });
+    fixture.componentInstance.onReplyPosted(reply);
+
+    expect(internals(fixture).draftChat()).toBeNull();
+    // A real public row for the same key now carries the conversation.
+    const row = internals(fixture).chats().find((c) => c.key === 'pub:alice');
+    expect(row).toBeDefined();
+    expect(row?.lastStatus?.id).toBe('r1');
+    expect(internals(fixture).selected()?.key).toBe('pub:alice');
   });
 
   it('suppresses Bluesky chats whose participant resolved to missing.invalid', () => {
