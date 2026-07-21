@@ -332,7 +332,7 @@ export class Api {
   search(
     q: string,
     type?: 'accounts' | 'statuses' | 'hashtags',
-    opts?: { resolve?: boolean; limit?: number },
+    opts?: { resolve?: boolean; limit?: number; offset?: number },
   ): Observable<SearchResults> {
     let params = new HttpParams().set('q', q);
     if (type) {
@@ -344,6 +344,11 @@ export class Api {
     }
     if (opts?.limit) {
       params = params.set('limit', String(opts.limit));
+    }
+    if (opts?.offset) {
+      // Mastodon's /api/v2/search paginates by offset (not max_id) — how "load
+      // more" pulls the next page of results for the same query.
+      params = params.set('offset', String(opts.offset));
     }
     return this.http.get<SearchResults>('/api/v2/search', { params });
   }

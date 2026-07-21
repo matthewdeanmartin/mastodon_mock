@@ -155,6 +155,33 @@ describe('AnonymousPublicApi', () => {
     http.expectNone((request) => request.url.includes('/api/v2/search'));
   });
 
+  it('caps hashtag fan-out to maxTags so a search stays within the API-call budget', () => {
+    api
+      .searchPostsByHashtags('https://social.example', 'a b c d', { maxTags: 2 })
+      .subscribe();
+
+    // Only the first two words become timeline requests; c and d are dropped.
+    http.expectOne('https://social.example/api/v1/timelines/tag/a?limit=20').flush([]);
+    http.expectOne('https://social.example/api/v1/timelines/tag/b?limit=20').flush([]);
+    http.expectNone('https://social.example/api/v1/timelines/tag/c?limit=20');
+    http.expectNone('https://social.example/api/v1/timelines/tag/d?limit=20');
+  });
+
+  it('threads a per-tag max_id for load-more pagination', () => {
+    api
+      .searchPostsByHashtags('https://social.example', 'cats', { maxIds: { cats: '99' } })
+      .subscribe();
+
+    http
+      .expectOne('https://social.example/api/v1/timelines/tag/cats?limit=20&max_id=99')
+      .flush([]);
+  });
+
+  it('hashtagsForQuery returns distinct lowercased tags capped to the limit', () => {
+    expect(api.hashtagsForQuery('Cats, DOGS cats', 5)).toEqual(['cats', 'dogs']);
+    expect(api.hashtagsForQuery('a b c', 2)).toEqual(['a', 'b']);
+  });
+
   it('adapts anonymous search results to stable public source references', () => {
     let received: Status[] = [];
     api.search('https://social.example', 'cats', 'statuses').subscribe((results) => {

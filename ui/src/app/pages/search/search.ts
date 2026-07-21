@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -11,12 +11,35 @@ import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capab
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
+import {
+  buildFacets,
+  Facet,
+  FacetKind,
+  filterLoaded,
+  groupResults,
+  statusMatchesFacet,
+} from './search-refine';
+import {
+  PostContentType,
+  PostSearchCriteria,
+  ResultGrouping,
+  Tristate,
+} from './mawkingbird-search';
+import { serializeMastodonQuery } from './mastodon-query-serializer';
+import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-explain';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
-/** The mastodon.social full-text-search date operators the advanced panel builds. */
-const DATE_OPERATORS = ['before', 'after', 'during'] as const;
-type DateOperator = (typeof DATE_OPERATORS)[number];
+/** One selected facet value, keyed by "kind:value" (see selectedFacets). */
+type FacetSelection = { kind: FacetKind; value: string };
+
+/** Mastodon's max results per page. Big pages = a fatter faceting corpus per call. */
+const PAGE_SIZE = 40;
+/** Default budgets: a plain search pulls 2 pages; opening advanced bumps it to 3. */
+const DEFAULT_BUDGET_SIMPLE = 2;
+const DEFAULT_BUDGET_ADVANCED = 3;
+/** Manual "Load more" can page past the budget, but stops here so it never runs away. */
+const LOAD_MORE_HARD_CAP = 30;
 
 @Component({
   selector: 'app-search',
@@ -39,18 +62,201 @@ export class Search implements OnInit {
   protected searching = signal(false);
   protected type = signal<SearchType>('accounts');
 
-  // Advanced panel: date pickers that compose before:/after:/during: operators
-  // into the query itself (they're plain query syntax on mastodon.social, so
-  // the assembled query stays visible and hand-editable in the box).
+  // --- API-call budget (sprint 3) ---
+  // A ceiling on HTTP requests one search may spend. `callsUsed` counts real
+  // requests; pagination stops before it would exceed `apiBudget`. Anonymous
+  // post search costs N calls per page (one tag timeline each), so the "next
+  // page cost" is the tag count there and 1 everywhere else.
+  // Budget = how many large (40-post) pages to pull eagerly on Search, so
+  // client-side faceting has a real corpus to work with. Raising it after a
+  // search tops up with the extra pages; "Load more" keeps going past it.
+  protected readonly budgetOptions: { value: number; label: string }[] = [
+    { value: 1, label: '1 page (~40 posts)' },
+    { value: 2, label: '2 pages (~80 posts)' },
+    { value: 3, label: '3 pages (~120 posts)' },
+    { value: 5, label: '5 pages (~200 posts)' },
+    { value: 10, label: '10 pages (~400 posts)' },
+  ];
+  protected apiBudget = signal<number>(DEFAULT_BUDGET_SIMPLE);
+  protected callsUsed = signal(0);
+  /** How many statuses were requested but capped away by the budget (anon fan-out). */
+  protected tagsDropped = signal(0);
+
+  // Pagination cursors for "load more": authenticated search pages by offset;
+  // anonymous merges per-tag timelines paged by the oldest seen status id.
+  private nextOffset = 0;
+  private oldestId = '';
+  private executedQuery = '';
+  private executedType: SearchType = 'accounts';
+  /** Hashtags used for the current anonymous post search (null when not applicable). */
+  private firstPageTags: string[] | null = null;
+
+  /** Requests the *next* page would spend: N tags anonymous, else 1. */
+  protected nextPageCost = computed(() =>
+    this.capabilities.active && this.executedType === 'statuses'
+      ? (this.firstPageTags?.length ?? 1)
+      : 1,
+  );
+
+  /** Auto-fill wants another page while the last one had results and the next
+   *  page still fits inside the chosen budget (the eager corpus-building phase).
+   *  Only post searches page — accounts/hashtags are a single call. */
+  protected autoFillWants = computed(
+    () =>
+      this.executedType === 'statuses' &&
+      !!this.results()?.statuses.length &&
+      this.callsUsed() + this.nextPageCost() <= this.apiBudget(),
+  );
+
+  /** The manual "Load more" button keeps working past the budget (the user asked
+   *  to keep loading), up to a hard safety cap so it can't run away. */
+  protected canLoadMore = computed(
+    () =>
+      this.executedType === 'statuses' &&
+      !!this.results()?.statuses.length &&
+      this.callsUsed() < LOAD_MORE_HARD_CAP,
+  );
+
+  // --- Advanced post-search form (sprint 2) ---
+  // Each field binds to ngModel; `postCriteria` assembles them into the rich
+  // PostSearchCriteria that drives serialization, chips, and Explain.
   protected advancedOpen = signal(false);
+  protected exactPhrase = signal('');
+  protected excludeWords = signal('');
+  protected author = signal('');
   protected before = signal('');
   protected after = signal('');
-  protected during = signal('');
+  protected language = signal('');
+  protected contentType = signal<PostContentType>('any');
+  protected replies = signal<Tristate>('include');
+  protected sensitive = signal<Tristate>('include');
+  protected scope = signal<'all' | 'public' | 'library'>('all');
+
+  /** Bundled language options (no API call — spec §6.4). */
+  protected readonly languages = [
+    { code: '', label: 'Any language' },
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Spanish' },
+    { code: 'fr', label: 'French' },
+    { code: 'de', label: 'German' },
+    { code: 'pt', label: 'Portuguese' },
+    { code: 'ja', label: 'Japanese' },
+    { code: 'zh', label: 'Chinese' },
+  ];
+
+  protected readonly contentTypes: { value: PostContentType; label: string }[] = [
+    { value: 'any', label: 'Any' },
+    { value: 'media', label: 'Has media' },
+    { value: 'image', label: 'Image' },
+    { value: 'video', label: 'Video' },
+    { value: 'audio', label: 'Audio' },
+    { value: 'poll', label: 'Poll' },
+    { value: 'link', label: 'Link or preview' },
+    { value: 'text', label: 'Text only' },
+  ];
+
+  /** The advanced form assembled into the rich criteria object. */
+  protected postCriteria = computed<PostSearchCriteria>(() => ({
+    words: this.query().trim() || undefined,
+    exactPhrase: this.exactPhrase().trim() || undefined,
+    excludeWords: this.excludeWords().trim() || undefined,
+    author: this.author().trim() || undefined,
+    dates:
+      this.after() || this.before()
+        ? { after: this.after() || undefined, before: this.before() || undefined }
+        : undefined,
+    language: this.language() || undefined,
+    contentType: this.contentType() === 'any' ? undefined : this.contentType(),
+    replies: this.replies() === 'include' ? undefined : this.replies(),
+    sensitive: this.sensitive() === 'include' ? undefined : this.sensitive(),
+    scope: this.scope() === 'all' ? undefined : this.scope(),
+  }));
+
+  /** Active-filter chips for the last executed post search (§10). */
+  protected chips = computed<Chip[]>(() =>
+    this.type() === 'statuses' && this.results()
+      ? postChips(this.executedCriteria() ?? {}, !this.capabilities.active)
+      : [],
+  );
+
+  protected explainOpen = signal(false);
+
+  /** Explain-panel content for the last executed post search (§9). */
+  protected explain = computed<ExplainPanel | null>(() => {
+    if (this.type() !== 'statuses' || !this.results()) {
+      return null;
+    }
+    const anonTags = this.capabilities.active
+      ? (this.results()?.hashtags ?? []).map((h) => h.name)
+      : null;
+    return explainPostSearch(
+      {
+        version: 1,
+        target: 'posts',
+        post: this.executedCriteria() ?? {},
+        apiCallBudget: this.apiBudget(),
+        presentation: { grouping: 'none' },
+      },
+      !this.capabilities.active,
+      anonTags,
+      { maximum: this.apiBudget(), used: this.callsUsed(), tagsDropped: this.tagsDropped() },
+    );
+  });
+
+  /** Snapshot of the criteria that produced the current results (for chips/Explain). */
+  private executedCriteria = signal<PostSearchCriteria | null>(null);
+
+  /**
+   * Criteria staged by the advanced form for the next fetch. Because
+   * `applyAdvanced` rewrites the query box into the serialized string, we can't
+   * reconstruct the structured criteria from the URL — so we stash them here and
+   * let `fetch` adopt them, falling back to a words-only search for the plain box.
+   */
+  private pendingCriteria: PostSearchCriteria | null = null;
+
+  // --- Client-side refinement over loaded post results (sprint 1) ---
+  // None of this makes an API call: it narrows/reshapes results already in hand.
+  protected loadedFilter = signal('');
+  protected grouping = signal<ResultGrouping>('none');
+  // Facets open by default — collapsed, the "Refine loaded results" section is
+  // easy to miss entirely.
+  protected refineOpen = signal(true);
+  protected selectedFacets = signal<FacetSelection[]>([]);
+
+  /** Statuses from the current results, after facet + text filtering. */
+  protected visibleStatuses = computed<Status[]>(() => {
+    const all = this.results()?.statuses ?? [];
+    const facets = this.selectedFacets();
+    // Facets of different kinds AND together; values within a kind OR together.
+    const byKind = new Map<FacetKind, string[]>();
+    for (const f of facets) {
+      byKind.set(f.kind, [...(byKind.get(f.kind) ?? []), f.value]);
+    }
+    const faceted = all.filter((s) =>
+      [...byKind.entries()].every(([kind, values]) =>
+        values.some((v) => statusMatchesFacet(s, kind, v)),
+      ),
+    );
+    return filterLoaded(faceted, this.loadedFilter());
+  });
+
+  /** Facets computed from all loaded statuses (counts reflect the full load). */
+  protected facets = computed<Facet[]>(() => buildFacets(this.results()?.statuses ?? []));
+
+  /** Loaded statuses reshaped by the current grouping selection. */
+  protected groups = computed(() => groupResults(this.visibleStatuses(), this.grouping()));
+
+  protected loadedCount = computed(() => this.results()?.statuses.length ?? 0);
+  protected shownCount = computed(() => this.visibleStatuses().length);
 
   // Idle-state trends: shown under the box before anything is searched.
   protected trendingPosts = signal<Status[]>([]);
   protected trendingTags = signal<Tag[]>([]);
   private trendsRequested = false;
+  /** Last q/type reflected in the URL, so run() can detect an identical re-search
+   *  (which wouldn't emit a new queryParamMap) and fetch directly. */
+  private urlQuery = '';
+  private urlType: SearchType = 'accounts';
 
   ngOnInit(): void {
     // Restore the query/type from the URL so that returning here (e.g. via the
@@ -59,6 +265,8 @@ export class Search implements OnInit {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const q = params.get('q') ?? '';
       const t = (params.get('type') as SearchType) ?? 'accounts';
+      this.urlQuery = q;
+      this.urlType = t;
       this.query.set(q);
       this.type.set(t);
       if (q.trim()) {
@@ -100,67 +308,278 @@ export class Search implements OnInit {
     if (!q) {
       return;
     }
-    // Push the search into the URL; ngOnInit's subscription performs the fetch.
+    const type = this.type();
+    // Navigating to identical query params emits nothing, so re-clicking Search
+    // (or changing the budget, which isn't in the URL) would be a silent no-op.
+    // Detect that case (tracked from the queryParamMap subscription) and fetch
+    // directly instead of relying on navigation.
+    if (this.urlQuery === q && this.urlType === type) {
+      this.fetch(q, type);
+      return;
+    }
+    // Otherwise push the search into the URL; ngOnInit's subscription fetches.
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { q, type: this.type() },
+      queryParams: { q, type },
       queryParamsHandling: 'merge',
     });
   }
 
   /**
-   * Rewrite the query's date operators from the pickers (dropping any typed by
-   * hand first, so the panel is the single source of truth) and search.
+   * Execute the advanced post search. The rich `postCriteria` is the source of
+   * truth: authenticated searches serialize it into a Mastodon full-text query;
+   * anonymous searches can only send the plain words (the hashtag transform in
+   * `searchPostsByHashtags` handles the rest), so the advanced criteria degrade
+   * to loaded-result filters — which the chips/Explain panel make explicit.
    */
   applyAdvanced(): void {
-    let q = this.query();
-    for (const op of DATE_OPERATORS) {
-      q = q.replace(new RegExp(`\\s*\\b${op}:\\S+`, 'gi'), '');
+    this.type.set('statuses');
+    const criteria = this.postCriteria();
+    this.pendingCriteria = criteria;
+    // Authenticated: the serialized query IS the search string (operators and all).
+    // Anonymous: only the words survive as a server request; the rest are shown
+    // as loaded-result criteria and applied client-side after results arrive.
+    const q = this.capabilities.active
+      ? (criteria.words ?? '').trim() // anonymous: only words go to the hashtag transform
+      : serializeMastodonQuery(criteria); // authenticated: full operator query
+    if (!q.trim()) {
+      return;
     }
-    q = q.trim();
-    const picked: [DateOperator, string][] = [
-      ['before', this.before()],
-      ['after', this.after()],
-      ['during', this.during()],
-    ];
-    for (const [op, date] of picked) {
-      if (date) {
-        q = `${q} ${op}:${date}`.trim();
-      }
-    }
+    // Keep the box showing what will actually be sent (authenticated) or the
+    // plain words (anonymous), so the URL/box stay honest.
     this.query.set(q);
-    if (q) {
-      // Date operators only apply to full-text status search.
-      this.type.set('statuses');
-      this.run();
+    this.run();
+  }
+
+  /** Toggle the advanced panel. Opening it raises the default budget to 3 (an
+   *  advanced search is usually a faceting session that wants a bigger corpus),
+   *  unless the user already picked a larger budget. */
+  toggleAdvanced(): void {
+    const opening = !this.advancedOpen();
+    this.advancedOpen.set(opening);
+    if (opening && this.apiBudget() < DEFAULT_BUDGET_ADVANCED) {
+      this.apiBudget.set(DEFAULT_BUDGET_ADVANCED);
     }
   }
 
   clearAdvanced(): void {
+    this.exactPhrase.set('');
+    this.excludeWords.set('');
+    this.author.set('');
     this.before.set('');
     this.after.set('');
-    this.during.set('');
+    this.language.set('');
+    this.contentType.set('any');
+    this.replies.set('include');
+    this.sensitive.set('include');
+    this.scope.set('all');
+    // The main box may hold a serialized DSL string from a prior Apply — clear it
+    // too, otherwise the query lingers confusingly after the fields are emptied.
+    this.query.set('');
+  }
+
+  /** True when any advanced field is set (drives the "Clear" button visibility). */
+  protected hasAdvanced = computed(
+    () =>
+      !!this.exactPhrase() ||
+      !!this.excludeWords() ||
+      !!this.author() ||
+      !!this.before() ||
+      !!this.after() ||
+      !!this.language() ||
+      this.contentType() !== 'any' ||
+      this.replies() !== 'include' ||
+      this.sensitive() !== 'include' ||
+      this.scope() !== 'all',
+  );
+
+  // --- Refinement controls (all client-side, no API calls) ---
+
+  isFacetSelected(kind: FacetKind, value: string): boolean {
+    return this.selectedFacets().some((f) => f.kind === kind && f.value === value);
+  }
+
+  toggleFacet(kind: FacetKind, value: string): void {
+    this.selectedFacets.update((sel) =>
+      sel.some((f) => f.kind === kind && f.value === value)
+        ? sel.filter((f) => !(f.kind === kind && f.value === value))
+        : [...sel, { kind, value }],
+    );
+  }
+
+  clearRefinements(): void {
+    this.selectedFacets.set([]);
+    this.loadedFilter.set('');
+  }
+
+  /** Change the budget. If a search already ran and the budget went up, top up
+   *  by fetching the extra pages right away (§ user's "5 after 3 → fetch 2 more"). */
+  setBudget(value: string | number): void {
+    const next = Number(value);
+    this.apiBudget.set(next);
+    if (this.results()?.statuses.length && this.executedType === 'statuses') {
+      this.maybeAutoFill(true);
+    }
+  }
+
+  /** Drop everything derived from the previous result set before a new search. */
+  private resetRefinements(): void {
+    this.selectedFacets.set([]);
+    this.loadedFilter.set('');
+    this.grouping.set('none');
   }
 
   private fetch(q: string, type: SearchType): void {
     this.activeSearch?.unsubscribe();
+    this.resetRefinements();
+    // A new search resets the budget counters and pagination cursors (§7/§20).
+    this.callsUsed.set(0);
+    this.tagsDropped.set(0);
+    this.nextOffset = 0;
+    this.oldestId = '';
+    this.executedQuery = q;
+    this.executedType = type;
+    // Snapshot the criteria that produced this search so chips/Explain describe
+    // exactly what was run. Advanced searches stage full criteria in
+    // `pendingCriteria`; a plain-box status search is just the words.
+    if (type === 'statuses') {
+      this.executedCriteria.set(this.pendingCriteria ?? { words: q });
+    } else {
+      this.executedCriteria.set(null);
+    }
+    this.pendingCriteria = null;
     this.searching.set(true);
+
+    // Anonymous post search fans out to one call per hashtag. Cap the tag count
+    // to the budget so page 1 never exceeds it (§7 "never silently exceed"), and
+    // record how many we dropped so Explain can note the truncation.
+    if (this.capabilities.active && type === 'statuses') {
+      const allTags = this.anonymousPublic.hashtagsForQuery(q);
+      const affordable = allTags.slice(0, this.apiBudget());
+      this.tagsDropped.set(allTags.length - affordable.length);
+      this.firstPageTags = affordable;
+    } else {
+      this.firstPageTags = null;
+    }
+
     // Handle- or URL-shaped queries get resolve=true so the server webfingers
     // accounts it hasn't federated with yet (how you find someone by address).
     const resolve =
       type === 'accounts' && (/^@?[\w.-]+@[\w.-]+\.\w+$/.test(q) || /^https?:\/\//.test(q));
+    const cost = this.firstPageTags ? this.firstPageTags.length : 1;
     const request = this.capabilities.active
       ? type === 'statuses'
-        ? this.anonymousPublic.searchPostsByHashtags(this.anonymous.server(), q)
+        ? this.anonymousPublic.searchPostsByHashtags(this.anonymous.server(), q, {
+            maxTags: this.apiBudget(),
+          })
         : this.anonymousPublic.search(this.anonymous.server(), q, type)
-      : this.api.search(q, type, resolve ? { resolve: true } : undefined);
+      : this.api.search(
+          q,
+          type,
+          type === 'statuses'
+            ? { limit: PAGE_SIZE }
+            : resolve
+              ? { resolve: true }
+              : undefined,
+        );
     this.activeSearch = request.subscribe({
       next: (r) => {
         this.results.set(r);
+        this.callsUsed.update((c) => c + cost);
+        this.rememberCursors(r);
         this.searching.set(false);
+        // Eagerly page up to the budget so client-side faceting has a corpus.
+        this.maybeAutoFill(r.statuses.length > 0);
       },
       error: () => this.searching.set(false),
     });
+  }
+
+  /**
+   * §14 budget-fill: when enabled, keep paging until the budget is spent, the
+   * server stops returning new results, or the user cancels. Guarded on the last
+   * page having grown so we never loop on an endpoint that keeps returning the
+   * same (already de-duped) statuses.
+   */
+  private maybeAutoFill(pageGrew: boolean): void {
+    if (pageGrew && this.autoFillWants()) {
+      this.loadMore();
+    }
+  }
+
+  /** Update pagination cursors from the latest page of statuses. */
+  private rememberCursors(r: SearchResults): void {
+    this.nextOffset += r.statuses.length;
+    // For anonymous, remember each tag's oldest status id so the next page of
+    // that timeline starts below it.
+    for (const s of r.statuses) {
+      // Statuses don't carry their source tag, so track a single global floor:
+      // the oldest id we've seen. getTagTimeline(max_id) is per-tag but using the
+      // global oldest is a safe monotonic cursor for "older than everything shown".
+      if (!this.oldestId || s.id < this.oldestId) {
+        this.oldestId = s.id;
+      }
+    }
+  }
+
+  /**
+   * Fetch one more page and append it. Used both by the eager budget auto-fill
+   * and the manual "Load more" button. `manual` clicks keep working past the
+   * budget (the user asked to keep loading) up to a hard safety cap.
+   */
+  loadMore(manual = false): void {
+    if (this.searching()) {
+      return;
+    }
+    if (manual) {
+      if (this.callsUsed() >= LOAD_MORE_HARD_CAP) {
+        return;
+      }
+    } else if (!this.autoFillWants()) {
+      return;
+    }
+    this.searching.set(true);
+    const cost = this.nextPageCost();
+    const q = this.executedQuery;
+    const request =
+      this.capabilities.active && this.executedType === 'statuses'
+        ? this.anonymousPublic.searchPostsByHashtags(this.anonymous.server(), q, {
+            maxTags: this.firstPageTags?.length ?? this.apiBudget(),
+            maxIds: Object.fromEntries(
+              (this.firstPageTags ?? []).map((t) => [t, this.oldestId]).filter(([, v]) => v),
+            ) as Record<string, string>,
+          })
+        : this.api.search(q, this.executedType, {
+            offset: this.nextOffset,
+            limit: PAGE_SIZE,
+          });
+    this.activeSearch = request.subscribe({
+      next: (r) => {
+        const added = this.appendResults(r);
+        this.callsUsed.update((c) => c + cost);
+        this.rememberCursors(r);
+        this.searching.set(false);
+        this.maybeAutoFill(added > 0);
+      },
+      error: () => this.searching.set(false),
+    });
+  }
+
+  /** Merge a newly-fetched page into the current results, de-duping statuses.
+   *  Returns how many new statuses were actually added. */
+  private appendResults(page: SearchResults): number {
+    let added = 0;
+    this.results.update((cur) => {
+      if (!cur) {
+        added = page.statuses.length;
+        return page;
+      }
+      const seen = new Set(cur.statuses.map((s) => s.url || s.id));
+      const fresh = page.statuses.filter((s) => !seen.has(s.url || s.id));
+      added = fresh.length;
+      return { ...cur, statuses: [...cur.statuses, ...fresh] };
+    });
+    return added;
   }
 
   accountLink(account: Account): (string | number)[] {

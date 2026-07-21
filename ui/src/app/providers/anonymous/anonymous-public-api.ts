@@ -133,14 +133,32 @@ export class AnonymousPublicApi {
       );
   }
 
-  /** Approximate anonymous post search by merging one public hashtag timeline per query word. */
-  searchPostsByHashtags(server: string, query: string): Observable<SearchResults> {
-    const tags = searchTags(query);
+  /** The distinct hashtags an anonymous post query maps to, capped so the caller
+   *  can bound fan-out to its API-call budget (`maxTags`). Exposed so the search
+   *  page can size its budget and explain the transform before fetching. */
+  hashtagsForQuery(query: string, maxTags = ANONYMOUS_POST_SEARCH_TAG_LIMIT): string[] {
+    return searchTags(query).slice(0, Math.max(0, maxTags));
+  }
+
+  /**
+   * Approximate anonymous post search by merging one public hashtag timeline per
+   * query word. Costs one API call per tag (see {@link hashtagsForQuery}); the
+   * caller caps `maxTags` to stay within its budget. `maxIds` supplies a per-tag
+   * `max_id` so "load more" fetches the next page of each timeline.
+   */
+  searchPostsByHashtags(
+    server: string,
+    query: string,
+    opts: { maxTags?: number; maxIds?: Record<string, string> } = {},
+  ): Observable<SearchResults> {
+    const tags = this.hashtagsForQuery(query, opts.maxTags ?? ANONYMOUS_POST_SEARCH_TAG_LIMIT);
     if (!tags.length) {
       return of({ accounts: [], statuses: [], hashtags: [] });
     }
     return forkJoin(
-      tags.map((tag) => this.getTagTimeline(server, tag).pipe(catchError(() => of<Status[]>([])))),
+      tags.map((tag) =>
+        this.getTagTimeline(server, tag, opts.maxIds?.[tag]).pipe(catchError(() => of<Status[]>([]))),
+      ),
     ).pipe(
       map((pages) => {
         const byUrl = new Map<string, Status>();

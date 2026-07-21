@@ -1,12 +1,68 @@
+/* Wide layout, modeled on chat's .chat-page. The search bar is a full-width
+   header; below it, post searches split into a form/facets column + a results
+   column. Everything is centered in a max-width canvas since the shell drops
+   its rails for /search. */
+.search-shell {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 16px 4px;
+}
+
+.search-page {
+  margin-top: 16px;
+}
+
+.search-page.two-box {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Bordered rounded cards like chat's panes. The full-width search bar is its
+   own card above the grid. */
+.search-bar,
+.two-box .search-form-box,
+.two-box .search-results-box {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--col-bg);
+}
+
+.two-box .search-form-box,
+.two-box .search-results-box {
+  overflow: hidden;
+}
+
+/* The form column sticks so facets stay in view while scrolling results. */
+.two-box .search-form-box {
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+}
+
+@media (max-width: 800px) {
+  .search-page.two-box {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .two-box .search-form-box {
+    position: static;
+    max-height: none;
+  }
+}
+
 .search-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
 }
 
 .search-bar input {
-  flex: 1;
+  flex: 1 1 240px;
+  min-width: 0;
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 9999px;
@@ -101,4 +157,242 @@
   font-weight: 400;
   font-size: 0.85em;
   margin-left: 8px;
+}
+
+/* ---- Client-side refinement layer (sprint 1) ---- */
+
+.refine-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.refine-filter {
+  flex: 1;
+  min-width: 160px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.group-by {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Segmented control, matched to chat's .seg so the app reads as one system. */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--border);
+}
+
+.seg button.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  font-weight: 700;
+}
+
+.refine-facets {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.refine-facets > summary {
+  cursor: pointer;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.facet {
+  margin-top: 10px;
+}
+
+.facet-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.facet-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+.facet-value .facet-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-status {
+  padding: 10px 16px;
+}
+
+.group-head {
+  padding: 12px 16px 4px;
+  font-weight: 800;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted, #777);
+  border-top: 1px solid var(--border);
+}
+
+/* ---- Advanced form fields (sprint 2) ---- */
+
+.adv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.adv-field input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.advanced-fields select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* ---- API-call budget (sprint 3) ---- */
+
+.budget-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-row {
+  flex-wrap: wrap;
+}
+
+.budget-row select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+}
+
+/* ---- Active-filter chips (§10) ---- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+
+/* Sent-to-server chips get the accent; loaded-result chips are neutral/dashed,
+   so the two §23 categories never look like the same thing. */
+.chip-server {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.chip-loaded {
+  border-style: dashed;
+  color: var(--muted, #666);
+}
+
+/* ---- Explain panel (§9) ---- */
+
+.explain {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.explain > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.explain-section {
+  margin-top: 10px;
+}
+
+.explain-head {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+
+.explain code {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--bg, rgb(0 0 0 / 4%));
+  font-size: 13px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.explain ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.explain .tag-lit {
+  font-weight: 700;
+  margin: 0 3px;
 }

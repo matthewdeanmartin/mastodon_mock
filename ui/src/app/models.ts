@@ -122,6 +122,8 @@ export interface Status {
   sensitive: boolean;
   poll: Poll | null;
   quote_approval_policy: string | null;
+  /** ISO 639 language code Mastodon detected/declared for the post. Nullable. */
+  language?: string | null;
   media_attachments: MediaAttachment[];
   /** The app the post was made with (nullable; absent on some providers). */
   application?: { name: string; website?: string | null } | null;

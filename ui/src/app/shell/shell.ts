@@ -15,7 +15,12 @@ import { LeftRail } from './left-rail/left-rail';
 import { RightRail } from './right-rail/right-rail';
 
 function isWideUrl(url: string): boolean {
-  return url.startsWith('/settings') || url.startsWith('/conversations');
+  // /search goes rails-off wide so facets have room to live beside results.
+  return (
+    url.startsWith('/settings') ||
+    url.startsWith('/conversations') ||
+    url.startsWith('/search')
+  );
 }
 
 @Component({
