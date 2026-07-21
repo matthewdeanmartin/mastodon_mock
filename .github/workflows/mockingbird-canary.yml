@@ -43,10 +43,12 @@ jobs:
       - name: Build Canary
         # Served from the /canary/ sub-path, so build with a matching base href.
         run: make mockingbird MOCKINGBIRD_BASE_HREF=/canary/
-      - name: Add SPA 404 fallback and canary marker
-        run: |
-          cp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
-          printf '%s\n' "$GITHUB_SHA" > ui/dist-mockingbird/browser/canary-commit.txt
+      - name: Add canary marker
+        # No per-directory 404.html here: GitHub Pages serves only the site-root
+        # /404.html (published by production), which is subpath-aware and routes
+        # /canary/… deep links back into this canary SPA. A /canary/404.html
+        # would just be dead weight — Pages never serves it.
+        run: printf '%s\n' "$GITHUB_SHA" > ui/dist-mockingbird/browser/canary-commit.txt
       - name: Publish /canary/ to gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -52,9 +52,12 @@ jobs:
         # so build the Angular app with a root base href.
         run: make mockingbird MOCKINGBIRD_BASE_HREF=/
       - name: Add SPA 404 fallback
-        # GitHub Pages serves 404.html for unknown paths; mirroring index.html lets the
-        # Angular router handle deep links (e.g. /accounts/123) on reload.
-        run: cp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
+        # GitHub Pages serves ONE custom 404 per site: this root /404.html. It is
+        # subpath-aware — it boots the production SPA for root deep links, but
+        # routes /canary/… deep links to the canary SPA (preserving the path), so
+        # refreshing/chunk-reloading a canary page stays on canary instead of
+        # bouncing to the production root. See ui/public/404-subpath-redirect.html.
+        run: cp ui/dist-mockingbird/browser/404-subpath-redirect.html ui/dist-mockingbird/browser/404.html
       - name: Add custom domain
         # The CNAME lives at the site root and binds the whole Pages site
         # (production AND /canary/) to the production custom domain.
