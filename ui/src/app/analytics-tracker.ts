@@ -47,6 +47,49 @@ export class AnalyticsTracker {
   private count(path: string): void {
     // count.js loads async; if a navigation beats it, that view is skipped
     // rather than queued — acceptable for lightweight page analytics.
-    window.goatcounter?.count?.({ path });
+    window.goatcounter?.count?.({ path: sanitizePath(path) });
   }
+}
+
+/**
+ * Strips personally-identifying data out of a route before it reaches
+ * analytics. We only want to know which *kinds* of page get visited, never
+ * which specific account, post, tag, list, etc. someone looked at — that's
+ * both a privacy leak and pure noise in GoatCounter's Pages report.
+ *
+ * Two things get removed:
+ *   1. The query string, entirely (e.g. ?open=pub:cynical13@… &with=1095…).
+ *   2. Any dynamic ID-like segment that follows a known collection prefix,
+ *      replaced with `:id` so `/accounts/111422…` collapses to `/accounts/:id`.
+ *
+ * Anything not matched is passed through unchanged, so static routes keep
+ * their real, readable paths.
+ */
+export function sanitizePath(path: string): string {
+  // Drop the query string and fragment; only the pathname carries the route.
+  const pathname = path.split(/[?#]/, 1)[0];
+
+  // Collection prefixes whose next segment is a per-item identifier we must
+  // not record. tags/:tag is included: a tag name is a lookup someone made.
+  const idParents = new Set([
+    'accounts',
+    'statuses',
+    'lists',
+    'collections',
+    'filters',
+    'tags',
+  ]);
+
+  // Static child routes that share a collection prefix but are NOT identifiers
+  // (e.g. /settings/filters/new, /collections/starter). Leave these readable.
+  const staticChildren = new Set(['new', 'starter']);
+
+  const segments = pathname.split('/');
+  for (let i = 0; i < segments.length - 1; i++) {
+    const child = segments[i + 1];
+    if (idParents.has(segments[i]) && child !== '' && !staticChildren.has(child)) {
+      segments[i + 1] = ':id';
+    }
+  }
+  return segments.join('/');
 }
