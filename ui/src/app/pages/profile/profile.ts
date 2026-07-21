@@ -145,6 +145,8 @@ export class Profile implements OnInit, OnDestroy {
   protected followError = signal<string | null>(null);
 
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
+  /** True when this profile is Eliza's — unlocks her local "Message" button. */
+  protected isEliza = computed(() => isElizaId(this.account()?.id));
 
   /** Discoverable Mastodon 4.6 Collections curated by this profile. */
   protected collections = signal<Collection[]>([]);

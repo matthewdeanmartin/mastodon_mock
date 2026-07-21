@@ -85,6 +85,9 @@
               {{ relationship()?.following ? 'Following' : 'Follow' }}
             </button>
           }
+          @if (isEliza() && relationship()?.following) {
+            <a class="btn" routerLink="/eliza/chat">💬 Message</a>
+          }
         </div>
       }
     </div>

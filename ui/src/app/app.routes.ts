@@ -303,6 +303,13 @@ export const routes: Routes = [
         pathMatch: 'full',
       },
       {
+        // Eliza's browser-local chat — reachable once you follow her (the
+        // component redirects to her profile if you don't). Deliberately NOT
+        // behind the anonymous guard: this is the one chat anon users can have.
+        path: 'eliza/chat',
+        loadComponent: () => import('./eliza/eliza-chat').then((m) => m.ElizaChat),
+      },
+      {
         path: 'accounts/:id',
         loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
       },
