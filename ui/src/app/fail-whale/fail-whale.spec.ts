@@ -1,8 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Server } from '../server';
+import { Auth } from '../auth';
 import { FailWhale } from './fail-whale';
 
 describe('FailWhale', () => {
@@ -54,5 +55,38 @@ describe('FailWhale', () => {
     const link = el.querySelector('a')!;
     expect(link.getAttribute('href')).toBe('https://fediverse.observer/example.social');
     expect(link.textContent).toContain('View third-party uptime information');
+  });
+
+  // ---------------------------------------------------------------- change server (anonymous)
+
+  it('does not offer the instance picker to a non-anonymous session', () => {
+    const el = render();
+    expect(el.querySelector('app-server-picker')).toBeNull();
+    expect(el.querySelector('.change-server')).toBeNull();
+  });
+
+  it('offers the instance picker to an anonymous session', () => {
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const el = render();
+    expect(el.querySelector('app-server-picker')).not.toBeNull();
+    expect(el.querySelector('.change-server')!.textContent).toContain('browse a different instance');
+  });
+
+  it('picking a server moves the anonymous identity and reloads', () => {
+    const auth = TestBed.inject(Auth);
+    auth.enterAnonymous('https://mastodon.social');
+    const fixture: ComponentFixture<FailWhale> = TestBed.createComponent(FailWhale);
+    fixture.detectChanges();
+
+    const enterSpy = vi.spyOn(auth, 'enterAnonymous');
+    // Stub the reload seam so the test runner isn't navigated.
+    const reloadSpy = vi
+      .spyOn(fixture.componentInstance as unknown as { reload: () => void }, 'reload')
+      .mockImplementation(() => undefined);
+
+    fixture.componentInstance.onServerPicked('https://mstdn.social');
+
+    expect(enterSpy).toHaveBeenCalledWith('https://mstdn.social');
+    expect(reloadSpy).toHaveBeenCalled();
   });
 });

@@ -37,3 +37,24 @@
   gap: 12px;
   margin-top: 8px;
 }
+
+/* Anonymous "browse a different instance" picker. Constrained and left-aligned
+   so the combo + its dropdown read cleanly inside the centered overlay. */
+.change-server {
+  width: min(420px, 90vw);
+  margin-top: 8px;
+  text-align: left;
+}
+
+.change-server > p {
+  margin: 0 0 6px;
+}
+
+.change-server input {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  color: inherit;
+  font-size: 14px;
+}

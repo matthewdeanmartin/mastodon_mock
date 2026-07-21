@@ -28,6 +28,15 @@
     </button>
     <button class="btn" type="button" (click)="reporting.set(true)">Report this</button>
   </div>
+
+  @if (canChangeServer) {
+    <!-- Anonymous browsing isn't bound to one instance: if the chosen server is
+         what's down, let the user hop to another without leaving the app. -->
+    <div class="change-server">
+      <p class="muted small">Or browse a different instance:</p>
+      <app-server-picker (picked)="onServerPicked($event)" />
+    </div>
+  }
 </div>
 @if (reporting()) {
   <app-bug-report-dialog (closed)="reporting.set(false)" />
