@@ -14,10 +14,23 @@
 }
 
 .whale-img {
-  width: min(320px, 70vw);
+  /* The whale is 640×480 (4:3). Lock the ratio and size it medium-big off the
+     width; height follows, so it never squishes. When vertical room is tight,
+     clamp by height with width:auto so the ratio still holds. */
+  width: min(460px, 80vw);
   height: auto;
-  max-height: 40vh;
+  max-height: 50vh;
+  aspect-ratio: 4 / 3;
   object-fit: contain;
+}
+
+/* Short viewports: drive the size off height instead so the ratio is preserved
+   rather than the width clamp fighting the height clamp. */
+@media (max-height: 620px) {
+  .whale-img {
+    width: auto;
+    height: min(50vh, 360px);
+  }
 }
 
 .fail-whale h1 {
