@@ -6,7 +6,8 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../../client-prefs';
-import { Context, Status } from '../../models';
+import { Auth } from '../../auth';
+import { Account, Context, Status } from '../../models';
 import { Thread } from './thread';
 import { anonymousStatusRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 
@@ -47,6 +48,13 @@ function makeStatus(id: string): Status {
     quote_approval_policy: null,
     media_attachments: [],
   };
+}
+
+/** A status authored by a specific account (id + acct), for chat-partner tests. */
+function makeStatusBy(id: string, authorId: string, acct: string): Status {
+  const s = makeStatus(id);
+  s.account = { id: authorId, username: acct, acct, display_name: acct } as never;
+  return s;
 }
 
 function makeBskyStatus(id = 'bsky:at://did:plc:x/app.bsky.feed.post/1'): Status {
@@ -417,5 +425,74 @@ describe('Thread', () => {
     expect(el.querySelector('.reader-comments-note')?.textContent).toContain(
       "doesn't publish comments",
     );
+  });
+
+  // ---------------------------------------------------------------- open in chat
+
+  interface ChatInternals {
+    chatKey: () => string | null;
+    chatPartner: () => Account | null;
+  }
+
+  function chatInternals(fixture: ComponentFixture<Thread>): ChatInternals {
+    return fixture.componentInstance as unknown as ChatInternals;
+  }
+
+  const ME: Account = { id: 'me', username: 'me', acct: 'me', display_name: 'Me' } as Account;
+
+  it('offers "open in chat" for a two-person thread (me + one other)', () => {
+    const fixture = setUpWithId('1');
+    TestBed.inject(Auth).account.set(ME);
+    // Focused post by the other person; my reply is a descendant.
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatusBy('1', 'them', 'them'));
+    httpMock
+      .expectOne('/api/v1/statuses/1/context')
+      .flush(makeContext([], [makeStatusBy('2', 'me', 'me')]));
+    fixture.detectChanges();
+
+    expect(chatInternals(fixture).chatPartner()?.acct).toBe('them');
+    expect(chatInternals(fixture).chatKey()).toBe('pub:them');
+    const link = (fixture.nativeElement as HTMLElement).querySelector(
+      'a.btn[href*="/conversations"]',
+    );
+    expect(link?.textContent).toContain('Open in chat');
+  });
+
+  it('disables "open in chat" once a third voice joins the thread', () => {
+    const fixture = setUpWithId('1');
+    TestBed.inject(Auth).account.set(ME);
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatusBy('1', 'them', 'them'));
+    httpMock
+      .expectOne('/api/v1/statuses/1/context')
+      .flush(makeContext([], [makeStatusBy('2', 'me', 'me'), makeStatusBy('3', 'other', 'other')]));
+    fixture.detectChanges();
+
+    expect(chatInternals(fixture).chatKey()).toBeNull();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('a.btn[href*="/conversations"]')).toBeNull();
+    expect(el.querySelector('button[disabled][title*="two-person"]')).not.toBeNull();
+  });
+
+  it('disables "open in chat" for a solo thread (only me)', () => {
+    const fixture = setUpWithId('1');
+    TestBed.inject(Auth).account.set(ME);
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatusBy('1', 'me', 'me'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+    fixture.detectChanges();
+
+    expect(chatInternals(fixture).chatKey()).toBeNull();
+  });
+
+  it('does not offer chat for a Bluesky thread', () => {
+    // Load a plain Mastodon thread, then swap the focused post for a bsky one:
+    // a bsky post routes to a different DM system and must disqualify.
+    const fixture = setUpWithId('1');
+    TestBed.inject(Auth).account.set(ME);
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatusBy('1', 'them', 'them'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+
+    internals(fixture).status.set(makeBskyStatus());
+    fixture.detectChanges();
+    expect(chatInternals(fixture).chatKey()).toBeNull();
   });
 });

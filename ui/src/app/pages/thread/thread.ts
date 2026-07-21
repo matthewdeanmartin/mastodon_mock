@@ -1,10 +1,11 @@
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
+import { Auth } from '../../auth';
 import { Terminology } from '../../terminology';
 import { ClientPrefs } from '../../client-prefs';
-import { Status } from '../../models';
+import { Account, Status } from '../../models';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
 import { HumanTimePipe } from '../../human-time.pipe';
@@ -25,12 +26,13 @@ import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmark
 
 @Component({
   selector: 'app-thread',
-  imports: [StatusCard, Compose, BskyReply, HumanTimePipe],
+  imports: [StatusCard, Compose, BskyReply, HumanTimePipe, RouterLink],
   templateUrl: './thread.html',
   styleUrl: './thread.css',
 })
 export class Thread implements OnInit {
   private api = inject(Api);
+  private auth = inject(Auth);
   private bsky = inject(BlueskyApi);
   private rss = inject(RssProvider);
   private anonymousPublic = inject(AnonymousPublicApi);
@@ -75,6 +77,49 @@ export class Thread implements OnInit {
   protected comments = computed<Status[]>(() => {
     const chainIds = new Set(this.chain().map((s) => s.id));
     return this.thread().filter((s) => !chainIds.has(s.id));
+  });
+
+  /**
+   * The single other participant when this thread is a 1:1 conversation —
+   * exactly the current user and one other person across every post in the
+   * thread. Null for a solo thread, or the moment a third voice appears.
+   *
+   * The chat tab has no multi-person UI yet, and we don't want to make it easy
+   * to stumble into a 20-way "chat" that reads badly — so "open in chat" is only
+   * offered (and enabled) when it maps cleanly onto a two-person DM. Bluesky/RSS/
+   * anonymous threads don't participate: those don't have a Mastodon DM to open.
+   */
+  protected chatPartner = computed(() => {
+    if (this.isRss() || this.isAnonymousPublic()) {
+      return null;
+    }
+    const me = this.auth.account();
+    const posts = this.thread();
+    if (!me || !posts.length) {
+      return null;
+    }
+    // Bluesky posts route to a different DM system; if any post is bsky this
+    // isn't a Mastodon 1:1 chat we can open here.
+    if (posts.some((p) => this.isBluesky(p))) {
+      return null;
+    }
+    const others = new Map<string, Account>();
+    for (const p of posts) {
+      const acc = p.account;
+      if (acc.id !== me.id) {
+        others.set(acc.id, acc);
+      }
+    }
+    // Exactly one other voice → a clean two-person chat. Zero (a solo thread) or
+    // two-plus (a group) both disqualify.
+    return others.size === 1 ? [...others.values()][0] : null;
+  });
+
+  /** The conversations-tab key for a 1:1 chat, matching how public chats group
+   *  by the other person (see notifications' `chatKey`). Null when not eligible. */
+  protected chatKey = computed(() => {
+    const partner = this.chatPartner();
+    return partner ? `pub:${partner.acct}` : null;
   });
 
   /** Id of the chain post whose inline reply composer is open (reader mode). */
