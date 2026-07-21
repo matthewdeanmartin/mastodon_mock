@@ -36,7 +36,62 @@
         Advanced ▾
       </button>
     }
+
+    <!-- Saved searches: a dropdown of stored definitions to re-run. -->
+    <details class="saved-menu" [open]="savedMenuOpen()">
+      <summary class="btn btn-outline" (click)="savedMenuOpen.set(!savedMenuOpen())">
+        Saved ({{ saved.count() }}) ▾
+      </summary>
+      <div class="saved-panel">
+        @if (!saved.count()) {
+          <p class="muted small saved-empty">No saved searches yet.</p>
+        }
+        @for (item of saved.all(); track item.id) {
+          <div class="saved-row">
+            <button class="saved-run" (click)="runSaved(item.id)" [title]="item.name">
+              {{ item.name }}
+              @if (!item.authenticated) {
+                <span class="muted small">· anon</span>
+              }
+            </button>
+            <button
+              class="saved-del"
+              (click)="saved.delete(item.id)"
+              aria-label="Delete saved search"
+              title="Delete"
+            >
+              ✕
+            </button>
+          </div>
+        }
+      </div>
+    </details>
+
+    <button class="btn btn-outline" [disabled]="saved.atLimit()" (click)="openSaveDialog()">
+      Save
+    </button>
+    <button class="btn btn-outline" (click)="share()">
+      {{ shareCopied() ? 'Link copied!' : 'Share' }}
+    </button>
   </div>
+
+  @if (saveDialogOpen()) {
+    <div class="save-dialog">
+      <input
+        type="text"
+        [ngModel]="saveName()"
+        (ngModelChange)="saveName.set($event)"
+        (keyup.enter)="confirmSave()"
+        placeholder="Name this search"
+        aria-label="Saved search name"
+      />
+      <button class="btn btn-sm" (click)="confirmSave()">Save</button>
+      <button class="btn btn-outline btn-sm" (click)="saveDialogOpen.set(false)">Cancel</button>
+    </div>
+  }
+  @if (savedNotice()) {
+    <p class="saved-notice muted small">{{ savedNotice() }}</p>
+  }
 
   <div class="search-page" [class.two-box]="postSearchRan">
     <div class="search-form-box">

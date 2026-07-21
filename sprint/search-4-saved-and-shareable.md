@@ -6,6 +6,25 @@ structured searches. Both features read/write the *same* object the form is buil
 
 Covers spec §15, §16, and the cross-mode explanation of §15/§17.
 
+## Status: DONE (2026-07-20)
+
+- `saved-searches.ts` (+ spec) — account-scoped (`scopedKey`) localStorage, **cap 20**, deep-clone
+  on save, newest-first, save/rename/duplicate/delete. Definitions only (no results/bodies).
+- `search-url.ts` (+ spec) — encode/decode `MawkingbirdSearch` to URL: readable flat params for
+  simple searches, compact `?s=<base64url-json>` blob for rich ones. Validates every field,
+  ignores unknown, malformed → safe empty search. No token / numeric-id / view-state ever encoded.
+- **No DSL parsing needed** — the structured object is canonical, so decode just validates fields.
+- UI: a **Saved (N) ▾ dropdown** in the search bar (details-menu pattern), Save dialog, Share
+  (copies link to clipboard, resolved against `<base href>` for the `/_ui/` sub-path).
+- Shareable URL captures pre-search definition + budget + grouping only — NOT page/facets/scroll.
+- Two bugs found & fixed during verification: (1) advanced searches routed the serialized DSL
+  through the `q=` URL, which stamped it back into the query box and polluted saved/shared
+  `words` — advanced searches now fetch directly, keeping the box as plain words; (2) share link
+  missed the `/_ui/` base — now built via `new URL('search?…', document.baseURI)`.
+- Runtime-verified: save → dropdown → persists across reload; share blob decodes to clean
+  structured criteria (`words: angular`, not the DSL); reopening a shared link repopulates the
+  form. All 938 UI tests pass.
+
 ## Deliverables
 
 ### 1. Saved searches — `pages/search/saved-searches.ts` (new)

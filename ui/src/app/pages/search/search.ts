@@ -20,13 +20,17 @@ import {
   statusMatchesFacet,
 } from './search-refine';
 import {
+  MawkingbirdSearch,
   PostContentType,
   PostSearchCriteria,
   ResultGrouping,
+  SearchTarget,
   Tristate,
 } from './mawkingbird-search';
 import { serializeMastodonQuery } from './mastodon-query-serializer';
 import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-explain';
+import { SavedSearches } from './saved-searches';
+import { decodeSearchFromParams, encodeSearchToParams } from './search-url';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
@@ -55,6 +59,7 @@ export class Search implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  protected saved = inject(SavedSearches);
   private activeSearch: Subscription | null = null;
 
   protected query = signal('');
@@ -172,6 +177,29 @@ export class Search implements OnInit {
     scope: this.scope() === 'all' ? undefined : this.scope(),
   }));
 
+  /** The complete current search assembled from all form state — the shape that
+   *  gets saved and encoded into shareable URLs (§15/§16). Presentation/budget
+   *  travel with it; transient view state (page, facets) deliberately does not. */
+  protected currentSearch = computed<MawkingbirdSearch>(() => {
+    const target = this.type() === 'statuses' ? 'posts' : (this.type() as SearchTarget);
+    return {
+      version: 1,
+      target,
+      account: target === 'accounts' ? { text: this.query().trim() } : undefined,
+      hashtag: target === 'hashtags' ? { text: this.query().trim() } : undefined,
+      post: target === 'posts' ? this.postCriteria() : undefined,
+      apiCallBudget: this.apiBudget(),
+      presentation: { grouping: this.grouping() },
+    };
+  });
+
+  // --- Saved searches + sharing (sprint 4) ---
+  protected savedMenuOpen = signal(false);
+  protected saveDialogOpen = signal(false);
+  protected saveName = signal('');
+  protected shareCopied = signal(false);
+  protected savedNotice = signal('');
+
   /** Active-filter chips for the last executed post search (§10). */
   protected chips = computed<Chip[]>(() =>
     this.type() === 'statuses' && this.results()
@@ -258,11 +286,24 @@ export class Search implements OnInit {
   private urlQuery = '';
   private urlType: SearchType = 'accounts';
 
+  private sharedLinkHandled = false;
+
   ngOnInit(): void {
     // Restore the query/type from the URL so that returning here (e.g. via the
     // browser back button after visiting a result) re-runs the same search
     // instead of showing an empty page.
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      // On first load, a shared link may carry the full structured search
+      // (a compact `?s=` blob or advanced flat params). Decode it once into the
+      // form and run it, rather than treating it as a bare q/type search.
+      if (!this.sharedLinkHandled && this.isSharedLink(params)) {
+        this.sharedLinkHandled = true;
+        const decoded = decodeSearchFromParams((k) => params.get(k));
+        this.applySearch(decoded);
+        return;
+      }
+      this.sharedLinkHandled = true;
+
       const q = params.get('q') ?? '';
       const t = (params.get('type') as SearchType) ?? 'accounts';
       this.urlQuery = q;
@@ -278,6 +319,19 @@ export class Search implements OnInit {
         this.loadTrends();
       }
     });
+  }
+
+  /** A shared link is one carrying structured search beyond a bare q/type: the
+   *  compact blob, or any of the advanced flat params. */
+  private isSharedLink(params: { has(key: string): boolean }): boolean {
+    return (
+      params.has('s') ||
+      params.has('after') ||
+      params.has('media') ||
+      params.has('language') ||
+      params.has('scope') ||
+      params.has('calls')
+    );
   }
 
   /** Fetch trending posts + tags once, for the idle states. Failures show nothing. */
@@ -345,10 +399,12 @@ export class Search implements OnInit {
     if (!q.trim()) {
       return;
     }
-    // Keep the box showing what will actually be sent (authenticated) or the
-    // plain words (anonymous), so the URL/box stay honest.
-    this.query.set(q);
-    this.run();
+    // Fetch directly rather than through the q= URL param: an advanced search's
+    // real query string is a serialized DSL, and routing it through the URL would
+    // stamp that DSL back into the query box (clobbering the plain words that
+    // save/share need to capture). The structured criteria live in
+    // `pendingCriteria`; the box keeps the user's plain words.
+    this.fetch(q, 'statuses');
   }
 
   /** Toggle the advanced panel. Opening it raises the default budget to 3 (an
@@ -376,6 +432,75 @@ export class Search implements OnInit {
     // The main box may hold a serialized DSL string from a prior Apply — clear it
     // too, otherwise the query lingers confusingly after the fields are emptied.
     this.query.set('');
+  }
+
+  // --- Saved searches + sharing ---
+
+  /** Load a saved/shared search into the form and run it. Populates every field
+   *  from the structured object (no DSL parsing — the object is canonical). */
+  applySearch(search: MawkingbirdSearch): void {
+    this.type.set(search.target === 'posts' ? 'statuses' : search.target);
+    this.apiBudget.set(search.apiCallBudget || DEFAULT_BUDGET_SIMPLE);
+    this.grouping.set(search.presentation?.grouping ?? 'none');
+
+    const p = search.post ?? {};
+    this.exactPhrase.set(p.exactPhrase ?? '');
+    this.excludeWords.set(p.excludeWords ?? '');
+    this.author.set(p.author ?? '');
+    this.after.set(p.dates?.after ?? '');
+    this.before.set(p.dates?.before ?? '');
+    this.language.set(p.language ?? '');
+    this.contentType.set(p.contentType ?? 'any');
+    this.replies.set(p.replies ?? 'include');
+    this.sensitive.set(p.sensitive ?? 'include');
+    this.scope.set(p.scope ?? 'all');
+
+    if (search.target === 'posts') {
+      // Run through the advanced path so the serializer/hashtag-transform apply.
+      this.query.set(p.words ?? '');
+      this.applyAdvanced();
+    } else {
+      this.query.set((search.account?.text ?? search.hashtag?.text ?? '').trim());
+      this.run();
+    }
+  }
+
+  runSaved(id: string): void {
+    const found = this.saved.all().find((s) => s.id === id);
+    if (found) {
+      this.savedMenuOpen.set(false);
+      this.applySearch(found.search);
+    }
+  }
+
+  openSaveDialog(): void {
+    this.saveName.set('');
+    this.saveDialogOpen.set(true);
+  }
+
+  confirmSave(): void {
+    const result = this.saved.save(this.saveName(), this.currentSearch(), {
+      instance: this.capabilities.active ? this.anonymous.server() : '',
+      authenticated: !this.capabilities.active,
+    });
+    this.saveDialogOpen.set(false);
+    this.savedNotice.set(result.ok ? 'Search saved.' : result.error);
+    setTimeout(() => this.savedNotice.set(''), 3000);
+  }
+
+  /** Copy a shareable link to the current search definition. */
+  async share(): Promise<void> {
+    const params = new URLSearchParams(encodeSearchToParams(this.currentSearch())).toString();
+    // Resolve against <base href> so the link is valid under a sub-path like /_ui/.
+    const url = new URL(`search?${params}`, document.baseURI).toString();
+    try {
+      await navigator.clipboard.writeText(url);
+      this.shareCopied.set(true);
+      setTimeout(() => this.shareCopied.set(false), 2000);
+    } catch {
+      // Clipboard blocked — surface the URL so the user can copy it manually.
+      this.savedNotice.set(url);
+    }
   }
 
   /** True when any advanced field is set (drives the "Clear" button visibility). */
