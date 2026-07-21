@@ -16,6 +16,7 @@ import { inject, Injectable } from '@angular/core';
 import { Account, Relationship, Status } from '../models';
 import { elizaReply } from './eliza-engine';
 import { ElizaFollow } from './eliza-follow';
+import { LocalNotificationStore } from './local-notification-store';
 import {
   ELIZA_ACCT,
   ELIZA_ID,
@@ -27,6 +28,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class ElizaService {
   private readonly followState = inject(ElizaFollow);
+  private readonly notifications = inject(LocalNotificationStore);
 
   /** Reactive: does the viewer follow Eliza? Gates her DM thread and replies. */
   readonly following = this.followState.following;
@@ -70,6 +72,8 @@ export class ElizaService {
   /** Follow Eliza (browser-local; never touches a real following list). */
   follow(): void {
     this.followState.follow();
+    // Greet the new follower in her inbox (one-time).
+    this.notifications.ensureWelcome();
   }
 
   /** Unfollow Eliza. */

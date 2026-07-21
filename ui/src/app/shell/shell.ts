@@ -6,6 +6,8 @@ import { filter, map } from 'rxjs';
 import { Api } from '../api';
 import { AccountChoice, Auth, Session } from '../auth';
 import { ClientPrefs } from '../client-prefs';
+import { ElizaService } from '../eliza/eliza.service';
+import { LocalNotificationStore } from '../eliza/local-notification-store';
 import { environment } from '../../environments/environment';
 import { brandLogoSrc, isCanaryBuild } from '../build-flavor';
 import { Hotkeys } from '../hotkeys';
@@ -40,6 +42,8 @@ function isWideUrl(url: string): boolean {
 })
 export class Shell implements OnInit {
   protected auth = inject(Auth);
+  protected eliza = inject(ElizaService);
+  protected elizaNotifs = inject(LocalNotificationStore);
   private api = inject(Api);
   private router = inject(Router);
   /** Mastodon-compatible keyboard shortcuts (and the "?" help dialog). */

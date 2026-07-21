@@ -1,0 +1,30 @@
+<header class="eliza-chat-header">
+  <a class="eliza-chat-back" routerLink="/eliza" aria-label="Back to Eliza's profile">←</a>
+  <img class="eliza-chat-avatar" [src]="account.avatar" width="40" height="40" alt="" />
+  <div class="eliza-chat-who">
+    <strong>{{ account.display_name }}</strong>
+    <span class="muted">&#64;{{ account.acct }}</span>
+  </div>
+</header>
+
+<div class="eliza-chat-thread" #scroller>
+  @for (m of dm.messages(); track m.id) {
+    <div class="eliza-msg" [class.mine]="m.from === 'me'" [class.theirs]="m.from === 'eliza'">
+      <div class="eliza-bubble">{{ m.text }}</div>
+      <time class="eliza-msg-time muted">{{ m.createdAt | humanTime }}</time>
+    </div>
+  }
+</div>
+
+<form class="eliza-chat-compose" (submit)="$event.preventDefault(); send()">
+  <input
+    class="eliza-chat-input"
+    type="text"
+    [(ngModel)]="draft"
+    [ngModelOptions]="{ standalone: true }"
+    aria-label="Message Eliza"
+    placeholder="Message Eliza…"
+    autocomplete="off"
+  />
+  <button type="submit" class="btn" [disabled]="!draft.trim()">Send</button>
+</form>

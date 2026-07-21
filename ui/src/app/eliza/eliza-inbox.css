@@ -1,0 +1,72 @@
+.eliza-inbox-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eliza-inbox-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.eliza-inbox-who {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.eliza-inbox-empty {
+  padding: 32px 16px;
+}
+
+.eliza-inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.eliza-inbox-item {
+  border-bottom: 1px solid var(--border);
+}
+
+.eliza-inbox-item.unread {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.eliza-inbox-link {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.eliza-inbox-link:hover {
+  background: var(--hover, rgba(128, 128, 128, 0.08));
+}
+
+.eliza-inbox-icon {
+  font-size: 18px;
+  flex: none;
+  line-height: 1.4;
+}
+
+.eliza-inbox-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.eliza-inbox-text {
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.eliza-inbox-time {
+  font-size: 12px;
+}

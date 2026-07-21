@@ -19,6 +19,7 @@ import { Account, Status } from '../models';
 import { scopedKey } from '../account-scope';
 import { Auth } from '../auth';
 import { ElizaService } from './eliza.service';
+import { LocalNotificationStore } from './local-notification-store';
 import { elizaAccount } from './eliza-identity';
 import { LOCAL_POST_DISCLAIMER } from './eliza-content';
 
@@ -121,6 +122,7 @@ function buildStatus(
 export class LocalPostStore {
   private readonly auth = inject(Auth);
   private readonly eliza = inject(ElizaService);
+  private readonly notifications = inject(LocalNotificationStore);
 
   private readonly state = signal<LocalPostState>(loadState());
 
@@ -186,9 +188,12 @@ export class LocalPostStore {
 
   /** Build Eliza's reply to `mine`: the disclaimer plus an ELIZA-style line. */
   private elizaReplyTo(mine: Status, userText: string): Status {
-    const body = `${LOCAL_POST_DISCLAIMER}\n\n${this.eliza.reply(userText)}`;
+    const line = this.eliza.reply(userText);
+    const body = `${LOCAL_POST_DISCLAIMER}\n\n${line}`;
     // A moment after the user's post, so it sorts just below theirs.
     const createdAt = new Date(Date.parse(mine.created_at) + 1000).toISOString();
+    // Surface it in the Eliza inbox — the plain reflection line is the preview.
+    this.notifications.push('reply', line, '/home');
     return buildStatus(freshId('eliza:reply:'), elizaAccount(), body, createdAt, mine.id);
   }
 

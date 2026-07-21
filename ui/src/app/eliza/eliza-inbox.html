@@ -1,0 +1,27 @@
+<header class="eliza-inbox-header">
+  <img class="eliza-inbox-avatar" [src]="account.avatar" width="40" height="40" alt="" />
+  <div class="eliza-inbox-who">
+    <strong>From Eliza</strong>
+    <span class="muted">Your practice inbox — stays in your browser</span>
+  </div>
+</header>
+
+@if (!store.items().length) {
+  <p class="muted center eliza-inbox-empty">
+    Nothing here yet. <a routerLink="/eliza/chat">Say hi to Eliza</a> or post something on your feed.
+  </p>
+} @else {
+  <ul class="eliza-inbox-list">
+    @for (n of store.items(); track n.id) {
+      <li class="eliza-inbox-item" [class.unread]="!n.read">
+        <a [routerLink]="n.link" class="eliza-inbox-link">
+          <span class="eliza-inbox-icon" aria-hidden="true">{{ icon(n.kind) }}</span>
+          <span class="eliza-inbox-body">
+            <span class="eliza-inbox-text">{{ n.text }}</span>
+            <time class="eliza-inbox-time muted">{{ n.createdAt | humanTime }}</time>
+          </span>
+        </a>
+      </li>
+    }
+  </ul>
+}

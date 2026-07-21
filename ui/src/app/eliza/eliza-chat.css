@@ -1,0 +1,109 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 60vh;
+}
+
+.eliza-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--col-bg);
+  z-index: 1;
+}
+
+.eliza-chat-back {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text);
+  text-decoration: none;
+  padding: 4px 8px;
+}
+
+.eliza-chat-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.eliza-chat-who {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.eliza-chat-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eliza-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 78%;
+}
+
+.eliza-msg.mine {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.eliza-msg.theirs {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.eliza-bubble {
+  padding: 9px 13px;
+  border-radius: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.eliza-msg.theirs .eliza-bubble {
+  background: var(--hover, rgba(128, 128, 128, 0.15));
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+
+.eliza-msg.mine .eliza-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.eliza-msg-time {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.eliza-chat-compose {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--col-bg);
+  position: sticky;
+  bottom: 0;
+}
+
+.eliza-chat-input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--col-bg);
+  color: var(--text);
+  font: inherit;
+}

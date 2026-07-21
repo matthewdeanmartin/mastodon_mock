@@ -310,6 +310,12 @@ export const routes: Routes = [
         loadComponent: () => import('./eliza/eliza-chat').then((m) => m.ElizaChat),
       },
       {
+        // Eliza's browser-local inbox — her replies, DMs, and welcome. Also
+        // follow-gated and outside the anonymous guard.
+        path: 'eliza/inbox',
+        loadComponent: () => import('./eliza/eliza-inbox').then((m) => m.ElizaInbox),
+      },
+      {
         path: 'accounts/:id',
         loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
       },

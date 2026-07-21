@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ElizaService } from './eliza.service';
+import { LocalNotificationStore } from './local-notification-store';
 import { ELIZA_ID } from './eliza-identity';
 import { ELIZA_POSTS } from './eliza-content';
 
@@ -8,6 +9,7 @@ describe('ElizaService', () => {
   let eliza: ElizaService;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({});
     eliza = TestBed.inject(ElizaService);
   });
@@ -45,5 +47,14 @@ describe('ElizaService', () => {
     expect(eliza.replyWithSeed('i need a break', 3)).toBe(
       eliza.replyWithSeed('i need a break', 3),
     );
+  });
+
+  it('following her posts a one-time welcome notification', () => {
+    const notifs = TestBed.inject(LocalNotificationStore);
+    eliza.follow();
+    eliza.follow(); // idempotent
+    const welcomes = notifs.items().filter((n) => n.kind === 'welcome');
+    expect(welcomes.length).toBe(1);
+    expect(welcomes[0].link).toBe('/eliza/chat');
   });
 });
