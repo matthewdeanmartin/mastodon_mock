@@ -16,10 +16,12 @@ import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home
 /** Exposes Home's protected signals for white-box testing. */
 interface HomeInternals {
   statuses: Signal<Status[]>;
+  visible: Signal<Status[]>;
   live: WritableSignal<boolean>;
   autoLoading: Signal<boolean>;
   capActive: Signal<boolean>;
   canLoadMore: Signal<boolean>;
+  eliza: { follow(): void; unfollow(): void };
   toggleLive(): void;
   loadMore(): void;
 }
@@ -132,7 +134,9 @@ describe('Home', () => {
     const fixture = TestBed.createComponent(Home);
     fixture.detectChanges();
 
-    const link = fixture.nativeElement.querySelector('.starter-pack-post a') as HTMLAnchorElement;
+    const link = fixture.nativeElement.querySelector(
+      '.starter-pack-universal a',
+    ) as HTMLAnchorElement;
     expect(link.textContent).toContain('Get your account started with the universal starter pack');
     expect(link.getAttribute('href')).toBe('/collections/starter');
     const loginPost = fixture.nativeElement.querySelector(
@@ -143,6 +147,25 @@ describe('Home', () => {
     );
     expect(loginPost.textContent).toContain('Pinned');
     expect(loginPost.getAttribute('href')).toBe('/login');
+  });
+
+  it('keeps the starter pack after following Eliza (still few real friends)', () => {
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+
+    // Follow Eliza — her posts now fill the feed, but the onboarding cards must stay.
+    (fixture.componentInstance as unknown as { eliza: { follow(): void } }).eliza.follow();
+    fixture.detectChanges();
+
+    const starter = fixture.nativeElement.querySelector('.starter-pack-universal a');
+    expect(starter).not.toBeNull();
+    // The Eliza invite, however, retires once she's followed.
+    expect(fixture.nativeElement.querySelector('.eliza-invite')).toBeNull();
+    // And the feed is no longer empty.
+    expect(
+      (fixture.componentInstance as unknown as { visible: () => unknown[] }).visible().length,
+    ).toBeGreaterThan(0);
   });
 
   it('toggleLive() opens a user stream and flips the live flag', () => {
@@ -289,5 +312,38 @@ describe('Home', () => {
     // A second cap hit reuses the fetched tail — no refetch.
     internals(fixture).loadMore();
     httpMock.expectNone((r) => r.url === '/api/v1/bookmarks');
+  });
+
+  // ---------------------------------------------------------------- Eliza merge
+  it('keeps Eliza out of the feed until she is followed', () => {
+    const fixture = setUp();
+    const home = internals(fixture);
+    expect(home.visible().some((s) => s.id.startsWith('eliza:'))).toBe(false);
+  });
+
+  it('folds Eliza posts into the visible feed once followed', () => {
+    const fixture = setUp();
+    const home = internals(fixture);
+
+    home.eliza.follow();
+    fixture.detectChanges();
+
+    const elizaPosts = home.visible().filter((s) => s.id.startsWith('eliza:'));
+    expect(elizaPosts.length).toBeGreaterThan(0);
+    // She's not in the raw feed — only the derived visible() view.
+    expect(home.statuses().some((s) => s.id.startsWith('eliza:'))).toBe(false);
+  });
+
+  it('removes Eliza posts again on unfollow', () => {
+    const fixture = setUp();
+    const home = internals(fixture);
+
+    home.eliza.follow();
+    fixture.detectChanges();
+    expect(home.visible().some((s) => s.id.startsWith('eliza:'))).toBe(true);
+
+    home.eliza.unfollow();
+    fixture.detectChanges();
+    expect(home.visible().some((s) => s.id.startsWith('eliza:'))).toBe(false);
   });
 });

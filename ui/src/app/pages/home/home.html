@@ -41,6 +41,10 @@
   <app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
 }
 
+@if (auth.isAnonymous) {
+  <app-local-compose (posted)="onLocalPosted()" />
+}
+
 <app-command-bar
   [live]="live()"
   [showLive]="!auth.isAnonymous"
@@ -60,11 +64,25 @@
   </aside>
 }
 
-@if (loading()) {
-  <p class="muted center">Loading…</p>
-} @else if (!visible().length) {
-  @if (auth.isAnonymous && anonymousFollows.count() === 0) {
-    <article class="starter-pack-post">
+@if (showOnboarding()) {
+  @if (!eliza.following()) {
+    <article class="starter-pack-post eliza-invite">
+      <img class="starter-pack-avatar" src="eliza-avatar.svg" width="40" height="40" alt="" />
+      <div class="starter-pack-content">
+        <div class="starter-pack-author">
+          <strong>Eliza</strong>
+          <span class="muted">&#64;eliza</span>
+        </div>
+        <p class="eliza-invite-copy">
+          New here, or no one to follow yet? I'm your practice friend — follow me and you can
+          post, reply, and chat, all safely in your browser.
+        </p>
+        <a class="btn" routerLink="/eliza">Meet Eliza →</a>
+      </div>
+    </article>
+  }
+  @if (auth.isAnonymous) {
+    <article class="starter-pack-post starter-pack-universal">
       <div class="starter-pack-avatar" aria-hidden="true">M</div>
       <div class="starter-pack-content">
         <div class="starter-pack-author">
@@ -76,17 +94,21 @@
         </a>
       </div>
     </article>
-  } @else {
-    <p class="muted center">
-      @if (auth.isAnonymous) {
-        Follow a public Mastodon account from Search or its profile to build this feed. Posts are
-        fetched only when you load or refresh this page.
-      } @else {
-        Your home timeline is empty.
-        <a routerLink="/find-people">Find people to follow</a>, or post something.
-      }
-    </p>
   }
+}
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!visible().length) {
+  <p class="muted center">
+    @if (auth.isAnonymous) {
+      Follow a public Mastodon account from Search or its profile to build this feed. Posts are
+      fetched only when you load or refresh this page.
+    } @else {
+      Your home timeline is empty.
+      <a routerLink="/find-people">Find people to follow</a>, or post something.
+    }
+  </p>
 } @else {
   @for (s of visible(); track s.id) {
     <app-status-card

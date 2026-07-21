@@ -24,6 +24,8 @@ import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
 import { AnonymousProviderRef } from '../providers/anonymous/anonymous-mastodon-provider';
+import { isElizaId } from '../eliza/eliza-identity';
+import { LocalCompose } from '../eliza/local-compose';
 import {
   anonymousAccountRouteRef,
   anonymousStatusRouteRef,
@@ -46,6 +48,7 @@ const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
     Lightbox,
     VerifiedBadge,
     NgOptimizedImage,
+    LocalCompose,
   ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
@@ -629,6 +632,21 @@ export class StatusCard {
     return this.capabilities.statusCaps(this.display.provider ?? 'mastodon');
   }
 
+  /** A browser-local practice post — the viewer's own (`local:`) or one of
+   *  Eliza's (`eliza:`). These support replying locally even for anonymous
+   *  visitors, and their replies route through {@link LocalPostStore}, never the
+   *  network. */
+  protected get isLocalPractice(): boolean {
+    const id = this.display.id;
+    return id.startsWith('local:') || isElizaId(id);
+  }
+
+  /** Whether to show an enabled reply affordance: either the network supports it,
+   *  or it's a local practice post the viewer can always reply to. */
+  protected get canReply(): boolean {
+    return this.caps.reply || this.isLocalPractice;
+  }
+
   /** Public Mastodon edit history remains readable without a user token. */
   protected get canViewPublicHistory(): boolean {
     const ref = this.anonymousRef;
@@ -664,7 +682,9 @@ export class StatusCard {
   // --- inline reply / quote ---
   toggleReply(event: Event): void {
     event.stopPropagation();
-    if (!this.capabilities.canCompose) {
+    // Local practice posts are always replyable; otherwise a real compose
+    // capability is required.
+    if (!this.capabilities.canCompose && !this.isLocalPractice) {
       return;
     }
     this.quoting.set(false);

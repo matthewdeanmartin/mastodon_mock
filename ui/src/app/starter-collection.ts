@@ -26,7 +26,6 @@ export const STARTER_COLLECTION: readonly StarterAccount[] = [
   { name: 'OpenStreetMap', handle: 'openstreetmap@en.osm.town' },
   { name: 'Derek Powazek', handle: 'fraying@xoxo.zone' },
   { name: 'Cats of Yore', handle: 'CatsOfYore@mastodon.social' },
-  { name: 'Bats Bats Bats', handle: 'batsbatsbats@social.beeps.gay' },
   { name: 'Medieval Illumination', handle: 'medieval_illuminations@mastodon.social' },
   { name: 'LucasArts Places', handle: 'lucasarts_places@mastodon.social' },
 ];

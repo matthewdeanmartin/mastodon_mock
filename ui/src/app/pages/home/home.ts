@@ -26,16 +26,23 @@ import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-m
 import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home-feed-cache';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
+import { ElizaService } from '../../eliza/eliza.service';
+import { isElizaId } from '../../eliza/eliza-identity';
+import { LocalPostStore } from '../../eliza/local-post-store';
+import { LocalCompose } from '../../eliza/local-compose';
 
 /** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
+/** Keep the onboarding cards (Eliza invite, starter pack) around until the user
+ *  has this many real friends — a follow of Eliza alone shouldn't retire them. */
+const ONBOARDING_FRIEND_THRESHOLD = 10;
 const NUDGE_DISMISSED_KEY = 'mockingbird_follow_nudge_dismissed';
 /** How many saved bookmarks get tacked onto the feed when the cap hits. */
 const BOOKMARK_TAIL_SIZE = 40;
 
 @Component({
   selector: 'app-home',
-  imports: [CommandBar, Compose, StatusCard, Announcements, RouterLink],
+  imports: [CommandBar, Compose, StatusCard, Announcements, RouterLink, LocalCompose],
   templateUrl: './home.html',
   styleUrl: './home.css',
 })
@@ -55,6 +62,8 @@ export class Home implements OnInit, OnDestroy {
   private anonymousHomeCache = inject(AnonymousHomeFeedCache);
   protected anonymousFollows = inject(AnonymousFollows);
   private anonymousTags = inject(AnonymousTags);
+  protected eliza = inject(ElizaService);
+  protected localPosts = inject(LocalPostStore);
   private route = inject(ActivatedRoute);
   private drafts = inject(Drafts);
 
@@ -90,10 +99,28 @@ export class Home implements OnInit, OnDestroy {
   private now = signal(Date.now());
   private clock: ReturnType<typeof setInterval> | null = null;
 
-  /** The loaded feed minus providers hidden via the command-bar chips. */
-  protected visible = computed(() =>
-    this.statuses().filter((s) => this.prefs.isProviderVisible(s.provider ?? 'mastodon')),
-  );
+  /** The loaded feed minus providers hidden via the command-bar chips, with
+   *  Eliza's timeline folded in when she's followed and the viewer's own local
+   *  practice posts (plus Eliza's replies) always folded in. All synthetic posts
+   *  bypass the provider chips — they're explicit, local, and opt-in. */
+  protected visible = computed(() => {
+    const feed = this.statuses().filter((s) =>
+      this.prefs.isProviderVisible(s.provider ?? 'mastodon'),
+    );
+    const injected: Status[] = [...this.localPosts.posts()];
+    if (this.eliza.following()) {
+      injected.push(...this.eliza.timeline(this.now()));
+    }
+    if (!injected.length) {
+      return feed;
+    }
+    // Drop any real feed item colliding with an injected synthetic id.
+    const injectedIds = new Set(injected.map((s) => s.id));
+    const base = feed.filter((s) => !injectedIds.has(s.id) && !isElizaId(s.id));
+    return [...injected, ...base].sort(
+      (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+    );
+  });
 
   /** True while the max-feed cap is in force (hit, and within the cooldown). */
   protected capActive = computed(() => {
@@ -118,6 +145,19 @@ export class Home implements OnInit, OnDestroy {
   private nudgeDismissed = signal(localStorage.getItem(NUDGE_DISMISSED_KEY) === 'true');
 
   protected followingCount = computed(() => this.auth.account()?.following_count ?? 0);
+
+  /** Real friends the viewer has, across both modes — anonymous follows live in
+   *  browser storage, authed follows in the account's `following_count`. Eliza
+   *  is deliberately excluded: following her doesn't count as having friends. */
+  protected friendCount = computed(() =>
+    this.auth.isAnonymous ? this.anonymousFollows.count() : this.followingCount(),
+  );
+
+  /** Show the onboarding cards (Eliza invite + starter pack) until the viewer
+   *  builds up a handful of real friends — regardless of whether the feed now
+   *  has content (following Eliza fills the feed but you still need a starter
+   *  pack). */
+  protected showOnboarding = computed(() => this.friendCount() < ONBOARDING_FRIEND_THRESHOLD);
 
   protected showFollowNudge = computed(
     () =>
@@ -441,6 +481,13 @@ export class Home implements OnInit, OnDestroy {
 
   onPosted(status: Status): void {
     this.statuses.update((s) => [status, ...s]);
+  }
+
+  /** A local practice post was made: it (and Eliza's reply) live in the store,
+   *  which `visible()` reads reactively — nothing to splice into the real feed. */
+  onLocalPosted(): void {
+    // No-op beyond letting the signal-driven feed recompute; kept as a seam for
+    // future behaviour (e.g. scroll-to-post).
   }
 
   onChanged(original: Status, updated: Status): void {

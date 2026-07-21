@@ -28,6 +28,8 @@ import {
 import { AnonymousProviderRef } from '../../providers/anonymous/anonymous-mastodon-provider';
 import { AccountStatusesOptions } from '../../api';
 import { Observable } from 'rxjs';
+import { ElizaService } from '../../eliza/eliza.service';
+import { isElizaId } from '../../eliza/eliza-identity';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analytics';
@@ -58,6 +60,7 @@ export class Profile implements OnInit, OnDestroy {
   private anonymous = inject(AnonymousAccount);
   private anonymousPublic = inject(AnonymousPublicApi);
   protected anonymousFollows = inject(AnonymousFollows);
+  protected eliza = inject(ElizaService);
   private location = inject(Location);
   private rss = inject(RssProvider);
   private rssSubs = inject(RssSubscriptions);
@@ -194,6 +197,10 @@ export class Profile implements OnInit, OnDestroy {
       this.loadRss(id);
       return;
     }
+    if (isElizaId(id)) {
+      this.loadEliza();
+      return;
+    }
     if (this.auth.isAnonymous && id === 'anonymous') {
       this.account.set(this.anonymous.account());
       this.statuses.set([]);
@@ -284,6 +291,26 @@ export class Profile implements OnInit, OnDestroy {
         this.statusesLoading.set(false);
       },
     });
+  }
+
+  /**
+   * Eliza's synthetic profile: her account and pre-written timeline, served
+   * entirely from {@link ElizaService} with no network call. Works identically
+   * whether the viewer is anonymous or signed in — she's a browser-local friend.
+   * Her follow relationship is the local one (never the real follow API).
+   */
+  private loadEliza(): void {
+    this.eliza.refresh();
+    this.account.set(this.eliza.account());
+    const timeline = this.eliza.timeline();
+    this.pinnedStatuses.set(this.showPinned() ? timeline.filter((s) => s.pinned) : []);
+    this.statuses.set(timeline);
+    this.featured.set([]);
+    this.relationship.set(this.eliza.relationship());
+    this.loading.set(false);
+    this.statusesLoading.set(false);
+    this.exhausted.set(true);
+    this.tab.set('posts');
   }
 
   toggleBoosts(): void {
@@ -533,6 +560,15 @@ export class Profile implements OnInit, OnDestroy {
       return;
     }
     this.followError.set(null);
+    if (isElizaId(acc.id)) {
+      if (rel?.following) {
+        this.eliza.unfollow();
+      } else {
+        this.eliza.follow();
+      }
+      this.relationship.set(this.eliza.relationship());
+      return;
+    }
     if (this.auth.isAnonymous) {
       if (rel?.following) {
         this.relationship.set(

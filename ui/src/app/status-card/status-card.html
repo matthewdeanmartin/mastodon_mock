@@ -223,7 +223,7 @@
         }
       }
       <div class="actions">
-        @if (caps.reply) {
+        @if (canReply) {
           <button
             class="action"
             [class.on]="replying()"
@@ -574,7 +574,9 @@
 
       @if (replying()) {
         <div class="inline-compose" (click)="$event.stopPropagation()">
-          @if (display.provider === 'bluesky') {
+          @if (isLocalPractice) {
+            <app-local-compose [inReplyTo]="display.id" (posted)="onReplied($event)" />
+          } @else if (display.provider === 'bluesky') {
             <app-bsky-reply [replyTo]="display" (posted)="onReplied($event)" />
           } @else {
             <app-compose

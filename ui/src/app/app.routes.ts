@@ -297,6 +297,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/thread/thread').then((m) => m.Thread),
       },
       {
+        // Friendly alias for Eliza's synthetic profile (id `eliza:self`).
+        path: 'eliza',
+        redirectTo: 'accounts/eliza:self',
+        pathMatch: 'full',
+      },
+      {
         path: 'accounts/:id',
         loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
       },

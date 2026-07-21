@@ -160,3 +160,20 @@
 .starter-pack-content > a:hover {
   color: var(--accent);
 }
+
+/* Eliza invite reuses the starter-pack layout with an image avatar + CTA. */
+img.starter-pack-avatar {
+  object-fit: cover;
+  background: none;
+}
+
+.eliza-invite-copy {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.eliza-invite .btn {
+  align-self: flex-start;
+}

@@ -499,3 +499,59 @@ describe('Profile block/unblock', () => {
     expect(cmp.relationship().blocking).toBe(false);
   });
 });
+
+/**
+ * Eliza's synthetic profile. She is served entirely from ElizaService with no
+ * network call, so the HTTP mock must see zero requests, and Follow toggles the
+ * browser-local relationship rather than hitting the follow API.
+ */
+describe('Profile — Eliza', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => localStorage.clear());
+
+  function setUp() {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: 'eliza:self' })) },
+        },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    return fixture.componentInstance as unknown as {
+      account: () => Account | null;
+      statuses: () => Status[];
+      pinnedStatuses: () => Status[];
+      relationship: () => Relationship | null;
+      loading: () => boolean;
+      toggleFollow: () => void;
+    };
+  }
+
+  afterEach(() => httpMock.verify());
+
+  it('renders her account and timeline with zero HTTP requests', () => {
+    const cmp = setUp();
+    expect(cmp.loading()).toBe(false);
+    expect(cmp.account()?.id).toBe('eliza:self');
+    expect(cmp.statuses().length).toBeGreaterThan(0);
+    expect(cmp.pinnedStatuses().length).toBeGreaterThan(0);
+    httpMock.verify(); // no calls made
+  });
+
+  it('Follow toggles the local relationship without hitting the follow API', () => {
+    const cmp = setUp();
+    expect(cmp.relationship()?.following).toBe(false);
+    cmp.toggleFollow();
+    expect(cmp.relationship()?.following).toBe(true);
+    cmp.toggleFollow();
+    expect(cmp.relationship()?.following).toBe(false);
+    httpMock.verify(); // still no follow/unfollow calls
+  });
+});
