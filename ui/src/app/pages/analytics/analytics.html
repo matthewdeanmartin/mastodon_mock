@@ -1,94 +1,9 @@
 <div class="analytics">
   <header class="page-head">Analytics</header>
 
-  @if (loading()) {
-    <p class="muted center">Crunching your last 100 posts…</p>
-  } @else if (error()) {
-    <p class="muted center">Couldn't load your posts — try again later.</p>
-  } @else if (!posts().length) {
-    <p class="muted center">Nothing to analyze yet — post something first!</p>
+  @if (me(); as acc) {
+    <app-account-analytics [account]="acc" />
   } @else {
-    <p class="sample-note muted">
-      Based on your last {{ posts().length }} posts, boosts excluded.
-      @if (oldestPostDate(); as oldest) {
-        The sample goes back {{ oldest | humanTime }}.
-      }
-      Not real analytics, just a cheap peek.
-    </p>
-
-    <div class="tiles">
-      <div class="tile">
-        <span class="tile-label muted">Posts analyzed</span>
-        <span class="tile-value">{{ fmt(posts().length) }}</span>
-      </div>
-      <div class="tile">
-        <span class="tile-label muted">Favourites</span>
-        <span class="tile-value">{{ fmt(totalFavourites()) }}</span>
-      </div>
-      <div class="tile">
-        <span class="tile-label muted">Boosts</span>
-        <span class="tile-value">{{ fmt(totalBoosts()) }}</span>
-      </div>
-      <div class="tile">
-        <span class="tile-label muted">Replies received</span>
-        <span class="tile-value">{{ fmt(totalReplies()) }}</span>
-      </div>
-      <div class="tile">
-        <span class="tile-label muted">Engagements per post</span>
-        <span class="tile-value">{{ avgEngagement() }}</span>
-      </div>
-      <div class="tile">
-        <span class="tile-label muted">Posts per day</span>
-        <span class="tile-value">{{ postsPerDay() }}</span>
-      </div>
-      @if (me(); as acc) {
-        <div class="tile">
-          <span class="tile-label muted">Followers</span>
-          <span class="tile-value">{{ fmt(acc.followers_count) }}</span>
-        </div>
-        <div class="tile">
-          <span class="tile-label muted">Following</span>
-          <span class="tile-value">{{ fmt(acc.following_count) }}</span>
-        </div>
-      }
-    </div>
-
-    @if (topFollower(); as fan) {
-      <section class="section">
-        <h2>Top follower</h2>
-        <p class="muted small">Your follower with the biggest audience of their own.</p>
-        <a class="fan" [routerLink]="['/accounts', fan.id]">
-          <img
-            class="fan-avatar"
-            [src]="fan.avatar_static || fan.avatar"
-            alt=""
-            loading="lazy"
-            decoding="async"
-          />
-          <span class="fan-name">
-            {{ fan.display_name || fan.username }}
-            <small class="muted">&#64;{{ fan.acct }}</small>
-          </span>
-          <span class="fan-count muted">{{ fmt(fan.followers_count) }} followers</span>
-        </a>
-      </section>
-    }
-
-    <section class="section">
-      <h2>Top posts</h2>
-      @if (!topPosts().length) {
-        <p class="muted small">No engagement on your recent posts yet — keep at it, champ.</p>
-      } @else {
-        <p class="muted small">Your most engaged posts (favourites + boosts + replies).</p>
-        @for (s of topPosts(); track s.id; let i = $index) {
-          <div class="top-post">
-            <span class="rank" aria-hidden="true">{{ i + 1 }}</span>
-            <div class="top-post-card">
-              <app-status-card [status]="s" filterContext="account" />
-            </div>
-          </div>
-        }
-      }
-    </section>
+    <p class="muted center">Log in to see your analytics.</p>
   }
 </div>

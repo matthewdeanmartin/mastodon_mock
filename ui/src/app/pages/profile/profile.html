@@ -142,6 +142,9 @@
             <strong>Collections ({{ collections().length }})</strong>
           </button>
         }
+        <button type="button" class="count-btn" (click)="setTab('analytics')">
+          <strong>Analytics</strong>
+        </button>
       }
     </div>
   </header>
@@ -218,6 +221,24 @@
           Followers
         </button>
       }
+      @if (collections().length > 0) {
+        <button
+          type="button"
+          class="ptab"
+          [class.active]="tab() === 'collections'"
+          (click)="setTab('collections')"
+        >
+          Collections
+        </button>
+      }
+      <button
+        type="button"
+        class="ptab"
+        [class.active]="tab() === 'analytics'"
+        (click)="setTab('analytics')"
+      >
+        Analytics
+      </button>
     </div>
   }
 
@@ -268,6 +289,10 @@
         }
       </div>
     </section>
+  }
+
+  @if (!isRss() && tab() === 'analytics') {
+    <app-account-analytics [account]="a" [publicRef]="publicRef" />
   }
 
   @if (tab() === 'posts') {

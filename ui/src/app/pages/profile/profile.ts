@@ -14,6 +14,7 @@ import { ListDialog } from '../../list-dialog/list-dialog';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
 import { HumanCountPipe } from '../../human-count.pipe';
 import { PeopleBrowser } from '../../people-browser/people-browser';
+import { AccountAnalytics } from '../../account-analytics/account-analytics';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
@@ -29,7 +30,7 @@ import { AccountStatusesOptions } from '../../api';
 import { Observable } from 'rxjs';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
-type ProfileTab = 'posts' | 'following' | 'followers' | 'collections';
+type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analytics';
 
 @Component({
   selector: 'app-profile',
@@ -41,6 +42,7 @@ type ProfileTab = 'posts' | 'following' | 'followers' | 'collections';
     VerifiedBadge,
     HumanCountPipe,
     PeopleBrowser,
+    AccountAnalytics,
     NgOptimizedImage,
   ],
   templateUrl: './profile.html',
@@ -107,6 +109,11 @@ export class Profile implements OnInit, OnDestroy {
 
   setTab(tab: ProfileTab): void {
     this.tab.set(tab);
+  }
+
+  /** The anonymous public-profile ref, for children that need read-only API access. */
+  protected get publicRef(): AnonymousPublicRef | null {
+    return this.publicProfileRef;
   }
 
   protected peopleServer(): string | null {
