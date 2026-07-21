@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Relationship } from '../../models';
 import { AccountSearchCriteria } from './mawkingbird-search';
 import { AccountFacetKind, AccountWithMatches } from './account-refine';
+import { AccountSortKey } from './search-sort';
 
 /**
  * A snapshot of a completed account search, held in memory so returning to the
@@ -28,6 +29,8 @@ export interface AccountSearchSnapshot {
   facets: { kind: AccountFacetKind; value: string }[];
   /** The loaded-result text filter. */
   filter: string;
+  /** The chosen sort of the loaded people. */
+  sort: AccountSortKey;
   /** The numeric bounds the results were gated by. */
   bounds: AccountSearchCriteria;
   /** API calls the search spent (for the honesty line). */

@@ -53,6 +53,14 @@ import {
   SearchTarget,
   Tristate,
 } from './mawkingbird-search';
+import {
+  AccountSortKey,
+  ACCOUNT_SORTS,
+  StatusSortKey,
+  STATUS_SORTS,
+  sortAccounts,
+  sortStatuses,
+} from './search-sort';
 import { serializeMastodonQuery } from './mastodon-query-serializer';
 import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-explain';
 import { SavedSearches } from './saved-searches';
@@ -334,6 +342,13 @@ export class Search implements OnInit, OnDestroy {
   // None of this makes an API call: it narrows/reshapes results already in hand.
   protected loadedFilter = signal('');
   protected grouping = signal<ResultGrouping>('none');
+  // Sort of the loaded results — a reorder in memory, never a re-fetch. Kept as
+  // separate signals per result type so switching tabs doesn't carry an
+  // irrelevant sort key across (a post sort makes no sense for accounts).
+  protected readonly statusSorts = STATUS_SORTS;
+  protected readonly accountSorts = ACCOUNT_SORTS;
+  protected statusSort = signal<StatusSortKey>('relevance');
+  protected accountSort = signal<AccountSortKey>('relevance');
   // Facets open by default — collapsed, the "Refine loaded results" section is
   // easy to miss entirely.
   protected refineOpen = signal(true);
@@ -353,7 +368,9 @@ export class Search implements OnInit, OnDestroy {
         values.some((v) => statusMatchesFacet(s, kind, v)),
       ),
     );
-    return filterLoaded(faceted, this.loadedFilter());
+    // Sort last, so it reorders exactly the posts that survive facet + text
+    // filtering (grouping then buckets this sorted list).
+    return sortStatuses(filterLoaded(faceted, this.loadedFilter()), this.statusSort());
   });
 
   /** Facets computed from all loaded statuses (counts reflect the full load). */
@@ -430,6 +447,7 @@ export class Search implements OnInit, OnDestroy {
       expanded: [...this.expandedAccounts()],
       facets: this.selectedAccountFacets(),
       filter: this.accountFilter(),
+      sort: this.accountSort(),
       bounds: this.executedAccountBounds(),
       callsUsed: this.callsUsed(),
       // The results column doesn't scroll internally (overflow:hidden) — the page
@@ -455,6 +473,7 @@ export class Search implements OnInit, OnDestroy {
     this.expandedAccounts.set(new Set(snap.expanded));
     this.selectedAccountFacets.set(snap.facets);
     this.accountFilter.set(snap.filter);
+    this.accountSort.set(snap.sort ?? 'relevance');
     this.executedAccountBounds.set(snap.bounds);
     this.callsUsed.set(snap.callsUsed);
     this.accountSearchRan.set(true);
@@ -728,6 +747,7 @@ export class Search implements OnInit, OnDestroy {
     this.selectedFacets.set([]);
     this.loadedFilter.set('');
     this.grouping.set('none');
+    this.statusSort.set('relevance');
   }
 
   private fetch(q: string, type: SearchType): void {
@@ -739,6 +759,7 @@ export class Search implements OnInit, OnDestroy {
     this.expandedAccounts.set(new Set());
     this.selectedAccountFacets.set([]);
     this.accountFilter.set('');
+    this.accountSort.set('relevance');
     this.accountItems.set([]);
     this.accountSearchRan.set(false);
     // A new search resets the budget counters and pagination cursors (§7/§20).
@@ -1076,7 +1097,8 @@ export class Search implements OnInit, OnDestroy {
     );
     // Text filter reuses filterAccounts over the accounts, keeping matches attached.
     const kept = new Set(filterAccounts(gated.map((i) => i.account), this.accountFilter()));
-    return gated.filter((i) => kept.has(i.account));
+    const filtered = gated.filter((i) => kept.has(i.account));
+    return sortAccounts(filtered, this.accountSort());
   });
 
   protected loadedAccountCount = computed(() => this.accountItems().length);

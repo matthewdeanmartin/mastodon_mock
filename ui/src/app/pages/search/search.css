@@ -287,6 +287,22 @@
   gap: 8px;
 }
 
+/* Sort-of-loaded-results dropdown, sat beside the filter/group-by controls. */
+.sort-by {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-by select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: inherit;
+  font-size: 13px;
+}
+
 /* Segmented control, matched to chat's .seg so the app reads as one system. */
 .seg {
   display: inline-flex;

@@ -12,6 +12,7 @@ function makeSnapshot(query: string): AccountSearchSnapshot {
     expanded: [],
     facets: [],
     filter: '',
+    sort: 'relevance',
     bounds: { text: query },
     callsUsed: 2,
     scrollTop: 120,

@@ -326,6 +326,19 @@
             </button>
           </div>
         </div>
+        <!-- Sort of the loaded posts — reorders in memory, no new search. -->
+        <label class="sort-by">
+          <span class="muted small">Sort</span>
+          <select
+            [ngModel]="statusSort()"
+            (ngModelChange)="statusSort.set($event)"
+            aria-label="Sort posts"
+          >
+            @for (s of statusSorts; track s.value) {
+              <option [value]="s.value">{{ s.label }}</option>
+            }
+          </select>
+        </label>
       </div>
 
       @if (facets().length) {
@@ -448,6 +461,19 @@
           placeholder="Filter these people"
           aria-label="Filter loaded people"
         />
+        <!-- Sort of the loaded people — reorders in memory, no new search. -->
+        <label class="sort-by">
+          <span class="muted small">Sort</span>
+          <select
+            [ngModel]="accountSort()"
+            (ngModelChange)="accountSort.set($event)"
+            aria-label="Sort people"
+          >
+            @for (s of accountSorts; track s.value) {
+              <option [value]="s.value">{{ s.label }}</option>
+            }
+          </select>
+        </label>
       </div>
 
       @if (accountFacets().length) {
