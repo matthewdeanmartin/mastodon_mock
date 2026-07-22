@@ -21,10 +21,11 @@ export type ServerStatus = 'idle' | 'checking' | 'ok' | 'degraded' | 'unreachabl
  * offer the same "change your server" affordance the login page does.
  *
  * It is deliberately self-contained and side-effect free: it probes a typed or
- * chosen instance's `/api/v1/instance`, and on a reachable one emits `picked`
- * with the normalized base URL. The parent decides what changing servers means
- * (log in there, move the anonymous identity, clear the fail whale, …) — this
- * component never touches Server, Auth, or storage.
+ * chosen instance's `/api/v1/instance`, and on a healthy one emits `picked`
+ * with the normalized base URL. A reachable instance whose media host failed is
+ * held for explicit confirmation before it is emitted. The parent decides what
+ * changing servers means (log in there, move the anonymous identity, clear the
+ * fail whale, …) — this component never touches Server, Auth, or storage.
  *
  * NOTE: the combo logic here is intentionally parallel to `Login`'s own copy.
  * Login predates this component and has its own probe wired into its OAuth flow;
@@ -52,10 +53,14 @@ export class ServerPicker implements OnInit, OnDestroy {
   protected serverStatus = signal<ServerStatus>('idle');
   /** The reached instance's self-reported title ("Mastodon", …). */
   protected serverTitle = signal<string | null>(null);
+  /** Host serving representative media, shown when the API works but media does not. */
+  protected mediaHost = signal<string | null>(null);
 
   private serverDebounce: ReturnType<typeof setTimeout> | null = null;
   /** Guards against a slow instance probe overwriting a newer one. */
   private probeSeq = 0;
+  /** A degraded result must be explicitly accepted before it is emitted. */
+  private pendingDegradedServer: string | null = null;
 
   ngOnInit(): void {
     // Warm the curated joinmastodon index (cached; weekly refresh) so the picker
@@ -71,9 +76,13 @@ export class ServerPicker implements OnInit, OnDestroy {
 
   /** As soon as the text looks like a domain, probe it and (on success) emit. */
   onServerInput(value: string): void {
+    // Invalidate an in-flight probe even when the replacement text is not yet a domain.
+    this.probeSeq += 1;
     this.customServer.set(value);
     this.serverStatus.set('idle');
     this.serverTitle.set(null);
+    this.mediaHost.set(null);
+    this.pendingDegradedServer = null;
     this.refreshSuggestions(value);
     if (this.serverDebounce) {
       clearTimeout(this.serverDebounce);
@@ -103,6 +112,9 @@ export class ServerPicker implements OnInit, OnDestroy {
   }
 
   chooseSuggestion(s: ServerSuggestion): void {
+    if (this.serverDebounce) {
+      clearTimeout(this.serverDebounce);
+    }
     this.customServer.set(s.domain);
     this.serverSuggestions.set([]);
     this.suggestOpen.set(false);
@@ -126,6 +138,16 @@ export class ServerPicker implements OnInit, OnDestroy {
     void this.probeAndApply(this.customServer());
   }
 
+  /** Accept a reachable server even though its representative media request failed. */
+  useDegradedServer(): void {
+    const base = this.pendingDegradedServer;
+    if (!base) {
+      return;
+    }
+    this.pendingDegradedServer = null;
+    this.picked.emit(base);
+  }
+
   private async probeAndApply(value: string): Promise<void> {
     const trimmed = value.trim().replace(/\/+$/, '');
     if (!DOMAIN_RE.test(trimmed)) {
@@ -134,6 +156,8 @@ export class ServerPicker implements OnInit, OnDestroy {
     // Quietly supply the scheme: https for real hosts, http for localhost / IPs.
     const base = normalizeHostUrl(trimmed);
     const seq = ++this.probeSeq;
+    this.pendingDegradedServer = null;
+    this.mediaHost.set(null);
     this.suggestOpen.set(false);
     this.serverStatus.set('checking');
     try {
@@ -145,8 +169,15 @@ export class ServerPicker implements OnInit, OnDestroy {
         this.serverStatus.set('unreachable');
         return;
       }
-      this.serverStatus.set(result.status === 'degraded' ? 'degraded' : 'ok');
       this.serverTitle.set(result.title || null);
+      this.mediaHost.set(result.mediaUrl ? new URL(result.mediaUrl).host : null);
+      if (result.status === 'degraded') {
+        this.pendingDegradedServer = base;
+        this.serverStatus.set('degraded');
+        return;
+      }
+      this.pendingDegradedServer = null;
+      this.serverStatus.set('ok');
       this.picked.emit(base);
     } catch {
       if (seq === this.probeSeq) {

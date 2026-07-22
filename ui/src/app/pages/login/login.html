@@ -124,8 +124,14 @@
             }
             @case ('degraded') {
               <span class="server-warning">
-                ⚠ Connected to <strong>{{ serverHostLabel() }}</strong
-                >, but its CDN is blocked or down. Images will not load.
+                ⚠ Connected to <strong>{{ probedServerHostLabel() }}</strong
+                >, but {{ mediaHost() || 'its media server' }} is blocked or down. Images will not
+                load.
+                @if (pendingDegradedServer()) {
+                  <button class="text-button" type="button" (click)="useDegradedServer()">
+                    Use anyway
+                  </button>
+                }
               </span>
             }
             @case ('unreachable') {
@@ -268,7 +274,7 @@
           <button
             class="btn btn-outline"
             type="button"
-            [disabled]="serverStatus() === 'unreachable'"
+            [disabled]="serverStatus() === 'unreachable' || !!pendingDegradedServer()"
             (click)="continueAnonymously()"
           >
             Continue anonymously

@@ -40,4 +40,28 @@ describe('probeServerAvailability', () => {
 
     expect((await probeServerAvailability('https://example.social')).status).toBe('degraded');
   });
+
+  it('checks the v1 contact account CDN when the same-origin thumbnail is reachable', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            title: 'Mastodon Uno',
+            thumbnail: 'https://mastodon.uno/preview.png',
+            contact_account: {
+              avatar_static: 'https://cdn.masto.host/mastodonuno/avatar.png',
+            },
+          }),
+      })
+      .mockRejectedValueOnce(new Error('CDN blocked'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(probeServerAvailability('https://mastodon.uno')).resolves.toEqual({
+      status: 'degraded',
+      title: 'Mastodon Uno',
+      mediaUrl: 'https://cdn.masto.host/mastodonuno/avatar.png',
+    });
+  });
 });

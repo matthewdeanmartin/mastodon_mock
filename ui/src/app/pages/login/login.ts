@@ -67,6 +67,10 @@ export class Login implements OnInit, OnDestroy {
   protected serverStatus = signal<ServerStatus>('idle');
   /** The reached instance's self-reported title ("Mastodon", …). */
   protected serverTitle = signal<string | null>(null);
+  /** Host serving representative media, shown when that request is blocked. */
+  protected mediaHost = signal<string | null>(null);
+  /** Degraded servers are not selected until the user explicitly accepts one. */
+  protected pendingDegradedServer = signal<string | null>(null);
   private serverDebounce: ReturnType<typeof setTimeout> | null = null;
   /** Guards against a slow instance probe overwriting a newer one. */
   private probeSeq = 0;
@@ -185,6 +189,8 @@ export class Login implements OnInit, OnDestroy {
     this.customServer.set(baseUrl);
     this.serverStatus.set('idle');
     this.serverTitle.set(null);
+    this.mediaHost.set(null);
+    this.pendingDegradedServer.set(null);
     // Dev users only exist on the local mock; skip the call (and its throwing stub) when
     // we've switched to a real instance or this is the Mocking Bird build.
     if (this.mockTooling && this.server.isMock) {
@@ -192,15 +198,15 @@ export class Login implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * The server combo has no "Use" button: as soon as the text looks like a
-   * domain (typed, picked from the suggestion list, or Enter), we probe its
-   * /api/v1/instance and switch to it on success.
-   */
+  /** Probe domain-like text and switch on success; degraded media requires confirmation. */
   onServerInput(value: string): void {
+    // Invalidate an in-flight probe even when the replacement text is not yet a domain.
+    this.probeSeq += 1;
     this.customServer.set(value);
     this.serverStatus.set('idle');
     this.serverTitle.set(null);
+    this.mediaHost.set(null);
+    this.pendingDegradedServer.set(null);
     this.refreshSuggestions(value);
     if (this.serverDebounce) {
       clearTimeout(this.serverDebounce);
@@ -232,6 +238,9 @@ export class Login implements OnInit, OnDestroy {
 
   /** Pick a suggested instance: fill the field and probe it immediately. */
   chooseSuggestion(s: ServerSuggestion): void {
+    if (this.serverDebounce) {
+      clearTimeout(this.serverDebounce);
+    }
     this.customServer.set(s.domain);
     this.serverSuggestions.set([]);
     this.suggestOpen.set(false);
@@ -255,6 +264,16 @@ export class Login implements OnInit, OnDestroy {
     void this.probeAndApply(this.customServer());
   }
 
+  /** Select a reachable server after warning that its media host is unavailable. */
+  useDegradedServer(): void {
+    const base = this.pendingDegradedServer();
+    if (!base) {
+      return;
+    }
+    this.server.setBaseUrl(base);
+    this.pendingDegradedServer.set(null);
+  }
+
   private async probeAndApply(value: string): Promise<void> {
     const trimmed = value.trim().replace(/\/+$/, '');
     if (!DOMAIN_RE.test(trimmed)) {
@@ -263,6 +282,8 @@ export class Login implements OnInit, OnDestroy {
     // Quietly supply the scheme: https for real hosts, http for localhost / IPs.
     const base = normalizeHostUrl(trimmed);
     const seq = ++this.probeSeq;
+    this.pendingDegradedServer.set(null);
+    this.mediaHost.set(null);
     this.suggestOpen.set(false);
     this.serverStatus.set('checking');
     try {
@@ -274,14 +295,26 @@ export class Login implements OnInit, OnDestroy {
         this.serverStatus.set('unreachable');
         return;
       }
-      this.server.setBaseUrl(base);
-      this.serverStatus.set(result.status === 'degraded' ? 'degraded' : 'ok');
       this.serverTitle.set(result.title || null);
+      this.mediaHost.set(result.mediaUrl ? new URL(result.mediaUrl).host : null);
+      if (result.status === 'degraded') {
+        this.pendingDegradedServer.set(base);
+        this.serverStatus.set('degraded');
+        return;
+      }
+      this.pendingDegradedServer.set(null);
+      this.server.setBaseUrl(base);
+      this.serverStatus.set('ok');
     } catch {
       if (seq === this.probeSeq) {
         this.serverStatus.set('unreachable');
       }
     }
+  }
+
+  /** Short host label for the server whose probe result is currently displayed. */
+  protected probedServerHostLabel(): string {
+    return normalizeHostUrl(this.customServer()).replace(/^https?:\/\//, '');
   }
 
   // ---------- Sign in with a pasted token ----------

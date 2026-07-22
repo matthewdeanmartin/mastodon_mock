@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
+import { Server } from '../../server';
 import { Login } from './login';
 
 const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
@@ -191,6 +192,39 @@ describe('Login', () => {
     expect(auth.sessions()).toEqual([]);
     expect(navigateSpy).toHaveBeenCalledWith('/home');
     httpMock.expectNone('/api/v1/accounts/verify_credentials');
+  });
+
+  it('does not select a degraded server until the user accepts the warning', async () => {
+    const fixture = setUp();
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
+    const component = fixture.componentInstance as unknown as {
+      onServerInput(value: string): void;
+      applyServerNow(): void;
+      useDegradedServer(): void;
+      serverStatus(): string;
+    };
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            title: 'Degraded Server',
+            contact_account: { avatar_static: 'https://cdn.example/avatar.png' },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockRejectedValueOnce(new Error('CDN blocked'));
+
+    component.onServerInput('degraded.example');
+    component.applyServerNow();
+    await vi.waitFor(() => expect(component.serverStatus()).toBe('degraded'));
+    fixture.detectChanges();
+
+    expect(TestBed.inject(Server).baseUrl()).toBe('');
+    expect(fixture.nativeElement.textContent).toContain('Use anyway');
+    component.useDegradedServer();
+    expect(TestBed.inject(Server).baseUrl()).toBe('https://degraded.example');
   });
 
   it('loginAs() mints a fresh token via _mock/login and signs in', () => {

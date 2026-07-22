@@ -11,6 +11,7 @@ interface PickerInternals {
   onServerInput(v: string): void;
   chooseSuggestion(s: ServerSuggestion): void;
   applyServerNow(): void;
+  useDegradedServer(): void;
 }
 
 function internals(cmp: ServerPicker): PickerInternals {
@@ -99,5 +100,31 @@ describe('ServerPicker', () => {
 
     expect(internals(cmp).serverStatus()).toBe('unreachable');
     expect(emitted).toEqual([]);
+  });
+
+  it('warns about a blocked media host and waits for explicit acceptance', async () => {
+    const cmp = create();
+    const emitted: string[] = [];
+    cmp.picked.subscribe((url) => emitted.push(url));
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            title: 'Degraded',
+            contact_account: { avatar_static: 'https://cdn.example/avatar.png' },
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockRejectedValueOnce(new Error('blocked'));
+
+    internals(cmp).onServerInput('degraded.example');
+    internals(cmp).applyServerNow();
+    await flush();
+
+    expect(internals(cmp).serverStatus()).toBe('degraded');
+    expect(emitted).toEqual([]);
+    internals(cmp).useDegradedServer();
+    expect(emitted).toEqual(['https://degraded.example']);
   });
 });

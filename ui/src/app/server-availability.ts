@@ -8,12 +8,16 @@ export interface ServerAvailability {
 interface InstanceInfo {
   title?: string;
   thumbnail?: string | { url?: string };
+  /** Mastodon v1 uses contact_account; v2 nests the same account under contact. */
+  contact_account?: { avatar?: string; avatar_static?: string };
   contact?: { account?: { avatar?: string; avatar_static?: string } };
 }
 
 function advertisedMedia(info: InstanceInfo, baseUrl: string): string | null {
   const candidates = [
     typeof info.thumbnail === 'string' ? info.thumbnail : info.thumbnail?.url,
+    info.contact_account?.avatar_static,
+    info.contact_account?.avatar,
     info.contact?.account?.avatar_static,
     info.contact?.account?.avatar,
   ].filter((candidate): candidate is string => !!candidate && /^https?:\/\//.test(candidate));

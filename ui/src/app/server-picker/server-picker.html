@@ -54,7 +54,8 @@
     }
     @case ('degraded') {
       ⚠ Connected to <strong>{{ hostLabel() }}</strong
-      >, but its CDN is blocked or down. Images will not load.
+      >, but {{ mediaHost() || 'its media server' }} is blocked or down. Images will not load.
+      <button class="text-button" type="button" (click)="useDegradedServer()">Use anyway</button>
     }
     @case ('unreachable') {
       ⚠ Can't reach {{ customServer() }} — check the address.
