@@ -1,65 +1,88 @@
 <div class="page-head">{{ title() }}</div>
 @if (def(); as d) {
-  <p class="muted small" style="padding: 0 1rem">{{ d.blurb }}</p>
+  <p class="muted small feed-blurb">{{ d.blurb }}</p>
 }
 
 @if (notice()) {
   <p class="muted center" role="status">{{ notice() }}</p>
 }
 
-<div class="tabs">
-  <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Posts</button>
-  <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
-    Members
-  </button>
-</div>
-
-@if (tab() === 'posts') {
+@if (isLinks()) {
+  <!-- News: trending preview cards, no members. -->
   @if (loading()) {
     <p class="muted center">Loading…</p>
-  } @else if (!statuses().length) {
+  } @else if (!links().length) {
     @if (!notice()) {
-      <p class="muted center">Nothing here right now.</p>
+      <p class="muted center">No trending news right now.</p>
     }
   } @else {
-    @for (s of statuses(); track s.id; let i = $index) {
-      <app-status-card
-        [status]="s"
-        (changed)="onChanged(i, $event)"
-        (deleted)="onDeleted($event)"
-      />
-    }
-    @if (!exhausted()) {
-      <button class="btn btn-outline more" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ loadingMore() ? 'Loading…' : 'Load more' }}
-      </button>
+    @for (link of links(); track link.url) {
+      <a class="news-card" [href]="link.url" target="_blank" rel="noopener noreferrer">
+        <span class="news-title">{{ link.title }}</span>
+        @if (link.description) {
+          <span class="news-desc muted">{{ link.description }}</span>
+        }
+        @if (link.provider_name) {
+          <span class="news-provider muted small">{{ link.provider_name }}</span>
+        }
+      </a>
     }
   }
 } @else {
-  <p class="muted small" style="padding: 0 1rem">
-    Members are the {{ members().length }} distinct
-    {{ members().length === 1 ? 'author' : 'authors' }} of the posts loaded so far. Scroll the
-    Posts tab to discover more.
-  </p>
-  @if (!members().length) {
-    <p class="muted center">No authors yet — load some posts first.</p>
+  <div class="tabs">
+    <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Posts</button>
+    <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
+      Members
+    </button>
+  </div>
+
+  @if (tab() === 'posts') {
+    @if (loading()) {
+      <p class="muted center">Loading…</p>
+    } @else if (!statuses().length) {
+      @if (!notice()) {
+        <p class="muted center">Nothing here right now.</p>
+      }
+    } @else {
+      @for (s of statuses(); track s.id; let i = $index) {
+        <app-status-card
+          [status]="s"
+          (changed)="onChanged(i, $event)"
+          (deleted)="onDeleted($event)"
+        />
+      }
+      @if (!exhausted()) {
+        <button class="btn btn-outline more" [disabled]="loadingMore()" (click)="loadMore()">
+          {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        </button>
+      }
+    }
   } @else {
-    @for (a of members(); track a.id) {
-      <div class="member-row">
-        <a class="member-link" [routerLink]="['/accounts', a.id]">
-          <img
-            class="avatar"
-            [src]="a.avatar_static || a.avatar"
-            [alt]="a.username"
-            loading="lazy"
-            decoding="async"
-          />
-          <span class="names">
-            <span class="name">{{ a.display_name || a.username }}</span>
-            <span class="acct muted">&#64;{{ a.acct }}</span>
-          </span>
-        </a>
-      </div>
+    <p class="muted small feed-blurb">
+      Members are the {{ members().length }} distinct
+      {{ members().length === 1 ? 'author' : 'authors' }} of the posts loaded so far. Load more
+      posts to discover more.
+    </p>
+    @if (!members().length) {
+      <p class="muted center">No authors yet — load some posts first.</p>
+    } @else {
+      @for (a of members(); track a.id) {
+        <div class="member-row">
+          <a class="member-link" [routerLink]="['/accounts', a.id]">
+            <img
+              class="avatar"
+              [src]="a.avatar_static || a.avatar"
+              [alt]="a.username"
+              loading="lazy"
+              decoding="async"
+            />
+            <span class="names">
+              <span class="name">{{ a.display_name || a.username }}</span>
+              <span class="acct muted">&#64;{{ a.acct }}</span>
+            </span>
+          </a>
+        </div>
+      }
     }
   }
 }

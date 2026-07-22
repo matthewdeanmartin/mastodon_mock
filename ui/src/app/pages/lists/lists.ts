@@ -21,10 +21,13 @@ export class Lists implements OnInit {
   private anonymousLists = inject(AnonymousLists);
   protected saved = inject(SavedSearches);
 
-  /** Server feeds available to the current session (auth-gated ones drop for anon). */
-  protected serverFeeds = computed<ServerFeedDef[]>(() =>
-    SERVER_FEEDS.filter((f) => !f.authRequired || !this.auth.isAnonymous),
-  );
+  /**
+   * Server feeds to show. Auth-gated feeds drop for anonymous sessions; probed
+   * feeds (Fediverse/Local) are hidden until confirmed non-empty, because
+   * mastodon.social has disabled them while other instances keep them — we
+   * don't want people clicking into a dead feed to find out.
+   */
+  protected serverFeeds = signal<ServerFeedDef[]>([]);
 
   protected lists = signal<UserList[]>([]);
   protected loading = signal(true);
@@ -53,6 +56,43 @@ export class Lists implements OnInit {
   ngOnInit(): void {
     this.load();
     this.loadCollections();
+    this.resolveServerFeeds();
+  }
+
+  /**
+   * Decide which server-feed rows to show. Non-probed, session-eligible feeds
+   * appear immediately; probed feeds (Fediverse/Local) are appended only after
+   * a HEAD-of-timeline fetch confirms the instance actually serves them.
+   */
+  private resolveServerFeeds(): void {
+    const eligible = SERVER_FEEDS.filter((f) => !f.authRequired || !this.auth.isAnonymous);
+    this.serverFeeds.set(eligible.filter((f) => !f.probe));
+
+    for (const def of eligible.filter((f) => f.probe)) {
+      const probe =
+        def.feed === 'local' ? this.api.publicTimeline(true) : this.api.publicTimeline(false);
+      probe.subscribe({
+        next: (statuses) => {
+          if (statuses.length) {
+            this.addServerFeed(def);
+          }
+        },
+        error: () => {
+          // Endpoint disabled/unauthorized on this instance — leave it hidden.
+        },
+      });
+    }
+  }
+
+  /** Insert a probed feed in its catalogue order (keeps rows stable). */
+  private addServerFeed(def: ServerFeedDef): void {
+    this.serverFeeds.update((current) => {
+      if (current.some((f) => f.feed === def.feed)) {
+        return current;
+      }
+      const order = SERVER_FEEDS.map((f) => f.feed);
+      return [...current, def].sort((a, b) => order.indexOf(a.feed) - order.indexOf(b.feed));
+    });
   }
 
   /** Count the signed-in user's own endorsements so the "Endorsed accounts"

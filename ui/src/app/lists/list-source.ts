@@ -14,7 +14,7 @@ export type ListSource =
   | { kind: 'server-feed'; feed: ServerFeedKind }
   | { kind: 'endorsed'; accountId: string };
 
-export type ServerFeedKind = 'federated' | 'local' | 'news';
+export type ServerFeedKind = 'federated' | 'local' | 'trending' | 'news';
 
 export type ListSourceKind = ListSource['kind'];
 

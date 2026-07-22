@@ -75,6 +75,17 @@ describe('Lists', () => {
   });
 
   /**
+   * Server-feed probing (Fediverse/Local) fires two timelines/public GETs in
+   * ngOnInit. Tests don't assert on the resulting rows, so we just settle them
+   * as empty (which hides both probed feeds).
+   */
+  function flushServerFeedProbes(): void {
+    httpMock
+      .match((r) => r.url === '/api/v1/timelines/public')
+      .forEach((req) => req.flush([]));
+  }
+
+  /**
    * Creates the component and settles the collections side of ngOnInit.
    * By default the auth snapshot is empty, so loadCollections() first calls
    * verify_credentials; erroring it short-circuits the collection fetches.
@@ -83,6 +94,7 @@ describe('Lists', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
     httpMock.expectOne('/api/v1/accounts/verify_credentials').error(new ProgressEvent('error'));
+    flushServerFeedProbes();
     return fixture;
   }
 
@@ -182,6 +194,7 @@ describe('Lists', () => {
   it('loads collections once credentials are verified', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
+    flushServerFeedProbes();
 
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
@@ -206,6 +219,7 @@ describe('Lists', () => {
   function setUpVerified(collections: Collection[] = []): ComponentFixture<Lists> {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
+    flushServerFeedProbes();
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
       .flush({ id: '9', username: 'me', acct: 'me' });
@@ -219,6 +233,7 @@ describe('Lists', () => {
   it('flips collectionsSupported=false when the collections GET 404s (pre-4.6 server)', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
+    flushServerFeedProbes();
 
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
