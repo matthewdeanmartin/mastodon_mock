@@ -18,8 +18,15 @@ export const ELIZA_NS = 'eliza:';
 /** Eliza's account id. */
 export const ELIZA_ID = 'eliza:self';
 
-/** Her handle, shown as `@eliza`. */
+/** Her local username. */
 export const ELIZA_ACCT = 'eliza';
+
+/**
+ * Her fully-qualified handle. Deliberately on `mockingbird.com` — which is not a
+ * Mastodon instance and never will be — so that anything qualifying her handle
+ * (list membership, mentions) can't resolve to a real `eliza@mastodon.social`.
+ */
+export const ELIZA_HANDLE = 'eliza@mockingbird.com';
 
 /** True for any id that belongs to Eliza (her account or one of her posts). */
 export function isElizaId(id: string | null | undefined): boolean {
@@ -48,7 +55,7 @@ export function elizaAccount(): Account {
   return {
     id: ELIZA_ID,
     username: ELIZA_ACCT,
-    acct: ELIZA_ACCT,
+    acct: ELIZA_HANDLE,
     display_name: 'Eliza',
     note: toHtml(ELIZA_BIO),
     url: '',

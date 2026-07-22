@@ -64,9 +64,9 @@
   </aside>
 }
 
-@if (showOnboarding()) {
+@if (!loading() && showOnboarding()) {
   @if (!eliza.following()) {
-    <article class="starter-pack-post eliza-invite">
+    <a class="starter-pack-post eliza-invite" routerLink="/eliza">
       <img class="starter-pack-avatar" src="eliza-avatar.svg" width="40" height="40" alt="" />
       <div class="starter-pack-content">
         <div class="starter-pack-author">
@@ -77,9 +77,8 @@
           New here, or no one to follow yet? I'm your practice friend — follow me and you can
           post, reply, and chat, all safely in your browser.
         </p>
-        <a class="btn" routerLink="/eliza">Meet Eliza →</a>
       </div>
-    </article>
+    </a>
   }
   @if (auth.isAnonymous) {
     <article class="starter-pack-post starter-pack-universal">

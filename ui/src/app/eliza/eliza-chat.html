@@ -18,6 +18,7 @@
 
 <form class="eliza-chat-compose" (submit)="$event.preventDefault(); send()">
   <input
+    #input
     class="eliza-chat-input"
     type="text"
     [(ngModel)]="draft"

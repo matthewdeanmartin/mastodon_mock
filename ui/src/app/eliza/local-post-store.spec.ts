@@ -85,4 +85,26 @@ describe('LocalPostStore', () => {
     const sorted = [...times].sort((a, b) => b - a);
     expect(times).toEqual(sorted);
   });
+
+  it('assembles a thread with the post and its descendants', () => {
+    const mine = store.compose('a practice post')!;
+    const built = store.thread(mine.id, []);
+    expect(built).not.toBeNull();
+    expect(built!.status.id).toBe(mine.id);
+    // Eliza's reply is a descendant.
+    expect(built!.descendants.some((d) => d.account.id === ELIZA_ID)).toBe(true);
+  });
+
+  it('includes an Eliza timeline post in the thread corpus', () => {
+    const timelinePost = { id: 'eliza:post:welcome' } as never;
+    // Reply to a timeline post, then thread from that timeline post.
+    store.reply('eliza:post:welcome', 'hi Eliza');
+    const built = store.thread('eliza:post:welcome', [timelinePost]);
+    expect(built).not.toBeNull();
+    expect(built!.descendants.length).toBeGreaterThan(0);
+  });
+
+  it('returns null for an unknown id', () => {
+    expect(store.thread('local:nope', [])).toBeNull();
+  });
 });

@@ -12,11 +12,13 @@
  * this same service so there is exactly one brain behind every door.
  */
 
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, Injector } from '@angular/core';
 import { Account, Relationship, Status } from '../models';
 import { elizaReply } from './eliza-engine';
 import { ElizaFollow } from './eliza-follow';
 import { LocalNotificationStore } from './local-notification-store';
+import { LocalPostStore } from './local-post-store';
+import { LocalDmStore } from './local-dm-store';
 import {
   ELIZA_ACCT,
   ELIZA_ID,
@@ -29,6 +31,8 @@ import {
 export class ElizaService {
   private readonly followState = inject(ElizaFollow);
   private readonly notifications = inject(LocalNotificationStore);
+  // Resolved lazily to break the cycle: the post/DM stores inject ElizaService.
+  private readonly injector = inject(Injector);
 
   /** Reactive: does the viewer follow Eliza? Gates her DM thread and replies. */
   readonly following = this.followState.following;
@@ -76,9 +80,14 @@ export class ElizaService {
     this.notifications.ensureWelcome();
   }
 
-  /** Unfollow Eliza. */
+  /** Unfollow Eliza, wiping the whole practice relationship: her feed replies,
+   *  your local practice posts, the DM thread, and her notifications. Ending the
+   *  follow ends the simulation cleanly rather than leaving orphaned content. */
   unfollow(): void {
     this.followState.unfollow();
+    this.injector.get(LocalPostStore).clear();
+    this.injector.get(LocalDmStore).clear();
+    this.notifications.clear();
   }
 
   /** Re-read follow state after an account switch changes the storage scope. */

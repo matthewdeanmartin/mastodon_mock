@@ -2,6 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ElizaService } from './eliza.service';
 import { LocalNotificationStore } from './local-notification-store';
+import { LocalPostStore } from './local-post-store';
+import { LocalDmStore } from './local-dm-store';
+import { Auth } from '../auth';
 import { ELIZA_ID } from './eliza-identity';
 import { ELIZA_POSTS } from './eliza-content';
 
@@ -56,5 +59,26 @@ describe('ElizaService', () => {
     const welcomes = notifs.items().filter((n) => n.kind === 'welcome');
     expect(welcomes.length).toBe(1);
     expect(welcomes[0].link).toBe('/eliza/chat');
+  });
+
+  it('unfollowing wipes local posts, the DM thread, and notifications', () => {
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const posts = TestBed.inject(LocalPostStore);
+    const dm = TestBed.inject(LocalDmStore);
+    const notifs = TestBed.inject(LocalNotificationStore);
+
+    eliza.follow();
+    posts.compose('practice post');
+    dm.ensureSeeded();
+    dm.send('hello');
+    expect(posts.posts().length).toBeGreaterThan(0);
+    expect(dm.messages().length).toBeGreaterThan(0);
+    expect(notifs.items().length).toBeGreaterThan(0);
+
+    eliza.unfollow();
+
+    expect(posts.posts()).toEqual([]);
+    expect(dm.messages()).toEqual([]);
+    expect(notifs.items()).toEqual([]);
   });
 });

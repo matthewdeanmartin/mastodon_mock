@@ -136,6 +136,37 @@ export class LocalPostStore {
     this.state.set(loadState());
   }
 
+  /**
+   * Assemble a thread for a local/Eliza post: the post itself, its ancestor
+   * chain (walking `in_reply_to_id` up), and its direct descendants (replies).
+   * The corpus is the viewer's practice posts plus Eliza's timeline, so both a
+   * timeline tip and a practice reply can open as a thread. Returns null when
+   * the id isn't among them.
+   */
+  thread(
+    id: string,
+    elizaTimeline: Status[],
+  ): { status: Status; ancestors: Status[]; descendants: Status[] } | null {
+    const corpus = [...elizaTimeline, ...this.state().posts];
+    const byId = new Map(corpus.map((s) => [s.id, s]));
+    const status = byId.get(id);
+    if (!status) {
+      return null;
+    }
+    const ancestors: Status[] = [];
+    let cursor = status.in_reply_to_id ? byId.get(status.in_reply_to_id) : undefined;
+    const guard = new Set<string>();
+    while (cursor && !guard.has(cursor.id)) {
+      guard.add(cursor.id);
+      ancestors.unshift(cursor);
+      cursor = cursor.in_reply_to_id ? byId.get(cursor.in_reply_to_id) : undefined;
+    }
+    const descendants = corpus
+      .filter((s) => s.in_reply_to_id === id)
+      .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+    return { status, ancestors, descendants };
+  }
+
   /** Post a new top-level local status; Eliza replies to it immediately.
    *  Returns the viewer's status (the reply is appended to the store too). */
   compose(text: string): Status | null {
@@ -184,6 +215,13 @@ export class LocalPostStore {
       this.persist(next);
       return next;
     });
+  }
+
+  /** Wipe the whole practice feed — used when the viewer unfollows Eliza. */
+  clear(): void {
+    const next: LocalPostState = { version: STATE_VERSION, posts: [] };
+    this.persist(next);
+    this.state.set(next);
   }
 
   /** Build Eliza's reply to `mine`: the disclaimer plus an ELIZA-style line. */

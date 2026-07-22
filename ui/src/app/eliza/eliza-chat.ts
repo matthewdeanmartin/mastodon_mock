@@ -36,6 +36,7 @@ export class ElizaChat implements OnInit, AfterViewChecked {
   protected draft = '';
 
   private scroller = viewChild<ElementRef<HTMLElement>>('scroller');
+  private inputBox = viewChild<ElementRef<HTMLInputElement>>('input');
   private pendingScroll = false;
 
   ngOnInit(): void {
@@ -68,5 +69,7 @@ export class ElizaChat implements OnInit, AfterViewChecked {
     this.dm.send(text);
     this.draft = '';
     this.pendingScroll = true;
+    // Keep the cursor in the box so you can keep typing.
+    this.inputBox()?.nativeElement.focus();
   }
 }

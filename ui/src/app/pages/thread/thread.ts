@@ -23,10 +23,14 @@ import {
   parseAnonymousStatusRouteRef,
 } from '../../providers/anonymous/anonymous-route-ref';
 import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmarks';
+import { ElizaService } from '../../eliza/eliza.service';
+import { LocalPostStore } from '../../eliza/local-post-store';
+import { LocalCompose } from '../../eliza/local-compose';
+import { isElizaId } from '../../eliza/eliza-identity';
 
 @Component({
   selector: 'app-thread',
-  imports: [StatusCard, Compose, BskyReply, HumanTimePipe, RouterLink],
+  imports: [StatusCard, Compose, BskyReply, HumanTimePipe, RouterLink, LocalCompose],
   templateUrl: './thread.html',
   styleUrl: './thread.css',
 })
@@ -37,6 +41,8 @@ export class Thread implements OnInit {
   private rss = inject(RssProvider);
   private anonymousPublic = inject(AnonymousPublicApi);
   private anonymousBookmarks = inject(AnonymousBookmarks);
+  private eliza = inject(ElizaService);
+  private localPosts = inject(LocalPostStore);
   private actions = inject(StatusActions);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -219,6 +225,10 @@ export class Thread implements OnInit {
       this.loadRss(id);
       return;
     }
+    if (isElizaId(id) || id.startsWith('local:')) {
+      this.loadLocal(id);
+      return;
+    }
     const publicRef = parseAnonymousStatusRouteRef(id);
     if (publicRef) {
       this.loadAnonymousPublic(publicRef);
@@ -262,6 +272,24 @@ export class Thread implements OnInit {
         error: () => this.publicContextUnavailable.set(true),
       }),
     );
+  }
+
+  /**
+   * A browser-local practice thread: Eliza's posts and the viewer's own local
+   * posts, assembled from the local stores with no network. Missing ids (e.g. a
+   * stale link after unfollow cleared the feed) fall through to the empty state.
+   */
+  private loadLocal(id: string): void {
+    this.localPosts.refresh();
+    const thread = this.localPosts.thread(id, this.eliza.timeline());
+    if (!thread) {
+      this.loading.set(false);
+      return;
+    }
+    this.status.set(thread.status);
+    this.ancestors.set(thread.ancestors);
+    this.descendants.set(thread.descendants);
+    this.loading.set(false);
   }
 
   /** Bluesky thread: `getPostThread` mapped onto the same ancestors/descendants shape. */
@@ -342,6 +370,13 @@ export class Thread implements OnInit {
   }
 
   onReply(status: Status): void {
+    // Local practice replies also draw an Eliza answer into the store, so
+    // re-assemble the whole thread rather than only appending the viewer's line.
+    const focused = this.status();
+    if (focused && this.isLocal(focused)) {
+      this.loadLocal(focused.id);
+      return;
+    }
     this.descendants.update((d) => [...d, status]);
   }
 
@@ -368,6 +403,12 @@ export class Thread implements OnInit {
 
   protected isBluesky(post: Status): boolean {
     return post.provider === 'bluesky';
+  }
+
+  /** True for a browser-local practice post (Eliza's or the viewer's) — its reply
+   *  box is the local composer, never the network one. */
+  protected isLocal(post: Status): boolean {
+    return isElizaId(post.id) || post.id.startsWith('local:');
   }
 }
 

@@ -33,7 +33,11 @@ describe('elizaAccount', () => {
   it('is a plausible bot account with her post count', () => {
     const account = elizaAccount();
     expect(account.id).toBe(ELIZA_ID);
-    expect(account.acct).toBe('eliza');
+    expect(account.username).toBe('eliza');
+    // Fully-qualified on a non-instance domain so lists/mentions can't resolve
+    // to a real eliza@mastodon.social.
+    expect(account.acct).toBe('eliza@mockingbird.com');
+    expect(account.acct.endsWith('@mastodon.social')).toBe(false);
     expect(account.bot).toBe(true);
     expect(account.statuses_count).toBe(ELIZA_POSTS.length);
     expect(account.note).toContain('<p>');

@@ -544,6 +544,9 @@ export class StatusCard {
    * the article (plus a comment feed when the publisher declares one).
    */
   protected get threadable(): boolean {
+    if (this.isLocalPractice) {
+      return true;
+    }
     const provider = this.display.provider ?? 'mastodon';
     if (provider === 'anonymous-mastodon') {
       const ref = this.anonymousRef;
@@ -554,6 +557,11 @@ export class StatusCard {
 
   protected get threadLink(): (string | number)[] | null {
     if (!this.threadable) return null;
+    // Local practice posts (Eliza's and the viewer's) thread by their raw id;
+    // the thread page reads them from the browser-local stores.
+    if (this.isLocalPractice) {
+      return ['/statuses', this.display.id];
+    }
     const ref = this.anonymousRef;
     if (this.display.provider === 'anonymous-mastodon') {
       if (!ref?.statusId) return null;
@@ -577,6 +585,11 @@ export class StatusCard {
   protected get accountLink(): (string | number)[] | null {
     const id = this.display.account.id;
     if (!this.foreign) {
+      return ['/accounts', id];
+    }
+    // Eliza's posts (and the viewer's own local practice posts) link straight to
+    // the author's profile by id — Eliza's synthetic profile, or the viewer's.
+    if (this.isLocalPractice) {
       return ['/accounts', id];
     }
     const ref = this.anonymousRef;
