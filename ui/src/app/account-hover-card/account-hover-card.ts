@@ -115,6 +115,7 @@ export class AccountHoverCard {
    * wrong. Hide the stats row rather than lie.
    */
   protected get hasStats(): boolean {
-    return !this.account().id.includes(':');
+    const id = this.account().id;
+    return typeof id === 'string' && !id.includes(':');
   }
 }

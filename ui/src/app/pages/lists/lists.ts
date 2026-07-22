@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 import { SavedSearches } from '../search/saved-searches';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 @Component({
   selector: 'app-lists',
@@ -20,6 +21,7 @@ export class Lists implements OnInit {
   protected auth = inject(Auth);
   private anonymousLists = inject(AnonymousLists);
   protected saved = inject(SavedSearches);
+  private diagnostics = inject(PageDiagnostics);
 
   /**
    * Server feeds to show. Auth-gated feeds drop for anonymous sessions; probed
@@ -54,6 +56,9 @@ export class Lists implements OnInit {
   );
 
   ngOnInit(): void {
+    this.diagnostics.info('Lists', 'page:open', {
+      mode: this.auth.mode() ?? 'unauthenticated',
+    });
     this.load();
     this.loadCollections();
     this.resolveServerFeeds();
@@ -107,18 +112,27 @@ export class Lists implements OnInit {
   }
 
   load(): void {
+    this.diagnostics.info('Lists', 'load:lists-start', { anonymous: this.auth.isAnonymous });
     this.loading.set(true);
     if (this.auth.isAnonymous) {
       this.lists.set(this.anonymousLists.lists());
       this.loading.set(false);
+      this.diagnostics.info('Lists', 'load:lists-success', {
+        anonymous: true,
+        count: this.lists().length,
+      });
       return;
     }
     this.api.lists().subscribe({
       next: (l) => {
         this.lists.set(l);
         this.loading.set(false);
+        this.diagnostics.info('Lists', 'load:lists-success', { anonymous: false, count: l.length });
       },
-      error: () => this.loading.set(false),
+      error: (error: unknown) => {
+        this.loading.set(false);
+        this.diagnostics.error('Lists', 'load:lists-error', error);
+      },
     });
   }
 
@@ -163,6 +177,10 @@ export class Lists implements OnInit {
     if (!title) {
       return;
     }
+    this.diagnostics.info('Lists', 'user:create-list', {
+      anonymous: this.auth.isAnonymous,
+      titleLength: title.length,
+    });
     if (this.auth.isAnonymous) {
       this.lists.update((lists) => [...lists, this.anonymousLists.create(title)]);
       this.newTitle.set('');
@@ -178,10 +196,15 @@ export class Lists implements OnInit {
   askDeleteList(list: UserList, event: Event): void {
     event.stopPropagation();
     event.preventDefault();
+    this.diagnostics.info('Lists', 'user:request-delete-list', { id: list.id });
     this.listToDelete.set(list);
   }
 
   remove(list: UserList): void {
+    this.diagnostics.info('Lists', 'user:confirm-delete-list', {
+      id: list.id,
+      anonymous: this.auth.isAnonymous,
+    });
     this.listToDelete.set(null);
     if (this.auth.isAnonymous) {
       this.anonymousLists.remove(list.id);
@@ -198,6 +221,7 @@ export class Lists implements OnInit {
     if (!name) {
       return;
     }
+    this.diagnostics.info('Lists', 'user:create-collection', { nameLength: name.length });
     this.api.createCollection(name).subscribe((wrapped) => {
       this.newCollectionName.set('');
       // The mock's stub returns {collection: null}; only append real payloads.
@@ -212,10 +236,12 @@ export class Lists implements OnInit {
   askDeleteCollection(collection: Collection, event: Event): void {
     event.stopPropagation();
     event.preventDefault();
+    this.diagnostics.info('Lists', 'user:request-delete-collection', { id: collection.id });
     this.collectionToDelete.set(collection);
   }
 
   removeCollection(collection: Collection): void {
+    this.diagnostics.info('Lists', 'user:confirm-delete-collection', { id: collection.id });
     this.collectionToDelete.set(null);
     this.api.deleteCollection(collection.id).subscribe(() => {
       this.collections.update((c) => c.filter((x) => x.id !== collection.id));

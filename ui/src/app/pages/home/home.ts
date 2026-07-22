@@ -178,6 +178,10 @@ export class Home implements OnInit, OnDestroy {
   private anonymousCacheGeneration = 0;
 
   ngOnInit(): void {
+    this.diagnostics.info('page:open', {
+      mode: this.auth.mode() ?? 'unauthenticated',
+      server: this.server.baseUrl() || 'same-origin',
+    });
     this.load();
     // Re-tick every 30s so the cap message / cooldown updates on its own.
     this.clock = setInterval(() => this.now.set(Date.now()), 30000);
@@ -194,11 +198,13 @@ export class Home implements OnInit, OnDestroy {
 
   toggleLive(): void {
     if (this.live()) {
+      this.diagnostics.info('user:live-off', { stored: this.statuses().length });
       this.liveSub?.unsubscribe();
       this.liveSub = null;
       this.live.set(false);
       return;
     }
+    this.diagnostics.info('user:live-on', { stored: this.statuses().length });
     this.live.set(true);
     // Going live starts from a fresh snapshot: refetch, then stream deltas on top.
     this.load();
@@ -221,16 +227,30 @@ export class Home implements OnInit, OnDestroy {
     this.aggregator.reset();
     this.anonymousCacheGeneration = this.anonymousHomeCache.generation();
     const anonymousSourceKey = this.anonymousSourceKey();
+    this.diagnostics.info('load:request', {
+      forceRefresh,
+      mode: this.auth.mode() ?? 'unauthenticated',
+      currentStored: this.statuses().length,
+      cache: this.anonymousHomeCache.loadReport,
+    });
     if (
       this.auth.isAnonymous &&
       !forceRefresh &&
       this.anonymousHomeCache.matchesSources(anonymousSourceKey)
     ) {
       const cached = this.anonymousHomeCache.statuses();
+      this.diagnostics.info('load:anonymous-cache-hit', {
+        stored: cached.length,
+        cache: this.anonymousHomeCache.loadReport,
+        providerCounts: this.providerCounts(cached),
+      });
       this.statuses.set(cached);
       this.publishMastodon(cached);
       this.loading.set(false);
-      this.diagnostics.info('load:anonymous-cache-hit', { stored: cached.length });
+      this.diagnostics.info('load:anonymous-cache-ready', {
+        stored: cached.length,
+        visible: this.visible().length,
+      });
       return;
     }
     this.diagnostics.info('load:start', {
@@ -363,6 +383,11 @@ export class Home implements OnInit, OnDestroy {
   }
 
   loadMore(): void {
+    this.diagnostics.info('user:load-more', {
+      stored: this.statuses().length,
+      canLoadMore: this.canLoadMore(),
+      capActive: this.capActive(),
+    });
     // Enforce the maximum: once the feed is this big, stop and start the
     // cooldown. Paging may overshoot slightly (a partial last page) — fine.
     if (this.statuses().length >= this.prefs.feedMax()) {

@@ -121,7 +121,7 @@
         <div class="poll" (click)="$event.stopPropagation()">
           @for (opt of p.options; track $index) {
             @if (pollClosed()) {
-              <div class="poll-result" [class.own]="p.own_votes.includes($index)">
+              <div class="poll-result" [class.own]="pollOwnVote(p, $index)">
                 <div class="poll-bar" [style.width.%]="pollPercent(opt)"></div>
                 <span class="poll-label">{{ opt.title }}</span>
                 <span class="poll-pct muted">{{ pollPercent(opt) }}% · {{ opt.votes_count }}</span>

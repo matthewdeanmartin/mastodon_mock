@@ -3,6 +3,7 @@ import { AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
 import { isCalmHidden } from '../../sentiment';
 import { Status } from '../../models';
+import { PageDiagnostics } from '../../page-diagnostics';
 import { StatusCard } from '../../status-card/status-card';
 import { Auth } from '../../auth';
 
@@ -33,6 +34,7 @@ export class Algo implements OnInit {
   protected feed = inject(AlgoFeed);
   protected prefs = inject(ClientPrefs);
   protected auth = inject(Auth);
+  private diagnostics = inject(PageDiagnostics);
 
   /** Whether a post survives the audience + tags chips (calm applied separately). */
   private passesChips(p: AlgoPost): boolean {
@@ -58,6 +60,12 @@ export class Algo implements OnInit {
   });
 
   ngOnInit(): void {
+    this.diagnostics.info('Algo', 'page:open', {
+      audience: this.prefs.algoAudience(),
+      tags: this.prefs.algoTags(),
+      calm: this.prefs.algoCalm(),
+      cachedPosts: this.feed.posts().length,
+    });
     this.feed.ensureBuilt();
   }
 
@@ -66,22 +74,29 @@ export class Algo implements OnInit {
   }
 
   setAudience(audience: AlgoAudience): void {
+    this.diagnostics.info('Algo', 'user:set-audience', { audience });
     this.prefs.setAlgoAudience(audience);
   }
 
   toggleTags(): void {
-    this.prefs.setAlgoTags(!this.prefs.algoTags());
+    const enabled = !this.prefs.algoTags();
+    this.diagnostics.info('Algo', 'user:toggle-tags', { enabled });
+    this.prefs.setAlgoTags(enabled);
   }
 
   toggleCalm(): void {
-    this.prefs.setAlgoCalm(!this.prefs.algoCalm());
+    const enabled = !this.prefs.algoCalm();
+    this.diagnostics.info('Algo', 'user:toggle-calm', { enabled });
+    this.prefs.setAlgoCalm(enabled);
   }
 
   shuffle(): void {
+    this.diagnostics.info('Algo', 'user:shuffle', { posts: this.feed.posts().length });
     this.feed.shufflePosts();
   }
 
   refresh(): void {
+    this.diagnostics.info('Algo', 'user:refresh', { cachedPosts: this.feed.posts().length });
     this.feed.refresh();
   }
 

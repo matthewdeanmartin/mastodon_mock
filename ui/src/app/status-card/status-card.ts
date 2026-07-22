@@ -252,6 +252,12 @@ export class StatusCard {
     this.sensitiveRevealed.set(true);
   }
 
+  /** Older cached poll payloads may omit own_votes; treat them as no selected options. */
+  protected pollOwnVote(poll: Poll, index: number): boolean {
+    const ownVotes = (poll as Partial<Poll>).own_votes;
+    return Array.isArray(ownVotes) && ownVotes.includes(index);
+  }
+
   // --- content filters (server-computed `filtered`, applied client-side) ---
 
   /** Matched filters that apply in this timeline's context. */
@@ -260,7 +266,11 @@ export class StatusCard {
     const results = s.reblog
       ? [...(s.filtered ?? []), ...(s.reblog.filtered ?? [])]
       : (s.filtered ?? []);
-    return results.filter((r) => r.filter.context.includes(this.filterContext()));
+    return results.filter(
+      (result) =>
+        Array.isArray(result?.filter?.context) &&
+        result.filter.context.includes(this.filterContext()),
+    );
   });
 
   /** A hide-action filter matched: the post renders as nothing at all. */

@@ -52,4 +52,10 @@ describe('AccountHoverCard', () => {
     const el = render({ ...ACCOUNT, note: '' });
     expect(el.querySelector('.hc-note')).toBeNull();
   });
+
+  it('does not call includes on a missing id from stale cached data', () => {
+    const el = render({ ...ACCOUNT, id: undefined } as unknown as Account);
+    expect(el.querySelector('.hc-name')?.textContent).toContain('Kay');
+    expect(el.querySelector('.hc-stats')).toBeNull();
+  });
 });

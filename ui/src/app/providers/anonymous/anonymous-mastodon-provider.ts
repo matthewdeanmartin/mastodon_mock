@@ -75,9 +75,10 @@ function host(server: string): string {
 
 export function adaptAnonymousAccount(account: Account, server: string): Account {
   const accountHost = host(server);
+  const acct = typeof account.acct === 'string' ? account.acct : '';
   return {
     ...account,
-    acct: account.acct.includes('@') ? account.acct : `${account.username}@${accountHost}`,
+    acct: acct.includes('@') ? acct : `${account.username}@${accountHost}`,
   };
 }
 

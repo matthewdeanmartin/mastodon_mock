@@ -65,11 +65,15 @@ import { serializeMastodonQuery } from './mastodon-query-serializer';
 import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-explain';
 import { SavedSearches } from './saved-searches';
 import { decodeSearchFromParams, encodeSearchToParams } from './search-url';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
 /** One selected facet value, keyed by "kind:value" (see selectedFacets). */
-type FacetSelection = { kind: FacetKind; value: string };
+interface FacetSelection {
+  kind: FacetKind;
+  value: string;
+}
 
 /** Mastodon's max results per page. Big pages = a fatter faceting corpus per call. */
 const PAGE_SIZE = 40;
@@ -95,13 +99,13 @@ export class Search implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private diagnostics = inject(PageDiagnostics);
   protected saved = inject(SavedSearches);
   private activeSearch: Subscription | null = null;
 
   /** Dev-only structured logging. Silent in production builds. */
   private debug(...args: unknown[]): void {
     if (isDevMode()) {
-      // eslint-disable-next-line no-console
       console.debug(...args);
     }
   }
@@ -394,6 +398,10 @@ export class Search implements OnInit, OnDestroy {
   private sharedLinkHandled = false;
 
   ngOnInit(): void {
+    this.diagnostics.info('Search', 'page:open', {
+      anonymous: this.capabilities.active,
+      savedSearches: this.saved.all().length,
+    });
     // Restore the query/type from the URL so that returning here (e.g. via the
     // browser back button after visiting a result) re-runs the same search
     // instead of showing an empty page.
@@ -537,6 +545,12 @@ export class Search implements OnInit, OnDestroy {
       return;
     }
     const type = this.type();
+    this.diagnostics.info('Search', 'user:run', {
+      type,
+      queryLength: q.length,
+      budget: this.apiBudget(),
+      anonymous: this.capabilities.active,
+    });
     // Navigating to identical query params emits nothing, so re-clicking Search
     // (or changing the budget, which isn't in the URL) would be a silent no-op.
     // Detect that case (tracked from the queryParamMap subscription) and fetch
@@ -573,6 +587,11 @@ export class Search implements OnInit, OnDestroy {
     if (!q.trim()) {
       return;
     }
+    this.diagnostics.info('Search', 'user:apply-advanced', {
+      queryLength: q.length,
+      budget: this.apiBudget(),
+      anonymous: this.capabilities.active,
+    });
     // Fetch directly rather than through the q= URL param: an advanced search's
     // real query string is a serialized DSL, and routing it through the URL would
     // stamp that DSL back into the query box (clobbering the plain words that
@@ -586,6 +605,7 @@ export class Search implements OnInit, OnDestroy {
    *  unless the user already picked a larger budget. */
   toggleAdvanced(): void {
     const opening = !this.advancedOpen();
+    this.diagnostics.info('Search', 'user:toggle-advanced', { open: opening });
     this.advancedOpen.set(opening);
     if (opening && this.apiBudget() < DEFAULT_BUDGET_ADVANCED) {
       this.apiBudget.set(DEFAULT_BUDGET_ADVANCED);
@@ -673,6 +693,7 @@ export class Search implements OnInit, OnDestroy {
   runSaved(id: string): void {
     const found = this.saved.all().find((s) => s.id === id);
     if (found) {
+      this.diagnostics.info('Search', 'user:run-saved', { id, target: found.search.target });
       this.savedMenuOpen.set(false);
       this.applySearch(found.search);
     }
@@ -689,6 +710,10 @@ export class Search implements OnInit, OnDestroy {
       authenticated: !this.capabilities.active,
     });
     this.saveDialogOpen.set(false);
+    this.diagnostics.info('Search', 'user:save', {
+      ok: result.ok,
+      target: this.currentSearch().target,
+    });
     this.savedNotice.set(result.ok ? 'Search saved.' : result.error);
     setTimeout(() => this.savedNotice.set(''), 3000);
   }
@@ -700,9 +725,11 @@ export class Search implements OnInit, OnDestroy {
     const url = new URL(`search?${params}`, document.baseURI).toString();
     try {
       await navigator.clipboard.writeText(url);
+      this.diagnostics.info('Search', 'user:share', { copied: true });
       this.shareCopied.set(true);
       setTimeout(() => this.shareCopied.set(false), 2000);
     } catch {
+      this.diagnostics.warn('Search', 'user:share', { copied: false, reason: 'clipboard' });
       // Clipboard blocked — surface the URL so the user can copy it manually.
       this.savedNotice.set(url);
     }
@@ -735,6 +762,11 @@ export class Search implements OnInit, OnDestroy {
         ? sel.filter((f) => !(f.kind === kind && f.value === value))
         : [...sel, { kind, value }],
     );
+    this.diagnostics.info('Search', 'user:toggle-post-facet', {
+      kind,
+      value,
+      selected: this.isFacetSelected(kind, value),
+    });
   }
 
   clearRefinements(): void {
@@ -746,6 +778,7 @@ export class Search implements OnInit, OnDestroy {
    *  by fetching the extra pages right away (§ user's "5 after 3 → fetch 2 more"). */
   setBudget(value: string | number): void {
     const next = Number(value);
+    this.diagnostics.info('Search', 'user:set-budget', { from: this.apiBudget(), to: next });
     this.apiBudget.set(next);
     if (this.results()?.statuses.length && this.executedType === 'statuses') {
       this.maybeAutoFill(true);
@@ -761,6 +794,12 @@ export class Search implements OnInit, OnDestroy {
   }
 
   private fetch(q: string, type: SearchType): void {
+    this.diagnostics.info('Search', 'load:start', {
+      type,
+      queryLength: q.length,
+      budget: this.apiBudget(),
+      anonymous: this.capabilities.active,
+    });
     this.activeSearch?.unsubscribe();
     this.resetRefinements();
     // Account cards carry per-result state (relationships, expansion) that must
@@ -823,10 +862,20 @@ export class Search implements OnInit, OnDestroy {
         this.callsUsed.update((c) => c + cost);
         this.rememberCursors(r);
         this.searching.set(false);
+        this.diagnostics.info('Search', 'load:success', {
+          type,
+          accounts: r.accounts.length,
+          statuses: r.statuses.length,
+          hashtags: r.hashtags.length,
+          callsUsed: this.callsUsed(),
+        });
         // Eagerly page up to the budget so client-side faceting has a corpus.
         this.maybeAutoFill(r.statuses.length > 0);
       },
-      error: () => this.searching.set(false),
+      error: (error: unknown) => {
+        this.searching.set(false);
+        this.diagnostics.error('Search', 'load:error', error, { type });
+      },
     });
   }
 
@@ -859,8 +908,10 @@ export class Search implements OnInit, OnDestroy {
     const resilient = (obs: Observable<SearchResults>, label: string): Observable<SearchResults> =>
       obs.pipe(
         catchError((err) => {
-          // eslint-disable-next-line no-console
-          console.warn(`[search] account "${label}" branch failed — degrading to empty`, err);
+          this.diagnostics.warn('Search', 'load:account-branch-error', {
+            branch: label,
+            error: err,
+          });
           return of(EMPTY_RESULTS);
         }),
       );
@@ -927,6 +978,10 @@ export class Search implements OnInit, OnDestroy {
       if (--pending <= 0) {
         this.searching.set(false);
         this.accountSearchRan.set(true);
+        this.diagnostics.info('Search', 'load:accounts-complete', {
+          accounts: this.accountItems().length,
+          callsUsed: this.callsUsed(),
+        });
       }
     };
     const mergeIn = (authors: AccountWithMatches[], addedCost: number): void => {
@@ -1007,6 +1062,13 @@ export class Search implements OnInit, OnDestroy {
     } else if (!this.autoFillWants()) {
       return;
     }
+    if (manual) {
+      this.diagnostics.info('Search', 'user:load-more', {
+        type: this.executedType,
+        callsUsed: this.callsUsed(),
+        nextPageCost: this.nextPageCost(),
+      });
+    }
     this.searching.set(true);
     const cost = this.nextPageCost();
     const q = this.executedQuery;
@@ -1028,9 +1090,23 @@ export class Search implements OnInit, OnDestroy {
         this.callsUsed.update((c) => c + cost);
         this.rememberCursors(r);
         this.searching.set(false);
+        if (manual) {
+          this.diagnostics.info('Search', 'load-more:success', {
+            received: r.statuses.length,
+            added,
+            callsUsed: this.callsUsed(),
+          });
+        }
         this.maybeAutoFill(added > 0);
       },
-      error: () => this.searching.set(false),
+      error: (error: unknown) => {
+        this.searching.set(false);
+        if (manual) {
+          this.diagnostics.error('Search', 'load-more:error', error, {
+            type: this.executedType,
+          });
+        }
+      },
     });
   }
 
@@ -1126,6 +1202,11 @@ export class Search implements OnInit, OnDestroy {
         ? sel.filter((f) => !(f.kind === kind && f.value === value))
         : [...sel, { kind, value }],
     );
+    this.diagnostics.info('Search', 'user:toggle-account-facet', {
+      kind,
+      value,
+      selected: this.isAccountFacetSelected(kind, value),
+    });
   }
 
   clearAccountRefinements(): void {
@@ -1148,7 +1229,8 @@ export class Search implements OnInit, OnDestroy {
   toggleAccountExpand(id: string): void {
     this.expandedAccounts.update((set) => {
       const next = new Set(set);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -1187,7 +1269,8 @@ export class Search implements OnInit, OnDestroy {
   private setFollowBusy(id: string, busy: boolean): void {
     this.followBusy.update((set) => {
       const next = new Set(set);
-      busy ? next.add(id) : next.delete(id);
+      if (busy) next.add(id);
+      else next.delete(id);
       return next;
     });
   }

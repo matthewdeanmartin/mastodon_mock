@@ -44,7 +44,8 @@ function hostFromAccount(account: Account, fallbackServer: string): string {
   } catch {
     // Fall through to the federated handle or selected home instance.
   }
-  const acctHost = account.acct.includes('@') ? account.acct.split('@').at(-1) : null;
+  const acct = typeof account.acct === 'string' ? account.acct : '';
+  const acctHost = acct.includes('@') ? acct.split('@').at(-1) : null;
   if (acctHost) {
     return acctHost.toLowerCase();
   }
@@ -88,7 +89,8 @@ function validRetryState(value: unknown): value is RouteRetryAfter {
 }
 
 function keyFor(account: Account, fallbackServer: string): string {
-  return `${account.username.toLowerCase()}@${hostFromAccount(account, fallbackServer)}`;
+  const username = typeof account.username === 'string' ? account.username : '';
+  return `${username.toLowerCase()}@${hostFromAccount(account, fallbackServer)}`;
 }
 
 function relationship(id: string, following: boolean): Relationship {

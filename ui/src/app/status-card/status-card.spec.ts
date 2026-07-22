@@ -1155,4 +1155,15 @@ describe('StatusCard reader mode (expand all)', () => {
     readerOn(fixture);
     expect(fixture.nativeElement.textContent).not.toContain('never show this');
   });
+
+  it('ignores a stale cached filter with no context array', () => {
+    const fixture = setUpCard(
+      makeStatus({
+        content: '<p>still render this</p>',
+        filtered: [{ filter: { title: 'incomplete' } }] as unknown as Status['filtered'],
+      }),
+    );
+
+    expect(fixture.nativeElement.textContent).toContain('still render this');
+  });
 });
