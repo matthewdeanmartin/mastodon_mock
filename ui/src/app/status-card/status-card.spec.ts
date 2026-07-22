@@ -132,6 +132,20 @@ describe('StatusCard', () => {
     expect(el.querySelector('[title="Favourites"]')?.textContent).toContain('3');
   });
 
+  it('opens the share-elsewhere dialog from the Anonymous boost button', () => {
+    TestBed.inject(Auth).enterAnonymous();
+    const f = setUp(makeStatus({ url: 'https://social.example/@alice/1' }));
+    const share = (f.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '[aria-label="Share elsewhere"]',
+    )!;
+
+    share.click();
+    f.detectChanges();
+
+    expect((f.nativeElement as HTMLElement).querySelector('app-share-dialog')).not.toBeNull();
+    expect((f.nativeElement as HTMLElement).textContent).toContain('Share post elsewhere');
+  });
+
   it('loads public edit history from the post server in Anonymous', () => {
     TestBed.inject(Auth).enterAnonymous('https://home.example');
     const f = setUp(

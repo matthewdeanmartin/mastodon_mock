@@ -1,0 +1,72 @@
+<div class="overlay">
+  <button
+    class="backdrop"
+    type="button"
+    aria-label="Close share dialog"
+    (click)="closed.emit()"
+  ></button>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="share-heading">
+    <div class="dialog-heading">
+      <div>
+        <h3 id="share-heading">Share post elsewhere</h3>
+        <p class="muted small">Choose what to share, then where to send it.</p>
+      </div>
+      <button class="close" type="button" aria-label="Close share dialog" (click)="closed.emit()">
+        ×
+      </button>
+    </div>
+
+    @if (contentLinks().length) {
+      <fieldset class="targets">
+        <legend>Share</legend>
+        <label>
+          <input
+            type="radio"
+            name="share-target"
+            value=""
+            [checked]="!selectedUrl()"
+            (change)="selectedUrl.set('')"
+          />
+          <span
+            ><strong>This post</strong><small>{{ host(status().url!) }}</small></span
+          >
+        </label>
+        @for (link of contentLinks(); track link) {
+          <label>
+            <input
+              type="radio"
+              name="share-target"
+              [value]="link"
+              [checked]="selectedUrl() === link"
+              (change)="selectedUrl.set(link)"
+            />
+            <span
+              ><strong>Linked page (without the post wrapper)</strong
+              ><small>{{ host(link) }}</small></span
+            >
+          </label>
+        }
+      </fieldset>
+    }
+
+    <div class="destinations">
+      @if (canShareUsingDevice) {
+        <button type="button" class="destination native" (click)="shareUsingDevice()">
+          Share using device…
+        </button>
+      }
+      @for (destination of destinations; track destination.id) {
+        <button type="button" class="destination" (click)="open(destination)">
+          {{ destination.label }}
+        </button>
+      }
+      <button type="button" class="destination" (click)="copyLink()">
+        {{ copied() ? 'Link copied!' : 'Copy link' }}
+      </button>
+    </div>
+
+    @if (copyFailed()) {
+      <p class="copy-error" role="alert">Couldn’t copy the link. Please try again.</p>
+    }
+  </div>
+</div>

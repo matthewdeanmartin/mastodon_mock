@@ -270,9 +270,21 @@
           </button>
         }
         @if (auth.isAnonymous) {
-          <span class="action" title="Reposts"
-            >🔁 <span>{{ display.reblogs_count }}</span></span
-          >
+          @if (display.url) {
+            <button
+              type="button"
+              class="action"
+              title="Share elsewhere"
+              aria-label="Share elsewhere"
+              (click)="showShare.set(true); $event.stopPropagation()"
+            >
+              🔁 <span>{{ display.reblogs_count }}</span>
+            </button>
+          } @else {
+            <span class="action" title="Reposts"
+              >🔁 <span>{{ display.reblogs_count }}</span></span
+            >
+          }
         } @else if (!foreign && capabilities.canCompose) {
           <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
             ❝
@@ -628,5 +640,9 @@
       [startIndex]="lightboxIndex()!"
       (closed)="lightboxIndex.set(null)"
     />
+  }
+
+  @if (showShare()) {
+    <app-share-dialog [status]="display" (closed)="showShare.set(false)" />
   }
 }

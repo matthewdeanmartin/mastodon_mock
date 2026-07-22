@@ -36,6 +36,7 @@ import { AnonymousProviderRef } from '../providers/anonymous/anonymous-mastodon-
 import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
 import { isElizaId } from '../eliza/eliza-identity';
 import { LocalCompose } from '../eliza/local-compose';
+import { ShareDialog } from '../share-dialog/share-dialog';
 import {
   anonymousAccountRouteRef,
   anonymousStatusRouteRef,
@@ -111,6 +112,7 @@ function compactContentLinks(content: string, embeddedPostUrl: string | null): s
     VerifiedBadge,
     NgOptimizedImage,
     LocalCompose,
+    ShareDialog,
   ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
@@ -207,6 +209,7 @@ export class StatusCard {
   // Inline composers (reply / quote), shown beneath the status when toggled.
   protected replying = signal(false);
   protected quoting = signal(false);
+  protected showShare = signal(false);
 
   // --- content warnings ---
 
