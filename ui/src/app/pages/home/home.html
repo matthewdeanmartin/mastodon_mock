@@ -41,7 +41,7 @@
   <app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
 }
 
-@if (auth.isAnonymous) {
+@if (auth.isAnonymous && eliza.following()) {
   <app-local-compose (posted)="onLocalPosted()" />
 }
 
@@ -74,8 +74,8 @@
           <span class="muted">&#64;eliza</span>
         </div>
         <p class="eliza-invite-copy">
-          New here, or no one to follow yet? I'm your practice friend — follow me and you can
-          post, reply, and chat, all safely in your browser.
+          New here, or no one to follow yet? I'm your practice friend — follow me and you can post,
+          reply, and chat, all safely in your browser.
         </p>
       </div>
     </a>

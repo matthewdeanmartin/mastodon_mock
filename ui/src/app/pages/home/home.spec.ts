@@ -168,6 +168,19 @@ describe('Home', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('shows the Anonymous practice composer only after Eliza is followed', () => {
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-local-compose')).toBeNull();
+
+    internals(fixture).eliza.follow();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-local-compose')).not.toBeNull();
+  });
+
   it('toggleLive() opens a user stream and flips the live flag', () => {
     const fixture = setUp();
     goLive(fixture);

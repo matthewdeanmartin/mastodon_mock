@@ -15,13 +15,12 @@ import { ShortcutHelp } from '../shortcut-help/shortcut-help';
 import { AppFooter } from './app-footer/app-footer';
 import { LeftRail } from './left-rail/left-rail';
 import { RightRail } from './right-rail/right-rail';
+import { ServerAbout } from '../server-about';
 
 function isWideUrl(url: string): boolean {
   // /search goes rails-off wide so facets have room to live beside results.
   return (
-    url.startsWith('/settings') ||
-    url.startsWith('/conversations') ||
-    url.startsWith('/search')
+    url.startsWith('/settings') || url.startsWith('/conversations') || url.startsWith('/search')
   );
 }
 
@@ -49,6 +48,7 @@ export class Shell implements OnInit {
   /** Mastodon-compatible keyboard shortcuts (and the "?" help dialog). */
   protected hotkeys = inject(Hotkeys);
   protected prefs = inject(ClientPrefs);
+  protected serverAbout = inject(ServerAbout);
 
   /** Build flavor: drives the brand and whether mock-only nav links are shown. */
   protected mockTooling = environment.mockTooling;
@@ -86,6 +86,13 @@ export class Shell implements OnInit {
 
   dismissToast(): void {
     this.toast.set(null);
+  }
+
+  /** Optional server links are discovered only when the user opens More. */
+  onMoreToggle(event: Event): void {
+    if ((event.currentTarget as HTMLDetailsElement).open) {
+      this.serverAbout.load();
+    }
   }
 
   ngOnInit(): void {

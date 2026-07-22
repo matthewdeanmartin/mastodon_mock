@@ -107,11 +107,7 @@
         }
         @if (!cwCollapsed()) {
           <a class="content-link" [routerLink]="threadLink" (click)="onContentClick($event)">
-            @if (translation(); as t) {
-              <div class="content" [innerHTML]="md(t.content)"></div>
-            } @else {
-              <div class="content" [innerHTML]="md(display.content)"></div>
-            }
+            <div class="content" [innerHTML]="renderedContent()"></div>
           </a>
           @if (translation()) {
             <div class="translation-note muted small">
@@ -160,7 +156,7 @@
       }
 
       @if (!cwCollapsed() && quotedStatus(); as q) {
-        <a class="quote-card" [routerLink]="['/statuses', q.id]" (click)="$event.stopPropagation()">
+        <a class="quote-card" [routerLink]="quoteThreadLink(q)" (click)="$event.stopPropagation()">
           <div class="quote-meta">
             <img
               class="quote-avatar"

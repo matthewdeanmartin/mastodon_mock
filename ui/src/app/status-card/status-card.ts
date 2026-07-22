@@ -1,4 +1,13 @@
-import { Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  linkedSignal,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgOptimizedImage } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -24,6 +33,7 @@ import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
 import { AnonymousProviderRef } from '../providers/anonymous/anonymous-mastodon-provider';
+import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
 import { isElizaId } from '../eliza/eliza-identity';
 import { LocalCompose } from '../eliza/local-compose';
 import {
@@ -32,6 +42,58 @@ import {
 } from '../providers/anonymous/anonymous-route-ref';
 
 const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
+
+interface MastodonPostRef {
+  url: string;
+  server: string;
+  id: string;
+}
+
+/** Recognise the public URL shapes emitted by Mastodon and compatible servers. */
+function mastodonPostRef(content: string): MastodonPostRef | null {
+  const doc = new DOMParser().parseFromString(content, 'text/html');
+  for (const anchor of Array.from(doc.querySelectorAll<HTMLAnchorElement>('a[href]'))) {
+    try {
+      const url = new URL(anchor.href);
+      if (!['http:', 'https:'].includes(url.protocol)) continue;
+      const id =
+        url.pathname.match(/^\/@[^/]+\/(\d+)\/?$/)?.[1] ??
+        url.pathname.match(/^\/users\/[^/]+\/statuses\/(\d+)\/?$/)?.[1] ??
+        url.pathname.match(/^\/statuses\/(\d+)\/?$/)?.[1];
+      if (id) return { url: anchor.getAttribute('href')!, server: url.origin, id };
+    } catch {
+      // A malformed href remains an ordinary link.
+    }
+  }
+  return null;
+}
+
+/** Keep long bare URLs compact while preserving the anchor's real destination. */
+function compactContentLinks(content: string, embeddedPostUrl: string | null): string {
+  const doc = new DOMParser().parseFromString(content, 'text/html');
+  for (const anchor of Array.from(doc.querySelectorAll<HTMLAnchorElement>('a[href]'))) {
+    const href = anchor.getAttribute('href')!;
+    if (embeddedPostUrl === href) {
+      const parent = anchor.parentElement;
+      anchor.remove();
+      if (parent?.tagName === 'P' && !parent.textContent?.trim() && !parent.children.length) {
+        parent.remove();
+      }
+      continue;
+    }
+    try {
+      const url = new URL(href);
+      const visible = (anchor.textContent ?? '').trim();
+      if (/^https?:\/\//i.test(visible)) {
+        const hasTail = url.pathname !== '/' || !!url.search || !!url.hash;
+        anchor.textContent = `${url.host}${hasTail ? '/…' : ''}`;
+      }
+    } catch {
+      // Relative and malformed links keep their server-supplied label.
+    }
+  }
+  return doc.body.innerHTML;
+}
 
 @Component({
   selector: 'app-status-card',
@@ -63,6 +125,7 @@ export class StatusCard {
   private localMod = inject(LocalModeration);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymousBookmarks = inject(AnonymousBookmarks);
+  private anonymousPublic = inject(AnonymousPublicApi);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
@@ -119,6 +182,27 @@ export class StatusCard {
   readonly deleted = output<Status>();
   /** Emitted with the newly-created reply when the user replies inline. */
   readonly replied = output<Status>();
+
+  /** A legacy quote represented only by a Mastodon post URL in the body. */
+  private linkQuote = signal<Status | null>(null);
+  private linkQuoteUrl = signal<string | null>(null);
+  private resolveLinkQuote = effect((onCleanup) => {
+    const display = this.display;
+    const ref = display.quote ? null : mastodonPostRef(display.content);
+    this.linkQuote.set(null);
+    this.linkQuoteUrl.set(null);
+    if (!ref || ref.url === display.url) return;
+    const subscription = this.anonymousPublic
+      .getStatus({ server: ref.server, id: ref.id, originalUrl: ref.url })
+      .subscribe({
+        next: (status) => {
+          this.linkQuote.set(status);
+          this.linkQuoteUrl.set(ref.url);
+        },
+        error: () => undefined,
+      });
+    onCleanup(() => subscription.unsubscribe());
+  });
 
   // Inline composers (reply / quote), shown beneath the status when toggled.
   protected replying = signal(false);
@@ -227,6 +311,14 @@ export class StatusCard {
   // Translation: held locally; null means "showing original".
   protected translation = signal<Translation | null>(null);
   protected translating = signal(false);
+
+  /** Body HTML with mobile-safe bare-link labels and a resolved quote URL removed. */
+  protected renderedContent = computed(() =>
+    compactContentLinks(
+      this.md(this.translation()?.content ?? this.display.content),
+      this.linkQuoteUrl(),
+    ),
+  );
 
   // Poll voting state (selected option positions before submitting).
   protected pollSelection = signal<number[]>([]);
@@ -493,6 +585,13 @@ export class StatusCard {
       this.router.navigate(['/tags', tag]);
       return;
     }
+    const mention = this.mentionLink(anchor, href);
+    if (mention) {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.router.navigate(mention);
+      return;
+    }
     // Treat anything else with an explicit http(s) origin as external.
     if (/^https?:\/\//i.test(href)) {
       event.preventDefault();
@@ -515,6 +614,34 @@ export class StatusCard {
     const raw = fromHref ?? anchor.textContent ?? '';
     const name = decodeURIComponent(raw).replace(/^#/, '').trim();
     return name || null;
+  }
+
+  /** Route resolved Mastodon mentions to Mawkingbird's profile page. */
+  private mentionLink(anchor: HTMLAnchorElement, href: string): (string | number)[] | null {
+    if (!anchor.classList.contains('mention') || anchor.classList.contains('hashtag')) return null;
+    const visible = (anchor.textContent ?? '').trim().replace(/^@/, '').toLocaleLowerCase();
+    const mention = this.display.mentions?.find(
+      (candidate) =>
+        candidate.url === href ||
+        candidate.acct.toLocaleLowerCase() === visible ||
+        candidate.username.toLocaleLowerCase() === visible,
+    );
+    if (!mention) return null;
+    if (this.display.provider === 'anonymous-mastodon') {
+      try {
+        return [
+          '/accounts',
+          anonymousAccountRouteRef({
+            server: new URL(mention.url).origin,
+            id: mention.id,
+            originalUrl: mention.url,
+          }),
+        ];
+      } catch {
+        return null;
+      }
+    }
+    return ['/accounts', mention.id];
   }
 
   /** The status to render: unwrap a boost to the original. */
@@ -684,7 +811,25 @@ export class StatusCard {
   }
 
   /** The quoted status to embed, if this status quotes a visible one. */
-  protected quotedStatus = computed<Status | null>(() => this.display.quote?.quoted_status ?? null);
+  protected quotedStatus = computed<Status | null>(
+    () => this.display.quote?.quoted_status ?? this.linkQuote(),
+  );
+
+  /** Thread route for both native quote entities and URL-resolved remote quotes. */
+  protected quoteThreadLink(status: Status): (string | number)[] {
+    const ref = status.providerRef as Partial<AnonymousProviderRef> | undefined;
+    if (status.provider === 'anonymous-mastodon' && ref?.server && ref.statusId) {
+      return [
+        '/statuses',
+        anonymousStatusRouteRef({
+          server: ref.server,
+          id: ref.statusId,
+          originalUrl: status.url ?? undefined,
+        }),
+      ];
+    }
+    return ['/statuses', status.id];
+  }
 
   /** True when a quote exists but the quoted status is hidden (e.g. revoked). */
   protected quoteUnavailable = computed<boolean>(() => {

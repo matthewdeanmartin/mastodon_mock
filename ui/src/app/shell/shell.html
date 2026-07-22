@@ -90,7 +90,7 @@
     </nav>
 
     <div class="header-actions">
-      <details class="more-menu">
+      <details class="more-menu" (toggle)="onMoreToggle($event)">
         <summary aria-label="More navigation">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="5" cy="12" r="1.5" />
@@ -101,7 +101,7 @@
         </summary>
         <div class="menu-panel">
           @if (auth.isAnonymous) {
-            <a routerLink="/eliza">🐦 Meet Eliza</a>
+            <a routerLink="/eliza">Meet Eliza</a>
             <div class="menu-divider"></div>
           }
           @if (!auth.isAnonymous) {
@@ -114,14 +114,15 @@
           }
           <a routerLink="/observability">Observability</a>
           <a routerLink="/about">Design</a>
-          <a
-            href="https://mawkingbird.com/canary/"
-            target="_blank"
-            rel="noopener noreferrer"
+          <a href="https://mawkingbird.com/canary/" target="_blank" rel="noopener noreferrer"
             >Canary ↗</a
           >
-          <a routerLink="/server-rules">Server rules</a>
-          <a routerLink="/terms">Terms of Service</a>
+          @if (serverAbout.hasRules()) {
+            <a routerLink="/server-rules">Server rules</a>
+          }
+          @if (serverAbout.hasTerms()) {
+            <a routerLink="/terms">Terms of Service</a>
+          }
           <a routerLink="/credits">Credits/Privacy</a>
           <div class="menu-divider"></div>
           <a routerLink="/settings">Settings</a>

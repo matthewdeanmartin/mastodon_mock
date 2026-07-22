@@ -779,6 +779,60 @@ describe('StatusCard', () => {
     openSpy.mockRestore();
   });
 
+  it('onContentClick: routes a resolved mention to its Mawkingbird profile', () => {
+    const f = setUp(
+      makeStatus({
+        content:
+          '<p>Hello <span class="h-card"><a class="u-url mention" href="https://remote.example/@alice">@alice@remote.example</a></span></p>',
+        mentions: [
+          {
+            id: '42',
+            username: 'alice',
+            acct: 'alice@remote.example',
+            url: 'https://remote.example/@alice',
+          },
+        ],
+      }),
+    );
+    const navSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const event = clickOnAnchor('https://remote.example/@alice', 'u-url mention');
+    Object.defineProperty(event.target, 'textContent', { value: '@alice@remote.example' });
+
+    internals(f).onContentClick(event);
+
+    expect(navSpy).toHaveBeenCalledWith(['/accounts', '42']);
+  });
+
+  it('shortens a bare long URL label without changing its destination', () => {
+    const url = 'https://example.com/really_long_path/that/keeps/going?with=query';
+    const f = setUp(makeStatus({ content: `<p><a href="${url}">${url}</a></p>` }));
+    const anchor = (f.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>('.content a')!;
+
+    expect(anchor.textContent).toBe('example.com/…');
+    expect(anchor.getAttribute('href')).toBe(url);
+  });
+
+  it('resolves a Mastodon post link into an embedded quote card', () => {
+    const quoteUrl = 'https://remote.example/@alice/456';
+    const f = setUp(
+      makeStatus({ content: `<p>Worth reading</p><p><a href="${quoteUrl}">${quoteUrl}</a></p>` }),
+    );
+    httpMock.expectOne('https://remote.example/api/v1/statuses/456').flush(
+      makeStatus({
+        id: '456',
+        url: quoteUrl,
+        content: '<p>The quoted post</p>',
+        account: { ...makeAccount('9'), username: 'alice', acct: 'alice' },
+      }),
+    );
+    f.detectChanges();
+
+    const element = f.nativeElement as HTMLElement;
+    expect(element.querySelector('.quote-card')?.textContent).toContain('The quoted post');
+    expect(element.querySelector('.content')?.textContent).toContain('Worth reading');
+    expect(element.querySelector('.content')?.textContent).not.toContain('remote.example');
+  });
+
   it('onContentClick: ignores clicks that are not on a link', () => {
     const f = setUp();
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);

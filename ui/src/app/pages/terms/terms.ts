@@ -1,6 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { Api } from '../../api';
-import { TermsOfService } from '../../models';
+import { Component, inject, OnInit } from '@angular/core';
+import { ServerAbout } from '../../server-about';
 
 /** Terms of service published by the connected Mastodon instance. */
 @Component({
@@ -9,18 +8,12 @@ import { TermsOfService } from '../../models';
   styleUrl: './terms.css',
 })
 export class Terms implements OnInit {
-  private api = inject(Api);
+  private serverAbout = inject(ServerAbout);
 
-  protected terms = signal<TermsOfService | null>(null);
-  protected loading = signal(true);
+  protected terms = this.serverAbout.terms;
+  protected loading = this.serverAbout.loading;
 
   ngOnInit(): void {
-    this.api.termsOfService().subscribe({
-      next: (terms) => {
-        this.terms.set(terms);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.serverAbout.load();
   }
 }

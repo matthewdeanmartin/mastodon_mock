@@ -80,6 +80,11 @@
 .content {
   margin-top: 2px;
   word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.content :is(a) {
+  max-width: 100%;
 }
 
 .editor {
