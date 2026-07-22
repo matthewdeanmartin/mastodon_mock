@@ -5,11 +5,22 @@ import { Subscription } from 'rxjs';
 import { NgOptimizedImage } from '@angular/common';
 import { Api } from '../../api';
 import { ClientPrefs } from '../../client-prefs';
-import { MastodonNotification, Relationship, Status } from '../../models';
+import { Account, MastodonNotification, Relationship, Status } from '../../models';
 import { Streaming } from '../../streaming';
 import { AccountListDialog, AccountListMode } from '../../account-list-dialog/account-list-dialog';
+import { AccountResultCard } from '../search/account-result-card';
+import { AccountWithMatches } from '../search/account-refine';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 type NotifAudience = 'all' | 'friends' | 'followers';
+type NotificationView = 'notifications' | 'new-accounts';
+
+export interface NewAccountCandidate {
+  account: Account;
+  relationship: Relationship;
+  notification: MastodonNotification;
+  notificationCount: number;
+}
 
 /** Collapse buckets only once they outgrow this many distinct people. */
 export const GROUP_THRESHOLD = 3;
@@ -89,9 +100,44 @@ function dedupeByAccount(bucket: MastodonNotification[]): MastodonNotification[]
   return out;
 }
 
+/** One newest notification per unfamiliar account, preserving notification order. */
+export function accountsNewToMe(
+  notifications: MastodonNotification[],
+  relationships: ReadonlyMap<string, Relationship>,
+  dismissed: ReadonlySet<string> = new Set(),
+): NewAccountCandidate[] {
+  const candidates = new Map<string, NewAccountCandidate>();
+  for (const notification of notifications) {
+    const id = notification.account.id;
+    const relationship = relationships.get(id);
+    if (
+      !relationship ||
+      relationship.following ||
+      relationship.requested ||
+      relationship.blocking ||
+      relationship.muting ||
+      dismissed.has(id)
+    ) {
+      continue;
+    }
+    const existing = candidates.get(id);
+    if (existing) {
+      existing.notificationCount += 1;
+    } else {
+      candidates.set(id, {
+        account: notification.account,
+        relationship,
+        notification,
+        notificationCount: 1,
+      });
+    }
+  }
+  return [...candidates.values()];
+}
+
 @Component({
   selector: 'app-notifications',
-  imports: [RouterLink, FormsModule, AccountListDialog, NgOptimizedImage],
+  imports: [RouterLink, FormsModule, AccountListDialog, NgOptimizedImage, AccountResultCard],
   templateUrl: './notifications.html',
   styleUrl: './notifications.css',
 })
@@ -99,6 +145,7 @@ export class Notifications implements OnInit, OnDestroy {
   private api = inject(Api);
   private streaming = inject(Streaming);
   private prefs = inject(ClientPrefs);
+  private diagnostics = inject(PageDiagnostics);
 
   /** Media thumbnails respect the feed-wide images on/off preference. */
   protected showImages = this.prefs.showImages;
@@ -113,10 +160,16 @@ export class Notifications implements OnInit, OnDestroy {
   // List filters: who the notification is from, and what kind it is.
   protected audience = signal<NotifAudience>('all');
   protected typeFilter = signal<string>('all');
+  protected view = signal<NotificationView>('notifications');
 
   /** Relationships for the friends/followers filters; fetched lazily. */
   private rels = signal<Map<string, Relationship>>(new Map());
   private requestedRels = new Set<string>();
+  protected relationshipChecksPending = signal(0);
+  protected relationshipCheckFailed = signal(false);
+  private dismissedAccounts = signal<Set<string>>(new Set());
+  protected accountActionBusy = signal<Set<string>>(new Set());
+  protected accountActionError = signal<string | null>(null);
 
   /** Distinct notification types present, for the type dropdown. */
   protected types = computed(() => [...new Set(this.items().map((n) => n.type))].sort());
@@ -140,12 +193,17 @@ export class Notifications implements OnInit, OnDestroy {
   /** The filtered list with same-status pile-ups collapsed into group rows. */
   protected rows = computed(() => groupNotifications(this.visible()));
 
+  /** Notification actors the viewer has not followed, deduped to one profile row each. */
+  protected newAccounts = computed(() =>
+    accountsNewToMe(this.items(), this.rels(), this.dismissedAccounts()),
+  );
+
   /** The "who favourited / who boosted" dialog opened from a group row. */
   protected listTarget = signal<{ statusId: string; mode: AccountListMode } | null>(null);
 
   constructor() {
     effect(() => {
-      if (this.audience() === 'all') {
+      if (this.audience() === 'all' && this.view() !== 'new-accounts') {
         return;
       }
       const missing = [
@@ -161,14 +219,29 @@ export class Notifications implements OnInit, OnDestroy {
       for (const id of missing) {
         this.requestedRels.add(id);
       }
-      this.api.relationships(missing).subscribe((list) => {
-        this.rels.update((map) => {
-          const next = new Map(map);
-          for (const r of list) {
-            next.set(r.id, r);
+      this.relationshipChecksPending.update((count) => count + 1);
+      this.relationshipCheckFailed.set(false);
+      this.api.relationships(missing).subscribe({
+        next: (list) => {
+          this.rels.update((map) => {
+            const next = new Map(map);
+            for (const r of list) {
+              next.set(r.id, r);
+            }
+            return next;
+          });
+          this.relationshipChecksPending.update((count) => Math.max(0, count - 1));
+        },
+        error: (error: unknown) => {
+          for (const id of missing) {
+            this.requestedRels.delete(id);
           }
-          return next;
-        });
+          this.relationshipChecksPending.update((count) => Math.max(0, count - 1));
+          this.relationshipCheckFailed.set(true);
+          this.diagnostics.error('Notifications', 'load:relationships-error', error, {
+            accounts: missing.length,
+          });
+        },
       });
     });
   }
@@ -176,12 +249,17 @@ export class Notifications implements OnInit, OnDestroy {
   private liveSub: Subscription | null = null;
 
   ngOnInit(): void {
+    this.diagnostics.info('Notifications', 'page:open');
     this.api.notifications().subscribe({
       next: (n) => {
         this.items.set(n);
         this.loading.set(false);
+        this.diagnostics.info('Notifications', 'load:success', { notifications: n.length });
       },
-      error: () => this.loading.set(false),
+      error: (error: unknown) => {
+        this.loading.set(false);
+        this.diagnostics.error('Notifications', 'load:error', error);
+      },
     });
   }
 
@@ -221,6 +299,117 @@ export class Notifications implements OnInit, OnDestroy {
       if (event === 'notification') {
         this.items.update((list) => [payload as MastodonNotification, ...list]);
       }
+    });
+  }
+
+  setView(view: NotificationView): void {
+    this.view.set(view);
+    this.accountActionError.set(null);
+    this.diagnostics.info('Notifications', 'user:set-view', { view });
+  }
+
+  newAccountItem(candidate: NewAccountCandidate): AccountWithMatches {
+    return { account: candidate.account, matchingPosts: [] };
+  }
+
+  newAccountReason(candidate: NewAccountCandidate): string {
+    const notification = candidate.notification;
+    let base: string;
+    switch (notification.type) {
+      case 'favourite':
+        base = 'liked your post';
+        break;
+      case 'reblog':
+        base = 'boosted your post';
+        break;
+      case 'mention':
+        base = notification.status?.in_reply_to_id ? 'replied to you' : 'mentioned you';
+        break;
+      case 'follow':
+        base = 'followed you';
+        break;
+      default:
+        base = this.label(notification.type);
+    }
+    const extra = candidate.notificationCount - 1;
+    return extra > 0
+      ? `${base} · ${extra} more recent notification${extra === 1 ? '' : 's'}`
+      : base;
+  }
+
+  newAccountReasonLink(candidate: NewAccountCandidate): (string | number)[] | null {
+    return candidate.notification.status ? ['/statuses', candidate.notification.status.id] : null;
+  }
+
+  isAccountActionBusy(id: string): boolean {
+    return this.accountActionBusy().has(id);
+  }
+
+  followAccount(account: Account): void {
+    if (this.isAccountActionBusy(account.id)) return;
+    this.setAccountActionBusy(account.id, true);
+    this.accountActionError.set(null);
+    this.diagnostics.info('Notifications', 'user:follow-new-account', { accountId: account.id });
+    this.api.follow(account.id).subscribe({
+      next: (relationship) => {
+        this.setRelationship(relationship);
+        this.setAccountActionBusy(account.id, false);
+      },
+      error: () => {
+        this.setAccountActionBusy(account.id, false);
+        this.accountActionError.set(`Could not follow @${account.acct}.`);
+      },
+    });
+  }
+
+  muteAccount(request: { account: Account; seconds: number | null }): void {
+    const { account, seconds } = request;
+    if (this.isAccountActionBusy(account.id)) return;
+    this.setAccountActionBusy(account.id, true);
+    this.accountActionError.set(null);
+    this.diagnostics.info('Notifications', 'user:mute-new-account', {
+      accountId: account.id,
+      seconds,
+    });
+    this.api.muteAccount(account.id, seconds ?? undefined).subscribe({
+      next: (relationship) => this.finishModeration(account.id, relationship),
+      error: () => {
+        this.setAccountActionBusy(account.id, false);
+        this.accountActionError.set(`Could not mute @${account.acct}.`);
+      },
+    });
+  }
+
+  blockAccount(account: Account): void {
+    if (this.isAccountActionBusy(account.id)) return;
+    this.setAccountActionBusy(account.id, true);
+    this.accountActionError.set(null);
+    this.diagnostics.info('Notifications', 'user:block-new-account', { accountId: account.id });
+    this.api.block(account.id).subscribe({
+      next: (relationship) => this.finishModeration(account.id, relationship),
+      error: () => {
+        this.setAccountActionBusy(account.id, false);
+        this.accountActionError.set(`Could not block @${account.acct}.`);
+      },
+    });
+  }
+
+  private finishModeration(accountId: string, relationship: Relationship): void {
+    this.setRelationship(relationship);
+    this.dismissedAccounts.update((ids) => new Set(ids).add(accountId));
+    this.setAccountActionBusy(accountId, false);
+  }
+
+  private setRelationship(relationship: Relationship): void {
+    this.rels.update((map) => new Map(map).set(relationship.id, relationship));
+  }
+
+  private setAccountActionBusy(id: string, busy: boolean): void {
+    this.accountActionBusy.update((ids) => {
+      const next = new Set(ids);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
     });
   }
 

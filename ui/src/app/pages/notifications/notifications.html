@@ -1,25 +1,35 @@
 <div class="live-toggle">
   <div class="notif-filters">
-    <div class="seg" role="group" aria-label="From">
-      <button [class.active]="audience() === 'all'" (click)="audience.set('all')">All</button>
-      <button [class.active]="audience() === 'friends'" (click)="audience.set('friends')">
-        Friends
+    <div class="seg view-seg" role="group" aria-label="Notification view">
+      <button [class.active]="view() === 'notifications'" (click)="setView('notifications')">
+        Notifications
       </button>
-      <button [class.active]="audience() === 'followers'" (click)="audience.set('followers')">
-        Followers
+      <button [class.active]="view() === 'new-accounts'" (click)="setView('new-accounts')">
+        Accounts New to Me
       </button>
     </div>
-    <select
-      class="type-select"
-      [ngModel]="typeFilter()"
-      (ngModelChange)="typeFilter.set($event)"
-      title="Notification type"
-    >
-      <option value="all">All types</option>
-      @for (t of types(); track t) {
-        <option [value]="t">{{ t }}</option>
-      }
-    </select>
+    @if (view() === 'notifications') {
+      <div class="seg" role="group" aria-label="From">
+        <button [class.active]="audience() === 'all'" (click)="audience.set('all')">All</button>
+        <button [class.active]="audience() === 'friends'" (click)="audience.set('friends')">
+          Friends
+        </button>
+        <button [class.active]="audience() === 'followers'" (click)="audience.set('followers')">
+          Followers
+        </button>
+      </div>
+      <select
+        class="type-select"
+        [ngModel]="typeFilter()"
+        (ngModelChange)="typeFilter.set($event)"
+        title="Notification type"
+      >
+        <option value="all">All types</option>
+        @for (t of types(); track t) {
+          <option [value]="t">{{ t }}</option>
+        }
+      </select>
+    }
   </div>
   <button
     class="btn btn-outline"
@@ -39,6 +49,34 @@
   <p class="muted center">Loading…</p>
 } @else if (!items().length) {
   <p class="muted center">No notifications yet.</p>
+} @else if (view() === 'new-accounts') {
+  @if (accountActionError(); as error) {
+    <p class="new-account-error" role="alert">{{ error }}</p>
+  }
+  @if (relationshipChecksPending() && !newAccounts().length) {
+    <p class="muted center">Checking which accounts are new to you…</p>
+  } @else if (relationshipCheckFailed() && !newAccounts().length) {
+    <p class="muted center">Couldn’t check account relationships. Try this view again.</p>
+  } @else if (!newAccounts().length) {
+    <p class="muted center">No unfamiliar accounts in the notifications loaded so far.</p>
+  } @else {
+    <div class="new-account-list">
+      @for (candidate of newAccounts(); track candidate.account.id) {
+        <app-account-result-card
+          [item]="newAccountItem(candidate)"
+          [relationship]="candidate.relationship"
+          [profileLink]="['/accounts', candidate.account.id]"
+          [reason]="newAccountReason(candidate)"
+          [reasonLink]="newAccountReasonLink(candidate)"
+          [followBusy]="isAccountActionBusy(candidate.account.id)"
+          [showModerationMenu]="true"
+          (follow)="followAccount($event)"
+          (muteAccount)="muteAccount($event)"
+          (blockAccount)="blockAccount($event)"
+        />
+      }
+    </div>
+  }
 } @else if (!visible().length) {
   <p class="muted center">No notifications match the filters.</p>
 } @else {

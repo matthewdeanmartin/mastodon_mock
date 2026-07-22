@@ -13,6 +13,10 @@
   flex-wrap: wrap;
 }
 
+.view-seg {
+  margin-right: 4px;
+}
+
 .seg {
   display: inline-flex;
   border: 1px solid var(--border);
@@ -46,6 +50,16 @@
   background: var(--col-bg);
   color: inherit;
   font-size: 12px;
+}
+
+.new-account-list {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.new-account-error {
+  margin: 10px 16px;
+  color: var(--danger, #c62828);
 }
 
 .notif {

@@ -39,6 +39,17 @@
         <div class="acct-bio" [innerHTML]="a.note"></div>
       }
 
+      @if (reason(); as why) {
+        <div class="acct-reason small">
+          <span class="muted">Why you’re seeing this:</span>
+          @if (reasonLink(); as link) {
+            <a [routerLink]="link">{{ why }}</a>
+          } @else {
+            <span>{{ why }}</span>
+          }
+        </div>
+      }
+
       <div class="acct-stats muted small">
         <span title="Posts"
           ><strong>{{ a.statuses_count | humanCount }}</strong> posts</span
@@ -73,6 +84,25 @@
       >
         {{ followBusy() ? '…' : followLabel() }}
       </button>
+      @if (showModerationMenu()) {
+        <details class="acct-danger-menu">
+          <summary class="btn btn-outline btn-sm" aria-label="More account actions">•••</summary>
+          <div class="acct-danger-panel">
+            <div class="menu-note muted small">Mute for…</div>
+            @for (duration of muteDurations; track duration.label) {
+              <button
+                type="button"
+                (click)="muteAccount.emit({ account: a, seconds: duration.seconds })"
+              >
+                {{ duration.label }}
+              </button>
+            }
+            <button class="danger-action" type="button" (click)="blockAccount.emit(a)">
+              Block account
+            </button>
+          </div>
+        </details>
+      }
     </div>
   </div>
 

@@ -39,10 +39,18 @@ export class AccountResultCard {
   readonly followBusy = input(false);
   /** True for anonymous viewers, so the card can soften relationship labels. */
   readonly anonymous = input(false);
+  /** Optional explanation for contexts such as notification-driven discovery. */
+  readonly reason = input<string | null>(null);
+  /** Internal route to the post that caused the account to surface, when available. */
+  readonly reasonLink = input<(string | number)[] | null>(null);
+  /** Show the account mute/block overflow menu. Search results leave this off. */
+  readonly showModerationMenu = input(false);
 
   readonly follow = output<Account>();
   readonly unfollow = output<Account>();
   readonly toggleExpand = output<void>();
+  readonly muteAccount = output<{ account: Account; seconds: number | null }>();
+  readonly blockAccount = output<Account>();
 
   protected account = computed(() => this.item().account);
   protected matchingPosts = computed<Status[]>(() => this.item().matchingPosts);
@@ -61,6 +69,13 @@ export class AccountResultCard {
   protected followedBy = computed(() => !!this.relationship()?.followed_by);
   protected mutual = computed(() => this.following() && this.followedBy());
   protected requested = computed(() => !!this.relationship()?.requested);
+
+  protected readonly muteDurations: { label: string; seconds: number | null }[] = [
+    { label: '1 hour', seconds: 3600 },
+    { label: '1 day', seconds: 86400 },
+    { label: '7 days', seconds: 604800 },
+    { label: 'forever', seconds: null },
+  ];
 
   /** The label on the follow button, reflecting the current relationship. */
   protected followLabel = computed(() => {

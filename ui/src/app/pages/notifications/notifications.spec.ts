@@ -4,10 +4,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MastodonNotification, Status } from '../../models';
+import { Account, MastodonNotification, Relationship, Status } from '../../models';
 import { Streaming } from '../../streaming';
 import { FakeStreaming } from '../../testing/fake-streaming';
-import { groupNotifications, Notifications } from './notifications';
+import { accountsNewToMe, groupNotifications, Notifications } from './notifications';
 
 interface NotificationsInternals {
   items: Signal<MastodonNotification[]>;
@@ -30,6 +30,38 @@ function makeNotification(id: string, type: string): MastodonNotification {
       acct: 'alan',
       display_name: 'Alan',
     } as MastodonNotification['account'],
+  };
+}
+
+function makeAccount(id: string, name = `Person ${id}`): Account {
+  return {
+    id,
+    username: `person${id}`,
+    acct: `person${id}@example.social`,
+    display_name: name,
+    note: `<p>Bio for ${name}</p>`,
+    url: `https://example.social/@person${id}`,
+    avatar: '',
+    avatar_static: '',
+    header: '',
+    followers_count: 12,
+    following_count: 3,
+    statuses_count: 45,
+    bot: false,
+    locked: false,
+    fields: [],
+  };
+}
+
+function relationship(id: string, over: Partial<Relationship> = {}): Relationship {
+  return {
+    id,
+    following: false,
+    followed_by: false,
+    requested: false,
+    blocking: false,
+    muting: false,
+    ...over,
   };
 }
 
@@ -109,6 +141,111 @@ describe('Notifications', () => {
     const img = el.querySelector<HTMLImageElement>('.excerpt-media img');
     expect(img?.getAttribute('src')).toBe('https://x/prev.png');
     expect(el.querySelector('.excerpt-content')?.textContent).toContain('look at this');
+  });
+
+  it('shows one profile row per unfamiliar account and excludes followed accounts', () => {
+    const fixture = TestBed.createComponent(Notifications);
+    fixture.detectChanges();
+    const first = makeNotification('n1', 'favourite');
+    first.account = makeAccount('new', 'New Person');
+    first.status = { id: 'post-1', content: '', media_attachments: [] } as unknown as Status;
+    const repeat = makeNotification('n2', 'mention');
+    repeat.account = first.account;
+    repeat.status = { id: 'reply-1', content: '', media_attachments: [] } as unknown as Status;
+    const followed = makeNotification('n3', 'reblog');
+    followed.account = makeAccount('known', 'Known Person');
+    httpMock.expectOne('/api/v1/notifications').flush([first, repeat, followed]);
+    fixture.detectChanges();
+
+    const newViewButton = [...fixture.nativeElement.querySelectorAll('button')].find(
+      (button: HTMLButtonElement) => button.textContent?.includes('Accounts New to Me'),
+    ) as HTMLButtonElement;
+    newViewButton.click();
+    fixture.detectChanges();
+    httpMock
+      .expectOne((request) => request.url === '/api/v1/accounts/relationships')
+      .flush([relationship('new'), relationship('known', { following: true })]);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelectorAll('app-account-result-card')).toHaveLength(1);
+    expect(element.textContent).toContain('New Person');
+    expect(element.textContent).toContain('Bio for New Person');
+    expect(element.textContent).toContain('liked your post · 1 more recent notification');
+    expect(element.textContent).not.toContain('Known Person');
+    expect(element.querySelector<HTMLAnchorElement>('.acct-reason a')?.getAttribute('href')).toBe(
+      '/statuses/post-1',
+    );
+    expect(element.textContent).toContain('Block account');
+
+    [...element.querySelectorAll<HTMLButtonElement>('.acct-danger-panel button')]
+      .find((button) => button.textContent?.trim() === '1 day')!
+      .click();
+    const mute = httpMock.expectOne('/api/v1/accounts/new/mute');
+    expect(mute.request.body).toEqual({ duration: 86400 });
+    mute.flush(relationship('new', { muting: true }));
+    fixture.detectChanges();
+    expect(element.querySelectorAll('app-account-result-card')).toHaveLength(0);
+  });
+
+  it('removes an unfamiliar account from the view immediately after following', () => {
+    const fixture = TestBed.createComponent(Notifications);
+    fixture.detectChanges();
+    const notification = makeNotification('n1', 'mention');
+    notification.account = makeAccount('new', 'New Person');
+    notification.status = {
+      id: 'reply-1',
+      content: '',
+      media_attachments: [],
+    } as unknown as Status;
+    httpMock.expectOne('/api/v1/notifications').flush([notification]);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const buttons = (): HTMLButtonElement[] => [
+      ...element.querySelectorAll<HTMLButtonElement>('button'),
+    ];
+    buttons()
+      .find((button) => button.textContent?.includes('Accounts New to Me'))!
+      .click();
+    fixture.detectChanges();
+    httpMock
+      .expectOne((request) => request.url === '/api/v1/accounts/relationships')
+      .flush([relationship('new')]);
+    fixture.detectChanges();
+
+    buttons()
+      .find((button) => button.textContent?.trim() === 'Follow')!
+      .click();
+    httpMock
+      .expectOne('/api/v1/accounts/new/follow')
+      .flush(relationship('new', { following: true }));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('app-account-result-card')).toHaveLength(0);
+    expect(fixture.nativeElement.textContent).toContain('No unfamiliar accounts');
+  });
+
+  it('deduplicates new actors and excludes followed, mutual, requested, muted, and blocked ones', () => {
+    const notifications = ['new', 'new', 'followed', 'mutual', 'requested', 'muted', 'blocked'].map(
+      (id, index) => ({
+        ...makeNotification(String(index), 'favourite'),
+        account: makeAccount(id),
+      }),
+    );
+    const relationships = new Map([
+      ['new', relationship('new')],
+      ['followed', relationship('followed', { following: true })],
+      ['mutual', relationship('mutual', { following: true, followed_by: true })],
+      ['requested', relationship('requested', { requested: true })],
+      ['muted', relationship('muted', { muting: true })],
+      ['blocked', relationship('blocked', { blocking: true })],
+    ]);
+
+    const candidates = accountsNewToMe(notifications, relationships);
+
+    expect(candidates.map((candidate) => candidate.account.id)).toEqual(['new']);
+    expect(candidates[0].notificationCount).toBe(2);
   });
 
   describe('groupNotifications', () => {

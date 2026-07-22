@@ -88,6 +88,17 @@
   margin-top: 4px;
 }
 
+.acct-reason {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 2px;
+}
+
+.acct-reason a {
+  font-weight: 600;
+}
+
 .acct-stats strong {
   color: var(--text);
 }
@@ -120,10 +131,65 @@
 
 .acct-actions {
   flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .follow-btn {
   min-width: 92px;
+}
+
+.acct-danger-menu {
+  position: relative;
+}
+
+.acct-danger-menu summary {
+  min-width: 38px;
+  list-style: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.acct-danger-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.acct-danger-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 170px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--col-bg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.acct-danger-panel button {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.acct-danger-panel button:hover {
+  background: var(--bg);
+}
+
+.acct-danger-panel .danger-action {
+  color: var(--danger, #c62828);
+}
+
+.acct-danger-panel .menu-note {
+  padding: 4px 8px 2px;
 }
 
 /* A followed/mutual button reads as an outlined "done" state, not a call to
