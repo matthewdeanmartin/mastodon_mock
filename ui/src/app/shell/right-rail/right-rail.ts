@@ -8,8 +8,9 @@ import { Server } from '../../server';
 
 /**
  * Right sidebar: house ads (inventory lives in house-ads.ts — edit that file to
- * change them), then the Fediverse card — explore entry points, ways to give back
- * (your own server, the Mastodon project), server info.
+ * change them), then the Fediverse card — server-feed entry points (which now
+ * route into the Lists tab, not /explore), ways to give back (your own server,
+ * the Mastodon project), server info.
  * Trends moved to the left rail under "Who to follow".
  */
 @Component({

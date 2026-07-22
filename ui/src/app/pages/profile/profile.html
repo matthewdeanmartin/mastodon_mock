@@ -164,6 +164,7 @@
       </div>
       <p class="featured-hint muted">
         A hand-picked collection of accounts this profile vouches for.
+        <a class="featured-feed-link" [routerLink]="['/endorsed', a.id]">View as feed →</a>
       </p>
       @for (f of featured(); track f.id) {
         <div class="featured-row">

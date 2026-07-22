@@ -222,6 +222,8 @@
     />
     @if (isBluesky(s)) {
       <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
+    } @else if (isLocal(s)) {
+      <app-local-compose [inReplyTo]="s.id" (posted)="onReply($event)" />
     } @else if (!isRss() && !isAnonymousPublic()) {
       <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
     }

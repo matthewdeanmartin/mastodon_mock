@@ -6,6 +6,8 @@ import { Auth } from '../../auth';
 import { Collection, UserList } from '../../models';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
+import { SavedSearches } from '../search/saved-searches';
+import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 
 @Component({
   selector: 'app-lists',
@@ -17,6 +19,12 @@ export class Lists implements OnInit {
   private api = inject(Api);
   protected auth = inject(Auth);
   private anonymousLists = inject(AnonymousLists);
+  protected saved = inject(SavedSearches);
+
+  /** Server feeds available to the current session (auth-gated ones drop for anon). */
+  protected serverFeeds = computed<ServerFeedDef[]>(() =>
+    SERVER_FEEDS.filter((f) => !f.authRequired || !this.auth.isAnonymous),
+  );
 
   protected lists = signal<UserList[]>([]);
   protected loading = signal(true);
@@ -28,6 +36,9 @@ export class Lists implements OnInit {
   protected collectionsLoading = signal(true);
   protected collectionsSupported = signal(true);
   protected newCollectionName = signal('');
+
+  // Your own endorsed accounts, surfaced as a synthetic list (see endorsed-list page).
+  protected myEndorsedCount = signal<number | null>(null);
 
   // Pending deletions awaiting confirmation.
   protected listToDelete = signal<UserList | null>(null);
@@ -42,6 +53,17 @@ export class Lists implements OnInit {
   ngOnInit(): void {
     this.load();
     this.loadCollections();
+  }
+
+  /** Count the signed-in user's own endorsements so the "Endorsed accounts"
+   *  section shows a row only when there's something to see. Called with a
+   *  verified account from {@link loadCollections} (which already resolves the
+   *  auth snapshot), so it never issues its own verify_credentials. */
+  private loadEndorsed(accountId: string): void {
+    this.api.accountEndorsements(accountId).subscribe({
+      next: (accounts) => this.myEndorsedCount.set(accounts.length),
+      error: () => this.myEndorsedCount.set(null),
+    });
   }
 
   load(): void {
@@ -77,6 +99,8 @@ export class Lists implements OnInit {
       });
       return;
     }
+    // The account is now resolved; fetch the user's own endorsements alongside.
+    this.loadEndorsed(me.id);
     this.collectionsLoading.set(true);
     this.api.accountCollections(me.id).subscribe({
       next: (c) => {

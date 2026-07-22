@@ -409,6 +409,16 @@ export class Search implements OnInit, OnDestroy {
       }
       this.sharedLinkHandled = true;
 
+      // Deep-link from the Lists tab: ?saved=<id> loads and runs a saved search.
+      const savedId = params.get('saved');
+      if (savedId) {
+        const found = this.saved.all().find((s) => s.id === savedId);
+        if (found) {
+          this.applySearch(found.search);
+          return;
+        }
+      }
+
       const q = params.get('q') ?? '';
       const t = (params.get('type') as SearchType) ?? 'accounts';
       this.urlQuery = q;

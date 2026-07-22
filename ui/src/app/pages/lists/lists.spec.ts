@@ -187,6 +187,7 @@ describe('Lists', () => {
       .expectOne('/api/v1/accounts/verify_credentials')
       .flush({ id: '9', username: 'me', acct: 'me' });
     httpMock.expectOne('/api/v1/lists').flush([]);
+    httpMock.expectOne('/api/v1/accounts/9/endorsements').flush([]);
     httpMock.expectOne('/api/v1/accounts/9/collections').flush({ collections: [] });
     httpMock.expectOne('/api/v1/accounts/9/in_collections').flush({ collections: [] });
 
@@ -209,6 +210,7 @@ describe('Lists', () => {
       .expectOne('/api/v1/accounts/verify_credentials')
       .flush({ id: '9', username: 'me', acct: 'me' });
     httpMock.expectOne('/api/v1/lists').flush([]);
+    httpMock.expectOne('/api/v1/accounts/9/endorsements').flush([]);
     httpMock.expectOne('/api/v1/accounts/9/collections').flush({ collections });
     httpMock.expectOne('/api/v1/accounts/9/in_collections').flush({ collections: [] });
     return fixture;
@@ -222,6 +224,7 @@ describe('Lists', () => {
       .expectOne('/api/v1/accounts/verify_credentials')
       .flush({ id: '9', username: 'me', acct: 'me' });
     httpMock.expectOne('/api/v1/lists').flush([]);
+    httpMock.expectOne('/api/v1/accounts/9/endorsements').flush([]);
     httpMock
       .expectOne('/api/v1/accounts/9/collections')
       .flush('', { status: 404, statusText: 'Not Found' });
@@ -258,6 +261,7 @@ describe('Lists', () => {
     httpMock.expectOne('/api/v1/collections').flush({ collection: null });
 
     // Null payload → loadCollections() re-runs (account already verified).
+    httpMock.expectOne('/api/v1/accounts/9/endorsements').flush([]);
     httpMock
       .expectOne('/api/v1/accounts/9/collections')
       .flush({ collections: [makeCollection('C2')] });

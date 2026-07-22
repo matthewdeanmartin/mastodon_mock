@@ -274,6 +274,15 @@ export const routes: Routes = [
           import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),
       },
       {
+        path: 'feeds/:feed',
+        loadComponent: () => import('./pages/server-feed/server-feed').then((m) => m.ServerFeed),
+      },
+      {
+        path: 'endorsed/:accountId',
+        loadComponent: () =>
+          import('./pages/endorsed-list/endorsed-list').then((m) => m.EndorsedList),
+      },
+      {
         path: 'collections/starter',
         loadComponent: () =>
           import('./pages/starter-collection/starter-collection').then((m) => m.StarterCollection),

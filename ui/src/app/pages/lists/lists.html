@@ -1,5 +1,10 @@
 <div class="page-head">Lists</div>
+<p class="muted small page-intro">
+  Every custom feed in one place — your lists, saved searches, server feeds, and curated
+  collections. Each opens as a feed of posts with the people behind them.
+</p>
 
+<div class="section-head">Lists</div>
 <div class="new-list">
   <input
     type="text"
@@ -24,6 +29,36 @@
       <button class="del" (click)="askDeleteList(l, $event)" title="Delete list">✕</button>
     </a>
   }
+}
+
+<div class="section-head">Saved searches</div>
+@if (!saved.count()) {
+  <p class="muted center">
+    No saved searches yet. Build one on the
+    <a routerLink="/search">search page</a> and save it — it becomes a live post feed here.
+  </p>
+} @else {
+  @for (s of saved.all(); track s.id) {
+    <a class="list-row" [routerLink]="['/search']" [queryParams]="{ saved: s.id }">
+      <span>
+        {{ s.name }}
+        <span class="muted small">· saved search</span>
+        @if (!s.authenticated) {
+          <span class="muted small">· anon</span>
+        }
+      </span>
+    </a>
+  }
+}
+
+<div class="section-head">Server feeds</div>
+@for (f of serverFeeds(); track f.feed) {
+  <a class="list-row" [routerLink]="['/feeds', f.feed]">
+    <span>
+      {{ f.title }}
+      <span class="muted small">· {{ f.blurb }}</span>
+    </span>
+  </a>
 }
 
 @if (auth.isAnonymous) {
@@ -96,6 +131,25 @@
         </a>
       }
     }
+  }
+}
+
+@if (!auth.isAnonymous) {
+  <div class="section-head">Endorsed accounts</div>
+  @if (myEndorsedCount()) {
+    <a class="list-row" [routerLink]="['/endorsed', auth.account()?.id]">
+      <span>
+        Accounts you endorse
+        <span class="muted small">
+          · {{ myEndorsedCount() }} member{{ myEndorsedCount() === 1 ? '' : 's' }} · merged feed
+        </span>
+      </span>
+    </a>
+  } @else {
+    <p class="muted center">
+      You haven't endorsed anyone yet. Endorse accounts from their profile to build a merged
+      feed of the people you vouch for.
+    </p>
   }
 }
 

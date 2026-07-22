@@ -1,7 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, forkJoin, map, of } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, CollectionWithAccounts, Status } from '../../models';
@@ -9,11 +8,7 @@ import { StatusCard } from '../../status-card/status-card';
 import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { ListCollectionConverter } from '../../list-collection-converter';
-
-/** How many statuses to pull per member when synthesizing the feed. */
-const FEED_PER_MEMBER = 20;
-/** Cap on the merged feed length. */
-const FEED_MAX = 40;
+import { ListFeedResolver } from '../../lists/list-feed-resolver';
 
 /** A member of the collection paired with its item id (needed for removal). */
 interface Member {
@@ -40,6 +35,7 @@ export class CollectionPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private converter = inject(ListCollectionConverter);
+  private feedResolver = inject(ListFeedResolver);
 
   protected data = signal<CollectionWithAccounts | null>(null);
   protected loading = signal(true);
@@ -148,28 +144,13 @@ export class CollectionPage implements OnInit {
       return;
     }
     this.feedLoading.set(true);
-    forkJoin(
-      ids.map((id) =>
-        this.api
-          .getAccountStatuses(id, { excludeReplies: true, limit: FEED_PER_MEMBER })
-          .pipe(catchError(() => of([] as Status[]))),
-      ),
-    )
-      .pipe(
-        map((lists) =>
-          lists
-            .flat()
-            .sort((a, b) => b.created_at.localeCompare(a.created_at))
-            .slice(0, FEED_MAX),
-        ),
-      )
-      .subscribe({
-        next: (statuses) => {
-          this.feed.set(statuses);
-          this.feedLoading.set(false);
-        },
-        error: () => this.feedLoading.set(false),
-      });
+    this.feedResolver.mergeMemberTimelines(ids).subscribe({
+      next: (merged) => {
+        this.feed.set(merged.statuses);
+        this.feedLoading.set(false);
+      },
+      error: () => this.feedLoading.set(false),
+    });
   }
 
   onChanged(index: number, updated: Status): void {
