@@ -1,0 +1,65 @@
+<div class="spage-head">
+  <h1>Server</h1>
+  <p>
+    Choose the Mastodon server used for public timelines, profiles, and searches while you browse
+    anonymously. Your browser-local identity and preferences stay the same.
+  </p>
+</div>
+
+<div class="spage-body">
+  <section class="ssection">
+    <h2>Current server</h2>
+    <div class="current-card">
+      <div>
+        <strong>{{ currentHost() }}</strong>
+        @if (suggestion(); as item) {
+          <div class="muted small">
+            @if (item.category) {
+              {{ item.category }}
+            }
+            @if (item.users) {
+              · {{ item.users.toLocaleString() }} users listed
+            }
+          </div>
+          @if (item.description) {
+            <p>{{ item.description }}</p>
+          }
+        }
+      </div>
+      <div class="connection" [class.bad]="connectionStatus() === 'unreachable'">
+        @switch (connectionStatus()) {
+          @case ('checking') {
+            Checking…
+          }
+          @case ('available') {
+            ✓ Available
+          }
+          @case ('unreachable') {
+            ⚠ Unreachable
+          }
+        }
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm check-button" type="button" (click)="checkCurrent()">
+      Check connection
+    </button>
+    @if (changed()) {
+      <p class="success" aria-live="polite">Now browsing anonymously via {{ currentHost() }}.</p>
+    }
+  </section>
+
+  <section class="ssection">
+    <h2>Find another server</h2>
+    <p class="muted">
+      We’ll check randomly selected servers from the bundled Mastodon directory. Nothing changes
+      until you approve a working server.
+    </p>
+    <app-server-discovery [currentServer]="currentUrl()" (selected)="useServer($event)" />
+  </section>
+
+  <section class="ssection">
+    <h2>Use a specific server</h2>
+    <p class="muted">Enter a server domain if you already know where you want to browse.</p>
+    <app-server-picker (picked)="useServer($event)" />
+  </section>
+</div>

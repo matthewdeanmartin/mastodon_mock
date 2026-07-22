@@ -1,0 +1,55 @@
+<div class="discovery" aria-live="polite">
+  @switch (state()) {
+    @case ('idle') {
+      <button class="btn btn-outline" type="button" (click)="startSearch()">
+        {{ startLabel() }}
+      </button>
+    }
+    @case ('searching') {
+      <div class="searching-row">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>
+          Looking for an available server…
+          <span class="muted small">{{ tried() }} tried</span>
+        </span>
+        <button class="text-button" type="button" (click)="cancel()">Cancel</button>
+      </div>
+      @if (directorySource() === 'bundled') {
+        <p class="muted small source-note">Using the bundled Mastodon server directory.</p>
+      }
+    }
+    @case ('found') {
+      @if (candidate(); as server) {
+        <div class="candidate">
+          <strong>{{ server.domain }} is available</strong>
+          <span class="muted small">
+            @if (server.category) {
+              {{ server.category }}
+            }
+            @if (sizeLabel(server.users)) {
+              · {{ sizeLabel(server.users) }}
+            }
+          </span>
+          @if (server.title !== server.domain) {
+            <span class="muted small">{{ server.title }}</span>
+          }
+          @if (server.description) {
+            <p>{{ server.description }}</p>
+          }
+          <div class="candidate-actions">
+            <button class="btn" type="button" (click)="useCandidate()">Use this server</button>
+            <button class="btn btn-outline" type="button" (click)="startSearch(false)">
+              Keep looking
+            </button>
+          </div>
+        </div>
+      }
+    }
+    @case ('exhausted') {
+      <p class="muted small">
+        Couldn’t find an available server right now. Your current server has not changed.
+      </p>
+      <button class="btn btn-outline" type="button" (click)="startSearch()">Search again</button>
+    }
+  }
+</div>
