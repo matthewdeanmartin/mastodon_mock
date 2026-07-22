@@ -1,1 +1,0 @@
-var t=[{feed:"federated",title:"Fediverse",blurb:"Public posts from across the federated network.",authRequired:!0},{feed:"local",title:"Local timeline",blurb:"Public posts from this server's own members.",authRequired:!0},{feed:"news",title:"News",blurb:"Posts trending right now.",authRequired:!1}];function d(e){return t.find(r=>r.feed===e)}export{t as a,d as b};
