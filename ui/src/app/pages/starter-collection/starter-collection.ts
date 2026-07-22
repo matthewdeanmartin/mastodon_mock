@@ -35,7 +35,11 @@ export class StarterCollection implements OnInit {
 
   ngOnInit(): void {
     this.importer.reset();
-    this.importer.load(this.accounts.map((account) => account.handle));
+    if (this.auth.isAnonymous) {
+      this.importer.loadResolved(this.accounts);
+    } else {
+      this.importer.load(this.accounts.map((account) => account.handle));
+    }
   }
 
   followAll(): void {
@@ -51,7 +55,8 @@ export class StarterCollection implements OnInit {
     this.opening.set(item.handle);
     try {
       const resolved = this.importer.rows().find((row) => row.handle === item.handle)?.account;
-      const account = resolved ?? (await this.resolveAccount(item.handle));
+      const account =
+        resolved ?? (this.auth.isAnonymous ? item.account : await this.resolveAccount(item.handle));
       if (!account) return;
       if (this.auth.isAnonymous) {
         const server = this.serverFor(item.handle);

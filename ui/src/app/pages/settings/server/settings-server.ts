@@ -4,8 +4,9 @@ import { MastodonServers } from '../../../mastodon-servers';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
 import { ServerDiscovery } from '../../../server-discovery/server-discovery';
 import { ServerPicker } from '../../../server-picker/server-picker';
+import { probeServerAvailability } from '../../../server-availability';
 
-type ConnectionStatus = 'checking' | 'available' | 'unreachable';
+type ConnectionStatus = 'checking' | 'available' | 'degraded' | 'unreachable';
 
 /** Anonymous-only control for the public Mastodon instance used by read-only API calls. */
 @Component({
@@ -34,17 +35,15 @@ export class SettingsServer implements OnInit {
 
   protected useServer(url: string): void {
     this.auth.enterAnonymous(url);
-    this.connectionStatus.set('available');
     this.changed.set(true);
+    void this.checkCurrent();
   }
 
   protected async checkCurrent(): Promise<void> {
     this.connectionStatus.set('checking');
     try {
-      const response = await fetch(`${this.currentUrl()}/api/v1/instance`, {
-        signal: AbortSignal.timeout(6000),
-      });
-      this.connectionStatus.set(response.ok ? 'available' : 'unreachable');
+      const result = await probeServerAvailability(this.currentUrl());
+      this.connectionStatus.set(result.status);
     } catch {
       this.connectionStatus.set('unreachable');
     }

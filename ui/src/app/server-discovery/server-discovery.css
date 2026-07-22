@@ -59,6 +59,18 @@
   margin-top: 6px;
 }
 
+.degraded,
+.degraded-option {
+  color: #b54708;
+}
+
+.degraded-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

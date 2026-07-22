@@ -4,7 +4,6 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
-import { Account } from '../../models';
 import { StarterCollection } from './starter-collection';
 
 describe('StarterCollection', () => {
@@ -24,7 +23,7 @@ describe('StarterCollection', () => {
     localStorage.clear();
   });
 
-  it('resolves a clicked member and opens its internal Anonymous profile', async () => {
+  it('opens a clicked member from the built-in Anonymous account snapshot', async () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const fixture = TestBed.createComponent(StarterCollection);
@@ -35,24 +34,9 @@ describe('StarterCollection', () => {
     };
 
     const opening = component.openAccount(component.accounts[0]);
-    const request = httpMock.expectOne(
-      (candidate) => candidate.url === 'https://mastodon.social/api/v2/search',
-    );
-    expect(request.request.params.get('q')).toBe('Gargron');
-    expect(request.request.params.get('type')).toBe('accounts');
-    request.flush({
-      accounts: [
-        {
-          id: '1',
-          username: 'Gargron',
-          acct: 'Gargron',
-          url: 'https://mastodon.social/@Gargron',
-        } as Account,
-      ],
-      statuses: [],
-      hashtags: [],
-    });
     await opening;
+
+    httpMock.expectNone((candidate) => candidate.url.includes('/api/v2/search'));
 
     expect(navigate).toHaveBeenCalledWith([
       '/accounts',

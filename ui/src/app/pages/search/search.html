@@ -98,539 +98,580 @@
   <div class="search-page" [class.two-box]="twoBox">
     <div class="search-form-box">
       @if (type() === 'statuses') {
-      <div class="budget-row">
-        <label class="muted small" for="api-budget">Maximum API calls</label>
-        <select
-          id="api-budget"
-          [ngModel]="apiBudget()"
-          (ngModelChange)="setBudget($event)"
-          aria-label="Maximum API calls"
-        >
-          @for (b of budgetOptions; track b.value) {
-            <option [value]="b.value">{{ b.label }}</option>
-          }
-        </select>
-      </div>
-    }
-
-    @if (advancedOpen() && type() === 'statuses') {
-      <div class="advanced-panel">
-        @if (capabilities.active) {
-          <p class="muted small">
-            Anonymous post search uses hashtags — Mastodon doesn't offer anonymous full-text
-            search. Fields below are applied to loaded results.
-            <a routerLink="/login">Sign in</a> for full-text post search.
-          </p>
-        }
-
-        <label class="adv-field">
-          <span class="muted small">Exact phrase</span>
-          <input
-            type="text"
-            [ngModel]="exactPhrase()"
-            (ngModelChange)="exactPhrase.set($event)"
-            placeholder="change detection"
-          />
-        </label>
-
-        <label class="adv-field">
-          <span class="muted small">Exclude these words</span>
-          <input
-            type="text"
-            [ngModel]="excludeWords()"
-            (ngModelChange)="excludeWords.set($event)"
-            placeholder="react vue"
-          />
-        </label>
-
-        <label class="adv-field">
-          <span class="muted small">Posted by</span>
-          <input
-            type="text"
-            [ngModel]="author()"
-            (ngModelChange)="author.set($event)"
-            [disabled]="capabilities.active"
-            placeholder="@account@server.example"
-          />
-        </label>
-
-        <div class="advanced-fields">
-          <label>
-            <span class="muted small">Posted after</span>
-            <input type="date" [ngModel]="after()" (ngModelChange)="after.set($event)" />
-          </label>
-          <label>
-            <span class="muted small">Posted before</span>
-            <input type="date" [ngModel]="before()" (ngModelChange)="before.set($event)" />
-          </label>
-          <label>
-            <span class="muted small">Language</span>
-            <select [ngModel]="language()" (ngModelChange)="language.set($event)">
-              @for (l of languages; track l.code) {
-                <option [value]="l.code">{{ l.label }}</option>
-              }
-            </select>
-          </label>
-        </div>
-
-        <div class="advanced-fields">
-          <label>
-            <span class="muted small">Content</span>
-            <select [ngModel]="contentType()" (ngModelChange)="contentType.set($event)">
-              @for (c of contentTypes; track c.value) {
-                <option [value]="c.value">{{ c.label }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            <span class="muted small">Replies</span>
-            <select [ngModel]="replies()" (ngModelChange)="replies.set($event)">
-              <option value="include">Include replies</option>
-              <option value="only">Replies only</option>
-              <option value="exclude">Exclude replies</option>
-            </select>
-          </label>
-          <label>
-            <span class="muted small">Sensitive</span>
-            <select [ngModel]="sensitive()" (ngModelChange)="sensitive.set($event)">
-              <option value="include">Include</option>
-              <option value="only">Sensitive only</option>
-              <option value="exclude">Exclude sensitive</option>
-            </select>
-          </label>
-          @if (!capabilities.active) {
-            <label>
-              <span class="muted small">Search in</span>
-              <select [ngModel]="scope()" (ngModelChange)="scope.set($event)">
-                <option value="all">Public and my library</option>
-                <option value="public">Public</option>
-                <option value="library">My library</option>
-              </select>
-            </label>
-          }
-        </div>
-
-        <div class="advanced-actions">
-          <button class="btn btn-sm" (click)="applyAdvanced()">Apply &amp; search</button>
-          @if (hasAdvanced()) {
-            <button class="btn btn-outline btn-sm" (click)="clearAdvanced()">Clear</button>
-          }
-        </div>
-      </div>
-    }
-
-    @if (advancedOpen() && type() === 'accounts') {
-      <div class="advanced-panel">
-        <p class="muted small">
-          Mastodon's account search only matches names &amp; bios. "What they post" runs a post
-          search and condenses the results down to the people who posted — good for finding, say,
-          economists rather than one specific person.
-        </p>
-
-        <label class="adv-field">
-          <span class="muted small">Match on</span>
-          <select [ngModel]="accountSource()" (ngModelChange)="accountSource.set($event)">
-            @for (s of accountSources; track s.value) {
-              <option [value]="s.value">{{ s.label }}</option>
+        <div class="budget-row">
+          <label class="muted small" for="api-budget">Maximum API calls</label>
+          <select
+            id="api-budget"
+            [ngModel]="apiBudget()"
+            (ngModelChange)="setBudget($event)"
+            aria-label="Maximum API calls"
+          >
+            @for (b of budgetOptions; track b.value) {
+              <option [value]="b.value">{{ b.label }}</option>
             }
           </select>
-        </label>
-
-        <div class="num-facet-grid">
-          <div class="num-facet">
-            <span class="muted small">Followers</span>
-            <div class="num-range">
-              <input type="number" min="0" placeholder="min" [ngModel]="followersMin()" (ngModelChange)="followersMin.set($event)" aria-label="Minimum followers" />
-              <span class="muted">–</span>
-              <input type="number" min="0" placeholder="max" [ngModel]="followersMax()" (ngModelChange)="followersMax.set($event)" aria-label="Maximum followers" />
-            </div>
-          </div>
-          <div class="num-facet">
-            <span class="muted small">Following</span>
-            <div class="num-range">
-              <input type="number" min="0" placeholder="min" [ngModel]="followingMin()" (ngModelChange)="followingMin.set($event)" aria-label="Minimum following" />
-              <span class="muted">–</span>
-              <input type="number" min="0" placeholder="max" [ngModel]="followingMax()" (ngModelChange)="followingMax.set($event)" aria-label="Maximum following" />
-            </div>
-          </div>
-          <div class="num-facet">
-            <span class="muted small">Posts</span>
-            <div class="num-range">
-              <input type="number" min="0" placeholder="min" [ngModel]="statusesMin()" (ngModelChange)="statusesMin.set($event)" aria-label="Minimum posts" />
-              <span class="muted">–</span>
-              <input type="number" min="0" placeholder="max" [ngModel]="statusesMax()" (ngModelChange)="statusesMax.set($event)" aria-label="Maximum posts" />
-            </div>
-          </div>
-        </div>
-        <p class="muted small">
-          Ranges filter the loaded results — e.g. cap followers to skip celebrities, or require a
-          minimum post count to skip dead accounts.
-        </p>
-
-        <div class="advanced-actions">
-          <button class="btn btn-sm" (click)="applyAccountAdvanced()">Apply &amp; search</button>
-          @if (hasAccountAdvanced()) {
-            <button class="btn btn-outline btn-sm" (click)="clearAccountAdvanced()">Clear</button>
-          }
-        </div>
-      </div>
-    }
-
-    <!-- Refinement controls live in the form box, beside the results (post mode only).
-         Everything here runs on already-loaded results — no API calls. -->
-    @if (postSearchRan) {
-      <!-- Active-filter chips (§10). 'server' chips were sent to Mastodon;
-           'loaded' chips are applied to the results already in hand. Shown even
-           for zero results, alongside Explain. -->
-      @if (chips().length) {
-        <div class="chips">
-          @for (chip of chips(); track chip.key + chip.label) {
-            <span
-              class="chip"
-              [class.chip-server]="chip.origin === 'server'"
-              [class.chip-loaded]="chip.origin === 'loaded'"
-              [title]="
-                chip.origin === 'server'
-                  ? 'Sent to Mastodon — changing this needs a new search'
-                  : 'Applied to loaded results'
-              "
-            >
-              {{ chip.label }}
-            </span>
-          }
         </div>
       }
 
-      <!-- Refine controls need actual posts to act on. -->
-      @if (postResults) {
-        <div class="refine-bar">
-        <input
-          type="search"
-          class="refine-filter"
-          [ngModel]="loadedFilter()"
-          (ngModelChange)="loadedFilter.set($event)"
-          placeholder="Filter these results"
-          aria-label="Filter loaded results"
-        />
-        <div class="group-by" role="group" aria-label="Group by">
-          <span class="muted small">Group by</span>
-          <div class="seg">
-            <button [class.active]="grouping() === 'none'" (click)="grouping.set('none')">
-              None
-            </button>
-            <button [class.active]="grouping() === 'author'" (click)="grouping.set('author')">
-              Author
-            </button>
-            <button [class.active]="grouping() === 'date'" (click)="grouping.set('date')">
-              Date
-            </button>
+      @if (advancedOpen() && type() === 'statuses') {
+        <div class="advanced-panel">
+          @if (capabilities.active) {
+            <p class="muted small">
+              Anonymous post search uses hashtags — Mastodon doesn't offer anonymous full-text
+              search. Fields below are applied to loaded results.
+              <a routerLink="/login">Sign in</a> for full-text post search.
+            </p>
+          }
+
+          <label class="adv-field">
+            <span class="muted small">Exact phrase</span>
+            <input
+              type="text"
+              [ngModel]="exactPhrase()"
+              (ngModelChange)="exactPhrase.set($event)"
+              placeholder="change detection"
+            />
+          </label>
+
+          <label class="adv-field">
+            <span class="muted small">Exclude these words</span>
+            <input
+              type="text"
+              [ngModel]="excludeWords()"
+              (ngModelChange)="excludeWords.set($event)"
+              placeholder="react vue"
+            />
+          </label>
+
+          <label class="adv-field">
+            <span class="muted small">Posted by</span>
+            <input
+              type="text"
+              [ngModel]="author()"
+              (ngModelChange)="author.set($event)"
+              [disabled]="capabilities.active"
+              placeholder="@account@server.example"
+            />
+          </label>
+
+          <div class="advanced-fields">
+            <label>
+              <span class="muted small">Posted after</span>
+              <input type="date" [ngModel]="after()" (ngModelChange)="after.set($event)" />
+            </label>
+            <label>
+              <span class="muted small">Posted before</span>
+              <input type="date" [ngModel]="before()" (ngModelChange)="before.set($event)" />
+            </label>
+            <label>
+              <span class="muted small">Language</span>
+              <select [ngModel]="language()" (ngModelChange)="language.set($event)">
+                @for (l of languages; track l.code) {
+                  <option [value]="l.code">{{ l.label }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="advanced-fields">
+            <label>
+              <span class="muted small">Content</span>
+              <select [ngModel]="contentType()" (ngModelChange)="contentType.set($event)">
+                @for (c of contentTypes; track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              <span class="muted small">Replies</span>
+              <select [ngModel]="replies()" (ngModelChange)="replies.set($event)">
+                <option value="include">Include replies</option>
+                <option value="only">Replies only</option>
+                <option value="exclude">Exclude replies</option>
+              </select>
+            </label>
+            <label>
+              <span class="muted small">Sensitive</span>
+              <select [ngModel]="sensitive()" (ngModelChange)="sensitive.set($event)">
+                <option value="include">Include</option>
+                <option value="only">Sensitive only</option>
+                <option value="exclude">Exclude sensitive</option>
+              </select>
+            </label>
+            @if (!capabilities.active) {
+              <label>
+                <span class="muted small">Search in</span>
+                <select [ngModel]="scope()" (ngModelChange)="scope.set($event)">
+                  <option value="all">Public and my library</option>
+                  <option value="public">Public</option>
+                  <option value="library">My library</option>
+                </select>
+              </label>
+            }
+          </div>
+
+          <div class="advanced-actions">
+            <button class="btn btn-sm" (click)="applyAdvanced()">Apply &amp; search</button>
+            @if (hasAdvanced()) {
+              <button class="btn btn-outline btn-sm" (click)="clearAdvanced()">Clear</button>
+            }
           </div>
         </div>
-        <!-- Sort of the loaded posts — reorders in memory, no new search. -->
-        <label class="sort-by">
-          <span class="muted small">Sort</span>
-          <select
-            [ngModel]="statusSort()"
-            (ngModelChange)="statusSort.set($event)"
-            aria-label="Sort posts"
-          >
-            @for (s of statusSorts; track s.value) {
-              <option [value]="s.value">{{ s.label }}</option>
-            }
-          </select>
-        </label>
-      </div>
+      }
 
-      @if (facets().length) {
-        <details class="refine-facets" [open]="refineOpen()">
-          <summary (click)="refineOpen.set(!refineOpen())">
-            Refine loaded results
-            <span class="muted small">Based on {{ loadedCount() }} loaded posts</span>
-          </summary>
-          @for (facet of facets(); track facet.kind) {
-            <div class="facet">
-              <div class="facet-label muted small">{{ facet.label }}</div>
-              @for (v of facet.values.slice(0, 5); track v.value) {
-                <label class="facet-value">
-                  <input
-                    type="checkbox"
-                    [checked]="isFacetSelected(facet.kind, v.value)"
-                    (change)="toggleFacet(facet.kind, v.value)"
-                  />
-                  <span>{{ v.label }}</span>
-                  <span class="muted facet-count">{{ v.count }}</span>
-                </label>
+      @if (advancedOpen() && type() === 'accounts') {
+        <div class="advanced-panel">
+          <p class="muted small">
+            Mastodon's account search only matches names &amp; bios. "What they post" runs a post
+            search and condenses the results down to the people who posted — good for finding, say,
+            economists rather than one specific person.
+          </p>
+
+          <label class="adv-field">
+            <span class="muted small">Match on</span>
+            <select [ngModel]="accountSource()" (ngModelChange)="accountSource.set($event)">
+              @for (s of accountSources; track s.value) {
+                <option [value]="s.value">{{ s.label }}</option>
               }
+            </select>
+          </label>
+
+          <div class="num-facet-grid">
+            <div class="num-facet">
+              <span class="muted small">Followers</span>
+              <div class="num-range">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="min"
+                  [ngModel]="followersMin()"
+                  (ngModelChange)="followersMin.set($event)"
+                  aria-label="Minimum followers"
+                />
+                <span class="muted">–</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="max"
+                  [ngModel]="followersMax()"
+                  (ngModelChange)="followersMax.set($event)"
+                  aria-label="Maximum followers"
+                />
+              </div>
             </div>
+            <div class="num-facet">
+              <span class="muted small">Following</span>
+              <div class="num-range">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="min"
+                  [ngModel]="followingMin()"
+                  (ngModelChange)="followingMin.set($event)"
+                  aria-label="Minimum following"
+                />
+                <span class="muted">–</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="max"
+                  [ngModel]="followingMax()"
+                  (ngModelChange)="followingMax.set($event)"
+                  aria-label="Maximum following"
+                />
+              </div>
+            </div>
+            <div class="num-facet">
+              <span class="muted small">Posts</span>
+              <div class="num-range">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="min"
+                  [ngModel]="statusesMin()"
+                  (ngModelChange)="statusesMin.set($event)"
+                  aria-label="Minimum posts"
+                />
+                <span class="muted">–</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="max"
+                  [ngModel]="statusesMax()"
+                  (ngModelChange)="statusesMax.set($event)"
+                  aria-label="Maximum posts"
+                />
+              </div>
+            </div>
+          </div>
+          <p class="muted small">
+            Ranges filter the loaded results — e.g. cap followers to skip celebrities, or require a
+            minimum post count to skip dead accounts.
+          </p>
+
+          <div class="advanced-actions">
+            <button class="btn btn-sm" (click)="applyAccountAdvanced()">Apply &amp; search</button>
+            @if (hasAccountAdvanced()) {
+              <button class="btn btn-outline btn-sm" (click)="clearAccountAdvanced()">Clear</button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Refinement controls live in the form box, beside the results (post mode only).
+         Everything here runs on already-loaded results — no API calls. -->
+      @if (postSearchRan) {
+        <!-- Active-filter chips (§10). 'server' chips were sent to Mastodon;
+           'loaded' chips are applied to the results already in hand. Shown even
+           for zero results, alongside Explain. -->
+        @if (chips().length) {
+          <div class="chips">
+            @for (chip of chips(); track chip.key + chip.label) {
+              <span
+                class="chip"
+                [class.chip-server]="chip.origin === 'server'"
+                [class.chip-loaded]="chip.origin === 'loaded'"
+                [title]="
+                  chip.origin === 'server'
+                    ? 'Sent to Mastodon — changing this needs a new search'
+                    : 'Applied to loaded results'
+                "
+              >
+                {{ chip.label }}
+              </span>
+            }
+          </div>
+        }
+
+        <!-- Refine controls need actual posts to act on. -->
+        @if (postResults) {
+          <div class="refine-bar">
+            <input
+              type="search"
+              class="refine-filter"
+              [ngModel]="loadedFilter()"
+              (ngModelChange)="loadedFilter.set($event)"
+              placeholder="Filter these results"
+              aria-label="Filter loaded results"
+            />
+            <div class="group-by" role="group" aria-label="Group by">
+              <span class="muted small">Group by</span>
+              <div class="seg">
+                <button [class.active]="grouping() === 'none'" (click)="grouping.set('none')">
+                  None
+                </button>
+                <button [class.active]="grouping() === 'author'" (click)="grouping.set('author')">
+                  Author
+                </button>
+                <button [class.active]="grouping() === 'date'" (click)="grouping.set('date')">
+                  Date
+                </button>
+              </div>
+            </div>
+            <!-- Sort of the loaded posts — reorders in memory, no new search. -->
+            <label class="sort-by">
+              <span class="muted small">Sort</span>
+              <select
+                [ngModel]="statusSort()"
+                (ngModelChange)="statusSort.set($event)"
+                aria-label="Sort posts"
+              >
+                @for (s of statusSorts; track s.value) {
+                  <option [value]="s.value">{{ s.label }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          @if (facets().length) {
+            <details class="refine-facets" [open]="refineOpen()">
+              <summary (click)="refineOpen.set(!refineOpen())">
+                Refine loaded results
+                <span class="muted small">Based on {{ loadedCount() }} loaded posts</span>
+              </summary>
+              @for (facet of facets(); track facet.kind) {
+                <div class="facet">
+                  <div class="facet-label muted small">{{ facet.label }}</div>
+                  @for (v of facet.values.slice(0, 5); track v.value) {
+                    <label class="facet-value">
+                      <input
+                        type="checkbox"
+                        [checked]="isFacetSelected(facet.kind, v.value)"
+                        (change)="toggleFacet(facet.kind, v.value)"
+                      />
+                      <span>{{ v.label }}</span>
+                      <span class="muted facet-count">{{ v.count }}</span>
+                    </label>
+                  }
+                </div>
+              }
+              @if (selectedFacets().length || loadedFilter()) {
+                <button class="btn btn-outline btn-sm" (click)="clearRefinements()">
+                  Clear filters
+                </button>
+              }
+            </details>
           }
-          @if (selectedFacets().length || loadedFilter()) {
-            <button class="btn btn-outline btn-sm" (click)="clearRefinements()">
-              Clear filters
-            </button>
-          }
-        </details>
+
+          <div class="result-status muted small">
+            Showing {{ shownCount() }} of {{ loadedCount() }} loaded posts<br />
+            {{ callsUsed() }} of up to {{ apiBudget() }} API calls used
+          </div>
+        }
+        <!-- /postResults -->
+
+        <!-- Explain (§9): the honesty anchor. Shows exactly what was sent to the
+           server vs. filtered locally, and any anonymous hashtag transform. -->
+        @if (explain(); as ex) {
+          <details class="explain" [open]="explainOpen()">
+            <summary (click)="explainOpen.set(!explainOpen())">Explain this search</summary>
+
+            <div class="explain-section">
+              <div class="explain-head muted small">Endpoint</div>
+              <code>{{ ex.endpoint }}</code>
+            </div>
+
+            @if (ex.mastodonQuery) {
+              <div class="explain-section">
+                <div class="explain-head muted small">Mastodon query</div>
+                <code>{{ ex.mastodonQuery }}</code>
+              </div>
+            }
+
+            @if (ex.anonymousTags?.length) {
+              <div class="explain-section">
+                <div class="explain-head muted small">Anonymous transformation</div>
+                <p class="small">
+                  Searched as hashtags
+                  @for (t of ex.anonymousTags; track t) {
+                    <span class="tag-lit">#{{ t }}</span>
+                  }
+                  — Mastodon does not provide anonymous full-text post search.
+                </p>
+              </div>
+            }
+
+            @if (ex.serverCriteria.length) {
+              <div class="explain-section">
+                <div class="explain-head muted small">Server-side criteria</div>
+                <ul class="small">
+                  @for (c of ex.serverCriteria; track c) {
+                    <li>{{ c }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (ex.loadedCriteria.length) {
+              <div class="explain-section">
+                <div class="explain-head muted small">Filters applied to loaded results</div>
+                <ul class="small">
+                  @for (c of ex.loadedCriteria; track c) {
+                    <li>{{ c }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            <div class="explain-section">
+              <div class="explain-head muted small">API usage</div>
+              <ul class="small">
+                <li>Maximum: {{ ex.apiUsage.maximum }} calls</li>
+                <li>Used: {{ ex.apiUsage.used }} calls</li>
+                @if (ex.apiUsage.tagsDropped) {
+                  <li>
+                    Truncated: {{ ex.apiUsage.tagsDropped }} hashtag(s) dropped to stay within the
+                    API-call budget.
+                  </li>
+                }
+              </ul>
+            </div>
+          </details>
+        }
+      }
+
+      <!-- Account refinement: numeric gates live in Advanced; here are the text
+         filter + categorical/bucket facets over the loaded people. -->
+      @if (type() === 'accounts' && loadedAccountCount()) {
+        <div class="refine-bar">
+          <input
+            type="search"
+            class="refine-filter"
+            [ngModel]="accountFilter()"
+            (ngModelChange)="accountFilter.set($event)"
+            placeholder="Filter these people"
+            aria-label="Filter loaded people"
+          />
+          <!-- Sort of the loaded people — reorders in memory, no new search. -->
+          <label class="sort-by">
+            <span class="muted small">Sort</span>
+            <select
+              [ngModel]="accountSort()"
+              (ngModelChange)="accountSort.set($event)"
+              aria-label="Sort people"
+            >
+              @for (s of accountSorts; track s.value) {
+                <option [value]="s.value">{{ s.label }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        @if (accountFacets().length) {
+          <details class="refine-facets" [open]="refineOpen()">
+            <summary (click)="refineOpen.set(!refineOpen())">
+              Refine loaded people
+              <span class="muted small">Based on {{ loadedAccountCount() }} loaded accounts</span>
+            </summary>
+            @for (facet of accountFacets(); track facet.kind) {
+              <div class="facet">
+                <div class="facet-label muted small">{{ facet.label }}</div>
+                @for (v of facet.values.slice(0, 5); track v.value) {
+                  <label class="facet-value">
+                    <input
+                      type="checkbox"
+                      [checked]="isAccountFacetSelected(facet.kind, v.value)"
+                      (change)="toggleAccountFacet(facet.kind, v.value)"
+                    />
+                    <span>{{ v.label }}</span>
+                    <span class="muted facet-count">{{ v.count }}</span>
+                  </label>
+                }
+              </div>
+            }
+            @if (selectedAccountFacets().length || accountFilter()) {
+              <button class="btn btn-outline btn-sm" (click)="clearAccountRefinements()">
+                Clear filters
+              </button>
+            }
+          </details>
         }
 
         <div class="result-status muted small">
-          Showing {{ shownCount() }} of {{ loadedCount() }} loaded posts<br />
+          Showing {{ shownAccountCount() }} of {{ loadedAccountCount() }} loaded accounts<br />
           {{ callsUsed() }} of up to {{ apiBudget() }} API calls used
         </div>
       }
-      <!-- /postResults -->
+    </div>
 
-
-      <!-- Explain (§9): the honesty anchor. Shows exactly what was sent to the
-           server vs. filtered locally, and any anonymous hashtag transform. -->
-      @if (explain(); as ex) {
-        <details class="explain" [open]="explainOpen()">
-          <summary (click)="explainOpen.set(!explainOpen())">Explain this search</summary>
-
-          <div class="explain-section">
-            <div class="explain-head muted small">Endpoint</div>
-            <code>{{ ex.endpoint }}</code>
-          </div>
-
-          @if (ex.mastodonQuery) {
-            <div class="explain-section">
-              <div class="explain-head muted small">Mastodon query</div>
-              <code>{{ ex.mastodonQuery }}</code>
-            </div>
-          }
-
-          @if (ex.anonymousTags?.length) {
-            <div class="explain-section">
-              <div class="explain-head muted small">Anonymous transformation</div>
-              <p class="small">
-                Searched as hashtags
-                @for (t of ex.anonymousTags; track t) {
-                  <span class="tag-lit">#{{ t }}</span>
-                }
-                — Mastodon does not provide anonymous full-text post search.
-              </p>
-            </div>
-          }
-
-          @if (ex.serverCriteria.length) {
-            <div class="explain-section">
-              <div class="explain-head muted small">Server-side criteria</div>
-              <ul class="small">
-                @for (c of ex.serverCriteria; track c) {
-                  <li>{{ c }}</li>
-                }
-              </ul>
-            </div>
-          }
-
-          @if (ex.loadedCriteria.length) {
-            <div class="explain-section">
-              <div class="explain-head muted small">Filters applied to loaded results</div>
-              <ul class="small">
-                @for (c of ex.loadedCriteria; track c) {
-                  <li>{{ c }}</li>
-                }
-              </ul>
-            </div>
-          }
-
-          <div class="explain-section">
-            <div class="explain-head muted small">API usage</div>
-            <ul class="small">
-              <li>Maximum: {{ ex.apiUsage.maximum }} calls</li>
-              <li>Used: {{ ex.apiUsage.used }} calls</li>
-              @if (ex.apiUsage.tagsDropped) {
-                <li>
-                  Truncated: {{ ex.apiUsage.tagsDropped }} hashtag(s) dropped to stay within the
-                  API-call budget.
-                </li>
-              }
-            </ul>
-          </div>
-        </details>
-      }
-    }
-
-    <!-- Account refinement: numeric gates live in Advanced; here are the text
-         filter + categorical/bucket facets over the loaded people. -->
-    @if (type() === 'accounts' && loadedAccountCount()) {
-      <div class="refine-bar">
-        <input
-          type="search"
-          class="refine-filter"
-          [ngModel]="accountFilter()"
-          (ngModelChange)="accountFilter.set($event)"
-          placeholder="Filter these people"
-          aria-label="Filter loaded people"
-        />
-        <!-- Sort of the loaded people — reorders in memory, no new search. -->
-        <label class="sort-by">
-          <span class="muted small">Sort</span>
-          <select
-            [ngModel]="accountSort()"
-            (ngModelChange)="accountSort.set($event)"
-            aria-label="Sort people"
-          >
-            @for (s of accountSorts; track s.value) {
-              <option [value]="s.value">{{ s.label }}</option>
-            }
-          </select>
-        </label>
-      </div>
-
-      @if (accountFacets().length) {
-        <details class="refine-facets" [open]="refineOpen()">
-          <summary (click)="refineOpen.set(!refineOpen())">
-            Refine loaded people
-            <span class="muted small">Based on {{ loadedAccountCount() }} loaded accounts</span>
-          </summary>
-          @for (facet of accountFacets(); track facet.kind) {
-            <div class="facet">
-              <div class="facet-label muted small">{{ facet.label }}</div>
-              @for (v of facet.values.slice(0, 5); track v.value) {
-                <label class="facet-value">
-                  <input
-                    type="checkbox"
-                    [checked]="isAccountFacetSelected(facet.kind, v.value)"
-                    (change)="toggleAccountFacet(facet.kind, v.value)"
-                  />
-                  <span>{{ v.label }}</span>
-                  <span class="muted facet-count">{{ v.count }}</span>
-                </label>
-              }
-            </div>
-          }
-          @if (selectedAccountFacets().length || accountFilter()) {
-            <button class="btn btn-outline btn-sm" (click)="clearAccountRefinements()">
-              Clear filters
-            </button>
-          }
-        </details>
-      }
-
-      <div class="result-status muted small">
-        Showing {{ shownAccountCount() }} of {{ loadedAccountCount() }} loaded accounts<br />
-        {{ callsUsed() }} of up to {{ apiBudget() }} API calls used
-      </div>
-    }
-  </div>
-
-  <div class="search-results-box">
-    @if (type() === 'accounts' && !accountResultsRan && !accountSearchRan() && !searching()) {
-      <!-- Nothing searched yet and looking for people: offer follow-list import &
+    <div class="search-results-box">
+      @if (type() === 'accounts' && !accountResultsRan && !accountSearchRan() && !searching()) {
+        <!-- Nothing searched yet and looking for people: offer follow-list import &
            directories. Once a search has run (even to zero results) we show the
            results block's empty state instead, so the button never looks inert. -->
-      <div class="search-idle">
-        <div class="page-head">Find people to follow</div>
-        <app-find-people [embedded]="true" />
-      </div>
-    }
-
-    @if (!results() && type() === 'statuses') {
-      <!-- Nothing searched yet: fill the blank space with what's trending now. -->
-      @if (trendingPosts().length) {
-        <div class="page-head">Trending posts</div>
-        @for (s of trendingPosts(); track s.id) {
-          <app-status-card
-            [status]="s"
-            (changed)="onTrendChanged($event)"
-            (deleted)="onTrendDeleted($event)"
-          />
-        }
-      }
-    }
-
-    @if (!results() && type() === 'hashtags') {
-      @if (trendingTags().length) {
-        <div class="page-head">Trending hashtags</div>
-        @for (h of trendingTags(); track h.name) {
-          <a class="result-tag" [routerLink]="['/tags', h.name]">
-            #{{ h.name }}
-            <span class="muted tag-uses">{{ tagUses(h).toLocaleString() }} recent uses</span>
-          </a>
-        }
-      }
-    }
-
-    @if (type() === 'accounts' && (accountResultsRan || accountSearchRan() || searching())) {
-      @if (loadedAccountCount()) {
-        <div class="page-head">
-          People
-          @if (searching()) {
-            <span class="muted small">· searching posts…</span>
-          }
+        <div class="search-idle">
+          <div class="page-head">Find people to follow</div>
+          <app-find-people [embedded]="true" />
         </div>
-        @for (item of visibleAccounts(); track item.account.id) {
-          <app-account-result-card
-            [item]="item"
-            [relationship]="relationshipFor(item.account.id)"
-            [profileLink]="accountLink(item.account)"
-            [expanded]="isAccountExpanded(item.account.id)"
-            [followBusy]="isFollowBusy(item.account.id)"
-            [anonymous]="capabilities.active"
-            (follow)="onFollow($event)"
-            (unfollow)="onUnfollow($event)"
-            (toggleExpand)="toggleAccountExpand(item.account.id)"
-          />
-        }
-        @if (!shownAccountCount()) {
-          <p class="muted center">No loaded people match the current filters.</p>
-        }
-      } @else if (searching()) {
-        <p class="muted center">Searching…</p>
-      } @else {
-        <p class="muted center">No people found.</p>
-      }
-    }
-
-    @if (results(); as r) {
-      @if (r.hashtags.length) {
-        <div class="page-head">Hashtags</div>
-        @for (h of r.hashtags; track h.name) {
-          <a class="result-tag" [routerLink]="['/tags', h.name]">#{{ h.name }}</a>
-        }
       }
 
-      @if (r.statuses.length) {
-        <div class="page-head">Posts</div>
-        @for (group of groups(); track group.key) {
-          @if (group.label) {
-            <div class="group-head">{{ group.label }}</div>
-          }
-          @for (s of group.statuses; track s.id) {
+      @if (!results() && type() === 'statuses') {
+        <!-- Nothing searched yet: fill the blank space with what's trending now. -->
+        @if (trendingPosts().length) {
+          <div class="page-head">Trending posts</div>
+          @for (s of trendingPosts(); track s.id) {
             <app-status-card
               [status]="s"
-              (changed)="onChanged($event)"
-              (deleted)="onDeleted($event)"
+              (changed)="onTrendChanged($event)"
+              (deleted)="onTrendDeleted($event)"
             />
           }
         }
-        @if (!shownCount()) {
-          <p class="muted center">No loaded posts match the current filters.</p>
+      }
+
+      @if (!results() && type() === 'hashtags') {
+        @if (trendingTags().length) {
+          <div class="page-head">Trending hashtags</div>
+          @for (h of trendingTags(); track h.name) {
+            <a class="result-tag" [routerLink]="['/tags', h.name]">
+              #{{ h.name }}
+              <span class="muted tag-uses">{{ tagUses(h).toLocaleString() }} recent uses</span>
+            </a>
+          }
+        }
+      }
+
+      @if (type() === 'accounts' && (accountResultsRan || accountSearchRan() || searching())) {
+        @if (loadedAccountCount()) {
+          <div class="page-head">
+            People
+            @if (searching()) {
+              <span class="muted small">· searching posts…</span>
+            }
+          </div>
+          @for (item of visibleAccounts(); track item.account.id) {
+            <app-account-result-card
+              [item]="item"
+              [relationship]="relationshipFor(item.account.id)"
+              [profileLink]="accountLink(item.account)"
+              [expanded]="isAccountExpanded(item.account.id)"
+              [followBusy]="isFollowBusy(item.account.id)"
+              [anonymous]="capabilities.active"
+              (follow)="onFollow($event)"
+              (unfollow)="onUnfollow($event)"
+              (toggleExpand)="toggleAccountExpand(item.account.id)"
+            />
+          }
+          @if (!shownAccountCount()) {
+            <p class="muted center">No loaded people match the current filters.</p>
+          }
+        } @else if (searching()) {
+          <p class="muted center">Searching…</p>
+        } @else {
+          <p class="muted center">No people found.</p>
+        }
+      }
+
+      @if (results(); as r) {
+        @if (r.hashtags.length) {
+          <div class="page-head">Hashtags</div>
+          @for (h of r.hashtags; track h.name) {
+            <a class="result-tag" [routerLink]="['/tags', h.name]">#{{ h.name }}</a>
+          }
         }
 
-        <!-- Load more keeps paging past the budget (up to a safety cap) so you can
-             grow the faceting corpus as much as you like. -->
-        <div class="load-more-row">
-          @if (canLoadMore()) {
-            <button class="btn btn-outline" [disabled]="searching()" (click)="loadMore(true)">
-              @if (searching()) {
-                Loading…
-              } @else {
-                Load more posts
-              }
-            </button>
-          } @else {
-            <p class="muted small center">
-              Loaded {{ loadedCount() }} posts in {{ callsUsed() }} API calls. Facet counts and
-              filters apply only to these posts.
-            </p>
+        @if (r.statuses.length) {
+          <div class="page-head">Posts</div>
+          @for (group of groups(); track group.key) {
+            @if (group.label) {
+              <div class="group-head">{{ group.label }}</div>
+            }
+            @for (s of group.statuses; track s.id) {
+              <app-status-card
+                [status]="s"
+                (changed)="onChanged($event)"
+                (deleted)="onDeleted($event)"
+              />
+            }
           }
-        </div>
-      }
+          @if (!shownCount()) {
+            <p class="muted center">No loaded posts match the current filters.</p>
+          }
 
-      @if (type() !== 'accounts' && !r.hashtags.length && !r.statuses.length) {
-        <p class="muted center">No results.</p>
+          <!-- Load more keeps paging past the budget (up to a safety cap) so you can
+             grow the faceting corpus as much as you like. -->
+          <div class="load-more-row">
+            @if (canLoadMore()) {
+              <button class="btn btn-outline" [disabled]="searching()" (click)="loadMore(true)">
+                @if (searching()) {
+                  Loading…
+                } @else {
+                  Load more posts
+                }
+              </button>
+            } @else {
+              <p class="muted small center">
+                Loaded {{ loadedCount() }} posts in {{ callsUsed() }} API calls. Facet counts and
+                filters apply only to these posts.
+              </p>
+            }
+          </div>
+        }
+
+        @if (type() !== 'accounts' && !r.hashtags.length && !r.statuses.length) {
+          <p class="muted center">No results.</p>
+        }
       }
-    }
     </div>
   </div>
 </div>

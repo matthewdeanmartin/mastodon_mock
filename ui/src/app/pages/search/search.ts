@@ -856,10 +856,7 @@ export class Search implements OnInit, OnDestroy {
     // config, and forkJoin would otherwise blank the account hits too. Each
     // branch degrades to an empty page (logged) so the other still shows.
     const EMPTY_RESULTS: SearchResults = { accounts: [], statuses: [], hashtags: [] };
-    const resilient = (
-      obs: Observable<SearchResults>,
-      label: string,
-    ): Observable<SearchResults> =>
+    const resilient = (obs: Observable<SearchResults>, label: string): Observable<SearchResults> =>
       obs.pipe(
         catchError((err) => {
           // eslint-disable-next-line no-console
@@ -1106,7 +1103,12 @@ export class Search implements OnInit, OnDestroy {
         ),
     );
     // Text filter reuses filterAccounts over the accounts, keeping matches attached.
-    const kept = new Set(filterAccounts(gated.map((i) => i.account), this.accountFilter()));
+    const kept = new Set(
+      filterAccounts(
+        gated.map((i) => i.account),
+        this.accountFilter(),
+      ),
+    );
     const filtered = gated.filter((i) => kept.has(i.account));
     return sortAccounts(filtered, this.accountSort());
   });

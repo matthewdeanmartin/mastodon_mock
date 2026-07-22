@@ -2,7 +2,11 @@
 
 <div class="acct-card" [class.expanded]="expanded()">
   <div class="acct-main">
-    <a class="acct-avatar-link" [routerLink]="profileLink()" [attr.aria-label]="a.display_name || a.username">
+    <a
+      class="acct-avatar-link"
+      [routerLink]="profileLink()"
+      [attr.aria-label]="a.display_name || a.username"
+    >
       <img
         class="avatar"
         [src]="a.avatar_static || a.avatar"
@@ -36,9 +40,15 @@
       }
 
       <div class="acct-stats muted small">
-        <span title="Posts"><strong>{{ a.statuses_count | humanCount }}</strong> posts</span>
-        <span title="Following"><strong>{{ a.following_count | humanCount }}</strong> following</span>
-        <span title="Followers"><strong>{{ a.followers_count | humanCount }}</strong> followers</span>
+        <span title="Posts"
+          ><strong>{{ a.statuses_count | humanCount }}</strong> posts</span
+        >
+        <span title="Following"
+          ><strong>{{ a.following_count | humanCount }}</strong> following</span
+        >
+        <span title="Followers"
+          ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
+        >
       </div>
 
       @if (a.fields.length) {

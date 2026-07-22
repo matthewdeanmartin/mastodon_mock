@@ -156,9 +156,7 @@ describe('AnonymousPublicApi', () => {
   });
 
   it('caps hashtag fan-out to maxTags so a search stays within the API-call budget', () => {
-    api
-      .searchPostsByHashtags('https://social.example', 'a b c d', { maxTags: 2 })
-      .subscribe();
+    api.searchPostsByHashtags('https://social.example', 'a b c d', { maxTags: 2 }).subscribe();
 
     // Only the first two words become timeline requests; c and d are dropped.
     http.expectOne('https://social.example/api/v1/timelines/tag/a?limit=20').flush([]);
@@ -172,9 +170,7 @@ describe('AnonymousPublicApi', () => {
       .searchPostsByHashtags('https://social.example', 'cats', { maxIds: { cats: '99' } })
       .subscribe();
 
-    http
-      .expectOne('https://social.example/api/v1/timelines/tag/cats?limit=20&max_id=99')
-      .flush([]);
+    http.expectOne('https://social.example/api/v1/timelines/tag/cats?limit=20&max_id=99').flush([]);
   });
 
   it('hashtagsForQuery returns distinct lowercased tags capped to the limit', () => {

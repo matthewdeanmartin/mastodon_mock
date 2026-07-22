@@ -1,10 +1,13 @@
 import { Component, inject, input, OnDestroy, output, signal } from '@angular/core';
 import { MastodonServers, ServerSuggestion } from '../mastodon-servers';
+import { probeServerAvailability } from '../server-availability';
 
 type DiscoveryState = 'idle' | 'searching' | 'found' | 'exhausted';
 
 export interface DiscoveredServer extends ServerSuggestion {
   title: string;
+  degraded: boolean;
+  mediaHost: string | null;
 }
 
 /** Finds a CORS-accessible Mastodon instance without depending on the live directory. */
@@ -24,6 +27,7 @@ export class ServerDiscovery implements OnDestroy {
   protected readonly state = signal<DiscoveryState>('idle');
   protected readonly candidate = signal<DiscoveredServer | null>(null);
   protected readonly tried = signal(0);
+  protected readonly acceptDegraded = signal(false);
   protected readonly directorySource = this.directory.source;
 
   private readonly attempted = new Set<string>();
@@ -99,34 +103,30 @@ export class ServerDiscovery implements OnDestroy {
 
   private async runWorker(queue: ServerSuggestion[], sequence: number): Promise<void> {
     while (sequence === this.searchSequence && this.state() === 'searching') {
-      const server = queue.pop();
+      const server = queue.shift();
       if (!server) {
         return;
       }
       this.attempted.add(server.domain.toLowerCase());
       this.tried.update((count) => count + 1);
-      const title = await this.probe(server.domain, this.searchAbort?.signal);
-      if (title !== null && sequence === this.searchSequence && this.state() === 'searching') {
-        this.candidate.set({ ...server, title });
+      const result = await probeServerAvailability(
+        `https://${server.domain}`,
+        this.searchAbort?.signal,
+        4000,
+      );
+      const usable =
+        result.status === 'available' || (result.status === 'degraded' && this.acceptDegraded());
+      if (usable && sequence === this.searchSequence && this.state() === 'searching') {
+        this.candidate.set({
+          ...server,
+          title: result.title,
+          degraded: result.status === 'degraded',
+          mediaHost: result.mediaUrl ? new URL(result.mediaUrl).host : null,
+        });
         this.state.set('found');
         this.searchAbort?.abort();
         return;
       }
-    }
-  }
-
-  private async probe(domain: string, searchSignal?: AbortSignal): Promise<string | null> {
-    const timeout = AbortSignal.timeout(4000);
-    const signal = searchSignal ? AbortSignal.any([searchSignal, timeout]) : timeout;
-    try {
-      const response = await fetch(`https://${domain}/api/v1/instance`, { signal });
-      if (!response.ok) {
-        return null;
-      }
-      const info = (await response.json()) as { title?: string };
-      return info.title?.trim() || domain;
-    } catch {
-      return null;
     }
   }
 }

@@ -237,7 +237,11 @@ describe('Conversations', () => {
     expect(draft?.kind).toBe('public');
     expect(draft?.accounts[0].id).toBe('2');
     // It appears in the list and is auto-selected with an empty history.
-    expect(internals(fixture).chats().some((c) => c.key === 'pub:alice')).toBe(true);
+    expect(
+      internals(fixture)
+        .chats()
+        .some((c) => c.key === 'pub:alice'),
+    ).toBe(true);
     expect(internals(fixture).selected()?.key).toBe('pub:alice');
     expect(internals(fixture).messages()).toEqual([]);
   });
@@ -268,7 +272,11 @@ describe('Conversations', () => {
     httpMock.expectOne('/api/v1/accounts/2').flush('', { status: 404, statusText: 'Not Found' });
 
     expect(internals(fixture).draftChat()).toBeNull();
-    expect(internals(fixture).chats().some((c) => c.key === 'pub:alice')).toBe(false);
+    expect(
+      internals(fixture)
+        .chats()
+        .some((c) => c.key === 'pub:alice'),
+    ).toBe(false);
   });
 
   it('retires the draft once a real reply is posted under its key', () => {
@@ -287,7 +295,9 @@ describe('Conversations', () => {
 
     expect(internals(fixture).draftChat()).toBeNull();
     // A real public row for the same key now carries the conversation.
-    const row = internals(fixture).chats().find((c) => c.key === 'pub:alice');
+    const row = internals(fixture)
+      .chats()
+      .find((c) => c.key === 'pub:alice');
     expect(row).toBeDefined();
     expect(row?.lastStatus?.id).toBe('r1');
     expect(internals(fixture).selected()?.key).toBe('pub:alice');
@@ -308,9 +318,21 @@ describe('Conversations', () => {
       convo('valid', 'alice.bsky.social'),
     ]);
 
-    expect(internals(fixture).chats().filter((chat) => chat.kind === 'bsky')).toHaveLength(1);
-    expect(internals(fixture).chats().some((chat) => chat.key === 'bsky:valid')).toBe(true);
-    expect(internals(fixture).chats().some((chat) => chat.key === 'bsky:broken')).toBe(false);
+    expect(
+      internals(fixture)
+        .chats()
+        .filter((chat) => chat.kind === 'bsky'),
+    ).toHaveLength(1);
+    expect(
+      internals(fixture)
+        .chats()
+        .some((chat) => chat.key === 'bsky:valid'),
+    ).toBe(true);
+    expect(
+      internals(fixture)
+        .chats()
+        .some((chat) => chat.key === 'bsky:broken'),
+    ).toBe(false);
   });
 
   it('different authors produce different public chats', () => {
@@ -414,7 +436,7 @@ describe('Conversations', () => {
     expect(internals(fixture).replyVisibility()).toBe('unlisted');
   });
 
-  it("replyMentions (public): seeds the other recipients but drops the obvious author", () => {
+  it('replyMentions (public): seeds the other recipients but drops the obvious author', () => {
     // The reply reaches alice implicitly via in_reply_to_id, so her handle is
     // left out of the box; bob (a co-recipient) still needs an explicit mention.
     const alice = makeAccount('2', 'alice');

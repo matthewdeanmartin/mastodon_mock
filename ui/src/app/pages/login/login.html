@@ -122,6 +122,12 @@
                 ({{ serverTitle() }})
               }
             }
+            @case ('degraded') {
+              <span class="server-warning">
+                ⚠ Connected to <strong>{{ serverHostLabel() }}</strong
+                >, but its CDN is blocked or down. Images will not load.
+              </span>
+            }
             @case ('unreachable') {
               <span class="server-warning">
                 ⚠ Can’t reach {{ customServer() }}. The server may be offline or blocked.

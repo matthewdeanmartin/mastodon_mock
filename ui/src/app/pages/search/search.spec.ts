@@ -355,11 +355,19 @@ describe('Search', () => {
       const req = httpMock.expectOne(
         (r) => r.url === '/api/v2/search' && r.params.get('type') === 'accounts',
       );
-      req.flush({ accounts: [makeAccount({ id: 'a', display_name: 'Jane' })], statuses: [], hashtags: [] });
+      req.flush({
+        accounts: [makeAccount({ id: 'a', display_name: 'Jane' })],
+        statuses: [],
+        hashtags: [],
+      });
       // Relationships batch-fetch for the loaded account.
       httpMock.expectOne((r) => r.url === '/api/v1/accounts/relationships').flush([]);
 
-      expect(internals(fixture).accountItems().map((i) => i.account.id)).toEqual(['a']);
+      expect(
+        internals(fixture)
+          .accountItems()
+          .map((i) => i.account.id),
+      ).toEqual(['a']);
     });
 
     it("'both' source fans out to account + post search and merges authors", () => {
@@ -382,15 +390,17 @@ describe('Search', () => {
       });
       // Each branch merges independently as it arrives, so each batch-loads
       // relationships for its own accounts (bio, then post-authors).
-      httpMock
-        .match((r) => r.url === '/api/v1/accounts/relationships')
-        .forEach((r) => r.flush([]));
+      httpMock.match((r) => r.url === '/api/v1/accounts/relationships').forEach((r) => r.flush([]));
 
-      const ids = internals(fixture).accountItems().map((i) => i.account.id);
+      const ids = internals(fixture)
+        .accountItems()
+        .map((i) => i.account.id);
       expect(ids).toContain('bio');
       expect(ids).toContain('poster');
       // The condensed author carries its matching post.
-      const poster = internals(fixture).accountItems().find((i) => i.account.id === 'poster');
+      const poster = internals(fixture)
+        .accountItems()
+        .find((i) => i.account.id === 'poster');
       expect(poster?.matchingPosts.map((s) => s.id)).toEqual(['p1']);
     });
 
@@ -415,7 +425,11 @@ describe('Search', () => {
 
       // Both loaded; only the sub-10k account survives the numeric gate.
       expect(internals(fixture).accountItems()).toHaveLength(2);
-      expect(internals(fixture).visibleAccounts().map((i) => i.account.id)).toEqual(['person']);
+      expect(
+        internals(fixture)
+          .visibleAccounts()
+          .map((i) => i.account.id),
+      ).toEqual(['person']);
     });
 
     it('restores the result set from the store on return (no new request)', () => {
@@ -437,7 +451,11 @@ describe('Search', () => {
       // Returning with the same URL restores from the store — no search HTTP.
       queryParams$.next(convertToParamMap({ q: 'economist', type: 'accounts' }));
       const second = setUp();
-      expect(internals(second).accountItems().map((i) => i.account.id)).toEqual(['econ1']);
+      expect(
+        internals(second)
+          .accountItems()
+          .map((i) => i.account.id),
+      ).toEqual(['econ1']);
       httpMock.expectNone((r) => r.url === '/api/v2/search');
     });
   });

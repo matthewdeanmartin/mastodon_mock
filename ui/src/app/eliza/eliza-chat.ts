@@ -1,11 +1,4 @@
-import {
-  AfterViewChecked,
-  Component,
-  ElementRef,
-  inject,
-  OnInit,
-  viewChild,
-} from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, inject, OnInit, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HumanTimePipe } from '../human-time.pipe';

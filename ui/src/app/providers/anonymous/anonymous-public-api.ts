@@ -157,7 +157,9 @@ export class AnonymousPublicApi {
     }
     return forkJoin(
       tags.map((tag) =>
-        this.getTagTimeline(server, tag, opts.maxIds?.[tag]).pipe(catchError(() => of<Status[]>([]))),
+        this.getTagTimeline(server, tag, opts.maxIds?.[tag]).pipe(
+          catchError(() => of<Status[]>([])),
+        ),
       ),
     ).pipe(
       map((pages) => {

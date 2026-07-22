@@ -47,16 +47,20 @@ function needsBlob(s: MawkingbirdSearch): boolean {
   if (s.target === 'accounts') {
     const a = s.account;
     // Anything beyond a plain text search needs the structured blob.
-    return !!(
-      a &&
-      ((a.source && a.source !== 'both') || a.followers || a.following || a.statuses)
-    );
+    return !!(a && ((a.source && a.source !== 'both') || a.followers || a.following || a.statuses));
   }
   const p = s.post;
   if (s.target !== 'posts' || !p) {
     return false;
   }
-  return !!(p.exactPhrase || p.excludeWords || p.author || p.dates?.before || p.replies || p.sensitive);
+  return !!(
+    p.exactPhrase ||
+    p.excludeWords ||
+    p.author ||
+    p.dates?.before ||
+    p.replies ||
+    p.sensitive
+  );
 }
 
 function base64UrlEncode(json: string): string {

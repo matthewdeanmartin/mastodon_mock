@@ -58,9 +58,9 @@ describe('serializeMastodonQuery', () => {
   });
 
   it('emits both after and before when a date range is given', () => {
-    expect(
-      serializeMastodonQuery({ dates: { after: '2026-01-01', before: '2026-02-01' } }),
-    ).toBe('after:2026-01-01 before:2026-02-01');
+    expect(serializeMastodonQuery({ dates: { after: '2026-01-01', before: '2026-02-01' } })).toBe(
+      'after:2026-01-01 before:2026-02-01',
+    );
   });
 
   it('emits has:poll for a poll content type', () => {

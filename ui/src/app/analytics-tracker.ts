@@ -71,14 +71,7 @@ export function sanitizePath(path: string): string {
 
   // Collection prefixes whose next segment is a per-item identifier we must
   // not record. tags/:tag is included: a tag name is a lookup someone made.
-  const idParents = new Set([
-    'accounts',
-    'statuses',
-    'lists',
-    'collections',
-    'filters',
-    'tags',
-  ]);
+  const idParents = new Set(['accounts', 'statuses', 'lists', 'collections', 'filters', 'tags']);
 
   // Static child routes that share a collection prefix but are NOT identifiers
   // (e.g. /settings/filters/new, /collections/starter). Leave these readable.

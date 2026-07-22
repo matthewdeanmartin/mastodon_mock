@@ -26,13 +26,20 @@
           }
         }
       </div>
-      <div class="connection" [class.bad]="connectionStatus() === 'unreachable'">
+      <div
+        class="connection"
+        [class.bad]="connectionStatus() === 'unreachable'"
+        [class.degraded]="connectionStatus() === 'degraded'"
+      >
         @switch (connectionStatus()) {
           @case ('checking') {
             Checking…
           }
           @case ('available') {
             ✓ Available
+          }
+          @case ('degraded') {
+            ⚠ Available, but degraded — images will not load
           }
           @case ('unreachable') {
             ⚠ Unreachable

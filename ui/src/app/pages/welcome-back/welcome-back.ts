@@ -33,8 +33,7 @@ export class WelcomeBack {
 
   /** The instance's own signup page, opened in a new tab. */
   protected signupUrl = computed(() => {
-    const base =
-      this.route.snapshot.queryParamMap.get('server') || this.server.baseUrl();
+    const base = this.route.snapshot.queryParamMap.get('server') || this.server.baseUrl();
     return base ? `${base}/auth/sign_up` : null;
   });
 

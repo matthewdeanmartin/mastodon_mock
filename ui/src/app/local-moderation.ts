@@ -36,8 +36,14 @@ export function accountKey(account: Pick<Account, 'acct' | 'url' | 'id'>): strin
 function load(): StoredState {
   const empty: StoredState = { version: STATE_VERSION, entries: {} };
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as Partial<StoredState> | null;
-    if (parsed?.version !== STATE_VERSION || typeof parsed.entries !== 'object' || !parsed.entries) {
+    const parsed = JSON.parse(
+      localStorage.getItem(STORE_KEY) ?? 'null',
+    ) as Partial<StoredState> | null;
+    if (
+      parsed?.version !== STATE_VERSION ||
+      typeof parsed.entries !== 'object' ||
+      !parsed.entries
+    ) {
       return empty;
     }
     const now = Date.now();
@@ -106,7 +112,11 @@ export class LocalModeration {
 
   /** Block indefinitely (hide this person). */
   block(account: Pick<Account, 'acct' | 'url' | 'id'>): void {
-    this.put(account, { kind: 'block', expiresAt: FOREVER, acct: account.acct || account.url || account.id });
+    this.put(account, {
+      kind: 'block',
+      expiresAt: FOREVER,
+      acct: account.acct || account.url || account.id,
+    });
   }
 
   /** Mute for `seconds` (null = indefinitely). */

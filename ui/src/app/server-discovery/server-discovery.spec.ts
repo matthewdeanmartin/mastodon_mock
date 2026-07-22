@@ -23,13 +23,13 @@ describe('ServerDiscovery', () => {
   const directory = {
     source: signal<'cache' | 'bundled' | 'live'>('bundled'),
     ready: vi.fn().mockResolvedValue(undefined),
-    shuffled: vi.fn().mockReturnValue(SERVERS),
+    shuffled: vi.fn().mockImplementation(() => [...SERVERS]),
   };
 
   beforeEach(() => {
     directory.ready.mockClear();
     directory.shuffled.mockClear();
-    directory.shuffled.mockReturnValue(SERVERS);
+    directory.shuffled.mockImplementation(() => [...SERVERS]);
     TestBed.configureTestingModule({
       imports: [ServerDiscovery],
       providers: [{ provide: MastodonServers, useValue: directory }],
@@ -86,5 +86,51 @@ describe('ServerDiscovery', () => {
 
     const excluded = directory.shuffled.mock.calls[0][0] as Set<string>;
     expect(excluded.has('current.example')).toBe(true);
+  });
+
+  it('skips degraded servers unless the user explicitly accepts them', async () => {
+    directory.shuffled.mockImplementation(() => [
+      { domain: 'degraded.example', description: '', category: '', users: 20_000 },
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ thumbnail: 'https://cdn.example/image.png' }),
+        })
+        .mockRejectedValueOnce(new Error('cdn blocked'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ thumbnail: 'https://cdn.example/image.png' }),
+        })
+        .mockRejectedValueOnce(new Error('cdn blocked')),
+    );
+    const fixture = TestBed.createComponent(ServerDiscovery);
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    const buttons = (): HTMLButtonElement[] =>
+      Array.from(element.querySelectorAll<HTMLButtonElement>('button'));
+
+    buttons()
+      .find((button) => button.textContent?.includes('Find another'))!
+      .click();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(element.textContent).toContain('Couldn’t find');
+    });
+
+    const checkbox = element.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    buttons()
+      .find((button) => button.textContent?.includes('Search again'))!
+      .click();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(element.textContent).toContain('available but degraded');
+    });
   });
 });

@@ -100,7 +100,9 @@ export class ServerFeed implements OnInit {
     this.exhausted.set(this.feed() === 'trending');
     if (this.def()?.authRequired && this.auth.isAnonymous) {
       this.loading.set(false);
-      this.notice.set('Sign in to view this timeline. Anonymous sessions can only browse Trending and News.');
+      this.notice.set(
+        'Sign in to view this timeline. Anonymous sessions can only browse Trending and News.',
+      );
       return;
     }
     this.loading.set(true);

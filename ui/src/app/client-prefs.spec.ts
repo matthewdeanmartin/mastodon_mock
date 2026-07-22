@@ -161,7 +161,7 @@ describe('ClientPrefs', () => {
     expect(JSON.parse(localStorage.getItem(scoped!) ?? '[]')).toEqual(['bluesky']);
   });
 
-  it('does not leak one account\'s hidden providers to another', () => {
+  it("does not leak one account's hidden providers to another", () => {
     localStorage.setItem(TOKEN_KEY, 'token-one');
     const one = create();
     one.toggleProvider('bluesky');

@@ -21,13 +21,7 @@ export type StatusSortKey =
   | 'reblogs'
   | 'replies';
 
-export type AccountSortKey =
-  | 'relevance'
-  | 'followers'
-  | 'following'
-  | 'posts'
-  | 'name'
-  | 'matches';
+export type AccountSortKey = 'relevance' | 'followers' | 'following' | 'posts' | 'name' | 'matches';
 
 export interface SortOption<K extends string> {
   value: K;
@@ -91,7 +85,10 @@ export function sortStatuses(statuses: Status[], key: StatusSortKey): Status[] {
 }
 
 /** Reorder loaded accounts by the chosen key. 'relevance' returns them as-is. */
-export function sortAccounts(items: AccountWithMatches[], key: AccountSortKey): AccountWithMatches[] {
+export function sortAccounts(
+  items: AccountWithMatches[],
+  key: AccountSortKey,
+): AccountWithMatches[] {
   switch (key) {
     case 'relevance':
       return items;

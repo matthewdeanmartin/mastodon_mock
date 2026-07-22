@@ -12,12 +12,7 @@
  * matching machinery only.
  */
 
-import {
-  ELIZA_FALLBACK,
-  ELIZA_FAQ,
-  ELIZA_RULES,
-  FaqPair,
-} from './eliza-content';
+import { ELIZA_FALLBACK, ELIZA_FAQ, ELIZA_RULES, FaqPair } from './eliza-content';
 
 /**
  * First-person ⇄ second-person swaps, applied to a matched fragment so it reads

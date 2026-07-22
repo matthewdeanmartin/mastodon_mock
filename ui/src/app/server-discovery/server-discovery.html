@@ -21,7 +21,15 @@
     @case ('found') {
       @if (candidate(); as server) {
         <div class="candidate">
-          <strong>{{ server.domain }} is available</strong>
+          <strong>
+            {{ server.domain }} is {{ server.degraded ? 'available but degraded' : 'available' }}
+          </strong>
+          @if (server.degraded) {
+            <span class="degraded small">
+              Images will not load because {{ server.mediaHost || 'its media server' }} is blocked
+              or down.
+            </span>
+          }
           <span class="muted small">
             @if (server.category) {
               {{ server.category }}
@@ -52,4 +60,12 @@
       <button class="btn btn-outline" type="button" (click)="startSearch()">Search again</button>
     }
   }
+  <label class="degraded-option small">
+    <input
+      type="checkbox"
+      [checked]="acceptDegraded()"
+      (change)="acceptDegraded.set($any($event.target).checked)"
+    />
+    Accept degraded servers with blocked or down CDNs
+  </label>
 </div>

@@ -73,24 +73,38 @@ describe('ServerFeed', () => {
     expect(internals(fixture).members()).toEqual([]);
 
     internals(fixture).setTab('members');
-    expect(internals(fixture).members().map((m) => m.id)).toEqual(['a', 'b']);
+    expect(
+      internals(fixture)
+        .members()
+        .map((m) => m.id),
+    ).toEqual(['a', 'b']);
   });
 
   it('news loads trending links and reports a links feed (no members tab)', () => {
     const fixture = setUp('news');
     expect(internals(fixture).isLinks()).toBe(true);
-    http.expectOne('/api/v1/trends/links').flush([
-      { url: 'https://x/1', title: 'Headline', description: 'd', provider_name: 'X' },
-    ] as TrendLink[]);
+    http
+      .expectOne('/api/v1/trends/links')
+      .flush([
+        { url: 'https://x/1', title: 'Headline', description: 'd', provider_name: 'X' },
+      ] as TrendLink[]);
 
-    expect(internals(fixture).links().map((l) => l.title)).toEqual(['Headline']);
+    expect(
+      internals(fixture)
+        .links()
+        .map((l) => l.title),
+    ).toEqual(['Headline']);
     // No statuses/timeline requests are made — verify() asserts this.
   });
 
   it('federated fetches the public timeline when not anonymous', () => {
     const fixture = setUp('federated');
     http.expectOne((r) => r.url === '/api/v1/timelines/public').flush([makeStatus('1', 'a')]);
-    expect(internals(fixture).statuses().map((s) => s.id)).toEqual(['1']);
+    expect(
+      internals(fixture)
+        .statuses()
+        .map((s) => s.id),
+    ).toEqual(['1']);
   });
 
   it('federated shows a sign-in notice for anonymous sessions without fetching', () => {

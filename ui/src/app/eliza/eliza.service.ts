@@ -19,13 +19,7 @@ import { ElizaFollow } from './eliza-follow';
 import { LocalNotificationStore } from './local-notification-store';
 import { LocalPostStore } from './local-post-store';
 import { LocalDmStore } from './local-dm-store';
-import {
-  ELIZA_ACCT,
-  ELIZA_ID,
-  elizaAccount,
-  elizaTimeline,
-  isElizaId,
-} from './eliza-identity';
+import { ELIZA_ACCT, ELIZA_ID, elizaAccount, elizaTimeline, isElizaId } from './eliza-identity';
 
 @Injectable({ providedIn: 'root' })
 export class ElizaService {

@@ -42,9 +42,9 @@ describe('ElizaFollow', () => {
     );
     follow.unfollow();
     expect(follow.following()).toBe(false);
-    expect(
-      Object.keys(localStorage).some((k) => k.startsWith('mockingbird_eliza_following')),
-    ).toBe(false);
+    expect(Object.keys(localStorage).some((k) => k.startsWith('mockingbird_eliza_following'))).toBe(
+      false,
+    );
   });
 
   it('toggle flips and returns the new value', () => {

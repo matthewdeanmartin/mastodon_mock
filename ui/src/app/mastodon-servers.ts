@@ -133,14 +133,32 @@ export class MastodonServers {
       }));
   }
 
-  /** Every directory entry in a fresh random order, optionally excluding known hosts. */
+  /**
+   * A fresh random order that alternates large and smaller communities. This keeps
+   * random discovery from clustering around the largest (and most commonly blocked)
+   * instances without condemning anonymous users to only tiny-instance limitations.
+   */
   shuffled(excluded: ReadonlySet<string> = new Set()): ServerSuggestion[] {
-    const result = this.servers().filter((server) => !excluded.has(server.domain.toLowerCase()));
-    for (let index = result.length - 1; index > 0; index -= 1) {
-      const other = Math.floor(Math.random() * (index + 1));
-      [result[index], result[other]] = [result[other], result[index]];
+    const available = this.servers().filter((server) => !excluded.has(server.domain.toLowerCase()));
+    const large = available.filter((server) => server.users >= 10_000);
+    const small = available.filter((server) => server.users < 10_000);
+    this.shuffle(large);
+    this.shuffle(small);
+    const result: ServerSuggestion[] = [];
+    while (large.length || small.length) {
+      const preferred = result.length % 2 === 0 ? large : small;
+      const fallback = preferred === large ? small : large;
+      const next = preferred.pop() ?? fallback.pop();
+      if (next) result.push(next);
     }
     return result;
+  }
+
+  private shuffle(servers: ServerSuggestion[]): void {
+    for (let index = servers.length - 1; index > 0; index -= 1) {
+      const other = Math.floor(Math.random() * (index + 1));
+      [servers[index], servers[other]] = [servers[other], servers[index]];
+    }
   }
 
   /**

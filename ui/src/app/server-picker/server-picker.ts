@@ -1,15 +1,8 @@
-import {
-  Component,
-  DestroyRef,
-  inject,
-  OnDestroy,
-  OnInit,
-  output,
-  signal,
-} from '@angular/core';
+import { Component, DestroyRef, inject, OnDestroy, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MastodonServers, ServerSuggestion } from '../mastodon-servers';
 import { normalizeHostUrl } from '../host-url';
+import { probeServerAvailability } from '../server-availability';
 
 /**
  * Something that could plausibly be an instance host (with or without scheme): a
@@ -20,7 +13,7 @@ const DOMAIN_RE =
   /^(https?:\/\/)?(([a-z0-9-]+\.)+[a-z]{2,}|localhost|([a-z0-9-]+\.)*localhost|(\d{1,3}\.){3}\d{1,3})(:\d+)?$/i;
 
 /** How the current combo text relates to a reachable instance. */
-export type ServerStatus = 'idle' | 'checking' | 'ok' | 'unreachable';
+export type ServerStatus = 'idle' | 'checking' | 'ok' | 'degraded' | 'unreachable';
 
 /**
  * The instance-picker combo box: a text field with joinmastodon-backed
@@ -144,20 +137,16 @@ export class ServerPicker implements OnInit, OnDestroy {
     this.suggestOpen.set(false);
     this.serverStatus.set('checking');
     try {
-      const res = await fetch(`${base}/api/v1/instance`, { signal: AbortSignal.timeout(6000) });
+      const result = await probeServerAvailability(base);
       if (seq !== this.probeSeq) {
         return; // a newer probe superseded this one
       }
-      if (!res.ok) {
+      if (result.status === 'unreachable') {
         this.serverStatus.set('unreachable');
         return;
       }
-      const info = (await res.json()) as { title?: string };
-      if (seq !== this.probeSeq) {
-        return;
-      }
-      this.serverStatus.set('ok');
-      this.serverTitle.set(info.title ?? null);
+      this.serverStatus.set(result.status === 'degraded' ? 'degraded' : 'ok');
+      this.serverTitle.set(result.title || null);
       this.picked.emit(base);
     } catch {
       if (seq === this.probeSeq) {

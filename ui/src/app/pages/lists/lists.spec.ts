@@ -80,9 +80,7 @@ describe('Lists', () => {
    * as empty (which hides both probed feeds).
    */
   function flushServerFeedProbes(): void {
-    httpMock
-      .match((r) => r.url === '/api/v1/timelines/public')
-      .forEach((req) => req.flush([]));
+    httpMock.match((r) => r.url === '/api/v1/timelines/public').forEach((req) => req.flush([]));
   }
 
   /**

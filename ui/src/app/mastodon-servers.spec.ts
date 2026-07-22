@@ -108,4 +108,14 @@ describe('MastodonServers', () => {
       'tiny.example',
     ]);
   });
+
+  it('alternates large and small servers during random discovery', async () => {
+    mockDirectoryFetch(RAW);
+    await svc.ensureLoaded();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const candidates = svc.shuffled();
+
+    expect(candidates.map((server) => server.users >= 10_000)).toEqual([true, false, true]);
+  });
 });

@@ -83,7 +83,9 @@ export class SavedSearches {
   rename(id: string, name: string): void {
     this.persist(
       this.all().map((s) =>
-        s.id === id ? { ...s, name: name.trim() || s.name, updatedAt: new Date().toISOString() } : s,
+        s.id === id
+          ? { ...s, name: name.trim() || s.name, updatedAt: new Date().toISOString() }
+          : s,
       ),
     );
   }

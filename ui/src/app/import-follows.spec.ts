@@ -140,4 +140,27 @@ describe('ImportFollows', () => {
     expect(follow).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), 'https://b.social');
     expect(importer.rows()[0].status).toBe('followed');
   });
+
+  it('uses pre-resolved snapshots without a search for anonymous follows', async () => {
+    const search = vi.fn();
+    const follow = vi.fn().mockReturnValue({ ok: true, relationship: { id: '1' } });
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: Api, useValue: {} },
+        { provide: Auth, useValue: { isAnonymous: true } },
+        { provide: AnonymousAccount, useValue: { server: () => 'https://home.social' } },
+        { provide: AnonymousPublicApi, useValue: { search } },
+        { provide: AnonymousFollows, useValue: { follow } },
+      ],
+    });
+    const importer = TestBed.inject(ImportFollows);
+    const account = acct('canonical-id', 'alice@b.social');
+    importer.loadResolved([{ handle: 'alice@b.social', account }]);
+
+    await importer.start();
+
+    expect(search).not.toHaveBeenCalled();
+    expect(follow).toHaveBeenCalledWith(account, 'https://b.social');
+    expect(importer.rows()[0].status).toBe('followed');
+  });
 });

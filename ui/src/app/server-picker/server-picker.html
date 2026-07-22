@@ -52,6 +52,10 @@
         ({{ serverTitle() }})
       }
     }
+    @case ('degraded') {
+      ⚠ Connected to <strong>{{ hostLabel() }}</strong
+      >, but its CDN is blocked or down. Images will not load.
+    }
     @case ('unreachable') {
       ⚠ Can't reach {{ customServer() }} — check the address.
     }

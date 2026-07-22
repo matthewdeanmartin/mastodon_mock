@@ -15,7 +15,12 @@ function roundTrip(search: MawkingbirdSearch): MawkingbirdSearch {
 describe('encodeSearchToParams', () => {
   it('uses readable flat params for a simple post search', () => {
     const s = emptySearch('posts');
-    s.post = { words: 'angular', language: 'en', dates: { after: '2026-07-01' }, contentType: 'media' };
+    s.post = {
+      words: 'angular',
+      language: 'en',
+      dates: { after: '2026-07-01' },
+      contentType: 'media',
+    };
     s.apiCallBudget = 3;
     const params = encodeSearchToParams(s);
     expect(params).toEqual({
@@ -47,7 +52,12 @@ describe('encodeSearchToParams', () => {
 describe('decodeSearchFromParams', () => {
   it('round-trips a simple post search', () => {
     const s = emptySearch('posts');
-    s.post = { words: 'angular', language: 'en', dates: { after: '2026-07-01' }, contentType: 'media' };
+    s.post = {
+      words: 'angular',
+      language: 'en',
+      dates: { after: '2026-07-01' },
+      contentType: 'media',
+    };
     s.apiCallBudget = 5;
     const back = roundTrip(s);
     expect(back.target).toBe('posts');

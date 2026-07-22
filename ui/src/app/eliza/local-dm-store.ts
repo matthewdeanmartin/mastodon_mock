@@ -43,7 +43,9 @@ function storageKey(): string {
 
 function loadState(): DmState {
   try {
-    const parsed = JSON.parse(localStorage.getItem(storageKey()) ?? 'null') as Partial<DmState> | null;
+    const parsed = JSON.parse(
+      localStorage.getItem(storageKey()) ?? 'null',
+    ) as Partial<DmState> | null;
     if (parsed?.version !== STATE_VERSION || !Array.isArray(parsed.messages)) {
       return { version: STATE_VERSION, messages: [], seeded: false };
     }

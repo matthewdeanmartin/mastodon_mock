@@ -54,12 +54,14 @@ describe('EndorsedList', () => {
 
     // Owner account (non-fatal header lookup) + endorsements.
     http.expectOne('/api/v1/accounts/O').flush(makeAccount('O'));
-    http
-      .expectOne('/api/v1/accounts/O/endorsements')
-      .flush([makeAccount('A'), makeAccount('B')]);
+    http.expectOne('/api/v1/accounts/O/endorsements').flush([makeAccount('A'), makeAccount('B')]);
 
     expect(internals(fixture).loading()).toBe(false);
-    expect(internals(fixture).members().map((m) => m.id)).toEqual(['A', 'B']);
+    expect(
+      internals(fixture)
+        .members()
+        .map((m) => m.id),
+    ).toEqual(['A', 'B']);
 
     // One statuses request per member → merged newest-first.
     http
@@ -69,7 +71,11 @@ describe('EndorsedList', () => {
       .expectOne((r) => r.url === '/api/v1/accounts/B/statuses')
       .flush([makeStatus('2', 'B', '2026-02-01T00:00:00Z')]);
 
-    expect(internals(fixture).feed().map((s) => s.id)).toEqual(['2', '1']);
+    expect(
+      internals(fixture)
+        .feed()
+        .map((s) => s.id),
+    ).toEqual(['2', '1']);
   });
 
   it('shows no feed request when there are no endorsements', () => {

@@ -113,6 +113,13 @@ export class ImportFollows {
     this.rows.set(handles.map((handle) => ({ handle, status: 'pending' as const })));
   }
 
+  /** Load already-resolved canonical snapshots (used by code-shipped collections). */
+  loadResolved(entries: readonly { handle: string; account: Account }[]): void {
+    this.rows.set(
+      entries.map(({ handle, account }) => ({ handle, account, status: 'pending' as const })),
+    );
+  }
+
   stop(): void {
     this.stopRequested = true;
   }
@@ -139,7 +146,7 @@ export class ImportFollows {
           continue;
         }
         await this.processRow(i);
-        if (this.delayMs) {
+        if (this.delayMs && !this.auth.isAnonymous) {
           await sleep(this.delayMs);
         }
       }
@@ -150,14 +157,16 @@ export class ImportFollows {
 
   private async processRow(i: number): Promise<void> {
     const handle = this.rows()[i].handle;
-    this.patch(i, { status: 'resolving' });
-    let account: Account | undefined;
-    try {
-      const results = await this.withRateLimitRetry(() => firstValueFrom(this.search(handle)));
-      account = pickAccount(handle, results.accounts ?? []);
-    } catch (err) {
-      this.patch(i, { status: 'failed', error: describeHttpError(err) });
-      return;
+    let account = this.rows()[i].account;
+    if (!account) {
+      this.patch(i, { status: 'resolving' });
+      try {
+        const results = await this.withRateLimitRetry(() => firstValueFrom(this.search(handle)));
+        account = pickAccount(handle, results.accounts ?? []);
+      } catch (err) {
+        this.patch(i, { status: 'failed', error: describeHttpError(err) });
+        return;
+      }
     }
     if (!account) {
       this.patch(i, { status: 'not_found' });

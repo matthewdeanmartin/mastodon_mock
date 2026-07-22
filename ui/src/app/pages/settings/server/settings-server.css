@@ -26,6 +26,12 @@
   color: #b42318;
 }
 
+.connection.degraded {
+  max-width: 220px;
+  color: #b54708;
+  text-align: right;
+}
+
 .check-button {
   margin-top: 10px;
 }

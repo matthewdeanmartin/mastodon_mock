@@ -48,9 +48,7 @@ describe('ListFeedResolver.mergeMemberTimelines', () => {
     http
       .expectOne((r) => r.url === '/api/v1/accounts/a/statuses')
       .flush([makeStatus('1', 'a', '2026-01-01T00:00:00Z')]);
-    http
-      .expectOne((r) => r.url === '/api/v1/accounts/b/statuses')
-      .error(new ProgressEvent('fail'));
+    http.expectOne((r) => r.url === '/api/v1/accounts/b/statuses').error(new ProgressEvent('fail'));
 
     expect(result.map((s) => s.id)).toEqual(['1']);
     http.verify();

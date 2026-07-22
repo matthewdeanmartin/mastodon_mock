@@ -40,9 +40,7 @@ import { ProviderRegistry } from '../providers/provider-registry';
         class="btn btn-outline"
         [class.active]="imagesHidden()"
         (click)="toggleImages()"
-        [title]="
-          imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'
-        "
+        [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
       >
         🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
       </button>

@@ -69,7 +69,9 @@ describe('FailWhale', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
     const el = render();
     expect(el.querySelector('app-server-picker')).not.toBeNull();
-    expect(el.querySelector('.change-server')!.textContent).toContain('browse a different instance');
+    expect(el.querySelector('.change-server')!.textContent).toContain(
+      'browse a different instance',
+    );
   });
 
   it('picking a server moves the anonymous identity and reloads', () => {

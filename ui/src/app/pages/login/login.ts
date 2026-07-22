@@ -8,6 +8,7 @@ import { DevUser } from '../../models';
 import { Server, SERVER_PRESETS } from '../../server';
 import { MastodonServers, ServerSuggestion } from '../../mastodon-servers';
 import { normalizeHostUrl } from '../../host-url';
+import { probeServerAvailability } from '../../server-availability';
 import { environment } from '../../../environments/environment';
 import { brandLogoSrc } from '../../build-flavor';
 import { AppFooter } from '../../shell/app-footer/app-footer';
@@ -31,7 +32,7 @@ const DOMAIN_RE =
   /^(https?:\/\/)?(([a-z0-9-]+\.)+[a-z]{2,}|localhost|([a-z0-9-]+\.)*localhost|(\d{1,3}\.){3}\d{1,3})(:\d+)?$/i;
 
 /** How the current server-combo text relates to a reachable instance. */
-type ServerStatus = 'idle' | 'checking' | 'ok' | 'unreachable';
+type ServerStatus = 'idle' | 'checking' | 'ok' | 'degraded' | 'unreachable';
 
 @Component({
   selector: 'app-login',
@@ -265,21 +266,17 @@ export class Login implements OnInit, OnDestroy {
     this.suggestOpen.set(false);
     this.serverStatus.set('checking');
     try {
-      const res = await fetch(`${base}/api/v1/instance`, { signal: AbortSignal.timeout(6000) });
+      const result = await probeServerAvailability(base);
       if (seq !== this.probeSeq) {
         return; // a newer probe superseded this one
       }
-      if (!res.ok) {
+      if (result.status === 'unreachable') {
         this.serverStatus.set('unreachable');
         return;
       }
-      const info = (await res.json()) as { title?: string };
-      if (seq !== this.probeSeq) {
-        return;
-      }
       this.server.setBaseUrl(base);
-      this.serverStatus.set('ok');
-      this.serverTitle.set(info.title ?? null);
+      this.serverStatus.set(result.status === 'degraded' ? 'degraded' : 'ok');
+      this.serverTitle.set(result.title || null);
     } catch {
       if (seq === this.probeSeq) {
         this.serverStatus.set('unreachable');

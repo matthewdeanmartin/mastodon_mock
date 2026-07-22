@@ -251,7 +251,11 @@ describe('ListTimeline', () => {
     internals(fixture).setTab('members');
     internals(fixture).onBulkAdded();
 
-    expect(internals(fixture).members().map((member) => member.id)).toEqual(['bob']);
+    expect(
+      internals(fixture)
+        .members()
+        .map((member) => member.id),
+    ).toEqual(['bob']);
     httpMock.expectNone((request) => request.url.startsWith('/api/v1/lists/'));
   });
 

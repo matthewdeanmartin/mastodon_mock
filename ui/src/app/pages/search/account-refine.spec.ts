@@ -107,7 +107,11 @@ describe('accountMatchesNumeric', () => {
 
 describe('filterAccounts', () => {
   const accounts = [
-    makeAccount({ display_name: 'Jane Economist', acct: 'jane@econ.social', note: '<p>I study inflation</p>' }),
+    makeAccount({
+      display_name: 'Jane Economist',
+      acct: 'jane@econ.social',
+      note: '<p>I study inflation</p>',
+    }),
     makeAccount({ display_name: 'Bob', acct: 'bob@tech.example', note: '<p>rust and go</p>' }),
   ];
   it('returns everything for an empty filter', () => {
@@ -205,7 +209,9 @@ describe('buildAccountFacets', () => {
 
 describe('accountMatchesFacet', () => {
   it('matches domain, treating local as "local"', () => {
-    expect(accountMatchesFacet(makeAccount({ acct: 'x@econ.social' }), 'domain', 'econ.social')).toBe(true);
+    expect(
+      accountMatchesFacet(makeAccount({ acct: 'x@econ.social' }), 'domain', 'econ.social'),
+    ).toBe(true);
     expect(accountMatchesFacet(makeAccount({ acct: 'local' }), 'domain', 'local')).toBe(true);
   });
   it('matches bot / human buckets', () => {
@@ -213,7 +219,11 @@ describe('accountMatchesFacet', () => {
     expect(accountMatchesFacet(makeAccount({ bot: false }), 'bot', 'human')).toBe(true);
   });
   it('matches the follower bucket the account falls in', () => {
-    expect(accountMatchesFacet(makeAccount({ followers_count: 500 }), 'followers', '100-999')).toBe(true);
-    expect(accountMatchesFacet(makeAccount({ followers_count: 500 }), 'followers', '10000+')).toBe(false);
+    expect(accountMatchesFacet(makeAccount({ followers_count: 500 }), 'followers', '100-999')).toBe(
+      true,
+    );
+    expect(accountMatchesFacet(makeAccount({ followers_count: 500 }), 'followers', '10000+')).toBe(
+      false,
+    );
   });
 });

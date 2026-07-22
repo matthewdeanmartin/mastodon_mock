@@ -47,9 +47,7 @@ describe('ElizaService', () => {
   });
 
   it('replyWithSeed is deterministic and does not advance the rolling seed', () => {
-    expect(eliza.replyWithSeed('i need a break', 3)).toBe(
-      eliza.replyWithSeed('i need a break', 3),
-    );
+    expect(eliza.replyWithSeed('i need a break', 3)).toBe(eliza.replyWithSeed('i need a break', 3));
   });
 
   it('following her posts a one-time welcome notification', () => {

@@ -159,9 +159,15 @@ describe('groupResults', () => {
 
   it('groups by author in first-seen order, preserving within-group order', () => {
     const statuses = [
-      makeStatus({ id: 'a1', account: { acct: 'alan', display_name: 'Alan' } as Status['account'] }),
+      makeStatus({
+        id: 'a1',
+        account: { acct: 'alan', display_name: 'Alan' } as Status['account'],
+      }),
       makeStatus({ id: 'b1', account: { acct: 'bea', display_name: 'Bea' } as Status['account'] }),
-      makeStatus({ id: 'a2', account: { acct: 'alan', display_name: 'Alan' } as Status['account'] }),
+      makeStatus({
+        id: 'a2',
+        account: { acct: 'alan', display_name: 'Alan' } as Status['account'],
+      }),
     ];
     const groups = groupResults(statuses, 'author');
     expect(groups.map((g) => g.key)).toEqual(['alan', 'bea']);

@@ -79,7 +79,11 @@ describe('sortStatuses', () => {
       favourites_count: 100,
     });
     const boost = status({ id: 'boost', created_at: '2000-01-01T00:00:00.000Z', reblog: inner });
-    const plain = status({ id: 'plain', created_at: '2021-01-01T00:00:00.000Z', favourites_count: 5 });
+    const plain = status({
+      id: 'plain',
+      created_at: '2021-01-01T00:00:00.000Z',
+      favourites_count: 5,
+    });
     // The boost sorts by the inner post's newer date and higher fav count.
     expect(sortStatuses([plain, boost], 'newest').map((s) => s.id)).toEqual(['boost', 'plain']);
     expect(sortStatuses([plain, boost], 'favourites').map((s) => s.id)).toEqual(['boost', 'plain']);

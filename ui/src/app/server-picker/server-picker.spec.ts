@@ -73,9 +73,7 @@ describe('ServerPicker', () => {
 
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response(JSON.stringify({ title: 'Mastodon' }), { status: 200 }),
-      );
+      .mockResolvedValue(new Response(JSON.stringify({ title: 'Mastodon' }), { status: 200 }));
 
     internals(cmp).chooseSuggestion(SUGGESTION);
     // Let the probe's fetch + res.json() promises settle.

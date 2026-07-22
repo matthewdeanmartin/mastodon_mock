@@ -10,6 +10,8 @@ describe('STARTER_COLLECTION', () => {
       expect(account.name.trim()).not.toBe('');
       // Handles are fully-qualified `user@domain` so a fresh account can follow.
       expect(account.handle).toMatch(/^[^@\s]+@[^@\s]+$/);
+      expect(account.account.id).not.toBe('');
+      expect(account.account.acct.toLowerCase()).toBe(account.handle.toLowerCase());
     }
   });
 

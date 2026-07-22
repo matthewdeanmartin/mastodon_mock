@@ -504,7 +504,10 @@ export class ClientPrefs {
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     // Hidden providers live in their own account-scoped key, not the global blob.
-    localStorage.setItem(scopedKey(HIDDEN_PROVIDERS_KEY_BASE), JSON.stringify(this.hiddenProviders()));
+    localStorage.setItem(
+      scopedKey(HIDDEN_PROVIDERS_KEY_BASE),
+      JSON.stringify(this.hiddenProviders()),
+    );
   }
 
   /**

@@ -5,9 +5,7 @@ import { AccountSearchStore, AccountSearchSnapshot } from './account-search-stor
 function makeSnapshot(query: string): AccountSearchSnapshot {
   return {
     query,
-    items: [
-      { account: { id: 'a', acct: 'a' } as Account, matchingPosts: [] },
-    ],
+    items: [{ account: { id: 'a', acct: 'a' } as Account, matchingPosts: [] }],
     relationships: {},
     expanded: [],
     facets: [],
