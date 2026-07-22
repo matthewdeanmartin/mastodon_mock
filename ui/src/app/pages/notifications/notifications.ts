@@ -11,6 +11,7 @@ import { AccountListDialog, AccountListMode } from '../../account-list-dialog/ac
 import { AccountResultCard } from '../search/account-result-card';
 import { AccountWithMatches } from '../search/account-refine';
 import { PageDiagnostics } from '../../page-diagnostics';
+import { Auth } from '../../auth';
 
 type NotifAudience = 'all' | 'friends' | 'followers';
 type NotificationView = 'notifications' | 'new-accounts';
@@ -20,6 +21,48 @@ export interface NewAccountCandidate {
   relationship: Relationship;
   notification: MastodonNotification;
   notificationCount: number;
+}
+
+function normalizedAccountUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    parsed.search = '';
+    return parsed.toString().replace(/\/$/, '').toLocaleLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Compare two accounts as identities from the current Mastodon server. */
+export function isSameAccount(candidate: Account, self: Account | null): boolean {
+  if (!self) return false;
+  if (candidate.id && self.id && candidate.id === self.id) return true;
+
+  const candidateUrl = normalizedAccountUrl(candidate.url);
+  const selfUrl = normalizedAccountUrl(self.url);
+  if (candidateUrl && selfUrl && candidateUrl === selfUrl) return true;
+
+  const candidateAcct = candidate.acct.replace(/^@/, '').toLocaleLowerCase();
+  const selfAcct = self.acct.replace(/^@/, '').toLocaleLowerCase();
+  if (candidateAcct.includes('@') && selfAcct.includes('@')) return candidateAcct === selfAcct;
+
+  // Mastodon commonly returns the current account's acct as just "alice" but
+  // notification actors as "alice@example.social". Qualify the local form
+  // from its profile URL before comparing.
+  const candidateHost = candidateUrl ? new URL(candidateUrl).host : null;
+  const selfHost = selfUrl ? new URL(selfUrl).host : null;
+  const qualifiedCandidate = candidateAcct.includes('@')
+    ? candidateAcct
+    : candidateHost
+      ? `${candidate.username.toLocaleLowerCase()}@${candidateHost}`
+      : candidateAcct;
+  const qualifiedSelf = selfAcct.includes('@')
+    ? selfAcct
+    : selfHost
+      ? `${self.username.toLocaleLowerCase()}@${selfHost}`
+      : selfAcct;
+  return qualifiedCandidate === qualifiedSelf;
 }
 
 /** Collapse buckets only once they outgrow this many distinct people. */
@@ -105,12 +148,14 @@ export function accountsNewToMe(
   notifications: MastodonNotification[],
   relationships: ReadonlyMap<string, Relationship>,
   dismissed: ReadonlySet<string> = new Set(),
+  self: Account | null = null,
 ): NewAccountCandidate[] {
   const candidates = new Map<string, NewAccountCandidate>();
   for (const notification of notifications) {
     const id = notification.account.id;
     const relationship = relationships.get(id);
     if (
+      isSameAccount(notification.account, self) ||
       !relationship ||
       relationship.following ||
       relationship.requested ||
@@ -146,6 +191,7 @@ export class Notifications implements OnInit, OnDestroy {
   private streaming = inject(Streaming);
   private prefs = inject(ClientPrefs);
   private diagnostics = inject(PageDiagnostics);
+  private auth = inject(Auth);
 
   /** Media thumbnails respect the feed-wide images on/off preference. */
   protected showImages = this.prefs.showImages;
@@ -195,7 +241,7 @@ export class Notifications implements OnInit, OnDestroy {
 
   /** Notification actors the viewer has not followed, deduped to one profile row each. */
   protected newAccounts = computed(() =>
-    accountsNewToMe(this.items(), this.rels(), this.dismissedAccounts()),
+    accountsNewToMe(this.items(), this.rels(), this.dismissedAccounts(), this.auth.account()),
   );
 
   /** The "who favourited / who boosted" dialog opened from a group row. */
@@ -209,6 +255,7 @@ export class Notifications implements OnInit, OnDestroy {
       const missing = [
         ...new Set(
           this.items()
+            .filter((notification) => !isSameAccount(notification.account, this.auth.account()))
             .map((n) => n.account.id)
             .filter((id) => !this.requestedRels.has(id)),
         ),

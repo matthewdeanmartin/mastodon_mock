@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Account, MastodonNotification, Relationship, Status } from '../../models';
 import { Streaming } from '../../streaming';
 import { FakeStreaming } from '../../testing/fake-streaming';
-import { accountsNewToMe, groupNotifications, Notifications } from './notifications';
+import { accountsNewToMe, groupNotifications, isSameAccount, Notifications } from './notifications';
 
 interface NotificationsInternals {
   items: Signal<MastodonNotification[]>;
@@ -252,6 +252,38 @@ describe('Notifications', () => {
 
     expect(candidates.map((candidate) => candidate.account.id)).toEqual(['new']);
     expect(candidates[0].notificationCount).toBe(2);
+  });
+
+  it('excludes the signed-in account from Accounts New to Me', () => {
+    const self = makeAccount('self');
+    self.username = 'demodemoson';
+    self.acct = 'demodemoson';
+    self.url = 'https://mastodon.social/@demodemoson';
+    const notification = makeNotification('self-notification', 'favourite');
+    notification.account = {
+      ...self,
+      id: 'alternate-self-representation',
+      acct: 'demodemoson@mastodon.social',
+    };
+    const relationships = new Map([
+      [notification.account.id, relationship(notification.account.id)],
+    ]);
+
+    expect(isSameAccount(notification.account, self)).toBe(true);
+    expect(accountsNewToMe([notification], relationships, new Set(), self)).toEqual([]);
+  });
+
+  it('does not confuse the same username on another server with the signed-in account', () => {
+    const self = makeAccount('self');
+    self.username = 'demodemoson';
+    self.acct = 'demodemoson@mastodon.social';
+    self.url = 'https://mastodon.social/@demodemoson';
+    const other = makeAccount('other');
+    other.username = 'demodemoson';
+    other.acct = 'demodemoson@other.social';
+    other.url = 'https://other.social/@demodemoson';
+
+    expect(isSameAccount(other, self)).toBe(false);
   });
 
   describe('groupNotifications', () => {
