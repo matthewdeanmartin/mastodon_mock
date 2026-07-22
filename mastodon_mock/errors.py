@@ -14,12 +14,13 @@ detail="message")``; the handler owns the wire shape.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ExceptionHandler
 
 
 def error_body(detail: Any) -> dict[str, Any]:
@@ -84,5 +85,5 @@ async def _validation_exception_handler(request: Request, exc: RequestValidation
 
 def install_error_handlers(app: FastAPI) -> None:
     """Register the Mastodon-envelope handlers on ``app``."""
-    app.add_exception_handler(StarletteHTTPException, _http_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(RequestValidationError, _validation_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(StarletteHTTPException, cast(ExceptionHandler, _http_exception_handler))
+    app.add_exception_handler(RequestValidationError, cast(ExceptionHandler, _validation_exception_handler))

@@ -200,7 +200,7 @@ def _relationship_rows(db: DbSession, account_id: int, kind: str) -> list[tuple[
             .join(Relationship, Relationship.target_account_id == Account.id)
             .where(Relationship.source_account_id == account_id, flag.is_(True))
             .order_by(Account.username)
-        ).all()
+        ).tuples().all()
     )
 
 
