@@ -298,9 +298,34 @@ export class AnonymousMastodonProvider implements FeedProvider {
   }
 
   private fetchSource(source: SourceCursor): Observable<Status[]> {
-    return this.fetchApi(source, source.follow.readRef, 'read-api').pipe(
+    return this.fetchPreferredApi(source).pipe(
       catchError(() => this.fetchCanonicalApi(source)),
       catchError(() => this.fetchRss(source)),
+    );
+  }
+
+  /**
+   * Read through the server Anonymous currently selected. Account ids are local to
+   * an instance, so a reference learned elsewhere (including a compiled Starter
+   * Collection id) must first be resolved into the selected server's namespace.
+   */
+  private fetchPreferredApi(source: SourceCursor): Observable<Status[]> {
+    const selectedServer = this.anonymous.server();
+    const storedRef = source.follow.readRef;
+    if (host(storedRef.server) === host(selectedServer) && storedRef.accountId) {
+      return this.fetchApi(source, storedRef, 'read-api');
+    }
+    if (this.followStore.routeDeferred(source.follow, 'read-api')) {
+      return throwError(() => new Error('Selected-server public API is temporarily deferred.'));
+    }
+    return this.lookupAccountOn(selectedServer, source.follow.handle).pipe(
+      mergeMap((account) =>
+        this.fetchApi(source, { server: selectedServer, accountId: account.id }, 'read-api'),
+      ),
+      catchError((error: unknown) => {
+        this.followStore.markRouteFailure(source.follow.key, 'read-api');
+        return throwError(() => error);
+      }),
     );
   }
 
@@ -344,6 +369,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
         source.maxId = statuses.at(-1)?.id ?? source.maxId;
         if (statuses.length < PAGE_SIZE) source.exhausted = true;
         this.followStore.markApiSuccess(source.follow.key, ref);
+        source.follow = { ...source.follow, readRef: ref };
         return statuses.map((status) => adaptAnonymousStatus(status, ref.server));
       }),
       catchError((error: unknown) => {
@@ -413,5 +439,25 @@ export class AnonymousMastodonProvider implements FeedProvider {
         context: externalFetch(),
       })
       .pipe(timeout(REQUEST_TIMEOUT_MS));
+  }
+
+  private lookupAccountOn(server: string, handle: string): Observable<Account> {
+    const normalized = handle.replace(/^@/, '').toLowerCase();
+    const params = new HttpParams().set('q', handle).set('type', 'accounts').set('limit', '5');
+    return this.http
+      .get<{ accounts: Account[] }>(`${server}/api/v2/search`, {
+        params,
+        context: externalFetch(),
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((results) => {
+          const account =
+            results.accounts.find((candidate) => candidate.acct.toLowerCase() === normalized) ??
+            results.accounts[0];
+          if (!account) throw new Error(`Could not resolve @${handle} through ${server}.`);
+          return account;
+        }),
+      );
   }
 }

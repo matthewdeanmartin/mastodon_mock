@@ -94,6 +94,49 @@ describe('AnonymousMastodonProvider', () => {
     expect(received[0].account.acct).toBe('alice@social.example');
   });
 
+  it('resolves Starter-style canonical ids through the selected anonymous server', () => {
+    const target = {
+      ...account('alice', 'https://blocked-home.example', 'canonical-id'),
+      acct: 'alice@blocked-home.example',
+    };
+    const follows = TestBed.inject(AnonymousFollows);
+    // A compiled Starter snapshot naturally knows the canonical server and id.
+    follows.follow(target, 'https://blocked-home.example');
+    const provider = TestBed.inject(AnonymousMastodonProvider);
+    provider.reset();
+    let received: Status[] = [];
+
+    provider.fetchPage().subscribe((items) => (received = items));
+
+    const lookup = httpMock.expectOne(
+      (request) => request.url === 'https://mastodon.social/api/v2/search',
+    );
+    expect(lookup.request.params.get('q')).toBe('alice@blocked-home.example');
+    expect(lookup.request.params.get('type')).toBe('accounts');
+    lookup.flush({
+      accounts: [
+        {
+          ...target,
+          id: 'selected-server-id',
+        },
+      ],
+      statuses: [],
+      hashtags: [],
+    });
+    httpMock
+      .expectOne(
+        'https://mastodon.social/api/v1/accounts/selected-server-id/statuses?limit=20&exclude_replies=true',
+      )
+      .flush([status(target)]);
+
+    httpMock.expectNone((request) => request.url.includes('blocked-home.example'));
+    expect(received).toHaveLength(1);
+    expect(follows.follows()[0].readRef).toEqual({
+      server: 'https://mastodon.social',
+      accountId: 'selected-server-id',
+    });
+  });
+
   it('streams a growing snapshot as each source lands, not one batch at the end', () => {
     const follows = TestBed.inject(AnonymousFollows);
     follows.follow(account('alice', 'https://one.example', 'a-copy'), 'https://mastodon.social');
