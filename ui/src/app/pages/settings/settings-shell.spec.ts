@@ -38,10 +38,22 @@ describe('SettingsShell', () => {
 
     expect(labels).toEqual([
       'Public profile',
+      'Server',
       'Mockingbird Blue',
       'Connections',
       'Appearance',
       'Local storage',
     ]);
+  });
+
+  it('does not show anonymous server settings for a signed-in account', () => {
+    TestBed.inject(Auth).setToken('signed-in-token');
+    const fixture = TestBed.createComponent(SettingsShell);
+    fixture.detectChanges();
+    const labels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.settings-nav a span:first-child'),
+    ).map((node) => node.textContent?.trim());
+
+    expect(labels).not.toContain('Server');
   });
 });

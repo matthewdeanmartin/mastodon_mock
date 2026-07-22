@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { adminGuard } from './admin/admin.guard';
 import { anonymousUnavailableGuard } from './providers/anonymous/anonymous-route.guard';
+import { anonymousOnlyGuard } from './providers/anonymous/anonymous-only.guard';
 // Mock-only routes; file-replaced with an empty list in the Mocking Bird build.
 import { mockOnlyChildren } from './mock-routes';
 
@@ -68,6 +69,13 @@ export const routes: Routes = [
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/profile/settings-profile').then((m) => m.SettingsProfile),
+          },
+          {
+            path: 'server',
+            canActivate: [anonymousOnlyGuard],
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/server/settings-server').then((m) => m.SettingsServer),
           },
           {
             path: 'blue',

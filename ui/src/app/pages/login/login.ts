@@ -11,6 +11,7 @@ import { normalizeHostUrl } from '../../host-url';
 import { environment } from '../../../environments/environment';
 import { brandLogoSrc } from '../../build-flavor';
 import { AppFooter } from '../../shell/app-footer/app-footer';
+import { ServerDiscovery } from '../../server-discovery/server-discovery';
 
 const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
 
@@ -34,7 +35,7 @@ type ServerStatus = 'idle' | 'checking' | 'ok' | 'unreachable';
 
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, RouterLink, AppFooter],
+  imports: [FormsModule, RouterLink, AppFooter, ServerDiscovery],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
@@ -166,8 +167,8 @@ export class Login implements OnInit, OnDestroy {
   }
 
   /** Enter the real application as the one browser-local Anonymous account. */
-  continueAnonymously(): void {
-    const selected = this.server.baseUrl() || 'https://mastodon.social';
+  continueAnonymously(discoveredServer?: string): void {
+    const selected = discoveredServer || this.server.baseUrl() || 'https://mastodon.social';
     this.auth.enterAnonymous(selected);
     void this.router.navigateByUrl('/home');
   }

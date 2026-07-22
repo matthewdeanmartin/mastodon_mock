@@ -52,11 +52,11 @@
     @if (tab() === 'signin') {
       <!-- ---------- Server combo: pick a common one or type your own ---------- -->
       <p class="muted small">
-              Not sure which server?
-              <a href="https://joinmastodon.org/servers" target="_blank" rel="noopener">
-                Browse the full directory on joinmastodon.org ↗
-              </a>
-            </p>
+        Not sure which server?
+        <a href="https://joinmastodon.org/servers" target="_blank" rel="noopener">
+          Browse the full directory on joinmastodon.org ↗
+        </a>
+      </p>
       <div class="server-row">
         <label class="server-label muted" for="server-combo">Your server</label>
         <div class="server-combo">
@@ -123,7 +123,12 @@
               }
             }
             @case ('unreachable') {
-              ⚠ Can't reach {{ customServer() }} — check the address.
+              <span class="server-warning">
+                ⚠ Can’t reach {{ customServer() }}. The server may be offline or blocked.
+                <button class="text-button" type="button" (click)="applyServerNow()">
+                  Try again
+                </button>
+              </span>
             }
             @default {
               Talking to
@@ -245,8 +250,8 @@
               Create an account on {{ serverHostLabel() }} →
             </a>
             <p class="muted small">
-              Sign-up happens on the server itself — Mocking Bird will not get your
-              email or password. We'll help you bookmark us so you can come back and sign in.
+              Sign-up happens on the server itself — Mocking Bird will not get your email or
+              password. We'll help you bookmark us so you can come back and sign in.
             </p>
           }
         </section>
@@ -254,12 +259,23 @@
         <!-- Path 3: local-only Anonymous account, kept visually secondary. -->
         <section class="path anonymous-option" aria-labelledby="anonymous-heading">
           <h2 id="anonymous-heading">Browse anonymously</h2>
-          <button class="btn btn-outline" type="button" (click)="continueAnonymously()">
+          <button
+            class="btn btn-outline"
+            type="button"
+            [disabled]="serverStatus() === 'unreachable'"
+            (click)="continueAnonymously()"
+          >
             Continue anonymously
           </button>
           <p class="muted small">
-            Try it out without any account at all, using the {{ anonymousServerHostLabel() }}.
+            Try it without an account, using {{ anonymousServerHostLabel() }} for public data.
           </p>
+          <p class="anonymous-finder-label">Or let us find a working public server:</p>
+          <app-server-discovery
+            startLabel="Find a working server"
+            [currentServer]="server.baseUrl()"
+            (selected)="continueAnonymously($event)"
+          />
         </section>
       </div>
     }

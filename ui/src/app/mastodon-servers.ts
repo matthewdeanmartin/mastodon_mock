@@ -15,6 +15,8 @@ export interface ServerSuggestion {
 
 /** joinmastodon's public, CORS-open index (Access-Control-Allow-Origin: *). */
 const SERVERS_URL = 'https://api.joinmastodon.org/servers';
+/** A complete point-in-time copy of the same directory, shipped with the client. */
+const BUNDLED_SERVERS_URL = 'mastodon-servers.json';
 
 const CACHE_KEY = 'mastodon_mock_server_index';
 /** Re-fetch the index at most weekly — it barely changes and the payload is ~200KB. */
@@ -44,38 +46,101 @@ export class MastodonServers {
   readonly servers = signal<ServerSuggestion[]>(this.readCache());
   /** True while a network fetch is in flight (for a subtle "loading suggestions" hint). */
   readonly loading = signal(false);
+  /** Where the currently-visible directory came from. */
+  readonly source = signal<'cache' | 'bundled' | 'live'>(
+    this.servers().length ? 'cache' : 'bundled',
+  );
+
+  private loadingPromise: Promise<void> | null = null;
+  private bundledPromise: Promise<void> | null = null;
 
   /**
    * Ensure we have a reasonably fresh index. Serves the cache immediately (already loaded
    * into the signal) and only hits the network when the cache is missing or stale. Failures
    * are swallowed — a stale or empty list still lets the user type a domain by hand.
    */
-  ensureLoaded(): void {
-    if (this.loading()) {
-      return;
+  ensureLoaded(): Promise<void> {
+    if (this.loadingPromise) {
+      return this.loadingPromise;
     }
     if (this.servers().length && this.cacheIsFresh()) {
-      return;
+      return Promise.resolve();
     }
     this.loading.set(true);
-    fetch(SERVERS_URL, { signal: AbortSignal.timeout(8000) })
-      .then((res) => (res.ok ? (res.json() as Promise<RawServer[]>) : Promise.reject()))
-      .then((raw) => {
-        const trimmed = raw
-          .filter((s) => s.domain)
-          .map<ServerSuggestion>((s) => ({
-            domain: s.domain,
-            description: (s.description ?? '').replace(/\s+/g, ' ').trim(),
-            category: s.category ?? '',
-            users: s.total_users ?? 0,
-          }));
+    this.loadingPromise = this.loadDirectory().finally(() => {
+      this.loading.set(false);
+      this.loadingPromise = null;
+    });
+    return this.loadingPromise;
+  }
+
+  /** Wait only until some usable directory is available; a blocked live refresh stays background work. */
+  async ready(): Promise<void> {
+    const complete = this.ensureLoaded();
+    if (this.servers().length) {
+      return;
+    }
+    if (this.bundledPromise) {
+      await this.bundledPromise;
+    }
+    if (!this.servers().length) {
+      await complete;
+    }
+  }
+
+  private async loadDirectory(): Promise<void> {
+    // Start both reads together. Callers that only need candidates can await ready(), which
+    // returns as soon as the same-origin snapshot arrives instead of waiting on a blocked API.
+    this.bundledPromise = this.servers().length ? Promise.resolve() : this.loadBundled();
+    await Promise.all([this.bundledPromise, this.refreshLive()]);
+  }
+
+  private async loadBundled(): Promise<void> {
+    try {
+      const bundledUrl = new URL(BUNDLED_SERVERS_URL, document.baseURI).toString();
+      const response = await fetch(bundledUrl);
+      if (response.ok && !this.servers().length) {
+        this.servers.set(this.trim((await response.json()) as RawServer[]));
+        this.source.set('bundled');
+      }
+    } catch {
+      // A live refresh remains available if the static asset cannot be read.
+    }
+  }
+
+  private async refreshLive(): Promise<void> {
+    try {
+      const response = await fetch(SERVERS_URL, { signal: AbortSignal.timeout(8000) });
+      if (response.ok) {
+        const trimmed = this.trim((await response.json()) as RawServer[]);
         this.servers.set(trimmed);
+        this.source.set('live');
         this.writeCache(trimmed);
-      })
-      .catch(() => {
-        // Offline, blocked, or timed out: keep whatever we already had.
-      })
-      .finally(() => this.loading.set(false));
+      }
+    } catch {
+      // Blocked, offline, or timed out: the bundled snapshot (or stale cache) is the fallback.
+    }
+  }
+
+  private trim(raw: RawServer[]): ServerSuggestion[] {
+    return raw
+      .filter((server) => server.domain)
+      .map((server) => ({
+        domain: server.domain,
+        description: (server.description ?? '').replace(/\s+/g, ' ').trim(),
+        category: server.category ?? '',
+        users: server.total_users ?? 0,
+      }));
+  }
+
+  /** Every directory entry in a fresh random order, optionally excluding known hosts. */
+  shuffled(excluded: ReadonlySet<string> = new Set()): ServerSuggestion[] {
+    const result = this.servers().filter((server) => !excluded.has(server.domain.toLowerCase()));
+    for (let index = result.length - 1; index > 0; index -= 1) {
+      const other = Math.floor(Math.random() * (index + 1));
+      [result[index], result[other]] = [result[other], result[index]];
+    }
+    return result;
   }
 
   /**
@@ -86,7 +151,10 @@ export class MastodonServers {
    */
   search(query: string, limit = 7): ServerSuggestion[] {
     const all = this.servers();
-    const q = query.trim().toLowerCase().replace(/^https?:\/\//, '');
+    const q = query
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '');
     if (!q) {
       return [...all].sort((a, b) => b.users - a.users).slice(0, limit);
     }

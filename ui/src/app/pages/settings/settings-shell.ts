@@ -13,6 +13,8 @@ interface SettingsNavItem {
   mockOnly?: boolean;
   /** Safe and useful for the one browser-local Anonymous account. */
   anonymous?: boolean;
+  /** Meaningful only for the browser-local Anonymous account. */
+  anonymousOnly?: boolean;
 }
 
 /**
@@ -38,6 +40,7 @@ export class SettingsShell {
 
   protected readonly nav: SettingsNavItem[] = [
     { label: 'Public profile', path: 'profile', exact: true, anonymous: true },
+    { label: 'Server', path: 'server', exact: true, anonymous: true, anonymousOnly: true },
     // Client-side premium-style features; the same controls also live in Appearance.
     { label: 'Mockingbird Blue', path: 'blue', exact: true, anonymous: true },
     // Client-side (localStorage): RSS feeds now, Bluesky next. Works anywhere.
@@ -60,6 +63,8 @@ export class SettingsShell {
     { label: 'Development', path: 'development', exact: true, mockOnly: true },
   ].filter(
     (item) =>
-      (environment.mockTooling || !item.mockOnly) && (!this.auth.isAnonymous || item.anonymous),
+      (environment.mockTooling || !item.mockOnly) &&
+      (!this.auth.isAnonymous || item.anonymous) &&
+      (this.auth.isAnonymous || !item.anonymousOnly),
   );
 }

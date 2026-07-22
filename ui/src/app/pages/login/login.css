@@ -132,6 +132,15 @@
   min-height: 1.2em;
 }
 
+.server-warning .text-button {
+  border: 0;
+  padding: 0 3px;
+  background: none;
+  color: var(--accent);
+  font-size: inherit;
+  font-weight: 700;
+}
+
 /* --- Three ways in: columns on desktop, stacked on narrow screens --- */
 .paths {
   display: grid;
@@ -274,6 +283,12 @@ app-app-footer {
 
 .anonymous-option .btn {
   margin-top: 8px;
+}
+
+.anonymous-finder-label {
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .tabs {

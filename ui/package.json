@@ -11,7 +11,8 @@
     "test:ci": "ng test --no-watch --coverage",
     "lint": "ng lint ui --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,html,css,scss}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\""
+    "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\"",
+    "servers:snapshot": "node scripts/update-server-snapshot.mjs"
   },
   "private": true,
   "packageManager": "npm@11.17.0",

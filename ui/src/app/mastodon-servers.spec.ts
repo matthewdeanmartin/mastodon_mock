@@ -27,10 +27,18 @@ describe('MastodonServers', () => {
   });
 
   function mockFetchOnce(data: unknown, ok = true): void {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok, json: () => Promise.resolve(data) }),
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok, json: () => Promise.resolve(data) }));
+  }
+
+  function mockDirectoryFetch(live: unknown, bundled: unknown = RAW): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(url.includes('api.joinmastodon.org') ? live : bundled),
+      }),
     );
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
   }
 
   it('ensureLoaded fetches, trims whitespace, and caches to localStorage', async () => {
@@ -68,9 +76,36 @@ describe('MastodonServers', () => {
   });
 
   it('swallows fetch failures and keeps any existing list', async () => {
-    mockFetchOnce(RAW, false); // not ok -> rejected internally
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     svc.ensureLoaded();
     await vi.waitFor(() => expect(svc.loading()).toBe(false));
     expect(svc.servers()).toEqual([]);
+  });
+
+  it('uses the bundled directory when the live API is blocked', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('api.joinmastodon.org')) {
+        return Promise.reject(new Error('blocked'));
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(RAW) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await svc.ensureLoaded();
+
+    expect(svc.servers()).toHaveLength(3);
+    expect(svc.source()).toBe('bundled');
+  });
+
+  it('returns all unexcluded servers in discovery order', async () => {
+    mockDirectoryFetch(RAW);
+    await svc.ensureLoaded();
+
+    const candidates = svc.shuffled(new Set(['mastodon.social']));
+
+    expect(candidates.map((server) => server.domain).sort()).toEqual([
+      'fosstodon.org',
+      'tiny.example',
+    ]);
   });
 });
