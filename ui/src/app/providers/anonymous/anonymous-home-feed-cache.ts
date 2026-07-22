@@ -2,7 +2,7 @@ import { computed, Injectable, signal } from '@angular/core';
 import { Status } from '../../models';
 
 const STORAGE_KEY = 'mockingbird_anonymous_home_feed';
-const STATE_VERSION = 2;
+const STATE_VERSION = 3;
 const CACHE_LIMIT = 500;
 
 interface AnonymousHomeFeedState {

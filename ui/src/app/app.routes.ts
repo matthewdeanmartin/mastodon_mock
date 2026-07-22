@@ -78,6 +78,15 @@ export const routes: Routes = [
               import('./pages/settings/server/settings-server').then((m) => m.SettingsServer),
           },
           {
+            path: 'anonymous',
+            canActivate: [anonymousOnlyGuard],
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/anonymous/settings-anonymous').then(
+                (m) => m.SettingsAnonymous,
+              ),
+          },
+          {
             path: 'blue',
             data: { preloadSettings: true },
             loadComponent: () =>

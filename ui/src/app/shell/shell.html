@@ -114,9 +114,11 @@
           }
           <a routerLink="/observability">Observability</a>
           <a routerLink="/about">Design</a>
-          <a href="https://mawkingbird.com/canary/" target="_blank" rel="noopener noreferrer"
-            >Canary ↗</a
-          >
+          @if (!isCanary) {
+            <a href="https://mawkingbird.com/canary/" target="_blank" rel="noopener noreferrer"
+              >Canary ↗</a
+            >
+          }
           @if (serverAbout.hasRules()) {
             <a routerLink="/server-rules">Server rules</a>
           }

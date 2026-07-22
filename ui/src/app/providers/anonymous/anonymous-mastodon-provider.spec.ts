@@ -7,6 +7,7 @@ import { Account, Status } from '../../models';
 import { AnonymousFollows } from './anonymous-follows';
 import { AnonymousMastodonProvider } from './anonymous-mastodon-provider';
 import { AnonymousTags } from './anonymous-tags';
+import { AnonymousPreferences } from './anonymous-preferences';
 
 function account(username: string, server: string, id = '1'): Account {
   return {
@@ -291,6 +292,38 @@ describe('AnonymousMastodonProvider', () => {
 
     expect(received).toHaveLength(1);
     expect(received[0].provider).toBe('anonymous-mastodon');
+  });
+
+  it('age-filters followed-account posts without filtering followed hashtags', () => {
+    const target = account('alice', 'https://mastodon.social', 'alice-id');
+    TestBed.inject(AnonymousFollows).follow(target, 'https://mastodon.social');
+    TestBed.inject(AnonymousTags).follow('history');
+    TestBed.inject(AnonymousPreferences).setFollowedPostMaxAgeDays(30);
+    const provider = TestBed.inject(AnonymousMastodonProvider);
+    provider.reset();
+    let received: Status[] = [];
+
+    provider.fetchPage().subscribe((items) => (received = items));
+
+    const recent = { ...status(target, 'recent'), created_at: new Date().toISOString() };
+    const oldFollow = { ...status(target, 'old-follow'), created_at: '2000-01-01T00:00:00Z' };
+    httpMock
+      .expectOne(
+        'https://mastodon.social/api/v1/accounts/alice-id/statuses?limit=20&exclude_replies=true',
+      )
+      .flush([recent, oldFollow]);
+    const oldTag = {
+      ...status(account('historian', 'https://mastodon.social'), 'old-tag'),
+      created_at: '2000-01-01T00:00:00Z',
+    };
+    httpMock
+      .expectOne('https://mastodon.social/api/v1/timelines/tag/history?limit=20')
+      .flush([oldTag]);
+
+    expect(received.map((item) => item.id)).toEqual([
+      'anonymous-mastodon:mastodon.social:recent',
+      'anonymous-mastodon:mastodon.social:old-tag',
+    ]);
   });
 
   it('keeps per-follow cursors in an independent list session and pages only on demand', () => {

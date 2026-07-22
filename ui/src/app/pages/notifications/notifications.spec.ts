@@ -177,6 +177,12 @@ describe('Notifications', () => {
       '/statuses/post-1',
     );
     expect(element.textContent).toContain('Block account');
+    const cardBodyChildren = [
+      ...element.querySelector<HTMLElement>('.acct-body')!.children,
+    ] as HTMLElement[];
+    expect(cardBodyChildren.indexOf(element.querySelector('.acct-reason')!)).toBeLessThan(
+      cardBodyChildren.indexOf(element.querySelector('.acct-bio')!),
+    );
 
     [...element.querySelectorAll<HTMLButtonElement>('.acct-danger-panel button')]
       .find((button) => button.textContent?.trim() === '1 day')!

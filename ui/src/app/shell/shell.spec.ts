@@ -121,4 +121,15 @@ describe('Shell account switching', () => {
       expect(fixture.nativeElement.querySelector('.profile-stats')?.textContent).toContain('Posts');
     },
   );
+
+  it('hides the Canary destination from the More menu on the Canary build', () => {
+    const fixture = createShell();
+    const component = fixture.componentInstance as unknown as { isCanary: boolean };
+    component.isCanary = true;
+    fixture.detectChanges();
+    drainRailRequests();
+
+    const links = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a')];
+    expect(links.some((link) => link.textContent?.includes('Canary'))).toBe(false);
+  });
 });

@@ -41,6 +41,7 @@ export class SettingsShell {
   protected readonly nav: SettingsNavItem[] = [
     { label: 'Public profile', path: 'profile', exact: true, anonymous: true },
     { label: 'Server', path: 'server', exact: true, anonymous: true, anonymousOnly: true },
+    { label: 'Anonymous', path: 'anonymous', exact: true, anonymous: true, anonymousOnly: true },
     // Client-side premium-style features; the same controls also live in Appearance.
     { label: 'Mockingbird Blue', path: 'blue', exact: true, anonymous: true },
     // Client-side (localStorage): RSS feeds now, Bluesky next. Works anywhere.

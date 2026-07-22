@@ -64,7 +64,7 @@ describe('AnonymousHomeFeedCache', () => {
     localStorage.setItem(
       'mockingbird_anonymous_home_feed',
       JSON.stringify({
-        version: 2,
+        version: 3,
         statuses: [valid, missingAcct, badFilter],
         populatedAt: '2026-07-22T00:00:00.000Z',
         sourceKey: 'sources',

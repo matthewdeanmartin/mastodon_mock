@@ -35,10 +35,6 @@
         }
       </div>
 
-      @if (a.note) {
-        <div class="acct-bio" [innerHTML]="a.note"></div>
-      }
-
       @if (reason(); as why) {
         <div class="acct-reason small">
           <span class="muted">Why you’re seeing this:</span>
@@ -48,6 +44,10 @@
             <span>{{ why }}</span>
           }
         </div>
+      }
+
+      @if (a.note) {
+        <div class="acct-bio" [innerHTML]="a.note"></div>
       }
 
       <div class="acct-stats muted small">

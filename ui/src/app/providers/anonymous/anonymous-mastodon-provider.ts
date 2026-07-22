@@ -25,6 +25,7 @@ import { feedToStatuses } from '../rss/rss-adapter';
 import { AnonymousAccount } from './anonymous-account';
 import { AnonymousTags } from './anonymous-tags';
 import { externalFetch } from '../external-fetch';
+import { AnonymousPreferences } from './anonymous-preferences';
 
 const PAGE_SIZE = 20;
 const MAX_CONCURRENCY = 4;
@@ -106,6 +107,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
   private auth = inject(Auth);
   private followStore = inject(AnonymousFollows);
   private tagStore = inject(AnonymousTags);
+  private preferences = inject(AnonymousPreferences);
   private anonymous = inject(AnonymousAccount);
   private rss = inject(RssFetch);
 
@@ -137,7 +139,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
         .map((source) => ({
           label: `@${source.follow.handle}`,
           cursor: source,
-          fetch: () => this.fetchSource(source),
+          fetch: () => this.fetchHomeFollowSource(source),
         })),
       ...this.tagCursors
         .filter((source) => !source.exhausted)
@@ -202,7 +204,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
         .map((source) => ({
           label: `@${source.follow.handle}`,
           cursor: source,
-          fetch: () => this.fetchSource(source),
+          fetch: () => this.fetchHomeFollowSource(source),
         })),
       ...this.tagCursors
         .filter((source) => !source.exhausted)
@@ -302,6 +304,21 @@ export class AnonymousMastodonProvider implements FeedProvider {
     return this.fetchPreferredApi(source).pipe(
       catchError(() => this.fetchCanonicalApi(source)),
       catchError(() => this.fetchRss(source)),
+    );
+  }
+
+  /** Home-only age gate for followed accounts; hashtag timelines remain untouched. */
+  private fetchHomeFollowSource(source: SourceCursor): Observable<Status[]> {
+    return this.fetchSource(source).pipe(
+      map((statuses) => {
+        const allowed = statuses.filter((status) =>
+          this.preferences.allowsFollowedPost(status.created_at),
+        );
+        // Account timelines are newest-first. Once this page crosses the age
+        // boundary, every subsequent page can only be older.
+        if (allowed.length !== statuses.length) source.exhausted = true;
+        return allowed;
+      }),
     );
   }
 

@@ -39,6 +39,7 @@ describe('SettingsShell', () => {
     expect(labels).toEqual([
       'Public profile',
       'Server',
+      'Anonymous',
       'Mockingbird Blue',
       'Connections',
       'Appearance',
