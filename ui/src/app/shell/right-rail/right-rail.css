@@ -83,6 +83,13 @@
   font-size: 12px;
 }
 
+.share-server {
+  display: inline-flex;
+  width: auto;
+  margin-top: 9px;
+  text-decoration: none;
+}
+
 /*
  * House-ad cards. Deliberately NOT named .ad-anything: EasyList-style ad-blocker
  * cosmetic filters hide elements with generic ad classes (.ad-card, .ad-body,

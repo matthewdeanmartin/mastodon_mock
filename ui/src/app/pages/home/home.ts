@@ -81,6 +81,9 @@ export class Home implements OnInit, OnDestroy {
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
   protected live = signal(false);
+  /** Home timeline presentation filters, matching the profile-feed controls. */
+  protected showBoosts = signal(true);
+  protected showReplies = signal(false);
   /** True while auto-loading pages to reach the configured minimum feed size. */
   protected autoLoading = signal(false);
 
@@ -111,16 +114,30 @@ export class Home implements OnInit, OnDestroy {
     if (this.eliza.following()) {
       injected.push(...this.eliza.timeline(this.now()));
     }
-    if (!injected.length) {
-      return feed;
-    }
+    if (!injected.length) return this.applyTimelineFilters(feed);
     // Drop any real feed item colliding with an injected synthetic id.
     const injectedIds = new Set(injected.map((s) => s.id));
     const base = feed.filter((s) => !injectedIds.has(s.id) && !isElizaId(s.id));
-    return [...injected, ...base].sort(
-      (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+    return this.applyTimelineFilters(
+      [...injected, ...base].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)),
     );
   });
+
+  protected toggleBoosts(): void {
+    this.showBoosts.update((show) => !show);
+  }
+
+  protected toggleReplies(): void {
+    this.showReplies.update((show) => !show);
+  }
+
+  private applyTimelineFilters(statuses: Status[]): Status[] {
+    return statuses.filter(
+      (status) =>
+        (this.showBoosts() || status.reblog === null) &&
+        (this.showReplies() || status.in_reply_to_id === null),
+    );
+  }
 
   /** True while the max-feed cap is in force (hit, and within the cooldown). */
   protected capActive = computed(() => {

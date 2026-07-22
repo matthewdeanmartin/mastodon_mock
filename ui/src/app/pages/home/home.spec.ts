@@ -21,9 +21,13 @@ interface HomeInternals {
   autoLoading: Signal<boolean>;
   capActive: Signal<boolean>;
   canLoadMore: Signal<boolean>;
+  showBoosts: WritableSignal<boolean>;
+  showReplies: WritableSignal<boolean>;
   eliza: { follow(): void; unfollow(): void };
   toggleLive(): void;
   loadMore(): void;
+  toggleBoosts(): void;
+  toggleReplies(): void;
 }
 
 function internals(fixture: ComponentFixture<Home>): HomeInternals {
@@ -104,6 +108,34 @@ describe('Home', () => {
       'load:first-page-empty',
       expect.objectContaining({ received: 0, stored: 0, visible: 0 }),
     );
+  });
+
+  it('toggles retweets and replies in the home feed', () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    const original = makeStatus('original');
+    const retweet = { ...makeStatus('retweet'), reblog: makeStatus('boosted') };
+    const reply = { ...makeStatus('reply'), in_reply_to_id: 'parent' };
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([original, retweet, reply]);
+
+    expect(
+      internals(fixture)
+        .visible()
+        .map((status) => status.id),
+    ).toEqual(['original', 'retweet']);
+    internals(fixture).toggleReplies();
+    expect(
+      internals(fixture)
+        .visible()
+        .map((status) => status.id),
+    ).toEqual(['original', 'retweet', 'reply']);
+    internals(fixture).toggleBoosts();
+    expect(
+      internals(fixture)
+        .visible()
+        .map((status) => status.id),
+    ).toEqual(['original', 'reply']);
   });
 
   it('reuses a populated Anonymous feed until the user explicitly refreshes', () => {

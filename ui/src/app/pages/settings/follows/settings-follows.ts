@@ -6,7 +6,7 @@ import { Auth } from '../../../auth';
 import { AnonymousFollow, AnonymousFollows } from '../../../providers/anonymous/anonymous-follows';
 import { anonymousAccountRouteRef } from '../../../providers/anonymous/anonymous-route-ref';
 
-/** Follows and followers: pending follow requests. */
+/** Approve or reject pending follow requests. */
 @Component({
   selector: 'app-settings-follows',
   imports: [RouterLink],

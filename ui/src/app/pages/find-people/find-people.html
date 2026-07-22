@@ -3,7 +3,8 @@
 }
 <p class="muted">
   Your home timeline is built from the people you follow — with too few, Mastodon feels empty.
-  Import a follow list below, or browse a directory to find interesting accounts.
+  Browse a directory to find interesting accounts, or
+  <a routerLink="/settings/import-export">import a follow list</a> in Settings.
 </p>
 
 @if (embedded() && hasNoFollows()) {
@@ -16,93 +17,6 @@
     <span class="starter-pack-arrow" aria-hidden="true">→</span>
   </a>
 }
-
-<section class="card">
-  <h2 class="card-title">Import a follow list</h2>
-  <div class="card-body">
-    <p class="muted small">
-      Paste <code>&#64;user&#64;host</code> handles or profile URLs (one per line), or upload a
-      Mastodon CSV export (Settings → Import and export → <code>following_accounts.csv</code> on
-      your old server). Everything runs in your browser: each account is looked up and followed one
-      at a time.
-    </p>
-    <textarea
-      rows="6"
-      [ngModel]="pasted()"
-      (ngModelChange)="pasted.set($event)"
-      placeholder="@Gargron@mastodon.social&#10;https://fosstodon.org/@someone&#10;…"
-      [disabled]="importer.running()"
-    ></textarea>
-    <div class="import-actions">
-      <label class="btn btn-outline file-btn">
-        Upload CSV…
-        <input type="file" accept=".csv,.txt" (change)="onFile($event)" hidden />
-      </label>
-      <button
-        class="btn btn-outline"
-        [disabled]="!pasted().trim() || importer.running()"
-        (click)="preview()"
-      >
-        Preview
-      </button>
-      @if (importer.rows().length && !importer.running()) {
-        <button class="btn" (click)="start()">Follow all ({{ importer.rows().length }})</button>
-      }
-      @if (importer.running()) {
-        <button class="btn btn-outline" (click)="importer.stop()">Stop</button>
-      }
-      @if (pasted() || importer.rows().length) {
-        <button class="link" (click)="clear()">clear</button>
-      }
-    </div>
-    @if (fileName(); as name) {
-      <p class="muted small">
-        Loaded <code>{{ name }}</code>
-      </p>
-    }
-    @if (parseNote(); as note) {
-      <p class="muted small">{{ note }}</p>
-    }
-
-    @if (importer.rows().length) {
-      @if (importer.running() || doneCount()) {
-        <div
-          class="progress-track"
-          role="progressbar"
-          [attr.aria-valuenow]="doneCount()"
-          [attr.aria-valuemin]="0"
-          [attr.aria-valuemax]="importer.rows().length"
-        >
-          <div
-            class="progress-fill"
-            [style.width.%]="(doneCount() / importer.rows().length) * 100"
-          ></div>
-        </div>
-        <p class="muted small">
-          {{ doneCount() }} / {{ importer.rows().length }} processed ·
-          {{ followedCount() }} followed
-        </p>
-      }
-      <ul class="import-rows">
-        @for (row of importer.rows(); track row.handle) {
-          <li class="import-row" [class]="'row-' + row.status">
-            @if (row.account; as acc) {
-              <a [routerLink]="['/accounts', acc.id]">
-                {{ acc.display_name || acc.username }}
-                <span class="muted">&#64;{{ acc.acct }}</span>
-              </a>
-            } @else {
-              <span>&#64;{{ row.handle }}</span>
-            }
-            <span class="row-status muted" [title]="row.error || ''">
-              {{ statusLabel(row.status) }}
-            </span>
-          </li>
-        }
-      </ul>
-    }
-  </div>
-</section>
 
 <section class="card">
   <h2 class="card-title">Browse directories</h2>

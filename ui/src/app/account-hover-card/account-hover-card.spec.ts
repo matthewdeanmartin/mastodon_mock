@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Account } from '../models';
 import { AccountHoverCard } from './account-hover-card';
@@ -43,9 +43,32 @@ describe('AccountHoverCard', () => {
     expect(stats).toContain('321');
   });
 
-  it('is info-only: renders no buttons or links', () => {
+  it('shows a follow action without eagerly fetching the relationship', () => {
     const el = render(ACCOUNT);
-    expect(el.querySelectorAll('button, a')).toHaveLength(0);
+    expect(el.querySelector('button')?.textContent).toContain('Follow');
+    TestBed.inject(HttpTestingController).expectNone('/api/v1/accounts/relationships');
+  });
+
+  it('uses Request and Requested for an approval-only account', () => {
+    const fixture = TestBed.createComponent(AccountHoverCard);
+    fixture.componentRef.setInput('account', { ...ACCOUNT, locked: true });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('button')?.textContent).toContain('Request');
+
+    el.querySelector('.hover-card')?.dispatchEvent(new MouseEvent('mouseenter'));
+    const httpMock = TestBed.inject(HttpTestingController);
+    httpMock
+      .expectOne('/api/v1/accounts/relationships?id%5B%5D=42')
+      .flush([{ id: '42', following: false, requested: false }]);
+    fixture.detectChanges();
+    (el.querySelector('button') as HTMLButtonElement).click();
+    httpMock
+      .expectOne('/api/v1/accounts/42/follow')
+      .flush({ id: '42', following: false, requested: true });
+    fixture.detectChanges();
+
+    expect(el.querySelector('button')?.textContent).toContain('Requested');
   });
 
   it('omits the bio block when the account has no note', () => {

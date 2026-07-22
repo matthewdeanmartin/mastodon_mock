@@ -52,6 +52,12 @@ export class RightRail {
     return host ? `https://${host}/about` : '/about';
   });
 
+  /** Shareable entry point that opens Mawkingbird anonymously on this instance. */
+  protected anonymousShareUrl = computed<string>(() => {
+    const host = this.homeHost();
+    return host ? `/anonymous?${encodeURIComponent(host)}` : '/anonymous';
+  });
+
   constructor() {
     // Runs on init and again when the user switches accounts or instances, so
     // the server-info block and donate link don't go stale mid-session.

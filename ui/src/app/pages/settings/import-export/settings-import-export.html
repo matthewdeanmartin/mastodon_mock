@@ -1,82 +1,190 @@
 <div class="spage-head">
-  <h1>Import and export</h1>
-  <p>Move your social graph in and out of this server as CSV files.</p>
+  <h1>Import/Export</h1>
+  <p>Move your friends between Mastodon accounts with a portable CSV file.</p>
 </div>
 
 <div class="spage-body">
-  <div class="ssection">
-    <div class="srow">
-      <span class="slabel">Follows</span>
-      <div class="scontrol">
-        <button type="button" class="btn btn-outline btn-sm" (click)="download('following')">
-          Download CSV
+  <section class="friend-section">
+    <h2>Import Friends</h2>
+    <p class="muted small">
+      Paste <code>&#64;user&#64;host</code> handles or profile URLs, one per line, or upload a
+      Mastodon <code>following_accounts.csv</code>. Each account is looked up and followed one at a
+      time.
+    </p>
+    <textarea
+      rows="6"
+      [ngModel]="pasted()"
+      (ngModelChange)="pasted.set($event)"
+      placeholder="@Gargron@mastodon.social&#10;https://fosstodon.org/@someone&#10;…"
+      [disabled]="importer.running()"
+    ></textarea>
+    <div class="import-actions">
+      <label class="btn btn-outline file-btn">
+        Upload CSV…
+        <input type="file" accept=".csv,.txt" (change)="onFriendFile($event)" hidden />
+      </label>
+      <button
+        type="button"
+        class="btn btn-outline"
+        [disabled]="!pasted().trim() || importer.running()"
+        (click)="previewFriends()"
+      >
+        Preview
+      </button>
+      @if (importer.rows().length && !importer.running()) {
+        <button type="button" class="btn" (click)="startImport()">
+          Follow all ({{ importer.rows().length }})
         </button>
-      </div>
+      }
+      @if (importer.running()) {
+        <button type="button" class="btn btn-outline" (click)="importer.stop()">Stop</button>
+      }
+      @if (pasted() || importer.rows().length) {
+        <button type="button" class="link" (click)="clearImport()">clear</button>
+      }
     </div>
-    <div class="srow">
-      <span class="slabel">Mutes</span>
-      <div class="scontrol">
-        <button type="button" class="btn btn-outline btn-sm" (click)="download('mutes')">
-          Download CSV
-        </button>
-      </div>
-    </div>
-    <div class="srow">
-      <span class="slabel">Blocks</span>
-      <div class="scontrol">
-        <button type="button" class="btn btn-outline btn-sm" (click)="download('blocks')">
-          Download CSV
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div class="ssection">
-    <div class="srow">
-      <span class="slabel">Import type</span>
-      <div class="scontrol">
-        <select
-          [ngModel]="importKind()"
-          (ngModelChange)="importKind.set($event)"
-          name="import_kind"
+    @if (fileName(); as name) {
+      <p class="muted small">
+        Loaded <code>{{ name }}</code>
+      </p>
+    }
+    @if (parseNote(); as note) {
+      <p class="muted small">{{ note }}</p>
+    }
+    @if (importer.rows().length) {
+      @if (importer.running() || doneCount()) {
+        <div
+          class="progress-track"
+          role="progressbar"
+          [attr.aria-valuenow]="doneCount()"
+          [attr.aria-valuemin]="0"
+          [attr.aria-valuemax]="importer.rows().length"
         >
-          <option value="following">Following list</option>
-          <option value="mutes">Muting list</option>
-          <option value="blocks">Blocking list</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="srow">
-      <span class="slabel">Data</span>
-      <div class="scontrol">
-        <input type="file" accept=".csv" (change)="onFile($event)" />
-        <textarea
-          rows="4"
-          placeholder="…or paste CSV here"
-          [ngModel]="csvText()"
-          (ngModelChange)="csvText.set($event)"
-          name="csv_text"
-        ></textarea>
-        <span class="hint">One handle per line, e.g. user&#64;example.com.</span>
-      </div>
-    </div>
-
-    <div class="srow">
-      <span class="slabel"></span>
-      <div class="scontrol">
-        <button type="button" class="btn" (click)="upload()" [disabled]="uploading()">
-          {{ uploading() ? 'Uploading…' : 'Upload' }}
-        </button>
-        @if (report(); as r) {
-          <span class="hint">
-            Imported {{ r.imported }}.
-            @if (r.skipped.length) {
-              Skipped: {{ r.skipped.join(', ') }}
+          <div
+            class="progress-fill"
+            [style.width.%]="(doneCount() / importer.rows().length) * 100"
+          ></div>
+        </div>
+        <p class="muted small">
+          {{ doneCount() }} / {{ importer.rows().length }} processed ·
+          {{ followedCount() }} followed
+        </p>
+      }
+      <ul class="import-rows">
+        @for (row of importer.rows(); track row.handle) {
+          <li class="import-row" [class]="'row-' + row.status">
+            @if (row.account; as account) {
+              <a [routerLink]="['/accounts', account.id]">
+                {{ account.display_name || account.username }}
+                <span class="muted">&#64;{{ account.acct }}</span>
+              </a>
+            } @else {
+              <span>&#64;{{ row.handle }}</span>
             }
-          </span>
+            <span class="row-status muted" [title]="row.error || ''">
+              {{ statusLabel(row.status) }}
+            </span>
+          </li>
         }
+      </ul>
+    }
+  </section>
+
+  <section class="friend-section">
+    <h2>Export Friends</h2>
+    <p class="muted small">
+      Fetch every account you follow and download a Mastodon-compatible
+      <code>following_accounts.csv</code> that can be imported above or by another Mastodon server.
+    </p>
+    <button
+      type="button"
+      class="btn btn-outline"
+      [disabled]="exportingFriends()"
+      (click)="exportFriends()"
+    >
+      {{ exportingFriends() ? 'Exporting ' + exportCount() + '…' : 'Export all friends' }}
+    </button>
+    @if (exportError(); as error) {
+      <p class="export-error" role="alert">{{ error }}</p>
+    }
+  </section>
+
+  @if (mockTooling) {
+    <div class="ssection">
+      <h2 class="server-tools-title">Mock server data</h2>
+      <div class="srow">
+        <span class="slabel">Follows</span>
+        <div class="scontrol">
+          <button type="button" class="btn btn-outline btn-sm" (click)="download('following')">
+            Download CSV
+          </button>
+        </div>
+      </div>
+      <div class="srow">
+        <span class="slabel">Mutes</span>
+        <div class="scontrol">
+          <button type="button" class="btn btn-outline btn-sm" (click)="download('mutes')">
+            Download CSV
+          </button>
+        </div>
+      </div>
+      <div class="srow">
+        <span class="slabel">Blocks</span>
+        <div class="scontrol">
+          <button type="button" class="btn btn-outline btn-sm" (click)="download('blocks')">
+            Download CSV
+          </button>
+        </div>
       </div>
     </div>
-  </div>
+
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">Import type</span>
+        <div class="scontrol">
+          <select
+            [ngModel]="importKind()"
+            (ngModelChange)="importKind.set($event)"
+            name="import_kind"
+          >
+            <option value="following">Following list</option>
+            <option value="mutes">Muting list</option>
+            <option value="blocks">Blocking list</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="srow">
+        <span class="slabel">Data</span>
+        <div class="scontrol">
+          <input type="file" accept=".csv" (change)="onServerFile($event)" />
+          <textarea
+            rows="4"
+            placeholder="…or paste CSV here"
+            [ngModel]="csvText()"
+            (ngModelChange)="csvText.set($event)"
+            name="csv_text"
+          ></textarea>
+          <span class="hint">One handle per line, e.g. user&#64;example.com.</span>
+        </div>
+      </div>
+
+      <div class="srow">
+        <span class="slabel"></span>
+        <div class="scontrol">
+          <button type="button" class="btn" (click)="upload()" [disabled]="uploading()">
+            {{ uploading() ? 'Uploading…' : 'Upload' }}
+          </button>
+          @if (report(); as r) {
+            <span class="hint">
+              Imported {{ r.imported }}.
+              @if (r.skipped.length) {
+                Skipped: {{ r.skipped.join(', ') }}
+              }
+            </span>
+          }
+        </div>
+      </div>
+    </div>
+  }
 </div>

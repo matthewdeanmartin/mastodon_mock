@@ -47,11 +47,16 @@
     </a>
   </div>
 
-  @if (instance(); as info) {
+  @if (instance() || homeHost()) {
     <div class="server-info">
-      <p class="server-title">{{ info.title }}</p>
-      <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
-      <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
+      @if (instance(); as info) {
+        <p class="server-title">{{ info.title }}</p>
+        <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
+        <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
+      }
+      <a class="btn btn-outline btn-sm share-server" [href]="anonymousShareUrl()">
+        Share this server
+      </a>
     </div>
   }
 </section>

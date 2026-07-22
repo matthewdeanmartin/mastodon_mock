@@ -1,20 +1,25 @@
-import { Component, input } from '@angular/core';
-import { Account } from '../models';
+import { Component, computed, DestroyRef, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Account, Relationship } from '../models';
+import { Api } from '../api';
+import { Auth } from '../auth';
 import { HumanCountPipe } from '../human-count.pipe';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
+import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
+import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 
 /**
- * Small info-only card shown when hovering an account's avatar or name:
- * bio + post/following/follower counts, no actions. Purely presentational —
+ * Small card shown when hovering an account's avatar or name: bio,
+ * post/following/follower counts, and a relationship-aware follow action.
  * the wrapping element (`.hover-anchor`, see status-card.css) owns the
- * show-on-hover behavior, and the data is the `Account` already embedded in
- * the status, so hovering costs zero requests.
+ * show-on-hover behavior. Account details come from the status; relationship
+ * state is fetched lazily only when the viewer enters the card.
  */
 @Component({
   selector: 'app-account-hover-card',
   imports: [VerifiedBadge, HumanCountPipe],
   template: `
-    <div class="hover-card">
+    <div class="hover-card" (mouseenter)="loadRelationship()">
       <img
         class="hc-avatar"
         [src]="account().avatar_static || account().avatar"
@@ -43,6 +48,17 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
           >
         </div>
       }
+      @if (showFollowButton()) {
+        <button
+          type="button"
+          class="btn btn-sm hc-follow"
+          [class.following]="isFollowingState()"
+          [disabled]="relationshipLoading() || followBusy()"
+          (click)="toggleFollow($event)"
+        >
+          {{ relationshipLoading() || followBusy() ? '…' : followLabel() }}
+        </button>
+      }
     </div>
   `,
   styles: `
@@ -56,8 +72,7 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
       transition:
         opacity 0.12s ease,
         visibility 0.12s;
-      /* Info only: never intercept clicks meant for what's underneath. */
-      pointer-events: none;
+      pointer-events: auto;
     }
     .hover-card {
       width: 280px;
@@ -104,10 +119,83 @@ import { VerifiedBadge } from '../verified-badge/verified-badge';
     .hc-stats strong {
       color: var(--text);
     }
+    .hc-follow {
+      width: auto;
+      min-width: 92px;
+      margin-top: 10px;
+    }
   `,
 })
 export class AccountHoverCard {
+  private api = inject(Api);
+  private auth = inject(Auth);
+  private anonymous = inject(AnonymousAccount);
+  private anonymousFollows = inject(AnonymousFollows);
+  private destroyRef = inject(DestroyRef);
+
   readonly account = input.required<Account>();
+  protected relationship = signal<Relationship | null>(null);
+  protected relationshipLoading = signal(false);
+  protected followBusy = signal(false);
+  private relationshipLoadedFor: string | null = null;
+
+  protected showFollowButton = computed(
+    () =>
+      this.account().id !== this.auth.account()?.id &&
+      !!this.account().id &&
+      !this.account().id.includes(':'),
+  );
+  protected isFollowingState = computed(
+    () => !!this.relationship()?.following || !!this.relationship()?.requested,
+  );
+  protected followLabel = computed(() => {
+    const relationship = this.relationship();
+    if (relationship?.requested) return 'Requested';
+    if (relationship?.following) return 'Following';
+    return this.account().locked ? 'Request' : 'Follow';
+  });
+
+  protected loadRelationship(): void {
+    const account = this.account();
+    if (!this.showFollowButton() || this.relationshipLoadedFor === account.id) return;
+    this.relationshipLoadedFor = account.id;
+    if (this.auth.isAnonymous) {
+      this.relationship.set(this.anonymousFollows.relationship(account, this.anonymous.server()));
+      return;
+    }
+    this.relationshipLoading.set(true);
+    this.api
+      .relationships([account.id])
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (relationships) => this.relationship.set(relationships[0] ?? null),
+        error: () => this.relationshipLoading.set(false),
+        complete: () => this.relationshipLoading.set(false),
+      });
+  }
+
+  protected toggleFollow(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.relationshipLoading() || this.followBusy()) return;
+    const account = this.account();
+    if (this.auth.isAnonymous) {
+      const relationship = this.isFollowingState()
+        ? this.anonymousFollows.unfollow(account, this.anonymous.server())
+        : this.anonymousFollows.follow(account, this.anonymous.server()).relationship;
+      this.relationship.set(relationship);
+      return;
+    }
+    this.followBusy.set(true);
+    const request = this.isFollowingState()
+      ? this.api.unfollow(account.id)
+      : this.api.follow(account.id);
+    request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (relationship) => this.relationship.set(relationship),
+      error: () => this.followBusy.set(false),
+      complete: () => this.followBusy.set(false),
+    });
+  }
 
   /**
    * Foreign accounts (e.g. Bluesky, id `bsky:did:…`) carry no counts — the

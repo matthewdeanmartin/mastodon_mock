@@ -140,7 +140,7 @@ export const routes: Routes = [
           {
             path: 'follows',
             canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Follows and followers settings', preloadSettings: true },
+            data: { anonymousFeature: 'Follow request approval', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/follows/settings-follows').then((m) => m.SettingsFollows),
           },
@@ -204,7 +204,7 @@ export const routes: Routes = [
           {
             path: 'import-export',
             canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Import and export', preloadSettings: true },
+            data: { anonymousFeature: 'Import/Export', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/import-export/settings-import-export').then(
                 (m) => m.SettingsImportExport,

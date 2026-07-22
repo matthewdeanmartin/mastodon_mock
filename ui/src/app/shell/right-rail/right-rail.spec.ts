@@ -11,6 +11,7 @@ import { RightRail } from './right-rail';
 interface RightRailInternals {
   homeHost: () => string | null;
   donateServerUrl: () => string;
+  anonymousShareUrl: () => string;
 }
 
 function internals(fixture: ComponentFixture<RightRail>): RightRailInternals {
@@ -46,6 +47,7 @@ describe('RightRail', () => {
 
     expect(internals(fixture).homeHost()).toBe('elekk.xyz');
     expect(internals(fixture).donateServerUrl()).toBe('https://elekk.xyz/about');
+    expect(internals(fixture).anonymousShareUrl()).toBe('/anonymous?elekk.xyz');
   });
 
   it('falls back to the connected instance for local accts', () => {
@@ -69,6 +71,7 @@ describe('RightRail', () => {
     );
     expect(hrefs).toContain('https://elekk.xyz/about');
     expect(hrefs).toContain('https://joinmastodon.org/sponsors');
+    expect(hrefs).toContain('/anonymous?elekk.xyz');
 
     // House-ad *content* is editorial and changes freely — assert structure, not
     // specific URLs: three cards, each linking out over https.

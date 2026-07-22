@@ -24,6 +24,8 @@ describe('SettingsShell', () => {
     expect(labels).toContain('Public profile');
     expect(labels).toContain('Filters');
     expect(labels).toContain('Muted accounts');
+    expect(labels).toContain('Approve follow requests');
+    expect(labels).toContain('Import/Export');
     // Mock build shows the _mock-backed pages too.
     expect(labels).toContain('Invite people');
   });

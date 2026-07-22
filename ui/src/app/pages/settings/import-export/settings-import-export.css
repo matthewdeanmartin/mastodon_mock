@@ -1,0 +1,96 @@
+.friend-section {
+  padding: 18px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.friend-section h2,
+.server-tools-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.friend-section textarea {
+  width: 100%;
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-btn {
+  display: inline-block;
+  cursor: pointer;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.progress-track {
+  height: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.import-rows {
+  max-height: 320px;
+  margin: 10px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.import-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.row-status {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.row-followed .row-status {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.row-failed .row-status,
+.row-not_found .row-status,
+.export-error {
+  color: var(--danger, #e0245e);
+}
+
+.server-tools-title {
+  padding: 16px 16px 4px;
+}

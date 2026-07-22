@@ -64,6 +64,9 @@ describe('SettingsFollows', () => {
   it('loads pending follow requests', () => {
     const fixture = setUp([makeAccount('1'), makeAccount('2')]);
     expect(internals(fixture).requests().length).toBe(2);
+    expect((fixture.nativeElement as HTMLElement).querySelector('h1')?.textContent).toContain(
+      'Approve follow requests',
+    );
   });
 
   it('accepting a request removes the row', () => {
