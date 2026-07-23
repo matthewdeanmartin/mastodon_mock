@@ -8,12 +8,14 @@ import { BlueskySession, BskySession } from '../../../providers/bluesky/bluesky-
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 import { SettingsConnections } from './settings-connections';
+import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 
 /** Expose the protected signals — ngModel writes are async in specs. */
 interface ConnectionsInternals {
   feedUrl: WritableSignal<string>;
   bskyHandle: WritableSignal<string>;
   bskyPassword: WritableSignal<string>;
+  raindropToken: WritableSignal<string>;
 }
 
 describe('SettingsConnections', () => {
@@ -180,5 +182,21 @@ describe('SettingsConnections', () => {
 
     [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Unlink'))!.click();
     expect(bskySession.unlink).toHaveBeenCalled();
+  });
+
+  it('connects Raindrop.io with a browser-compatible Test token', () => {
+    const fixture = setUp();
+    const component = fixture.componentInstance as unknown as ConnectionsInternals;
+    component.raindropToken.set('test-token');
+    fixture.detectChanges();
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLFormElement>('form.raindrop-form')!
+      .dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(TestBed.inject(RaindropSession).connected()).toBe(true);
+    expect(localStorage.getItem('mockingbird_raindrop_token')).toContain('test-token');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Connected');
   });
 });

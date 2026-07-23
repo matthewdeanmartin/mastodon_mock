@@ -30,11 +30,6 @@ export const routes: Routes = [
       import('./pages/dropbox-callback/dropbox-callback').then((m) => m.DropboxCallback),
   },
   {
-    path: 'raindrop',
-    loadComponent: () =>
-      import('./pages/raindrop-callback/raindrop-callback').then((m) => m.RaindropCallback),
-  },
-  {
     path: 'fail-whale',
     loadComponent: () =>
       import('./pages/fail-whale-demo/fail-whale-demo').then((m) => m.FailWhaleDemo),

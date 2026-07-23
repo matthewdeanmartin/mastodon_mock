@@ -95,27 +95,19 @@
     instance are skipped.
   </p>
   <ol class="setup-steps muted small">
-    <li>Create an app in Raindrop.io's App Management Console.</li>
-    <li>
-      Set its OAuth redirect URI to the exact callback shown below. The address is specific to this
-      deployment: local <code>/_ui/</code>, canary <code>/canary/</code>, and production each have a
-      different callback.
-    </li>
-    <li>Paste that app's client ID and client secret below, then choose “Save and connect”.</li>
+    <li>Create or open an app in Raindrop.io's App Management Console.</li>
+    <li>Copy the <strong>Test token</strong> shown in that app's settings.</li>
+    <li>Paste the Test token below and choose “Save connection”.</li>
   </ol>
-  <div class="redirect-row">
-    <code class="redirect-url">{{ raindropRedirectUrl }}</code>
-    <button class="btn btn-outline btn-sm" type="button" (click)="copyRaindropRedirect()">
-      Copy callback URL
-    </button>
-  </div>
   <p class="muted small">
-    Raindrop.io requires an exact match. If you test another deployment, register its displayed
-    callback there and use credentials for that app.
+    Client ID/secret OAuth is intentionally not used here: Raindrop's OAuth token exchange does not
+    permit browser CORS. Their Test token is the supported shortcut when an app only accesses its
+    owner's account; bookmark API calls still go directly from this browser to Raindrop.io.
   </p>
   <p class="credential-warning small">
-    Your client ID, client secret, and OAuth tokens are stored in this browser's localStorage. Only
-    use this on a device and browser profile you trust.
+    The Test token grants access to your Raindrop.io account and is stored in this browser's
+    localStorage. Only use this on a device and browser profile you trust. You can replace the token
+    in Raindrop.io to revoke access.
   </p>
 
   @if (raindrop.connected()) {
@@ -124,41 +116,21 @@
       <button class="btn btn-outline" type="button" (click)="disconnectRaindrop()">
         Disconnect
       </button>
-      <button class="btn btn-outline" type="button" (click)="forgetRaindrop()">
-        Forget credentials
-      </button>
     </div>
   } @else {
     <form class="raindrop-form" (ngSubmit)="connectRaindrop()">
       <input
-        type="text"
-        name="raindropClientId"
-        placeholder="Client ID"
-        autocomplete="off"
-        [ngModel]="raindropClientId()"
-        (ngModelChange)="raindropClientId.set($event)"
-      />
-      <input
         type="password"
-        name="raindropClientSecret"
-        placeholder="Client secret"
+        name="raindropToken"
+        placeholder="Raindrop.io Test token"
         autocomplete="off"
-        [ngModel]="raindropClientSecret()"
-        (ngModelChange)="raindropClientSecret.set($event)"
+        [ngModel]="raindropToken()"
+        (ngModelChange)="raindropToken.set($event)"
       />
-      <button
-        class="btn"
-        type="submit"
-        [disabled]="!raindropClientId().trim() || !raindropClientSecret()"
-      >
-        Save and connect
+      <button class="btn" type="submit" [disabled]="!raindropToken().trim()">
+        Save connection
       </button>
     </form>
-    @if (raindrop.configured) {
-      <button class="btn btn-outline btn-sm" type="button" (click)="forgetRaindrop()">
-        Forget saved credentials
-      </button>
-    }
   }
   @if (raindropNotice(); as msg) {
     <p class="connection-ok" role="status">{{ msg }}</p>

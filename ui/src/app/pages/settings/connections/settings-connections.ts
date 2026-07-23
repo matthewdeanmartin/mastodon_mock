@@ -7,7 +7,7 @@ import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
 import { DropboxEntry, DropboxSession } from '../../../providers/dropbox/dropbox-session';
-import { raindropRedirectUrl, RaindropSession } from '../../../providers/raindrop/raindrop-session';
+import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 
 /**
  * Connections: the other places your people post. Mastodon is home; everything
@@ -45,9 +45,7 @@ export class SettingsConnections implements OnInit {
   protected dropboxNotice = signal<string | null>(null);
   protected dropboxEntries = signal<DropboxEntry[] | null>(null);
 
-  protected raindropClientId = signal(this.raindrop.credentials()?.clientId ?? '');
-  protected raindropClientSecret = signal(this.raindrop.credentials()?.clientSecret ?? '');
-  protected readonly raindropRedirectUrl = raindropRedirectUrl();
+  protected raindropToken = signal('');
   protected raindropError = signal<string | null>(null);
   protected raindropNotice = signal<string | null>(null);
 
@@ -63,51 +61,23 @@ export class SettingsConnections implements OnInit {
     if (result) {
       void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
     }
-
-    const raindropResult = this.route.snapshot.queryParamMap.get('raindrop');
-    if (raindropResult === 'connected') {
-      this.raindropNotice.set('Raindrop.io connected. Bookmark buttons now offer both providers.');
-    } else if (raindropResult === 'error') {
-      this.raindropError.set(
-        this.route.snapshot.queryParamMap.get('message') ?? 'Raindrop.io authorization failed.',
-      );
-    }
-    if (raindropResult) {
-      void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
-    }
   }
 
   connectRaindrop(): void {
     this.raindropError.set(null);
     this.raindropNotice.set(null);
     try {
-      this.raindrop.saveCredentials(this.raindropClientId(), this.raindropClientSecret());
-      this.raindrop.connect();
+      this.raindrop.connect(this.raindropToken());
+      this.raindropToken.set('');
+      this.raindropNotice.set('Raindrop.io connected. Bookmark buttons now offer both providers.');
     } catch (error: unknown) {
-      this.raindropError.set(describeError(error, "Couldn't start Raindrop.io authorization."));
+      this.raindropError.set(describeError(error, "Couldn't connect Raindrop.io."));
     }
   }
 
   disconnectRaindrop(): void {
     this.raindrop.disconnect();
     this.raindropNotice.set(null);
-  }
-
-  forgetRaindrop(): void {
-    this.raindrop.disconnect(true);
-    this.raindropClientId.set('');
-    this.raindropClientSecret.set('');
-    this.raindropNotice.set(null);
-  }
-
-  async copyRaindropRedirect(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(this.raindropRedirectUrl);
-      this.raindropNotice.set('Callback URL copied.');
-      this.raindropError.set(null);
-    } catch {
-      this.raindropError.set('Select and copy the callback URL manually.');
-    }
   }
 
   async connectDropbox(): Promise<void> {

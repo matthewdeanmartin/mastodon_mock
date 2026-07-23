@@ -122,23 +122,6 @@
   min-width: 180px;
 }
 
-.redirect-url {
-  display: block;
-  flex: 1;
-  min-width: 0;
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: var(--border);
-  overflow-wrap: anywhere;
-}
-
-.redirect-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 10px 0;
-}
-
 .setup-steps {
   padding-left: 20px;
 }

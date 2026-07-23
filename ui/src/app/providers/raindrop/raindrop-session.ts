@@ -1,26 +1,12 @@
 import { Injectable, signal } from '@angular/core';
-import { Status } from '../../models';
 import { scopedKey } from '../../account-scope';
+import { Status } from '../../models';
 
-const CREDENTIALS_KEY_BASE = 'mockingbird_raindrop_credentials';
 const TOKEN_KEY_BASE = 'mockingbird_raindrop_token';
-const STATE_KEY = 'mockingbird_raindrop_oauth_state';
-
-export interface RaindropCredentials {
-  clientId: string;
-  clientSecret: string;
-}
+const LEGACY_CREDENTIALS_KEY_BASE = 'mockingbird_raindrop_credentials';
 
 interface StoredRaindropToken {
   accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-}
-
-interface RaindropTokenResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
 }
 
 interface RaindropErrorResponse {
@@ -30,72 +16,28 @@ interface RaindropErrorResponse {
 
 export type RaindropBookmarkTarget = 'post' | 'external-link';
 
-/** Browser-only Raindrop.io OAuth session and bookmark writer. */
+/** Browser-only Raindrop.io connection using the account's non-expiring Test token. */
 @Injectable({ providedIn: 'root' })
 export class RaindropSession {
-  private readonly credentialsKey = scopedKey(CREDENTIALS_KEY_BASE);
   private readonly tokenKey = scopedKey(TOKEN_KEY_BASE);
-  readonly credentials = signal<RaindropCredentials | null>(
-    readStored<RaindropCredentials>(this.credentialsKey),
-  );
-  private token = signal<StoredRaindropToken | null>(
-    readStored<StoredRaindropToken>(this.tokenKey),
-  );
-  readonly connected = signal(this.hasUsableToken());
+  private readonly legacyCredentialsKey = scopedKey(LEGACY_CREDENTIALS_KEY_BASE);
+  private token = signal<StoredRaindropToken | null>(readToken(this.tokenKey));
+  readonly connected = signal(this.token() !== null);
 
-  get configured(): boolean {
-    const credentials = this.credentials();
-    return !!credentials?.clientId.trim() && !!credentials.clientSecret;
+  constructor() {
+    // Do not retain client secrets saved by the superseded OAuth implementation.
+    localStorage.removeItem(this.legacyCredentialsKey);
   }
 
-  saveCredentials(clientId: string, clientSecret: string): void {
-    const credentials = { clientId: clientId.trim(), clientSecret };
-    if (!credentials.clientId || !credentials.clientSecret) {
-      throw new Error('Enter both the Raindrop.io client ID and client secret.');
+  connect(accessToken: string): void {
+    const trimmed = accessToken.trim();
+    if (!trimmed) {
+      throw new Error('Paste the Test token from your Raindrop.io app settings.');
     }
-    localStorage.setItem(this.credentialsKey, JSON.stringify(credentials));
-    this.credentials.set(credentials);
-  }
-
-  connect(): void {
-    const credentials = this.requireCredentials();
-    const state = randomBase64Url(32);
-    sessionStorage.setItem(STATE_KEY, state);
-    const authorizeUrl = new URL('https://raindrop.io/oauth/authorize');
-    authorizeUrl.search = new URLSearchParams({
-      response_type: 'code',
-      client_id: credentials.clientId,
-      redirect_uri: raindropRedirectUrl(),
-      state,
-    }).toString();
-    location.assign(authorizeUrl.toString());
-  }
-
-  async finishAuthorization(params: URLSearchParams): Promise<void> {
-    const oauthError = params.get('error_description') ?? params.get('error');
-    if (oauthError) {
-      this.clearPendingAuthorization();
-      throw new Error(oauthError);
-    }
-    const code = params.get('code');
-    const state = params.get('state');
-    const expectedState = sessionStorage.getItem(STATE_KEY);
-    if (!code || !state || !expectedState || state !== expectedState) {
-      this.clearPendingAuthorization();
-      throw new Error(
-        'Raindrop.io returned an invalid or expired authorization response. Please try again.',
-      );
-    }
-    try {
-      const result = await this.exchangeToken({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: raindropRedirectUrl(),
-      });
-      this.storeToken(result);
-    } finally {
-      this.clearPendingAuthorization();
-    }
+    const token = { accessToken: trimmed };
+    localStorage.setItem(this.tokenKey, JSON.stringify(token));
+    this.token.set(token);
+    this.connected.set(true);
   }
 
   async addBookmark(
@@ -111,7 +53,10 @@ export class RaindropSession {
           : 'This post does not have a public URL to save.',
       );
     }
-    const accessToken = await this.usableAccessToken();
+    const accessToken = this.token()?.accessToken;
+    if (!accessToken) {
+      throw new Error('Connect Raindrop.io in Settings → Connections first.');
+    }
     const body =
       target === 'external-link'
         ? { link, pleaseParse: {} }
@@ -130,89 +75,17 @@ export class RaindropSession {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      if (response.status === 401) {
-        this.disconnect(false);
-      }
+      if (response.status === 401) this.disconnect();
       throw new Error(await raindropError(response, "Raindrop.io couldn't save that bookmark."));
     }
   }
 
-  disconnect(forgetCredentials = false): void {
+  disconnect(): void {
     localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.legacyCredentialsKey);
     this.token.set(null);
     this.connected.set(false);
-    if (forgetCredentials) {
-      localStorage.removeItem(this.credentialsKey);
-      this.credentials.set(null);
-    }
   }
-
-  private async usableAccessToken(): Promise<string> {
-    const token = this.token();
-    if (!token) {
-      throw new Error('Connect Raindrop.io in Settings → Connections first.');
-    }
-    if (token.expiresAt > Date.now() + 30_000) {
-      return token.accessToken;
-    }
-    const result = await this.exchangeToken({
-      grant_type: 'refresh_token',
-      refresh_token: token.refreshToken,
-    });
-    this.storeToken(result);
-    return result.access_token;
-  }
-
-  private async exchangeToken(fields: Record<string, string>): Promise<RaindropTokenResponse> {
-    const credentials = this.requireCredentials();
-    const response = await fetch('https://raindrop.io/oauth/access_token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...fields,
-        client_id: credentials.clientId,
-        client_secret: credentials.clientSecret,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(
-        await raindropError(response, 'Raindrop.io rejected the authorization request.'),
-      );
-    }
-    return (await response.json()) as RaindropTokenResponse;
-  }
-
-  private storeToken(result: RaindropTokenResponse): void {
-    const token: StoredRaindropToken = {
-      accessToken: result.access_token,
-      refreshToken: result.refresh_token,
-      expiresAt: Date.now() + result.expires_in * 1000,
-    };
-    localStorage.setItem(this.tokenKey, JSON.stringify(token));
-    this.token.set(token);
-    this.connected.set(true);
-  }
-
-  private requireCredentials(): RaindropCredentials {
-    const credentials = this.credentials();
-    if (!credentials?.clientId.trim() || !credentials.clientSecret) {
-      throw new Error('Save your Raindrop.io client ID and client secret first.');
-    }
-    return credentials;
-  }
-
-  private hasUsableToken(): boolean {
-    return !!this.token();
-  }
-
-  private clearPendingAuthorization(): void {
-    sessionStorage.removeItem(STATE_KEY);
-  }
-}
-
-/** OAuth callback for this exact deployment, including sub-paths such as /_ui or /canary. */
-export function raindropRedirectUrl(baseUri = document.baseURI): string {
-  return new URL('raindrop', baseUri).toString();
 }
 
 /** Find the first ordinary web link, skipping hashtags and links back to the viewer's instance. */
@@ -235,9 +108,14 @@ export function firstExternalLink(content: string, instanceUrl: string): string 
   return null;
 }
 
-function readStored<T>(key: string): T | null {
+function readToken(key: string): StoredRaindropToken | null {
   try {
-    return JSON.parse(localStorage.getItem(key) ?? 'null') as T | null;
+    const parsed = JSON.parse(
+      localStorage.getItem(key) ?? 'null',
+    ) as Partial<StoredRaindropToken> | null;
+    return typeof parsed?.accessToken === 'string' && parsed.accessToken
+      ? { accessToken: parsed.accessToken }
+      : null;
   } catch {
     localStorage.removeItem(key);
     return null;
@@ -254,13 +132,6 @@ function safeOrigin(value: string): string | null {
 
 function plainText(html: string): string {
   return new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? '';
-}
-
-function randomBase64Url(byteLength: number): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 async function raindropError(response: Response, fallback: string): Promise<string> {

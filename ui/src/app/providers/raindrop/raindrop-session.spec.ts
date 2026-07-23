@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../../models';
-import { firstExternalLink, raindropRedirectUrl, RaindropSession } from './raindrop-session';
+import { firstExternalLink, RaindropSession } from './raindrop-session';
 
 function status(overrides: Partial<Status> = {}): Status {
   return {
@@ -66,16 +66,6 @@ describe('firstExternalLink', () => {
   });
 });
 
-describe('raindropRedirectUrl', () => {
-  it.each([
-    ['http://localhost:4200/_ui/', 'http://localhost:4200/_ui/raindrop'],
-    ['https://mawkingbird.com/canary/', 'https://mawkingbird.com/canary/raindrop'],
-    ['https://mawkingbird.com/', 'https://mawkingbird.com/raindrop'],
-  ])('keeps the deployment base path in %s', (base, expected) => {
-    expect(raindropRedirectUrl(base)).toBe(expected);
-  });
-});
-
 describe('RaindropSession', () => {
   const originalFetch = globalThis.fetch;
 
@@ -89,50 +79,43 @@ describe('RaindropSession', () => {
     vi.restoreAllMocks();
   });
 
-  it('stores credentials in localStorage and can forget them', () => {
+  it('stores the Test token and removes credentials from the abandoned OAuth flow', () => {
+    localStorage.setItem(
+      'mockingbird_raindrop_credentials',
+      JSON.stringify({ clientId: 'old-id', clientSecret: 'old-secret' }),
+    );
     const session = new RaindropSession();
-    session.saveCredentials(' client-id ', 'client-secret');
-
-    expect(session.credentials()).toEqual({ clientId: 'client-id', clientSecret: 'client-secret' });
-    expect(localStorage.getItem('mockingbird_raindrop_credentials')).toContain('client-secret');
-
-    session.disconnect(true);
-    expect(session.credentials()).toBeNull();
-    expect(localStorage.getItem('mockingbird_raindrop_credentials')).toBeNull();
-  });
-
-  it('exchanges an OAuth code and saves a post with the bearer token', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            access_token: 'access',
-            refresh_token: 'refresh',
-            expires_in: 1200,
-          }),
-          { status: 200 },
-        ),
-      )
-      .mockResolvedValueOnce(new Response(JSON.stringify({ result: true }), { status: 200 }));
-    globalThis.fetch = fetchMock;
-    const session = new RaindropSession();
-    session.saveCredentials('client-id', 'client-secret');
-    sessionStorage.setItem('mockingbird_raindrop_oauth_state', 'expected');
-
-    await session.finishAuthorization(new URLSearchParams({ code: 'code', state: 'expected' }));
-    await session.addBookmark(status(), 'post');
+    session.connect(' test-token ');
 
     expect(session.connected()).toBe(true);
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+    expect(localStorage.getItem('mockingbird_raindrop_token')).toBe(
+      JSON.stringify({ accessToken: 'test-token' }),
+    );
+    expect(localStorage.getItem('mockingbird_raindrop_credentials')).toBeNull();
+
+    session.disconnect();
+    expect(session.connected()).toBe(false);
+    expect(localStorage.getItem('mockingbird_raindrop_token')).toBeNull();
+  });
+
+  it('saves a post directly with the Test token', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ result: true }), { status: 200 }));
+    globalThis.fetch = fetchMock;
+    const session = new RaindropSession();
+    session.connect('test-token');
+
+    await session.addBookmark(status(), 'post');
+
+    expect(fetchMock).toHaveBeenCalledWith(
       'https://api.raindrop.io/rest/v1/raindrop',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer access' }),
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
       }),
     );
-    const request = fetchMock.mock.calls[1][1] as RequestInit;
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(request.body as string)).toMatchObject({
       link: 'https://social.example/@alice/42',
       excerpt: 'Hello article',
@@ -141,16 +124,8 @@ describe('RaindropSession', () => {
 
   it('saves only the unwrapped URL when requested', async () => {
     localStorage.setItem(
-      'mockingbird_raindrop_credentials',
-      JSON.stringify({ clientId: 'client-id', clientSecret: 'client-secret' }),
-    );
-    localStorage.setItem(
       'mockingbird_raindrop_token',
-      JSON.stringify({
-        accessToken: 'access',
-        refreshToken: 'refresh',
-        expiresAt: Date.now() + 60_000,
-      }),
+      JSON.stringify({ accessToken: 'test-token' }),
     );
     const fetchMock = vi
       .fn()
