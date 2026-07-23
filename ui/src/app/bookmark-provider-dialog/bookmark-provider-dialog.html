@@ -1,0 +1,41 @@
+<div class="bookmark-dialog-backdrop">
+  <section
+    class="bookmark-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="bookmark-provider-title"
+  >
+    <div class="bookmark-dialog-head">
+      <h2 id="bookmark-provider-title">Where should this bookmark go?</h2>
+      <button type="button" class="icon-close" aria-label="Close" (click)="closed.emit()">×</button>
+    </div>
+
+    <button type="button" class="provider-choice" (click)="chosen.emit('mastodon')">
+      <span class="choice-icon" aria-hidden="true">🐘</span>
+      <span>
+        <strong>{{ anonymous() ? 'This browser' : 'Mastodon' }}</strong>
+        <small>{{
+          nativeBookmarked() ? 'Remove the native bookmark' : 'Save the native bookmark'
+        }}</small>
+      </span>
+    </button>
+
+    <div class="raindrop-group">
+      <div class="raindrop-label">
+        <span aria-hidden="true">💧</span> <strong>Raindrop.io</strong>
+      </div>
+      <button type="button" class="provider-choice nested" (click)="chosen.emit('raindrop-post')">
+        <span><strong>Save the post</strong><small>Bookmark the post's public URL</small></span>
+      </button>
+      @if (externalUrl(); as url) {
+        <button type="button" class="provider-choice nested" (click)="chosen.emit('raindrop-link')">
+          <span
+            ><strong>Unwrap and save the first link</strong><small>{{ hostname(url) }}</small></span
+          >
+        </button>
+      } @else {
+        <p class="no-link">No external link was found in this post.</p>
+      }
+    </div>
+  </section>
+</div>

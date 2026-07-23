@@ -38,6 +38,12 @@ import { isElizaId } from '../eliza/eliza-identity';
 import { LocalCompose } from '../eliza/local-compose';
 import { ShareDialog } from '../share-dialog/share-dialog';
 import {
+  BookmarkChoice,
+  BookmarkProviderDialog,
+} from '../bookmark-provider-dialog/bookmark-provider-dialog';
+import { firstExternalLink, RaindropSession } from '../providers/raindrop/raindrop-session';
+import { Server } from '../server';
+import {
   anonymousAccountRouteRef,
   anonymousStatusRouteRef,
 } from '../providers/anonymous/anonymous-route-ref';
@@ -113,6 +119,7 @@ function compactContentLinks(content: string, embeddedPostUrl: string | null): s
     NgOptimizedImage,
     LocalCompose,
     ShareDialog,
+    BookmarkProviderDialog,
   ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
@@ -128,6 +135,8 @@ export class StatusCard {
   protected capabilities = inject(AnonymousCapabilities);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   private anonymousPublic = inject(AnonymousPublicApi);
+  private raindrop = inject(RaindropSession);
+  private server = inject(Server);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
@@ -888,6 +897,12 @@ export class StatusCard {
   protected actionBusy = signal(false);
   /** Last fav/boost failure, shown under the actions row until the next attempt. */
   protected actionError = signal<string | null>(null);
+  /** Successful external actions are announced without styling them as failures. */
+  protected actionNotice = signal<string | null>(null);
+  protected showBookmarkProviders = signal(false);
+  protected externalBookmarkUrl = computed(() =>
+    firstExternalLink(this.display.content, this.server.baseUrl()),
+  );
 
   toggleFavourite(event: Event): void {
     event.stopPropagation();
@@ -941,6 +956,42 @@ export class StatusCard {
     if (!this.capabilities.canBookmark) {
       return;
     }
+    if (this.raindrop.connected()) {
+      this.showBookmarkProviders.set(true);
+      return;
+    }
+    this.toggleNativeBookmark();
+  }
+
+  protected chooseBookmark(choice: BookmarkChoice): void {
+    this.showBookmarkProviders.set(false);
+    if (choice === 'mastodon') {
+      this.toggleNativeBookmark();
+      return;
+    }
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    this.actionNotice.set(null);
+    const target = choice === 'raindrop-link' ? 'external-link' : 'post';
+    void this.raindrop
+      .addBookmark(this.display, target, this.externalBookmarkUrl() ?? undefined)
+      .then(() => {
+        this.actionBusy.set(false);
+        this.actionNotice.set(
+          choice === 'raindrop-link'
+            ? 'External link saved to Raindrop.io.'
+            : 'Post saved to Raindrop.io.',
+        );
+      })
+      .catch((error: unknown) => {
+        this.actionBusy.set(false);
+        this.actionError.set(
+          error instanceof Error ? error.message : "Raindrop.io couldn't save that bookmark.",
+        );
+      });
+  }
+
+  private toggleNativeBookmark(): void {
     const s = this.display;
     if (this.auth.isAnonymous) {
       this.changed.emit(this.anonymousBookmarks.toggle(s));

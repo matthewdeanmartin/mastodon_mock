@@ -7,6 +7,10 @@ import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
 import { DropboxEntry, DropboxSession } from '../../../providers/dropbox/dropbox-session';
+import {
+  RAINDROP_REDIRECT_URL,
+  RaindropSession,
+} from '../../../providers/raindrop/raindrop-session';
 
 /**
  * Connections: the other places your people post. Mastodon is home; everything
@@ -25,6 +29,7 @@ export class SettingsConnections implements OnInit {
   protected subs = inject(RssSubscriptions);
   protected bsky = inject(BlueskySession);
   protected dropbox = inject(DropboxSession);
+  protected raindrop = inject(RaindropSession);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -43,6 +48,12 @@ export class SettingsConnections implements OnInit {
   protected dropboxNotice = signal<string | null>(null);
   protected dropboxEntries = signal<DropboxEntry[] | null>(null);
 
+  protected raindropClientId = signal(this.raindrop.credentials()?.clientId ?? '');
+  protected raindropClientSecret = signal(this.raindrop.credentials()?.clientSecret ?? '');
+  protected readonly raindropRedirectUrl = RAINDROP_REDIRECT_URL;
+  protected raindropError = signal<string | null>(null);
+  protected raindropNotice = signal<string | null>(null);
+
   ngOnInit(): void {
     const result = this.route.snapshot.queryParamMap.get('dropbox');
     if (result === 'connected') {
@@ -55,6 +66,41 @@ export class SettingsConnections implements OnInit {
     if (result) {
       void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
     }
+
+    const raindropResult = this.route.snapshot.queryParamMap.get('raindrop');
+    if (raindropResult === 'connected') {
+      this.raindropNotice.set('Raindrop.io connected. Bookmark buttons now offer both providers.');
+    } else if (raindropResult === 'error') {
+      this.raindropError.set(
+        this.route.snapshot.queryParamMap.get('message') ?? 'Raindrop.io authorization failed.',
+      );
+    }
+    if (raindropResult) {
+      void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    }
+  }
+
+  connectRaindrop(): void {
+    this.raindropError.set(null);
+    this.raindropNotice.set(null);
+    try {
+      this.raindrop.saveCredentials(this.raindropClientId(), this.raindropClientSecret());
+      this.raindrop.connect();
+    } catch (error: unknown) {
+      this.raindropError.set(describeError(error, "Couldn't start Raindrop.io authorization."));
+    }
+  }
+
+  disconnectRaindrop(): void {
+    this.raindrop.disconnect();
+    this.raindropNotice.set(null);
+  }
+
+  forgetRaindrop(): void {
+    this.raindrop.disconnect(true);
+    this.raindropClientId.set('');
+    this.raindropClientSecret.set('');
+    this.raindropNotice.set(null);
   }
 
   async connectDropbox(): Promise<void> {

@@ -354,6 +354,7 @@
               class="action"
               [class.on]="bookmarkActive()"
               (click)="toggleBookmark($event)"
+              [disabled]="actionBusy()"
               [title]="bookmarkActive() ? 'Remove bookmark' : 'Bookmark'"
               [attr.aria-pressed]="bookmarkActive()"
             >
@@ -563,6 +564,9 @@
       @if (actionError(); as err) {
         <div class="action-error">{{ err }}</div>
       }
+      @if (actionNotice(); as notice) {
+        <div class="action-notice" role="status">{{ notice }}</div>
+      }
 
       @if (redrafting()) {
         <div class="inline-compose redraft" (click)="$event.stopPropagation()">
@@ -644,5 +648,15 @@
 
   @if (showShare()) {
     <app-share-dialog [status]="display" (closed)="showShare.set(false)" />
+  }
+
+  @if (showBookmarkProviders()) {
+    <app-bookmark-provider-dialog
+      [nativeBookmarked]="bookmarkActive()"
+      [anonymous]="auth.isAnonymous"
+      [externalUrl]="externalBookmarkUrl()"
+      (chosen)="chooseBookmark($event)"
+      (closed)="showBookmarkProviders.set(false)"
+    />
   }
 }

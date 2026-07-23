@@ -443,6 +443,12 @@
   border-top: 1px solid var(--border);
 }
 
+.action-notice {
+  padding: 4px 16px 0;
+  color: #2b8a3e;
+  font-size: 13px;
+}
+
 .redraft-note {
   font-size: 0.85em;
   padding: 4px 16px 0;

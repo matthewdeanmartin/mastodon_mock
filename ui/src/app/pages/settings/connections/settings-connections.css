@@ -108,6 +108,34 @@
   font-size: 13px;
 }
 
+.raindrop-form,
+.raindrop-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.raindrop-form input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.redirect-url {
+  display: inline-block;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow-wrap: anywhere;
+}
+
+.credential-warning {
+  padding: 9px 11px;
+  border-left: 3px solid #d08a00;
+  background: rgb(208 138 0 / 9%);
+}
+
 .dropbox-modal-backdrop {
   position: fixed;
   inset: 0;

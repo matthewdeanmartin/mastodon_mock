@@ -56,9 +56,8 @@
 <section class="conn-section">
   <h2>📦 Dropbox</h2>
   <p class="muted">
-    Connect an app-specific Dropbox folder with OAuth. Authorization and file access happen
-    directly between this browser and Dropbox; Mockingbird never receives a client secret or your
-    files.
+    Connect an app-specific Dropbox folder with OAuth. Authorization and file access happen directly
+    between this browser and Dropbox; Mockingbird never receives a client secret or your files.
   </p>
   @if (!dropbox.configured) {
     <p class="feed-error">
@@ -75,8 +74,7 @@
       </button>
     </div>
     <p class="muted small">
-      This short-lived connection is kept only for this browser session. Reconnect after it
-      expires.
+      This short-lived connection is kept only for this browser session. Reconnect after it expires.
     </p>
   } @else {
     <button class="btn" type="button" (click)="connectDropbox()">Connect Dropbox</button>
@@ -85,6 +83,72 @@
     <p class="connection-ok" role="status">{{ msg }}</p>
   }
   @if (dropboxError(); as msg) {
+    <p class="feed-error" role="alert">{{ msg }}</p>
+  }
+</section>
+
+<section class="conn-section">
+  <h2>💧 Raindrop.io bookmarks</h2>
+  <p class="muted">
+    Add Raindrop.io as a second bookmark provider. When you bookmark a post, you can save the post
+    itself or unwrap it and save its first external link. Hashtags and links back to your Mastodon
+    instance are skipped.
+  </p>
+  <p class="muted small">
+    Create an app in Raindrop.io's App Management Console and register this redirect URL:
+    <code class="redirect-url">{{ raindropRedirectUrl }}</code>
+  </p>
+  <p class="credential-warning small">
+    Your client ID, client secret, and OAuth tokens are stored in this browser's localStorage. Only
+    use this on a device and browser profile you trust.
+  </p>
+
+  @if (raindrop.connected()) {
+    <div class="raindrop-actions">
+      <span class="connection-ok">Connected</span>
+      <button class="btn btn-outline" type="button" (click)="disconnectRaindrop()">
+        Disconnect
+      </button>
+      <button class="btn btn-outline" type="button" (click)="forgetRaindrop()">
+        Forget credentials
+      </button>
+    </div>
+  } @else {
+    <form class="raindrop-form" (ngSubmit)="connectRaindrop()">
+      <input
+        type="text"
+        name="raindropClientId"
+        placeholder="Client ID"
+        autocomplete="off"
+        [ngModel]="raindropClientId()"
+        (ngModelChange)="raindropClientId.set($event)"
+      />
+      <input
+        type="password"
+        name="raindropClientSecret"
+        placeholder="Client secret"
+        autocomplete="off"
+        [ngModel]="raindropClientSecret()"
+        (ngModelChange)="raindropClientSecret.set($event)"
+      />
+      <button
+        class="btn"
+        type="submit"
+        [disabled]="!raindropClientId().trim() || !raindropClientSecret()"
+      >
+        Save and connect
+      </button>
+    </form>
+    @if (raindrop.configured) {
+      <button class="btn btn-outline btn-sm" type="button" (click)="forgetRaindrop()">
+        Forget saved credentials
+      </button>
+    }
+  }
+  @if (raindropNotice(); as msg) {
+    <p class="connection-ok" role="status">{{ msg }}</p>
+  }
+  @if (raindropError(); as msg) {
     <p class="feed-error" role="alert">{{ msg }}</p>
   }
 </section>
@@ -156,7 +220,12 @@
     >
       <div class="dropbox-modal-head">
         <h2 id="dropbox-list-title">Dropbox files and folders</h2>
-        <button class="icon-close" type="button" aria-label="Close" (click)="dropboxEntries.set(null)">
+        <button
+          class="icon-close"
+          type="button"
+          aria-label="Close"
+          (click)="dropboxEntries.set(null)"
+        >
           ×
         </button>
       </div>

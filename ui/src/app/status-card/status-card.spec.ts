@@ -495,6 +495,38 @@ describe('StatusCard', () => {
     req.flush(makeStatus({ id: '8' }));
   });
 
+  it('offers Mastodon and Raindrop choices when the second provider is connected', () => {
+    localStorage.setItem(
+      'mockingbird_raindrop_credentials',
+      JSON.stringify({ clientId: 'client-id', clientSecret: 'client-secret' }),
+    );
+    localStorage.setItem(
+      'mockingbird_raindrop_token',
+      JSON.stringify({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresAt: Date.now() + 60_000,
+      }),
+    );
+    const f = setUp(
+      makeStatus({
+        id: '8',
+        url: 'https://social.example/@alice/8',
+        content: '<p><a href="https://article.example/read">Read it</a></p>',
+      }),
+    );
+
+    f.componentInstance.toggleBookmark(fakeEvent());
+    f.detectChanges();
+
+    const text = (f.nativeElement as HTMLElement).textContent;
+    expect(text).toContain('Where should this bookmark go?');
+    expect(text).toContain('Mastodon');
+    expect(text).toContain('Save the post');
+    expect(text).toContain('article.example');
+    httpMock.expectNone('/api/v1/statuses/8/bookmark');
+  });
+
   // ---------------------------------------------------------------- togglePin
 
   it('togglePin: POSTs to /pin when not pinned', () => {
