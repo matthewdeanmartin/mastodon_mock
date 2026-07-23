@@ -199,3 +199,20 @@
 .confidence-possible {
   background: color-mix(in srgb, #eab308 22%, transparent);
 }
+
+.contact-misses {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.contact-misses strong {
+  font-size: 14px;
+}
+
+.contact-misses span {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.5;
+}

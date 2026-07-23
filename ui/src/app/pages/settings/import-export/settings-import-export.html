@@ -193,7 +193,7 @@
       </p>
       <ol class="contact-rows">
         @for (row of contactDiscovery.rows(); track row.contact.id) {
-          @if (row.status !== 'pending') {
+          @if (row.matches.length || row.status === 'searching' || row.status === 'failed') {
             <li class="contact-row">
               <div class="contact-row-head">
                 <span>
@@ -206,9 +206,6 @@
               </div>
               @if (row.error) {
                 <p class="export-error small" role="alert">{{ row.error }}</p>
-              }
-              @if (row.status === 'complete' && !row.matches.length) {
-                <p class="muted small">No result had a matching clue.</p>
               }
               @if (row.matches.length) {
                 <ul class="contact-matches">
@@ -236,6 +233,12 @@
           }
         }
       </ol>
+      @if (!contactDiscovery.running() && contactMisses().length) {
+        <div class="contact-misses">
+          <strong>{{ contactMisses().length }} searched contacts had no candidate match:</strong>
+          <span class="muted small">{{ contactMisses().join(', ') }}</span>
+        </div>
+      }
     }
   </section>
 

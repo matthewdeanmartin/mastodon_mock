@@ -72,6 +72,12 @@ export class SettingsImportExport {
   protected followedCount = computed(
     () => this.importer.rows().filter((row) => row.status === 'followed').length,
   );
+  protected contactMisses = computed(() =>
+    this.contactDiscovery
+      .rows()
+      .filter((row) => row.status === 'complete' && row.matches.length === 0)
+      .map((row) => row.contact.name),
+  );
 
   protected importKind = signal<CsvKind>('following');
   protected csvText = signal('');
