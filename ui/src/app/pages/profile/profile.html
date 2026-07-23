@@ -79,10 +79,17 @@
           @if (capabilities.canFollow) {
             <button
               class="btn"
-              [class.btn-outline]="relationship()?.following"
+              [class.btn-outline]="relationship()?.following || relationship()?.requested"
+              [disabled]="relationship()?.requested"
               (click)="relationship()?.following ? requestUnfollow() : toggleFollow()"
             >
-              {{ relationship()?.following ? 'Following' : 'Follow' }}
+              {{
+                relationship()?.following
+                  ? 'Following'
+                  : relationship()?.requested
+                    ? 'Requested'
+                    : 'Follow'
+              }}
             </button>
           }
           @if (isEliza() && relationship()?.following) {

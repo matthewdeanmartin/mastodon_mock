@@ -3,7 +3,11 @@ import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
 import { Account, Relationship } from '../../../models';
-import { GitHubFollowedUser, GitHubSession } from '../../../providers/github/github-session';
+import {
+  GitHubFollowedUser,
+  GitHubSession,
+  GitHubStarredRepository,
+} from '../../../providers/github/github-session';
 
 export type GitHubFriendStatus = 'pending' | 'searching' | 'complete' | 'failed';
 export type GitHubFriendConfidence = 'confirmed' | 'probable' | 'candidate';
@@ -24,6 +28,8 @@ export interface GitHubFriendMatch {
 
 export interface GitHubFriendRow {
   profile: GitHubFollowedUser;
+  source?: 'following' | 'starred-owner';
+  starredRepositories?: GitHubStarredRepository[];
   status: GitHubFriendStatus;
   identity: MastodonIdentity | null;
   matches: GitHubFriendMatch[];
@@ -130,9 +136,7 @@ export class GitHubFriendDiscovery {
     this.loadError.set(null);
     this.stopRequested = false;
     this.callCount.set(0);
-    this.linkedLookupCount.set(0);
     this.githubPageCount.set(0);
-    this.relationships.set(new Map());
     this.followBusy.set(new Set());
     this.followErrors.set(new Map());
     try {
@@ -154,18 +158,22 @@ export class GitHubFriendDiscovery {
         }
         cursor = page.endCursor;
       }
-      this.rows.set(
-        profiles.map((profile) => {
+      const starredRows = this.rows().filter((row) => row.source === 'starred-owner');
+      const starredLogins = new Set(starredRows.map((row) => row.profile.login.toLowerCase()));
+      const followedRows = profiles
+        .filter((profile) => !starredLogins.has(profile.login.toLowerCase()))
+        .map((profile) => {
           const identity = profileMastodonIdentity(profile);
           return {
             profile,
+            source: 'following' as const,
             status: 'pending' as const,
             identity,
             matches: [],
           };
-        }),
-      );
-      await this.resolveLinkedRows();
+        });
+      this.rows.set([...starredRows, ...followedRows]);
+      await this.resolveLinkedRows(starredRows.length);
       await this.loadRelationships();
     } catch (error: unknown) {
       this.loadError.set(
@@ -198,11 +206,25 @@ export class GitHubFriendDiscovery {
         const page = await this.github.starredRepositoryOwners(cursor);
         this.starredPageCount.update((count) => count + 1);
         this.starredRepositoryCount.update((count) => count + page.repositoryCount);
-        for (const profile of page.owners) {
+        for (const owner of page.owners) {
+          const profile = owner.profile;
           const login = profile.login.toLowerCase();
-          if (starredOwners.has(login)) continue;
-          starredOwners.add(login);
-          this.starredOwnerCount.update((count) => count + 1);
+          if (!starredOwners.has(login)) {
+            starredOwners.add(login);
+            this.starredOwnerCount.update((count) => count + 1);
+          }
+          const existingIndex = this.rows().findIndex(
+            (row) => row.profile.login.toLowerCase() === login,
+          );
+          if (existingIndex >= 0) {
+            this.patch(existingIndex, {
+              starredRepositories: mergeRepositories(
+                this.rows()[existingIndex].starredRepositories ?? [],
+                owner.repositories,
+              ),
+            });
+            continue;
+          }
           if (seen.has(login)) continue;
           seen.add(login);
           const identity = profileMastodonIdentity(profile);
@@ -210,7 +232,14 @@ export class GitHubFriendDiscovery {
           const rowIndex = this.rows().length;
           this.rows.update((rows) => [
             ...rows,
-            { profile, status: 'pending', identity, matches: [] },
+            {
+              profile,
+              source: 'starred-owner',
+              starredRepositories: owner.repositories,
+              status: 'pending',
+              identity,
+              matches: [],
+            },
           ]);
           await this.resolveLinkedRow(rowIndex);
           await this.loadRelationships();
@@ -330,8 +359,8 @@ export class GitHubFriendDiscovery {
     if (!this.stopRequested && this.delayMs) await delay(this.delayMs);
   }
 
-  private async resolveLinkedRows(): Promise<void> {
-    for (let rowIndex = 0; rowIndex < this.rows().length; rowIndex++) {
+  private async resolveLinkedRows(startIndex = 0): Promise<void> {
+    for (let rowIndex = startIndex; rowIndex < this.rows().length; rowIndex++) {
       if (this.rows()[rowIndex].identity) await this.resolveLinkedRow(rowIndex);
     }
   }
@@ -447,4 +476,19 @@ function normalizeUsername(value: string): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function mergeRepositories(
+  current: readonly GitHubStarredRepository[],
+  incoming: readonly GitHubStarredRepository[],
+): GitHubStarredRepository[] {
+  const seen = new Set(current.map((repository) => repository.url));
+  return [
+    ...current,
+    ...incoming.filter((repository) => {
+      if (seen.has(repository.url)) return false;
+      seen.add(repository.url);
+      return true;
+    }),
+  ];
 }

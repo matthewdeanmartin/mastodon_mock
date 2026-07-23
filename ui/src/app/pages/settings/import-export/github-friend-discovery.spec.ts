@@ -56,6 +56,19 @@ function relationship(id: string, changes: Partial<Relationship> = {}): Relation
   };
 }
 
+function starredOwner(profile: GitHubFollowedUser, repository = `${profile.login}/project`) {
+  return {
+    profile,
+    repositories: [
+      {
+        nameWithOwner: repository,
+        url: `https://github.com/${repository}`,
+        description: `${repository} description`,
+      },
+    ],
+  };
+}
+
 describe('GitHub friend identity evidence', () => {
   it('turns a GitHub social-account Mastodon URL into a confirmed handle', () => {
     const identity = profileMastodonIdentity(
@@ -239,9 +252,15 @@ describe('GitHubFriendDiscovery API budget', () => {
     starredRepositoryOwners
       .mockResolvedValueOnce({
         owners: [
-          githubUser('owner-b', { websiteUrl: 'https://social.example/@owner-b' }),
-          githubUser('owner-a'),
-          githubUser('owner-b', { websiteUrl: 'https://social.example/@owner-b' }),
+          starredOwner(
+            githubUser('owner-b', { websiteUrl: 'https://social.example/@owner-b' }),
+            'owner-b/first',
+          ),
+          starredOwner(githubUser('owner-a')),
+          starredOwner(
+            githubUser('owner-b', { websiteUrl: 'https://social.example/@owner-b' }),
+            'owner-b/second',
+          ),
         ],
         repositoryCount: 3,
         hasNextPage: true,
@@ -249,8 +268,8 @@ describe('GitHubFriendDiscovery API budget', () => {
       })
       .mockResolvedValueOnce({
         owners: [
-          githubUser('existing', { websiteUrl: 'https://social.example/@existing' }),
-          githubUser('owner-c', { websiteUrl: 'https://social.example/@owner-c' }),
+          starredOwner(githubUser('existing', { websiteUrl: 'https://social.example/@existing' })),
+          starredOwner(githubUser('owner-c', { websiteUrl: 'https://social.example/@owner-c' })),
         ],
         repositoryCount: 2,
         hasNextPage: false,
@@ -282,6 +301,10 @@ describe('GitHubFriendDiscovery API budget', () => {
       'existing',
       'owner-b',
       'owner-c',
+    ]);
+    expect(discovery.rows()[1].starredRepositories?.map((repo) => repo.nameWithOwner)).toEqual([
+      'owner-b/first',
+      'owner-b/second',
     ]);
     expect(search.mock.calls.map(([query]) => query)).toEqual([
       'owner-b@social.example',
@@ -326,5 +349,45 @@ describe('GitHubFriendDiscovery API budget', () => {
       'first',
       'confirmed-second',
     ]);
+  });
+
+  it('keeps starred-owner matches when GitHub follows are loaded afterward', async () => {
+    starredRepositoryOwners.mockResolvedValue({
+      owners: [
+        starredOwner(
+          githubUser('star-owner', { websiteUrl: 'https://social.example/@star-owner' }),
+        ),
+      ],
+      repositoryCount: 1,
+      hasNextPage: false,
+      endCursor: null,
+    });
+    followedUsers.mockResolvedValue({
+      users: [githubUser('friend')],
+      hasNextPage: false,
+      endCursor: null,
+    });
+    search.mockReturnValue(
+      of({
+        accounts: [
+          mastodonAccount('star-owner', {
+            acct: 'star-owner@social.example',
+            url: 'https://social.example/@star-owner',
+          }),
+        ],
+        statuses: [],
+        hashtags: [],
+      }),
+    );
+    const discovery = TestBed.inject(GitHubFriendDiscovery);
+
+    await discovery.loadStarredOwners();
+    await discovery.load();
+
+    expect(discovery.rows().map((row) => [row.profile.login, row.source])).toEqual([
+      ['star-owner', 'starred-owner'],
+      ['friend', 'following'],
+    ]);
+    expect(discovery.rows()[0].matches).toHaveLength(1);
   });
 });

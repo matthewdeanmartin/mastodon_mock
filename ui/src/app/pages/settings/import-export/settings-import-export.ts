@@ -95,6 +95,12 @@ export class SettingsImportExport {
   protected githubPendingCount = computed(
     () => this.githubDiscovery.rows().filter((row) => row.status === 'pending').length,
   );
+  protected githubFollowingProfileCount = computed(
+    () => this.githubDiscovery.rows().filter((row) => row.source !== 'starred-owner').length,
+  );
+  protected githubStarredMatchCount = computed(
+    () => this.githubDiscovery.rows().filter((row) => row.source === 'starred-owner').length,
+  );
   protected githubVisibleRows = computed(() =>
     this.githubDiscovery.rows().filter((row) => {
       const renderable =

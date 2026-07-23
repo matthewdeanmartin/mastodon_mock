@@ -57,8 +57,19 @@ export interface GitHubFollowingPage {
   endCursor: string | null;
 }
 
+export interface GitHubStarredRepository {
+  nameWithOwner: string;
+  url: string;
+  description: string | null;
+}
+
+export interface GitHubStarredOwner {
+  profile: GitHubFollowedUser;
+  repositories: GitHubStarredRepository[];
+}
+
 export interface GitHubStarredOwnerPage {
-  owners: GitHubFollowedUser[];
+  owners: GitHubStarredOwner[];
   repositoryCount: number;
   hasNextPage: boolean;
   endCursor: string | null;
@@ -76,6 +87,9 @@ interface GitHubGraphQlResponse {
       };
       starredRepositories?: {
         nodes: {
+          nameWithOwner: string;
+          url: string;
+          description: string | null;
           owner: GitHubFollowedUser & {
             description?: string | null;
             socialAccounts?: { nodes: GitHubSocialAccount[] };
@@ -162,12 +176,28 @@ export class GitHubSession {
         body.errors?.[0]?.message ?? 'GitHub did not return your starred repositories.',
       );
     }
+    const owners = new Map<string, GitHubStarredOwner>();
+    for (const repository of starred.nodes) {
+      const profile = {
+        ...repository.owner,
+        bio: repository.owner.bio ?? repository.owner.description ?? null,
+        socialAccounts: repository.owner.socialAccounts ?? { nodes: [] },
+      };
+      const key = profile.login.toLowerCase();
+      const existing = owners.get(key);
+      const context = {
+        nameWithOwner: repository.nameWithOwner,
+        url: repository.url,
+        description: repository.description,
+      };
+      if (existing) {
+        existing.repositories.push(context);
+      } else {
+        owners.set(key, { profile, repositories: [context] });
+      }
+    }
     return {
-      owners: starred.nodes.map(({ owner }) => ({
-        ...owner,
-        bio: owner.bio ?? owner.description ?? null,
-        socialAccounts: owner.socialAccounts ?? { nodes: [] },
-      })),
+      owners: [...owners.values()],
       repositoryCount: starred.nodes.length,
       hasNextPage: starred.pageInfo.hasNextPage,
       endCursor: starred.pageInfo.endCursor,
@@ -247,6 +277,9 @@ const STARRED_REPOSITORY_OWNERS_QUERY = `
           endCursor
         }
         nodes {
+          nameWithOwner
+          url
+          description
           owner {
             login
             avatarUrl

@@ -108,6 +108,28 @@ describe('Profile block/unblock', () => {
     expect(cmp.relationship().following).toBe(false);
   });
 
+  it('shows Requested after a locked account accepts a pending follow request', () => {
+    const fixture = setUp();
+    const cmp = fixture.componentInstance as any;
+    cmp.account.update((account: Account) => ({ ...account, locked: true }));
+    cmp.relationship.set({ id: '900', following: false, requested: false } as Relationship);
+    fixture.detectChanges();
+
+    cmp.toggleFollow();
+    const request = httpMock.expectOne('/api/v1/accounts/900/follow');
+    expect(request.request.method).toBe('POST');
+    request.flush({ id: '900', following: false, requested: true } as Relationship);
+    fixture.detectChanges();
+
+    const followButton = [
+      ...fixture.nativeElement.querySelectorAll('.profile-buttons button'),
+    ].find((button: HTMLButtonElement) => button.textContent.includes('Requested')) as
+      | HTMLButtonElement
+      | undefined;
+    expect(followButton?.textContent).toContain('Requested');
+    expect(followButton?.disabled).toBe(true);
+  });
+
   it('removes a follower without blocking them', () => {
     const fixture = setUp();
     const cmp = fixture.componentInstance as any;

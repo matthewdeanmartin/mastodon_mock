@@ -128,6 +128,10 @@ describe('SettingsImportExport', () => {
       display_name: 'Alice',
       avatar: '',
       avatar_static: '',
+      note: '<p>Building friendly federated software.</p>',
+      statuses_count: 123,
+      following_count: 45,
+      followers_count: 678,
     } as Account;
     discovery.rows.set([
       {
@@ -140,6 +144,14 @@ describe('SettingsImportExport', () => {
           websiteUrl: null,
           socialAccounts: { nodes: [] },
         },
+        source: 'starred-owner',
+        starredRepositories: [
+          {
+            nameWithOwner: 'alice/useful-project',
+            url: 'https://github.com/alice/useful-project',
+            description: 'A useful project',
+          },
+        ],
         status: 'complete',
         identity: null,
         matches: [
@@ -172,6 +184,11 @@ describe('SettingsImportExport', () => {
     const match = (fixture.nativeElement as HTMLElement).querySelector('.contact-match')!;
     expect(match.querySelector('a')?.getAttribute('href')).toBe('/accounts/alice-id');
     expect(match.textContent).not.toContain('Add');
+    expect(fixture.nativeElement.textContent).toContain('alice/useful-project');
+    expect(match.textContent).toContain('Building friendly federated software.');
+    expect(match.textContent).toContain('123 posts');
+    expect(match.textContent).toContain('45 following');
+    expect(match.textContent).toContain('678 followers');
     match.querySelector<HTMLButtonElement>('button')!.click();
     httpMock.expectOne('/api/v1/accounts/alice-id/follow').flush({
       id: account.id,
@@ -185,6 +202,35 @@ describe('SettingsImportExport', () => {
     fixture.detectChanges();
 
     expect(match.querySelector('button')?.textContent).toContain('Following');
+  });
+
+  it('shows separate GitHub friends and stars actions before any import is prepared', () => {
+    localStorage.setItem(
+      'mockingbird_github_token',
+      JSON.stringify({
+        accessToken: 'ghp_test',
+        user: {
+          login: 'viewer',
+          avatar_url: '',
+          html_url: 'https://github.com/viewer',
+          name: 'Viewer',
+        },
+      }),
+    );
+
+    const fixture = setUp();
+    const githubSection = (fixture.nativeElement as HTMLElement).querySelector('#github-friends')!;
+    const labels = [...githubSection.querySelectorAll('button')].map((button) =>
+      button.textContent?.trim(),
+    );
+
+    expect(labels).toContain('Get matches via GitHub friends');
+    expect(labels).toContain('Get matches via GitHub stars');
+    expect(
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('#import-friends')
+        ?.textContent?.includes('GitHub stars'),
+    ).toBe(false);
   });
 
   it('hides already-followed GitHub matches without changing their discovery order', () => {

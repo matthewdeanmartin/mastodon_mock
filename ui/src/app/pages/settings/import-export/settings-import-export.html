@@ -35,25 +35,6 @@
         <button type="button" class="btn" (click)="startImport()">
           Follow all ({{ importer.rows().length }})
         </button>
-        <button
-          type="button"
-          class="btn btn-outline"
-          (click)="loadGitHubStarredOwners()"
-          [disabled]="
-            githubDiscovery.loading() ||
-            githubDiscovery.loadingStarredOwners() ||
-            githubDiscovery.running() ||
-            githubDiscovery.starredOwnersLoaded()
-          "
-        >
-          {{
-            githubDiscovery.loadingStarredOwners()
-              ? 'Checking starred repo owners…'
-              : githubDiscovery.starredOwnersLoaded()
-                ? 'Starred repo owners checked'
-                : 'Find rel=me matches from starred repo owners'
-          }}
-        </button>
       }
       @if (importer.running()) {
         <button type="button" class="btn btn-outline" (click)="importer.stop()">Stop</button>
@@ -113,31 +94,67 @@
     <section id="github-friends" class="friend-section contact-section">
       <h2>Find GitHub friends on Mastodon</h2>
       <p class="muted small">
-        Load everyone you follow on GitHub, then look for their Mastodon identity. Explicit profile
-        and <code>rel="me"</code> links are accepted without spending a Mastodon search call. Their
-        exact handles are still resolved through your home server so results can open inside
-        Mockingbird and show your follow status. Unmatched profiles are searched once by GitHub
-        username.
+        Use either or both GitHub sources. Exact handles are resolved through your Mastodon server
+        so results open inside Mockingbird and show your follow status.
       </p>
-      <div class="contact-controls">
-        <button
-          type="button"
-          class="btn btn-outline"
-          (click)="loadGitHubFriends()"
-          [disabled]="
-            githubDiscovery.loading() ||
-            githubDiscovery.loadingStarredOwners() ||
-            githubDiscovery.running()
-          "
-        >
-          {{
-            githubDiscovery.loading()
-              ? 'Loading GitHub follows…'
-              : githubDiscovery.rows().length
-                ? 'Reload GitHub follows'
-                : 'Load GitHub follows'
-          }}
-        </button>
+      <div class="github-sources">
+        <div class="github-source">
+          <div>
+            <h3>People you follow on GitHub</h3>
+            <p class="muted small">
+              The shorter, higher-confidence list. Direct profile links are matched first; remaining
+              profiles can be searched once by GitHub username.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline"
+            (click)="loadGitHubFriends()"
+            [disabled]="
+              githubDiscovery.loading() ||
+              githubDiscovery.loadingStarredOwners() ||
+              githubDiscovery.running()
+            "
+          >
+            {{
+              githubDiscovery.loading()
+                ? 'Loading GitHub follows…'
+                : githubFollowingProfileCount()
+                  ? 'Reload GitHub follows'
+                  : 'Get matches via GitHub friends'
+            }}
+          </button>
+        </div>
+        <div class="github-source">
+          <div>
+            <h3>Owners of repositories you starred</h3>
+            <p class="muted small">
+              The longer, lower-confidence list. Checks each unique repository owner for a direct
+              Mastodon profile link. Contributors and stargazers are never loaded.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline"
+            (click)="loadGitHubStarredOwners()"
+            [disabled]="
+              githubDiscovery.loading() ||
+              githubDiscovery.loadingStarredOwners() ||
+              githubDiscovery.running() ||
+              githubDiscovery.starredOwnersLoaded()
+            "
+          >
+            {{
+              githubDiscovery.loadingStarredOwners()
+                ? 'Checking starred repo owners…'
+                : githubDiscovery.starredOwnersLoaded()
+                  ? 'GitHub stars checked'
+                  : 'Get matches via GitHub stars'
+            }}
+          </button>
+        </div>
+      </div>
+      <div class="contact-controls github-result-controls">
         <label class="call-limit">
           Stop after
           <input
@@ -185,8 +202,13 @@
       @if (githubDiscovery.rows().length) {
         <div class="contact-summary" aria-live="polite">
           <strong>
-            {{ githubDiscovery.rows().length }} GitHub profiles · {{ githubFoundCount() }} Mastodon
-            match{{ githubFoundCount() === 1 ? '' : 'es' }}
+            {{ githubFollowingProfileCount() }} GitHub friend{{
+              githubFollowingProfileCount() === 1 ? '' : 's'
+            }}
+            · {{ githubStarredMatchCount() }} starred-owner match{{
+              githubStarredMatchCount() === 1 ? '' : 'es'
+            }}
+            · {{ githubFoundCount() }} Mastodon match{{ githubFoundCount() === 1 ? '' : 'es' }}
           </strong>
           <span class="muted small">
             {{ githubLinkedCount() }} matched directly from GitHub profile links. Loaded in
@@ -238,6 +260,29 @@
                   </span>
                   <span class="row-status muted">{{ githubStatusLabel(row.status) }}</span>
                 </div>
+                @if (row.starredRepositories?.length) {
+                  <div class="github-repositories small">
+                    <span class="muted">You starred:</span>
+                    @for (
+                      repository of row.starredRepositories?.slice(0, 5);
+                      track repository.url
+                    ) {
+                      <a
+                        [href]="repository.url"
+                        target="_blank"
+                        rel="noopener"
+                        [title]="repository.description || repository.nameWithOwner"
+                      >
+                        {{ repository.nameWithOwner }}
+                      </a>
+                    }
+                    @if ((row.starredRepositories?.length || 0) > 5) {
+                      <span class="muted">
+                        +{{ (row.starredRepositories?.length || 0) - 5 }} more
+                      </span>
+                    }
+                  </div>
+                }
                 @if (row.error) {
                   <p class="export-error small" role="alert">{{ row.error }}</p>
                 }
@@ -260,7 +305,35 @@
                             <span [class]="'confidence confidence-' + match.confidence">
                               {{ match.confidence }}
                             </span>
+                            @if (match.account.locked) {
+                              <span class="github-account-badge" title="Requires follow approval">
+                                🔒 approval required
+                              </span>
+                            }
+                            @if (match.account.bot) {
+                              <span class="github-account-badge">BOT</span>
+                            }
                             <span class="muted small">{{ match.signals.join(' · ') }}</span>
+                            @if (match.account.note) {
+                              <div
+                                class="github-account-bio"
+                                [innerHTML]="match.account.note"
+                              ></div>
+                            }
+                            <div class="github-account-stats muted small">
+                              <span
+                                ><strong>{{ match.account.statuses_count || 0 }}</strong>
+                                posts</span
+                              >
+                              <span
+                                ><strong>{{ match.account.following_count || 0 }}</strong>
+                                following</span
+                              >
+                              <span
+                                ><strong>{{ match.account.followers_count || 0 }}</strong>
+                                followers</span
+                              >
+                            </div>
                           </div>
                           @if (githubDiscovery.relationship(match.account.id); as relationship) {
                             <button

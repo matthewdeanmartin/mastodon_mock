@@ -214,10 +214,86 @@
   gap: 9px;
 }
 
+.github-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.github-source {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.github-source h3,
+.github-source p {
+  margin: 0;
+}
+
+.github-source p {
+  margin-top: 5px;
+}
+
+.github-result-controls {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 .github-person img {
   width: 34px;
   height: 34px;
   border-radius: 50%;
+}
+
+.github-repositories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 8px;
+  padding-left: 43px;
+}
+
+.github-repositories a {
+  overflow-wrap: anywhere;
+}
+
+.github-account-bio {
+  margin-top: 4px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.github-account-bio :is(p) {
+  margin: 0 0 4px;
+}
+
+.github-account-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 3px;
+}
+
+.github-account-stats strong {
+  color: var(--text);
+}
+
+.github-account-badge {
+  width: max-content;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .contact-match .btn {

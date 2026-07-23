@@ -117,6 +117,9 @@ describe('GitHubSession', () => {
                 starredRepositories: {
                   nodes: [
                     {
+                      nameWithOwner: 'owner/project',
+                      url: 'https://github.com/owner/project',
+                      description: 'A useful project',
                       owner: {
                         login: 'owner',
                         name: 'Owner',
@@ -141,7 +144,14 @@ describe('GitHubSession', () => {
 
     const page = await session.starredRepositoryOwners(null);
 
-    expect(page.owners.map((owner) => owner.login)).toEqual(['owner']);
+    expect(page.owners.map((owner) => owner.profile.login)).toEqual(['owner']);
+    expect(page.owners[0].repositories).toEqual([
+      {
+        nameWithOwner: 'owner/project',
+        url: 'https://github.com/owner/project',
+        description: 'A useful project',
+      },
+    ]);
     expect(page).toMatchObject({
       repositoryCount: 1,
       hasNextPage: true,
