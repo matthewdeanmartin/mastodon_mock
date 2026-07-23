@@ -1,13 +1,14 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
 import { DropboxEntry, DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
+import { GitHubSession } from '../../../providers/github/github-session';
 
 /**
  * Connections: the other places your people post. Mastodon is home; everything
@@ -16,7 +17,7 @@ import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
  */
 @Component({
   selector: 'app-settings-connections',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './settings-connections.html',
   styleUrl: './settings-connections.css',
 })
@@ -27,6 +28,7 @@ export class SettingsConnections implements OnInit {
   protected bsky = inject(BlueskySession);
   protected dropbox = inject(DropboxSession);
   protected raindrop = inject(RaindropSession);
+  protected github = inject(GitHubSession);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -48,6 +50,11 @@ export class SettingsConnections implements OnInit {
   protected raindropToken = signal('');
   protected raindropError = signal<string | null>(null);
   protected raindropNotice = signal<string | null>(null);
+
+  protected githubToken = signal('');
+  protected githubBusy = signal(false);
+  protected githubError = signal<string | null>(null);
+  protected githubNotice = signal<string | null>(null);
 
   ngOnInit(): void {
     const result = this.route.snapshot.queryParamMap.get('dropbox');
@@ -73,6 +80,47 @@ export class SettingsConnections implements OnInit {
     } catch (error: unknown) {
       this.raindropError.set(describeError(error, "Couldn't connect Raindrop.io."));
     }
+  }
+
+  async connectGitHub(): Promise<void> {
+    if (this.githubBusy()) {
+      return;
+    }
+    this.githubBusy.set(true);
+    this.githubError.set(null);
+    this.githubNotice.set(null);
+    try {
+      const user = await this.github.connect(this.githubToken());
+      this.githubToken.set('');
+      this.githubNotice.set(`GitHub connected as @${user.login}.`);
+    } catch (error: unknown) {
+      this.githubError.set(describeError(error, "Couldn't connect GitHub."));
+    } finally {
+      this.githubBusy.set(false);
+    }
+  }
+
+  async proveGitHubConnection(): Promise<void> {
+    if (this.githubBusy()) {
+      return;
+    }
+    this.githubBusy.set(true);
+    this.githubError.set(null);
+    this.githubNotice.set(null);
+    try {
+      await this.github.runProof();
+      this.githubNotice.set('GitHub API proof completed in this browser.');
+    } catch (error: unknown) {
+      this.githubError.set(describeError(error, "Couldn't call the GitHub API."));
+    } finally {
+      this.githubBusy.set(false);
+    }
+  }
+
+  disconnectGitHub(): void {
+    this.github.disconnect();
+    this.githubNotice.set(null);
+    this.githubError.set(null);
   }
 
   disconnectRaindrop(): void {

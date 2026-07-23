@@ -196,8 +196,51 @@
   background: color-mix(in srgb, #22c55e 22%, transparent);
 }
 
+.confidence-confirmed {
+  background: color-mix(in srgb, #22c55e 22%, transparent);
+}
+
+.confidence-probable {
+  background: color-mix(in srgb, #eab308 22%, transparent);
+}
+
 .confidence-possible {
   background: color-mix(in srgb, #eab308 22%, transparent);
+}
+
+.github-person {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.github-person img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.github-direct-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+}
+
+.github-direct-match > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.contact-match .btn {
+  align-self: center;
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .contact-misses {

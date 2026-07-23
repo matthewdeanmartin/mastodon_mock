@@ -54,6 +54,88 @@
 </section>
 
 <section class="conn-section">
+  <h2>🐙 GitHub proof of concept</h2>
+  <p class="muted">
+    GitHub's REST API works directly from this browser. GitHub's OAuth and device-flow token
+    endpoints do not allow browser CORS, so a serverless connection must use a token you create and
+    paste here.
+  </p>
+
+  @if (github.connected() && github.user(); as user) {
+    <div class="github-linked">
+      <img class="github-avatar" [src]="user.avatar_url" alt="" decoding="async" />
+      <span class="names">
+        <a class="name" [href]="user.html_url" target="_blank" rel="noopener">
+          {{ user.name || user.login }}
+        </a>
+        <span class="muted small">&#64;{{ user.login }}</span>
+      </span>
+      <button class="btn" type="button" (click)="proveGitHubConnection()" [disabled]="githubBusy()">
+        {{ githubBusy() ? 'Calling GitHub…' : 'Run API proof' }}
+      </button>
+      <button class="btn btn-outline" type="button" (click)="disconnectGitHub()">Disconnect</button>
+    </div>
+    <p class="muted small">
+      Looking for the same people on Mastodon?
+      <a [routerLink]="['/settings/import-export']" fragment="github-friends">
+        Find and import GitHub friends
+      </a>
+      using profile links first, then a limited username search.
+    </p>
+
+    @if (github.notifications(); as notifications) {
+      <div class="github-proof" role="status">
+        <strong>Success.</strong> Read {{ notifications.length }} unread notification{{
+          notifications.length === 1 ? '' : 's'
+        }}
+        and the first {{ github.following()?.length ?? 0 }} followed account{{
+          github.following()?.length === 1 ? '' : 's'
+        }}
+        directly from <code>api.github.com</code>.
+      </div>
+    }
+  } @else {
+    <ol class="setup-steps muted small">
+      <li>
+        <a
+          href="https://github.com/settings/tokens/new?scopes=notifications%2Cread%3Auser&description=Mockingbird"
+          target="_blank"
+          rel="noopener"
+          >Create a classic personal access token</a
+        >
+        with <code>notifications</code> and <code>read:user</code>.
+      </li>
+      <li>Paste it below. Mockingbird validates it with <code>GET /user</code>.</li>
+    </ol>
+    <p class="credential-warning small">
+      This token can read your GitHub notifications. It is stored in this browser's localStorage,
+      never sent to Mockingbird, and sent only to <code>api.github.com</code>. Use a browser profile
+      and device you trust; revoke the token in GitHub to invalidate it.
+    </p>
+    <form class="github-form" (ngSubmit)="connectGitHub()">
+      <input
+        type="password"
+        name="githubToken"
+        placeholder="GitHub token (ghp_…)"
+        autocomplete="off"
+        [ngModel]="githubToken()"
+        (ngModelChange)="githubToken.set($event)"
+        [disabled]="githubBusy()"
+      />
+      <button class="btn" type="submit" [disabled]="!githubToken().trim() || githubBusy()">
+        {{ githubBusy() ? 'Checking…' : 'Connect GitHub' }}
+      </button>
+    </form>
+  }
+  @if (githubNotice(); as msg) {
+    <p class="connection-ok" role="status">{{ msg }}</p>
+  }
+  @if (githubError(); as msg) {
+    <p class="feed-error" role="alert">{{ msg }}</p>
+  }
+</section>
+
+<section class="conn-section">
   <h2>📦 Dropbox</h2>
   <p class="muted">
     Connect an app-specific Dropbox folder with OAuth. Authorization and file access happen directly

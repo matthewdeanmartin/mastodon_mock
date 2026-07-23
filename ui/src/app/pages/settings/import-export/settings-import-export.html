@@ -4,7 +4,7 @@
 </div>
 
 <div class="spage-body">
-  <section class="friend-section">
+  <section id="import-friends" class="friend-section">
     <h2>Import Friends</h2>
     <p class="muted small">
       Paste <code>&#64;user&#64;host</code> handles or profile URLs, one per line, or upload a
@@ -89,6 +89,171 @@
       </ul>
     }
   </section>
+
+  @if (github.connected()) {
+    <section id="github-friends" class="friend-section contact-section">
+      <h2>Find GitHub friends on Mastodon</h2>
+      <p class="muted small">
+        Load everyone you follow on GitHub, then look for their Mastodon identity. Explicit profile
+        and <code>rel="me"</code> links are accepted without spending a Mastodon search call.
+        Unmatched profiles are searched once by GitHub username through your home server. Review
+        every candidate before importing it.
+      </p>
+      <div class="contact-controls">
+        <button
+          type="button"
+          class="btn btn-outline"
+          (click)="loadGitHubFriends()"
+          [disabled]="githubDiscovery.loading() || githubDiscovery.running()"
+        >
+          {{
+            githubDiscovery.loading()
+              ? 'Loading GitHub follows…'
+              : githubDiscovery.rows().length
+                ? 'Reload GitHub follows'
+                : 'Load GitHub follows'
+          }}
+        </button>
+        <label class="call-limit">
+          Stop after
+          <input
+            type="number"
+            min="1"
+            max="1000"
+            [ngModel]="githubCallLimit()"
+            (ngModelChange)="setGitHubCallLimit($event)"
+            [disabled]="githubDiscovery.running()"
+          />
+          Mastodon API calls
+        </label>
+        @if (githubDiscovery.rows().length && !githubDiscovery.running()) {
+          <button
+            type="button"
+            class="btn"
+            (click)="startGitHubSearch()"
+            [disabled]="githubDiscovery.callCount() >= githubCallLimit() || !githubPendingCount()"
+          >
+            {{ githubDiscovery.callCount() ? 'Continue searching' : 'Find Mastodon accounts' }}
+          </button>
+        }
+        @if (githubDiscovery.running()) {
+          <button type="button" class="btn btn-outline" (click)="githubDiscovery.stop()">
+            Stop
+          </button>
+        }
+        @if (githubDiscovery.rows().length) {
+          <button type="button" class="link" (click)="githubDiscovery.reset()">clear</button>
+        }
+      </div>
+
+      @if (githubDiscovery.loadError(); as error) {
+        <p class="export-error" role="alert">{{ error }}</p>
+      }
+
+      @if (githubDiscovery.rows().length) {
+        <div class="contact-summary" aria-live="polite">
+          <strong>
+            {{ githubDiscovery.rows().length }} GitHub profiles · {{ githubFoundCount() }} Mastodon
+            match{{ githubFoundCount() === 1 ? '' : 'es' }}
+          </strong>
+          <span class="muted small">
+            {{ githubLinkedCount() }} matched directly from GitHub profile links. Loaded in
+            {{ githubDiscovery.githubPageCount() }} GitHub GraphQL request{{
+              githubDiscovery.githubPageCount() === 1 ? '' : 's'
+            }}. {{ githubDiscovery.callCount() }} / {{ githubCallLimit() }} Mastodon search calls
+            used. Profiles already linked to Mastodon do not count against that budget.
+          </span>
+        </div>
+        <div
+          class="progress-track"
+          role="progressbar"
+          [attr.aria-valuenow]="githubDiscovery.callCount()"
+          [attr.aria-valuemin]="0"
+          [attr.aria-valuemax]="githubCallLimit()"
+        >
+          <div
+            class="progress-fill"
+            [style.width.%]="(githubDiscovery.callCount() / githubCallLimit()) * 100"
+          ></div>
+        </div>
+
+        <ol class="contact-rows">
+          @for (row of githubDiscovery.rows(); track row.profile.login) {
+            @if (
+              row.identity ||
+              row.matches.length ||
+              row.status === 'searching' ||
+              row.status === 'failed'
+            ) {
+              <li class="contact-row">
+                <div class="contact-row-head">
+                  <span class="github-person">
+                    <img [src]="row.profile.avatarUrl" alt="" />
+                    <span>
+                      <a [href]="row.profile.url" target="_blank" rel="noopener">
+                        <strong>{{ row.profile.name || row.profile.login }}</strong>
+                      </a>
+                      <span class="muted small"> · &#64;{{ row.profile.login }}</span>
+                    </span>
+                  </span>
+                  <span class="row-status muted">{{ githubStatusLabel(row.status) }}</span>
+                </div>
+                @if (row.error) {
+                  <p class="export-error small" role="alert">{{ row.error }}</p>
+                }
+                @if (row.identity; as identity) {
+                  <div class="github-direct-match">
+                    <span>
+                      <a [href]="identity.url" target="_blank" rel="noopener">
+                        &#64;{{ identity.handle }}
+                      </a>
+                      <span class="confidence confidence-confirmed">{{ identity.confidence }}</span>
+                      <span class="muted small">{{ identity.evidence }}</span>
+                    </span>
+                    <button
+                      type="button"
+                      class="btn btn-outline btn-sm"
+                      (click)="addGitHubFriend(identity.handle)"
+                    >
+                      Add to Import Friends
+                    </button>
+                  </div>
+                }
+                @if (row.matches.length) {
+                  <ul class="contact-matches">
+                    @for (match of row.matches; track match.account.id) {
+                      <li class="contact-match">
+                        <img [src]="match.account.avatar_static || match.account.avatar" alt="" />
+                        <div class="match-main">
+                          <a [routerLink]="['/accounts', match.account.id]">
+                            <strong>{{
+                              match.account.display_name || match.account.username
+                            }}</strong>
+                            <span class="muted"> &#64;{{ match.account.acct }}</span>
+                          </a>
+                          <span [class]="'confidence confidence-' + match.confidence">
+                            {{ match.confidence }}
+                          </span>
+                          <span class="muted small">{{ match.signals.join(' · ') }}</span>
+                        </div>
+                        <button
+                          type="button"
+                          class="btn btn-outline btn-sm"
+                          (click)="addGitHubFriend(match.handle)"
+                        >
+                          Add
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                }
+              </li>
+            }
+          }
+        </ol>
+      }
+    </section>
+  }
 
   <section class="friend-section">
     <h2>Export Friends</h2>

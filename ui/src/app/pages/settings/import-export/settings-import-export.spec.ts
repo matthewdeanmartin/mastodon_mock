@@ -6,7 +6,7 @@ import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Account, ImportReport } from '../../../models';
 import { Auth } from '../../../auth';
-import { parseHandles } from '../../../import-follows';
+import { ImportFollows, parseHandles } from '../../../import-follows';
 import { followingAccountsCsv, SettingsImportExport } from './settings-import-export';
 
 /** Exposes SettingsImportExport's protected signals for white-box testing. */
@@ -15,9 +15,11 @@ interface SettingsImportExportInternals {
   csvText: WritableSignal<string>;
   report: WritableSignal<ImportReport | null>;
   exportCount: WritableSignal<number>;
+  importer: ImportFollows;
   download(kind: 'following' | 'mutes' | 'blocks'): void;
   upload(): void;
   exportFriends(): Promise<void>;
+  addGitHubFriend(handle: string): void;
 }
 
 function internals(fixture: ComponentFixture<SettingsImportExport>): SettingsImportExportInternals {
@@ -101,6 +103,15 @@ describe('SettingsImportExport', () => {
     expect(csv).toContain('alice@remote.social,true,false,');
     expect(csv).toContain('bob@home.social,true,false,');
     expect(parseHandles(csv)).toEqual(['alice@remote.social', 'bob@home.social']);
+  });
+
+  it('hands a discovered GitHub identity to the existing Import Friends preview', () => {
+    const fixture = setUp();
+
+    internals(fixture).addGitHubFriend('alice@social.example');
+
+    expect(internals(fixture).importer.rows()).toHaveLength(1);
+    expect(internals(fixture).importer.rows()[0].handle).toBe('alice@social.example');
   });
 
   it('pages through every friend before downloading the export', async () => {

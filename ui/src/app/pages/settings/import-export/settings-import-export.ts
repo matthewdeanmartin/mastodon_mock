@@ -8,6 +8,8 @@ import { ImportFollows, parseHandles } from '../../../import-follows';
 import { Account, ImportReport } from '../../../models';
 import { environment } from '../../../../environments/environment';
 import { ContactDiscovery } from './contact-discovery';
+import { GitHubSession } from '../../../providers/github/github-session';
+import { GitHubFriendDiscovery, GitHubFriendStatus } from './github-friend-discovery';
 
 type CsvKind = 'following' | 'mutes' | 'blocks';
 
@@ -49,6 +51,8 @@ export class SettingsImportExport {
   private auth = inject(Auth);
   protected importer = inject(ImportFollows);
   protected contactDiscovery = inject(ContactDiscovery);
+  protected github = inject(GitHubSession);
+  protected githubDiscovery = inject(GitHubFriendDiscovery);
 
   protected readonly mockTooling = environment.mockTooling;
   protected pasted = signal('');
@@ -59,6 +63,7 @@ export class SettingsImportExport {
   protected exportError = signal<string | null>(null);
   protected contactFileName = signal<string | null>(null);
   protected contactCallLimit = signal(20);
+  protected githubCallLimit = signal(20);
 
   protected doneCount = computed(
     () =>
@@ -77,6 +82,17 @@ export class SettingsImportExport {
       .rows()
       .filter((row) => row.status === 'complete' && row.matches.length === 0)
       .map((row) => row.contact.name),
+  );
+  protected githubFoundCount = computed(() =>
+    this.githubDiscovery
+      .rows()
+      .reduce((count, row) => count + (row.identity ? 1 : row.matches.length), 0),
+  );
+  protected githubLinkedCount = computed(
+    () => this.githubDiscovery.rows().filter((row) => row.identity).length,
+  );
+  protected githubPendingCount = computed(
+    () => this.githubDiscovery.rows().filter((row) => row.status === 'pending').length,
   );
 
   protected importKind = signal<CsvKind>('following');
@@ -150,6 +166,43 @@ export class SettingsImportExport {
   protected clearContactSearch(): void {
     this.contactFileName.set(null);
     this.contactDiscovery.reset();
+  }
+
+  protected loadGitHubFriends(): void {
+    void this.githubDiscovery.load();
+  }
+
+  protected startGitHubSearch(): void {
+    void this.githubDiscovery.start(this.githubCallLimit());
+  }
+
+  protected setGitHubCallLimit(value: number | string): void {
+    const parsed = Number(value);
+    this.githubCallLimit.set(
+      Number.isFinite(parsed) ? Math.min(1000, Math.max(1, Math.floor(parsed))) : 20,
+    );
+  }
+
+  protected addGitHubFriend(handle: string): void {
+    const normalized = handle.replace(/^@/, '').toLowerCase();
+    if (!parseHandles(this.pasted()).some((existing) => existing.toLowerCase() === normalized)) {
+      this.pasted.update((value) => `${value.trimEnd()}${value.trim() ? '\n' : ''}@${normalized}`);
+    }
+    this.previewFriends();
+    document.getElementById('import-friends')?.scrollIntoView?.({ behavior: 'smooth' });
+  }
+
+  protected githubStatusLabel(status: GitHubFriendStatus): string {
+    switch (status) {
+      case 'pending':
+        return 'waiting';
+      case 'searching':
+        return 'searching…';
+      case 'complete':
+        return 'checked';
+      default:
+        return 'failed';
+    }
   }
 
   protected contactStatusLabel(status: string): string {
