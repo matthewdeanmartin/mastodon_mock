@@ -95,9 +95,10 @@
       <h2>Find GitHub friends on Mastodon</h2>
       <p class="muted small">
         Load everyone you follow on GitHub, then look for their Mastodon identity. Explicit profile
-        and <code>rel="me"</code> links are accepted without spending a Mastodon search call.
-        Unmatched profiles are searched once by GitHub username through your home server. Review
-        every candidate before importing it.
+        and <code>rel="me"</code> links are accepted without spending a Mastodon search call. Their
+        exact handles are still resolved through your home server so results can open inside
+        Mockingbird and show your follow status. Unmatched profiles are searched once by GitHub
+        username.
       </p>
       <div class="contact-controls">
         <button
@@ -160,8 +161,12 @@
             {{ githubLinkedCount() }} matched directly from GitHub profile links. Loaded in
             {{ githubDiscovery.githubPageCount() }} GitHub GraphQL request{{
               githubDiscovery.githubPageCount() === 1 ? '' : 's'
-            }}. {{ githubDiscovery.callCount() }} / {{ githubCallLimit() }} Mastodon search calls
-            used. Profiles already linked to Mastodon do not count against that budget.
+            }}
+            and resolved {{ githubDiscovery.linkedLookupCount() }} exact linked profile{{
+              githubDiscovery.linkedLookupCount() === 1 ? '' : 's'
+            }}
+            through your server. {{ githubDiscovery.callCount() }} / {{ githubCallLimit() }}
+            username-search calls used.
           </span>
         </div>
         <div
@@ -201,24 +206,6 @@
                 @if (row.error) {
                   <p class="export-error small" role="alert">{{ row.error }}</p>
                 }
-                @if (row.identity; as identity) {
-                  <div class="github-direct-match">
-                    <span>
-                      <a [href]="identity.url" target="_blank" rel="noopener">
-                        &#64;{{ identity.handle }}
-                      </a>
-                      <span class="confidence confidence-confirmed">{{ identity.confidence }}</span>
-                      <span class="muted small">{{ identity.evidence }}</span>
-                    </span>
-                    <button
-                      type="button"
-                      class="btn btn-outline btn-sm"
-                      (click)="addGitHubFriend(identity.handle)"
-                    >
-                      Add to Import Friends
-                    </button>
-                  </div>
-                }
                 @if (row.matches.length) {
                   <ul class="contact-matches">
                     @for (match of row.matches; track match.account.id) {
@@ -236,14 +223,36 @@
                           </span>
                           <span class="muted small">{{ match.signals.join(' · ') }}</span>
                         </div>
-                        <button
-                          type="button"
-                          class="btn btn-outline btn-sm"
-                          (click)="addGitHubFriend(match.handle)"
-                        >
-                          Add
-                        </button>
+                        @if (githubDiscovery.relationship(match.account.id); as relationship) {
+                          <button
+                            type="button"
+                            class="btn btn-outline btn-sm"
+                            [disabled]="
+                              relationship.following ||
+                              relationship.requested ||
+                              githubDiscovery.followBusy().has(match.account.id)
+                            "
+                            (click)="githubDiscovery.follow(match.account)"
+                          >
+                            {{
+                              githubDiscovery.followBusy().has(match.account.id)
+                                ? 'Following…'
+                                : relationship.following
+                                  ? 'Following'
+                                  : relationship.requested
+                                    ? 'Requested'
+                                    : 'Follow'
+                            }}
+                          </button>
+                        } @else {
+                          <button type="button" class="btn btn-outline btn-sm" disabled>
+                            Checking…
+                          </button>
+                        }
                       </li>
+                      @if (githubDiscovery.followErrors().get(match.account.id); as followError) {
+                        <li class="export-error small" role="alert">{{ followError }}</li>
+                      }
                     }
                   </ul>
                 }

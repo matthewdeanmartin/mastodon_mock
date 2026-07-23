@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
-import { Account } from '../../../models';
+import { Account, Relationship } from '../../../models';
 import { GitHubFollowedUser, GitHubSession } from '../../../providers/github/github-session';
 
 export type GitHubFriendStatus = 'pending' | 'searching' | 'complete' | 'failed';
@@ -75,9 +75,12 @@ export function rankGitHubMatch(profile: GitHubFollowedUser, account: Account): 
     (field) =>
       !!field.verified_at && field.value.toLowerCase().replace(/\/$/, '').includes(githubUrl),
   );
+  const linkedMastodonHandle =
+    profileMastodonIdentity(profile)?.handle === accountHandle(account).toLowerCase();
 
   if (login && username === login) signals.push('Mastodon username matches GitHub login');
   if (displayName && accountName === displayName) signals.push('Display name exactly matches');
+  if (linkedMastodonHandle) signals.push('Exact Mastodon profile linked from GitHub');
   if (verifiedGitHubLink) signals.push('Verified rel=me link back to GitHub');
   else if (profileText.includes(githubUrl)) signals.push('Mastodon profile links back to GitHub');
   if (
@@ -87,11 +90,12 @@ export function rankGitHubMatch(profile: GitHubFollowedUser, account: Account): 
     signals.push('Website appears on both profiles');
   }
 
-  const confidence: GitHubFriendConfidence = verifiedGitHubLink
-    ? 'confirmed'
-    : signals.length >= 2
-      ? 'probable'
-      : 'candidate';
+  const confidence: GitHubFriendConfidence =
+    verifiedGitHubLink || linkedMastodonHandle
+      ? 'confirmed'
+      : signals.length >= 2
+        ? 'probable'
+        : 'candidate';
   return { account, handle: accountHandle(account), signals, confidence };
 }
 
@@ -106,8 +110,12 @@ export class GitHubFriendDiscovery {
   readonly loading = signal(false);
   readonly running = signal(false);
   readonly callCount = signal(0);
+  readonly linkedLookupCount = signal(0);
   readonly githubPageCount = signal(0);
   readonly loadError = signal<string | null>(null);
+  readonly relationships = signal<ReadonlyMap<string, Relationship>>(new Map());
+  readonly followBusy = signal<ReadonlySet<string>>(new Set());
+  readonly followErrors = signal<ReadonlyMap<string, string>>(new Map());
   /** Small courtesy delay between Mastodon searches; tests set this to zero. */
   delayMs = 350;
 
@@ -117,7 +125,11 @@ export class GitHubFriendDiscovery {
     this.loadError.set(null);
     this.stopRequested = false;
     this.callCount.set(0);
+    this.linkedLookupCount.set(0);
     this.githubPageCount.set(0);
+    this.relationships.set(new Map());
+    this.followBusy.set(new Set());
+    this.followErrors.set(new Map());
     try {
       const profiles: GitHubFollowedUser[] = [];
       const seen = new Set<string>();
@@ -142,12 +154,14 @@ export class GitHubFriendDiscovery {
           const identity = profileMastodonIdentity(profile);
           return {
             profile,
-            status: identity ? ('complete' as const) : ('pending' as const),
+            status: 'pending' as const,
             identity,
             matches: [],
           };
         }),
       );
+      await this.resolveLinkedRows();
+      await this.loadRelationships();
     } catch (error: unknown) {
       this.loadError.set(
         error instanceof Error ? error.message : "Couldn't load the people you follow on GitHub.",
@@ -163,8 +177,12 @@ export class GitHubFriendDiscovery {
     this.loading.set(false);
     this.running.set(false);
     this.callCount.set(0);
+    this.linkedLookupCount.set(0);
     this.githubPageCount.set(0);
     this.loadError.set(null);
+    this.relationships.set(new Map());
+    this.followBusy.set(new Set());
+    this.followErrors.set(new Map());
   }
 
   stop(): void {
@@ -182,8 +200,39 @@ export class GitHubFriendDiscovery {
         if (row.status === 'complete' || row.status === 'failed') continue;
         await this.searchRow(rowIndex);
       }
+      await this.loadRelationships();
     } finally {
       this.running.set(false);
+    }
+  }
+
+  relationship(accountId: string): Relationship | null {
+    return this.relationships().get(accountId) ?? null;
+  }
+
+  async follow(account: Account): Promise<void> {
+    if (this.followBusy().has(account.id)) return;
+    this.followBusy.update((busy) => new Set(busy).add(account.id));
+    this.followErrors.update((errors) => {
+      const next = new Map(errors);
+      next.delete(account.id);
+      return next;
+    });
+    try {
+      const relationship = await firstValueFrom(this.api.follow(account.id));
+      this.relationships.update((relationships) =>
+        new Map(relationships).set(account.id, relationship),
+      );
+    } catch {
+      this.followErrors.update((errors) =>
+        new Map(errors).set(account.id, 'Could not follow this account.'),
+      );
+    } finally {
+      this.followBusy.update((busy) => {
+        const next = new Set(busy);
+        next.delete(account.id);
+        return next;
+      });
     }
   }
 
@@ -218,6 +267,63 @@ export class GitHubFriendDiscovery {
       if (status === 429) this.stopRequested = true;
     }
     if (!this.stopRequested && this.delayMs) await delay(this.delayMs);
+  }
+
+  private async resolveLinkedRows(): Promise<void> {
+    for (let rowIndex = 0; rowIndex < this.rows().length; rowIndex++) {
+      const row = this.rows()[rowIndex];
+      if (!row.identity) continue;
+      this.linkedLookupCount.update((count) => count + 1);
+      try {
+        const result = await firstValueFrom(
+          this.api.search(row.identity.handle, 'accounts', { resolve: true, limit: 5 }),
+        );
+        const matches = (result.accounts ?? [])
+          .map((account) => rankGitHubMatch(row.profile, account))
+          .filter((match) => match.signals.length > 0)
+          .sort(
+            (a, b) =>
+              confidenceOrder(a.confidence) - confidenceOrder(b.confidence) ||
+              b.signals.length - a.signals.length,
+          )
+          .slice(0, 1);
+        this.patch(rowIndex, {
+          status: 'complete',
+          matches,
+          error: matches.length
+            ? undefined
+            : 'Linked Mastodon profile was not found by your server.',
+        });
+      } catch {
+        this.patch(rowIndex, {
+          status: 'failed',
+          error: 'Could not resolve the linked Mastodon profile through your server.',
+        });
+      }
+    }
+  }
+
+  private async loadRelationships(): Promise<void> {
+    const ids = [
+      ...new Set(
+        this.rows()
+          .flatMap((row) => row.matches)
+          .map((match) => match.account.id)
+          .filter((id) => id && !this.relationships().has(id)),
+      ),
+    ];
+    for (let index = 0; index < ids.length; index += 80) {
+      try {
+        const batch = await firstValueFrom(this.api.relationships(ids.slice(index, index + 80)));
+        this.relationships.update((relationships) => {
+          const next = new Map(relationships);
+          for (const relationship of batch) next.set(relationship.id, relationship);
+          return next;
+        });
+      } catch {
+        // Candidate cards remain viewable if relationship lookup is unavailable.
+      }
+    }
   }
 
   private patch(index: number, changes: Partial<GitHubFriendRow>): void {

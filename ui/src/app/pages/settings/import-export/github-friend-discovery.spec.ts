@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from '../../../api';
-import { Account } from '../../../models';
+import { Account, Relationship } from '../../../models';
 import { GitHubFollowedUser, GitHubSession } from '../../../providers/github/github-session';
 import {
   GitHubFriendDiscovery,
@@ -40,6 +40,18 @@ function mastodonAccount(username: string, changes: Partial<Account> = {}): Acco
     bot: false,
     locked: false,
     fields: [],
+    ...changes,
+  };
+}
+
+function relationship(id: string, changes: Partial<Relationship> = {}): Relationship {
+  return {
+    id,
+    following: false,
+    followed_by: false,
+    requested: false,
+    blocking: false,
+    muting: false,
     ...changes,
   };
 }
@@ -90,14 +102,18 @@ describe('GitHub friend identity evidence', () => {
 describe('GitHubFriendDiscovery API budget', () => {
   let followedUsers: ReturnType<typeof vi.fn>;
   let search: ReturnType<typeof vi.fn>;
+  let relationships: ReturnType<typeof vi.fn>;
+  let follow: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     followedUsers = vi.fn();
     search = vi.fn();
+    relationships = vi.fn().mockReturnValue(of([]));
+    follow = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         { provide: GitHubSession, useValue: { followedUsers } },
-        { provide: Api, useValue: { search } },
+        { provide: Api, useValue: { search, relationships, follow } },
       ],
     });
   });
@@ -117,6 +133,18 @@ describe('GitHubFriendDiscovery API budget', () => {
         hasNextPage: false,
         endCursor: null,
       });
+    search.mockReturnValue(
+      of({
+        accounts: [
+          mastodonAccount('linked', {
+            acct: 'linked@mastodon.social',
+            url: 'https://mastodon.social/@linked',
+          }),
+        ],
+        statuses: [],
+        hashtags: [],
+      }),
+    );
     const discovery = TestBed.inject(GitHubFriendDiscovery);
 
     await discovery.load();
@@ -126,6 +154,12 @@ describe('GitHubFriendDiscovery API budget', () => {
     expect(discovery.githubPageCount()).toBe(2);
     expect(discovery.rows().map((row) => row.status)).toEqual(['complete', 'pending', 'pending']);
     expect(discovery.rows()[0].identity?.handle).toBe('linked@mastodon.social');
+    expect(discovery.rows()[0].matches[0].account.id).toBe('linked');
+    expect(search).toHaveBeenCalledWith('linked@mastodon.social', 'accounts', {
+      resolve: true,
+      limit: 5,
+    });
+    expect(discovery.linkedLookupCount()).toBe(1);
     expect(discovery.callCount()).toBe(0);
   });
 
@@ -148,8 +182,8 @@ describe('GitHubFriendDiscovery API budget', () => {
 
     await discovery.start(1);
 
-    expect(search).toHaveBeenCalledTimes(1);
-    expect(search).toHaveBeenCalledWith('hotcoder', 'accounts', {
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(search).toHaveBeenNthCalledWith(2, 'hotcoder', 'accounts', {
       resolve: false,
       limit: 10,
     });
@@ -158,12 +192,39 @@ describe('GitHubFriendDiscovery API budget', () => {
 
     await discovery.start(2);
 
-    expect(search).toHaveBeenCalledTimes(2);
+    expect(search).toHaveBeenCalledTimes(3);
     expect(search).toHaveBeenLastCalledWith('later', 'accounts', {
       resolve: false,
       limit: 10,
     });
     expect(discovery.callCount()).toBe(2);
     expect(discovery.rows().every((row) => row.status === 'complete')).toBe(true);
+  });
+
+  it('loads relationships and follows an unfollowed match in place', async () => {
+    followedUsers.mockResolvedValue({
+      users: [githubUser('hotcoder')],
+      hasNextPage: false,
+      endCursor: null,
+    });
+    search.mockReturnValue(
+      of({ accounts: [mastodonAccount('hotcoder')], statuses: [], hashtags: [] }),
+    );
+    relationships.mockReturnValue(of([relationship('hotcoder')]));
+    follow.mockReturnValue(of(relationship('hotcoder', { following: true })));
+    const discovery = TestBed.inject(GitHubFriendDiscovery);
+    discovery.delayMs = 0;
+    await discovery.load();
+
+    await discovery.start(1);
+
+    const account = discovery.rows()[0].matches[0].account;
+    expect(relationships).toHaveBeenCalledWith(['hotcoder']);
+    expect(discovery.relationship(account.id)?.following).toBe(false);
+
+    await discovery.follow(account);
+
+    expect(follow).toHaveBeenCalledWith('hotcoder');
+    expect(discovery.relationship(account.id)?.following).toBe(true);
   });
 });

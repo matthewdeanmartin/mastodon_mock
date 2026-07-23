@@ -6,8 +6,9 @@ import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Account, ImportReport } from '../../../models';
 import { Auth } from '../../../auth';
-import { ImportFollows, parseHandles } from '../../../import-follows';
+import { parseHandles } from '../../../import-follows';
 import { followingAccountsCsv, SettingsImportExport } from './settings-import-export';
+import { GitHubFriendDiscovery } from './github-friend-discovery';
 
 /** Exposes SettingsImportExport's protected signals for white-box testing. */
 interface SettingsImportExportInternals {
@@ -15,11 +16,9 @@ interface SettingsImportExportInternals {
   csvText: WritableSignal<string>;
   report: WritableSignal<ImportReport | null>;
   exportCount: WritableSignal<number>;
-  importer: ImportFollows;
   download(kind: 'following' | 'mutes' | 'blocks'): void;
   upload(): void;
   exportFriends(): Promise<void>;
-  addGitHubFriend(handle: string): void;
 }
 
 function internals(fixture: ComponentFixture<SettingsImportExport>): SettingsImportExportInternals {
@@ -30,6 +29,7 @@ describe('SettingsImportExport', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
@@ -105,13 +105,85 @@ describe('SettingsImportExport', () => {
     expect(parseHandles(csv)).toEqual(['alice@remote.social', 'bob@home.social']);
   });
 
-  it('hands a discovered GitHub identity to the existing Import Friends preview', () => {
+  it('renders GitHub matches as local profiles and follows them in place', async () => {
+    localStorage.setItem(
+      'mockingbird_github_token',
+      JSON.stringify({
+        accessToken: 'ghp_test',
+        user: {
+          login: 'viewer',
+          avatar_url: '',
+          html_url: 'https://github.com/viewer',
+          name: 'Viewer',
+        },
+      }),
+    );
     const fixture = setUp();
+    const discovery = TestBed.inject(GitHubFriendDiscovery);
+    const account = {
+      id: 'alice-id',
+      username: 'alice',
+      acct: 'alice@social.example',
+      display_name: 'Alice',
+      avatar: '',
+      avatar_static: '',
+    } as Account;
+    discovery.rows.set([
+      {
+        profile: {
+          login: 'alice',
+          name: 'Alice',
+          avatarUrl: '',
+          url: 'https://github.com/alice',
+          bio: null,
+          websiteUrl: null,
+          socialAccounts: { nodes: [] },
+        },
+        status: 'complete',
+        identity: null,
+        matches: [
+          {
+            account,
+            handle: 'alice@social.example',
+            signals: ['Mastodon username matches GitHub login'],
+            confidence: 'candidate',
+          },
+        ],
+      },
+    ]);
+    discovery.relationships.set(
+      new Map([
+        [
+          account.id,
+          {
+            id: account.id,
+            following: false,
+            followed_by: false,
+            requested: false,
+            blocking: false,
+            muting: false,
+          },
+        ],
+      ]),
+    );
+    fixture.detectChanges();
 
-    internals(fixture).addGitHubFriend('alice@social.example');
+    const match = (fixture.nativeElement as HTMLElement).querySelector('.contact-match')!;
+    expect(match.querySelector('a')?.getAttribute('href')).toBe('/accounts/alice-id');
+    expect(match.textContent).not.toContain('Add');
+    match.querySelector<HTMLButtonElement>('button')!.click();
+    httpMock.expectOne('/api/v1/accounts/alice-id/follow').flush({
+      id: account.id,
+      following: true,
+      followed_by: false,
+      requested: false,
+      blocking: false,
+      muting: false,
+    });
+    await Promise.resolve();
+    fixture.detectChanges();
 
-    expect(internals(fixture).importer.rows()).toHaveLength(1);
-    expect(internals(fixture).importer.rows()[0].handle).toBe('alice@social.example');
+    expect(match.querySelector('button')?.textContent).toContain('Following');
   });
 
   it('pages through every friend before downloading the export', async () => {

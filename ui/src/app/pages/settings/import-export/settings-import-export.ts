@@ -183,15 +183,6 @@ export class SettingsImportExport {
     );
   }
 
-  protected addGitHubFriend(handle: string): void {
-    const normalized = handle.replace(/^@/, '').toLowerCase();
-    if (!parseHandles(this.pasted()).some((existing) => existing.toLowerCase() === normalized)) {
-      this.pasted.update((value) => `${value.trimEnd()}${value.trim() ? '\n' : ''}@${normalized}`);
-    }
-    this.previewFriends();
-    document.getElementById('import-friends')?.scrollIntoView?.({ behavior: 'smooth' });
-  }
-
   protected githubStatusLabel(status: GitHubFriendStatus): string {
     switch (status) {
       case 'pending':

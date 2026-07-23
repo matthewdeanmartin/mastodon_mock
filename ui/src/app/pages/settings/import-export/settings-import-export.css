@@ -220,23 +220,6 @@
   border-radius: 50%;
 }
 
-.github-direct-match {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--border);
-}
-
-.github-direct-match > span {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-
 .contact-match .btn {
   align-self: center;
   margin-left: auto;
