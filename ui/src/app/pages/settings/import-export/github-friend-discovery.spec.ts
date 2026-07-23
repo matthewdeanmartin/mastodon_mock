@@ -101,18 +101,20 @@ describe('GitHub friend identity evidence', () => {
 
 describe('GitHubFriendDiscovery API budget', () => {
   let followedUsers: ReturnType<typeof vi.fn>;
+  let starredRepositoryOwners: ReturnType<typeof vi.fn>;
   let search: ReturnType<typeof vi.fn>;
   let relationships: ReturnType<typeof vi.fn>;
   let follow: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     followedUsers = vi.fn();
+    starredRepositoryOwners = vi.fn();
     search = vi.fn();
     relationships = vi.fn().mockReturnValue(of([]));
     follow = vi.fn();
     TestBed.configureTestingModule({
       providers: [
-        { provide: GitHubSession, useValue: { followedUsers } },
+        { provide: GitHubSession, useValue: { followedUsers, starredRepositoryOwners } },
         { provide: Api, useValue: { search, relationships, follow } },
       ],
     });
@@ -226,5 +228,103 @@ describe('GitHubFriendDiscovery API budget', () => {
 
     expect(follow).toHaveBeenCalledWith('hotcoder');
     expect(discovery.relationship(account.id)?.following).toBe(true);
+  });
+
+  it('checks unique starred-repository owners for direct identities without username searches', async () => {
+    followedUsers.mockResolvedValue({
+      users: [githubUser('existing')],
+      hasNextPage: false,
+      endCursor: null,
+    });
+    starredRepositoryOwners
+      .mockResolvedValueOnce({
+        owners: [
+          githubUser('owner-b', { websiteUrl: 'https://social.example/@owner-b' }),
+          githubUser('owner-a'),
+          githubUser('owner-b', { websiteUrl: 'https://social.example/@owner-b' }),
+        ],
+        repositoryCount: 3,
+        hasNextPage: true,
+        endCursor: 'stars-2',
+      })
+      .mockResolvedValueOnce({
+        owners: [
+          githubUser('existing', { websiteUrl: 'https://social.example/@existing' }),
+          githubUser('owner-c', { websiteUrl: 'https://social.example/@owner-c' }),
+        ],
+        repositoryCount: 2,
+        hasNextPage: false,
+        endCursor: null,
+      });
+    search.mockImplementation((query: string) =>
+      of({
+        accounts: [
+          mastodonAccount(query.split('@')[0], {
+            acct: query,
+            url: `https://${query.split('@')[1]}/@${query.split('@')[0]}`,
+          }),
+        ],
+        statuses: [],
+        hashtags: [],
+      }),
+    );
+    const discovery = TestBed.inject(GitHubFriendDiscovery);
+    await discovery.load();
+    search.mockClear();
+
+    await discovery.loadStarredOwners();
+
+    expect(starredRepositoryOwners).toHaveBeenNthCalledWith(1, null);
+    expect(starredRepositoryOwners).toHaveBeenNthCalledWith(2, 'stars-2');
+    expect(discovery.starredRepositoryCount()).toBe(5);
+    expect(discovery.starredOwnerCount()).toBe(4);
+    expect(discovery.rows().map((row) => row.profile.login)).toEqual([
+      'existing',
+      'owner-b',
+      'owner-c',
+    ]);
+    expect(search.mock.calls.map(([query]) => query)).toEqual([
+      'owner-b@social.example',
+      'owner-c@social.example',
+    ]);
+    expect(discovery.callCount()).toBe(0);
+    expect(discovery.starredOwnersLoaded()).toBe(true);
+  });
+
+  it('keeps Mastodon matches in API arrival order', async () => {
+    followedUsers.mockResolvedValue({
+      users: [githubUser('alice')],
+      hasNextPage: false,
+      endCursor: null,
+    });
+    search.mockReturnValue(
+      of({
+        accounts: [
+          mastodonAccount('alice', { id: 'first', fields: [] }),
+          mastodonAccount('alice', {
+            id: 'confirmed-second',
+            fields: [
+              {
+                name: 'GitHub',
+                value: '<a href="https://github.com/alice">GitHub</a>',
+                verified_at: '2026-07-23T00:00:00.000Z',
+              },
+            ],
+          }),
+        ],
+        statuses: [],
+        hashtags: [],
+      }),
+    );
+    const discovery = TestBed.inject(GitHubFriendDiscovery);
+    discovery.delayMs = 0;
+    await discovery.load();
+
+    await discovery.start(1);
+
+    expect(discovery.rows()[0].matches.map((match) => match.account.id)).toEqual([
+      'first',
+      'confirmed-second',
+    ]);
   });
 });

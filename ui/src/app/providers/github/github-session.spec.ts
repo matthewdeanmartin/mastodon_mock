@@ -106,6 +106,53 @@ describe('GitHubSession', () => {
     );
   });
 
+  it('loads only repository owners from starred repositories', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify(USER), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                starredRepositories: {
+                  nodes: [
+                    {
+                      owner: {
+                        login: 'owner',
+                        name: 'Owner',
+                        avatarUrl: 'https://avatars.example/owner',
+                        url: 'https://github.com/owner',
+                        bio: null,
+                        websiteUrl: 'https://social.example/@owner',
+                        socialAccounts: { nodes: [] },
+                      },
+                    },
+                  ],
+                  pageInfo: { hasNextPage: true, endCursor: 'next-stars' },
+                },
+              },
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+    const session = TestBed.inject(GitHubSession);
+    await session.connect('ghp_secret');
+
+    const page = await session.starredRepositoryOwners(null);
+
+    expect(page.owners.map((owner) => owner.login)).toEqual(['owner']);
+    expect(page).toMatchObject({
+      repositoryCount: 1,
+      hasNextPage: true,
+      endCursor: 'next-stars',
+    });
+    const request = vi.mocked(fetch).mock.calls.at(-1)?.[1] as RequestInit;
+    expect(request.body).toContain('starredRepositories');
+    expect(request.body).toContain('owner');
+    expect(request.body).not.toContain('contributors');
+  });
+
   it('disconnects and forgets all proof data', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(USER), { status: 200 }),

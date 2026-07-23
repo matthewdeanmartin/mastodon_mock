@@ -35,6 +35,25 @@
         <button type="button" class="btn" (click)="startImport()">
           Follow all ({{ importer.rows().length }})
         </button>
+        <button
+          type="button"
+          class="btn btn-outline"
+          (click)="loadGitHubStarredOwners()"
+          [disabled]="
+            githubDiscovery.loading() ||
+            githubDiscovery.loadingStarredOwners() ||
+            githubDiscovery.running() ||
+            githubDiscovery.starredOwnersLoaded()
+          "
+        >
+          {{
+            githubDiscovery.loadingStarredOwners()
+              ? 'Checking starred repo owners…'
+              : githubDiscovery.starredOwnersLoaded()
+                ? 'Starred repo owners checked'
+                : 'Find rel=me matches from starred repo owners'
+          }}
+        </button>
       }
       @if (importer.running()) {
         <button type="button" class="btn btn-outline" (click)="importer.stop()">Stop</button>
@@ -105,7 +124,11 @@
           type="button"
           class="btn btn-outline"
           (click)="loadGitHubFriends()"
-          [disabled]="githubDiscovery.loading() || githubDiscovery.running()"
+          [disabled]="
+            githubDiscovery.loading() ||
+            githubDiscovery.loadingStarredOwners() ||
+            githubDiscovery.running()
+          "
         >
           {{
             githubDiscovery.loading()
@@ -143,6 +166,14 @@
           </button>
         }
         @if (githubDiscovery.rows().length) {
+          <button
+            type="button"
+            class="btn btn-outline"
+            [attr.aria-pressed]="hideGithubFollowed()"
+            (click)="hideGithubFollowed.set(!hideGithubFollowed())"
+          >
+            {{ hideGithubFollowed() ? 'Show already followed' : 'Hide already followed' }}
+          </button>
           <button type="button" class="link" (click)="githubDiscovery.reset()">clear</button>
         }
       </div>
@@ -167,6 +198,10 @@
             }}
             through your server. {{ githubDiscovery.callCount() }} / {{ githubCallLimit() }}
             username-search calls used.
+            @if (githubDiscovery.starredPageCount()) {
+              Checked {{ githubDiscovery.starredRepositoryCount() }} starred repositories and
+              {{ githubDiscovery.starredOwnerCount() }} unique owners; contributors were not loaded.
+            }
           </span>
         </div>
         <div
@@ -183,7 +218,7 @@
         </div>
 
         <ol class="contact-rows">
-          @for (row of githubDiscovery.rows(); track row.profile.login) {
+          @for (row of githubVisibleRows(); track row.profile.login) {
             @if (
               row.identity ||
               row.matches.length ||
@@ -209,49 +244,54 @@
                 @if (row.matches.length) {
                   <ul class="contact-matches">
                     @for (match of row.matches; track match.account.id) {
-                      <li class="contact-match">
-                        <img [src]="match.account.avatar_static || match.account.avatar" alt="" />
-                        <div class="match-main">
-                          <a [routerLink]="['/accounts', match.account.id]">
-                            <strong>{{
-                              match.account.display_name || match.account.username
-                            }}</strong>
-                            <span class="muted"> &#64;{{ match.account.acct }}</span>
-                          </a>
-                          <span [class]="'confidence confidence-' + match.confidence">
-                            {{ match.confidence }}
-                          </span>
-                          <span class="muted small">{{ match.signals.join(' · ') }}</span>
-                        </div>
-                        @if (githubDiscovery.relationship(match.account.id); as relationship) {
-                          <button
-                            type="button"
-                            class="btn btn-outline btn-sm"
-                            [disabled]="
-                              relationship.following ||
-                              relationship.requested ||
-                              githubDiscovery.followBusy().has(match.account.id)
-                            "
-                            (click)="githubDiscovery.follow(match.account)"
-                          >
-                            {{
-                              githubDiscovery.followBusy().has(match.account.id)
-                                ? 'Following…'
-                                : relationship.following
-                                  ? 'Following'
-                                  : relationship.requested
-                                    ? 'Requested'
-                                    : 'Follow'
-                            }}
-                          </button>
-                        } @else {
-                          <button type="button" class="btn btn-outline btn-sm" disabled>
-                            Checking…
-                          </button>
+                      @if (
+                        !hideGithubFollowed() ||
+                        !githubDiscovery.relationship(match.account.id)?.following
+                      ) {
+                        <li class="contact-match">
+                          <img [src]="match.account.avatar_static || match.account.avatar" alt="" />
+                          <div class="match-main">
+                            <a [routerLink]="['/accounts', match.account.id]">
+                              <strong>{{
+                                match.account.display_name || match.account.username
+                              }}</strong>
+                              <span class="muted"> &#64;{{ match.account.acct }}</span>
+                            </a>
+                            <span [class]="'confidence confidence-' + match.confidence">
+                              {{ match.confidence }}
+                            </span>
+                            <span class="muted small">{{ match.signals.join(' · ') }}</span>
+                          </div>
+                          @if (githubDiscovery.relationship(match.account.id); as relationship) {
+                            <button
+                              type="button"
+                              class="btn btn-outline btn-sm"
+                              [disabled]="
+                                relationship.following ||
+                                relationship.requested ||
+                                githubDiscovery.followBusy().has(match.account.id)
+                              "
+                              (click)="githubDiscovery.follow(match.account)"
+                            >
+                              {{
+                                githubDiscovery.followBusy().has(match.account.id)
+                                  ? 'Following…'
+                                  : relationship.following
+                                    ? 'Following'
+                                    : relationship.requested
+                                      ? 'Requested'
+                                      : 'Follow'
+                              }}
+                            </button>
+                          } @else {
+                            <button type="button" class="btn btn-outline btn-sm" disabled>
+                              Checking…
+                            </button>
+                          }
+                        </li>
+                        @if (githubDiscovery.followErrors().get(match.account.id); as followError) {
+                          <li class="export-error small" role="alert">{{ followError }}</li>
                         }
-                      </li>
-                      @if (githubDiscovery.followErrors().get(match.account.id); as followError) {
-                        <li class="export-error small" role="alert">{{ followError }}</li>
                       }
                     }
                   </ul>

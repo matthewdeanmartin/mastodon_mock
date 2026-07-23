@@ -64,6 +64,7 @@ export class SettingsImportExport {
   protected contactFileName = signal<string | null>(null);
   protected contactCallLimit = signal(20);
   protected githubCallLimit = signal(20);
+  protected hideGithubFollowed = signal(false);
 
   protected doneCount = computed(
     () =>
@@ -93,6 +94,20 @@ export class SettingsImportExport {
   );
   protected githubPendingCount = computed(
     () => this.githubDiscovery.rows().filter((row) => row.status === 'pending').length,
+  );
+  protected githubVisibleRows = computed(() =>
+    this.githubDiscovery.rows().filter((row) => {
+      const renderable =
+        row.identity || row.matches.length || row.status === 'searching' || row.status === 'failed';
+      return (
+        renderable &&
+        (!this.hideGithubFollowed() ||
+          !row.matches.length ||
+          row.matches.some(
+            (match) => !this.githubDiscovery.relationship(match.account.id)?.following,
+          ))
+      );
+    }),
   );
 
   protected importKind = signal<CsvKind>('following');
@@ -170,6 +185,10 @@ export class SettingsImportExport {
 
   protected loadGitHubFriends(): void {
     void this.githubDiscovery.load();
+  }
+
+  protected loadGitHubStarredOwners(): void {
+    void this.githubDiscovery.loadStarredOwners();
   }
 
   protected startGitHubSearch(): void {

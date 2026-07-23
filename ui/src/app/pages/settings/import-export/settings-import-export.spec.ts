@@ -16,6 +16,7 @@ interface SettingsImportExportInternals {
   csvText: WritableSignal<string>;
   report: WritableSignal<ImportReport | null>;
   exportCount: WritableSignal<number>;
+  hideGithubFollowed: WritableSignal<boolean>;
   download(kind: 'following' | 'mutes' | 'blocks'): void;
   upload(): void;
   exportFriends(): Promise<void>;
@@ -184,6 +185,89 @@ describe('SettingsImportExport', () => {
     fixture.detectChanges();
 
     expect(match.querySelector('button')?.textContent).toContain('Following');
+  });
+
+  it('hides already-followed GitHub matches without changing their discovery order', () => {
+    localStorage.setItem(
+      'mockingbird_github_token',
+      JSON.stringify({
+        accessToken: 'ghp_test',
+        user: {
+          login: 'viewer',
+          avatar_url: '',
+          html_url: 'https://github.com/viewer',
+          name: 'Viewer',
+        },
+      }),
+    );
+    const fixture = setUp();
+    const discovery = TestBed.inject(GitHubFriendDiscovery);
+    const account = (id: string) =>
+      ({
+        id,
+        username: id,
+        acct: `${id}@social.example`,
+        display_name: id,
+        avatar: '',
+        avatar_static: '',
+      }) as Account;
+    discovery.rows.set(
+      ['first', 'second'].map((id) => ({
+        profile: {
+          login: id,
+          name: id,
+          avatarUrl: '',
+          url: `https://github.com/${id}`,
+          bio: null,
+          websiteUrl: null,
+          socialAccounts: { nodes: [] },
+        },
+        status: 'complete' as const,
+        identity: null,
+        matches: [
+          {
+            account: account(id),
+            handle: `${id}@social.example`,
+            signals: ['Mastodon username matches GitHub login'],
+            confidence: 'candidate' as const,
+          },
+        ],
+      })),
+    );
+    discovery.relationships.set(
+      new Map([
+        [
+          'first',
+          {
+            id: 'first',
+            following: true,
+            followed_by: false,
+            requested: false,
+            blocking: false,
+            muting: false,
+          },
+        ],
+        [
+          'second',
+          {
+            id: 'second',
+            following: false,
+            followed_by: false,
+            requested: false,
+            blocking: false,
+            muting: false,
+          },
+        ],
+      ]),
+    );
+    internals(fixture).hideGithubFollowed.set(true);
+    fixture.detectChanges();
+
+    const rows = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.contact-row')].map(
+      (row) => row.textContent,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('second');
   });
 
   it('pages through every friend before downloading the export', async () => {

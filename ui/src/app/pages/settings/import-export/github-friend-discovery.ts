@@ -108,10 +108,15 @@ export class GitHubFriendDiscovery {
 
   readonly rows = signal<GitHubFriendRow[]>([]);
   readonly loading = signal(false);
+  readonly loadingStarredOwners = signal(false);
   readonly running = signal(false);
   readonly callCount = signal(0);
   readonly linkedLookupCount = signal(0);
   readonly githubPageCount = signal(0);
+  readonly starredRepositoryCount = signal(0);
+  readonly starredOwnerCount = signal(0);
+  readonly starredPageCount = signal(0);
+  readonly starredOwnersLoaded = signal(false);
   readonly loadError = signal<string | null>(null);
   readonly relationships = signal<ReadonlyMap<string, Relationship>>(new Map());
   readonly followBusy = signal<ReadonlySet<string>>(new Set());
@@ -120,7 +125,7 @@ export class GitHubFriendDiscovery {
   delayMs = 350;
 
   async load(): Promise<void> {
-    if (this.loading() || this.running()) return;
+    if (this.loading() || this.loadingStarredOwners() || this.running()) return;
     this.loading.set(true);
     this.loadError.set(null);
     this.stopRequested = false;
@@ -171,14 +176,76 @@ export class GitHubFriendDiscovery {
     }
   }
 
+  async loadStarredOwners(): Promise<void> {
+    if (
+      this.loading() ||
+      this.loadingStarredOwners() ||
+      this.running() ||
+      this.starredOwnersLoaded()
+    ) {
+      return;
+    }
+    this.loadingStarredOwners.set(true);
+    this.loadError.set(null);
+    this.starredRepositoryCount.set(0);
+    this.starredOwnerCount.set(0);
+    this.starredPageCount.set(0);
+    const seen = new Set(this.rows().map((row) => row.profile.login.toLowerCase()));
+    const starredOwners = new Set<string>();
+    let cursor: string | null = null;
+    try {
+      while (true) {
+        const page = await this.github.starredRepositoryOwners(cursor);
+        this.starredPageCount.update((count) => count + 1);
+        this.starredRepositoryCount.update((count) => count + page.repositoryCount);
+        for (const profile of page.owners) {
+          const login = profile.login.toLowerCase();
+          if (starredOwners.has(login)) continue;
+          starredOwners.add(login);
+          this.starredOwnerCount.update((count) => count + 1);
+          if (seen.has(login)) continue;
+          seen.add(login);
+          const identity = profileMastodonIdentity(profile);
+          if (!identity) continue;
+          const rowIndex = this.rows().length;
+          this.rows.update((rows) => [
+            ...rows,
+            { profile, status: 'pending', identity, matches: [] },
+          ]);
+          await this.resolveLinkedRow(rowIndex);
+          await this.loadRelationships();
+        }
+        if (!page.hasNextPage) break;
+        if (!page.endCursor || page.endCursor === cursor) {
+          throw new Error('GitHub starred-repository pagination did not advance.');
+        }
+        cursor = page.endCursor;
+      }
+      this.starredOwnersLoaded.set(true);
+    } catch (error: unknown) {
+      this.loadError.set(
+        error instanceof Error
+          ? error.message
+          : "Couldn't load the owners of your starred GitHub repositories.",
+      );
+    } finally {
+      this.loadingStarredOwners.set(false);
+    }
+  }
+
   reset(): void {
     this.stopRequested = true;
     this.rows.set([]);
     this.loading.set(false);
+    this.loadingStarredOwners.set(false);
     this.running.set(false);
     this.callCount.set(0);
     this.linkedLookupCount.set(0);
     this.githubPageCount.set(0);
+    this.starredRepositoryCount.set(0);
+    this.starredOwnerCount.set(0);
+    this.starredPageCount.set(0);
+    this.starredOwnersLoaded.set(false);
     this.loadError.set(null);
     this.relationships.set(new Map());
     this.followBusy.set(new Set());
@@ -247,12 +314,6 @@ export class GitHubFriendDiscovery {
       const matches = (result.accounts ?? [])
         .map((account) => rankGitHubMatch(row.profile, account))
         .filter((match) => match.signals.length > 0)
-        .sort(
-          (a, b) =>
-            confidenceOrder(a.confidence) - confidenceOrder(b.confidence) ||
-            b.signals.length - a.signals.length ||
-            a.account.acct.localeCompare(b.account.acct),
-        )
         .slice(0, 5);
       this.patch(rowIndex, { status: 'complete', matches });
     } catch (error: unknown) {
@@ -271,35 +332,32 @@ export class GitHubFriendDiscovery {
 
   private async resolveLinkedRows(): Promise<void> {
     for (let rowIndex = 0; rowIndex < this.rows().length; rowIndex++) {
-      const row = this.rows()[rowIndex];
-      if (!row.identity) continue;
-      this.linkedLookupCount.update((count) => count + 1);
-      try {
-        const result = await firstValueFrom(
-          this.api.search(row.identity.handle, 'accounts', { resolve: true, limit: 5 }),
-        );
-        const matches = (result.accounts ?? [])
-          .map((account) => rankGitHubMatch(row.profile, account))
-          .filter((match) => match.signals.length > 0)
-          .sort(
-            (a, b) =>
-              confidenceOrder(a.confidence) - confidenceOrder(b.confidence) ||
-              b.signals.length - a.signals.length,
-          )
-          .slice(0, 1);
-        this.patch(rowIndex, {
-          status: 'complete',
-          matches,
-          error: matches.length
-            ? undefined
-            : 'Linked Mastodon profile was not found by your server.',
-        });
-      } catch {
-        this.patch(rowIndex, {
-          status: 'failed',
-          error: 'Could not resolve the linked Mastodon profile through your server.',
-        });
-      }
+      if (this.rows()[rowIndex].identity) await this.resolveLinkedRow(rowIndex);
+    }
+  }
+
+  private async resolveLinkedRow(rowIndex: number): Promise<void> {
+    const row = this.rows()[rowIndex];
+    if (!row?.identity) return;
+    this.linkedLookupCount.update((count) => count + 1);
+    try {
+      const result = await firstValueFrom(
+        this.api.search(row.identity.handle, 'accounts', { resolve: true, limit: 5 }),
+      );
+      const matches = (result.accounts ?? [])
+        .map((account) => rankGitHubMatch(row.profile, account))
+        .filter((match) => match.signals.length > 0)
+        .slice(0, 1);
+      this.patch(rowIndex, {
+        status: 'complete',
+        matches,
+        error: matches.length ? undefined : 'Linked Mastodon profile was not found by your server.',
+      });
+    } catch {
+      this.patch(rowIndex, {
+        status: 'failed',
+        error: 'Could not resolve the linked Mastodon profile through your server.',
+      });
     }
   }
 
@@ -385,10 +443,6 @@ function normalize(value: string): string {
 
 function normalizeUsername(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
-}
-
-function confidenceOrder(confidence: GitHubFriendConfidence): number {
-  return confidence === 'confirmed' ? 0 : confidence === 'probable' ? 1 : 2;
 }
 
 function delay(ms: number): Promise<void> {

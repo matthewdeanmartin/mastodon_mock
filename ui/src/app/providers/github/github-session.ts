@@ -57,11 +57,30 @@ export interface GitHubFollowingPage {
   endCursor: string | null;
 }
 
+export interface GitHubStarredOwnerPage {
+  owners: GitHubFollowedUser[];
+  repositoryCount: number;
+  hasNextPage: boolean;
+  endCursor: string | null;
+}
+
 interface GitHubGraphQlResponse {
   data?: {
     viewer?: {
       following?: {
         nodes: GitHubFollowedUser[];
+        pageInfo: {
+          hasNextPage: boolean;
+          endCursor: string | null;
+        };
+      };
+      starredRepositories?: {
+        nodes: {
+          owner: GitHubFollowedUser & {
+            description?: string | null;
+            socialAccounts?: { nodes: GitHubSocialAccount[] };
+          };
+        }[];
         pageInfo: {
           hasNextPage: boolean;
           endCursor: string | null;
@@ -123,26 +142,7 @@ export class GitHubSession {
   }
 
   async followedUsers(cursor: string | null = null): Promise<GitHubFollowingPage> {
-    const accessToken = this.token()?.accessToken;
-    if (!accessToken) {
-      throw new Error('Connect GitHub first.');
-    }
-
-    const response = await fetch(`${API_ROOT}/graphql`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': API_VERSION,
-      },
-      body: JSON.stringify({ query: FOLLOWED_USERS_QUERY, variables: { cursor } }),
-    });
-    if (!response.ok) {
-      if (response.status === 401) this.disconnect();
-      throw new GitHubApiError(response.status, await githubError(response));
-    }
-    const body = (await response.json()) as GitHubGraphQlResponse;
+    const body = await this.graphQl(FOLLOWED_USERS_QUERY, cursor);
     const following = body.data?.viewer?.following;
     if (!following) {
       throw new Error(body.errors?.[0]?.message ?? 'GitHub did not return followed accounts.');
@@ -154,6 +154,26 @@ export class GitHubSession {
     };
   }
 
+  async starredRepositoryOwners(cursor: string | null = null): Promise<GitHubStarredOwnerPage> {
+    const body = await this.graphQl(STARRED_REPOSITORY_OWNERS_QUERY, cursor);
+    const starred = body.data?.viewer?.starredRepositories;
+    if (!starred) {
+      throw new Error(
+        body.errors?.[0]?.message ?? 'GitHub did not return your starred repositories.',
+      );
+    }
+    return {
+      owners: starred.nodes.map(({ owner }) => ({
+        ...owner,
+        bio: owner.bio ?? owner.description ?? null,
+        socialAccounts: owner.socialAccounts ?? { nodes: [] },
+      })),
+      repositoryCount: starred.nodes.length,
+      hasNextPage: starred.pageInfo.hasNextPage,
+      endCursor: starred.pageInfo.endCursor,
+    };
+  }
+
   disconnect(): void {
     localStorage.removeItem(this.tokenKey);
     this.token.set(null);
@@ -161,6 +181,28 @@ export class GitHubSession {
     this.connected.set(false);
     this.notifications.set(null);
     this.following.set(null);
+  }
+
+  private async graphQl(query: string, cursor: string | null): Promise<GitHubGraphQlResponse> {
+    const accessToken = this.token()?.accessToken;
+    if (!accessToken) {
+      throw new Error('Connect GitHub first.');
+    }
+    const response = await fetch(`${API_ROOT}/graphql`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': API_VERSION,
+      },
+      body: JSON.stringify({ query, variables: { cursor } }),
+    });
+    if (!response.ok) {
+      if (response.status === 401) this.disconnect();
+      throw new GitHubApiError(response.status, await githubError(response));
+    }
+    return (await response.json()) as GitHubGraphQlResponse;
   }
 }
 
@@ -184,6 +226,47 @@ const FOLLOWED_USERS_QUERY = `
               provider
               displayName
               url
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const STARRED_REPOSITORY_OWNERS_QUERY = `
+  query StarredRepositoryOwners($cursor: String) {
+    viewer {
+      starredRepositories(
+        first: 100
+        after: $cursor
+        orderBy: { field: STARRED_AT, direction: DESC }
+      ) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          owner {
+            login
+            avatarUrl
+            url
+            ... on User {
+              name
+              bio
+              websiteUrl
+              socialAccounts(first: 10) {
+                nodes {
+                  provider
+                  displayName
+                  url
+                }
+              }
+            }
+            ... on Organization {
+              name
+              description
+              websiteUrl
             }
           }
         }
