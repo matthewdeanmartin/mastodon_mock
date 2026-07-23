@@ -94,9 +94,24 @@
     itself or unwrap it and save its first external link. Hashtags and links back to your Mastodon
     instance are skipped.
   </p>
-  <p class="muted small">
-    Create an app in Raindrop.io's App Management Console and register this redirect URL:
+  <ol class="setup-steps muted small">
+    <li>Create an app in Raindrop.io's App Management Console.</li>
+    <li>
+      Set its OAuth redirect URI to the exact callback shown below. The address is specific to this
+      deployment: local <code>/_ui/</code>, canary <code>/canary/</code>, and production each have a
+      different callback.
+    </li>
+    <li>Paste that app's client ID and client secret below, then choose “Save and connect”.</li>
+  </ol>
+  <div class="redirect-row">
     <code class="redirect-url">{{ raindropRedirectUrl }}</code>
+    <button class="btn btn-outline btn-sm" type="button" (click)="copyRaindropRedirect()">
+      Copy callback URL
+    </button>
+  </div>
+  <p class="muted small">
+    Raindrop.io requires an exact match. If you test another deployment, register its displayed
+    callback there and use credentials for that app.
   </p>
   <p class="credential-warning small">
     Your client ID, client secret, and OAuth tokens are stored in this browser's localStorage. Only

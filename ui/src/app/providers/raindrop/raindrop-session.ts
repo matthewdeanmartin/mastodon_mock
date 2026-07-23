@@ -6,8 +6,6 @@ const CREDENTIALS_KEY_BASE = 'mockingbird_raindrop_credentials';
 const TOKEN_KEY_BASE = 'mockingbird_raindrop_token';
 const STATE_KEY = 'mockingbird_raindrop_oauth_state';
 
-export const RAINDROP_REDIRECT_URL = 'https://mawkingbird.com/raindrop';
-
 export interface RaindropCredentials {
   clientId: string;
   clientSecret: string;
@@ -67,7 +65,7 @@ export class RaindropSession {
     authorizeUrl.search = new URLSearchParams({
       response_type: 'code',
       client_id: credentials.clientId,
-      redirect_uri: RAINDROP_REDIRECT_URL,
+      redirect_uri: raindropRedirectUrl(),
       state,
     }).toString();
     location.assign(authorizeUrl.toString());
@@ -92,7 +90,7 @@ export class RaindropSession {
       const result = await this.exchangeToken({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: RAINDROP_REDIRECT_URL,
+        redirect_uri: raindropRedirectUrl(),
       });
       this.storeToken(result);
     } finally {
@@ -210,6 +208,11 @@ export class RaindropSession {
   private clearPendingAuthorization(): void {
     sessionStorage.removeItem(STATE_KEY);
   }
+}
+
+/** OAuth callback for this exact deployment, including sub-paths such as /_ui or /canary. */
+export function raindropRedirectUrl(baseUri = document.baseURI): string {
+  return new URL('raindrop', baseUri).toString();
 }
 
 /** Find the first ordinary web link, skipping hashtags and links back to the viewer's instance. */

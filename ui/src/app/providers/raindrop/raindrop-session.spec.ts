@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../../models';
-import { firstExternalLink, RaindropSession } from './raindrop-session';
+import { firstExternalLink, raindropRedirectUrl, RaindropSession } from './raindrop-session';
 
 function status(overrides: Partial<Status> = {}): Status {
   return {
@@ -63,6 +63,16 @@ describe('firstExternalLink', () => {
       <a href="https://news.example/story">story</a>
     `;
     expect(firstExternalLink(content, 'https://social.example')).toBe('https://news.example/story');
+  });
+});
+
+describe('raindropRedirectUrl', () => {
+  it.each([
+    ['http://localhost:4200/_ui/', 'http://localhost:4200/_ui/raindrop'],
+    ['https://mawkingbird.com/canary/', 'https://mawkingbird.com/canary/raindrop'],
+    ['https://mawkingbird.com/', 'https://mawkingbird.com/raindrop'],
+  ])('keeps the deployment base path in %s', (base, expected) => {
+    expect(raindropRedirectUrl(base)).toBe(expected);
   });
 });
 

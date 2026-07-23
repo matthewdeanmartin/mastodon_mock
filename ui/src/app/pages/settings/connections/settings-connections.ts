@@ -7,10 +7,7 @@ import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
 import { DropboxEntry, DropboxSession } from '../../../providers/dropbox/dropbox-session';
-import {
-  RAINDROP_REDIRECT_URL,
-  RaindropSession,
-} from '../../../providers/raindrop/raindrop-session';
+import { raindropRedirectUrl, RaindropSession } from '../../../providers/raindrop/raindrop-session';
 
 /**
  * Connections: the other places your people post. Mastodon is home; everything
@@ -50,7 +47,7 @@ export class SettingsConnections implements OnInit {
 
   protected raindropClientId = signal(this.raindrop.credentials()?.clientId ?? '');
   protected raindropClientSecret = signal(this.raindrop.credentials()?.clientSecret ?? '');
-  protected readonly raindropRedirectUrl = RAINDROP_REDIRECT_URL;
+  protected readonly raindropRedirectUrl = raindropRedirectUrl();
   protected raindropError = signal<string | null>(null);
   protected raindropNotice = signal<string | null>(null);
 
@@ -101,6 +98,16 @@ export class SettingsConnections implements OnInit {
     this.raindropClientId.set('');
     this.raindropClientSecret.set('');
     this.raindropNotice.set(null);
+  }
+
+  async copyRaindropRedirect(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.raindropRedirectUrl);
+      this.raindropNotice.set('Callback URL copied.');
+      this.raindropError.set(null);
+    } catch {
+      this.raindropError.set('Select and copy the callback URL manually.');
+    }
   }
 
   async connectDropbox(): Promise<void> {
