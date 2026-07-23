@@ -25,6 +25,11 @@ export const routes: Routes = [
   // The project story should be available before a visitor has an account.
   { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
   {
+    path: 'integrations/dropbox/callback',
+    loadComponent: () =>
+      import('./pages/dropbox-callback/dropbox-callback').then((m) => m.DropboxCallback),
+  },
+  {
     path: 'fail-whale',
     loadComponent: () =>
       import('./pages/fail-whale-demo/fail-whale-demo').then((m) => m.FailWhaleDemo),

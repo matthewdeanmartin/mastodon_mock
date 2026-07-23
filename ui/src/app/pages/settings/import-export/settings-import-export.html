@@ -109,6 +109,136 @@
     }
   </section>
 
+  <section class="friend-section contact-section">
+    <h2>Find contacts on Mastodon</h2>
+    <p class="muted small">
+      Upload a Google Contacts CSV to look for possible matches through your home server. The file
+      stays in this browser; only derived search terms are sent to your server. Nobody is followed
+      automatically. Names, usernames, domains, and profile links are clues—not proof of identity.
+    </p>
+    <div class="contact-controls">
+      <label class="btn btn-outline file-btn">
+        Choose contacts CSV…
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          (change)="onContactFile($event)"
+          [disabled]="contactDiscovery.running()"
+          hidden
+        />
+      </label>
+      <label class="call-limit">
+        Stop after
+        <input
+          type="number"
+          min="1"
+          max="1000"
+          [ngModel]="contactCallLimit()"
+          (ngModelChange)="setContactCallLimit($event)"
+          [disabled]="contactDiscovery.running()"
+        />
+        API calls
+      </label>
+      @if (contactDiscovery.rows().length && !contactDiscovery.running()) {
+        <button
+          type="button"
+          class="btn"
+          (click)="startContactSearch()"
+          [disabled]="contactDiscovery.callCount() >= contactCallLimit()"
+        >
+          {{ contactDiscovery.callCount() ? 'Continue searching' : 'Start searching' }}
+        </button>
+      }
+      @if (contactDiscovery.running()) {
+        <button type="button" class="btn btn-outline" (click)="contactDiscovery.stop()">
+          Stop
+        </button>
+      }
+      @if (contactDiscovery.parseResult()) {
+        <button type="button" class="link" (click)="clearContactSearch()">clear</button>
+      }
+    </div>
+
+    @if (contactDiscovery.parseResult(); as parsed) {
+      <div class="contact-summary" aria-live="polite">
+        <strong>{{ parsed.contacts.length }} contacts ready to search</strong>
+        <span class="muted small">
+          {{ parsed.skipped }} skipped because they had no full person name or Mastodon handle. Up
+          to {{ parsed.contacts.length * 2 }} calls total; this run stops at
+          {{ contactCallLimit() }}.
+        </span>
+        @if (contactFileName(); as name) {
+          <span class="muted small"
+            >Loaded <code>{{ name }}</code> only in this browser.</span
+          >
+        }
+      </div>
+    }
+
+    @if (contactDiscovery.rows().length) {
+      <div
+        class="progress-track"
+        role="progressbar"
+        [attr.aria-valuenow]="contactDiscovery.callCount()"
+        [attr.aria-valuemin]="0"
+        [attr.aria-valuemax]="contactCallLimit()"
+      >
+        <div
+          class="progress-fill"
+          [style.width.%]="(contactDiscovery.callCount() / contactCallLimit()) * 100"
+        ></div>
+      </div>
+      <p class="muted small">
+        {{ contactDiscovery.callCount() }} / {{ contactCallLimit() }} API calls used
+      </p>
+      <ol class="contact-rows">
+        @for (row of contactDiscovery.rows(); track row.contact.id) {
+          @if (row.status !== 'pending') {
+            <li class="contact-row">
+              <div class="contact-row-head">
+                <span>
+                  <strong>{{ row.contact.name }}</strong>
+                  @if (row.contact.organization) {
+                    <span class="muted small"> · {{ row.contact.organization }}</span>
+                  }
+                </span>
+                <span class="row-status muted">{{ contactStatusLabel(row.status) }}</span>
+              </div>
+              @if (row.error) {
+                <p class="export-error small" role="alert">{{ row.error }}</p>
+              }
+              @if (row.status === 'complete' && !row.matches.length) {
+                <p class="muted small">No result had a matching clue.</p>
+              }
+              @if (row.matches.length) {
+                <ul class="contact-matches">
+                  @for (match of row.matches; track match.account.id) {
+                    <li class="contact-match">
+                      <img [src]="match.account.avatar_static || match.account.avatar" alt="" />
+                      <div class="match-main">
+                        <a [routerLink]="['/accounts', match.account.id]">
+                          <strong>{{
+                            match.account.display_name || match.account.username
+                          }}</strong>
+                          <span class="muted"> &#64;{{ match.account.acct }}</span>
+                        </a>
+                        <span class="confidence" [class]="'confidence-' + match.confidence">
+                          {{ match.confidence }} · {{ match.signals.length }} matching
+                          {{ match.signals.length === 1 ? 'clue' : 'clues' }}
+                        </span>
+                        <span class="muted small">{{ match.signals.join(' · ') }}</span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </li>
+          }
+        }
+      </ol>
+    }
+  </section>
+
   @if (mockTooling) {
     <div class="ssection">
       <h2 class="server-tools-title">Mock server data</h2>

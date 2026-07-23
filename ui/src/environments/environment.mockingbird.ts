@@ -12,4 +12,6 @@ export const environment = {
   brand: 'Mocking Bird',
   mockTooling: false,
   allowThisServer: false,
+  /** Public OAuth client id. This is safe to include in the static browser bundle. */
+  dropboxAppKey: 'tx5g7f50ty6r3df',
 };

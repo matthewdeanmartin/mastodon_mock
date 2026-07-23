@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlueskySession, BskySession } from '../../../providers/bluesky/bluesky-session';
@@ -29,6 +30,7 @@ describe('SettingsConnections', () => {
     bskySession = { session: signal<BskySession | null>(null), login: vi.fn(), unlink: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
+        provideRouter([]),
         { provide: RssFetch, useValue: { fetchFeed } },
         { provide: BlueskySession, useValue: bskySession },
       ],

@@ -150,6 +150,7 @@ dev = [
     "httpx2>=2.4.0",
     # Transitive build dependency; keep at the bottom as an audit floor.
     "setuptools>=83.0.0",
+    "pillow>=12.3.0",
 ]
 
 [tool.uv]

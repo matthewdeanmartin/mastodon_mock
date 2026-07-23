@@ -21,4 +21,6 @@ export const environment = {
    * Mocking Bird has no own server, so it forces the user to pick an instance.
    */
   allowThisServer: true,
+  /** Public OAuth client id. Set this to the app key from the Dropbox App Console. */
+  dropboxAppKey: 'tx5g7f50ty6r3df',
 };

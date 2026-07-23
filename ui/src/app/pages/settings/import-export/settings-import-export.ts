@@ -7,6 +7,7 @@ import { Auth } from '../../../auth';
 import { ImportFollows, parseHandles } from '../../../import-follows';
 import { Account, ImportReport } from '../../../models';
 import { environment } from '../../../../environments/environment';
+import { ContactDiscovery } from './contact-discovery';
 
 type CsvKind = 'following' | 'mutes' | 'blocks';
 
@@ -47,6 +48,7 @@ export class SettingsImportExport {
   private api = inject(Api);
   private auth = inject(Auth);
   protected importer = inject(ImportFollows);
+  protected contactDiscovery = inject(ContactDiscovery);
 
   protected readonly mockTooling = environment.mockTooling;
   protected pasted = signal('');
@@ -55,6 +57,8 @@ export class SettingsImportExport {
   protected exportingFriends = signal(false);
   protected exportCount = signal(0);
   protected exportError = signal<string | null>(null);
+  protected contactFileName = signal<string | null>(null);
+  protected contactCallLimit = signal(20);
 
   protected doneCount = computed(
     () =>
@@ -115,6 +119,44 @@ export class SettingsImportExport {
       this.previewFriends();
     });
     input.value = '';
+  }
+
+  protected onContactFile(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.contactFileName.set(file.name);
+    file.text().then((text) => this.contactDiscovery.load(text));
+    input.value = '';
+  }
+
+  protected startContactSearch(): void {
+    void this.contactDiscovery.start(this.contactCallLimit());
+  }
+
+  protected setContactCallLimit(value: number | string): void {
+    const parsed = Number(value);
+    this.contactCallLimit.set(
+      Number.isFinite(parsed) ? Math.min(1000, Math.max(1, Math.floor(parsed))) : 20,
+    );
+  }
+
+  protected clearContactSearch(): void {
+    this.contactFileName.set(null);
+    this.contactDiscovery.reset();
+  }
+
+  protected contactStatusLabel(status: string): string {
+    switch (status) {
+      case 'pending':
+        return 'waiting';
+      case 'searching':
+        return 'searching…';
+      case 'complete':
+        return 'searched';
+      default:
+        return 'failed';
+    }
   }
 
   protected previewFriends(): void {

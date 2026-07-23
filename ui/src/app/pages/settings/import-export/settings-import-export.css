@@ -94,3 +94,108 @@
 .server-tools-title {
   padding: 16px 16px 4px;
 }
+
+.contact-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.call-limit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.call-limit input {
+  width: 72px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--col-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.contact-summary {
+  display: grid;
+  gap: 3px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.contact-rows,
+.contact-matches {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact-rows {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.contact-row {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.contact-row-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.contact-matches {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.contact-match {
+  display: flex;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.contact-match img {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.match-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.confidence {
+  width: fit-content;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.confidence-likely {
+  background: color-mix(in srgb, #22c55e 22%, transparent);
+}
+
+.confidence-possible {
+  background: color-mix(in srgb, #eab308 22%, transparent);
+}

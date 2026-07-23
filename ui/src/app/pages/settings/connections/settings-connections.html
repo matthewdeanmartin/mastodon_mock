@@ -53,6 +53,42 @@
   }
 </section>
 
+<section class="conn-section">
+  <h2>📦 Dropbox</h2>
+  <p class="muted">
+    Connect an app-specific Dropbox folder with OAuth. Authorization and file access happen
+    directly between this browser and Dropbox; Mockingbird never receives a client secret or your
+    files.
+  </p>
+  @if (!dropbox.configured) {
+    <p class="feed-error">
+      Dropbox is not configured for this build. Add the public Dropbox app key to the Angular
+      environment first.
+    </p>
+  } @else if (dropbox.connected()) {
+    <div class="dropbox-actions">
+      <button class="btn" type="button" (click)="listDropbox()" [disabled]="dropboxBusy()">
+        {{ dropboxBusy() ? 'Listing…' : 'List files and folders' }}
+      </button>
+      <button class="btn btn-outline" type="button" (click)="disconnectDropbox()">
+        Disconnect
+      </button>
+    </div>
+    <p class="muted small">
+      This short-lived connection is kept only for this browser session. Reconnect after it
+      expires.
+    </p>
+  } @else {
+    <button class="btn" type="button" (click)="connectDropbox()">Connect Dropbox</button>
+  }
+  @if (dropboxNotice(); as msg) {
+    <p class="connection-ok" role="status">{{ msg }}</p>
+  }
+  @if (dropboxError(); as msg) {
+    <p class="feed-error" role="alert">{{ msg }}</p>
+  }
+</section>
+
 @if (capabilities.canUseBluesky) {
   <section class="conn-section">
     <h2>🦋 Bluesky</h2>
@@ -108,4 +144,37 @@
       }
     }
   </section>
+}
+
+@if (dropboxEntries(); as entries) {
+  <div class="dropbox-modal-backdrop">
+    <section
+      class="dropbox-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dropbox-list-title"
+    >
+      <div class="dropbox-modal-head">
+        <h2 id="dropbox-list-title">Dropbox files and folders</h2>
+        <button class="icon-close" type="button" aria-label="Close" (click)="dropboxEntries.set(null)">
+          ×
+        </button>
+      </div>
+      @if (entries.length) {
+        <ul class="dropbox-list">
+          @for (entry of entries; track entry.id || entry.path_display || entry.name) {
+            <li>
+              <span aria-hidden="true">{{ entry['.tag'] === 'folder' ? '📁' : '📄' }}</span>
+              <span>{{ entry.name }}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="muted">This Dropbox folder is empty.</p>
+      }
+      <div class="dropbox-modal-foot">
+        <button class="btn" type="button" (click)="dropboxEntries.set(null)">Close</button>
+      </div>
+    </section>
+  </div>
 }
