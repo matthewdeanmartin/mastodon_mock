@@ -130,6 +130,49 @@
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
+.twitter-summary {
+  line-height: 1.45;
+}
+
+.archive-note {
+  margin: 10px 0 0;
+}
+
+.twitter-search-controls {
+  margin-top: 12px;
+}
+
+.twitter-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 16px 0 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.twitter-filters legend {
+  padding: 0 5px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.twitter-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.twitter-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 6px;
+}
+
 .contact-rows,
 .contact-matches {
   margin: 0;

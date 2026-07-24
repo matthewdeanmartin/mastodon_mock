@@ -44,6 +44,7 @@ export interface Account {
   followers_count: number;
   following_count: number;
   statuses_count: number;
+  last_status_at?: string | null;
   bot: boolean;
   locked: boolean;
   discoverable?: boolean | null;

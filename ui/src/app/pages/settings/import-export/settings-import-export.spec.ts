@@ -9,6 +9,8 @@ import { Auth } from '../../../auth';
 import { parseHandles } from '../../../import-follows';
 import { followingAccountsCsv, SettingsImportExport } from './settings-import-export';
 import { GitHubFriendDiscovery } from './github-friend-discovery';
+import { TwitterArchiveSummary } from '../../../twitter-archive';
+import { TwitterFriendDiscovery } from './twitter-friend-discovery';
 
 /** Exposes SettingsImportExport's protected signals for white-box testing. */
 interface SettingsImportExportInternals {
@@ -17,6 +19,7 @@ interface SettingsImportExportInternals {
   report: WritableSignal<ImportReport | null>;
   exportCount: WritableSignal<number>;
   hideGithubFollowed: WritableSignal<boolean>;
+  twitterArchive: WritableSignal<TwitterArchiveSummary | null>;
   download(kind: 'following' | 'mutes' | 'blocks'): void;
   upload(): void;
   exportFriends(): Promise<void>;
@@ -231,6 +234,110 @@ describe('SettingsImportExport', () => {
         .querySelector('#import-friends')
         ?.textContent?.includes('GitHub stars'),
     ).toBe(false);
+  });
+
+  it('shows Twitter source evidence, candidates, and an in-place follow action', async () => {
+    const fixture = setUp();
+    const discovery = TestBed.inject(TwitterFriendDiscovery);
+    const person = {
+      twitter_handle: 'alice',
+      twitter_name: 'Alice Example',
+      twitter_account_id: 'twitter-alice',
+      previous_handles: [],
+      currently_following: true,
+      reply_count: 12,
+      mention_count: 20,
+      first_interaction_at: '2020-01-01T00:00:00.000Z',
+      last_interaction_at: '2026-01-01T00:00:00.000Z',
+      twitter_profile_url: 'https://twitter.com/alice',
+    };
+    const account = {
+      id: 'mastodon-alice',
+      username: 'alice',
+      acct: 'alice@social.example',
+      display_name: 'Alice on Mastodon',
+      avatar: '',
+      avatar_static: '',
+      header: '',
+      note: '',
+      url: 'https://social.example/@alice',
+      followers_count: 0,
+      following_count: 0,
+      statuses_count: 0,
+      bot: false,
+      locked: false,
+      fields: [],
+    } as Account;
+    internals(fixture).twitterArchive.set({
+      files: ['following.js', 'tweets.js'],
+      people: [person],
+      currentFollowingCount: 1,
+      currentFollowingWithHandleCount: 1,
+      repliedPeopleCount: 1,
+      replyCount: 12,
+      mentionedPeopleCount: 1,
+      mentionCount: 20,
+    });
+    discovery.rows.set([
+      {
+        person,
+        status: 'complete',
+        matches: [
+          {
+            account,
+            confidence: 'likely',
+            signals: ['Mastodon username matches Twitter handle'],
+          },
+        ],
+      },
+    ]);
+    discovery.relationships.set(
+      new Map([
+        [
+          account.id,
+          {
+            id: account.id,
+            following: false,
+            followed_by: false,
+            requested: false,
+            blocking: false,
+            muting: false,
+          },
+        ],
+      ]),
+    );
+    fixture.detectChanges();
+
+    const twitterSection = (fixture.nativeElement as HTMLElement).querySelector(
+      '#twitter-archive',
+    )!;
+    const match = twitterSection.querySelector('.contact-match')!;
+    expect(twitterSection.textContent).toContain('Alice Example');
+    expect(twitterSection.textContent).toContain('12 replies');
+    expect(twitterSection.textContent).toContain('20 mentions');
+    expect(match.textContent).toContain('@alice@social.example');
+    expect(match.textContent).toContain('likely');
+    expect(twitterSection.querySelectorAll('.twitter-filters input')).toHaveLength(4);
+
+    match.querySelector<HTMLButtonElement>('button')!.click();
+    httpMock.expectOne('/api/v1/accounts/mastodon-alice/follow').flush({
+      id: account.id,
+      following: true,
+      followed_by: false,
+      requested: false,
+      blocking: false,
+      muting: false,
+    });
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    expect(match.querySelector('button')?.textContent).toContain('Following');
+
+    twitterSection.querySelector<HTMLInputElement>('.twitter-filters input')!.click();
+    fixture.detectChanges();
+
+    expect(twitterSection.querySelector('.contact-match')).toBeNull();
+    expect(twitterSection.textContent).toContain('0 of 1 Mastodon candidates shown');
   });
 
   it('hides already-followed GitHub matches without changing their discovery order', () => {

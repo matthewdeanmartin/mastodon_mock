@@ -90,6 +90,315 @@
     }
   </section>
 
+  <section id="twitter-archive" class="friend-section">
+    <h2>Extract contacts from X/Twitter</h2>
+    <p class="muted small">
+      Choose your unzipped archive folder. Mawkingbird reads only <code>following.js</code>,
+      <code>tweets.js</code>, and <code>deleted-tweets.js</code> in your browser; nothing is
+      uploaded. You can also select those files directly from the archive's <code>data</code>
+      folder.
+    </p>
+    <div class="import-actions">
+      <label class="btn btn-outline file-btn">
+        Choose unzipped archive…
+        <input
+          type="file"
+          accept=".js"
+          webkitdirectory
+          multiple
+          (change)="onTwitterArchive($event)"
+          [disabled]="twitterArchiveReading()"
+          hidden
+        />
+      </label>
+      <label class="btn btn-outline file-btn">
+        Choose data files…
+        <input
+          type="file"
+          accept=".js"
+          multiple
+          (change)="onTwitterArchive($event)"
+          [disabled]="twitterArchiveReading()"
+          hidden
+        />
+      </label>
+      @if (twitterArchive(); as archive) {
+        <button type="button" class="btn" (click)="downloadTwitterArchive()">
+          Download contacts CSV
+        </button>
+        <button type="button" class="link" (click)="clearTwitterArchive()">clear</button>
+      }
+    </div>
+
+    @if (twitterArchiveReading()) {
+      <p class="muted small" aria-live="polite">Reading the archive locally…</p>
+    }
+    @if (twitterArchiveError(); as error) {
+      <p class="export-error" role="alert">{{ error }}</p>
+    }
+    @if (twitterArchive(); as archive) {
+      <div class="contact-summary twitter-summary" aria-live="polite">
+        <strong>{{ archive.people.length }} unique Twitter accounts ready to export</strong>
+        <span class="muted small">
+          {{ archive.currentFollowingCount }} currently followed ·
+          {{ archive.currentFollowingWithHandleCount }} of those have a handle recovered from your
+          tweets
+        </span>
+        <span class="muted small">
+          {{ archive.repliedPeopleCount }} people replied to in {{ archive.replyCount }} replies ·
+          {{ archive.mentionedPeopleCount }} people seen in {{ archive.mentionCount }} mentions
+        </span>
+        <span class="muted small">
+          Read {{ archive.files.join(', ') }}. The CSV keeps numeric Twitter IDs even when X omitted
+          the handle.
+        </span>
+      </div>
+      @if (!archive.files.includes('following.js')) {
+        <p class="muted small archive-note">
+          No <code>following.js</code> was selected, so this export contains interactions only.
+        </p>
+      }
+      @if (!archive.files.includes('tweets.js')) {
+        <p class="muted small archive-note">
+          No <code>tweets.js</code> was selected. Add it to recover reply/mention history and
+          handles for some followed IDs.
+        </p>
+      }
+
+      <fieldset class="twitter-filters">
+        <legend>Hide candidates that are…</legend>
+        <label>
+          <input
+            type="checkbox"
+            [ngModel]="hideTwitterInactive()"
+            (ngModelChange)="hideTwitterInactive.set($event)"
+          />
+          Inactive (&lt;10 combined posts, following, and followers)
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            [ngModel]="hideTwitterIncomplete()"
+            (ngModelChange)="hideTwitterIncomplete.set($event)"
+          />
+          Missing a bio or avatar
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            [ngModel]="hideTwitterBots()"
+            (ngModelChange)="hideTwitterBots.set($event)"
+          />
+          Bots or mirrors
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            [ngModel]="hideTwitterStale()"
+            (ngModelChange)="hideTwitterStale.set($event)"
+          />
+          No posts, or last activity over a year ago (when known)
+        </label>
+      </fieldset>
+
+      <div class="contact-controls twitter-search-controls">
+        <label class="call-limit">
+          Stop after
+          <input
+            type="number"
+            min="1"
+            max="5000"
+            [ngModel]="twitterCallLimit()"
+            (ngModelChange)="setTwitterCallLimit($event)"
+            [disabled]="twitterDiscovery.running()"
+          />
+          Mastodon API calls
+        </label>
+        @if (twitterDiscovery.rows().length && !twitterDiscovery.running()) {
+          <button
+            type="button"
+            class="btn"
+            (click)="startTwitterSearch()"
+            [disabled]="
+              twitterDiscovery.callCount() >= twitterCallLimit() || !twitterPendingCount()
+            "
+          >
+            {{ twitterDiscovery.callCount() ? 'Continue searching' : 'Find Mastodon accounts' }}
+          </button>
+        }
+        @if (twitterDiscovery.running()) {
+          <button type="button" class="btn btn-outline" (click)="twitterDiscovery.stop()">
+            Stop
+          </button>
+        }
+        @if (twitterDiscovery.rows().length) {
+          <button
+            type="button"
+            class="btn btn-outline"
+            [attr.aria-pressed]="hideTwitterFollowed()"
+            (click)="hideTwitterFollowed.set(!hideTwitterFollowed())"
+          >
+            {{ hideTwitterFollowed() ? 'Show already followed' : 'Hide already followed' }}
+          </button>
+        }
+      </div>
+
+      @if (twitterDiscovery.rows().length) {
+        <div class="contact-summary" aria-live="polite">
+          <strong>
+            {{ twitterDiscovery.rows().length }} Twitter handles ready to search ·
+            @if (twitterFiltersActive()) {
+              {{ twitterVisibleMatchCount() }} of {{ twitterFoundCount() }} Mastodon candidates
+              shown
+            } @else {
+              {{ twitterFoundCount() }} Mastodon candidate{{ twitterFoundCount() === 1 ? '' : 's' }}
+            }
+          </strong>
+          <span class="muted small">
+            {{ twitterDiscovery.callCount() }} / {{ twitterCallLimit() }} username-search calls
+            used. Same-handle accounts are likely matches, not confirmed identities; a matching
+            display name or profile link back to Twitter is shown as extra evidence.
+          </span>
+        </div>
+        <div
+          class="progress-track"
+          role="progressbar"
+          [attr.aria-valuenow]="twitterDiscovery.callCount()"
+          [attr.aria-valuemin]="0"
+          [attr.aria-valuemax]="twitterCallLimit()"
+        >
+          <div
+            class="progress-fill"
+            [style.width.%]="(twitterDiscovery.callCount() / twitterCallLimit()) * 100"
+          ></div>
+        </div>
+
+        <ol class="contact-rows">
+          @for (
+            row of twitterVisibleRows();
+            track row.person.twitter_account_id || row.person.twitter_handle
+          ) {
+            <li class="contact-row">
+              <div class="contact-row-head">
+                <span>
+                  <a [href]="row.person.twitter_profile_url" target="_blank" rel="noopener">
+                    @if (row.person.twitter_name) {
+                      <strong>{{ row.person.twitter_name }}</strong>
+                    } @else {
+                      <strong>&#64;{{ row.person.twitter_handle }}</strong>
+                    }
+                  </a>
+                  @if (row.person.twitter_name) {
+                    <span class="muted small"> · &#64;{{ row.person.twitter_handle }} </span>
+                  }
+                </span>
+                <span class="row-status muted">{{ twitterStatusLabel(row.status) }}</span>
+              </div>
+              <div class="twitter-evidence muted small">
+                @if (row.person.currently_following) {
+                  <span>currently followed</span>
+                }
+                @if (row.person.reply_count) {
+                  <span>{{ row.person.reply_count }} replies</span>
+                }
+                @if (row.person.mention_count) {
+                  <span>{{ row.person.mention_count }} mentions</span>
+                }
+              </div>
+              @if (row.error) {
+                <p class="export-error small" role="alert">{{ row.error }}</p>
+              }
+              @if (row.matches.length) {
+                <ul class="contact-matches">
+                  @for (match of row.matches; track match.account.id) {
+                    @if (twitterMatchVisible(match.account)) {
+                      <li class="contact-match">
+                        <img [src]="match.account.avatar_static || match.account.avatar" alt="" />
+                        <div class="match-main">
+                          <a [routerLink]="['/accounts', match.account.id]">
+                            <strong>{{
+                              match.account.display_name || match.account.username
+                            }}</strong>
+                            <span class="muted"> &#64;{{ match.account.acct }}</span>
+                          </a>
+                          <span [class]="'confidence confidence-' + match.confidence">
+                            {{ match.confidence }}
+                          </span>
+                          @if (match.account.locked) {
+                            <span class="github-account-badge" title="Requires follow approval">
+                              🔒 approval required
+                            </span>
+                          }
+                          @if (match.account.bot) {
+                            <span class="github-account-badge">BOT</span>
+                          }
+                          <span class="muted small">{{ match.signals.join(' · ') }}</span>
+                          @if (match.account.note) {
+                            <div class="github-account-bio" [innerHTML]="match.account.note"></div>
+                          }
+                          <div class="github-account-stats muted small">
+                            <span
+                              ><strong>{{ match.account.statuses_count || 0 }}</strong> posts</span
+                            >
+                            <span
+                              ><strong>{{ match.account.following_count || 0 }}</strong>
+                              following</span
+                            >
+                            <span
+                              ><strong>{{ match.account.followers_count || 0 }}</strong>
+                              followers</span
+                            >
+                            @if (match.account.last_status_at) {
+                              <span
+                                >last active
+                                <strong>{{ match.account.last_status_at }}</strong></span
+                              >
+                            } @else if (match.account.last_status_at === null) {
+                              <span><strong>never posted</strong></span>
+                            }
+                          </div>
+                        </div>
+                        @if (twitterDiscovery.relationship(match.account.id); as relationship) {
+                          <button
+                            type="button"
+                            class="btn btn-outline btn-sm"
+                            [disabled]="
+                              relationship.following ||
+                              relationship.requested ||
+                              twitterDiscovery.followBusy().has(match.account.id)
+                            "
+                            (click)="twitterDiscovery.follow(match.account)"
+                          >
+                            {{
+                              twitterDiscovery.followBusy().has(match.account.id)
+                                ? 'Following…'
+                                : relationship.following
+                                  ? 'Following'
+                                  : relationship.requested
+                                    ? 'Requested'
+                                    : 'Follow'
+                            }}
+                          </button>
+                        } @else {
+                          <button type="button" class="btn btn-outline btn-sm" disabled>
+                            Checking…
+                          </button>
+                        }
+                      </li>
+                      @if (twitterDiscovery.followErrors().get(match.account.id); as followError) {
+                        <li class="export-error small" role="alert">{{ followError }}</li>
+                      }
+                    }
+                  }
+                </ul>
+              }
+            </li>
+          }
+        </ol>
+      }
+    }
+  </section>
+
   @if (github.connected()) {
     <section id="github-friends" class="friend-section contact-section">
       <h2>Find GitHub friends on Mastodon</h2>

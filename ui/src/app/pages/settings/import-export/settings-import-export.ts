@@ -10,6 +10,19 @@ import { environment } from '../../../../environments/environment';
 import { ContactDiscovery } from './contact-discovery';
 import { GitHubSession } from '../../../providers/github/github-session';
 import { GitHubFriendDiscovery, GitHubFriendStatus } from './github-friend-discovery';
+import {
+  extractTwitterArchive,
+  TwitterArchiveSummary,
+  twitterArchiveCsv,
+} from '../../../twitter-archive';
+import {
+  isBotOrMirrorTwitterCandidate,
+  isInactiveTwitterCandidate,
+  isIncompleteTwitterCandidate,
+  isStaleTwitterCandidate,
+  TwitterFriendDiscovery,
+  TwitterFriendStatus,
+} from './twitter-friend-discovery';
 
 type CsvKind = 'following' | 'mutes' | 'blocks';
 
@@ -53,6 +66,7 @@ export class SettingsImportExport {
   protected contactDiscovery = inject(ContactDiscovery);
   protected github = inject(GitHubSession);
   protected githubDiscovery = inject(GitHubFriendDiscovery);
+  protected twitterDiscovery = inject(TwitterFriendDiscovery);
 
   protected readonly mockTooling = environment.mockTooling;
   protected pasted = signal('');
@@ -65,6 +79,15 @@ export class SettingsImportExport {
   protected contactCallLimit = signal(20);
   protected githubCallLimit = signal(20);
   protected hideGithubFollowed = signal(false);
+  protected twitterArchive = signal<TwitterArchiveSummary | null>(null);
+  protected twitterArchiveReading = signal(false);
+  protected twitterArchiveError = signal<string | null>(null);
+  protected twitterCallLimit = signal(20);
+  protected hideTwitterFollowed = signal(false);
+  protected hideTwitterInactive = signal(false);
+  protected hideTwitterIncomplete = signal(false);
+  protected hideTwitterBots = signal(false);
+  protected hideTwitterStale = signal(false);
 
   protected doneCount = computed(
     () =>
@@ -115,6 +138,40 @@ export class SettingsImportExport {
       );
     }),
   );
+  protected twitterFoundCount = computed(() =>
+    this.twitterDiscovery.rows().reduce((count, row) => count + row.matches.length, 0),
+  );
+  protected twitterPendingCount = computed(
+    () => this.twitterDiscovery.rows().filter((row) => row.status === 'pending').length,
+  );
+  protected twitterFiltersActive = computed(
+    () =>
+      this.hideTwitterInactive() ||
+      this.hideTwitterIncomplete() ||
+      this.hideTwitterBots() ||
+      this.hideTwitterStale() ||
+      this.hideTwitterFollowed(),
+  );
+  protected twitterVisibleMatchCount = computed(() =>
+    this.twitterDiscovery
+      .rows()
+      .reduce(
+        (count, row) =>
+          count + row.matches.filter((match) => this.twitterMatchVisible(match.account)).length,
+        0,
+      ),
+  );
+  protected twitterVisibleRows = computed(() =>
+    this.twitterDiscovery.rows().filter((row) => {
+      const renderable =
+        row.matches.length || row.status === 'searching' || row.status === 'failed';
+      return (
+        renderable &&
+        (!row.matches.length ||
+          row.matches.some((match) => this.twitterMatchVisible(match.account)))
+      );
+    }),
+  );
 
   protected importKind = signal<CsvKind>('following');
   protected csvText = signal('');
@@ -162,6 +219,89 @@ export class SettingsImportExport {
       this.previewFriends();
     });
     input.value = '';
+  }
+
+  protected async onTwitterArchive(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = [...(input.files ?? [])].filter((file) =>
+      ['following.js', 'tweets.js', 'deleted-tweets.js'].includes(file.name.toLowerCase()),
+    );
+    input.value = '';
+    this.twitterArchive.set(null);
+    this.twitterArchiveError.set(null);
+    this.twitterDiscovery.reset();
+    if (!files.length) {
+      this.twitterArchiveError.set(
+        'No archive data found. Choose the unzipped archive folder or its data/following.js and data/tweets.js files.',
+      );
+      return;
+    }
+    this.twitterArchiveReading.set(true);
+    try {
+      const sources = await Promise.all(
+        files.map(async (file) => ({
+          name: file.webkitRelativePath || file.name,
+          text: await file.text(),
+        })),
+      );
+      const archive = extractTwitterArchive(sources);
+      this.twitterArchive.set(archive);
+      this.twitterDiscovery.load(archive.people);
+    } catch (error) {
+      this.twitterArchiveError.set(
+        error instanceof Error ? error.message : 'The X/Twitter archive could not be read.',
+      );
+    } finally {
+      this.twitterArchiveReading.set(false);
+    }
+  }
+
+  protected downloadTwitterArchive(): void {
+    const archive = this.twitterArchive();
+    if (!archive) {
+      return;
+    }
+    saveCsv(twitterArchiveCsv(archive.people), 'mawkingbird-twitter-contacts.csv');
+  }
+
+  protected clearTwitterArchive(): void {
+    this.twitterArchive.set(null);
+    this.twitterArchiveError.set(null);
+    this.twitterDiscovery.reset();
+  }
+
+  protected startTwitterSearch(): void {
+    void this.twitterDiscovery.start(this.twitterCallLimit());
+  }
+
+  protected setTwitterCallLimit(value: number | string): void {
+    const parsed = Number(value);
+    this.twitterCallLimit.set(
+      Number.isFinite(parsed) ? Math.min(5000, Math.max(1, Math.floor(parsed))) : 20,
+    );
+  }
+
+  protected twitterStatusLabel(status: TwitterFriendStatus): string {
+    switch (status) {
+      case 'pending':
+        return 'waiting';
+      case 'searching':
+        return 'searching…';
+      case 'complete':
+        return 'checked';
+      default:
+        return 'failed';
+    }
+  }
+
+  protected twitterMatchVisible(account: Account): boolean {
+    if (this.hideTwitterInactive() && isInactiveTwitterCandidate(account)) return false;
+    if (this.hideTwitterIncomplete() && isIncompleteTwitterCandidate(account)) return false;
+    if (this.hideTwitterBots() && isBotOrMirrorTwitterCandidate(account)) return false;
+    if (this.hideTwitterStale() && isStaleTwitterCandidate(account)) return false;
+    return !(
+      this.hideTwitterFollowed() && this.twitterDiscovery.relationship(account.id)?.following
+    );
   }
 
   protected onContactFile(event: Event): void {
