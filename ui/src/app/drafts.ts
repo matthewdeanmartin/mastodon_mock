@@ -22,6 +22,12 @@ export interface Draft {
   poll: DraftPoll | null;
   inReplyToId?: string;
   quotedStatusId?: string;
+  /** Publishing destination. Missing on drafts saved before provider-aware compose. */
+  target?: 'fedi' | 'bsky' | 'both' | 'paste';
+  /** Paste-service id, deliberately separate so another pastebin can be added later. */
+  pasteProviderId?: string;
+  pasteLanguage?: string;
+  pasteExpiry?: string;
 }
 
 export type DraftSnapshot = Omit<Draft, 'id' | 'updatedAt'>;

@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { Draft, Drafts } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { ScheduledStatus } from '../../models';
+import { Auth } from '../../auth';
 
 /**
  * The saved-drafts list plus the account's scheduled posts. Drafts live only
@@ -23,6 +24,7 @@ export class DraftsPage implements OnInit {
   protected drafts = inject(Drafts);
   private api = inject(Api);
   private router = inject(Router);
+  protected auth = inject(Auth);
 
   protected pendingDelete = signal<Draft | null>(null);
 
@@ -31,7 +33,10 @@ export class DraftsPage implements OnInit {
   protected pendingCancel = signal<ScheduledStatus | null>(null);
 
   ngOnInit(): void {
-    // Anonymous sessions can't list scheduled posts — just show nothing.
+    if (this.auth.isAnonymous) {
+      this.scheduledLoaded.set(true);
+      return;
+    }
     this.api.scheduledStatuses().subscribe({
       next: (rows) => {
         this.scheduled.set(rows);
@@ -90,8 +95,9 @@ export class DraftsPage implements OnInit {
       out.push(`🧵 thread of ${draft.segments.filter((s) => s.trim()).length}`);
     }
     if (draft.spoilerText) {
-      out.push('CW');
+      out.push(draft.target === 'paste' ? 'Title' : 'CW');
     }
+    if (draft.target === 'paste') out.push(`📋 ${draft.pasteProviderId ?? 'paste'}`);
     if (draft.poll) {
       out.push('📊 poll');
     }

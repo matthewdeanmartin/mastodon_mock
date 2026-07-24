@@ -14,6 +14,7 @@ export const PROVIDER_CAPS: Record<ProviderId, ProviderCapabilities> = {
   'anonymous-mastodon': { reply: false, favourite: false, reblog: false },
   bluesky: { reply: true, favourite: true, reblog: true },
   rss: { reply: false, favourite: false, reblog: false },
+  paste: { reply: false, favourite: false, reblog: false },
 };
 
 /**

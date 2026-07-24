@@ -286,9 +286,11 @@ export const routes: Routes = [
       },
       {
         path: 'drafts',
-        canActivate: [anonymousUnavailableGuard],
-        data: { anonymousFeature: 'Drafts' },
         loadComponent: () => import('./pages/drafts/drafts-page').then((m) => m.DraftsPage),
+      },
+      {
+        path: 'pastes',
+        loadComponent: () => import('./pages/pastes/pastes-page').then((m) => m.PastesPage),
       },
       {
         path: 'lists/:id',

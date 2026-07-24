@@ -39,50 +39,52 @@
   }
 }
 
-<div class="page-head scheduled-head">
-  <h2>Scheduled</h2>
-  <p class="muted">
-    Scheduled posts live on the server and publish automatically at their set time — even with this
-    browser closed.
-  </p>
-</div>
+@if (!auth.isAnonymous) {
+  <div class="page-head scheduled-head">
+    <h2>Scheduled</h2>
+    <p class="muted">
+      Scheduled posts live on the server and publish automatically at their set time — even with
+      this browser closed.
+    </p>
+  </div>
 
-@if (!scheduledLoaded()) {
-  <p class="muted center">Loading scheduled posts…</p>
-} @else if (!scheduled().length) {
-  <p class="muted center">Nothing scheduled. While composing, hit 🕒 to pick a publish time.</p>
-} @else {
-  @for (s of scheduled(); track s.id) {
-    <div class="draft-row">
-      <div class="draft-main">
-        <div class="draft-text">{{ scheduledPreview(s) }}</div>
-        <div class="draft-meta muted">
-          <span>🕒 {{ scheduledWhen(s) }}</span>
-          @if (s.params.visibility) {
-            <span class="draft-visibility">· {{ s.params.visibility }}</span>
-          }
-          @if (s.params.spoiler_text) {
-            <span class="draft-badge">CW</span>
-          }
-          @if (s.params.poll) {
-            <span class="draft-badge">📊 poll</span>
-          }
-          @if (s.media_attachments.length) {
-            <span class="draft-badge">📎 {{ s.media_attachments.length }}</span>
-          }
+  @if (!scheduledLoaded()) {
+    <p class="muted center">Loading scheduled posts…</p>
+  } @else if (!scheduled().length) {
+    <p class="muted center">Nothing scheduled. While composing, hit 🕒 to pick a publish time.</p>
+  } @else {
+    @for (s of scheduled(); track s.id) {
+      <div class="draft-row">
+        <div class="draft-main">
+          <div class="draft-text">{{ scheduledPreview(s) }}</div>
+          <div class="draft-meta muted">
+            <span>🕒 {{ scheduledWhen(s) }}</span>
+            @if (s.params.visibility) {
+              <span class="draft-visibility">· {{ s.params.visibility }}</span>
+            }
+            @if (s.params.spoiler_text) {
+              <span class="draft-badge">CW</span>
+            }
+            @if (s.params.poll) {
+              <span class="draft-badge">📊 poll</span>
+            }
+            @if (s.media_attachments.length) {
+              <span class="draft-badge">📎 {{ s.media_attachments.length }}</span>
+            }
+          </div>
+        </div>
+        <div class="draft-actions">
+          <button
+            class="btn btn-outline btn-sm"
+            type="button"
+            (click)="pendingCancel.set(s)"
+            title="Cancel scheduled post"
+          >
+            Cancel
+          </button>
         </div>
       </div>
-      <div class="draft-actions">
-        <button
-          class="btn btn-outline btn-sm"
-          type="button"
-          (click)="pendingCancel.set(s)"
-          title="Cancel scheduled post"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
+    }
   }
 }
 

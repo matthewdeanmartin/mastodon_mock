@@ -13,7 +13,8 @@
       type="text"
       [ngModel]="spoilerText()"
       (ngModelChange)="spoilerText.set($event)"
-      placeholder="Content warning"
+      [placeholder]="targetIncludesPaste() ? 'Paste title' : 'Content warning'"
+      [attr.maxlength]="targetIncludesPaste() ? 120 : null"
     />
   }
 
@@ -26,7 +27,7 @@
     (keydown)="onBoxKeydown($event)"
     (paste)="onPaste($event)"
   ></textarea>
-  @if (thread().length || text().length > maxChars - 50) {
+  @if (!targetIncludesPaste() && (thread().length || text().length > maxChars - 50)) {
     <div class="seg-count muted" [class.over-limit]="text().length > maxChars">
       {{ text().length }}/{{ maxChars }}
     </div>
@@ -138,7 +139,9 @@
       @for (html of previewHtml(); track $index; let i = $index) {
         <div class="preview-card">
           @if (cwOpen() && spoilerText().trim() && i === 0) {
-            <div class="spoiler">{{ spoilerText() }}</div>
+            <div class="spoiler">
+              {{ targetIncludesPaste() ? 'Title: ' : '' }}{{ spoilerText() }}
+            </div>
           }
           @if (html) {
             <div class="content" [innerHTML]="html"></div>
@@ -174,15 +177,59 @@
         <select
           class="target-select"
           [ngModel]="target()"
-          (ngModelChange)="target.set($event)"
+          (ngModelChange)="onTargetChange($event)"
           title="Post to"
         >
-          <option value="fedi">🦣 Fedi</option>
-          <option value="bsky">🦋 Bluesky</option>
-          <option value="both">🦣+🦋 Both</option>
+          @if (!auth.isAnonymous) {
+            <option value="fedi">🦣 Fedi</option>
+            @if (bskySession.linked()) {
+              <option value="bsky">🦋 Bluesky</option>
+              <option value="both">🦣+🦋 Both</option>
+            }
+          }
+          <option value="paste">📋 Paste</option>
         </select>
       }
-      @if (lockVisibility()) {
+      @if (targetIncludesPaste()) {
+        <select
+          class="target-select"
+          [ngModel]="pasteProviderId()"
+          (ngModelChange)="onPasteProviderChange($event)"
+          title="Paste service"
+        >
+          @for (provider of pasteProviders.all; track provider.id) {
+            <option [value]="provider.id">{{ provider.label }}</option>
+          }
+        </select>
+        @if (selectedPasteProvider().languages.length > 1) {
+          <select
+            class="target-select"
+            [ngModel]="pasteLanguage()"
+            (ngModelChange)="pasteLanguage.set($event)"
+            title="Syntax language"
+          >
+            @for (language of selectedPasteProvider().languages; track language.value) {
+              <option [value]="language.value">{{ language.label }}</option>
+            }
+          </select>
+        }
+        @if (selectedPasteProvider().expiries.length > 1) {
+          <select
+            class="target-select"
+            [ngModel]="pasteExpiry()"
+            (ngModelChange)="onPasteExpiryChange($event)"
+            title="Paste expiry"
+          >
+            @for (expiry of selectedPasteProvider().expiries; track expiry.value) {
+              <option [value]="expiry.value">{{ expiry.label }}</option>
+            }
+          </select>
+        }
+      }
+      @if (
+        lockVisibility() ||
+        (targetIncludesPaste() && selectedPasteProvider().visibilities.length === 1)
+      ) {
         <span class="visibility-locked" title="Visibility is fixed here"
           >🔒 {{ visibility() }}</span
         >
@@ -193,8 +240,14 @@
           (ngModelChange)="visibility.set($event)"
           title="Visibility"
         >
-          @for (v of visibilities; track v) {
-            <option [value]="v">{{ v }}</option>
+          @if (targetIncludesPaste()) {
+            @for (v of selectedPasteProvider().visibilities; track v) {
+              <option [value]="v">{{ v }}</option>
+            }
+          } @else {
+            @for (v of visibilities; track v) {
+              <option [value]="v">{{ v }}</option>
+            }
           }
         </select>
       }
@@ -214,54 +267,63 @@
 
     <div class="compose-actions">
       <div class="compose-tools">
-        <label
-          class="tool-btn"
-          [class.disabled]="!canAttachMedia()"
-          title="Attach media — or paste / drag & drop an image"
-        >
-          📎
-          <input
-            type="file"
-            multiple
-            hidden
-            [disabled]="!canAttachMedia()"
-            (change)="onFilesSelected($event)"
-          />
-        </label>
+        @if (!targetIncludesPaste()) {
+          <label
+            class="tool-btn"
+            [class.disabled]="!canAttachMedia()"
+            title="Attach media — or paste / drag & drop an image"
+          >
+            📎
+            <input
+              type="file"
+              multiple
+              hidden
+              [disabled]="!canAttachMedia()"
+              (change)="onFilesSelected($event)"
+            />
+          </label>
 
-        <button
-          class="tool-btn"
-          [class.on]="pollOpen()"
-          [disabled]="!canAddPoll()"
-          (click)="togglePoll()"
-          title="Add poll"
-        >
-          📊
-        </button>
-
-        @if (!inReplyToId() && !quotedStatusId()) {
           <button
             class="tool-btn"
-            [class.on]="scheduleOpen()"
-            (click)="toggleSchedule()"
-            title="Schedule post"
+            [class.on]="pollOpen()"
+            [disabled]="!canAddPoll()"
+            (click)="togglePoll()"
+            title="Add poll"
           >
-            🕒
+            📊
           </button>
-        }
 
-        <button class="tool-btn" [class.on]="cwOpen()" (click)="toggleCw()" title="Content warning">
-          CW
-        </button>
+          @if (!inReplyToId() && !quotedStatusId()) {
+            <button
+              class="tool-btn"
+              [class.on]="scheduleOpen()"
+              (click)="toggleSchedule()"
+              title="Schedule post"
+            >
+              🕒
+            </button>
+          }
+        }
 
         <button
           class="tool-btn"
-          [class.on]="sensitive()"
-          (click)="sensitive.set(!sensitive())"
-          title="Mark media sensitive"
+          [class.on]="cwOpen()"
+          (click)="toggleCw()"
+          [title]="targetIncludesPaste() ? 'Add a title' : 'Content warning'"
         >
-          ⚠️
+          {{ targetIncludesPaste() ? 'Title' : 'CW' }}
         </button>
+
+        @if (!targetIncludesPaste()) {
+          <button
+            class="tool-btn"
+            [class.on]="sensitive()"
+            (click)="sensitive.set(!sensitive())"
+            title="Mark media sensitive"
+          >
+            ⚠️
+          </button>
+        }
 
         <span class="emoji-anchor">
           <button
@@ -279,13 +341,15 @@
           }
         </span>
 
-        <button
-          class="tool-btn thread-btn"
-          (click)="addThreadBox()"
-          title="Add another post (thread / tweet storm)"
-        >
-          ➕🧵
-        </button>
+        @if (!targetIncludesPaste()) {
+          <button
+            class="tool-btn thread-btn"
+            (click)="addThreadBox()"
+            title="Add another post (thread / tweet storm)"
+          >
+            ➕🧵
+          </button>
+        }
 
         @if (compact()) {
           <button
@@ -316,7 +380,9 @@
           🦋 {{ bskyRemaining() }}
         </span>
       }
-      <span class="muted" [class.over-limit]="text().length > maxChars">{{ text().length }}</span>
+      <span class="muted" [class.over-limit]="overLimit()">
+        {{ targetIncludesPaste() ? pasteBytes() + ' bytes' : text().length }}
+      </span>
       <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
         {{
           uploading()
@@ -327,9 +393,11 @@
                 ? 'Quote'
                 : scheduleActive()
                   ? 'Schedule'
-                  : thread().length
-                    ? words().PostAll
-                    : words().Post
+                  : targetIncludesPaste()
+                    ? 'Paste'
+                    : thread().length
+                      ? words().PostAll
+                      : words().Post
         }}
       </button>
     </div>
@@ -366,11 +434,23 @@
   @if (targetIncludesBsky() && thread().length) {
     <div class="thread-hint muted">Threads post to Fedi only — Bluesky gets nothing.</div>
   }
+  @if (
+    targetIncludesPaste() && (media().length || pollOpen() || thread().length || scheduleActive())
+  ) {
+    <div class="thread-hint muted">
+      Paste services accept one text document here — remove media, polls, thread boxes, or
+      scheduling.
+    </div>
+  }
 
   @if (overLimit()) {
     <div class="thread-hint over-limit">
-      A post is over {{ maxChars }} characters — shorten it or move text to another thread post
-      (➕🧵).
+      @if (targetIncludesPaste()) {
+        This paste is over the provider's 2 MB limit.
+      } @else {
+        A post is over {{ maxChars }} characters — shorten it or move text to another thread post
+        (➕🧵).
+      }
     </div>
   } @else if (thread().length) {
     <div class="thread-hint muted">Will post as a thread of {{ segments().length }}.</div>

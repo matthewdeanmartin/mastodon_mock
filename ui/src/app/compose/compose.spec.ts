@@ -5,6 +5,7 @@ import { Signal, WritableSignal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../client-prefs';
 import { Status } from '../models';
+import { Auth } from '../auth';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { Compose, PostTarget } from './compose';
 
@@ -35,6 +36,9 @@ interface ComposeInternals {
   cancelSend(): void;
   publishNow(): void;
   target: WritableSignal<PostTarget>;
+  pasteLanguage: WritableSignal<string>;
+  pasteExpiry: WritableSignal<string>;
+  onPasteProviderChange(providerId: string): void;
   showTargetPicker: Signal<boolean>;
   crossPostError: Signal<string | null>;
   toggleCw(): void;
@@ -556,9 +560,9 @@ describe('Compose', () => {
     });
   }
 
-  it('shows no target picker (and posts to Fedi as before) when Bluesky is not linked', () => {
+  it('shows the target picker for Paste and posts to Fedi by default without Bluesky', () => {
     const f = setUp();
-    expect(internals(f).showTargetPicker()).toBe(false);
+    expect(internals(f).showTargetPicker()).toBe(true);
     expect(internals(f).target()).toBe('fedi');
     internals(f).text.set('plain post');
     internals(f).submit();
@@ -574,6 +578,79 @@ describe('Compose', () => {
     internals(f).submit();
     httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
     httpMock.expectNone(CREATE_RECORD);
+  });
+
+  it('target=paste creates a Pastepile paste, stores its edit key, and emits a status', () => {
+    const f = setUp();
+    const posted: Status[] = [];
+    f.componentInstance.posted.subscribe((status) => posted.push(status));
+    internals(f).target.set('paste');
+    internals(f).text.set('print("hello")');
+    internals(f).cwOpen.set(true);
+    internals(f).spoilerText.set('Example');
+    internals(f).visibility.set('unlisted');
+    internals(f).pasteLanguage.set('python');
+    internals(f).pasteExpiry.set('10m');
+
+    internals(f).submit();
+
+    const req = httpMock.expectOne('https://pastepile.com/api/public/pastes');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      title: 'Example',
+      content: 'print("hello")',
+      language: 'python',
+      expiry: '10m',
+      visibility: 'unlisted',
+    });
+    req.flush({
+      slug: 'abc123',
+      url: 'https://pastepile.com/p/abc123',
+      raw_url: 'https://pastepile.com/raw/abc123',
+      edit_key: 'secret',
+    });
+
+    expect(posted[0].provider).toBe('paste');
+    const stored = JSON.parse(localStorage.getItem('mockingbird_pastes') ?? '[]');
+    expect(stored[0].editKey).toBe('secret');
+    expect(internals(f).text()).toBe('');
+  });
+
+  it('can publish an unlisted Rentry page and stores its edit code locally', () => {
+    const f = setUp();
+    internals(f).target.set('paste');
+    internals(f).onPasteProviderChange('rentry');
+    internals(f).text.set('A durable browser draft');
+    internals(f).cwOpen.set(true);
+    internals(f).spoilerText.set('Draft title');
+
+    internals(f).submit();
+
+    const request = httpMock.expectOne('https://rentry.co/api/new');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body.get('text')).toBe('# Draft title\n\nA durable browser draft');
+    request.flush({
+      status: '200',
+      url: 'https://rentry.co/browser-draft',
+      edit_code: 'rentry-secret',
+    });
+
+    const stored = JSON.parse(localStorage.getItem('mockingbird_pastes') ?? '[]');
+    expect(stored[0].providerId).toBe('rentry');
+    expect(stored[0].editKey).toBe('rentry-secret');
+    expect(stored[0].expiry).toBe('never');
+    expect(stored[0].visibility).toBe('unlisted');
+  });
+
+  it('Anonymous defaults to Paste and exposes no identity-backed destinations', () => {
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const f = setUp();
+
+    expect(internals(f).target()).toBe('paste');
+    const options = [...(f.nativeElement as HTMLElement).querySelectorAll('.target-select option')];
+    expect(options.some((option) => option.getAttribute('value') === 'fedi')).toBe(false);
+    expect(options.some((option) => option.getAttribute('value') === 'bsky')).toBe(false);
+    expect(options.some((option) => option.getAttribute('value') === 'paste')).toBe(true);
   });
 
   it('target=bsky posts a record to Bluesky only and emits a local status', () => {

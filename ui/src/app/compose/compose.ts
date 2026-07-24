@@ -11,6 +11,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { Api } from '../api';
+import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { CustomEmojis } from '../custom-emojis';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
@@ -21,6 +22,9 @@ import { detectFacets, graphemeLength } from '../providers/bluesky/bluesky-facet
 import { buildLocalBskyStatus } from '../providers/bluesky/bluesky-local-status';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { BskyFacet } from '../providers/bluesky/bluesky-types';
+import { PasteHistory } from '../providers/paste/paste-history';
+import { PasteExpiry } from '../providers/paste/paste-provider';
+import { PasteProviderRegistry } from '../providers/paste/paste-provider-registry';
 import { applyMinimalMarkdown } from '../markdown';
 import { Terminology } from '../terminology';
 import { renderStatusText } from './status-text';
@@ -30,11 +34,12 @@ const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 /** Mastodon's default per-status character limit. */
 export const MAX_POST_CHARS = 500;
 
-/** Where a top-level compose publishes. Fedi is home; Bluesky is opt-in per post. */
-export type PostTarget = 'fedi' | 'bsky' | 'both';
+/** Where a top-level compose publishes. Paste is always exclusive to avoid correlation. */
+export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste';
 
 /** Bluesky's post limit, in graphemes (not characters). */
 const BSKY_MAX_GRAPHEMES = 300;
+const MAX_PASTE_BYTES = 2 * 1024 * 1024;
 
 /** Poll expiry presets (label → seconds). */
 const POLL_EXPIRY = [
@@ -70,11 +75,14 @@ function dragHasFiles(event: DragEvent): boolean {
 })
 export class Compose implements OnDestroy {
   private api = inject(Api);
+  protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private bskyApi = inject(BlueskyApi);
-  private bskySession = inject(BlueskySession);
+  protected bskySession = inject(BlueskySession);
   private drafts = inject(Drafts);
   private customEmojis = inject(CustomEmojis);
+  protected pasteProviders = inject(PasteProviderRegistry);
+  private pasteHistory = inject(PasteHistory);
   protected words = inject(Terminology).words;
 
   ngOnDestroy(): void {
@@ -216,8 +224,8 @@ export class Compose implements OnDestroy {
   protected pollExpiresIn = signal<number>(86400);
 
   /** Media and polls are mutually exclusive, matching Mastodon. */
-  protected canAttachMedia = computed(() => !this.pollOpen());
-  protected canAddPoll = computed(() => this.media().length === 0);
+  protected canAttachMedia = computed(() => !this.targetIncludesPaste() && !this.pollOpen());
+  protected canAddPoll = computed(() => !this.targetIncludesPaste() && this.media().length === 0);
 
   // Live preview (rendered like the feed will render it — not WYSIWYG).
   // Appears as soon as there's a character to render, gone when empty.
@@ -240,13 +248,21 @@ export class Compose implements OnDestroy {
   private lastFocusedBox: { index: number; el: HTMLTextAreaElement } | null = null;
 
   // Post target (top-level composes only; replies/quotes always stay on Fedi).
-  protected target = signal<PostTarget>('fedi');
-  protected showTargetPicker = computed(
-    () => this.bskySession.linked() && !this.inReplyToId() && !this.quotedStatusId(),
-  );
+  protected target = signal<PostTarget>(this.auth.isAnonymous ? 'paste' : 'fedi');
+  protected showTargetPicker = computed(() => !this.inReplyToId() && !this.quotedStatusId());
   protected targetIncludesBsky = computed(
-    () => this.showTargetPicker() && this.target() !== 'fedi',
+    () => this.showTargetPicker() && (this.target() === 'bsky' || this.target() === 'both'),
   );
+  protected targetIncludesPaste = computed(
+    () => this.showTargetPicker() && this.target() === 'paste',
+  );
+  protected pasteProviderId = signal(this.pasteProviders.default.id);
+  protected selectedPasteProvider = computed(
+    () => this.pasteProviders.get(this.pasteProviderId()) ?? this.pasteProviders.default,
+  );
+  protected pasteLanguage = signal('plaintext');
+  protected pasteExpiry = signal<PasteExpiry>('1w');
+  protected pasteBytes = computed(() => new TextEncoder().encode(this.text()).byteLength);
   /** Graphemes left under Bluesky's 300 limit (only meaningful when posting there). */
   protected bskyRemaining = computed(() => BSKY_MAX_GRAPHEMES - graphemeLength(this.text()));
   /** The Bluesky leg of a cross-post failed after the Fedi post went out. */
@@ -259,7 +275,11 @@ export class Compose implements OnDestroy {
   protected readonly maxChars = MAX_POST_CHARS;
 
   /** Any box over the limit blocks posting (no more silent auto-splitting). */
-  protected overLimit = computed(() => this.segments().some((s) => s.length > MAX_POST_CHARS));
+  protected overLimit = computed(() =>
+    this.targetIncludesPaste()
+      ? this.pasteBytes() > MAX_PASTE_BYTES
+      : this.segments().some((s) => s.length > MAX_POST_CHARS),
+  );
 
   /** "Saved to drafts" flash after an explicit save. */
   protected draftSaved = signal(false);
@@ -276,6 +296,15 @@ export class Compose implements OnDestroy {
     }
     if (this.overLimit() || this.altTextMissing()) {
       return false;
+    }
+    if (this.targetIncludesPaste()) {
+      return (
+        !!this.text().trim() &&
+        !this.thread().some((text) => text.trim()) &&
+        !this.media().length &&
+        !this.pollOpen() &&
+        !this.scheduleActive()
+      );
     }
     if (this.scheduleActive()) {
       // Scheduling covers exactly one post: no threads, no Bluesky leg.
@@ -301,6 +330,37 @@ export class Compose implements OnDestroy {
     const hasPoll = this.pollOpen() && this.pollOptions().filter((o) => o.trim()).length >= 2;
     return hasText || hasMedia || hasPoll;
   });
+
+  onTargetChange(target: PostTarget): void {
+    this.target.set(target);
+    if (target === 'paste') {
+      const provider = this.selectedPasteProvider();
+      if (!provider.visibilities.includes(this.visibility() as 'public' | 'unlisted')) {
+        this.visibility.set(provider.visibilities[0] ?? 'unlisted');
+      }
+    }
+  }
+
+  onPasteProviderChange(providerId: string): void {
+    const provider = this.pasteProviders.get(providerId) ?? this.pasteProviders.default;
+    this.pasteProviderId.set(provider.id);
+    if (!provider.languages.some((language) => language.value === this.pasteLanguage())) {
+      this.pasteLanguage.set(provider.languages[0]?.value ?? 'plaintext');
+    }
+    if (!provider.expiries.some((expiry) => expiry.value === this.pasteExpiry())) {
+      this.pasteExpiry.set(provider.expiries[0]?.value ?? '1w');
+    }
+    if (!provider.visibilities.includes(this.visibility() as 'public' | 'unlisted')) {
+      this.visibility.set(provider.visibilities[0] ?? 'unlisted');
+    }
+  }
+
+  onPasteExpiryChange(expiry: PasteExpiry): void {
+    this.pasteExpiry.set(expiry);
+    if (expiry === 'burn') {
+      this.visibility.set('unlisted');
+    }
+  }
 
   // --- thread boxes ---
 
@@ -518,6 +578,10 @@ export class Compose implements OnDestroy {
         : null,
       inReplyToId: this.inReplyToId(),
       quotedStatusId: this.quotedStatusId(),
+      target: this.target(),
+      pasteProviderId: this.pasteProviderId(),
+      pasteLanguage: this.pasteLanguage(),
+      pasteExpiry: this.pasteExpiry(),
     };
   }
 
@@ -530,6 +594,27 @@ export class Compose implements OnDestroy {
     if (!this.lockVisibility()) {
       this.visibility.set(d.visibility);
     }
+    const restoredTarget = d.target ?? 'fedi';
+    this.target.set(
+      this.auth.isAnonymous
+        ? 'paste'
+        : (restoredTarget === 'bsky' || restoredTarget === 'both') && !this.bskySession.linked()
+          ? 'fedi'
+          : restoredTarget,
+    );
+    this.onPasteProviderChange(d.pasteProviderId ?? this.pasteProviders.default.id);
+    const provider = this.selectedPasteProvider();
+    this.pasteLanguage.set(
+      provider.languages.some((language) => language.value === d.pasteLanguage)
+        ? (d.pasteLanguage ?? 'plaintext')
+        : (provider.languages[0]?.value ?? 'plaintext'),
+    );
+    const expiry = (d.pasteExpiry as PasteExpiry | undefined) ?? '1w';
+    this.pasteExpiry.set(
+      provider.expiries.some((option) => option.value === expiry)
+        ? expiry
+        : (provider.expiries[0]?.value ?? '1w'),
+    );
     if (d.poll) {
       this.pollOpen.set(true);
       this.pollOptions.set(d.poll.options.length >= 2 ? d.poll.options : ['', '']);
@@ -662,6 +747,11 @@ export class Compose implements OnDestroy {
     this.submitting.set(true);
     this.crossPostError.set(null);
 
+    if (this.targetIncludesPaste()) {
+      this.sendToPaste();
+      return;
+    }
+
     if (this.targetIncludesBsky()) {
       const text = this.text().trim();
       if (this.target() === 'bsky') {
@@ -737,6 +827,44 @@ export class Compose implements OnDestroy {
     this.api.postStatus(posts[0], options).subscribe({
       next: (status) => this.postRest(status, status, posts.slice(1)),
       error: () => this.submitting.set(false),
+    });
+  }
+
+  private sendToPaste(): void {
+    const provider = this.selectedPasteProvider();
+    const visibility =
+      this.pasteExpiry() !== 'burn' && provider.visibilities.includes('public')
+        ? this.visibility() === 'public'
+          ? 'public'
+          : 'unlisted'
+        : 'unlisted';
+    const input = {
+      title: this.cwOpen() ? this.spoilerText().trim() : '',
+      content: this.text().trim(),
+      language: this.pasteLanguage(),
+      expiry: this.pasteExpiry(),
+      visibility,
+    } as const;
+    provider.create(input).subscribe({
+      next: (created) => {
+        this.pasteHistory.add(provider.id, provider.label, input, created);
+        this.reset();
+        this.posted.emit(
+          provider.status({
+            slug: created.slug,
+            title: input.title || null,
+            language: input.language,
+            preview: input.content,
+            createdAt: new Date().toISOString(),
+            url: created.url,
+            rawUrl: created.rawUrl,
+          }),
+        );
+      },
+      error: () => {
+        this.submitting.set(false);
+        this.crossPostError.set(`Couldn't create the ${provider.label} paste — try again.`);
+      },
     });
   }
 

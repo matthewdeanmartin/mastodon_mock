@@ -30,6 +30,7 @@ import { ElizaService } from '../../eliza/eliza.service';
 import { isElizaId } from '../../eliza/eliza-identity';
 import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
+import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
 
 /** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -66,6 +67,7 @@ export class Home implements OnInit, OnDestroy {
   protected localPosts = inject(LocalPostStore);
   private route = inject(ActivatedRoute);
   private drafts = inject(Drafts);
+  private pasteFeeds = inject(PasteFeedSubscriptions);
 
   /** A draft opened from /drafts (?draft=<id>), handed to the composer. */
   protected openedDraft = toSignal(
@@ -512,12 +514,17 @@ export class Home implements OnInit, OnDestroy {
   }
 
   private anonymousSourceKey(): string {
+    const pasteFeeds = this.pasteFeeds
+      .enabledFeeds()
+      .map((feed) => feed.providerId)
+      .sort();
     return JSON.stringify({
       follows: this.anonymousFollows
         .follows()
         .map((follow) => follow.key)
         .sort(),
       tags: [...this.anonymousTags.tags()].sort(),
+      ...(pasteFeeds.length ? { pasteFeeds } : {}),
     });
   }
 

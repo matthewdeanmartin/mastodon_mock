@@ -13,7 +13,7 @@ const PREFS_KEY = 'mockingbird_client_prefs';
  */
 const HIDDEN_PROVIDERS_KEY_BASE = 'mockingbird_hidden_providers';
 
-const PROVIDER_IDS: ProviderId[] = ['mastodon', 'anonymous-mastodon', 'bluesky', 'rss'];
+const PROVIDER_IDS: ProviderId[] = ['mastodon', 'anonymous-mastodon', 'bluesky', 'rss', 'paste'];
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 

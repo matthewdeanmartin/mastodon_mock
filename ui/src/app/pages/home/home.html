@@ -37,9 +37,9 @@
       </div>
     </div>
   </a>
-} @else if (!auth.isAnonymous) {
-  <app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
 }
+
+<app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
 
 @if (auth.isAnonymous && eliza.following()) {
   <app-local-compose (posted)="onLocalPosted()" />
