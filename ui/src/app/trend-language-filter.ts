@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, Signal } from '@angular/core';
 import { ClientPrefs } from './client-prefs';
-import { detectLanguage, detectScriptLanguage } from './language-detect';
+import { detectLanguage, detectScriptCandidates } from './language-detect';
 import { Status, Tag } from './models';
 import { stripHtml } from './sentiment';
 
@@ -77,11 +77,14 @@ export class TrendLanguageFilter {
       return true;
     }
     // Strip a leading '#' if present; detect on the bare name.
-    const lang = detectScriptLanguage(tag.name.replace(/^#/, ''));
-    if (!lang || lang === 'und') {
+    const candidates = detectScriptCandidates(tag.name.replace(/^#/, ''));
+    if (!candidates.length) {
       return true; // undetermined ⇒ keep
     }
-    return this.known.knows(lang);
+    // Keep if the user knows ANY candidate language. For bare Han the candidates
+    // are [zh, ja], so it's hidden only from someone who knows neither — which
+    // is exactly the case a monolingual-English reader hits with kanji trends.
+    return candidates.some((lang) => this.known.knows(lang));
   }
 
   /** Filter a list of tags, preserving order. */

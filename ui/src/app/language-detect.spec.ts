@@ -4,6 +4,7 @@ import {
   LangCode,
   detectLanguage,
   detectLanguageMix,
+  detectScriptCandidates,
   detectScriptLanguage,
   sharePct,
 } from './language-detect';
@@ -224,6 +225,34 @@ describe('detectScriptLanguage (short strings / hashtags)', () => {
 
   it('treats kana-with-kanji as Japanese', () => {
     expect(detectScriptLanguage('東京です')).toBe('ja');
+  });
+});
+
+describe('detectScriptCandidates (exposes zh/ja ambiguity)', () => {
+  it('returns both zh and ja for bare Han', () => {
+    expect(detectScriptCandidates('東京')).toEqual(['zh', 'ja']);
+    expect(detectScriptCandidates('速報')).toEqual(['zh', 'ja']);
+    expect(detectScriptCandidates('NHK紅白')).toEqual(['zh', 'ja']); // Latin + kanji
+  });
+
+  it('commits to ja when kana is present', () => {
+    expect(detectScriptCandidates('ドラマ')).toEqual(['ja']);
+    expect(detectScriptCandidates('東京です')).toEqual(['ja']);
+  });
+
+  it('returns a single language for unambiguous scripts', () => {
+    expect(detectScriptCandidates('안녕')).toEqual(['ko']);
+    expect(detectScriptCandidates('Київ')).toEqual(['uk']);
+    expect(detectScriptCandidates('مصر')).toEqual(['ar']);
+  });
+
+  it('returns [] for plain Latin and non-scriptable input', () => {
+    expect(detectScriptCandidates('Eurovision')).toEqual([]);
+    expect(detectScriptCandidates('2024')).toEqual([]);
+  });
+
+  it('uses exclusive letters when present', () => {
+    expect(detectScriptCandidates('Straße')).toEqual(['de']);
   });
 });
 

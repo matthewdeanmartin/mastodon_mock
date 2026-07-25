@@ -81,8 +81,23 @@ describe('TrendLanguageFilter', () => {
     expect(kept.map((t) => t.name)).toEqual(['안녕', 'Berlin']);
   });
 
-  it('keeps ambiguous bare-Han tags regardless (東京 could be ja or zh)', () => {
+  it('hides bare-Han tags from a reader who knows neither Chinese nor Japanese', () => {
+    // Regression: kanji-only Japanese trends (#東京, #速報, #地震) were leaking
+    // through to an English-only reader because bare Han was treated as "keep".
     prefs.setKnownLanguages(['en']); // knows neither ja nor zh
+    prefs.setExcludeUnknownLangTrends(true);
+    const kept = filter.apply([tag('東京'), tag('速報'), tag('地震'), tag('Eurovision')]);
+    expect(kept.map((t) => t.name)).toEqual(['Eurovision']);
+  });
+
+  it('keeps bare-Han tags when the reader knows Japanese (might be ja)', () => {
+    prefs.setKnownLanguages(['en', 'ja']);
+    prefs.setExcludeUnknownLangTrends(true);
+    expect(filter.shouldShow(tag('東京'))).toBe(true);
+  });
+
+  it('keeps bare-Han tags when the reader knows Chinese (might be zh)', () => {
+    prefs.setKnownLanguages(['en', 'zh']);
     prefs.setExcludeUnknownLangTrends(true);
     expect(filter.shouldShow(tag('東京'))).toBe(true);
   });

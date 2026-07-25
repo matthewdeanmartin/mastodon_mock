@@ -406,9 +406,32 @@ export function sharePct(share: number): number {
  * "keep it".
  */
 export function detectScriptLanguage(text: string): LangCode | null {
+  const candidates = detectScriptCandidates(text);
+  // A single candidate is a committed guess. Multiple candidates (only bare Han,
+  // which is zh/ja-ambiguous) stay undetermined for this single-answer API —
+  // callers that must decide between them use detectScriptCandidates directly.
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+/**
+ * The **set of languages** a short string's script/letters could be, most
+ * likely first. Unlike {@link detectScriptLanguage} (which returns null when
+ * uncertain), this exposes genuine ambiguity so callers can reason about it:
+ *
+ *  - kana → `['ja']`; hangul → `['ko']`; Cyrillic → `['ru']` or `['uk']`;
+ *    Greek/Arabic/Hebrew/Thai/Devanagari → their single language.
+ *  - **bare Han (no kana) → `['zh', 'ja']`** — the honest answer. It is one of
+ *    those two, we just can't say which from characters alone. A reader who
+ *    knows *neither* still can't read it (the trending filter uses exactly
+ *    that); a reader who knows *either* might, so it's kept for them.
+ *  - Latin with an exclusive letter → that one language; plain Latin → `[]`.
+ *  - nothing scriptable (digits/punctuation) → `[]` (undetermined).
+ */
+export function detectScriptCandidates(text: string): LangCode[] {
   const counts = new Map<LangCode, number>();
   let ukrainian = false;
   let hasKana = false;
+  let hasHan = false;
   for (const ch of text) {
     if (UKRAINIAN_RE.test(ch)) {
       ukrainian = true;
@@ -416,21 +439,27 @@ export function detectScriptLanguage(text: string): LangCode | null {
     if (KANA_RE.test(ch)) {
       hasKana = true;
     }
+    if (HAN_RE.test(ch)) {
+      hasHan = true;
+    }
     const lang = scriptFor(ch);
     if (lang) {
       counts.set(lang, (counts.get(lang) ?? 0) + 1);
     }
   }
-  // Kana anywhere makes the whole thing Japanese, even amid kanji.
+  // Kana anywhere makes the whole thing unambiguously Japanese, even amid kanji.
   if (hasKana) {
-    return 'ja';
+    return ['ja'];
   }
-  // Bare Han (no kana) is ambiguous between Chinese and Japanese — don't commit.
+  // Bare Han (no kana): genuinely ambiguous between Chinese and Japanese.
   counts.delete('zh');
+  if (hasHan && !counts.size) {
+    return ['zh', 'ja'];
+  }
   if (!counts.size) {
-    // No committing non-Latin script — fall back to the Latin exclusive-letter
-    // test (returns null for plain Latin, which correctly stays undetermined).
-    return exclusiveLetterLanguage(text);
+    // No non-Latin script — try the Latin exclusive-letter test.
+    const latin = exclusiveLetterLanguage(text);
+    return latin ? [latin] : [];
   }
   let best: LangCode | null = null;
   let bestN = 0;
@@ -441,7 +470,7 @@ export function detectScriptLanguage(text: string): LangCode | null {
     }
   }
   if (best === 'ru' && ukrainian) {
-    return 'uk';
+    return ['uk'];
   }
-  return best;
+  return best ? [best] : [];
 }
