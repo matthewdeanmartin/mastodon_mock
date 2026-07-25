@@ -879,6 +879,12 @@ export class Compose implements OnDestroy {
           url: created.url,
         });
         this.pasteHistory.add(provider.id, provider.label, input, created);
+        // The paste went out; if localStorage couldn't retain the link, say so
+        // now — it's the one moment the user can still copy it.
+        const persistError = this.pasteHistory.persistError();
+        if (persistError) {
+          this.crossPostError.set(`${provider.label} paste created (${created.url}). ${persistError}`);
+        }
         this.reset();
         this.posted.emit(
           provider.status({

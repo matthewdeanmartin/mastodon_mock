@@ -1,11 +1,32 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { PasteHistory } from './paste-history';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PasteHistory, PasteRecord } from './paste-history';
+
+function created(slug: string) {
+  return {
+    slug,
+    url: `https://pastepile.com/p/${slug}`,
+    rawUrl: `https://pastepile.com/raw/${slug}`,
+    editKey: `key-${slug}`,
+  };
+}
+
+const INPUT = {
+  title: '',
+  content: 'hello',
+  language: 'plaintext',
+  expiry: '1w',
+  visibility: 'unlisted',
+} as const;
 
 describe('PasteHistory', () => {
   beforeEach(() => {
     localStorage.clear();
     TestBed.configureTestingModule({});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('persists links and edit keys for the browser', () => {

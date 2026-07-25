@@ -26,6 +26,10 @@
   }
 </section>
 
+@if (history.persistError(); as message) {
+  <p class="paste-error" role="alert">{{ message }}</p>
+}
+
 @if (error(); as message) {
   <p class="paste-error" role="alert">{{ message }}</p>
 }
