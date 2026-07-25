@@ -126,6 +126,8 @@
   visibility: visible;
   opacity: 1;
   transition-delay: 0.45s;
+  /* Pairs with content-visibility:hidden on the card (see account-hover-card). */
+  content-visibility: visible;
 }
 
 .suggestion:last-of-type {

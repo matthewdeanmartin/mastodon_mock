@@ -380,6 +380,12 @@
   border-right: 1px solid var(--border);
   border-left: 1px solid var(--border);
   background: var(--col-bg);
+  /* Hard containment boundary for the feed. A grid item defaults to
+     min-width:auto, so one wide post (unbreakable handle, long URL, embed)
+     would widen this track past the viewport and put the whole page into
+     horizontal scroll -- which is what pulled the fixed bottom nav off screen
+     on phones. Nothing inside may size this column. */
+  min-width: 0;
 }
 
 /* Full-width mode (settings): one column, no rails, page-background canvas. */
@@ -476,6 +482,12 @@
     justify-content: space-around;
     border-top: 1px solid var(--border);
     background: color-mix(in srgb, var(--col-bg) 97%, transparent);
+    /* Belt and braces: even if something downstream reintroduces horizontal
+       overflow, pin the bar to the viewport rather than the (wider) document,
+       so the last tab can never drift off the right edge. */
+    width: 100vw;
+    max-width: 100vw;
+    box-sizing: border-box;
   }
 
   .primary-nav a {

@@ -42,6 +42,9 @@
   visibility: visible;
   opacity: 1;
   transition-delay: 0.45s;
+  /* Paired with content-visibility:hidden on the card, which keeps it out of
+     layout (and out of the page's horizontal overflow) until it's hovered. */
+  content-visibility: visible;
 }
 
 .action-error {
@@ -55,19 +58,54 @@
   min-width: 0;
 }
 
+/* Single-line header: name · @handle · time · visibility.
+   Everything shows in full when there's room. When there isn't, space is given
+   up in priority order rather than by truncating everything at once:
+   the handle collapses first, then the display name, while the short fixed-width
+   bits (time, badges) never shrink. Without min-width:0 here the unbreakable
+   @handle sets a min-content floor that widens the whole column and puts the
+   page into horizontal overflow -- which drags the fixed bottom nav off screen. */
 .meta {
   display: flex;
   gap: 6px;
   align-items: baseline;
+  min-width: 0;
+}
+
+/* The hover-anchor wrapping .name is the real flex item, so the shrink
+   behaviour has to live on it as well as on the link inside. */
+.meta > .hover-anchor {
+  min-width: 0;
+  flex-shrink: 1;
+  display: flex;
 }
 
 .name {
   font-weight: 700;
   color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* Handle yields space fastest: it's the least useful thing to read in full,
+   and it's a single unbreakable token so it's the main overflow culprit. */
 .acct {
   font-size: 14px;
+  min-width: 0;
+  flex-shrink: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Short and fixed-length: cheaper to keep whole than to ellipsize. */
+.meta > .post-time,
+.meta > .badge,
+.meta > app-verified-badge {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .content-link,

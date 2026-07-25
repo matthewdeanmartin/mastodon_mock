@@ -81,6 +81,20 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
         opacity 0.12s ease,
         visibility 0.12s;
       pointer-events: auto;
+      /* visibility:hidden still lays the card out and still counts toward the
+         document's scrollable overflow -- a 280px card anchored mid-row reaches
+         well past a phone viewport, which silently put the whole page into
+         horizontal scroll. content-visibility keeps it out of layout until it
+         is actually shown. */
+      content-visibility: hidden;
+    }
+
+    /* Touch screens have no hover, so the card can never be triggered there.
+       Drop it entirely rather than leaving an invisible box that widens the page. */
+    @media (hover: none), (max-width: 720px) {
+      :host {
+        display: none;
+      }
     }
     .hover-card {
       width: 280px;
