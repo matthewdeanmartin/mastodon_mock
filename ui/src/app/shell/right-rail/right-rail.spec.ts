@@ -12,6 +12,10 @@ interface RightRailInternals {
   homeHost: () => string | null;
   donateServerUrl: () => string;
   anonymousShareUrl: () => string;
+  anonymousShareAbsoluteUrl: () => string;
+  shareOpen: () => boolean;
+  openShare: () => void;
+  closeShare: () => void;
 }
 
 function internals(fixture: ComponentFixture<RightRail>): RightRailInternals {
@@ -50,6 +54,27 @@ describe('RightRail', () => {
     expect(internals(fixture).anonymousShareUrl()).toBe('/anonymous?elekk.xyz');
   });
 
+  it('exposes an absolute (origin-qualified) share URL for copying, not just a route', () => {
+    TestBed.inject(Auth).account.set({ id: '1', acct: 'matt@elekk.xyz' } as Account);
+    const fixture = setUp();
+
+    const absolute = internals(fixture).anonymousShareAbsoluteUrl();
+    // A real link someone can paste elsewhere: origin + the anonymous route.
+    expect(absolute).toBe(`${location.origin}/anonymous?elekk.xyz`);
+    expect(absolute.startsWith('http')).toBe(true);
+  });
+
+  it('"Share this server" opens a dialog instead of navigating', () => {
+    TestBed.inject(Auth).account.set({ id: '1', acct: 'matt@elekk.xyz' } as Account);
+    const fixture = setUp();
+
+    expect(internals(fixture).shareOpen()).toBe(false);
+    internals(fixture).openShare();
+    expect(internals(fixture).shareOpen()).toBe(true);
+    internals(fixture).closeShare();
+    expect(internals(fixture).shareOpen()).toBe(false);
+  });
+
   it('falls back to the connected instance for local accts', () => {
     TestBed.inject(Server).setBaseUrl('https://mastodon.social');
     TestBed.inject(Auth).account.set({ id: '1', acct: 'matt' } as Account);
@@ -71,7 +96,11 @@ describe('RightRail', () => {
     );
     expect(hrefs).toContain('https://elekk.xyz/about');
     expect(hrefs).toContain('https://joinmastodon.org/sponsors');
-    expect(hrefs).toContain('/anonymous?elekk.xyz');
+    // "Share this server" is a button that opens a copy dialog, NOT an <a> that
+    // navigates to the anonymous route — so it must not appear among the hrefs.
+    expect(hrefs).not.toContain('/anonymous?elekk.xyz');
+    const shareBtn = el.querySelector<HTMLButtonElement>('button.share-server');
+    expect(shareBtn?.textContent?.trim()).toBe('Share this server');
 
     // House-ad *content* is editorial and changes freely — assert structure, not
     // specific URLs: three cards, each linking out over https.

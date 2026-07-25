@@ -52,11 +52,46 @@ export class RightRail {
     return host ? `https://${host}/about` : '/about';
   });
 
-  /** Shareable entry point that opens Mawkingbird anonymously on this instance. */
+  /** In-app route that opens Mawkingbird anonymously on this instance. */
   protected anonymousShareUrl = computed<string>(() => {
     const host = this.homeHost();
     return host ? `/anonymous?${encodeURIComponent(host)}` : '/anonymous';
   });
+
+  /**
+   * The *absolute* shareable link, for copying and handing to someone else. The
+   * relative route above navigates the current tab (which is not what "Share"
+   * should do); this resolves it against the current origin so it's a link that
+   * works when pasted elsewhere.
+   */
+  protected anonymousShareAbsoluteUrl = computed<string>(() => {
+    const path = this.anonymousShareUrl();
+    const origin = typeof location !== 'undefined' ? location.origin : '';
+    return origin ? `${origin}${path}` : path;
+  });
+
+  /** Whether the "copy this server's share link" dialog is open. */
+  protected shareOpen = signal(false);
+  /** Copy feedback: 'copied' after success, 'failed' if the clipboard was denied. */
+  protected copyState = signal<'idle' | 'copied' | 'failed'>('idle');
+
+  openShare(): void {
+    this.copyState.set('idle');
+    this.shareOpen.set(true);
+  }
+
+  closeShare(): void {
+    this.shareOpen.set(false);
+  }
+
+  async copyShareUrl(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.anonymousShareAbsoluteUrl());
+      this.copyState.set('copied');
+    } catch {
+      this.copyState.set('failed');
+    }
+  }
 
   constructor() {
     // Runs on init and again when the user switches accounts or instances, so

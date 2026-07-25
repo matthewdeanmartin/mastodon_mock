@@ -421,6 +421,11 @@
   border-top: 3px solid #ffb300;
 }
 
+.reply-mention-hint {
+  margin: 0 0 6px;
+  line-height: 1.35;
+}
+
 .bsky-compose {
   display: flex;
   gap: 8px;

@@ -8,23 +8,24 @@
   </p>
 </div>
 
-<section class="feed-settings" aria-labelledby="paste-feeds-heading">
-  <h3 id="paste-feeds-heading">Public paste feeds</h3>
-  <p class="muted">
-    These feeds are optional. Following one adds its recent public pastes to Home.
-  </p>
-  @for (provider of providers.feeds; track provider.id) {
-    <div class="feed-row">
-      <div>
-        <strong>{{ provider.label }}</strong>
-        <div class="muted small">{{ provider.feedUrl }}</div>
-      </div>
-      <button class="btn btn-outline btn-sm" type="button" (click)="toggleFeed(provider)">
-        {{ isFollowing(provider) ? 'Unfollow public feed' : 'Follow public feed' }}
-      </button>
-    </div>
-  }
-</section>
+<div class="paste-tabs" role="tablist">
+  <button
+    role="tab"
+    [class.active]="tab() === 'mine'"
+    [attr.aria-selected]="tab() === 'mine'"
+    (click)="selectTab('mine')"
+  >
+    My Pastes
+  </button>
+  <button
+    role="tab"
+    [class.active]="tab() === 'feeds'"
+    [attr.aria-selected]="tab() === 'feeds'"
+    (click)="selectTab('feeds')"
+  >
+    Public Paste Feeds
+  </button>
+</div>
 
 @if (history.persistError(); as message) {
   <p class="paste-error" role="alert">{{ message }}</p>
@@ -34,92 +35,135 @@
   <p class="paste-error" role="alert">{{ message }}</p>
 }
 
-@if (!history.records().length) {
-  <p class="muted center">Pastes created in this browser will appear here.</p>
-} @else {
-  <div class="paste-list">
-    @for (paste of history.records(); track paste.providerId + ':' + paste.slug) {
-      <article class="paste-card">
-        @if (editing() === paste.slug) {
-          <label>
-            <span>Title</span>
-            <input type="text" [ngModel]="editTitle()" (ngModelChange)="editTitle.set($event)" />
-          </label>
-          <label>
-            <span>Language</span>
-            <select [ngModel]="editLanguage()" (ngModelChange)="editLanguage.set($event)">
-              @for (
-                language of providers.get(paste.providerId)?.languages ?? [];
-                track language.value
-              ) {
-                <option [value]="language.value">{{ language.label }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            <span>Paste</span>
-            <textarea
-              rows="12"
-              [ngModel]="editContent()"
-              (ngModelChange)="editContent.set($event)"
-            ></textarea>
-          </label>
-          <div class="paste-actions">
-            <button
-              class="btn btn-sm"
-              type="button"
-              [disabled]="busy() === paste.slug || !editContent().trim()"
-              (click)="save(paste)"
-            >
-              {{ busy() === paste.slug ? 'Saving…' : 'Save changes' }}
-            </button>
-            <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">
-              Cancel
-            </button>
-          </div>
-        } @else {
-          <div class="paste-card-head">
-            <div>
-              <h3>{{ paste.title || 'Untitled paste' }}</h3>
-              <div class="muted small">
-                {{ paste.providerLabel }} · {{ paste.language }} · {{ paste.visibility }} ·
-                {{ paste.createdAt | humanTime }}
-              </div>
-            </div>
-            <span class="expiry">{{ paste.expiry }}</span>
-          </div>
-          <pre>{{ paste.content }}</pre>
-          <div class="paste-actions">
-            <a class="btn btn-sm" [href]="paste.url" target="_blank" rel="noopener noreferrer">
-              Open paste ↗
-            </a>
-            <a
-              class="btn btn-outline btn-sm"
-              [href]="paste.rawUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Raw ↗
-            </a>
-            @if (!isImmutable(paste.providerId)) {
-              <button class="btn btn-outline btn-sm" type="button" (click)="beginEdit(paste)">
-                Edit
-              </button>
-              <button
-                class="btn btn-outline btn-sm danger"
-                type="button"
-                [disabled]="busy() === paste.slug"
-                (click)="delete(paste)"
-              >
-                Delete remotely
-              </button>
-            }
-            <button class="btn btn-outline btn-sm" type="button" (click)="forget(paste)">
-              Forget link
-            </button>
-          </div>
-        }
-      </article>
+@if (tab() === 'feeds') {
+  <section class="feed-settings" aria-labelledby="paste-feeds-heading">
+    <h3 id="paste-feeds-heading">Public paste feeds</h3>
+    <p class="muted">
+      These feeds are optional. Following one adds its recent public pastes to Home.
+    </p>
+    @for (provider of providers.feeds; track provider.id) {
+      <div class="feed-row">
+        <div>
+          <strong>{{ provider.label }}</strong>
+          <div class="muted small">{{ provider.feedUrl }}</div>
+        </div>
+        <button class="btn btn-outline btn-sm" type="button" (click)="toggleFeed(provider)">
+          {{ isFollowing(provider) ? 'Unfollow public feed' : 'Follow public feed' }}
+        </button>
+      </div>
     }
-  </div>
+  </section>
+} @else {
+  @if (!history.records().length) {
+    <p class="muted center">Pastes created in this browser will appear here.</p>
+  } @else {
+    <div class="paste-list">
+      @for (paste of history.records(); track paste.providerId + ':' + paste.slug) {
+        <article class="paste-card">
+          @if (editing() === paste.slug) {
+            <label>
+              <span>Title</span>
+              <input type="text" [ngModel]="editTitle()" (ngModelChange)="editTitle.set($event)" />
+            </label>
+            <label>
+              <span>Language</span>
+              <select [ngModel]="editLanguage()" (ngModelChange)="editLanguage.set($event)">
+                @for (
+                  language of providers.get(paste.providerId)?.languages ?? [];
+                  track language.value
+                ) {
+                  <option [value]="language.value">{{ language.label }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              <span>Paste</span>
+              <textarea
+                rows="12"
+                [ngModel]="editContent()"
+                (ngModelChange)="editContent.set($event)"
+              ></textarea>
+            </label>
+            <div class="paste-actions">
+              <button
+                class="btn btn-sm"
+                type="button"
+                [disabled]="busy() === paste.slug || !editContent().trim()"
+                (click)="save(paste)"
+              >
+                {{ busy() === paste.slug ? 'Saving…' : 'Save changes' }}
+              </button>
+              <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">
+                Cancel
+              </button>
+            </div>
+          } @else {
+            <div class="paste-card-head">
+              <div>
+                <h3>{{ paste.title || 'Untitled paste' }}</h3>
+                <div class="muted small">
+                  {{ paste.providerLabel }} · {{ paste.language }} · {{ paste.visibility }} ·
+                  {{ paste.createdAt | humanTime }}
+                </div>
+              </div>
+              <span class="expiry">{{ paste.expiry }}</span>
+            </div>
+            <pre>{{ paste.content }}</pre>
+            <div class="paste-actions">
+              <a class="btn btn-sm" [href]="paste.url" target="_blank" rel="noopener noreferrer">
+                Open paste ↗
+              </a>
+              <a
+                class="btn btn-outline btn-sm"
+                [href]="paste.rawUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Raw ↗
+              </a>
+              <button
+                class="btn btn-outline btn-sm"
+                type="button"
+                [class.active]="sharing() === paste.slug"
+                (click)="toggleShare(paste)"
+                title="Post a link to this paste on Mastodon or Bluesky"
+              >
+                {{ sharing() === paste.slug ? 'Close share' : 'Share ↗' }}
+              </button>
+              @if (!isImmutable(paste.providerId)) {
+                <button class="btn btn-outline btn-sm" type="button" (click)="beginEdit(paste)">
+                  Edit
+                </button>
+                <button
+                  class="btn btn-outline btn-sm danger"
+                  type="button"
+                  [disabled]="busy() === paste.slug"
+                  (click)="delete(paste)"
+                >
+                  Delete remotely
+                </button>
+              }
+              <button class="btn btn-outline btn-sm" type="button" (click)="forget(paste)">
+                Forget link
+              </button>
+            </div>
+            @if (sharing() === paste.slug) {
+              <div class="paste-share">
+                <p class="muted small">
+                  Share the link. The paste lives at {{ paste.providerLabel }} — the post below just
+                  points to it. Pick Mastodon or Bluesky in the composer.
+                </p>
+                <app-compose
+                  [compact]="true"
+                  [initialText]="shareText(paste)"
+                  placeholder="Say something about your paste…"
+                  (posted)="onShared()"
+                />
+              </div>
+            }
+          }
+        </article>
+      }
+    </div>
+  }
 }

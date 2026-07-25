@@ -331,6 +331,12 @@
         </div>
       } @else {
         <div class="chat-compose" [class.compose-public]="chat.kind === 'public'">
+          @if (chat.kind === 'public' && replySeedsMention()) {
+            <p class="reply-mention-hint muted small">
+              💬 The <strong>&#64;handle</strong> above notifies them of your reply. Remove it to
+              reply without sending a mention notification.
+            </p>
+          }
           <app-compose
             [compact]="true"
             [inReplyToId]="replyToId()"

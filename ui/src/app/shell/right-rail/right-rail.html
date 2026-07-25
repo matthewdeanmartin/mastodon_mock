@@ -54,9 +54,59 @@
         <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
         <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
       }
-      <a class="btn btn-outline btn-sm share-server" [href]="anonymousShareUrl()">
+      <button
+        type="button"
+        class="btn btn-outline btn-sm share-server"
+        (click)="openShare()"
+        title="Copy a link that opens this server anonymously"
+      >
         Share this server
-      </a>
+      </button>
     </div>
   }
 </section>
+
+@if (shareOpen()) {
+  <div
+    class="overlay"
+    role="presentation"
+    tabindex="-1"
+    (click)="closeShare()"
+    (keyup.escape)="closeShare()"
+  >
+    <div
+      class="dialog"
+      role="dialog"
+      aria-labelledby="share-server-title"
+      (click)="$event.stopPropagation()"
+      (keyup)="$event.stopPropagation()"
+    >
+      <h3 id="share-server-title">Share this server</h3>
+      <p class="muted small">
+        This link opens Mawkingbird anonymously on {{ homeHost() }}. Copy it to share — it won't take
+        you anywhere.
+      </p>
+      <div class="share-url-row">
+        <input
+          class="share-url"
+          type="text"
+          readonly
+          [value]="anonymousShareAbsoluteUrl()"
+          aria-label="Shareable server link"
+          (focus)="$any($event.target).select()"
+        />
+        <button class="btn" type="button" (click)="copyShareUrl()">Copy</button>
+      </div>
+      @if (copyState() === 'copied') {
+        <p class="share-copy-note ok small">Copied to clipboard.</p>
+      } @else if (copyState() === 'failed') {
+        <p class="share-copy-note fail small">
+          Couldn't copy automatically — select the text above and copy it manually.
+        </p>
+      }
+      <div class="share-actions">
+        <button class="btn btn-outline" type="button" (click)="closeShare()">Close</button>
+      </div>
+    </div>
+  </div>
+}

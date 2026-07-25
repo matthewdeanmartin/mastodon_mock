@@ -332,14 +332,20 @@ export class Conversations implements OnInit, OnDestroy {
   );
 
   /**
-   * Pre-seed the composer with @mentions of the *extra* participants only.
+   * Pre-seed the composer with @mentions of the reply's recipients.
    *
-   * The person we're replying to is reached automatically via `in_reply_to_id`
-   * (Mastodon adds the parent author to the reply's mentions server-side), so
-   * seeding their handle into the box is just noise — a 1:1 chat gets an empty
-   * box. Group chats still seed the *other* members, who wouldn't otherwise be
-   * notified. This keeps the obvious recipient out of the box while preserving
-   * delivery to everyone in a wider thread.
+   * Mastodon quirk this works around: `in_reply_to_id` *threads* a reply but does
+   * NOT by itself notify the parent author — on the real API a recipient only gets
+   * a mention notification if their `@handle` is actually in the post text. So for
+   * **public** chats we seed the recipient's handle by default; a reply that reads
+   * as a silent thread-reply (no ping) is the surprising case, not the norm. The
+   * composer helper text tells the user they can delete the handle to reply
+   * without sending that notification (see conversations.html).
+   *
+   * **Private** (direct) chats are different: delivery there rides on the
+   * `direct` visibility + the conversation itself, which already surfaces to the
+   * recipient, so the obvious 1:1 partner is dropped to keep the box clean. Group
+   * private chats still seed the *other* members, who wouldn't otherwise be reached.
    */
   protected replyMentions = computed(() => {
     const chat = this.selected();
@@ -347,15 +353,16 @@ export class Conversations implements OnInit, OnDestroy {
       return '';
     }
     const me = this.auth.account();
-    // Who the reply already reaches implicitly: the author of the message we're
-    // chaining onto (the newest one in the open thread).
+    // Who the reply is chaining onto: the author of the newest message in the
+    // open thread (the person a bare reply would otherwise fail to notify).
     const replyTo = this.messages().at(-1) ?? chat.lastStatus;
     const implicit = replyTo?.account.acct;
 
     const handles = new Set<string>(chat.handles.filter((h) => h !== ''));
     if (chat.kind === 'public') {
       // Author-grouped chats only know the reply guy; keep everyone the last
-      // message was addressed to in the thread too.
+      // message was addressed to in the thread too — and, unlike private chats,
+      // keep the recipient's own handle so the reply actually pings them.
       if (replyTo) {
         if (replyTo.account.acct !== me?.acct) {
           handles.add(replyTo.account.acct);
@@ -366,9 +373,9 @@ export class Conversations implements OnInit, OnDestroy {
           }
         }
       }
-    }
-    // Drop the obvious recipient (reached via the reply itself) and myself.
-    if (implicit) {
+    } else if (implicit) {
+      // Private chats: the 1:1 partner is reached via the conversation itself,
+      // so drop their handle from the box (group members are kept above).
       handles.delete(implicit);
     }
     if (me?.acct) {
@@ -376,6 +383,9 @@ export class Conversations implements OnInit, OnDestroy {
     }
     return handles.size ? [...handles].map((h) => `@${h}`).join(' ') + ' ' : '';
   });
+
+  /** True when the seeded reply text pings someone — drives the composer hint. */
+  protected replySeedsMention = computed(() => this.replyMentions().trim().length > 0);
 
   /** Replies chain onto the newest message in the open thread. */
   protected replyToId = computed(

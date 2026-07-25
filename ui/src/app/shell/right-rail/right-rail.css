@@ -134,3 +134,63 @@
   padding: 4px 14px 10px;
   font-size: 11px;
 }
+
+/* Share-this-server dialog */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+  padding: 16px;
+}
+
+.dialog {
+  background: var(--col-bg);
+  border-radius: 16px;
+  padding: 24px;
+  width: 420px;
+  max-width: 100%;
+}
+
+.dialog h3 {
+  margin: 0 0 8px;
+}
+
+.share-url-row {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.share-url {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  color: inherit;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.share-copy-note {
+  margin: 4px 0 0;
+}
+
+.share-copy-note.ok {
+  color: var(--accent);
+}
+
+.share-copy-note.fail {
+  color: #e0245e;
+}
+
+.share-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}

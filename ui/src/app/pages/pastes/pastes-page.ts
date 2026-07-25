@@ -1,15 +1,19 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Compose } from '../../compose/compose';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
 import { PasteHistory, PasteRecord } from '../../providers/paste/paste-history';
 import { FeedPasteProvider } from '../../providers/paste/paste-provider';
 import { PasteProviderRegistry } from '../../providers/paste/paste-provider-registry';
 
+/** Which top-level section is showing. "My Pastes" is the default landing tab. */
+type PasteTab = 'mine' | 'feeds';
+
 @Component({
   selector: 'app-pastes-page',
-  imports: [FormsModule, RouterLink, HumanTimePipe],
+  imports: [FormsModule, RouterLink, HumanTimePipe, Compose],
   templateUrl: './pastes-page.html',
   styleUrl: './pastes-page.css',
 })
@@ -18,12 +22,43 @@ export class PastesPage {
   protected providers = inject(PasteProviderRegistry);
   private feeds = inject(PasteFeedSubscriptions);
 
+  /** Active tab; mirrors the Lists page split (My Pastes | Public Paste Feeds). */
+  protected tab = signal<PasteTab>('mine');
+
   protected editing = signal<string | null>(null);
   protected editTitle = signal('');
   protected editContent = signal('');
   protected editLanguage = signal('plaintext');
   protected busy = signal<string | null>(null);
   protected error = signal<string | null>(null);
+
+  /**
+   * The paste whose "Paste and Share" composer is open, or null. The paste
+   * already exists at its provider; sharing just posts a link to it on the
+   * socials (Mastodon/Bsky), so the composer is seeded with the title + URL and
+   * lets the target picker choose where the link goes. One open at a time.
+   */
+  protected sharing = signal<string | null>(null);
+
+  selectTab(tab: PasteTab): void {
+    this.tab.set(tab);
+  }
+
+  /** Open the share composer for a paste (closing any other), or toggle it shut. */
+  toggleShare(record: PasteRecord): void {
+    this.sharing.set(this.sharing() === record.slug ? null : record.slug);
+  }
+
+  /** Seed text for the share post: the title (if any) followed by the paste URL. */
+  shareText(record: PasteRecord): string {
+    const title = record.title?.trim();
+    return title ? `${title}\n\n${record.url}` : record.url;
+  }
+
+  /** Once the share post is published, collapse the composer. */
+  onShared(): void {
+    this.sharing.set(null);
+  }
 
   isFollowing(provider: FeedPasteProvider): boolean {
     return this.feeds.has(provider.id);

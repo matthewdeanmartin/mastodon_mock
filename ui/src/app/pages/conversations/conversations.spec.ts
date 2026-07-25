@@ -25,6 +25,7 @@ interface ConversationsInternals {
   visibleChats: Signal<Chat[]>;
   selected: Signal<Chat | null>;
   replyMentions: Signal<string>;
+  replySeedsMention: Signal<boolean>;
   replyToId: Signal<string | undefined>;
   replyVisibility: Signal<string>;
 }
@@ -436,9 +437,10 @@ describe('Conversations', () => {
     expect(internals(fixture).replyVisibility()).toBe('unlisted');
   });
 
-  it('replyMentions (public): seeds the other recipients but drops the obvious author', () => {
-    // The reply reaches alice implicitly via in_reply_to_id, so her handle is
-    // left out of the box; bob (a co-recipient) still needs an explicit mention.
+  it('replyMentions (public): seeds the author AND the co-recipients so the reply pings them', () => {
+    // On real Mastodon a bare reply threads but does not notify; the recipient
+    // must be @-mentioned in the text. So alice (the author we're replying to)
+    // keeps her handle in the box, alongside co-recipient bob.
     const alice = makeAccount('2', 'alice');
     const s1 = makeStatus('s1', {
       visibility: 'public',
@@ -451,7 +453,22 @@ describe('Conversations', () => {
     const fixture = setUp([], [makeMention('n1', s1)]);
     internals(fixture).selectedKey.set(internals(fixture).chats()[0].key);
 
-    expect(internals(fixture).replyMentions()).toBe('@bob ');
+    expect(internals(fixture).replyMentions()).toBe('@alice @bob ');
+    expect(internals(fixture).replySeedsMention()).toBe(true);
+  });
+
+  it('replyMentions (private 1:1): stays empty since the conversation notifies the partner', () => {
+    // Direct chats reach the partner via the conversation itself, so a 1:1 gets a
+    // clean box — the notification quirk only applies to public reply threads.
+    const conv = makeConversation('c1', {
+      accounts: [makeAccount('2', 'alice')],
+      last_status: makeStatus('s1', { account: makeAccount('2', 'alice') }),
+    });
+    const fixture = setUp([conv]);
+    internals(fixture).selectedKey.set('priv:alice');
+
+    expect(internals(fixture).replyMentions()).toBe('');
+    expect(internals(fixture).replySeedsMention()).toBe(false);
   });
 
   it('replyToId chains onto the newest loaded message, not the list row', () => {
