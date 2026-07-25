@@ -28,6 +28,7 @@ import { AnonymousTags } from './anonymous-tags';
 import { externalFetch } from '../external-fetch';
 import { AnonymousPreferences } from './anonymous-preferences';
 import { PasteFeedProvider } from '../paste/paste-feed-provider';
+import { FeatureFlags } from '../../feature-flags';
 
 const PAGE_SIZE = 20;
 const MAX_CONCURRENCY = 4;
@@ -111,6 +112,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
   private tagStore = inject(AnonymousTags);
   private preferences = inject(AnonymousPreferences);
   private pasteFeed = inject(PasteFeedProvider);
+  private featureFlags = inject(FeatureFlags);
   private anonymous = inject(AnonymousAccount);
   private rss = inject(RssFetch);
 
@@ -120,7 +122,9 @@ export class AnonymousMastodonProvider implements FeedProvider {
   readonly linked = computed(
     () =>
       this.auth.isAnonymous &&
-      (this.followStore.count() > 0 || this.tagStore.count() > 0 || this.pasteFeed.linked()),
+      (this.followStore.count() > 0 ||
+        this.tagStore.count() > 0 ||
+        (this.featureFlags.enabled('pastebin') && this.pasteFeed.linked())),
   );
   readonly errors = signal<string[]>([]);
 
@@ -156,7 +160,9 @@ export class AnonymousMastodonProvider implements FeedProvider {
           cursor: source,
           fetch: () => this.fetchTag(source),
         })),
-      ...(this.pasteFeed.linked() && !this.pasteCursor.exhausted
+      ...(this.featureFlags.enabled('pastebin') &&
+      this.pasteFeed.linked() &&
+      !this.pasteCursor.exhausted
         ? [
             {
               label: 'Paste public feed',
@@ -232,7 +238,9 @@ export class AnonymousMastodonProvider implements FeedProvider {
           cursor: source,
           fetch: () => this.fetchTag(source),
         })),
-      ...(this.pasteFeed.linked() && !this.pasteCursor.exhausted
+      ...(this.featureFlags.enabled('pastebin') &&
+      this.pasteFeed.linked() &&
+      !this.pasteCursor.exhausted
         ? [
             {
               label: 'Paste public feed',

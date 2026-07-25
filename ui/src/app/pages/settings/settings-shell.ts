@@ -61,6 +61,7 @@ export class SettingsShell {
     { label: 'Account', path: 'account', exact: true },
     { label: 'Import/Export', path: 'import-export', exact: true },
     { label: 'Invite people', path: 'invites', exact: true, mockOnly: true },
+    { label: 'Feature flags', path: 'feature-flags', exact: true, anonymous: true },
     { label: 'Development', path: 'development', exact: true, mockOnly: true },
   ].filter(
     (item) =>

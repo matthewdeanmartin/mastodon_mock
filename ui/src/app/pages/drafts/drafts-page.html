@@ -25,7 +25,19 @@
         </div>
       </div>
       <div class="draft-actions">
-        <button class="btn btn-sm" type="button" (click)="open(d)">Continue</button>
+        <button
+          class="btn btn-sm"
+          type="button"
+          [disabled]="d.target === 'paste' && !featureFlags.enabled('pastebin')"
+          [title]="
+            d.target === 'paste' && !featureFlags.enabled('pastebin')
+              ? 'Enable Pastebin in Settings → Feature flags to continue'
+              : ''
+          "
+          (click)="open(d)"
+        >
+          Continue
+        </button>
         <button
           class="btn btn-outline btn-sm"
           type="button"

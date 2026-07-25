@@ -30,6 +30,7 @@ import { PasteProviderRegistry } from '../providers/paste/paste-provider-registr
 import { applyMinimalMarkdown } from '../markdown';
 import { Terminology } from '../terminology';
 import { renderStatusText } from './status-text';
+import { FeatureFlags } from '../feature-flags';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 
@@ -105,6 +106,7 @@ export class Compose implements OnDestroy {
   protected pasteProviders = inject(PasteProviderRegistry);
   private pasteHistory = inject(PasteHistory);
   private diagnostics = inject(PageDiagnostics);
+  protected featureFlags = inject(FeatureFlags);
   protected words = inject(Terminology).words;
 
   ngOnDestroy(): void {
@@ -290,13 +292,19 @@ export class Compose implements OnDestroy {
   private lastFocusedBox: { index: number; el: HTMLTextAreaElement } | null = null;
 
   // Post target (top-level composes only; replies/quotes always stay on Fedi).
-  protected target = signal<PostTarget>(this.auth.isAnonymous ? 'paste' : 'fedi');
+  protected target = signal<PostTarget>(
+    this.auth.isAnonymous && this.featureFlags.enabled('pastebin') ? 'paste' : 'fedi',
+  );
   protected showTargetPicker = computed(() => !this.inReplyToId() && !this.quotedStatusId());
   protected targetIncludesBsky = computed(
     () => this.showTargetPicker() && (this.target() === 'bsky' || this.target() === 'both'),
   );
   protected targetIncludesPaste = computed(
-    () => this.showTargetPicker() && this.target() === 'paste',
+    () =>
+      this.showTargetPicker() && this.target() === 'paste' && this.featureFlags.enabled('pastebin'),
+  );
+  protected pasteDisabledTarget = computed(
+    () => this.target() === 'paste' && !this.featureFlags.enabled('pastebin'),
   );
   protected pasteProviderId = signal(this.pasteProviders.default.id);
   protected selectedPasteProvider = computed(
@@ -333,6 +341,9 @@ export class Compose implements OnDestroy {
   );
 
   protected canSubmit = computed(() => {
+    if (this.pasteDisabledTarget()) {
+      return false;
+    }
     if (this.submitting() || this.uploading() || this.countdown() !== null) {
       return false;
     }
@@ -374,6 +385,9 @@ export class Compose implements OnDestroy {
   });
 
   onTargetChange(target: PostTarget): void {
+    if (target === 'paste' && !this.featureFlags.enabled('pastebin')) {
+      return;
+    }
     this.target.set(target);
     if (target === 'paste') {
       const provider = this.selectedPasteProvider();
@@ -648,7 +662,9 @@ export class Compose implements OnDestroy {
     const restoredTarget = d.target ?? 'fedi';
     this.target.set(
       this.auth.isAnonymous
-        ? 'paste'
+        ? this.featureFlags.enabled('pastebin')
+          ? 'paste'
+          : 'fedi'
         : (restoredTarget === 'bsky' || restoredTarget === 'both') && !this.bskySession.linked()
           ? 'fedi'
           : restoredTarget,
@@ -795,6 +811,10 @@ export class Compose implements OnDestroy {
   }
 
   private send(): void {
+    if (this.target() === 'paste' && !this.featureFlags.enabled('pastebin')) {
+      this.crossPostError.set('Pastebin is disabled in Feature flags.');
+      return;
+    }
     this.submitting.set(true);
     this.crossPostError.set(null);
 
@@ -913,7 +933,9 @@ export class Compose implements OnDestroy {
         // now — it's the one moment the user can still copy it.
         const persistError = this.pasteHistory.persistError();
         if (persistError) {
-          this.crossPostError.set(`${provider.label} paste created (${created.url}). ${persistError}`);
+          this.crossPostError.set(
+            `${provider.label} paste created (${created.url}). ${persistError}`,
+          );
         }
         this.reset();
         this.posted.emit(

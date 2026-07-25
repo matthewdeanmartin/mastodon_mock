@@ -1,0 +1,42 @@
+<div class="spage-head">
+  <h1>Feature flags</h1>
+  <p>Choose which release channel can use features that are being rolled out.</p>
+</div>
+
+<div class="spage-body">
+  <div class="ssection">
+    @for (flag of flags.definitions; track flag.id) {
+      <div class="srow">
+        <span class="slabel">{{ flag.label }}</span>
+        <div class="scontrol">
+          <select
+            [ngModel]="state(flag)"
+            (ngModelChange)="setState(flag, $event)"
+            [attr.aria-label]="flag.label + ' rollout'"
+          >
+            <option value="production">Production</option>
+            <option value="canary">Canary only</option>
+            <option value="off">Off everywhere</option>
+          </select>
+          <span class="hint">{{ flag.description }}</span>
+          <span class="hint">
+            Default for this release:
+            {{
+              flag.defaultState === 'production'
+                ? 'Production'
+                : flag.defaultState === 'canary'
+                  ? 'Canary only'
+                  : 'Off everywhere'
+            }}. It is currently {{ flags.enabled(flag.id) ? 'enabled' : 'disabled' }} on this
+            {{ flags.isCanary ? 'canary' : 'production' }} build.
+          </span>
+        </div>
+      </div>
+    }
+  </div>
+
+  <p class="hint">
+    Overrides are local to this browser and this published version. When the published hash changes,
+    all flags return to the new version's defaults.
+  </p>
+</div>

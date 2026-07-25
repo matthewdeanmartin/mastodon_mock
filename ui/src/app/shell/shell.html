@@ -110,7 +110,9 @@
           }
           <a routerLink="/bookmarks">Bookmarks</a>
           <a routerLink="/drafts">Drafts</a>
-          <a routerLink="/pastes">Pastes</a>
+          @if (featureFlags.enabled('pastebin')) {
+            <a routerLink="/pastes">Pastes</a>
+          }
           @if (!auth.isAnonymous) {
             <a routerLink="/analytics">Analytics</a>
           }

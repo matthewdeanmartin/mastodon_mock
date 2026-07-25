@@ -46,6 +46,7 @@ describe('SettingsShell', () => {
       'Connections',
       'Appearance',
       'Local storage',
+      'Feature flags',
     ]);
   });
 

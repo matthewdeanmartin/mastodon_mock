@@ -22,6 +22,13 @@ describe('application routes', () => {
     expect(shellChild('observability')?.canActivate).toBeUndefined();
   });
 
+  it('guards pastebin routes behind the pastebin feature flag', () => {
+    const route = shellChild('pastes');
+
+    expect(route?.data?.['featureFlag']).toBe('pastebin');
+    expect(route?.canActivate).toHaveLength(1);
+  });
+
   it('keeps interaction-only routes guarded from Anonymous', () => {
     expect(shellChild('favourites')?.canActivate).toHaveLength(1);
   });

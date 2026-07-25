@@ -187,7 +187,9 @@
               <option value="both">🦣+🦋 Both</option>
             }
           }
-          <option value="paste">📋 Paste</option>
+          @if (featureFlags.enabled('pastebin')) {
+            <option value="paste">📋 Paste</option>
+          }
         </select>
       }
       @if (targetIncludesPaste()) {
@@ -405,6 +407,11 @@
 
   @if (crossPostError(); as err) {
     <div class="cross-post-error">{{ err }}</div>
+  }
+  @if (pasteDisabledTarget()) {
+    <div class="cross-post-error">
+      This paste draft cannot be published while Pastebin is disabled in Settings → Feature flags.
+    </div>
   }
 
   @if (draftSaved()) {

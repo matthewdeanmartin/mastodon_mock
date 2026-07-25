@@ -3,6 +3,7 @@ import { authGuard } from './auth.guard';
 import { adminGuard } from './admin/admin.guard';
 import { anonymousUnavailableGuard } from './providers/anonymous/anonymous-route.guard';
 import { anonymousOnlyGuard } from './providers/anonymous/anonymous-only.guard';
+import { featureFlagGuard } from './feature-flag.guard';
 // Mock-only routes; file-replaced with an empty list in the Mocking Bird build.
 import { mockOnlyChildren } from './mock-routes';
 
@@ -229,6 +230,14 @@ export const routes: Routes = [
               import('./pages/settings/invites/settings-invites').then((m) => m.SettingsInvites),
           },
           {
+            path: 'feature-flags',
+            data: { featureFlagSettings: true, preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/feature-flags/settings-feature-flags').then(
+                (m) => m.SettingsFeatureFlags,
+              ),
+          },
+          {
             path: 'development',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Development settings', preloadSettings: true },
@@ -300,6 +309,8 @@ export const routes: Routes = [
       },
       {
         path: 'pastes',
+        canActivate: [featureFlagGuard],
+        data: { featureFlag: 'pastebin' },
         loadComponent: () => import('./pages/pastes/pastes-page').then((m) => m.PastesPage),
       },
       {

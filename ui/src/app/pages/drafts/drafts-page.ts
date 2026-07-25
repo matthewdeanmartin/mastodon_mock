@@ -6,6 +6,7 @@ import { Draft, Drafts } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { ScheduledStatus } from '../../models';
 import { Auth } from '../../auth';
+import { FeatureFlags } from '../../feature-flags';
 
 /**
  * The saved-drafts list plus the account's scheduled posts. Drafts live only
@@ -25,6 +26,7 @@ export class DraftsPage implements OnInit {
   private api = inject(Api);
   private router = inject(Router);
   protected auth = inject(Auth);
+  protected featureFlags = inject(FeatureFlags);
 
   protected pendingDelete = signal<Draft | null>(null);
 

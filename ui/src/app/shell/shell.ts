@@ -16,6 +16,7 @@ import { AppFooter } from './app-footer/app-footer';
 import { LeftRail } from './left-rail/left-rail';
 import { RightRail } from './right-rail/right-rail';
 import { ServerAbout } from '../server-about';
+import { FeatureFlags } from '../feature-flags';
 
 function isWideUrl(url: string): boolean {
   // /search goes rails-off wide so facets have room to live beside results.
@@ -49,6 +50,7 @@ export class Shell implements OnInit {
   protected hotkeys = inject(Hotkeys);
   protected prefs = inject(ClientPrefs);
   protected serverAbout = inject(ServerAbout);
+  protected featureFlags = inject(FeatureFlags);
 
   /** Build flavor: drives the brand and whether mock-only nav links are shown. */
   protected mockTooling = environment.mockTooling;
