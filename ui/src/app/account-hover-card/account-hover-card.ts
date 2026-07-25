@@ -1,4 +1,12 @@
-import { Component, computed, DestroyRef, inject, input, signal } from '@angular/core';
+import {
+  booleanAttribute,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Account, Relationship } from '../models';
 import { Api } from '../api';
@@ -35,7 +43,7 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
       @if (account().note) {
         <div class="hc-note" [innerHTML]="account().note"></div>
       }
-      @if (hasStats) {
+      @if (showStats() && hasStats) {
         <div class="hc-stats muted">
           <span
             ><strong>{{ account().statuses_count | humanCount }}</strong> posts</span
@@ -134,6 +142,8 @@ export class AccountHoverCard {
   private destroyRef = inject(DestroyRef);
 
   readonly account = input.required<Account>();
+  readonly allowFollow = input(true, { transform: booleanAttribute });
+  readonly showStats = input(true, { transform: booleanAttribute });
   protected relationship = signal<Relationship | null>(null);
   protected relationshipLoading = signal(false);
   protected followBusy = signal(false);
@@ -143,7 +153,8 @@ export class AccountHoverCard {
     () =>
       this.account().id !== this.auth.account()?.id &&
       !!this.account().id &&
-      !this.account().id.includes(':'),
+      !this.account().id.includes(':') &&
+      this.allowFollow(),
   );
   protected isFollowingState = computed(
     () => !!this.relationship()?.following || !!this.relationship()?.requested,

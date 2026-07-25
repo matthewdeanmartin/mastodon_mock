@@ -31,6 +31,8 @@ import { isElizaId } from '../../eliza/eliza-identity';
 import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
+import { StarterKitPost } from '../../starter-kit-post/starter-kit-post';
+import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 
 /** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -43,11 +45,20 @@ const BOOKMARK_TAIL_SIZE = 40;
 
 @Component({
   selector: 'app-home',
-  imports: [CommandBar, Compose, StatusCard, Announcements, RouterLink, LocalCompose],
+  imports: [
+    CommandBar,
+    Compose,
+    StatusCard,
+    Announcements,
+    RouterLink,
+    LocalCompose,
+    StarterKitPost,
+  ],
   templateUrl: './home.html',
   styleUrl: './home.css',
 })
 export class Home implements OnInit, OnDestroy {
+  protected readonly shippedStarterKits = SHIPPED_STARTER_KITS;
   private api = inject(Api);
   protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);

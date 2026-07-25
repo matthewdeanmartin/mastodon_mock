@@ -117,6 +117,10 @@ describe('Shell account switching', () => {
       expect(fixture.nativeElement.querySelector('.login-nav')).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('+ Add an account');
       expect(fixture.nativeElement.textContent).toContain('Observability');
+      const starterKits = fixture.nativeElement.querySelector(
+        'a[href="/starter-kits"]',
+      ) as HTMLAnchorElement;
+      expect(starterKits.textContent).toContain('Starter Kits');
       expect(fixture.nativeElement.querySelector('.anonymous-post-login')).toBeNull();
       expect(fixture.nativeElement.querySelector('.profile-stats')?.textContent).toContain('Posts');
     },
@@ -131,5 +135,14 @@ describe('Shell account switching', () => {
 
     const links = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a')];
     expect(links.some((link) => link.textContent?.includes('Canary'))).toBe(false);
+  });
+
+  it('always includes Starter Kits in the More menu for signed-in users', () => {
+    const fixture = createShell();
+    const link = fixture.nativeElement.querySelector(
+      'a[href="/starter-kits"]',
+    ) as HTMLAnchorElement;
+
+    expect(link.textContent).toContain('Starter Kits');
   });
 });

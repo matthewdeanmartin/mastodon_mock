@@ -1,0 +1,28 @@
+<div class="page-head">Starter Kits</div>
+
+<section class="starter-kits-intro">
+  <h1>Find your people</h1>
+  <p class="muted">
+    Starter kits are curated groups of accounts worth exploring. Preview the first five people in
+    each kit, hover for a profile, or open the complete collection.
+  </p>
+</section>
+
+<a class="universal-kit" routerLink="/collections/starter">
+  <div class="universal-icon" aria-hidden="true">M</div>
+  <div>
+    <strong>Universal starter kit</strong>
+    <p>A built-in mix of projects, reporting, art, history, science, and delightful bots.</p>
+    <span>Explore the built-in collection →</span>
+  </div>
+</a>
+
+<section class="shipped-kits" aria-labelledby="shipped-kits-title">
+  <div class="section-head">
+    <h2 id="shipped-kits-title">Community starter kits</h2>
+    <span class="muted small">{{ kits.length }} collections</span>
+  </div>
+  @for (kit of kits; track kit.id) {
+    <app-starter-kit-post [kit]="kit" />
+  }
+</section>

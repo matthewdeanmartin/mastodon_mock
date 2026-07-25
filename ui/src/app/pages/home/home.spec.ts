@@ -169,7 +169,7 @@ describe('Home', () => {
     const link = fixture.nativeElement.querySelector(
       '.starter-pack-universal a',
     ) as HTMLAnchorElement;
-    expect(link.textContent).toContain('Get your account started with the universal starter pack');
+    expect(link.textContent).toContain('Get your account started with the universal starter kit');
     expect(link.getAttribute('href')).toBe('/collections/starter');
     const loginPost = fixture.nativeElement.querySelector(
       '.anonymous-login-post',
@@ -179,6 +179,38 @@ describe('Home', () => {
     );
     expect(loginPost.textContent).toContain('Pinned');
     expect(loginPost.getAttribute('href')).toBe('/login');
+
+    const universal = fixture.nativeElement.querySelector('.starter-pack-universal');
+    const shipped = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('app-starter-kit-post'),
+    ];
+    expect(shipped).toHaveLength(11);
+    expect(
+      universal.compareDocumentPosition(shipped[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(shipped[0].textContent).toContain('Artists of Mastodon');
+  });
+
+  it('gives a new signed-in account actionable starter-kit widgets', () => {
+    const auth = TestBed.inject(Auth);
+    auth.setToken('starter-token');
+    auth.setAccount({
+      id: 'me',
+      username: 'new-user',
+      acct: 'new-user',
+      display_name: 'New User',
+      following_count: 0,
+    } as Status['account']);
+
+    const fixture = setUp();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelectorAll('app-starter-kit-post')).toHaveLength(11);
+    expect(el.querySelector('app-starter-kit-post')?.textContent).toContain('Follow first 5');
+    expect(el.querySelector('.starter-pack-universal a')?.getAttribute('href')).toBe(
+      '/collections/starter',
+    );
   });
 
   it('keeps the starter pack after following Eliza (still few real friends)', () => {

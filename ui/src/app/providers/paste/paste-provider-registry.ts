@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { IsgdProvider } from './isgd-provider';
 import { FeedPasteProvider, PasteProvider } from './paste-provider';
 import { PastepileProvider } from './pastepile-provider';
 import { RentryProvider } from './rentry-provider';
@@ -8,8 +9,9 @@ import { RentryProvider } from './rentry-provider';
 export class PasteProviderRegistry {
   private pastepile = inject(PastepileProvider);
   private rentry = inject(RentryProvider);
+  private isgd = inject(IsgdProvider);
 
-  readonly all: readonly PasteProvider[] = [this.pastepile, this.rentry];
+  readonly all: readonly PasteProvider[] = [this.pastepile, this.rentry, this.isgd];
   readonly feeds: readonly FeedPasteProvider[] = [this.pastepile];
   readonly default = this.pastepile;
 

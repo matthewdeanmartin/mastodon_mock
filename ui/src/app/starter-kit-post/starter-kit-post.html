@@ -1,0 +1,89 @@
+<article class="starter-kit-post">
+  <div class="kit-avatar" aria-hidden="true">✦</div>
+  <div class="kit-content">
+    <div class="kit-author">
+      <strong>{{ kit().curatorName }}</strong>
+      <span class="muted">&#64;{{ kit().curatorHandle }}</span>
+    </div>
+
+    <div class="kit-copy">
+      <strong>{{ kit().title }}</strong>
+      @if (kit().description) {
+        <p>{{ kit().description }}</p>
+      }
+      <span class="muted small">
+        {{ kit().itemCount }} {{ kit().itemCount === 1 ? 'account' : 'accounts' }}
+      </span>
+    </div>
+
+    <div class="kit-members" aria-label="First five accounts in {{ kit().title }}">
+      @for (account of kit().accounts; track account.url) {
+        <span class="kit-member-shell" (mouseenter)="prepareAccount(account)">
+          @if (auth.isAnonymous) {
+            <a
+              class="kit-member"
+              [href]="account.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              [attr.aria-label]="'Open ' + (account.display_name || account.acct) + ' profile'"
+            >
+              <img
+                [src]="account.avatar_static || account.avatar"
+                [alt]="account.display_name || account.acct"
+                width="38"
+                height="38"
+                loading="lazy"
+                decoding="async"
+              />
+              <span>{{ account.display_name || account.username }}</span>
+            </a>
+          } @else {
+            <button
+              type="button"
+              class="kit-member"
+              [disabled]="opening() !== null"
+              (click)="openAccount(account)"
+              [attr.aria-label]="'Open ' + (account.display_name || account.acct) + ' in app'"
+            >
+              <img
+                [src]="accountFor(account).avatar_static || accountFor(account).avatar"
+                [alt]="accountFor(account).display_name || accountFor(account).acct"
+                width="38"
+                height="38"
+                loading="lazy"
+                decoding="async"
+              />
+              <span>{{ accountFor(account).display_name || accountFor(account).username }}</span>
+            </button>
+          }
+          <app-account-hover-card
+            [account]="accountFor(account)"
+            [allowFollow]="!auth.isAnonymous && isResolved(account)"
+          />
+        </span>
+      }
+    </div>
+
+    <div class="kit-actions">
+      @if (!auth.isAnonymous) {
+        <button
+          type="button"
+          class="btn btn-sm"
+          [disabled]="importer.running() || completed() === kit().accounts.length"
+          (click)="followPreview()"
+        >
+          @if (importer.running()) {
+            Following… {{ completed() }}/{{ kit().accounts.length }}
+          } @else if (completed() === kit().accounts.length) {
+            Followed {{ followed() }} of {{ kit().accounts.length }}
+          } @else {
+            Follow first {{ kit().accounts.length }}
+          }
+        </button>
+      }
+      <a class="btn btn-outline btn-sm kit-link" [href]="kit().url" target="_blank" rel="noopener">
+        {{ auth.isAnonymous ? 'View collection ↗' : 'Open full collection ↗' }}
+      </a>
+    </div>
+  </div>
+</article>

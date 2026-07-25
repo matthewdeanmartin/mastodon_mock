@@ -24,6 +24,12 @@ export const routes: Routes = [
   },
   // The project story should be available before a visitor has an account.
   { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
+  // A message shared as an is.gd short link. Un-guarded so a shared link opens
+  // for anyone, signed in or not.
+  {
+    path: 'message',
+    loadComponent: () => import('./pages/message/message').then((m) => m.MessagePage),
+  },
   {
     path: 'integrations/dropbox/callback',
     loadComponent: () =>
@@ -237,6 +243,10 @@ export const routes: Routes = [
       {
         path: 'find-people',
         loadComponent: () => import('./pages/find-people/find-people').then((m) => m.FindPeople),
+      },
+      {
+        path: 'starter-kits',
+        loadComponent: () => import('./pages/starter-kits/starter-kits').then((m) => m.StarterKits),
       },
       {
         path: 'tags',

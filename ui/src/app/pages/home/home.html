@@ -101,19 +101,20 @@
       </div>
     </a>
   }
-  @if (auth.isAnonymous) {
-    <article class="starter-pack-post starter-pack-universal">
-      <div class="starter-pack-avatar" aria-hidden="true">M</div>
-      <div class="starter-pack-content">
-        <div class="starter-pack-author">
-          <strong>Mawkingbird</strong>
-          <span class="muted">&#64;mawkingbird</span>
-        </div>
-        <a routerLink="/collections/starter">
-          Get your account started with the universal starter pack
-        </a>
+  <article class="starter-pack-post starter-pack-universal">
+    <div class="starter-pack-avatar" aria-hidden="true">M</div>
+    <div class="starter-pack-content">
+      <div class="starter-pack-author">
+        <strong>Mawkingbird</strong>
+        <span class="muted">&#64;mawkingbird</span>
       </div>
-    </article>
+      <a routerLink="/collections/starter">
+        Get your account started with the universal starter kit
+      </a>
+    </div>
+  </article>
+  @for (kit of shippedStarterKits; track kit.id) {
+    <app-starter-kit-post [kit]="kit" />
   }
 }
 
