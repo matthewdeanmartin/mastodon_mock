@@ -228,11 +228,17 @@ export class ClientPrefs {
   readonly customSidebar = signal<CustomColor>(null);
 
   /**
-   * Hide trending tags detected as a language the user doesn't know. Off by
-   * default — see {@link KnownLanguages} for how "known" is derived and the
+   * Hide trending tags detected as a language the user doesn't know. **On by
+   * default**: with ~3000 human languages, a reader who happens to know the one
+   * a tag is written in is the rare case, so the sensible default is to exclude
+   * tags we're *sure* are foreign. The filter only ever hides tags whose script
+   * commits to a known-foreign language; anything undetermined (all Latin tags,
+   * bare Han for a reader who might know zh/ja) is still kept — so "we can't tell
+   * your language" degrades to showing everything, never hiding by mistake. See
+   * {@link KnownLanguages} for how "known" is derived and the
    * TrendLanguageFilter service for where it is applied.
    */
-  readonly excludeUnknownLangTrends = signal<boolean>(false);
+  readonly excludeUnknownLangTrends = signal<boolean>(true);
   /**
    * Languages the user has explicitly said they know (ISO 639-1). This is the
    * future home of Mastodon's "public timeline languages" checkbox list; it

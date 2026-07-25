@@ -430,6 +430,7 @@
           Switch to {{ languageName(mismatch.detected) }}
         </button>
         <button class="btn" (click)="confirmLanguageAndSend()">Post as {{ languageName(mismatch.picked) }}</button>
+        <button class="btn btn-outline" (click)="dismissLangMismatch()">Keep editing</button>
       </div>
     </div>
   }

@@ -173,6 +173,15 @@ export class Compose implements OnDestroy {
    */
   protected langMismatch = signal<{ picked: string; detected: string } | null>(null);
 
+  /**
+   * A mismatch the user explicitly dismissed ("keep editing"). While the picked
+   * language and detected language still match this pair, {@link submit} won't
+   * re-raise the banner — so dismissing genuinely gets it out of the way instead
+   * of having it pop straight back on the next Post. Cleared whenever the picker
+   * changes or the text is re-detected to something new.
+   */
+  private dismissedMismatch = signal<{ picked: string; detected: string } | null>(null);
+
   /** Every box in order; index 0 is the primary post. */
   protected segments = computed(() => [this.text(), ...this.thread()]);
 
@@ -549,8 +558,10 @@ export class Compose implements OnDestroy {
 
   onLanguageChange(code: string): void {
     this.postLanguage.set(code);
-    // Changing the picker clears any standing mismatch warning.
+    // Changing the picker clears any standing mismatch warning, and any prior
+    // dismissal — the user picked a new language, so re-check against it.
     this.langMismatch.set(null);
+    this.dismissedMismatch.set(null);
   }
 
   languageName(code: string): string {
@@ -589,6 +600,18 @@ export class Compose implements OnDestroy {
     if (detected) {
       this.postLanguage.set(detected);
     }
+    this.langMismatch.set(null);
+    this.dismissedMismatch.set(null);
+  }
+
+  /**
+   * Close the warning without changing anything and go back to editing. Records
+   * the pair so it doesn't immediately re-raise on the next Post; the user can
+   * keep their picked language and post when ready, or edit the text (which
+   * re-detects and, if it now reads as something else, warns afresh).
+   */
+  dismissLangMismatch(): void {
+    this.dismissedMismatch.set(this.langMismatch());
     this.langMismatch.set(null);
   }
 
@@ -869,7 +892,15 @@ export class Compose implements OnDestroy {
     // or "Not specified". Skipped for paste/Bluesky targets (no fedi language).
     if (this.postLanguage() && !this.targetIncludesPaste() && !this.targetIncludesBsky()) {
       const detected = this.detectedLanguage();
-      if (detected && detected !== this.postLanguage() && this.langMismatch() === null) {
+      const dismissed = this.dismissedMismatch();
+      const alreadyDismissed =
+        dismissed?.picked === this.postLanguage() && dismissed?.detected === detected;
+      if (
+        detected &&
+        detected !== this.postLanguage() &&
+        this.langMismatch() === null &&
+        !alreadyDismissed
+      ) {
         this.langMismatch.set({ picked: this.postLanguage(), detected });
         return;
       }

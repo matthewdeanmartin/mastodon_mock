@@ -102,6 +102,16 @@ describe('TrendLanguageFilter', () => {
     expect(filter.shouldShow(tag('東京'))).toBe(true);
   });
 
+  it('hides a long kana-bearing meme tag from a non-Japanese reader', () => {
+    // Regression: a sentence-length hashtag mixing kanji, kana and digits
+    // (#7月以内にこの投稿が50リア行かなかったらさようなら) leaked to an
+    // English-only reader. Kana anywhere pins it to Japanese, so it must hide.
+    prefs.setKnownLanguages(['en']);
+    prefs.setExcludeUnknownLangTrends(true);
+    const meme = tag('7月以内にこの投稿が50リア行かなかったらさようなら');
+    expect(filter.shouldShow(meme)).toBe(false);
+  });
+
   it('hides a Latin tag with an exclusive letter in an unknown language', () => {
     prefs.setKnownLanguages(['en']); // no German
     prefs.setExcludeUnknownLangTrends(true);

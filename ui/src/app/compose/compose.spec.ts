@@ -50,6 +50,10 @@ interface ComposeInternals {
   setMediaDescription(index: number, description: string): void;
   removeMedia(index: number): void;
   submit(): void;
+  postLanguage: WritableSignal<string>;
+  langMismatch: WritableSignal<{ picked: string; detected: string } | null>;
+  onLanguageChange(code: string): void;
+  dismissLangMismatch(): void;
 }
 
 function internals(fixture: ComponentFixture<Compose>): ComposeInternals {
@@ -776,5 +780,50 @@ describe('Compose', () => {
     internals(f).text.set('with a picture');
     internals(f).media.set([{ media: { id: 'm1' }, description: '' }]);
     expect(internals(f).canSubmit()).toBe(false);
+  });
+
+  // --------------------------------------------------- language-mismatch banner
+
+  /** English text that detects confidently as `en` (rich in stop-words). */
+  const ENGLISH_BODY = 'the cat is on the table and the dog is here with them';
+
+  it('raises the language-mismatch banner when picked language disagrees with text', () => {
+    const f = setUp();
+    internals(f).text.set(ENGLISH_BODY);
+    internals(f).onLanguageChange('de'); // picked German, text is English
+    internals(f).submit();
+    expect(internals(f).langMismatch()).toEqual({ picked: 'de', detected: 'en' });
+  });
+
+  it('"Keep editing" dismisses the banner and does not re-raise on next submit', () => {
+    const f = setUp();
+    internals(f).text.set(ENGLISH_BODY);
+    internals(f).onLanguageChange('de');
+    internals(f).submit();
+    expect(internals(f).langMismatch()).not.toBeNull();
+
+    internals(f).dismissLangMismatch();
+    expect(internals(f).langMismatch()).toBeNull();
+
+    // The exact same mismatch must not pop straight back up: the next submit
+    // proceeds to actually post (as the picked language) instead of re-warning.
+    internals(f).submit();
+    expect(internals(f).langMismatch()).toBeNull();
+    const req = httpMock.expectOne('/api/v1/statuses');
+    expect(req.request.body.language).toBe('de');
+    req.flush({ id: '1' });
+  });
+
+  it('re-arms the warning after a dismissal once the picked language changes', () => {
+    const f = setUp();
+    internals(f).text.set(ENGLISH_BODY);
+    internals(f).onLanguageChange('de');
+    internals(f).submit();
+    internals(f).dismissLangMismatch();
+
+    // Pick a different (still-wrong) language: the dismissal no longer applies.
+    internals(f).onLanguageChange('fr');
+    internals(f).submit();
+    expect(internals(f).langMismatch()).toEqual({ picked: 'fr', detected: 'en' });
   });
 });
