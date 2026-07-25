@@ -254,6 +254,20 @@
         </select>
       }
 
+      @if (!targetIncludesPaste() && !targetIncludesBsky()) {
+        <select
+          class="visibility-select"
+          [ngModel]="postLanguage()"
+          (ngModelChange)="onLanguageChange($event)"
+          title="Post language"
+        >
+          <option value="">🌐 Not specified</option>
+          @for (l of languageOptions(); track l.code) {
+            <option [value]="l.code">{{ l.name }}</option>
+          }
+        </select>
+      }
+
       @if ((!compact() || draftsOpen()) && (savedDrafts().length || hasDraftContent())) {
         <select class="drafts-select" (change)="onDraftSelect($any($event.target))" title="Drafts">
           <option value="" selected>📝 Drafts</option>
@@ -405,6 +419,20 @@
     </div>
   </div>
 
+  @if (langMismatch(); as mismatch) {
+    <div class="lang-mismatch">
+      <p>
+        You set the language to <strong>{{ languageName(mismatch.picked) }}</strong>, but this
+        reads as <strong>{{ languageName(mismatch.detected) }}</strong>. Post anyway, or fix it?
+      </p>
+      <div class="lang-mismatch-actions">
+        <button class="btn btn-outline" (click)="useDetectedLanguage()">
+          Switch to {{ languageName(mismatch.detected) }}
+        </button>
+        <button class="btn" (click)="confirmLanguageAndSend()">Post as {{ languageName(mismatch.picked) }}</button>
+      </div>
+    </div>
+  }
   @if (crossPostError(); as err) {
     <div class="cross-post-error">{{ err }}</div>
   }

@@ -1,11 +1,46 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ClientPrefs } from './client-prefs';
-import { Tag } from './models';
-import { KnownLanguages, TrendLanguageFilter, UI_LANGUAGE } from './trend-language-filter';
+import { Status, Tag } from './models';
+import {
+  FeedLanguageFilter,
+  KnownLanguages,
+  TrendLanguageFilter,
+  UI_LANGUAGE,
+} from './trend-language-filter';
 
 function tag(name: string): Tag {
   return { id: name, name, url: `https://x/tags/${name}`, following: false, featuring: false, history: [] };
+}
+
+function post(content: string, language: string | null = null, overrides: Partial<Status> = {}): Status {
+  return {
+    id: Math.random().toString(36).slice(2),
+    created_at: '2026-01-01T00:00:00Z',
+    edited_at: null,
+    content: `<p>${content}</p>`,
+    spoiler_text: '',
+    visibility: 'public',
+    url: null,
+    account: { id: 'a', username: 'a', acct: 'a', display_name: 'A' } as never,
+    reblog: null,
+    quote: null,
+    in_reply_to_id: null,
+    replies_count: 0,
+    reblogs_count: 0,
+    favourites_count: 0,
+    favourited: false,
+    reblogged: false,
+    bookmarked: false,
+    muted: false,
+    pinned: false,
+    sensitive: false,
+    poll: null,
+    quote_approval_policy: null,
+    language,
+    media_attachments: [],
+    ...overrides,
+  };
 }
 
 describe('TrendLanguageFilter', () => {
@@ -118,5 +153,75 @@ describe('KnownLanguages', () => {
     prefs.setKnownLanguages(['pt-BR', 'DE']);
     expect(known.knows('pt')).toBe(true);
     expect(known.knows('de')).toBe(true);
+  });
+});
+
+describe('FeedLanguageFilter', () => {
+  let prefs: ClientPrefs;
+  let filter: FeedLanguageFilter;
+
+  const FRENCH = 'le chat est dans la maison et je ne sais pas pourquoi mais il est là';
+  const ENGLISH = 'the quick brown fox is in the house and that is all we have here today';
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({});
+    prefs = TestBed.inject(ClientPrefs);
+    filter = TestBed.inject(FeedLanguageFilter);
+    prefs.setKnownLanguages(['en']); // user knows English only
+  });
+
+  it('passes everything through when the toggle is off', () => {
+    prefs.setHideForeignLangPosts(false);
+    expect(filter.shouldShow(post(FRENCH, 'fr'))).toBe(true);
+  });
+
+  it('hides a post that declares a language the user does not know', () => {
+    prefs.setHideForeignLangPosts(true);
+    expect(filter.hideReason(post('court texte', 'fr'))).toBe('foreign');
+  });
+
+  it('keeps a post declared in a known language', () => {
+    prefs.setHideForeignLangPosts(true);
+    expect(filter.shouldShow(post(ENGLISH, 'en'))).toBe(true);
+  });
+
+  it('hides a foreign post with no declared language but confident detection', () => {
+    prefs.setHideForeignLangPosts(true);
+    expect(filter.hideReason(post(FRENCH, null))).toBe('foreign');
+  });
+
+  it('flags misrepresentation: declared en, text confidently French', () => {
+    prefs.setKnownLanguages(['en', 'fr']); // knows both, so not "foreign"
+    prefs.setHideForeignLangPosts(true);
+    expect(filter.hideReason(post(FRENCH, 'en'))).toBe('misrepresented');
+  });
+
+  it('never hides a post too short to detect and with no declared language', () => {
+    prefs.setHideForeignLangPosts(true);
+    expect(filter.shouldShow(post('hi', null))).toBe(true);
+    expect(filter.shouldShow(post('ok merci', null))).toBe(true); // short → unsure
+  });
+
+  it('never hides on ambiguous detection (no confident winner)', () => {
+    prefs.setHideForeignLangPosts(true);
+    // Numbers/punctuation only — detection returns und → keep.
+    expect(filter.shouldShow(post('12345 67890 !!! ??? ...', null))).toBe(true);
+  });
+
+  it('uses the boost target language for a reblog', () => {
+    prefs.setHideForeignLangPosts(true);
+    const inner = post(FRENCH, 'fr');
+    const boost = post('', null, { reblog: inner });
+    expect(filter.hideReason(boost)).toBe('foreign');
+  });
+
+  it('apply() preserves order and drops only sure-foreign posts', () => {
+    prefs.setHideForeignLangPosts(true);
+    const list = [post(ENGLISH, 'en'), post(FRENCH, 'fr'), post('hi', null)];
+    const kept = filter.apply(list);
+    expect(kept).toHaveLength(2); // English kept, French dropped, short kept
+    expect(kept[0]).toBe(list[0]);
+    expect(kept[1]).toBe(list[2]);
   });
 });

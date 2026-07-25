@@ -40,6 +40,15 @@
     <button
       type="button"
       class="btn btn-outline"
+      [class.active]="prefs.hideForeignLangPosts()"
+      (click)="toggleLangFilter()"
+      title="Hide posts confidently in a language you don't know, or that mislabel their language. Never hides posts whose language is unclear. Set your languages under Settings → Internationalization."
+    >
+      🌐 {{ prefs.hideForeignLangPosts() ? 'My languages' : 'All languages' }}
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
       (click)="shuffle()"
       [disabled]="feed.loading()"
       title="Re-deal the same posts in a random order"

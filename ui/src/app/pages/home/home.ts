@@ -7,6 +7,8 @@ import { Auth } from '../../auth';
 import { Drafts } from '../../drafts';
 import { ClientPrefs, FEED_MAX_COOLDOWN_MS } from '../../client-prefs';
 import { Status } from '../../models';
+import { isCalmHidden } from '../../sentiment';
+import { FeedLanguageFilter } from '../../trend-language-filter';
 import { CommandBar } from '../../command-bar/command-bar';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
@@ -61,7 +63,8 @@ export class Home implements OnInit, OnDestroy {
   protected readonly shippedStarterKits = SHIPPED_STARTER_KITS;
   private api = inject(Api);
   protected auth = inject(Auth);
-  private prefs = inject(ClientPrefs);
+  protected prefs = inject(ClientPrefs);
+  private feedLangFilter = inject(FeedLanguageFilter);
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private diagnostics = inject(HomeDiagnostics);
@@ -148,7 +151,9 @@ export class Home implements OnInit, OnDestroy {
     return statuses.filter(
       (status) =>
         (this.showBoosts() || status.reblog === null) &&
-        (this.showReplies() || status.in_reply_to_id === null),
+        (this.showReplies() || status.in_reply_to_id === null) &&
+        !(this.prefs.algoCalm() && isCalmHidden(status)) &&
+        this.feedLangFilter.shouldShow(status),
     );
   }
 

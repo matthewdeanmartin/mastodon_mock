@@ -117,6 +117,7 @@ interface StoredPrefs {
   customSidebar?: CustomColor;
   excludeUnknownLangTrends?: boolean;
   knownLanguages?: string[];
+  hideForeignLangPosts?: boolean;
 }
 
 /** ISO 639-1 codes normalized/deduped; also drives the trending-tag language filter. */
@@ -239,6 +240,14 @@ export class ClientPrefs {
    * the browser, and the posting default.
    */
   readonly knownLanguages = signal<string[]>([]);
+
+  /**
+   * Hide feed posts (Home, Algo) that are confidently in a language the user
+   * doesn't know, or that misrepresent their own language. Off by default. Like
+   * the trending filter, it never hides a post whose language can't be
+   * determined — see the FeedLanguageFilter service.
+   */
+  readonly hideForeignLangPosts = signal<boolean>(false);
 
   /** Resolved theme actually in effect ('auto' resolved against the OS preference). */
   readonly resolvedTheme = signal<'light' | 'dark'>('light');
@@ -409,6 +418,10 @@ export class ClientPrefs {
     this.knownLanguages.set(normalizeLangs(list));
   }
 
+  setHideForeignLangPosts(on: boolean): void {
+    this.hideForeignLangPosts.set(on);
+  }
+
   /** Add one language to the explicit known-languages list. */
   addKnownLanguage(code: string): void {
     this.knownLanguages.update((list) => normalizeLangs([...list, code]));
@@ -519,6 +532,7 @@ export class ClientPrefs {
     this.customSidebar.set(normalizeColor(stored.customSidebar ?? null));
     this.loadBool(stored.excludeUnknownLangTrends, this.excludeUnknownLangTrends);
     this.knownLanguages.set(normalizeLangs(stored.knownLanguages));
+    this.loadBool(stored.hideForeignLangPosts, this.hideForeignLangPosts);
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -559,6 +573,7 @@ export class ClientPrefs {
       customSidebar: this.customSidebar(),
       excludeUnknownLangTrends: this.excludeUnknownLangTrends(),
       knownLanguages: this.knownLanguages(),
+      hideForeignLangPosts: this.hideForeignLangPosts(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     // Hidden providers live in their own account-scoped key, not the global blob.

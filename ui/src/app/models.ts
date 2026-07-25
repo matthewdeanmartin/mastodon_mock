@@ -188,6 +188,8 @@ export interface ComposeOptions {
   poll?: PollDraft;
   /** ISO datetime; when ≥ ~5 min out the server schedules instead of posting. */
   scheduledAt?: string;
+  /** ISO 639-1 language for the post; omitted lets the server auto-detect. */
+  language?: string;
 }
 
 /**

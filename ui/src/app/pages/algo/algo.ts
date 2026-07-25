@@ -2,6 +2,7 @@ import { Component, computed, inject, OnInit } from '@angular/core';
 import { AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
 import { isCalmHidden } from '../../sentiment';
+import { FeedLanguageFilter } from '../../trend-language-filter';
 import { Status } from '../../models';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { StatusCard } from '../../status-card/status-card';
@@ -34,6 +35,7 @@ export class Algo implements OnInit {
   protected feed = inject(AlgoFeed);
   protected prefs = inject(ClientPrefs);
   protected auth = inject(Auth);
+  private feedLangFilter = inject(FeedLanguageFilter);
   private diagnostics = inject(PageDiagnostics);
 
   /** Whether a post survives the audience + tags chips (calm applied separately). */
@@ -44,11 +46,16 @@ export class Algo implements OnInit {
     return p.source !== 'hashtag' || this.prefs.algoTags();
   }
 
-  /** The cached feed with the audience, tags, and calm filters applied. */
+  /** The cached feed with the audience, tags, calm, and language filters applied. */
   protected visible = computed(() =>
     this.feed
       .posts()
-      .filter((p) => this.passesChips(p) && !(this.prefs.algoCalm() && isCalmHidden(p.status))),
+      .filter(
+        (p) =>
+          this.passesChips(p) &&
+          !(this.prefs.algoCalm() && isCalmHidden(p.status)) &&
+          this.feedLangFilter.shouldShow(p.status),
+      ),
   );
 
   /** How many posts calm mode is currently hiding, for the chip hint. */
@@ -88,6 +95,12 @@ export class Algo implements OnInit {
     const enabled = !this.prefs.algoCalm();
     this.diagnostics.info('Algo', 'user:toggle-calm', { enabled });
     this.prefs.setAlgoCalm(enabled);
+  }
+
+  toggleLangFilter(): void {
+    const enabled = !this.prefs.hideForeignLangPosts();
+    this.diagnostics.info('Algo', 'user:toggle-lang-filter', { enabled });
+    this.prefs.setHideForeignLangPosts(enabled);
   }
 
   shuffle(): void {

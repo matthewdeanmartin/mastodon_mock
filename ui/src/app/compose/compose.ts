@@ -31,6 +31,9 @@ import { applyMinimalMarkdown } from '../markdown';
 import { Terminology } from '../terminology';
 import { renderStatusText } from './status-text';
 import { FeatureFlags } from '../feature-flags';
+import { KnownLanguages } from '../trend-language-filter';
+import { LANG_NAMES, LangCode, detectLanguage } from '../language-detect';
+import { stripHtml } from '../sentiment';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 
@@ -108,6 +111,7 @@ export class Compose implements OnDestroy {
   private diagnostics = inject(PageDiagnostics);
   protected featureFlags = inject(FeatureFlags);
   protected words = inject(Terminology).words;
+  private knownLanguages = inject(KnownLanguages);
 
   ngOnDestroy(): void {
     this.clearCountdown();
@@ -144,6 +148,30 @@ export class Compose implements OnDestroy {
 
   // Visibility + content warning.
   protected visibility = signal<string>('public');
+
+  /**
+   * Selected post language: an ISO 639-1 code, or '' for "Not specified" (let
+   * the server auto-detect). The picker offers only the languages we believe
+   * the user knows ({@link KnownLanguages}) rather than all ~180 ISO codes —
+   * you almost always post in a language you read. Defaults to the posting
+   * default when it's among the known set, else "Not specified".
+   */
+  protected postLanguage = signal<string>('');
+  /** Options for the language picker: the known languages, named + sorted. */
+  protected languageOptions = computed(() =>
+    [...this.knownLanguages.codes()]
+      .map((code) => ({ code, name: LANG_NAMES[code as LangCode] ?? code.toUpperCase() }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  /** True once the default has been seeded, so it isn't re-applied over a user pick. */
+  private seededLanguage = false;
+
+  /**
+   * A pending "you picked X but this reads as Y" confirmation. Non-null blocks
+   * the send and drives the warning banner; the user either fixes the picker or
+   * confirms and posts anyway.
+   */
+  protected langMismatch = signal<{ picked: string; detected: string } | null>(null);
 
   /** Every box in order; index 0 is the primary post. */
   protected segments = computed(() => [this.text(), ...this.thread()]);
@@ -186,6 +214,8 @@ export class Compose implements OnDestroy {
     });
 
     effect(() => this.previewOn.set(!this.compact()));
+
+    this.seedDefaultLanguage();
 
     // Autosave (debounced) so a stray reload never eats a half-written post.
     effect(() => {
@@ -498,6 +528,70 @@ export class Compose implements OnDestroy {
     }
   }
 
+  // --- post language ---
+
+  /**
+   * Seed the picker from the account's posting-default language, but only if
+   * that language is one we'd offer (i.e. in the known set). Reads the already
+   * loaded credential account (`source.language`) — no extra request — so it
+   * costs nothing and stays "Not specified" when there's no default. Runs once.
+   */
+  private seedDefaultLanguage(): void {
+    if (this.seededLanguage) {
+      return;
+    }
+    this.seededLanguage = true;
+    const def = this.auth.account()?.source?.language?.toLowerCase().split(/[-_]/)[0] ?? '';
+    if (def && this.knownLanguages.knows(def)) {
+      this.postLanguage.set(def);
+    }
+  }
+
+  onLanguageChange(code: string): void {
+    this.postLanguage.set(code);
+    // Changing the picker clears any standing mismatch warning.
+    this.langMismatch.set(null);
+  }
+
+  languageName(code: string): string {
+    return LANG_NAMES[code as LangCode] ?? code.toUpperCase();
+  }
+
+  /**
+   * A *confident* language for the composed body, or null when it's too short or
+   * ambiguous to tell. Mirrors the feed filter's confidence bar so the warning
+   * only fires when detection is actually sure — we don't nag on a "hi".
+   */
+  private detectedLanguage(): string | null {
+    const text = this.segments()
+      .map((s) => stripHtml(s))
+      .join(' ')
+      .trim();
+    if (text.length < 20) {
+      return null;
+    }
+    const [top] = detectLanguage(text);
+    if (!top || top.lang === 'und' || top.share < 0.6) {
+      return null;
+    }
+    return top.lang;
+  }
+
+  /** Post anyway despite the language mismatch (keeps the user's picked value). */
+  confirmLanguageAndSend(): void {
+    this.langMismatch.set(null);
+    this.send();
+  }
+
+  /** Adopt the detected language into the picker and dismiss the warning. */
+  useDetectedLanguage(): void {
+    const detected = this.langMismatch()?.detected;
+    if (detected) {
+      this.postLanguage.set(detected);
+    }
+    this.langMismatch.set(null);
+  }
+
   onFilesSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
@@ -769,6 +863,17 @@ export class Compose implements OnDestroy {
     if (!this.canSubmit()) {
       return;
     }
+    // Language sanity check: if the user picked a specific language and the text
+    // confidently reads as a *different* one, pause and let them fix it or post
+    // anyway. Only fires when both are known and disagree — never on unsure text
+    // or "Not specified". Skipped for paste/Bluesky targets (no fedi language).
+    if (this.postLanguage() && !this.targetIncludesPaste() && !this.targetIncludesBsky()) {
+      const detected = this.detectedLanguage();
+      if (detected && detected !== this.postLanguage() && this.langMismatch() === null) {
+        this.langMismatch.set({ picked: this.postLanguage(), detected });
+        return;
+      }
+    }
     if (this.prefs.confirmBeforePost() && !confirm('Do you really want to post that?')) {
       return;
     }
@@ -839,6 +944,9 @@ export class Compose implements OnDestroy {
       quotedStatusId: this.quotedStatusId(),
       visibility: this.visibility(),
     };
+    if (this.postLanguage()) {
+      options.language = this.postLanguage();
+    }
     if (this.cwOpen() && this.spoilerText().trim()) {
       options.spoilerText = this.spoilerText().trim();
     }
@@ -1043,6 +1151,7 @@ export class Compose implements OnDestroy {
     this.scheduleOpen.set(false);
     this.scheduleAt.set('');
     this.emojiOpen.set(false);
+    this.langMismatch.set(null);
     this.lastFocusedBox = null;
     if (this.autosaveTimer) {
       clearTimeout(this.autosaveTimer);

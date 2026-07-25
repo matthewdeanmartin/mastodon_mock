@@ -192,6 +192,9 @@ export class Api {
       // not a Status — callers that schedule must not treat the result as one.
       body['scheduled_at'] = options.scheduledAt;
     }
+    if (options.language) {
+      body['language'] = options.language;
+    }
     return this.http.post<Status>('/api/v1/statuses', body);
   }
 

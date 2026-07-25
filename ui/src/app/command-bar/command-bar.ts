@@ -44,6 +44,26 @@ import { ProviderRegistry } from '../providers/provider-registry';
       >
         🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
       </button>
+      @if (showLangFilter()) {
+        <button
+          class="btn btn-outline"
+          [class.active]="prefs.hideForeignLangPosts()"
+          (click)="prefs.setHideForeignLangPosts(!prefs.hideForeignLangPosts())"
+          title="Hide posts that are confidently in a language you don't know, or that mislabel their own language. Never hides posts whose language is unclear. Set which languages you know under Settings → Internationalization."
+        >
+          🌐 {{ prefs.hideForeignLangPosts() ? 'My languages' : 'All languages' }}
+        </button>
+      }
+      @if (showCalm()) {
+        <button
+          class="btn btn-outline"
+          [class.active]="prefs.algoCalm()"
+          (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
+          title="Calm mode: hide posts that read as inflammatory — heated wording, quote-dunks, and ratioed posts (all detected on-device)"
+        >
+          😌 Calm
+        </button>
+      }
       @if (providerChips() && (!auth.isAnonymous || registry.linked().length)) {
         @if (!auth.isAnonymous) {
           <button
@@ -121,6 +141,10 @@ export class CommandBar {
   readonly showRefresh = input(false);
   /** Whether this page merges foreign providers (home) — shows the filter chips. */
   readonly providerChips = input(false);
+  /** Show the 🌐 foreign-language filter toggle (Home). */
+  readonly showLangFilter = input(false);
+  /** Show the 😌 Calm toggle (Home; Algo has its own chip). */
+  readonly showCalm = input(false);
   readonly toggleLive = output<void>();
   readonly refresh = output<void>();
   /** A source filter changed; merged feeds need to refetch their active sources. */

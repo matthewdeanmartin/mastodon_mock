@@ -25,6 +25,26 @@
         </span>
       </div>
     </div>
+
+    <div class="srow">
+      <span class="slabel">Feed posts</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="prefs.hideForeignLangPosts()"
+            (ngModelChange)="prefs.setHideForeignLangPosts($event)"
+            name="hideForeignLangPosts"
+          />
+          Hide posts in languages I don't know (Home and Algo)
+        </label>
+        <span class="hint">
+          Removes posts confidently in a language you haven't listed, or that
+          mislabel their own language. Posts whose language can't be determined
+          are always kept. Also toggleable with the 🌐 button on Home and Algo.
+        </span>
+      </div>
+    </div>
   </div>
 
   <div class="ssection">

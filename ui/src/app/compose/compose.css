@@ -265,6 +265,25 @@ textarea {
   font-size: 0.9em;
 }
 
+.lang-mismatch {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  font-size: 0.9em;
+}
+
+.lang-mismatch p {
+  margin: 0 0 8px;
+}
+
+.lang-mismatch-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .media-previews {
   display: flex;
   flex-direction: column;
