@@ -150,6 +150,25 @@
       </section>
     }
 
+    <section class="section">
+      <h2>Languages</h2>
+      <p class="muted small">
+        Inferred from the sample's text and each post's declared language — script,
+        accents and common words, not a full model. A rough read.
+      </p>
+      <div class="lang-list">
+        @for (l of languages(); track l.lang) {
+          <div class="lang-row" [title]="langName(l.lang) + ' ~' + langPct(l.share) + '%'">
+            <span class="lang-name">{{ langName(l.lang) }}</span>
+            <span class="lang-bar-track">
+              <span class="lang-bar" [style.width.%]="langPct(l.share)"></span>
+            </span>
+            <span class="lang-pct muted">{{ langPct(l.share) }}%</span>
+          </div>
+        }
+      </div>
+    </section>
+
     @if (topFollower(); as fan) {
       <section class="section">
         <h2>Top follower</h2>

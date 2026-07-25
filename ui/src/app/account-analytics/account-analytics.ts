@@ -18,6 +18,8 @@ import {
   weekdayHistogram,
   weeklyActivity,
 } from '../account-metrics';
+import { LANG_NAMES, LangShare, detectLanguageMix, sharePct } from '../language-detect';
+import { stripHtml } from '../sentiment';
 
 /** How many of the account's most recent posts the component analyzes. */
 const SAMPLE_SIZE = 100;
@@ -259,6 +261,23 @@ export class AccountAnalytics implements OnInit {
 
   /** CSS class for the liveliness pill. */
   protected livelinessClass = computed(() => 'live-' + this.liveliness().label.toLowerCase());
+
+  // --- Language mix (cheap script/stop-word detector) ---
+
+  /**
+   * Estimated language distribution across the sample. Each post contributes its
+   * text plus its Mastodon-declared `language` as an authoritative prior.
+   */
+  protected languages = computed<LangShare[]>(() =>
+    detectLanguageMix(
+      this.posts().map((s) => ({ text: stripHtml(s.content), meta: s.language })),
+    ),
+  );
+
+  langName(code: LangShare['lang']): string {
+    return LANG_NAMES[code];
+  }
+  langPct = sharePct;
 
   private engagement(s: Status): number {
     return s.favourites_count + s.reblogs_count + s.replies_count;

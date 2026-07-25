@@ -1,0 +1,329 @@
+/**
+ * A deliberately cheap, synchronous, dependency-free language detector.
+ *
+ * Real language ID (CLD3, fastText, franc's full model) means shipping a model
+ * and running n-gram scoring. This does not: it decides by *script* first
+ * (Unicode ranges are free and settle most of the world's languages outright),
+ * then by *diacritic fingerprint* for Latin text, then by a compact *stop-word*
+ * table for plain Latin scripts that share the same alphabet. It is meant to be
+ * called pervasively — over every post in a sample, inline in a list — so the
+ * budget is "a few string scans", not "load a classifier".
+ *
+ * It will be wrong sometimes; that's the accepted trade, in the same spirit as
+ * the rage lexicon in `sentiment.ts`. Output is always a *distribution* so a
+ * caller can say "70% English, 30% German, 1% unknown" honestly, rather than
+ * pretending to a single confident verdict.
+ *
+ * The first consumer is the analytics page. Because it is a pure function over
+ * text, it can later back search filters, per-post language badges, translation
+ * prompts, etc. — keep the contract stable.
+ */
+
+/** ISO 639-1 codes this module can name. `und` = undetermined. */
+export type LangCode =
+  | 'en'
+  | 'de'
+  | 'fr'
+  | 'es'
+  | 'pt'
+  | 'it'
+  | 'nl'
+  | 'sv'
+  | 'da'
+  | 'no'
+  | 'fi'
+  | 'pl'
+  | 'tr'
+  | 'ru'
+  | 'uk'
+  | 'el'
+  | 'ja'
+  | 'ko'
+  | 'zh'
+  | 'ar'
+  | 'he'
+  | 'hi'
+  | 'th'
+  | 'und';
+
+/** One language's share of a text, 0–1. */
+export interface LangShare {
+  lang: LangCode;
+  /** Fraction of the analyzed text attributed to this language (0–1). */
+  share: number;
+}
+
+/** Human-facing names for the codes we emit, for UI labels. */
+export const LANG_NAMES: Record<LangCode, string> = {
+  en: 'English',
+  de: 'German',
+  fr: 'French',
+  es: 'Spanish',
+  pt: 'Portuguese',
+  it: 'Italian',
+  nl: 'Dutch',
+  sv: 'Swedish',
+  da: 'Danish',
+  no: 'Norwegian',
+  fi: 'Finnish',
+  pl: 'Polish',
+  tr: 'Turkish',
+  ru: 'Russian',
+  uk: 'Ukrainian',
+  el: 'Greek',
+  ja: 'Japanese',
+  ko: 'Korean',
+  zh: 'Chinese',
+  ar: 'Arabic',
+  he: 'Hebrew',
+  hi: 'Hindi',
+  th: 'Thai',
+  und: 'Unknown',
+};
+
+// ---------------------------------------------------------------------------
+// Tier 1: script detection (Unicode ranges)
+// ---------------------------------------------------------------------------
+
+/**
+ * Non-Latin scripts that map cleanly (or near enough) to one language for our
+ * purposes. Han is special-cased below because Japanese mixes kanji with kana.
+ */
+const SCRIPT_RANGES: { lang: LangCode; re: RegExp }[] = [
+  { lang: 'ja', re: /[぀-ゟ゠-ヿ]/ }, // Hiragana + Katakana ⇒ Japanese
+  { lang: 'ko', re: /[가-힯ᄀ-ᇿ]/ }, // Hangul
+  { lang: 'el', re: /[Ͱ-Ͽ]/ }, // Greek
+  { lang: 'ru', re: /[Ѐ-ӿ]/ }, // Cyrillic (defaults to Russian; uk refined below)
+  { lang: 'ar', re: /[؀-ۿ]/ }, // Arabic
+  { lang: 'he', re: /[֐-׿]/ }, // Hebrew
+  { lang: 'hi', re: /[ऀ-ॿ]/ }, // Devanagari ⇒ Hindi
+  { lang: 'th', re: /[฀-๿]/ }, // Thai
+];
+
+const HAN_RE = /[一-鿿]/; // CJK Unified Ideographs
+const KANA_RE = /[぀-ゟ゠-ヿ]/;
+/** Cyrillic letters unique to Ukrainian (ї, і, є, ґ) disambiguate ru vs uk. */
+const UKRAINIAN_RE = /[іїєґ]/i;
+
+/**
+ * Classify a single non-Latin character run's script. Returns null if the
+ * character is Latin/ASCII/punctuation (handled by the Latin path instead).
+ */
+function scriptFor(ch: string): LangCode | null {
+  if (KANA_RE.test(ch)) {
+    return 'ja';
+  }
+  if (HAN_RE.test(ch)) {
+    // Han without kana is ambiguous; treat as Chinese. (A doc that also has
+    // kana is caught by the kana rule and attributed to Japanese overall.)
+    return 'zh';
+  }
+  for (const { lang, re } of SCRIPT_RANGES) {
+    if (re.test(ch)) {
+      return lang;
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Tier 2: diacritic fingerprints (Latin scripts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Characters that strongly bias a Latin-script guess toward one language.
+ * These are hints layered on top of the stop-word vote, not verdicts — plenty
+ * of languages share `é`/`ü`, so only distinctive marks carry weight.
+ */
+const DIACRITIC_HINTS: { lang: LangCode; re: RegExp; weight: number }[] = [
+  { lang: 'de', re: /[äöüß]/i, weight: 2 }, // ß is nearly unique to German
+  { lang: 'sv', re: /[åä]/i, weight: 1 },
+  { lang: 'da', re: /[æø]/i, weight: 2 },
+  { lang: 'no', re: /[æø]/i, weight: 1 },
+  { lang: 'fi', re: /[äö]/i, weight: 1 },
+  { lang: 'es', re: /[ñ¿¡]/i, weight: 2 },
+  { lang: 'pt', re: /[ãõ]/i, weight: 2 },
+  { lang: 'fr', re: /[àâçèêëîïôùûœ]/i, weight: 1 },
+  { lang: 'pl', re: /[ąćęłńóśźż]/i, weight: 2 },
+  { lang: 'tr', re: /[ğışİ]/i, weight: 2 },
+  { lang: 'it', re: /[àèìòù]/i, weight: 1 },
+];
+
+// ---------------------------------------------------------------------------
+// Tier 3: stop-word tables (top function words per Latin-script language)
+// ---------------------------------------------------------------------------
+
+/**
+ * The highest-frequency function words per language. Seeing many of these is
+ * the classic cheap signal ("lots of the/of/and ⇒ English"). Kept compact —
+ * ~20–30 words each — because this runs per post. Words that collide across
+ * languages ("a", "in", "no") are tolerated: the winner is whoever collects
+ * the most hits overall.
+ */
+const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
+  en: ['the', 'of', 'and', 'to', 'in', 'is', 'you', 'that', 'it', 'for', 'was', 'on', 'are', 'with', 'as', 'this', 'have', 'from', 'they', 'be', 'at', 'not', 'but', 'what', 'all', 'were', 'we', 'when', 'your', 'can'],
+  de: ['der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich', 'des', 'auf', 'für', 'ist', 'im', 'dem', 'nicht', 'ein', 'eine', 'als', 'auch', 'es', 'an', 'werden', 'aus', 'er', 'hat', 'dass', 'sie', 'nach'],
+  fr: ['le', 'la', 'les', 'de', 'des', 'un', 'une', 'et', 'est', 'que', 'qui', 'dans', 'pour', 'pas', 'sur', 'au', 'avec', 'ne', 'se', 'ce', 'il', 'elle', 'nous', 'vous', 'plus', 'par', 'je', 'mais', 'ou', 'son'],
+  es: ['el', 'la', 'los', 'las', 'de', 'que', 'y', 'en', 'un', 'una', 'por', 'con', 'no', 'una', 'su', 'para', 'es', 'se', 'del', 'al', 'lo', 'como', 'más', 'pero', 'sus', 'le', 'ya', 'este', 'sí', 'porque'],
+  pt: ['de', 'que', 'não', 'os', 'as', 'um', 'uma', 'para', 'com', 'por', 'se', 'na', 'no', 'dos', 'das', 'mais', 'como', 'mas', 'ao', 'ele', 'das', 'seu', 'sua', 'ou', 'quando', 'muito', 'já', 'está', 'também', 'pelo'],
+  it: ['il', 'di', 'che', 'la', 'le', 'un', 'una', 'in', 'per', 'con', 'non', 'sono', 'gli', 'del', 'della', 'da', 'si', 'come', 'più', 'ma', 'anche', 'lo', 'se', 'ci', 'ha', 'al', 'nel', 'sono', 'questo', 'io'],
+  nl: ['de', 'het', 'een', 'van', 'en', 'in', 'te', 'dat', 'op', 'voor', 'met', 'zijn', 'niet', 'aan', 'er', 'maar', 'om', 'ook', 'als', 'dan', 'ze', 'zo', 'door', 'over', 'ze', 'nog', 'wordt', 'naar', 'is', 'ik'],
+  sv: ['och', 'att', 'det', 'som', 'en', 'på', 'är', 'av', 'för', 'med', 'till', 'den', 'har', 'de', 'inte', 'om', 'ett', 'men', 'var', 'jag', 'sig', 'så', 'kan', 'man', 'när', 'vi', 'nu', 'han', 'från', 'eller'],
+  pl: ['nie', 'to', 'się', 'na', 'że', 'jest', 'do', 'co', 'jak', 'ale', 'tak', 'za', 'od', 'być', 'czy', 'już', 'tylko', 'przez', 'dla', 'ten', 'oraz', 'jego', 'jej', 'tego', 'ich', 'przy', 'bardzo', 'gdy', 'więc', 'lub'],
+};
+
+/** Words → the languages that count them, precomputed for one-pass scoring. */
+const WORD_TO_LANGS = (() => {
+  const map = new Map<string, LangCode[]>();
+  for (const [lang, words] of Object.entries(STOP_WORDS) as [LangCode, string[]][]) {
+    for (const w of words) {
+      const list = map.get(w);
+      if (list) {
+        list.push(lang);
+      } else {
+        map.set(w, [lang]);
+      }
+    }
+  }
+  return map;
+})();
+
+// ---------------------------------------------------------------------------
+// Core detection
+// ---------------------------------------------------------------------------
+
+/** Weight of a single Mastodon-declared language code as a prior. */
+const METADATA_PRIOR_WEIGHT = 3;
+
+/** Normalize a possibly-regioned ISO code ("en-US", "pt_BR") to a bare code. */
+function normalizeIso(code: string | null | undefined): LangCode | null {
+  if (!code) {
+    return null;
+  }
+  const base = code.toLowerCase().split(/[-_]/)[0];
+  return base in LANG_NAMES ? (base as LangCode) : null;
+}
+
+/**
+ * Detect the language distribution of a single plain-text snippet.
+ *
+ * `metaHint` is an authoritative-when-present prior (a Mastodon `status.language`
+ * or `account.source.language`). It seeds the vote but does not veto the text:
+ * a post declared `en` that is visibly all Cyrillic should still read as Russian.
+ */
+export function detectLanguage(text: string, metaHint?: string | null): LangShare[] {
+  const votes = new Map<LangCode, number>();
+  const add = (lang: LangCode, n: number) => votes.set(lang, (votes.get(lang) ?? 0) + n);
+
+  // Tier 1: script. Count characters by script; non-Latin scripts vote per char
+  // (weighted down so a stop-word-rich Latin doc isn't drowned by a few kanji).
+  let latinLetters = 0;
+  let ukrainianSeen = false;
+  for (const ch of text) {
+    if (UKRAINIAN_RE.test(ch)) {
+      ukrainianSeen = true;
+    }
+    const script = scriptFor(ch);
+    if (script) {
+      add(script, 1);
+    } else if (/[a-zA-Z]/.test(ch)) {
+      latinLetters += 1;
+    }
+  }
+  // Refine Cyrillic to Ukrainian when its unique letters appear.
+  if (ukrainianSeen && votes.has('ru')) {
+    add('uk', (votes.get('ru') ?? 0) + 2);
+  }
+
+  const lower = text.toLowerCase();
+
+  // Tier 2: diacritic fingerprints (only meaningful for Latin text).
+  if (latinLetters > 0) {
+    for (const { lang, re, weight } of DIACRITIC_HINTS) {
+      if (re.test(lower)) {
+        add(lang, weight);
+      }
+    }
+
+    // Tier 3: stop-word vote.
+    const tokens = lower.split(/[^a-zàâäçèéêëîïôöùûüßñãõœąćęłńóśźżğış]+/i).filter(Boolean);
+    for (const tok of tokens) {
+      const langs = WORD_TO_LANGS.get(tok);
+      if (langs) {
+        for (const lang of langs) {
+          add(lang, 1);
+        }
+      }
+    }
+
+    // If Latin text produced no lexical signal at all, record it as latin-unknown
+    // so the share math still accounts for the words (avoids false "100% en").
+    const gotLatinVote = [...votes].some(([l]) => l !== 'ja' && l !== 'zh');
+    if (!gotLatinVote) {
+      add('und', Math.max(1, Math.round(latinLetters / 5)));
+    }
+  }
+
+  // Tier 4: metadata prior — a nudge, applied last, never a veto.
+  const meta = normalizeIso(metaHint);
+  if (meta) {
+    add(meta, METADATA_PRIOR_WEIGHT);
+  }
+
+  if (!votes.size) {
+    return [{ lang: 'und', share: 1 }];
+  }
+
+  const total = [...votes.values()].reduce((a, b) => a + b, 0);
+  return [...votes.entries()]
+    .map(([lang, n]) => ({ lang, share: n / total }))
+    .sort((a, b) => b.share - a.share);
+}
+
+/**
+ * Aggregate a language distribution across many texts (e.g. a post sample),
+ * each optionally carrying its own metadata hint. Returns shares that sum to ~1,
+ * sorted most-used first, with tiny slivers below `minShare` folded into `und`.
+ */
+export function detectLanguageMix(
+  items: { text: string; meta?: string | null }[],
+  minShare = 0.01,
+): LangShare[] {
+  const totals = new Map<LangCode, number>();
+  let counted = 0;
+  for (const { text, meta } of items) {
+    if (!text.trim()) {
+      continue;
+    }
+    counted += 1;
+    // Weight each item equally: take its top language's full vote, spread the
+    // rest — but simplest and stable is to add each item's normalized shares.
+    for (const { lang, share } of detectLanguage(text, meta)) {
+      totals.set(lang, (totals.get(lang) ?? 0) + share);
+    }
+  }
+  if (!counted) {
+    return [{ lang: 'und', share: 1 }];
+  }
+
+  const grand = [...totals.values()].reduce((a, b) => a + b, 0) || 1;
+  let undShare = 0;
+  const kept: LangShare[] = [];
+  for (const [lang, sum] of totals) {
+    const share = sum / grand;
+    if (lang === 'und' || share < minShare) {
+      undShare += share;
+    } else {
+      kept.push({ lang, share });
+    }
+  }
+  if (undShare > 0) {
+    kept.push({ lang: 'und', share: undShare });
+  }
+  return kept.sort((a, b) => b.share - a.share);
+}
+
+/** Format a share (0–1) as a whole percent, never showing 0% for a present language. */
+export function sharePct(share: number): number {
+  return Math.max(1, Math.round(share * 100));
+}
