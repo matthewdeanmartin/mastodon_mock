@@ -6,13 +6,49 @@
   } @else if (!posts().length) {
     <p class="muted center">Nothing to analyze yet — no posts found.</p>
   } @else {
-    <p class="sample-note muted">
-      Based on the last {{ posts().length }} posts, boosts excluded.
-      @if (oldestPostDate(); as oldest) {
-        The sample goes back {{ oldest | humanTime }}.
+    <div class="sample-note muted">
+      <span>
+        Based on the last {{ posts().length }} posts, boosts excluded.
+        @if (oldestPostDate(); as oldest) {
+          The sample goes back {{ oldest | humanTime }}.
+        }
+        Reach is estimated, not measured — a cheap peek.
+      </span>
+      @if (hasMore()) {
+        <span class="load-more">
+          @if (loadingMore()) {
+            <span class="muted">Fetching more…</span>
+          } @else {
+            <label>Get more posts:</label>
+            @for (n of loadMoreChoices; track n) {
+              <button
+                type="button"
+                class="load-more-btn"
+                (click)="loadMore(n)"
+                [title]="'Fetch ' + n + ' more page' + (n === 1 ? '' : 's') + ' (' + n + ' API call' + (n === 1 ? '' : 's') + ')'"
+              >
+                +{{ n }}
+              </button>
+            }
+          }
+        </span>
       }
-      Not real analytics, just a cheap peek.
-    </p>
+    </div>
+
+    <div class="live-banner">
+      <span class="live-pill" [class]="livelinessClass()">{{ liveliness().label }}</span>
+      <span class="live-detail muted">
+        @if (liveliness().daysSinceLastPost === 0) {
+          Posted today.
+        } @else if (liveliness().daysSinceLastPost === 1) {
+          Last posted 1 day ago.
+        } @else {
+          Last posted {{ liveliness().daysSinceLastPost }} days ago.
+        }
+        {{ liveliness().postsLast30Days }} posts in the last 30 days,
+        {{ liveliness().postsLast90Days }} in the last 90.
+      </span>
+    </div>
 
     <div class="tiles">
       <div class="tile">
@@ -47,7 +83,72 @@
         <span class="tile-label muted">Following</span>
         <span class="tile-value">{{ fmt(account().following_count) }}</span>
       </div>
+      <div class="tile">
+        <span class="tile-label muted">Est. reach (total)</span>
+        <span class="tile-value">{{ fmt(totalReach()) }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label muted">Est. reach / post</span>
+        <span class="tile-value">
+          {{ fmt(reachPerPost()) }}
+          @if (reachTrendPct(); as trend) {
+            <small class="trend" [class.up]="trend > 0" [class.down]="trend < 0">
+              {{ trend > 0 ? '▲' : trend < 0 ? '▼' : '' }}{{ trend > 0 ? '+' : '' }}{{ trend }}%
+            </small>
+          }
+        </span>
+      </div>
+      <div class="tile">
+        <span class="tile-label muted">Liveliness</span>
+        <span class="tile-value">{{ liveliness().score }}<small class="muted">/100</small></span>
+      </div>
+      <div class="tile">
+        <span class="tile-label muted">Recent posts / day</span>
+        <span class="tile-value">{{ liveliness().recentPostsPerDay }}</span>
+      </div>
     </div>
+
+    @if (showWeekly() || showMonthly()) {
+      <section class="section">
+        <h2>When they post</h2>
+        <p class="muted small">
+          Posting activity over time (posting times, not location). Estimated reach in each bucket.
+        </p>
+
+        @if (showWeekly()) {
+          <h3 class="chart-title muted">By week</h3>
+          <div class="bars" role="img" aria-label="Posts per week">
+            @for (b of weekly(); track b.startIso) {
+              <div class="bar-col" [title]="b.label + ': ' + b.posts + ' posts, ~' + fmt(b.reach) + ' reach'">
+                <div class="bar" [style.height.%]="(b.posts / weeklyPeak()) * 100"></div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (showMonthly()) {
+          <h3 class="chart-title muted">By month</h3>
+          <div class="bars labelled" role="img" aria-label="Posts per month">
+            @for (b of monthly(); track b.startIso) {
+              <div class="bar-col" [title]="b.label + ': ' + b.posts + ' posts, ~' + fmt(b.reach) + ' reach'">
+                <div class="bar" [style.height.%]="(b.posts / monthlyPeak()) * 100"></div>
+                <span class="bar-label muted">{{ b.label }}</span>
+              </div>
+            }
+          </div>
+        }
+
+        <h3 class="chart-title muted">By day of week</h3>
+        <div class="bars labelled" role="img" aria-label="Posts per weekday">
+          @for (d of weekdays(); track d.label) {
+            <div class="bar-col" [title]="d.label + ': ' + d.posts + ' posts'">
+              <div class="bar" [style.height.%]="(d.posts / weekdayPeak()) * 100"></div>
+              <span class="bar-label muted">{{ d.label }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    }
 
     @if (topFollower(); as fan) {
       <section class="section">

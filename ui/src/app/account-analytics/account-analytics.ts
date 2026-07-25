@@ -7,6 +7,17 @@ import { AnonymousPublicRef } from '../providers/anonymous/anonymous-route-ref';
 import { HumanTimePipe } from '../human-time.pipe';
 import { Account, Status } from '../models';
 import { StatusCard } from '../status-card/status-card';
+import {
+  ActivityBucket,
+  Liveliness,
+  computeLiveliness,
+  estimateTotalReach,
+  hasMonthlyRange,
+  hasWeeklyRange,
+  monthlyActivity,
+  weekdayHistogram,
+  weeklyActivity,
+} from '../account-metrics';
 
 /** How many of the account's most recent posts the component analyzes. */
 const SAMPLE_SIZE = 100;
@@ -14,6 +25,8 @@ const SAMPLE_SIZE = 100;
 const PAGE_LIMIT = 40;
 /** Guard against endless paging on very sparse accounts. */
 const MAX_PAGES = 5;
+/** Extra pages a user may request via "get more posts", each = one API call. */
+const LOAD_MORE_CHOICES = [1, 3, 5, 10] as const;
 
 /**
  * Rudimentary Twitter-style analytics for any account, deliberately cheap:
@@ -45,6 +58,15 @@ export class AccountAnalytics implements OnInit {
   protected followers = signal<Account[]>([]);
   protected followersLoaded = signal(false);
 
+  /** True while a user-requested "load more" batch is in flight. */
+  protected loadingMore = signal(false);
+  /** False once the account has no older posts left to page. */
+  protected hasMore = signal(true);
+  /** maxId cursor for the next page beyond the current sample. */
+  private cursor: string | undefined;
+  /** How many extra pages the "load more" control offers, each one API call. */
+  protected readonly loadMoreChoices = LOAD_MORE_CHOICES;
+
   ngOnInit(): void {
     const acc = this.account();
     const id = this.publicRef()?.id ?? acc.id;
@@ -72,13 +94,22 @@ export class AccountAnalytics implements OnInit {
       : this.api.getAccountStatuses(id, opts);
   }
 
-  /** Page own statuses (boosts excluded server-side) until the sample is full. */
+  /**
+   * Page own statuses (boosts excluded server-side) until the sample is full.
+   * The initial load fetches enough pages to reach {@link SAMPLE_SIZE} (an
+   * overage on the last page is fine and always has been). Unlike the initial
+   * cap, {@link loadMore} lets the user deliberately spend more API calls to
+   * widen the window — no {@link SAMPLE_SIZE} truncation there.
+   */
   private fetchPosts(id: string, acc: Status[], maxId: string | undefined, page: number): void {
     this.getStatuses(id, { limit: PAGE_LIMIT, maxId, excludeReblogs: true }).subscribe({
       next: (batch) => {
         const all = [...acc, ...batch];
-        if (batch.length < PAGE_LIMIT || all.length >= SAMPLE_SIZE || page + 1 >= MAX_PAGES) {
-          this.posts.set(all.slice(0, SAMPLE_SIZE));
+        const exhausted = batch.length < PAGE_LIMIT;
+        if (exhausted || all.length >= SAMPLE_SIZE || page + 1 >= MAX_PAGES) {
+          this.posts.set(all);
+          this.cursor = all.length ? all[all.length - 1].id : undefined;
+          this.hasMore.set(!exhausted);
           this.loading.set(false);
         } else {
           this.fetchPosts(id, all, batch[batch.length - 1].id, page + 1);
@@ -89,6 +120,46 @@ export class AccountAnalytics implements OnInit {
         this.loading.set(false);
         this.error.set(acc.length === 0);
       },
+    });
+  }
+
+  /**
+   * Fetch `pages` more pages of older posts on demand — each page is exactly
+   * one API call, so the control asks the user how many to spend. Appends to
+   * the existing sample; every metric recomputes automatically off `posts()`.
+   */
+  loadMore(pages: number): void {
+    if (this.loadingMore() || !this.hasMore()) {
+      return;
+    }
+    const id = this.publicRef()?.id ?? this.account().id;
+    this.loadingMore.set(true);
+    this.fetchMore(id, pages, 0);
+  }
+
+  private fetchMore(id: string, remaining: number, done: number): void {
+    if (remaining <= 0) {
+      this.loadingMore.set(false);
+      return;
+    }
+    this.getStatuses(id, {
+      limit: PAGE_LIMIT,
+      maxId: this.cursor,
+      excludeReblogs: true,
+    }).subscribe({
+      next: (batch) => {
+        if (batch.length) {
+          this.posts.update((prev) => [...prev, ...batch]);
+          this.cursor = batch[batch.length - 1].id;
+        }
+        if (batch.length < PAGE_LIMIT) {
+          this.hasMore.set(false);
+          this.loadingMore.set(false);
+          return;
+        }
+        this.fetchMore(id, remaining - 1, done + 1);
+      },
+      error: () => this.loadingMore.set(false),
     });
   }
 
@@ -128,6 +199,66 @@ export class AccountAnalytics implements OnInit {
 
   /** When the oldest analyzed post was made — names the sample's period. */
   protected oldestPostDate = computed(() => this.posts().at(-1)?.created_at ?? null);
+
+  // --- Reach (estimated; see account-metrics.ts REACH_MODEL) ---
+
+  /** Total estimated reach across the sample — followers + boost/fav model. */
+  protected totalReach = computed(() =>
+    estimateTotalReach(this.posts(), this.account().followers_count),
+  );
+
+  /** Estimated reach per post. */
+  protected reachPerPost = computed(() => {
+    const n = this.posts().length;
+    return n ? Math.round(this.totalReach() / n) : 0;
+  });
+
+  /**
+   * Reach trend: newer-half vs older-half average reach, as a percent change.
+   * Null when the sample is too small to split meaningfully.
+   */
+  protected reachTrendPct = computed<number | null>(() => {
+    const posts = this.posts();
+    if (posts.length < 6) {
+      return null;
+    }
+    const followers = this.account().followers_count;
+    const mid = Math.floor(posts.length / 2);
+    const newer = posts.slice(0, mid); // newest-first, so this is the recent half
+    const older = posts.slice(mid);
+    const avg = (list: Status[]) => estimateTotalReach(list, followers) / list.length;
+    const olderAvg = avg(older);
+    if (olderAvg <= 0) {
+      return null;
+    }
+    return Math.round(((avg(newer) - olderAvg) / olderAvg) * 100);
+  });
+
+  // --- Liveliness (recency-weighted, relative to now) ---
+
+  protected liveliness = computed<Liveliness>(() => computeLiveliness(this.posts()));
+
+  // --- Time-window activity ("when they post") ---
+
+  protected weekly = computed<ActivityBucket[]>(() =>
+    weeklyActivity(this.posts(), this.account().followers_count),
+  );
+  protected monthly = computed<ActivityBucket[]>(() =>
+    monthlyActivity(this.posts(), this.account().followers_count),
+  );
+  protected showWeekly = computed(() => hasWeeklyRange(this.posts()));
+  protected showMonthly = computed(() => hasMonthlyRange(this.posts()));
+  protected weekdays = computed(() => weekdayHistogram(this.posts()));
+
+  /** Max post count in a weekly bucket, for bar scaling. */
+  protected weeklyPeak = computed(() => Math.max(1, ...this.weekly().map((b) => b.posts)));
+  /** Max post count in a monthly bucket, for bar scaling. */
+  protected monthlyPeak = computed(() => Math.max(1, ...this.monthly().map((b) => b.posts)));
+  /** Max post count in a weekday bucket, for bar scaling. */
+  protected weekdayPeak = computed(() => Math.max(1, ...this.weekdays().map((b) => b.posts)));
+
+  /** CSS class for the liveliness pill. */
+  protected livelinessClass = computed(() => 'live-' + this.liveliness().label.toLowerCase());
 
   private engagement(s: Status): number {
     return s.favourites_count + s.reblogs_count + s.replies_count;
