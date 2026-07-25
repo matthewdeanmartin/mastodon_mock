@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildMessageUrl, messageStatus, parseMessageParams } from './message-payload';
+import {
+  buildMessageUrl,
+  messageStatus,
+  messageStatusRouteRef,
+  parseMessageParams,
+  parseMessageStatusRouteRef,
+} from './message-payload';
 
 const BASE = 'https://mawkingbird.com/';
 
@@ -52,6 +58,38 @@ describe('message-payload', () => {
     expect(status.sensitive).toBe(true);
     expect(status.url).toBe('https://tinyurl.com/abc');
     expect(status.provider).toBe('paste');
+  });
+
+  it('round-trips a payload through the status route ref', () => {
+    const payload = { content: 'body & <stuff>\nline2', spoiler: 'cw', language: 'python' };
+    const ref = messageStatusRouteRef(payload);
+    expect(ref.startsWith('message-status.')).toBe(true);
+    expect(parseMessageStatusRouteRef(ref)).toEqual(payload);
+  });
+
+  it('encodes URL-unsafe base64 chars safely in the route ref', () => {
+    const ref = messageStatusRouteRef({ content: '???>>>', spoiler: '', language: 'plaintext' });
+    // base64url alphabet only: no +, /, or = in the segment.
+    expect(ref.slice('message-status.'.length)).toMatch(/^[A-Za-z0-9_-]*$/);
+  });
+
+  it('returns null for a non-message-status id', () => {
+    expect(parseMessageStatusRouteRef('12345')).toBeNull();
+    expect(parseMessageStatusRouteRef('anonymous-status.abc')).toBeNull();
+  });
+
+  it('returns null when the ref decodes to something without content', () => {
+    const bogus = 'message-status.' + btoa('{"spoiler":"x"}');
+    expect(parseMessageStatusRouteRef(bogus)).toBeNull();
+  });
+
+  it('defaults spoiler and language when the payload omits them', () => {
+    const ref = messageStatusRouteRef({ content: 'hi', spoiler: '', language: 'plaintext' });
+    expect(parseMessageStatusRouteRef(ref)).toEqual({
+      content: 'hi',
+      spoiler: '',
+      language: 'plaintext',
+    });
   });
 
   it('is not sensitive when there is no CW', () => {

@@ -70,6 +70,52 @@ export function parseMessageParams(params: URLSearchParams): MessagePayload | nu
   };
 }
 
+/**
+ * Route-segment scheme for a self-contained message, mirroring the
+ * `anonymous-status.` refs: the whole payload is base64url-encoded into a single
+ * `/statuses/:id` segment so the native thread page can render it as a real post
+ * with no network. This is what lets a shared message open in the same "show a
+ * post" view a logged-in user sees for any other status.
+ */
+const MESSAGE_STATUS_PREFIX = 'message-status.';
+
+function base64UrlEncode(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlDecode(value: string): string {
+  const encoded = value.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '='));
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+/** Encode a message payload into a `/statuses/:id` route segment. */
+export function messageStatusRouteRef(payload: MessagePayload): string {
+  return `${MESSAGE_STATUS_PREFIX}${base64UrlEncode(JSON.stringify(payload))}`;
+}
+
+/** Decode a `/statuses/:id` segment back into a message payload, or null. */
+export function parseMessageStatusRouteRef(id: string): MessagePayload | null {
+  if (!id.startsWith(MESSAGE_STATUS_PREFIX)) return null;
+  try {
+    const parsed = JSON.parse(base64UrlDecode(id.slice(MESSAGE_STATUS_PREFIX.length))) as Partial<
+      MessagePayload
+    >;
+    if (typeof parsed?.content !== 'string') return null;
+    return {
+      content: parsed.content,
+      spoiler: typeof parsed.spoiler === 'string' ? parsed.spoiler : '',
+      language: typeof parsed.language === 'string' ? parsed.language : 'plaintext',
+    };
+  } catch {
+    return null;
+  }
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')

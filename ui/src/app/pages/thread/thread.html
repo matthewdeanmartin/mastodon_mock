@@ -224,7 +224,7 @@
       <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
     } @else if (isLocal(s)) {
       <app-local-compose [inReplyTo]="s.id" (posted)="onReply($event)" />
-    } @else if (!isRss() && !isAnonymousPublic()) {
+    } @else if (!isRss() && !isAnonymousPublic() && !isMessageStatus()) {
       <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
     }
     @for (d of descendants(); track d.id) {

@@ -1,8 +1,13 @@
-import { Component, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { Auth } from '../../auth';
 import { StatusCard } from '../../status-card/status-card';
 import { Status } from '../../models';
-import { messageStatus, parseMessageParams } from '../../providers/paste/message-payload';
+import {
+  messageStatus,
+  messageStatusRouteRef,
+  parseMessageParams,
+} from '../../providers/paste/message-payload';
 
 /**
  * Landing page for a message shared as a short link.
@@ -13,6 +18,12 @@ import { messageStatus, parseMessageParams } from '../../providers/paste/message
  * step: TinyURL has no CORS-open resolve API, and the redirect already delivers
  * the target, so a bare short code is never handed to this page.)
  *
+ * By default we don't linger here: we re-encode the payload into a native
+ * `/statuses/:id` segment and redirect, so the message opens in the same
+ * "show a post" thread view every other status uses — for anyone, signed in or
+ * not. This lite page stays as a fallback that still renders the post inline
+ * (e.g. if the redirect is suppressed).
+ *
  * Deliberately outside the auth shell so a shared link opens for anyone.
  */
 @Component({
@@ -22,12 +33,33 @@ import { messageStatus, parseMessageParams } from '../../providers/paste/message
   styleUrl: './message.css',
 })
 export class MessagePage implements OnInit {
+  private router = inject(Router);
+  private auth = inject(Auth);
+
   protected status = signal<Status | null>(null);
 
   ngOnInit(): void {
     const params = new URLSearchParams(window.location.search);
     const payload = parseMessageParams(params);
-    this.status.set(payload ? messageStatus(payload, this.selfUrl(params)) : null);
+    if (!payload) {
+      this.status.set(null);
+      return;
+    }
+    // Show the message as a native post: hand it to the in-shell thread page via
+    // an encoded status ref. `?lite=1` opts out and keeps the inline view here.
+    if (params.get('lite') !== '1') {
+      // The thread page lives behind the auth shell. A signed-in (or already
+      // anonymous) visitor keeps their session — they're just reading a post,
+      // not opting into the anonymous experience. Only a session-less stranger
+      // is dropped into anonymous mode, on the default server (mastodon.social),
+      // so the shell can render around the post.
+      if (!this.auth.isAuthenticated) {
+        this.auth.enterAnonymous();
+      }
+      this.router.navigate(['/statuses', messageStatusRouteRef(payload)], { replaceUrl: true });
+      return;
+    }
+    this.status.set(messageStatus(payload, this.selfUrl(params)));
   }
 
   /** The canonical /message/ URL for these params, used as the post's permalink. */

@@ -27,6 +27,10 @@ import { ElizaService } from '../../eliza/eliza.service';
 import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { isElizaId } from '../../eliza/eliza-identity';
+import {
+  messageStatus,
+  parseMessageStatusRouteRef,
+} from '../../providers/paste/message-payload';
 
 @Component({
   selector: 'app-thread',
@@ -57,6 +61,9 @@ export class Thread implements OnInit {
   protected descendants = signal<Status[]>([]);
   protected loading = signal(true);
   protected isAnonymousPublic = signal(false);
+  /** True while viewing a message serialized into the URL: a synthetic, read-only
+   *  post with no network identity — no replies, boosts, favourites or bookmarks. */
+  protected isMessageStatus = signal(false);
   protected publicContextUnavailable = signal(false);
   protected publicOriginalUrl = signal<string | null>(null);
 
@@ -96,7 +103,7 @@ export class Thread implements OnInit {
    * anonymous threads don't participate: those don't have a Mastodon DM to open.
    */
   protected chatPartner = computed(() => {
-    if (this.isRss() || this.isAnonymousPublic()) {
+    if (this.isRss() || this.isAnonymousPublic() || this.isMessageStatus()) {
       return null;
     }
     const me = this.auth.account();
@@ -213,6 +220,7 @@ export class Thread implements OnInit {
     this.descendants.set([]);
     this.isRss.set(false);
     this.isAnonymousPublic.set(false);
+    this.isMessageStatus.set(false);
     this.publicContextUnavailable.set(false);
     this.publicOriginalUrl.set(null);
     this.rssHasCommentFeed.set(false);
@@ -227,6 +235,16 @@ export class Thread implements OnInit {
     }
     if (isElizaId(id) || id.startsWith('local:')) {
       this.loadLocal(id);
+      return;
+    }
+    const messagePayload = parseMessageStatusRouteRef(id);
+    if (messagePayload) {
+      // A self-contained message serialized into the URL: render it as a native
+      // post with no network and no thread context. It's read-only — there's no
+      // real status to reply to, boost, favourite or bookmark.
+      this.isMessageStatus.set(true);
+      this.status.set(messageStatus(messagePayload, this.messagePermalink(id)));
+      this.loading.set(false);
       return;
     }
     const publicRef = parseAnonymousStatusRouteRef(id);
@@ -290,6 +308,15 @@ export class Thread implements OnInit {
     this.ancestors.set(thread.ancestors);
     this.descendants.set(thread.descendants);
     this.loading.set(false);
+  }
+
+  /** The canonical in-app permalink for a URL-serialized message: this very page. */
+  private messagePermalink(id: string): string | null {
+    try {
+      return new URL(`statuses/${id}`, document.baseURI).toString();
+    } catch {
+      return null;
+    }
   }
 
   /** Bluesky thread: `getPostThread` mapped onto the same ancestors/descendants shape. */
