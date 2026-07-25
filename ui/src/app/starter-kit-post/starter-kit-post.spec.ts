@@ -30,17 +30,18 @@ describe('StarterKitPost', () => {
     return fixture;
   }
 
-  it('gives Anonymous users static profile previews and the canonical collection', () => {
+  it('shows every member and keeps the canonical collection as a secondary link', () => {
     const fixture = render(true);
     const el = fixture.nativeElement as HTMLElement;
+    const kit = SHIPPED_STARTER_KITS[0];
 
-    expect(el.querySelectorAll('.kit-member[href]')).toHaveLength(5);
-    expect(el.querySelectorAll('app-account-hover-card')).toHaveLength(5);
+    expect(el.querySelectorAll('.kit-member[href]')).toHaveLength(kit.itemCount);
+    expect(el.querySelectorAll('app-account-hover-card')).toHaveLength(kit.itemCount);
     expect(el.querySelector('app-account-hover-card button')).toBeNull();
-    expect(el.textContent).not.toContain('Follow first 5');
-    expect((el.querySelector('.kit-link') as HTMLAnchorElement).href).toBe(
-      SHIPPED_STARTER_KITS[0].url,
+    expect((el.querySelector('.kit-link') as HTMLAnchorElement).getAttribute('href')).toBe(
+      `/collections/preview/${kit.id}`,
     );
+    expect((el.querySelector('.kit-home-link') as HTMLAnchorElement).href).toBe(kit.url);
     httpMock.expectNone((request) => request.url.includes('/api/v2/search'));
   });
 
@@ -60,6 +61,6 @@ describe('StarterKitPost', () => {
 
     expect(navigate).toHaveBeenCalledWith(['/accounts', 'local-42']);
     expect(fixture.nativeElement.querySelector('app-account-hover-card button')).not.toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Follow first 5');
+    expect(fixture.nativeElement.textContent).toContain('Follow all');
   });
 });

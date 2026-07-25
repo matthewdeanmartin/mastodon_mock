@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { Account, CollectionItem, CollectionWithAccounts, Status } from '../../models';
+import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 import { CollectionPage } from './collection';
 
 /** Exposes CollectionPage's protected members for white-box testing. */
@@ -171,6 +172,21 @@ describe('CollectionPage', () => {
     expect(internals(fixture).loading()).toBe(false);
     expect(internals(fixture).error()).toContain('not support collections');
     expect(internals(fixture).data()).toBeNull();
+  });
+
+  it('opens a shipped collection preview without asking the selected home server', () => {
+    const kit = SHIPPED_STARTER_KITS[0];
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { paramMap: of(convertToParamMap({ id: kit.id })) },
+    });
+
+    const fixture = setUp();
+
+    httpMock.expectNone(`/api/v1/collections/${kit.id}`);
+    expect(internals(fixture).loading()).toBe(false);
+    expect(internals(fixture).tab()).toBe('members');
+    expect(internals(fixture).members()).toHaveLength(kit.itemCount);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(kit.title);
   });
 
   // ---------------------------------------------------------------- feed synthesis

@@ -207,7 +207,7 @@ describe('Home', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     expect(el.querySelectorAll('app-starter-kit-post')).toHaveLength(11);
-    expect(el.querySelector('app-starter-kit-post')?.textContent).toContain('Follow first 5');
+    expect(el.querySelector('app-starter-kit-post')?.textContent).toContain('Follow all');
     expect(el.querySelector('.starter-pack-universal a')?.getAttribute('href')).toBe(
       '/collections/starter',
     );

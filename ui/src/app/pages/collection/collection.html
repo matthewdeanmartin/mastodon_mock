@@ -7,9 +7,11 @@
 } @else if (data(); as d) {
   <div class="page-head page-head-actions">
     <span>{{ d.collection.name }}</span>
-    <button class="btn btn-outline btn-sm" [disabled]="converting()" (click)="convertToList()">
-      {{ converting() ? 'Converting…' : 'Convert to list' }}
-    </button>
+    @if (!shipped()) {
+      <button class="btn btn-outline btn-sm" [disabled]="converting()" (click)="convertToList()">
+        {{ converting() ? 'Converting…' : 'Convert to list' }}
+      </button>
+    }
   </div>
   @if (conversionMessage()) {
     <p class="conversion-message muted" role="status">{{ conversionMessage() }}</p>
@@ -27,6 +29,11 @@
       }
       {{ d.collection.item_count }} member{{ d.collection.item_count === 1 ? '' : 's' }}
     </p>
+    @if (shipped(); as kit) {
+      <a class="muted small" [href]="kit.url" target="_blank" rel="noopener">
+        Open original on its home server ↗
+      </a>
+    }
     <div class="coll-actions">
       @if (isOwner()) {
         <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
@@ -41,12 +48,14 @@
     </div>
   </div>
 
-  <div class="tabs">
-    <button class="tab" [class.active]="tab() === 'feed'" (click)="setTab('feed')">Feed</button>
-    <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
-      Members
-    </button>
-  </div>
+  @if (!shipped()) {
+    <div class="tabs">
+      <button class="tab" [class.active]="tab() === 'feed'" (click)="setTab('feed')">Feed</button>
+      <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
+        Members
+      </button>
+    </div>
+  }
 
   @if (tab() === 'feed') {
     @if (feedLoading()) {
@@ -101,19 +110,15 @@
     } @else {
       @for (m of members(); track m.itemId) {
         <div class="member-row">
-          <a class="member-link" [routerLink]="['/accounts', m.account.id]">
-            <img
-              class="avatar"
-              [src]="m.account.avatar_static || m.account.avatar"
-              [alt]="m.account.username"
-              loading="lazy"
-              decoding="async"
-            />
-            <span class="names">
-              <span class="name">{{ m.account.display_name || m.account.username }}</span>
-              <span class="acct muted">&#64;{{ m.account.acct }}</span>
-            </span>
-          </a>
+          @if (shipped()) {
+            <a class="member-link" [href]="m.account.url" target="_blank" rel="noopener noreferrer">
+              <ng-container *ngTemplateOutlet="memberIdentity; context: { $implicit: m.account }" />
+            </a>
+          } @else {
+            <a class="member-link" [routerLink]="['/accounts', m.account.id]">
+              <ng-container *ngTemplateOutlet="memberIdentity; context: { $implicit: m.account }" />
+            </a>
+          }
           @if (m.state === 'pending') {
             <span class="muted small">pending</span>
           }
@@ -155,3 +160,17 @@
     />
   }
 }
+
+<ng-template #memberIdentity let-account>
+  <img
+    class="avatar"
+    [src]="account.avatar_static || account.avatar"
+    [alt]="account.username"
+    loading="lazy"
+    decoding="async"
+  />
+  <span class="names">
+    <span class="name">{{ account.display_name || account.username }}</span>
+    <span class="acct muted">&#64;{{ account.acct }}</span>
+  </span>
+</ng-template>

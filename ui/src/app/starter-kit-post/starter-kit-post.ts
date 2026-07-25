@@ -1,5 +1,5 @@
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AccountHoverCard } from '../account-hover-card/account-hover-card';
 import { Api } from '../api';
@@ -10,7 +10,7 @@ import { ShippedStarterKit } from '../starter-kits';
 
 @Component({
   selector: 'app-starter-kit-post',
-  imports: [AccountHoverCard],
+  imports: [AccountHoverCard, RouterLink],
   providers: [ImportFollows],
   templateUrl: './starter-kit-post.html',
   styleUrl: './starter-kit-post.css',
@@ -67,8 +67,12 @@ export class StarterKitPost implements OnInit {
     }
   }
 
-  protected followPreview(): void {
+  protected followAll(): void {
     void this.importer.start();
+  }
+
+  protected collectionHost(): string {
+    return new URL(this.kit().url).host;
   }
 
   private async resolveAccount(account: Account): Promise<Account | null> {

@@ -16,7 +16,7 @@
       </span>
     </div>
 
-    <div class="kit-members" aria-label="First five accounts in {{ kit().title }}">
+    <div class="kit-members" aria-label="All accounts in {{ kit().title }}">
       @for (account of kit().accounts; track account.url) {
         <span class="kit-member-shell" (mouseenter)="prepareAccount(account)">
           @if (auth.isAnonymous) {
@@ -64,25 +64,33 @@
       }
     </div>
 
-    <div class="kit-actions">
-      @if (!auth.isAnonymous) {
-        <button
-          type="button"
-          class="btn btn-sm"
-          [disabled]="importer.running() || completed() === kit().accounts.length"
-          (click)="followPreview()"
+    <div class="kit-actions-wrap">
+      <div class="kit-actions">
+        @if (!auth.isAnonymous) {
+          <button
+            type="button"
+            class="btn btn-sm"
+            [disabled]="importer.running() || completed() === kit().accounts.length"
+            (click)="followAll()"
+          >
+            @if (importer.running()) {
+              Following… {{ completed() }}/{{ kit().accounts.length }}
+            } @else if (completed() === kit().accounts.length) {
+              Followed {{ followed() }} of {{ kit().accounts.length }}
+            } @else {
+              Follow all
+            }
+          </button>
+        }
+        <a
+          class="btn btn-outline btn-sm kit-link"
+          [routerLink]="['/collections/preview', kit().id]"
         >
-          @if (importer.running()) {
-            Following… {{ completed() }}/{{ kit().accounts.length }}
-          } @else if (completed() === kit().accounts.length) {
-            Followed {{ followed() }} of {{ kit().accounts.length }}
-          } @else {
-            Follow first {{ kit().accounts.length }}
-          }
-        </button>
-      }
-      <a class="btn btn-outline btn-sm kit-link" [href]="kit().url" target="_blank" rel="noopener">
-        {{ auth.isAnonymous ? 'View collection ↗' : 'Open full collection ↗' }}
+          View collection
+        </a>
+      </div>
+      <a class="kit-home-link muted small" [href]="kit().url" target="_blank" rel="noopener">
+        Open original on {{ collectionHost() }} ↗
       </a>
     </div>
   </div>

@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
@@ -9,6 +10,11 @@ import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { ListCollectionConverter } from '../../list-collection-converter';
 import { ListFeedResolver } from '../../lists/list-feed-resolver';
+import {
+  shippedStarterKit,
+  shippedStarterKitCollection,
+  ShippedStarterKit,
+} from '../../starter-kits';
 
 /** A member of the collection paired with its item id (needed for removal). */
 interface Member {
@@ -25,7 +31,7 @@ interface Member {
  */
 @Component({
   selector: 'app-collection',
-  imports: [FormsModule, RouterLink, StatusCard, BulkAddDialog, ConfirmDialog],
+  imports: [FormsModule, RouterLink, NgTemplateOutlet, StatusCard, BulkAddDialog, ConfirmDialog],
   templateUrl: './collection.html',
   styleUrl: './collection.css',
 })
@@ -38,6 +44,7 @@ export class CollectionPage implements OnInit {
   private feedResolver = inject(ListFeedResolver);
 
   protected data = signal<CollectionWithAccounts | null>(null);
+  protected shipped = signal<ShippedStarterKit | null>(null);
   protected loading = signal(true);
   protected error = signal('');
   protected tab = signal<'feed' | 'members'>('feed');
@@ -81,11 +88,14 @@ export class CollectionPage implements OnInit {
 
   protected isOwner = computed(() => {
     const d = this.data();
-    return !!d && d.collection.account_id === this.auth.account()?.id;
+    return !this.shipped() && !!d && d.collection.account_id === this.auth.account()?.id;
   });
 
   /** My own item in someone else's collection, if I'm featured in it. */
   protected myItem = computed<Member | null>(() => {
+    if (this.shipped()) {
+      return null;
+    }
     const me = this.auth.account()?.id;
     return (this.members().find((m) => m.account.id === me) as Member | undefined) ?? null;
   });
@@ -103,6 +113,15 @@ export class CollectionPage implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.feedLoadedFor = '';
+    const kit = shippedStarterKit(id);
+    if (kit) {
+      this.shipped.set(kit);
+      this.data.set(shippedStarterKitCollection(kit));
+      this.tab.set('members');
+      this.loading.set(false);
+      return;
+    }
+    this.shipped.set(null);
     this.api.getCollection(id).subscribe({
       next: (d) => {
         this.data.set(d);

@@ -115,12 +115,23 @@
   flex-wrap: wrap;
   gap: 8px;
   width: auto;
+}
+
+.kit-actions-wrap {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px;
   margin-top: 12px;
 }
 
 .kit-link {
   display: inline-flex;
   width: auto;
+}
+
+.kit-home-link {
+  padding-left: 2px;
 }
 
 @media (max-width: 520px) {
