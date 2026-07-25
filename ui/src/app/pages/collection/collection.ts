@@ -233,7 +233,7 @@ export class CollectionPage implements OnInit {
     if (!d) {
       return;
     }
-    this.api.deleteCollection(d.collection.id).subscribe(() => this.router.navigate(['/lists']));
+    this.api.deleteCollection(d.collection.id).subscribe(() => this.router.navigate(['/feeds']));
   }
 
   /** Re-fetch the collection after a bulk add (the server assigns item ids). */

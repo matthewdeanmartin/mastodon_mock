@@ -21,6 +21,16 @@
   margin-top: 12px;
 }
 
+/* Compact empty states: an empty section should be about one row tall, not a
+   tall centred block (the global .center adds 32px of vertical padding). Keep
+   these terse and left-aligned so an empty Feeds page reads as a tight list. */
+p.muted.center.small {
+  padding: 8px 16px;
+  margin: 0;
+  text-align: left;
+  font-size: 13px;
+}
+
 .list-row {
   display: flex;
   align-items: center;

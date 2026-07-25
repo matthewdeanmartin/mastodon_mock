@@ -1,0 +1,25 @@
+<div class="page-head">Docs</div>
+
+<a class="doc-row" routerLink="/about">
+  <span class="doc-title">Design</span>
+  <span class="muted small">Why this client exists — read it as a post.</span>
+</a>
+
+<a class="doc-row" routerLink="/credits">
+  <span class="doc-title">Credits &amp; Privacy</span>
+  <span class="muted small">The software this client ships, and how it handles data.</span>
+</a>
+
+@if (serverAbout.hasRules()) {
+  <a class="doc-row" routerLink="/server-rules">
+    <span class="doc-title">Server rules</span>
+    <span class="muted small">The rules published by your instance.</span>
+  </a>
+}
+
+@if (serverAbout.hasTerms()) {
+  <a class="doc-row" routerLink="/terms">
+    <span class="doc-title">Terms of Service</span>
+    <span class="muted small">Your instance's terms of service.</span>
+  </a>
+}

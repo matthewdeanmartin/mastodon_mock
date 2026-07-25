@@ -23,8 +23,6 @@ export const routes: Routes = [
     path: 'explore',
     loadComponent: () => import('./pages/explore/explore').then((m) => m.Explore),
   },
-  // The project story should be available before a visitor has an account.
-  { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
   // A message shared as a TinyURL short link. Un-guarded so a shared link opens
   // for anyone, signed in or not.
   {
@@ -263,11 +261,27 @@ export const routes: Routes = [
         path: 'starter-kits',
         loadComponent: () => import('./pages/starter-kits/starter-kits').then((m) => m.StarterKits),
       },
+      // Feeds hub: lists, saved searches, server feeds, collections and tags in
+      // one page. `/feeds/lists` and `/feeds/tags` are filtered views of the same
+      // component (see Feeds.only). These literal segments MUST precede the
+      // `feeds/:feed` server-feed route below so they aren't swallowed by it.
       {
-        path: 'tags',
-        loadComponent: () =>
-          import('./pages/followed-tags/followed-tags').then((m) => m.FollowedTags),
+        path: 'feeds',
+        loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
       },
+      {
+        path: 'feeds/lists',
+        data: { only: 'lists' },
+        loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
+      },
+      {
+        path: 'feeds/tags',
+        data: { only: 'tags' },
+        loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
+      },
+      // Back-compat: the old top-level Lists/Tags entries now live under Feeds.
+      { path: 'lists', pathMatch: 'full', redirectTo: 'feeds/lists' },
+      { path: 'tags', pathMatch: 'full', redirectTo: 'feeds/tags' },
       {
         path: 'search',
         loadComponent: () => import('./pages/search/search').then((m) => m.Search),
@@ -283,10 +297,6 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/bookmarks/bookmarks').then((m) => m.Bookmarks),
       },
       {
-        path: 'lists',
-        loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
-      },
-      {
         path: 'analytics',
         canActivate: [anonymousUnavailableGuard],
         data: { anonymousFeature: 'Analytics' },
@@ -296,6 +306,21 @@ export const routes: Routes = [
         path: 'observability',
         loadComponent: () =>
           import('./pages/observability/observability').then((m) => m.Observability),
+      },
+      // Docs hub + the "blog-post"-style pages it links to. Design lives inside
+      // the shell now (rendered as a virtual tweet), so the reader keeps the top
+      // nav, rails and footer instead of dropping into a bare full-page layout.
+      {
+        // Route is `/blog` (the user's framing: these are "blog-post"-style
+        // pages), not `/docs` — the mock backend's FastAPI serves Swagger UI at
+        // `/docs`, so an in-app `/docs` route would be shadowed on hard-nav.
+        path: 'blog',
+        loadComponent: () => import('./pages/docs/docs').then((m) => m.Docs),
+      },
+      {
+        // "Design" — the project story, as a virtual tweet in the centre column.
+        path: 'about',
+        loadComponent: () => import('./pages/about/about').then((m) => m.About),
       },
       {
         path: 'server-rules',

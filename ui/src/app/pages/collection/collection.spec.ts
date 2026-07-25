@@ -242,7 +242,7 @@ describe('CollectionPage', () => {
 
   // ---------------------------------------------------------------- owner actions
 
-  it('isOwner is true for the curator, and remove() DELETEs then navigates to /lists', () => {
+  it('isOwner is true for the curator, and remove() DELETEs then navigates to /feeds', () => {
     TestBed.inject(Auth).account.set(makeAccount(OWNER));
     const router = TestBed.inject(Router);
     const nav = vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -254,7 +254,7 @@ describe('CollectionPage', () => {
     internals(fixture).remove();
     httpMock.expectOne('/api/v1/collections/C1').flush({});
 
-    expect(nav).toHaveBeenCalledWith(['/lists']);
+    expect(nav).toHaveBeenCalledWith(['/feeds']);
   });
 
   it('addMember POSTs /items then re-fetches the collection', () => {

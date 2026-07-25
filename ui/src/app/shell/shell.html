@@ -67,17 +67,11 @@
         </svg>
         <span>Search</span>
       </a>
-      <a routerLink="/lists" routerLinkActive="active">
+      <a routerLink="/feeds" routerLinkActive="active">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
         </svg>
-        <span>Lists</span>
-      </a>
-      <a routerLink="/tags" routerLinkActive="active">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M9.5 4 7 20M17 4l-2.5 16M4.5 9h16M3.5 15h16" />
-        </svg>
-        <span>Tags</span>
+        <span>Feeds</span>
       </a>
       @if (auth.shouldOfferLogin) {
         <a class="login-nav" routerLink="/login" (click)="auth.exitAnonymous()">
@@ -104,40 +98,55 @@
             <a routerLink="/eliza">Meet Eliza</a>
             <div class="menu-divider"></div>
           }
-          <a routerLink="/starter-kits">Starter Kits</a>
+
+          <a routerLink="/settings">Settings</a>
+
+          <!-- Feed-likes -->
+          <div class="menu-divider"></div>
           @if (!auth.isAnonymous) {
             <a routerLink="/favourites">Favourites</a>
           }
           <a routerLink="/bookmarks">Bookmarks</a>
+          <a routerLink="/feeds/lists">Lists</a>
+          <a routerLink="/feeds/tags">Tags</a>
+
+          <!-- Write / draft-likes -->
+          <div class="menu-divider"></div>
           <a routerLink="/drafts">Drafts</a>
           @if (featureFlags.enabled('pastebin')) {
             <a routerLink="/pastes">Pastes</a>
           }
+
+          <!-- Find people to follow -->
+          <div class="menu-divider"></div>
+          <a routerLink="/starter-kits">Starter Kits</a>
+          <a routerLink="/settings/import-export">Find my friends</a>
+
+          <!-- Analytics (of self + the client) -->
+          <div class="menu-divider"></div>
           @if (!auth.isAnonymous) {
             <a routerLink="/analytics">Analytics</a>
           }
           <a routerLink="/observability">Observability</a>
-          <a routerLink="/about">Design</a>
+
+          <!-- Docs & grab-bag -->
+          <div class="menu-divider"></div>
+          <a routerLink="/blog">Docs</a>
           @if (!isCanary) {
             <a href="https://mawkingbird.com/canary/" target="_blank" rel="noopener noreferrer"
               >Canary ↗</a
             >
           }
-          @if (serverAbout.hasRules()) {
-            <a routerLink="/server-rules">Server rules</a>
-          }
-          @if (serverAbout.hasTerms()) {
-            <a routerLink="/terms">Terms of Service</a>
-          }
-          <a routerLink="/credits">Credits/Privacy</a>
-          <div class="menu-divider"></div>
-          <a routerLink="/settings">Settings</a>
-          @if (mockTooling) {
-            <a routerLink="/dev/faults">Faults</a>
-            <a href="/docs" target="_blank" rel="noopener">API Docs ↗</a>
-          }
-          @if (isStaff()) {
-            <a routerLink="/admin" class="admin-link">Admin</a>
+
+          @if (mockTooling || isStaff()) {
+            <div class="menu-divider"></div>
+            @if (mockTooling) {
+              <a routerLink="/dev/faults">Faults</a>
+              <a href="/docs" target="_blank" rel="noopener">API Docs ↗</a>
+            }
+            @if (isStaff()) {
+              <a routerLink="/admin" class="admin-link">Admin</a>
+            }
           }
         </div>
       </details>

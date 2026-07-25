@@ -1,14 +1,22 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
-import { Collection, UserList } from '../../models';
+import { Collection, FeaturedTag, Tag, UserList } from '../../models';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
+import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 import { SavedSearches } from '../search/saved-searches';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 import { PageDiagnostics } from '../../page-diagnostics';
+
+/**
+ * Which sections the Feeds page shows. `/feeds` shows everything; `/feeds/lists`
+ * and `/feeds/tags` are filtered views used by the More menu's Lists / Tags
+ * entries. Read from the route's `only` data.
+ */
+type FeedFilter = 'all' | 'lists' | 'tags';
 
 @Component({
   selector: 'app-lists',
@@ -20,8 +28,21 @@ export class Lists implements OnInit {
   private api = inject(Api);
   protected auth = inject(Auth);
   private anonymousLists = inject(AnonymousLists);
+  private anonymousTags = inject(AnonymousTags);
   protected saved = inject(SavedSearches);
   private diagnostics = inject(PageDiagnostics);
+  private route = inject(ActivatedRoute);
+
+  /** Section filter from the route (`/feeds/lists`, `/feeds/tags`, else all). */
+  protected filter: FeedFilter = (this.route.snapshot.data['only'] as FeedFilter) ?? 'all';
+  /** A given section is shown when we're on the "all" view or it owns the filter. */
+  protected shows(section: FeedFilter): boolean {
+    return this.filter === 'all' || this.filter === section;
+  }
+
+  // Followed / featured hashtags, surfaced here as feed rows (the old /tags page).
+  protected followedTags = signal<Tag[]>([]);
+  protected featuredTags = signal<FeaturedTag[]>([]);
 
   /**
    * Server feeds to show. Auth-gated feeds drop for anonymous sessions; probed
@@ -58,10 +79,60 @@ export class Lists implements OnInit {
   ngOnInit(): void {
     this.diagnostics.info('Lists', 'page:open', {
       mode: this.auth.mode() ?? 'unauthenticated',
+      filter: this.filter,
     });
-    this.load();
-    this.loadCollections();
-    this.resolveServerFeeds();
+    if (this.shows('lists')) {
+      this.load();
+      this.loadCollections();
+      this.resolveServerFeeds();
+    }
+    if (this.shows('tags')) {
+      this.loadTags();
+    }
+  }
+
+  /** Followed + featured hashtags (mirrors the retired standalone /tags page). */
+  private loadTags(): void {
+    if (this.auth.isAnonymous) {
+      this.followedTags.set(
+        this.anonymousTags.tags().map((name) => ({
+          id: name,
+          name,
+          url: '',
+          history: [],
+          following: true,
+          featuring: false,
+        })),
+      );
+      this.featuredTags.set([]);
+      return;
+    }
+    this.api.followedTags().subscribe({
+      next: (tags) => this.followedTags.set(tags),
+      error: () => this.followedTags.set([]),
+    });
+    this.api.featuredTags().subscribe({
+      next: (tags) => this.featuredTags.set(tags),
+      error: () => this.featuredTags.set([]),
+    });
+  }
+
+  /** The ✕ sits inside a routerLink; unfollow without navigating to the tag. */
+  askUnfollowTag(tag: Tag, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.unfollowTag(tag);
+  }
+
+  private unfollowTag(tag: Tag): void {
+    if (this.auth.isAnonymous) {
+      this.anonymousTags.unfollow(tag.name);
+      this.followedTags.update((list) => list.filter((t) => t.name !== tag.name));
+      return;
+    }
+    this.api.unfollowTag(tag.name).subscribe(() => {
+      this.followedTags.update((list) => list.filter((t) => t.name !== tag.name));
+    });
   }
 
   /**

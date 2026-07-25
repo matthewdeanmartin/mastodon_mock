@@ -132,8 +132,8 @@ export class Hotkeys {
         if (this.capabilities.active) return null;
         return '/notifications';
       case 'e':
-        // "explore" — the Lists tab is now the hub for all custom/server feeds.
-        return '/lists';
+        // "explore" — the Feeds tab is the hub for all custom/server feeds.
+        return '/feeds';
       case 'l':
         return '/feeds/local';
       case 't':

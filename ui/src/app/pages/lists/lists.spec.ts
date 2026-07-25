@@ -84,6 +84,15 @@ describe('Lists', () => {
   }
 
   /**
+   * On the default (unfiltered) Feeds view the Tags section loads followed and
+   * featured hashtags. Tests don't assert on them, so settle both as empty.
+   */
+  function flushTagLoads(): void {
+    httpMock.match((r) => r.url === '/api/v1/followed_tags').forEach((req) => req.flush([]));
+    httpMock.match((r) => r.url === '/api/v1/featured_tags').forEach((req) => req.flush([]));
+  }
+
+  /**
    * Creates the component and settles the collections side of ngOnInit.
    * By default the auth snapshot is empty, so loadCollections() first calls
    * verify_credentials; erroring it short-circuits the collection fetches.
@@ -93,6 +102,7 @@ describe('Lists', () => {
     fixture.detectChanges();
     httpMock.expectOne('/api/v1/accounts/verify_credentials').error(new ProgressEvent('error'));
     flushServerFeedProbes();
+    flushTagLoads();
     return fixture;
   }
 
@@ -193,6 +203,7 @@ describe('Lists', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
     flushServerFeedProbes();
+    flushTagLoads();
 
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
@@ -218,6 +229,7 @@ describe('Lists', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
     flushServerFeedProbes();
+    flushTagLoads();
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
       .flush({ id: '9', username: 'me', acct: 'me' });
@@ -232,6 +244,7 @@ describe('Lists', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
     flushServerFeedProbes();
+    flushTagLoads();
 
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
