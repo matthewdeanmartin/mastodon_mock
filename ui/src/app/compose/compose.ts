@@ -168,6 +168,12 @@ export class Compose implements OnDestroy {
       this.visibility.set(initialVisibility);
       const saved = draft ?? this.drafts.loadAutosave(this.contextKey());
       if (saved && draftHasContent(saved)) {
+        this.diagnostics.info('Paste', 'draft:restore', {
+          context: this.contextKey(),
+          source: draft ? 'draft' : 'autosave',
+          target: saved.target ?? 'fedi',
+          provider: saved.pasteProviderId ?? this.pasteProviders.default.id,
+        });
         this.applySnapshot(saved);
       }
       if (draft) {
@@ -378,6 +384,7 @@ export class Compose implements OnDestroy {
   }
 
   onPasteProviderChange(providerId: string): void {
+    const previousProviderId = this.pasteProviderId();
     const provider = this.pasteProviders.get(providerId) ?? this.pasteProviders.default;
     this.pasteProviderId.set(provider.id);
     if (!provider.languages.some((language) => language.value === this.pasteLanguage())) {
@@ -389,6 +396,14 @@ export class Compose implements OnDestroy {
     if (!provider.visibilities.includes(this.visibility() as 'public' | 'unlisted')) {
       this.visibility.set(provider.visibilities[0] ?? 'unlisted');
     }
+    this.diagnostics.info('Paste', 'provider:change', {
+      requestedProvider: providerId,
+      previousProvider: previousProviderId,
+      selectedProvider: this.pasteProviderId(),
+      language: this.pasteLanguage(),
+      expiry: this.pasteExpiry(),
+      visibility: this.visibility(),
+    });
   }
 
   onPasteExpiryChange(expiry: PasteExpiry): void {
@@ -883,6 +898,7 @@ export class Compose implements OnDestroy {
     } as const;
     this.diagnostics.info('Paste', 'create:start', {
       provider: provider.id,
+      selectedProvider: this.pasteProviderId(),
       bytes: new TextEncoder().encode(input.content).byteLength,
       visibility: input.visibility,
     });
