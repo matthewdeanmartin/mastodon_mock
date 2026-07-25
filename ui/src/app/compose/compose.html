@@ -27,6 +27,12 @@
     (keydown)="onBoxKeydown($event)"
     (paste)="onPaste($event)"
   ></textarea>
+  @if (showReplyMentionHint()) {
+    <p class="reply-mention-hint muted">
+      💬 The leading <strong>&#64;handle</strong> notifies them of your reply. Remove it to reply
+      without sending a mention notification.
+    </p>
+  }
   @if (!targetIncludesPaste() && (thread().length || text().length > maxChars - 50)) {
     <div class="seg-count muted" [class.over-limit]="text().length > maxChars">
       {{ text().length }}/{{ maxChars }}

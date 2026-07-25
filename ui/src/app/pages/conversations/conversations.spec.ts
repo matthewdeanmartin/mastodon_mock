@@ -25,7 +25,6 @@ interface ConversationsInternals {
   visibleChats: Signal<Chat[]>;
   selected: Signal<Chat | null>;
   replyMentions: Signal<string>;
-  replySeedsMention: Signal<boolean>;
   replyToId: Signal<string | undefined>;
   replyVisibility: Signal<string>;
 }
@@ -454,7 +453,6 @@ describe('Conversations', () => {
     internals(fixture).selectedKey.set(internals(fixture).chats()[0].key);
 
     expect(internals(fixture).replyMentions()).toBe('@alice @bob ');
-    expect(internals(fixture).replySeedsMention()).toBe(true);
   });
 
   it('replyMentions (private 1:1): stays empty since the conversation notifies the partner', () => {
@@ -468,7 +466,6 @@ describe('Conversations', () => {
     internals(fixture).selectedKey.set('priv:alice');
 
     expect(internals(fixture).replyMentions()).toBe('');
-    expect(internals(fixture).replySeedsMention()).toBe(false);
   });
 
   it('replyToId chains onto the newest loaded message, not the list row', () => {

@@ -593,6 +593,7 @@
           } @else {
             <app-compose
               [inReplyToId]="display.id"
+              [replyToHandle]="display.account.acct"
               placeholder="Post your reply"
               (posted)="onReplied($event)"
             />

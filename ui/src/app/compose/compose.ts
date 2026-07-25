@@ -124,6 +124,16 @@ export class Compose implements OnDestroy {
   readonly placeholder = input('What is happening?');
   /** Optional pre-seeded body (e.g. @mentions for a direct reply). */
   readonly initialText = input('');
+  /**
+   * The parent author's handle (bare `acct`, e.g. `alice@dmv.community`) for a
+   * reply. When set and no explicit {@link initialText} is given, the composer
+   * seeds `@handle ` into the box so the reply actually notifies them — matching
+   * mastodon.social's own default. Verified live: a reply with `in_reply_to_id`
+   * but no `@handle` in the body threads correctly yet sends NO notification, so
+   * this seed is what makes "reply" ping the person by default. The user can
+   * delete the handle to reply silently; {@link showReplyMentionHint} explains it.
+   */
+  readonly replyToHandle = input('');
   /** Optional initial visibility (e.g. 'direct' for a conversation reply). */
   readonly initialVisibility = input('public');
   /** Pin visibility to initialVisibility (no picker) — e.g. private chats stay direct. */
@@ -185,6 +195,16 @@ export class Compose implements OnDestroy {
   /** Every box in order; index 0 is the primary post. */
   protected segments = computed(() => [this.text(), ...this.thread()]);
 
+  /**
+   * Whether to show the "removing the @handle replies without notifying them"
+   * hint. Shown only for replies whose body currently *leads* with an @mention —
+   * so it appears while the seeded handle is present and quietly disappears the
+   * moment the user deletes it (their signal that they've opted out of the ping).
+   */
+  protected showReplyMentionHint = computed(
+    () => !!this.inReplyToId() && /^\s*@[\w.-]+(@[\w.-]+)?/.test(this.text()),
+  );
+
   constructor() {
     // Seed the composer from inputs + any autosaved text or explicitly opened
     // draft. This re-seeds only when the *conversation context* changes (a
@@ -196,7 +216,14 @@ export class Compose implements OnDestroy {
     // has written it. The `seededKey` guard prevents that.
     effect(() => {
       const draft = this.initialDraft();
-      const initialText = this.initialText();
+      // A caller's explicit initialText wins; otherwise, for a reply, seed the
+      // parent author's @handle so the reply notifies them by default (see
+      // replyToHandle). Never seed the user's own handle — like mastodon.social,
+      // replying to yourself gets an empty box. Non-reply composers seed nothing.
+      const handle = this.replyToHandle().trim();
+      const mine = this.auth.account()?.acct;
+      const seedHandle = handle && handle !== mine ? `@${handle} ` : '';
+      const initialText = this.initialText() || seedHandle;
       const initialVisibility = this.initialVisibility();
       const key = `${this.contextKey()}|${draft?.id ?? ''}`;
       if (key === this.seededKey) {

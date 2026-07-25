@@ -34,6 +34,12 @@ textarea {
   margin: 2px 4px 0 0;
 }
 
+.reply-mention-hint {
+  margin: 4px 2px 0;
+  font-size: 0.8em;
+  line-height: 1.35;
+}
+
 .thread-box {
   display: flex;
   gap: 8px;

@@ -334,13 +334,13 @@ export class Conversations implements OnInit, OnDestroy {
   /**
    * Pre-seed the composer with @mentions of the reply's recipients.
    *
-   * Mastodon quirk this works around: `in_reply_to_id` *threads* a reply but does
-   * NOT by itself notify the parent author — on the real API a recipient only gets
-   * a mention notification if their `@handle` is actually in the post text. So for
-   * **public** chats we seed the recipient's handle by default; a reply that reads
-   * as a silent thread-reply (no ping) is the surprising case, not the norm. The
-   * composer helper text tells the user they can delete the handle to reply
-   * without sending that notification (see conversations.html).
+   * Mastodon quirk this works around (verified live against real instances):
+   * `in_reply_to_id` *threads* a reply but does NOT by itself notify the parent
+   * author — a recipient only gets a mention notification if their `@handle` is
+   * actually in the post text. So for **public** chats we seed the recipient's
+   * handle by default; a reply that reads as a silent thread-reply (no ping) is
+   * the surprising case, not the norm. The composer itself shows the "remove the
+   * handle to reply without notifying" hint (see Compose.showReplyMentionHint).
    *
    * **Private** (direct) chats are different: delivery there rides on the
    * `direct` visibility + the conversation itself, which already surfaces to the
@@ -383,9 +383,6 @@ export class Conversations implements OnInit, OnDestroy {
     }
     return handles.size ? [...handles].map((h) => `@${h}`).join(' ') + ' ' : '';
   });
-
-  /** True when the seeded reply text pings someone — drives the composer hint. */
-  protected replySeedsMention = computed(() => this.replyMentions().trim().length > 0);
 
   /** Replies chain onto the newest message in the open thread. */
   protected replyToId = computed(

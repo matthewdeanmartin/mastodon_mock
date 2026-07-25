@@ -54,6 +54,7 @@ interface ComposeInternals {
   langMismatch: WritableSignal<{ picked: string; detected: string } | null>;
   onLanguageChange(code: string): void;
   dismissLangMismatch(): void;
+  showReplyMentionHint: Signal<boolean>;
 }
 
 function internals(fixture: ComponentFixture<Compose>): ComposeInternals {
@@ -825,5 +826,59 @@ describe('Compose', () => {
     internals(f).onLanguageChange('fr');
     internals(f).submit();
     expect(internals(f).langMismatch()).toEqual({ picked: 'fr', detected: 'en' });
+  });
+
+  // ------------------------------------------------------- reply mention seeding
+
+  it('seeds the parent author @handle for a reply so it notifies them', () => {
+    const f = setUp();
+    f.componentRef.setInput('inReplyToId', 's1');
+    f.componentRef.setInput('replyToHandle', 'alice@dmv.community');
+    f.detectChanges();
+
+    expect(internals(f).text()).toBe('@alice@dmv.community ');
+    expect(internals(f).showReplyMentionHint()).toBe(true);
+  });
+
+  it('drops the mention hint once the seeded @handle is removed', () => {
+    const f = setUp();
+    f.componentRef.setInput('inReplyToId', 's1');
+    f.componentRef.setInput('replyToHandle', 'alice@dmv.community');
+    f.detectChanges();
+    expect(internals(f).showReplyMentionHint()).toBe(true);
+
+    // User deletes the handle to reply silently: hint disappears.
+    internals(f).text.set('just a quiet thread reply');
+    expect(internals(f).showReplyMentionHint()).toBe(false);
+  });
+
+  it('does not seed your own handle when replying to yourself', () => {
+    TestBed.inject(Auth).account.set({ id: '1', acct: 'me@dmv.community' } as never);
+    const f = setUp();
+    f.componentRef.setInput('inReplyToId', 's1');
+    f.componentRef.setInput('replyToHandle', 'me@dmv.community');
+    f.detectChanges();
+
+    expect(internals(f).text()).toBe('');
+    expect(internals(f).showReplyMentionHint()).toBe(false);
+  });
+
+  it('never shows the mention hint outside a reply (top-level compose)', () => {
+    const f = setUp();
+    internals(f).text.set('@someone hello');
+    // No inReplyToId → not a reply → no hint even if text leads with a mention.
+    expect(internals(f).showReplyMentionHint()).toBe(false);
+  });
+
+  it('lets an explicit initialText override the auto-seeded reply handle', () => {
+    const f = setUp();
+    f.componentRef.setInput('inReplyToId', 's1');
+    f.componentRef.setInput('replyToHandle', 'alice@dmv.community');
+    f.componentRef.setInput('initialText', '@alice@dmv.community @bob@x.social ');
+    f.detectChanges();
+
+    // The caller's multi-mention seed wins (e.g. group chat), not the single handle.
+    expect(internals(f).text()).toBe('@alice@dmv.community @bob@x.social ');
+    expect(internals(f).showReplyMentionHint()).toBe(true);
   });
 });

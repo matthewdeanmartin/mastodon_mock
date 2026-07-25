@@ -143,6 +143,7 @@
               } @else {
                 <app-compose
                   [inReplyToId]="post.id"
+                  [replyToHandle]="post.account.acct"
                   placeholder="Post your reply"
                   (posted)="onReaderReplied($event)"
                 />
@@ -225,7 +226,12 @@
     } @else if (isLocal(s)) {
       <app-local-compose [inReplyTo]="s.id" (posted)="onReply($event)" />
     } @else if (!isRss() && !isAnonymousPublic() && !isMessageStatus()) {
-      <app-compose [inReplyToId]="s.id" placeholder="Post your reply" (posted)="onReply($event)" />
+      <app-compose
+        [inReplyToId]="s.id"
+        [replyToHandle]="s.account.acct"
+        placeholder="Post your reply"
+        (posted)="onReply($event)"
+      />
     }
     @for (d of descendants(); track d.id) {
       <app-status-card
