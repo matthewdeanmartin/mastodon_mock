@@ -16,7 +16,9 @@ export class PasteProviderRegistry {
   // offline), so it must not be the default a fresh composer posts to.
   readonly all: readonly PasteProvider[] = [this.rentry, this.tinyurl, this.pastepile];
   readonly feeds: readonly FeedPasteProvider[] = [this.pastepile];
-  readonly default = this.rentry;
+  // Typed as the interface (not RentryProvider) so callers keep the full
+  // visibility union; narrowing to one provider's literal types breaks them.
+  readonly default: PasteProvider = this.rentry;
 
   get(id: string): PasteProvider | undefined {
     return this.all.find((provider) => provider.id === id);
