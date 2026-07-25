@@ -24,7 +24,7 @@ export const routes: Routes = [
   },
   // The project story should be available before a visitor has an account.
   { path: 'about', loadComponent: () => import('./pages/about/about').then((m) => m.About) },
-  // A message shared as an is.gd short link. Un-guarded so a shared link opens
+  // A message shared as a TinyURL short link. Un-guarded so a shared link opens
   // for anyone, signed in or not.
   {
     path: 'message',

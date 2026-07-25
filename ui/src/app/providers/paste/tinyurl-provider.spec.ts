@@ -2,8 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
-import { IsgdProvider } from './isgd-provider';
 import { PasteCreated } from './paste-provider';
+import { TinyurlProvider } from './tinyurl-provider';
 
 const INPUT = {
   title: '',
@@ -13,66 +13,57 @@ const INPUT = {
   visibility: 'unlisted',
 } as const;
 
-describe('IsgdProvider', () => {
-  function setup(): [IsgdProvider, HttpTestingController] {
+describe('TinyurlProvider', () => {
+  function setup(): [TinyurlProvider, HttpTestingController] {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
-    return [TestBed.inject(IsgdProvider), TestBed.inject(HttpTestingController)];
+    return [TestBed.inject(TinyurlProvider), TestBed.inject(HttpTestingController)];
   }
 
-  it('shortens the message URL via is.gd and returns the short link', () => {
+  it('shortens the message URL via TinyURL and returns the short link', () => {
     const [provider, http] = setup();
     let result: PasteCreated | undefined;
 
     provider.create(INPUT).subscribe((created) => (result = created));
 
-    const request = http.expectOne((r) => r.url === 'https://is.gd/create.php');
-    expect(request.request.params.get('format')).toBe('json');
+    const request = http.expectOne((r) => r.url === 'https://tinyurl.com/api-create.php');
+    expect(request.request.responseType).toBe('text');
     const target = request.request.params.get('url')!;
     expect(target).toContain('/message/');
-    // The message body survives the round-trip through the target URL's params.
     expect(new URL(target).searchParams.get('m')).toBe('why did the chicken cross the road?');
-    request.flush({ shorturl: 'https://is.gd/q7x9eD' });
+    request.flush('https://tinyurl.com/22qwvuhy');
 
-    expect(result?.url).toBe('https://is.gd/q7x9eD');
-    expect(result?.slug).toBe('q7x9eD');
+    expect(result?.url).toBe('https://tinyurl.com/22qwvuhy');
+    expect(result?.slug).toBe('22qwvuhy');
     expect(result?.rawUrl).toContain('/message/');
     expect(result?.editKey).toBe('');
     http.verify();
   });
 
-  it('falls back to v.gd when is.gd fails', () => {
+  it('trims whitespace from the plain-text response body', () => {
     const [provider, http] = setup();
     let result: PasteCreated | undefined;
 
     provider.create(INPUT).subscribe((created) => (result = created));
-
-    // is.gd returns an API error (HTTP 200 but no shorturl) -> should retry v.gd.
     http
-      .expectOne((r) => r.url === 'https://is.gd/create.php')
-      .flush({ errorcode: 1, errormessage: 'Error, database insert failed' });
+      .expectOne((r) => r.url === 'https://tinyurl.com/api-create.php')
+      .flush('  https://tinyurl.com/abc123\n');
 
-    const fallback = http.expectOne((r) => r.url === 'https://v.gd/create.php');
-    fallback.flush({ shorturl: 'https://v.gd/abc123' });
-
-    expect(result?.url).toBe('https://v.gd/abc123');
-    expect(result?.slug).toBe('abc123');
+    expect(result?.url).toBe('https://tinyurl.com/abc123');
     http.verify();
   });
 
-  it('errors when both services fail', () => {
+  it('errors when TinyURL returns a non-URL body (e.g. an error string)', () => {
     const [provider, http] = setup();
     let message = '';
 
     provider.create(INPUT).subscribe({ error: (e: Error) => (message = e.message) });
-
     http
-      .expectOne((r) => r.url === 'https://is.gd/create.php')
-      .flush({ errormessage: 'throttled' });
-    http.expectOne((r) => r.url === 'https://v.gd/create.php').flush({ errormessage: 'throttled' });
+      .expectOne((r) => r.url === 'https://tinyurl.com/api-create.php')
+      .flush('Error: rate limited');
 
-    expect(message).toBe('throttled');
+    expect(message).toBe('Error: rate limited');
     http.verify();
   });
 

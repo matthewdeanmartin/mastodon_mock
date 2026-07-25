@@ -2,7 +2,9 @@
   <h2>Pastes</h2>
   <p class="muted">
     Paste links and edit keys are saved only in this browser. Clearing site data removes your
-    ability to edit or delete them.
+    ability to edit or delete them. Short-link services (TinyURL) are permanent and public: those
+    links cannot be edited or deleted afterwards. Your use of each service is governed by its own
+    terms — see <a routerLink="/credits">Credits &amp; Privacy</a>.
   </p>
 </div>
 
@@ -95,17 +97,19 @@
             >
               Raw ↗
             </a>
-            <button class="btn btn-outline btn-sm" type="button" (click)="beginEdit(paste)">
-              Edit
-            </button>
-            <button
-              class="btn btn-outline btn-sm danger"
-              type="button"
-              [disabled]="busy() === paste.slug"
-              (click)="delete(paste)"
-            >
-              Delete remotely
-            </button>
+            @if (!isImmutable(paste.providerId)) {
+              <button class="btn btn-outline btn-sm" type="button" (click)="beginEdit(paste)">
+                Edit
+              </button>
+              <button
+                class="btn btn-outline btn-sm danger"
+                type="button"
+                [disabled]="busy() === paste.slug"
+                (click)="delete(paste)"
+              >
+                Delete remotely
+              </button>
+            }
             <button class="btn btn-outline btn-sm" type="button" (click)="forget(paste)">
               Forget link
             </button>

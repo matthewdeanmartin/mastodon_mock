@@ -4,8 +4,8 @@ import { PasteCreateInput } from './paste-provider';
 /**
  * The shortener stores a redirect target, so a "paste" is really a message
  * encoded into a mawkingbird.com/message/ URL. These helpers are the single
- * encode/decode contract shared by the is.gd provider (writes the target) and
- * the /message reader page (reads it back and rebuilds a Mastodon status).
+ * encode/decode contract shared by the shortener provider (writes the target)
+ * and the /message reader page (reads it back and rebuilds a Mastodon status).
  *
  * Query params (all optional except `m`):
  *   m  - message body (plain text)
@@ -21,12 +21,12 @@ export interface MessagePayload {
 const READER_ACCOUNT: Account = {
   id: 'paste:message',
   username: 'message',
-  acct: 'message@is.gd',
+  acct: 'message@tinyurl.com',
   display_name: 'Shared message',
   note: 'A message shared as a short link.',
   url: '',
-  avatar: 'https://is.gd/favicon.ico',
-  avatar_static: 'https://is.gd/favicon.ico',
+  avatar: 'https://tinyurl.com/favicon.ico',
+  avatar_static: 'https://tinyurl.com/favicon.ico',
   header: '',
   followers_count: 0,
   following_count: 0,
@@ -108,6 +108,6 @@ export function messageStatus(payload: MessagePayload, sourceUrl: string | null)
     quote_approval_policy: null,
     language: payload.language,
     media_attachments: [],
-    application: { name: 'is.gd link', website: 'https://is.gd' },
+    application: { name: 'TinyURL link', website: 'https://tinyurl.com' },
   };
 }

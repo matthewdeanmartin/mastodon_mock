@@ -45,12 +45,12 @@ describe('message-payload', () => {
   it('builds an escaped status carrying the CW as spoiler_text', () => {
     const status = messageStatus(
       { content: 'a & b\n<script>', spoiler: 'heads up', language: 'plaintext' },
-      'https://is.gd/abc',
+      'https://tinyurl.com/abc',
     );
     expect(status.content).toBe('a &amp; b<br>&lt;script&gt;');
     expect(status.spoiler_text).toBe('heads up');
     expect(status.sensitive).toBe(true);
-    expect(status.url).toBe('https://is.gd/abc');
+    expect(status.url).toBe('https://tinyurl.com/abc');
     expect(status.provider).toBe('paste');
   });
 

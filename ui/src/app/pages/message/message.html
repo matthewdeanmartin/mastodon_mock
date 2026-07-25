@@ -4,11 +4,7 @@
     <h1>A message shared as a short link</h1>
   </header>
 
-  @if (loading()) {
-    <p class="message-status">Resolving the link…</p>
-  } @else if (error()) {
-    <p class="message-status message-error">{{ error() }}</p>
-  } @else if (status(); as s) {
+  @if (status(); as s) {
     <app-status-card [status]="s" filterContext="thread" />
   } @else {
     <p class="message-status">This link doesn’t carry a readable message.</p>

@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
 import { PasteHistory, PasteRecord } from '../../providers/paste/paste-history';
@@ -8,7 +9,7 @@ import { PasteProviderRegistry } from '../../providers/paste/paste-provider-regi
 
 @Component({
   selector: 'app-pastes-page',
-  imports: [FormsModule, HumanTimePipe],
+  imports: [FormsModule, RouterLink, HumanTimePipe],
   templateUrl: './pastes-page.html',
   styleUrl: './pastes-page.css',
 })
@@ -26,6 +27,11 @@ export class PastesPage {
 
   isFollowing(provider: FeedPasteProvider): boolean {
     return this.feeds.has(provider.id);
+  }
+
+  /** TinyURL links can't be edited or deleted after creation. */
+  isImmutable(providerId: string): boolean {
+    return !!this.providers.get(providerId)?.immutable;
   }
 
   toggleFeed(provider: FeedPasteProvider): void {

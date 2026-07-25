@@ -43,6 +43,8 @@ export interface PasteRecentItem {
 export interface PasteProvider {
   readonly id: string;
   readonly label: string;
+  /** True when the service cannot edit or delete a paste after it is created. */
+  readonly immutable?: boolean;
   readonly feedUrl?: string;
   readonly languages: readonly PasteLanguage[];
   readonly expiries: readonly PasteExpiryOption[];

@@ -92,3 +92,4 @@ ui/dist/
 # Local self-signed TLS dev certs (see README for how to generate)
 .dev_certs/
 /spec/contacts/contacts.csv
+/datar/
