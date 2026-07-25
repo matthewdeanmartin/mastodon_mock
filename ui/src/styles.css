@@ -301,6 +301,62 @@ a.tab:hover {
   color: var(--text);
 }
 
+/* Internationalization settings: known-language chips + inference list. */
+.lang-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.lang-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--col-bg);
+}
+
+.lang-chip .chip-x {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.lang-chip .chip-x:hover {
+  color: var(--text);
+}
+
+.lang-chip .chip-auto {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.lang-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.infer-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 .sactions {
   display: flex;
   align-items: center;

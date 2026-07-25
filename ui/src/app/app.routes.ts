@@ -230,6 +230,12 @@ export const routes: Routes = [
               import('./pages/settings/invites/settings-invites').then((m) => m.SettingsInvites),
           },
           {
+            path: 'i18n',
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/i18n/settings-i18n').then((m) => m.SettingsI18n),
+          },
+          {
             path: 'feature-flags',
             data: { featureFlagSettings: true, preloadSettings: true },
             loadComponent: () =>

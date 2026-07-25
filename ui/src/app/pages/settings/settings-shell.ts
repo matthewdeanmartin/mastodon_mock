@@ -50,6 +50,7 @@ export class SettingsShell {
     // Appearance is client-side (theme/accent/undo-send in localStorage) and works
     // against any instance; the page hides its server-backed rows off-mock itself.
     { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },
+    { label: 'Internationalization', path: 'i18n', exact: true, anonymous: true },
     { label: 'Local storage', path: 'storage', exact: true, anonymous: true },
     { label: 'Posting defaults', path: 'posting', exact: true },
     { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },

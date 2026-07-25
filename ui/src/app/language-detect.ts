@@ -189,6 +189,56 @@ const WORD_TO_LANGS = (() => {
 })();
 
 // ---------------------------------------------------------------------------
+// Tier 2b: language-exclusive letters (for short strings like hashtags)
+// ---------------------------------------------------------------------------
+
+/**
+ * Letters used by **exactly one** language among the ones this module names, so
+ * a single occurrence pins the language down without any lexical context. This
+ * is intentionally far more conservative than {@link DIACRITIC_HINTS}: those are
+ * *biases* that vote alongside stop-words (é, ü, à are shared by many
+ * languages), whereas these are near-*proofs* usable on a lone word.
+ *
+ * The bar for inclusion: no other language in {@link LangCode} uses the letter
+ * in normal orthography. That rules out the whole Scandinavian set (å/ä/ö/ø/æ
+ * are shared across sv/da/no/fi) and most French/Italian accents (shared with
+ * Portuguese/Spanish/…), so those languages get no exclusive-letter signal —
+ * which is the correct, cautious outcome, not an omission.
+ *
+ * Kept letters and why they're safe:
+ *  - de `ß`         — the eszett exists in no other language here.
+ *  - es `ñ ¿ ¡`     — inverted marks are Spanish; ñ isn't used by any other
+ *                     listed language (pt uses nh, not ñ).
+ *  - pt `ã õ`       — nasal a/o tildes; Spanish uses ñ, not ã/õ.
+ *  - pl `ł ż ź ą ę` — Polish-specific hooks/strokes; not in cz/sk (absent here).
+ *  - tr `ı İ ğ`     — dotless i, dotted capital I, and soft g are Turkish.
+ *
+ * Ordering matters only if a string somehow carried two exclusive letters from
+ * different languages (e.g. a joke tag "#ßółç"): first match wins, which is
+ * acceptable for such pathological input.
+ */
+const EXCLUSIVE_LETTERS: { lang: LangCode; re: RegExp }[] = [
+  { lang: 'de', re: /ß/ },
+  { lang: 'es', re: /[ñ¿¡]/i },
+  { lang: 'pt', re: /[ãõ]/i },
+  { lang: 'pl', re: /[łżźąę]/i },
+  { lang: 'tr', re: /[ıİğĞ]/ }, // dotless ı, dotted İ, soft ğ/Ğ — all Turkish
+];
+
+/**
+ * A confident language from a single exclusive letter, or null if the text
+ * contains none. Latin text without any exclusive letter stays undetermined.
+ */
+function exclusiveLetterLanguage(text: string): LangCode | null {
+  for (const { lang, re } of EXCLUSIVE_LETTERS) {
+    if (re.test(text)) {
+      return lang;
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Core detection
 // ---------------------------------------------------------------------------
 
@@ -326,4 +376,72 @@ export function detectLanguageMix(
 /** Format a share (0–1) as a whole percent, never showing 0% for a present language. */
 export function sharePct(share: number): number {
   return Math.max(1, Math.round(share * 100));
+}
+
+/**
+ * A *confident* single-language guess for a very short string (a hashtag, a
+ * display name), based on **script and exclusive letters only** — no stop-word
+ * voting, because one word is far too thin for the lexical tier and would
+ * misfire wildly.
+ *
+ * Two tiers, both designed to commit only when practically certain:
+ *  1. **Script** — kana → ja, hangul → ko, Cyrillic → ru/uk,
+ *     Greek/Arabic/Hebrew/Thai/Devanagari.
+ *  2. **Exclusive letters** ({@link EXCLUSIVE_LETTERS}) — a Latin string carrying
+ *     a letter used by exactly one language commits to it: "#Straße" → de,
+ *     "#mañana" → es, "#São" → pt, "#Łódź" → pl, "#Diyarbakır" → tr.
+ *
+ * Anything else Latin returns `null` ("undetermined"): "#Berlin" could be
+ * German, English or anything using the plain Latin alphabet, and no single
+ * exclusive letter is present, so we never claim to know.
+ *
+ * **Bare Han (kanji/hanzi with no kana) is deliberately treated as undetermined
+ * too.** "東京" is a Japanese place name written in the same characters Chinese
+ * uses — committing to `zh` would wrongly hide it from a Japanese reader. Under
+ * the filter's "only hide what we're sure about" rule, ambiguous Han is kept.
+ * Kana anywhere still resolves the whole string to Japanese.
+ *
+ * This is the basis for the trending-tag language filter, whose product rule is
+ * "hide only what we're sure is a language you don't know" — `null` here means
+ * "keep it".
+ */
+export function detectScriptLanguage(text: string): LangCode | null {
+  const counts = new Map<LangCode, number>();
+  let ukrainian = false;
+  let hasKana = false;
+  for (const ch of text) {
+    if (UKRAINIAN_RE.test(ch)) {
+      ukrainian = true;
+    }
+    if (KANA_RE.test(ch)) {
+      hasKana = true;
+    }
+    const lang = scriptFor(ch);
+    if (lang) {
+      counts.set(lang, (counts.get(lang) ?? 0) + 1);
+    }
+  }
+  // Kana anywhere makes the whole thing Japanese, even amid kanji.
+  if (hasKana) {
+    return 'ja';
+  }
+  // Bare Han (no kana) is ambiguous between Chinese and Japanese — don't commit.
+  counts.delete('zh');
+  if (!counts.size) {
+    // No committing non-Latin script — fall back to the Latin exclusive-letter
+    // test (returns null for plain Latin, which correctly stays undetermined).
+    return exclusiveLetterLanguage(text);
+  }
+  let best: LangCode | null = null;
+  let bestN = 0;
+  for (const [lang, n] of counts) {
+    if (n > bestN) {
+      best = lang;
+      bestN = n;
+    }
+  }
+  if (best === 'ru' && ukrainian) {
+    return 'uk';
+  }
+  return best;
 }

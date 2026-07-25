@@ -115,6 +115,26 @@ interface StoredPrefs {
   customBg?: CustomColor;
   customLink?: CustomColor;
   customSidebar?: CustomColor;
+  excludeUnknownLangTrends?: boolean;
+  knownLanguages?: string[];
+}
+
+/** ISO 639-1 codes normalized/deduped; also drives the trending-tag language filter. */
+function normalizeLangs(list: unknown): string[] {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  const seen = new Set<string>();
+  for (const raw of list) {
+    if (typeof raw !== 'string') {
+      continue;
+    }
+    const code = raw.toLowerCase().split(/[-_]/)[0];
+    if (/^[a-z]{2,3}$/.test(code)) {
+      seen.add(code);
+    }
+  }
+  return [...seen];
 }
 
 /** Feed-size bounds (see feedMin / feedMax). */
@@ -205,6 +225,20 @@ export class ClientPrefs {
   readonly customBg = signal<CustomColor>(null);
   readonly customLink = signal<CustomColor>(null);
   readonly customSidebar = signal<CustomColor>(null);
+
+  /**
+   * Hide trending tags detected as a language the user doesn't know. Off by
+   * default — see {@link KnownLanguages} for how "known" is derived and the
+   * TrendLanguageFilter service for where it is applied.
+   */
+  readonly excludeUnknownLangTrends = signal<boolean>(false);
+  /**
+   * Languages the user has explicitly said they know (ISO 639-1). This is the
+   * future home of Mastodon's "public timeline languages" checkbox list; it
+   * augments — never replaces — the languages we can infer from the UI language,
+   * the browser, and the posting default.
+   */
+  readonly knownLanguages = signal<string[]>([]);
 
   /** Resolved theme actually in effect ('auto' resolved against the OS preference). */
   readonly resolvedTheme = signal<'light' | 'dark'>('light');
@@ -366,6 +400,26 @@ export class ClientPrefs {
     this.customSidebar.set(normalizeColor(color));
   }
 
+  setExcludeUnknownLangTrends(on: boolean): void {
+    this.excludeUnknownLangTrends.set(on);
+  }
+
+  /** Replace the explicit known-languages list (deduped, normalized). */
+  setKnownLanguages(list: string[]): void {
+    this.knownLanguages.set(normalizeLangs(list));
+  }
+
+  /** Add one language to the explicit known-languages list. */
+  addKnownLanguage(code: string): void {
+    this.knownLanguages.update((list) => normalizeLangs([...list, code]));
+  }
+
+  /** Remove one language from the explicit known-languages list. */
+  removeKnownLanguage(code: string): void {
+    const bare = code.toLowerCase().split(/[-_]/)[0];
+    this.knownLanguages.update((list) => list.filter((c) => c !== bare));
+  }
+
   toggleProvider(id: ProviderId): void {
     this.hiddenProviders.update((hidden) =>
       hidden.includes(id) ? hidden.filter((p) => p !== id) : [...hidden, id],
@@ -463,6 +517,8 @@ export class ClientPrefs {
     this.customBg.set(normalizeColor(stored.customBg ?? null));
     this.customLink.set(normalizeColor(stored.customLink ?? null));
     this.customSidebar.set(normalizeColor(stored.customSidebar ?? null));
+    this.loadBool(stored.excludeUnknownLangTrends, this.excludeUnknownLangTrends);
+    this.knownLanguages.set(normalizeLangs(stored.knownLanguages));
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -501,6 +557,8 @@ export class ClientPrefs {
       customBg: this.customBg(),
       customLink: this.customLink(),
       customSidebar: this.customSidebar(),
+      excludeUnknownLangTrends: this.excludeUnknownLangTrends(),
+      knownLanguages: this.knownLanguages(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     // Hidden providers live in their own account-scoped key, not the global blob.

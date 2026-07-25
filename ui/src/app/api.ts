@@ -41,6 +41,7 @@ import {
   Translation,
   UserList,
 } from './models';
+import { TrendLanguageFilter } from './trend-language-filter';
 
 /** Filters/paging for an account's statuses (Mastodon query params). */
 export interface AccountStatusesOptions {
@@ -55,6 +56,7 @@ export interface AccountStatusesOptions {
 @Injectable({ providedIn: 'root' })
 export class Api {
   private http = inject(HttpClient);
+  private trendLangFilter = inject(TrendLanguageFilter);
 
   // --- auth / account ---
   verifyCredentials(): Observable<Account> {
@@ -585,8 +587,15 @@ export class Api {
     return this.http.get<Status[]>('/api/v1/trends/statuses');
   }
 
+  /**
+   * Trending hashtags. Applies the client-side {@link TrendLanguageFilter}
+   * centrally so every trending-tag surface (left rail, Explore, Search)
+   * respects the "exclude languages I don't know" setting without its own wiring.
+   */
   trendingTags(): Observable<Tag[]> {
-    return this.http.get<Tag[]>('/api/v1/trends/tags');
+    return this.http
+      .get<Tag[]>('/api/v1/trends/tags')
+      .pipe(map((tags) => this.trendLangFilter.apply(tags)));
   }
 
   trendingLinks(): Observable<TrendLink[]> {

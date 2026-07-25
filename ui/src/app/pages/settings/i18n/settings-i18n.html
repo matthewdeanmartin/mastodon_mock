@@ -1,0 +1,98 @@
+<div class="spage-head">
+  <h1>Internationalization</h1>
+  <p>Tell Mockingbird which languages you read, and keep trending content relevant.</p>
+</div>
+
+<div class="spage-body">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Trending tags</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="prefs.excludeUnknownLangTrends()"
+            (ngModelChange)="toggleExclude($event)"
+            name="excludeUnknownLangTrends"
+          />
+          Exclude languages I don't know from trending tags
+        </label>
+        <span class="hint">
+          Hides trending hashtags that are clearly in a script for a language you
+          haven't listed (e.g. Japanese or Arabic tags). Tags in the Latin
+          alphabet, or ones we can't identify, are always kept. Applies
+          everywhere trending tags appear.
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Languages you know</span>
+      <div class="scontrol">
+        <span class="hint">
+          We infer these from your interface language, your browser, and your
+          posting default. Add any others you read.
+        </span>
+
+        <div class="lang-chips">
+          @for (code of knownCodes(); track code) {
+            <span class="lang-chip">
+              {{ name(code) }}
+              @if (prefs.knownLanguages().includes(code)) {
+                <button
+                  type="button"
+                  class="chip-x"
+                  (click)="remove(code)"
+                  [attr.aria-label]="'Remove ' + name(code)"
+                >
+                  ×
+                </button>
+              } @else {
+                <span class="chip-auto" title="Inferred automatically">auto</span>
+              }
+            </span>
+          }
+        </div>
+
+        <div class="lang-add">
+          <select [ngModel]="toAdd()" (ngModelChange)="toAdd.set($event)" name="addLang">
+            <option value="">Add a language…</option>
+            @for (code of addable(); track code) {
+              <option [value]="code">{{ name(code) }}</option>
+            }
+          </select>
+          <button type="button" class="btn" (click)="add()" [disabled]="!toAdd()">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Inferred from</span>
+      <div class="scontrol">
+        <ul class="infer-list">
+          <li>Interface language: <strong>{{ name(uiLanguage) }}</strong></li>
+          <li>
+            Browser:
+            @if (browserLangs.length) {
+              @for (c of browserLangs; track c; let last = $last) {
+                <strong>{{ name(c) }}</strong>{{ last ? '' : ', ' }}
+              }
+            } @else {
+              <span class="hint">none reported</span>
+            }
+          </li>
+          <li>
+            Posting default:
+            @if (postingLang()) {
+              <strong>{{ name(postingLang()!) }}</strong>
+            } @else {
+              <span class="hint">not set</span>
+            }
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

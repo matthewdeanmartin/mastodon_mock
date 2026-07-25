@@ -45,6 +45,7 @@ describe('SettingsShell', () => {
       'Mockingbird Blue',
       'Connections',
       'Appearance',
+      'Internationalization',
       'Local storage',
       'Feature flags',
     ]);

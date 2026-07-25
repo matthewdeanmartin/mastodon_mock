@@ -4,6 +4,7 @@ import {
   LangCode,
   detectLanguage,
   detectLanguageMix,
+  detectScriptLanguage,
   sharePct,
 } from './language-detect';
 
@@ -166,6 +167,63 @@ describe('detectLanguageMix', () => {
       { text: 'sure', meta: 'ja' },
     ]);
     expect(mix[0].lang).toBe('ja');
+  });
+});
+
+describe('detectScriptLanguage (short strings / hashtags)', () => {
+  it('commits on unambiguous non-Latin scripts', () => {
+    expect(detectScriptLanguage('안녕')).toBe('ko');
+    expect(detectScriptLanguage('Москва')).toBe('ru');
+    expect(detectScriptLanguage('مصر')).toBe('ar');
+    expect(detectScriptLanguage('Αθήνα')).toBe('el');
+    expect(detectScriptLanguage('กรุงเทพ')).toBe('th');
+  });
+
+  it('treats bare Han as undetermined (東京 could be ja or zh)', () => {
+    // No kana to disambiguate: don't commit, so nothing is wrongly hidden.
+    expect(detectScriptLanguage('東京')).toBeNull();
+    expect(detectScriptLanguage('中文')).toBeNull();
+  });
+
+  it('refines Cyrillic to Ukrainian on its unique letters', () => {
+    expect(detectScriptLanguage('Київ')).toBe('uk');
+  });
+
+  it('returns null for plain Latin input with no exclusive letter (undetermined)', () => {
+    expect(detectScriptLanguage('Eurovision')).toBeNull();
+    expect(detectScriptLanguage('Berlin')).toBeNull();
+    expect(detectScriptLanguage('München')).toBeNull(); // ü is shared, not exclusive
+    expect(detectScriptLanguage('café')).toBeNull(); // é is shared
+    expect(detectScriptLanguage('Malmö')).toBeNull(); // ö shared across sv/de/fi/tr
+  });
+
+  it('commits on language-exclusive Latin letters', () => {
+    expect(detectScriptLanguage('Straße')).toBe('de'); // ß
+    expect(detectScriptLanguage('mañana')).toBe('es'); // ñ
+    expect(detectScriptLanguage('¿Qué?')).toBe('es'); // inverted question mark
+    expect(detectScriptLanguage('São')).toBe('pt'); // ã
+    expect(detectScriptLanguage('promoção')).toBe('pt'); // ã
+    expect(detectScriptLanguage('Łódź')).toBe('pl'); // ł, ż/ź
+    expect(detectScriptLanguage('Wrocław')).toBe('pl'); // ł
+    expect(detectScriptLanguage('Diyarbakır')).toBe('tr'); // dotless ı
+    expect(detectScriptLanguage('Doğa')).toBe('tr'); // ğ
+  });
+
+  it('does not commit on shared Scandinavian/French letters', () => {
+    // å/ä/ø/æ are shared across sv/da/no/fi — no single-language proof.
+    expect(detectScriptLanguage('Göteborg')).toBeNull();
+    expect(detectScriptLanguage('København')).toBeNull();
+    expect(detectScriptLanguage('smörgåsbord')).toBeNull();
+    expect(detectScriptLanguage('français')).toBeNull(); // ç shared with pt/tr
+  });
+
+  it('returns null for punctuation/digits only', () => {
+    expect(detectScriptLanguage('2024')).toBeNull();
+    expect(detectScriptLanguage('#!!!')).toBeNull();
+  });
+
+  it('treats kana-with-kanji as Japanese', () => {
+    expect(detectScriptLanguage('東京です')).toBe('ja');
   });
 });
 
