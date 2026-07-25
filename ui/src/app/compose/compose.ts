@@ -147,13 +147,25 @@ export class Compose implements OnDestroy {
   protected segments = computed(() => [this.text(), ...this.thread()]);
 
   constructor() {
-    // Seed the composer from inputs once they resolve (runs again only if the
-    // container swaps the bound conversation), then let any autosaved text or
-    // an explicitly opened draft override the seed.
+    // Seed the composer from inputs + any autosaved text or explicitly opened
+    // draft. This re-seeds only when the *conversation context* changes (a
+    // container like /conversations reuses one instance across replies), keyed
+    // by contextKey + draft identity. It must NOT re-run on unrelated signal
+    // churn: it reads localStorage, so re-applying within the same context would
+    // reload the previous autosave and silently clobber a live edit — e.g. the
+    // paste provider the user just picked, before the debounced autosave below
+    // has written it. The `seededKey` guard prevents that.
     effect(() => {
-      this.text.set(this.initialText());
-      this.visibility.set(this.initialVisibility());
       const draft = this.initialDraft();
+      const initialText = this.initialText();
+      const initialVisibility = this.initialVisibility();
+      const key = `${this.contextKey()}|${draft?.id ?? ''}`;
+      if (key === this.seededKey) {
+        return;
+      }
+      this.seededKey = key;
+      this.text.set(initialText);
+      this.visibility.set(initialVisibility);
       const saved = draft ?? this.drafts.loadAutosave(this.contextKey());
       if (saved && draftHasContent(saved)) {
         this.applySnapshot(saved);
@@ -189,6 +201,8 @@ export class Compose implements OnDestroy {
   }
 
   private restored = false;
+  /** The context+draft key the seed effect last applied; guards re-seeding. */
+  private seededKey: string | null = null;
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected cwOpen = signal(false);
