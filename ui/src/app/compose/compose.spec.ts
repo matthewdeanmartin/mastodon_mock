@@ -585,6 +585,7 @@ describe('Compose', () => {
     const posted: Status[] = [];
     f.componentInstance.posted.subscribe((status) => posted.push(status));
     internals(f).target.set('paste');
+    internals(f).onPasteProviderChange('pastepile');
     internals(f).text.set('print("hello")');
     internals(f).cwOpen.set(true);
     internals(f).spoilerText.set('Example');

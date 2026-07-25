@@ -8,9 +8,11 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { Api } from '../api';
+import { PageDiagnostics } from '../page-diagnostics';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { CustomEmojis } from '../custom-emojis';
@@ -40,6 +42,25 @@ export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste';
 /** Bluesky's post limit, in graphemes (not characters). */
 const BSKY_MAX_GRAPHEMES = 300;
 const MAX_PASTE_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Pull the HTTP status out of a paste failure for logging. A cross-origin fetch
+ * that a CORS policy blocks (or that never connects) surfaces as an
+ * HttpErrorResponse with `status: 0` — the browser deliberately hides the real
+ * response, so there is no code to show and no point retrying.
+ */
+function describePasteFailure(error: unknown): { status: number | null; hint: string } {
+  if (error instanceof HttpErrorResponse) {
+    return {
+      status: error.status,
+      hint:
+        error.status === 0
+          ? 'CORS-blocked or network failure — status is opaque to the browser'
+          : error.statusText || 'HTTP error',
+    };
+  }
+  return { status: null, hint: error instanceof Error ? error.message : 'non-HTTP error' };
+}
 
 /** Poll expiry presets (label → seconds). */
 const POLL_EXPIRY = [
@@ -83,6 +104,7 @@ export class Compose implements OnDestroy {
   private customEmojis = inject(CustomEmojis);
   protected pasteProviders = inject(PasteProviderRegistry);
   private pasteHistory = inject(PasteHistory);
+  private diagnostics = inject(PageDiagnostics);
   protected words = inject(Terminology).words;
 
   ngOnDestroy(): void {
@@ -845,8 +867,17 @@ export class Compose implements OnDestroy {
       expiry: this.pasteExpiry(),
       visibility,
     } as const;
+    this.diagnostics.info('Paste', 'create:start', {
+      provider: provider.id,
+      bytes: new TextEncoder().encode(input.content).byteLength,
+      visibility: input.visibility,
+    });
     provider.create(input).subscribe({
       next: (created) => {
+        this.diagnostics.info('Paste', 'create:success', {
+          provider: provider.id,
+          url: created.url,
+        });
         this.pasteHistory.add(provider.id, provider.label, input, created);
         this.reset();
         this.posted.emit(
@@ -861,9 +892,21 @@ export class Compose implements OnDestroy {
           }),
         );
       },
-      error: () => {
+      error: (error: unknown) => {
         this.submitting.set(false);
-        this.crossPostError.set(`Couldn't create the ${provider.label} paste — try again.`);
+        const { status, hint } = describePasteFailure(error);
+        this.diagnostics.error('Paste', 'create:error', error, {
+          provider: provider.id,
+          httpStatus: status,
+          hint,
+        });
+        // status 0 is the browser hiding a CORS/network failure — the service is
+        // likely down or not sending CORS headers, which "try again" won't fix.
+        this.crossPostError.set(
+          status === 0
+            ? `Couldn't reach ${provider.label} (blocked or unreachable — the service may be down). Try a different paste service.`
+            : `Couldn't create the ${provider.label} paste${status ? ` (HTTP ${status})` : ''} — try again.`,
+        );
       },
     });
   }

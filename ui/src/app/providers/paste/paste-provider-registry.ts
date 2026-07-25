@@ -11,9 +11,12 @@ export class PasteProviderRegistry {
   private rentry = inject(RentryProvider);
   private tinyurl = inject(TinyurlProvider);
 
-  readonly all: readonly PasteProvider[] = [this.pastepile, this.rentry, this.tinyurl];
+  // Rentry leads and is the default: it is CORS-clean and editable. Pastepile is
+  // kept for its public feed but has been returning a CORS-less 308 (effectively
+  // offline), so it must not be the default a fresh composer posts to.
+  readonly all: readonly PasteProvider[] = [this.rentry, this.tinyurl, this.pastepile];
   readonly feeds: readonly FeedPasteProvider[] = [this.pastepile];
-  readonly default = this.pastepile;
+  readonly default = this.rentry;
 
   get(id: string): PasteProvider | undefined {
     return this.all.find((provider) => provider.id === id);
