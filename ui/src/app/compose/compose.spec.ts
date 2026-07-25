@@ -38,6 +38,7 @@ interface ComposeInternals {
   target: WritableSignal<PostTarget>;
   pasteLanguage: WritableSignal<string>;
   pasteExpiry: WritableSignal<string>;
+  pasteProviderId: WritableSignal<string>;
   onPasteProviderChange(providerId: string): void;
   showTargetPicker: Signal<boolean>;
   crossPostError: Signal<string | null>;
@@ -641,6 +642,51 @@ describe('Compose', () => {
     expect(stored[0].editKey).toBe('rentry-secret');
     expect(stored[0].expiry).toBe('never');
     expect(stored[0].visibility).toBe('unlisted');
+  });
+
+  it('keeps the user-picked paste provider when the seed effect re-runs (stale autosave)', () => {
+    // Reproduces the bug where selecting Rentry still posted to the previously
+    // autosaved Pastepile: the seed effect re-ran, reloaded the old autosave,
+    // and clobbered the live pick. Seed a stale pastepile autosave first.
+    localStorage.setItem(
+      'mockingbird_compose_autosave',
+      JSON.stringify({
+        new: {
+          segments: ['stale draft body'],
+          spoilerText: '',
+          sensitive: false,
+          visibility: 'unlisted',
+          poll: null,
+          target: 'paste',
+          pasteProviderId: 'pastepile',
+          pasteLanguage: 'plaintext',
+          pasteExpiry: '1w',
+        },
+      }),
+    );
+
+    const f = setUp();
+    // The stale autosave seeded pastepile…
+    expect(internals(f).pasteProviderId()).toBe('pastepile');
+
+    // …the user now picks Rentry…
+    internals(f).target.set('paste');
+    internals(f).onPasteProviderChange('rentry');
+    internals(f).text.set('A durable browser draft');
+
+    // …and something re-triggers the seed effect (a tracked input changes).
+    f.componentRef.setInput('initialText', 'nudged');
+    f.detectChanges();
+
+    // The pick must survive — not revert to the stale pastepile.
+    expect(internals(f).pasteProviderId()).toBe('rentry');
+
+    internals(f).submit();
+    const request = httpMock.expectOne('https://rentry.co/api/new');
+    request.flush({ status: '200', url: 'https://rentry.co/ok', edit_code: 'k' });
+    expect(JSON.parse(localStorage.getItem('mockingbird_pastes') ?? '[]')[0].providerId).toBe(
+      'rentry',
+    );
   });
 
   it('Anonymous defaults to Paste and exposes no identity-backed destinations', () => {

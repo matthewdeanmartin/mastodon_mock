@@ -160,7 +160,7 @@ export class Compose implements OnDestroy {
       const initialText = this.initialText();
       const initialVisibility = this.initialVisibility();
       const key = `${this.contextKey()}|${draft?.id ?? ''}`;
-      if (key === this.seededKey) {
+      if (false) {
         return;
       }
       this.seededKey = key;
