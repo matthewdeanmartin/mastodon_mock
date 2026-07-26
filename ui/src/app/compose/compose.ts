@@ -66,6 +66,143 @@ function describePasteFailure(error: unknown): { status: number | null; hint: st
   return { status: null, hint: error instanceof Error ? error.message : 'non-HTTP error' };
 }
 
+/** One extra field from an error body, rendered as a labelled row. */
+export interface PostFailureDetail {
+  label: string;
+  value: string;
+}
+
+/**
+ * A failed post, in a shape the UI can render without knowing the server.
+ *
+ * `message` is the headline. `details` carries everything else the body said.
+ */
+export interface PostFailure {
+  message: string;
+  details: PostFailureDetail[];
+}
+
+/** Fields we render as the headline or handle specially, not as detail rows. */
+const HANDLED_ERROR_KEYS = new Set(['error', 'error_description', 'message', 'detail', 'details']);
+
+/** Keys not worth showing a user: plumbing, not explanation. */
+const NOISE_ERROR_KEYS = new Set(['request_id', 'status', 'statuscode', 'timestamp', 'path']);
+
+/** Turn snake_case / camelCase keys into something readable. */
+function humanizeKey(key: string): string {
+  const spaced = key
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** Render a JSON value as a single readable line. */
+function stringifyValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    return value.map(stringifyValue).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([k, v]) => `${humanizeKey(k)}: ${stringifyValue(v)}`)
+      .filter(Boolean)
+      .join('; ');
+  }
+  return '';
+}
+
+/** Parse an error body that may arrive already-parsed or as a raw string. */
+function parseErrorBody(raw: unknown): Record<string, unknown> | null {
+  let body = raw;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      // A non-JSON body (an HTML error page) is not worth showing verbatim.
+      return null;
+    }
+  }
+  return body && typeof body === 'object' && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * Turn a failed post into something worth showing the user.
+ *
+ * Servers reject posts for reasons the user can act on — too long, a link in
+ * the text, a missing hashtag, moderated wording — and they say which in the
+ * response body. Rendering "try again" instead tells the user nothing and they
+ * retry the identical text forever.
+ *
+ * Deliberately generic about the body's shape. Server-side validation evolves,
+ * and a client that only understands the codes it was written against gets
+ * steadily less useful as new ones appear. So: use the known message fields for
+ * the headline, then show *every other field* as a labelled row rather than
+ * discarding it. A rule this client has never heard of still explains itself.
+ */
+export function describePostFailure(error: unknown): PostFailure {
+  const plain = (message: string): PostFailure => ({ message, details: [] });
+
+  if (!(error instanceof HttpErrorResponse)) {
+    return plain(
+      error instanceof Error && error.message ? error.message : "Couldn't post — try again.",
+    );
+  }
+  // status 0 is the browser hiding a CORS/network failure; there is no body.
+  if (error.status === 0) {
+    return plain("Couldn't reach the server (offline, or it isn't sending CORS headers).");
+  }
+
+  const body = parseErrorBody(error.error);
+  if (!body) {
+    if (error.status === 401 || error.status === 403) {
+      return plain('That account is no longer signed in — reauthenticate and try again.');
+    }
+    return plain(`Couldn't post (HTTP ${error.status}) — try again.`);
+  }
+
+  // Headline: the first human-readable field the server offered.
+  let message = '';
+  for (const key of ['error_description', 'error', 'message', 'detail']) {
+    const v = body[key];
+    if (typeof v === 'string' && v.trim()) {
+      message = v.trim();
+      break;
+    }
+  }
+
+  // Everything else the body carried. This is what keeps the client useful as
+  // the server grows rules it has never heard of: an unrecognized `limit`,
+  // `field`, or `retry_at` still reaches the user instead of being dropped.
+  const details: PostFailureDetail[] = [];
+  for (const [key, value] of Object.entries(body)) {
+    const lower = key.toLowerCase();
+    if (HANDLED_ERROR_KEYS.has(lower) || NOISE_ERROR_KEYS.has(lower)) continue;
+    const text = stringifyValue(value);
+    if (text) {
+      details.push({ label: humanizeKey(key), value: text });
+    }
+  }
+
+  if (!message) {
+    if (error.status === 401 || error.status === 403) {
+      message = 'That account is no longer signed in — reauthenticate and try again.';
+    } else if (details.length) {
+      // The body said something, just not in a field we recognize as the
+      // headline. The detail rows below carry it.
+      message = 'The server rejected that post:';
+    } else {
+      message = `Couldn't post (HTTP ${error.status}) — try again.`;
+    }
+  }
+
+  return { message, details };
+}
+
 /** Poll expiry presets (label → seconds). */
 const POLL_EXPIRY = [
   { label: '5 minutes', seconds: 300 },
@@ -383,6 +520,15 @@ export class Compose implements OnDestroy {
   protected bskyRemaining = computed(() => BSKY_MAX_GRAPHEMES - graphemeLength(this.text()));
   /** The Bluesky leg of a cross-post failed after the Fedi post went out. */
   protected crossPostError = signal<string | null>(null);
+  /**
+   * Why the server refused the post. Kept separate from crossPostError: this one
+   * means nothing was published, so the text stays in the box for editing.
+   */
+  protected postError = signal<PostFailure | null>(null);
+
+  protected dismissPostError(): void {
+    this.postError.set(null);
+  }
 
   /** Seconds left on the undo-send countdown, or null when no send is pending. */
   protected countdown = signal<number | null>(null);
@@ -980,6 +1126,7 @@ export class Compose implements OnDestroy {
     }
     this.submitting.set(true);
     this.crossPostError.set(null);
+    this.postError.set(null);
 
     if (this.targetIncludesPaste()) {
       this.sendToPaste();
@@ -1051,7 +1198,10 @@ export class Compose implements OnDestroy {
             this.posted.emit(result);
           }
         },
-        error: () => this.submitting.set(false),
+        error: (error: unknown) => {
+          this.submitting.set(false);
+          this.postError.set(describePostFailure(error));
+        },
       });
       return;
     }
@@ -1063,7 +1213,10 @@ export class Compose implements OnDestroy {
       .filter((s, i) => i === 0 || s !== '');
     this.api.postStatus(posts[0], options).subscribe({
       next: (status) => this.postRest(status, status, posts.slice(1)),
-      error: () => this.submitting.set(false),
+      error: (error: unknown) => {
+        this.submitting.set(false);
+        this.postError.set(describePostFailure(error));
+      },
     });
   }
 
@@ -1191,7 +1344,16 @@ export class Compose implements OnDestroy {
     };
     this.api.postStatus(rest[0], options).subscribe({
       next: (status) => this.postRest(root, status, rest.slice(1)),
-      error: () => this.submitting.set(false),
+      // Mid-thread: earlier posts are already public, so this is not a plain
+      // retry — say so, or the user re-sends the whole thread and duplicates it.
+      error: (error: unknown) => {
+        this.submitting.set(false);
+        const failure = describePostFailure(error);
+        this.postError.set({
+          ...failure,
+          message: `${failure.message} Earlier posts in this thread were already published.`,
+        });
+      },
     });
   }
 
@@ -1199,6 +1361,7 @@ export class Compose implements OnDestroy {
     this.text.set('');
     this.thread.set([]);
     this.submitting.set(false);
+    this.postError.set(null);
     this.cwOpen.set(false);
     this.spoilerText.set('');
     this.sensitive.set(false);

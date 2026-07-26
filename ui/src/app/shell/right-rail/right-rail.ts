@@ -4,6 +4,7 @@ import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { HOUSE_ADS } from '../../house-ads';
 import { InstanceInfo } from '../../models';
+import { SearchServer } from '../../search-server';
 import { Server } from '../../server';
 
 /**
@@ -23,8 +24,19 @@ export class RightRail {
   private api = inject(Api);
   private auth = inject(Auth);
   private server = inject(Server);
+  protected searchServer = inject(SearchServer);
 
   protected ads = HOUSE_ADS;
+
+  /**
+   * Anonymous visitors leaning on someone else's search server are consuming a
+   * second instance's resources without an account there, so the rail asks them
+   * to chip in to that server too. Logged-in users already see the donate block
+   * for their own server; this is specifically the anonymous freeloading case.
+   */
+  protected showSearchServerDonate = computed(
+    () => this.auth.isAnonymous && this.searchServer.active(),
+  );
 
   protected instance = signal<InstanceInfo | null>(null);
 

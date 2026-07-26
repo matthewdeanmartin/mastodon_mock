@@ -1,6 +1,10 @@
 <header class="page-head">
   <h1>Server rules</h1>
-  <p>Rules published by this Mastodon server.</p>
+  @if (host(); as searchHost) {
+    <p>Rules published by {{ searchHost }}, your search server.</p>
+  } @else {
+    <p>Rules published by this Mastodon server.</p>
+  }
 </header>
 
 @if (loading()) {

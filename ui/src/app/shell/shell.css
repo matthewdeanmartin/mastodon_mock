@@ -556,3 +556,55 @@
 .toast-close:hover {
   opacity: 1;
 }
+
+/* --- Rejected-session dialog -------------------------------------------------
+   Modal rather than a toast on purpose: the two ways out (reauthenticate,
+   remove) are the only things that resolve it, and the broken account is not
+   active, so the account menu can't reach it. */
+.dead-session-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(0 0 0 / 45%);
+}
+
+.dead-session {
+  position: fixed;
+  z-index: 61;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 440px);
+  padding: 20px 22px;
+  background: var(--bg, #fff);
+  color: var(--text, #14171a);
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 30%);
+}
+
+.dead-session h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.dead-session p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.dead-session-note {
+  color: var(--muted, #657786);
+}
+
+.dead-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dead-session-actions .danger {
+  border-color: #e0245e;
+  color: #e0245e;
+}

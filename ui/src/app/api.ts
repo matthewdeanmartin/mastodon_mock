@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
+import { SearchServer, searchServerRequest } from './search-server';
 import {
   Account,
   Announcement,
@@ -57,6 +58,7 @@ export interface AccountStatusesOptions {
 export class Api {
   private http = inject(HttpClient);
   private trendLangFilter = inject(TrendLanguageFilter);
+  private searchServer = inject(SearchServer);
 
   // --- auth / account ---
   verifyCredentials(): Observable<Account> {
@@ -343,8 +345,9 @@ export class Api {
     if (type) {
       params = params.set('type', type);
     }
-    if (opts?.resolve) {
-      // Asks the server to webfinger accounts it hasn't seen yet (needs auth).
+    if (opts?.resolve && !this.searchServer.active()) {
+      // Asks the server to webfinger accounts it hasn't seen yet (needs auth) —
+      // pointless against a search server, where we're anonymous by design.
       params = params.set('resolve', 'true');
     }
     if (opts?.limit) {
@@ -355,7 +358,12 @@ export class Api {
       // more" pulls the next page of results for the same query.
       params = params.set('offset', String(opts.offset));
     }
-    return this.http.get<SearchResults>('/api/v2/search', { params });
+    // Tagged so the server/auth interceptors can divert this one call to a
+    // separately chosen search server (see search-server.ts). No-op when none is set.
+    return this.http.get<SearchResults>('/api/v2/search', {
+      params,
+      context: searchServerRequest(),
+    });
   }
 
   // --- lists ---

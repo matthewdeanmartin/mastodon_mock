@@ -75,28 +75,77 @@ describe('Shell account switching', () => {
     expect(server.baseUrl()).toBe('https://mastodon.social');
   });
 
+  /** Drive a switch to the social account and have its instance reject the token. */
+  function failSwitchToSocial(): any {
+    const fixture = createShell();
+    const cmp = fixture.componentInstance as any;
+    const social = auth.sessions().find((s) => s.token === 'social-token')!;
+    cmp.switchTo(social);
+    httpMock
+      .expectOne('https://mastodon.social/api/v1/accounts/verify_credentials')
+      .flush('nope', { status: 401, statusText: 'Unauthorized' });
+    return cmp;
+  }
+
   it(
-    'a failed switch reverts to the previous account and toasts (keeps the session)',
+    'a failed switch reverts to the previous account and keeps the session',
     { timeout: 20_000 },
     () => {
-      const fixture = createShell();
-      const cmp = fixture.componentInstance as any;
-      const social = auth.sessions().find((s) => s.token === 'social-token')!;
-
-      cmp.switchTo(social);
-      httpMock
-        .expectOne('https://mastodon.social/api/v1/accounts/verify_credentials')
-        .flush('nope', { status: 401, statusText: 'Unauthorized' });
+      const cmp = failSwitchToSocial();
 
       // Reverted, not logged out: still on the art account and server.
       expect(auth.token()).toBe('art-token');
       expect(server.baseUrl()).toBe('https://mastodon.art');
       // The rejected session is NOT deleted.
       expect(auth.sessions().some((s) => s.token === 'social-token')).toBe(true);
-      // And the user is told, non-blockingly.
-      expect(cmp.toast()).toContain("Couldn't switch");
+      // The user gets an actionable dialog, not a toast that leaves them stuck.
+      expect(cmp.deadSession()?.token).toBe('social-token');
     },
   );
+
+  // The bug this guards: the failed switch leaves the broken account *inactive*,
+  // so the account menu's Log out (which acts on the active account) can never
+  // reach it. Without this the account is unusable and undeletable.
+  it('a rejected account can be removed without becoming active', { timeout: 20_000 }, () => {
+    const cmp = failSwitchToSocial();
+
+    cmp.forgetDeadSession();
+
+    expect(auth.sessions().some((s) => s.token === 'social-token')).toBe(false);
+    // The account the user was actually using is untouched.
+    expect(auth.token()).toBe('art-token');
+    expect(server.baseUrl()).toBe('https://mastodon.art');
+    expect(cmp.deadSession()).toBeNull();
+  });
+
+  // Boot is the other half of the same trap: the stored token was rejected on
+  // load and the old code called logout(), silently deleting the account.
+  it('a token rejected on boot offers the dialog instead of deleting', { timeout: 20_000 }, () => {
+    const fixture = TestBed.createComponent(Shell);
+    fixture.detectChanges();
+    httpMock
+      .expectOne('https://mastodon.art/api/v1/accounts/verify_credentials')
+      .flush('nope', { status: 401, statusText: 'Unauthorized' });
+    drainRailRequests();
+    const cmp = fixture.componentInstance as any;
+
+    expect(cmp.deadSession()?.token).toBe('art-token');
+    // The saved session survives, so Reauthenticate has something to refresh.
+    expect(auth.sessions().some((s) => s.token === 'art-token')).toBe(true);
+    // ...but the known-bad token is no longer active.
+    expect(auth.token()).toBeNull();
+  });
+
+  it('reauthenticating points at the dead account instance without activating it', () => {
+    auth.prepareReauth('social-token');
+
+    // Login opens against the account's own host...
+    expect(server.baseUrl()).toBe('https://mastodon.social');
+    // ...but the known-bad token is not active, or every request would 401.
+    expect(auth.token()).toBeNull();
+    // The session survives, so cancelling the login leaves it in the switcher.
+    expect(auth.sessions().some((s) => s.token === 'social-token')).toBe(true);
+  });
 
   it(
     'boots Anonymous without verifying credentials and preserves saved sessions',

@@ -66,6 +66,9 @@ import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-expla
 import { SavedSearches } from './saved-searches';
 import { decodeSearchFromParams, encodeSearchToParams } from './search-url';
 import { PageDiagnostics } from '../../page-diagnostics';
+import { SearchServer } from '../../search-server';
+import { probeSearchServer, SearchServerStatus } from '../../search-server-probe';
+import { normalizeHostUrl } from '../../host-url';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
@@ -101,6 +104,7 @@ export class Search implements OnInit, OnDestroy {
   private destroyRef = inject(DestroyRef);
   private diagnostics = inject(PageDiagnostics);
   protected saved = inject(SavedSearches);
+  protected searchServer = inject(SearchServer);
   private activeSearch: Subscription | null = null;
 
   /** Dev-only structured logging. Silent in production builds. */
@@ -704,6 +708,71 @@ export class Search implements OnInit, OnDestroy {
     this.saveDialogOpen.set(true);
   }
 
+  // --- search server ---
+  // Search can be pointed at a *different* instance than everything else, because
+  // plenty of servers disable anonymous search outright. Only the search call moves;
+  // feeds, profiles and the logged-in account stay on the primary server.
+
+  /**
+   * The host anonymous search calls should hit: the chosen search server if there
+   * is one, otherwise the anonymous instance. (Authenticated search goes through
+   * Api.search, which the interceptors divert on their own.)
+   */
+  protected searchHost(): string {
+    return this.searchServer.baseUrl() || this.anonymous.server();
+  }
+
+  /** Text in the search-server box; seeded from the stored choice. */
+  protected searchServerInput = signal(this.searchServer.host() ?? '');
+  protected searchServerStatus = signal<SearchServerStatus>('idle');
+  /** Result count from the canary probe, shown as evidence the index is live. */
+  protected searchServerHits = signal(0);
+  protected searchServerOpen = signal(false);
+  private searchServerProbeSeq = 0;
+
+  toggleSearchServer(): void {
+    this.searchServerOpen.update((open) => !open);
+  }
+
+  /**
+   * Validate and adopt whatever is typed. Reachability isn't enough — the probe
+   * runs a real anonymous search for a well-known account, so a server that 401s
+   * or returns an empty index is rejected before it becomes the search server.
+   */
+  async applySearchServer(): Promise<void> {
+    const typed = this.searchServerInput().trim();
+    if (!typed) {
+      this.clearSearchServer();
+      return;
+    }
+    const base = normalizeHostUrl(typed);
+    const seq = ++this.searchServerProbeSeq;
+    this.searchServerStatus.set('checking');
+    this.searchServerHits.set(0);
+    const probe = await probeSearchServer(base);
+    if (seq !== this.searchServerProbeSeq) {
+      return; // superseded by a newer attempt
+    }
+    this.searchServerStatus.set(probe.status);
+    this.searchServerHits.set(probe.accounts);
+    this.diagnostics.info('Search', 'user:search-server-probe', {
+      host: base,
+      status: probe.status,
+    });
+    if (probe.status === 'ok') {
+      this.searchServer.setBaseUrl(base);
+    }
+  }
+
+  clearSearchServer(): void {
+    this.searchServerProbeSeq += 1;
+    this.searchServer.clear();
+    this.searchServerInput.set('');
+    this.searchServerStatus.set('idle');
+    this.searchServerHits.set(0);
+    this.diagnostics.info('Search', 'user:search-server-clear', {});
+  }
+
   confirmSave(): void {
     const result = this.saved.save(this.saveName(), this.currentSearch(), {
       instance: this.capabilities.active ? this.anonymous.server() : '',
@@ -851,10 +920,10 @@ export class Search implements OnInit, OnDestroy {
     const cost = this.firstPageTags ? this.firstPageTags.length : 1;
     const request = this.capabilities.active
       ? type === 'statuses'
-        ? this.anonymousPublic.searchPostsByHashtags(this.anonymous.server(), q, {
+        ? this.anonymousPublic.searchPostsByHashtags(this.searchHost(), q, {
             maxTags: this.apiBudget(),
           })
-        : this.anonymousPublic.search(this.anonymous.server(), q, type)
+        : this.anonymousPublic.search(this.searchHost(), q, type)
       : this.api.search(q, type, type === 'statuses' ? { limit: PAGE_SIZE } : undefined);
     this.activeSearch = request.subscribe({
       next: (r) => {
@@ -924,7 +993,7 @@ export class Search implements OnInit, OnDestroy {
         ? null
         : resilient(
             this.capabilities.active
-              ? this.anonymousPublic.search(this.anonymous.server(), q, 'accounts', {
+              ? this.anonymousPublic.search(this.searchHost(), q, 'accounts', {
                   limit: PAGE_SIZE,
                 })
               : this.api.search(
@@ -949,7 +1018,7 @@ export class Search implements OnInit, OnDestroy {
         ? null
         : resilient(
             this.capabilities.active
-              ? this.anonymousPublic.searchPostsByHashtags(this.anonymous.server(), q, {
+              ? this.anonymousPublic.searchPostsByHashtags(this.searchHost(), q, {
                   maxTags: this.apiBudget(),
                 })
               : this.api.search(q, 'statuses', { limit: PAGE_SIZE }),
@@ -1074,7 +1143,7 @@ export class Search implements OnInit, OnDestroy {
     const q = this.executedQuery;
     const request =
       this.capabilities.active && this.executedType === 'statuses'
-        ? this.anonymousPublic.searchPostsByHashtags(this.anonymous.server(), q, {
+        ? this.anonymousPublic.searchPostsByHashtags(this.searchHost(), q, {
             maxTags: this.firstPageTags?.length ?? this.apiBudget(),
             maxIds: Object.fromEntries(
               (this.firstPageTags ?? []).map((t) => [t, this.oldestId]).filter(([, v]) => v),

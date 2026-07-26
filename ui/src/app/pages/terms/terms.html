@@ -1,6 +1,10 @@
 <header class="page-head">
   <h1>Terms of Service</h1>
-  <p>Terms published by this Mastodon server.</p>
+  @if (host(); as searchHost) {
+    <p>Terms published by {{ searchHost }}, your search server.</p>
+  } @else {
+    <p>Terms published by this Mastodon server.</p>
+  }
 </header>
 
 @if (loading()) {

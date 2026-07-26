@@ -68,6 +68,13 @@
   text-decoration: none;
 }
 
+/* Badge for the second (search) server: same row style, with a subordinate
+   caption so it reads as "and also this one", not a duplicate home server. */
+.search-server-donate span {
+  display: block;
+  font-weight: 400;
+}
+
 .server-info {
   padding: 10px 14px 12px;
 }

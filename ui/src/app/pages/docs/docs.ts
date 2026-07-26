@@ -1,5 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { SearchServer } from '../../search-server';
+import { SearchServerAbout } from '../../search-server-about';
 import { ServerAbout } from '../../server-about';
 
 /**
@@ -16,9 +18,13 @@ import { ServerAbout } from '../../server-about';
 })
 export class Docs implements OnInit {
   protected serverAbout = inject(ServerAbout);
+  protected searchServerAbout = inject(SearchServerAbout);
+  protected searchServer = inject(SearchServer);
 
   ngOnInit(): void {
     // So the Rules/Terms rows can appear only when the instance actually has them.
     this.serverAbout.load();
+    // Two servers means two sets of house rules; list the search server's too.
+    this.searchServerAbout.load();
   }
 }

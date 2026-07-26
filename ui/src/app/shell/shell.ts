@@ -90,6 +90,73 @@ export class Shell implements OnInit {
     this.toast.set(null);
   }
 
+  /**
+   * A saved account whose token its instance rejected, from either a failed
+   * switch or a failed verify on boot. In both cases the token has been cleared,
+   * so it is *not* the active account — which is exactly why this has to exist.
+   * The account menu's Log out acts on the active account, so without an
+   * explicit escape the user could neither enter the broken account nor remove it.
+   */
+  protected deadSession = signal<AccountChoice | null>(null);
+
+  /** Human label for the stuck account, for the dialog copy. */
+  protected deadSessionName = computed(() => {
+    const s = this.deadSession();
+    return s?.account?.display_name || s?.account?.username || 'That account';
+  });
+
+  protected deadSessionServer = computed(() => {
+    const s = this.deadSession();
+    return s?.server ? s.server.replace(/^https?:\/\//, '') : 'this server';
+  });
+
+  /**
+   * Close the dialog. If the failure happened on boot there is no signed-in
+   * account behind it, so dismissing has to land somewhere usable rather than
+   * leaving a logged-out shell rendering empty feeds.
+   */
+  protected dismissDeadSession(): void {
+    this.deadSession.set(null);
+    if (!this.auth.isAuthenticated) {
+      location.assign('login');
+    }
+  }
+
+  /**
+   * Sign in again to refresh the rejected token. The failed switch already
+   * restored that session's instance, so the login page opens pointed at the
+   * right host; ?add=1 stops it bouncing a signed-in user home.
+   */
+  protected reauthenticate(): void {
+    const session = this.deadSession();
+    if (!session?.token) {
+      return;
+    }
+    // Re-point at the dead session's instance without activating its token, so
+    // the login page offers the host the account actually belongs to.
+    this.auth.prepareReauth(session.token);
+    location.assign('login?add=1');
+  }
+
+  /** Give up on the stuck account and drop it from the switcher. */
+  protected forgetDeadSession(): void {
+    const session = this.deadSession();
+    if (!session?.token) {
+      return;
+    }
+    this.auth.removeSession(session.token);
+    this.deadSession.set(null);
+    if (!this.auth.isAuthenticated) {
+      // Boot-failure case: that was the only account, so there is nothing to
+      // stay signed in as.
+      location.assign('login');
+      return;
+    }
+    // removeSession only touches the active account if it *was* active; it isn't
+    // here, so the current identity is untouched and no reload is needed.
+    this.showToast('Removed that account. Nothing else changed.');
+  }
+
   /** Optional server links are discovered only when the user opens More. */
   onMoreToggle(event: Event): void {
     if ((event.currentTarget as HTMLDetailsElement).open) {
@@ -106,11 +173,27 @@ export class Shell implements OnInit {
       this.api.verifyCredentials().subscribe({
         next: (acc) => this.auth.setAccount(acc),
         error: () => {
-          // Token was rejected: drop it (falling back to another saved account if any).
-          this.auth.logout();
-          if (!this.auth.isAuthenticated) {
+          // The stored token was rejected on boot. Don't silently delete the
+          // account: offer the same reauthenticate/remove choice as a failed
+          // switch. The dead token is the *active* one here, so clear it (every
+          // request would 401) while leaving the saved session intact.
+          const token = this.auth.token();
+          const session = token
+            ? (this.auth.sessions().find((s) => s.token === token) ?? null)
+            : null;
+          this.auth.exitToLoggedOut();
+          if (!session) {
+            // Nothing saved to reauthenticate against — the old behaviour is right.
             location.assign('login');
+            return;
           }
+          this.deadSession.set({
+            key: `mastodon:${session.token}`,
+            kind: 'mastodon',
+            token: session.token,
+            server: session.server ?? '',
+            account: session.account,
+          });
         },
       });
     }
@@ -157,16 +240,20 @@ export class Shell implements OnInit {
       },
       error: () => {
         // The token was rejected by its instance. Don't silently delete the account —
-        // revert to where we were and tell the user (non-blocking toast).
-        const name = session.account?.display_name || session.account?.username || 'that account';
+        // put the user back where they were, then offer the only two things that
+        // actually resolve it. A toast was a dead end: the switch leaves the broken
+        // account inactive, so the account menu's Log out (which acts on the *active*
+        // account) can never reach it, and retrying the switch just fails again.
         if (previousWasAnonymous) {
           this.auth.enterAnonymous();
         } else if (previous) {
           this.auth.switchTo(previous);
+        } else {
+          // Nothing to revert to: the failed token is still stored as active, so
+          // clear it rather than leaving the app authenticated with a dead token.
+          this.auth.exitToLoggedOut();
         }
-        this.showToast(
-          `Couldn't switch to ${name} — its session may have expired. Sign in again to refresh it.`,
-        );
+        this.deadSession.set(session);
       },
     });
   }

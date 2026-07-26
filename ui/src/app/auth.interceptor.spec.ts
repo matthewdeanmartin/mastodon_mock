@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from './auth';
 import { authInterceptor } from './auth.interceptor';
 import { externalFetch } from './providers/external-fetch';
+import { SearchServer, searchServerRequest } from './search-server';
 import { Server } from './server';
 
 describe('authInterceptor', () => {
   let httpMock: HttpTestingController;
   let auth: Auth;
+  let searchServer: SearchServer;
   let httpClient: HttpClient;
 
   beforeEach(() => {
@@ -24,6 +26,7 @@ describe('authInterceptor', () => {
     });
     httpMock = TestBed.inject(HttpTestingController);
     auth = TestBed.inject(Auth);
+    searchServer = TestBed.inject(SearchServer);
     httpClient = TestBed.inject(HttpClient);
   });
 
@@ -58,6 +61,27 @@ describe('authInterceptor', () => {
     const req = httpMock.expectOne('https://example.com/feed.xml');
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush('<rss/>');
+  });
+
+  it('never sends the token to a separately chosen search server', () => {
+    auth.setToken('my-access-token');
+    searchServer.setBaseUrl('mastodon.social');
+
+    httpClient.get('/api/v2/search', { context: searchServerRequest() }).subscribe();
+
+    const req = httpMock.expectOne('/api/v2/search');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush({});
+  });
+
+  it('still authenticates search when no separate search server is configured', () => {
+    auth.setToken('my-access-token');
+
+    httpClient.get('/api/v2/search', { context: searchServerRequest() }).subscribe();
+
+    const req = httpMock.expectOne('/api/v2/search');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer my-access-token');
+    req.flush({});
   });
 
   it('does not overwrite a caller-supplied Authorization header', () => {

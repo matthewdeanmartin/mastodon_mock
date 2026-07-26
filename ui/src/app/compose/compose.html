@@ -428,16 +428,42 @@
   @if (langMismatch(); as mismatch) {
     <div class="lang-mismatch">
       <p>
-        You set the language to <strong>{{ languageName(mismatch.picked) }}</strong>, but this
-        reads as <strong>{{ languageName(mismatch.detected) }}</strong>. Post anyway, or fix it?
+        You set the language to <strong>{{ languageName(mismatch.picked) }}</strong
+        >, but this reads as <strong>{{ languageName(mismatch.detected) }}</strong
+        >. Post anyway, or fix it?
       </p>
       <div class="lang-mismatch-actions">
         <button class="btn btn-outline" (click)="useDetectedLanguage()">
           Switch to {{ languageName(mismatch.detected) }}
         </button>
-        <button class="btn" (click)="confirmLanguageAndSend()">Post as {{ languageName(mismatch.picked) }}</button>
+        <button class="btn" (click)="confirmLanguageAndSend()">
+          Post as {{ languageName(mismatch.picked) }}
+        </button>
         <button class="btn btn-outline" (click)="dismissLangMismatch()">Keep editing</button>
       </div>
+    </div>
+  }
+  @if (postError(); as err) {
+    <div class="post-error" role="alert">
+      <span class="post-error-label">Not posted</span>
+      <div class="post-error-body">
+        <span class="post-error-text">{{ err.message }}</span>
+        <!-- Anything else the server said, rendered generically so a rule this
+             client has never heard of still explains itself. -->
+        @if (err.details.length) {
+          <dl class="post-error-details">
+            @for (d of err.details; track d.label) {
+              <div class="post-error-detail">
+                <dt>{{ d.label }}</dt>
+                <dd>{{ d.value }}</dd>
+              </div>
+            }
+          </dl>
+        }
+      </div>
+      <button class="post-error-dismiss" type="button" title="Dismiss" (click)="dismissPostError()">
+        ×
+      </button>
     </div>
   }
   @if (crossPostError(); as err) {

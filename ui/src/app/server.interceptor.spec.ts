@@ -2,12 +2,14 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { SearchServer, searchServerRequest } from './search-server';
 import { Server } from './server';
 import { serverInterceptor } from './server.interceptor';
 
 describe('serverInterceptor', () => {
   let httpMock: HttpTestingController;
   let server: Server;
+  let searchServer: SearchServer;
   let httpClient: HttpClient;
 
   beforeEach(() => {
@@ -21,6 +23,7 @@ describe('serverInterceptor', () => {
     });
     httpMock = TestBed.inject(HttpTestingController);
     server = TestBed.inject(Server);
+    searchServer = TestBed.inject(SearchServer);
     httpClient = TestBed.inject(HttpClient);
   });
 
@@ -41,6 +44,32 @@ describe('serverInterceptor', () => {
     httpClient.get('/api/v1/timelines/home').subscribe();
 
     httpMock.expectOne('/api/v1/timelines/home').flush([]);
+  });
+
+  it('routes search-tagged requests to the search server when one is set', () => {
+    server.setBaseUrl('https://home.example');
+    searchServer.setBaseUrl('mastodon.social');
+
+    httpClient.get('/api/v2/search', { context: searchServerRequest() }).subscribe();
+
+    httpMock.expectOne('https://mastodon.social/api/v2/search').flush({});
+  });
+
+  it('leaves untagged requests on the primary server while a search server is set', () => {
+    server.setBaseUrl('https://home.example');
+    searchServer.setBaseUrl('mastodon.social');
+
+    httpClient.get('/api/v1/timelines/home').subscribe();
+
+    httpMock.expectOne('https://home.example/api/v1/timelines/home').flush([]);
+  });
+
+  it('falls back to the primary server for search when no search server is set', () => {
+    server.setBaseUrl('https://home.example');
+
+    httpClient.get('/api/v2/search', { context: searchServerRequest() }).subscribe();
+
+    httpMock.expectOne('https://home.example/api/v2/search').flush({});
   });
 
   it('does not modify already-absolute URLs regardless of baseUrl', () => {

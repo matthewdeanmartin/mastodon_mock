@@ -77,6 +77,87 @@
     </button>
   </div>
 
+  <!-- Search server: a full-width row of its own, directly under the search bar.
+       A server combo needs horizontal room and the two-box layout below has none
+       to give, so it spans the shell instead of squeezing into a column. -->
+  <div class="search-server-row">
+    <button
+      class="btn btn-outline btn-sm search-server-toggle"
+      type="button"
+      (click)="toggleSearchServer()"
+      [attr.aria-expanded]="searchServerOpen()"
+    >
+      🔍 Search server:
+      <strong>{{ searchServer.host() || 'this server' }}</strong>
+      ▾
+    </button>
+    @if (searchServer.active()) {
+      <span class="muted small search-server-note">
+        Searching anonymously on {{ searchServer.host() }} — public results only.
+      </span>
+    }
+  </div>
+
+  @if (searchServerOpen()) {
+    <div class="search-server-panel">
+      <p class="muted small">
+        Some servers turn off search for logged-out visitors. Point search at a server that allows
+        it — feeds, profiles and your account stay on your own server.
+      </p>
+      <div class="search-server-controls">
+        <input
+          type="text"
+          class="search-server-input"
+          [ngModel]="searchServerInput()"
+          (ngModelChange)="searchServerInput.set($event)"
+          (keyup.enter)="applySearchServer()"
+          placeholder="mastodon.social"
+          aria-label="Search server host"
+        />
+        <button
+          class="btn btn-sm"
+          type="button"
+          [disabled]="searchServerStatus() === 'checking'"
+          (click)="applySearchServer()"
+        >
+          {{ searchServerStatus() === 'checking' ? 'Checking…' : 'Use this server' }}
+        </button>
+        @if (searchServer.active()) {
+          <button class="btn btn-outline btn-sm" type="button" (click)="clearSearchServer()">
+            Use my own server
+          </button>
+        }
+      </div>
+
+      <!-- Every verdict below comes from a real anonymous search for a well-known
+           account: reachable-but-unsearchable is the exact failure we're catching. -->
+      @switch (searchServerStatus()) {
+        @case ('checking') {
+          <p class="muted small">Running a test search…</p>
+        }
+        @case ('ok') {
+          <p class="ok small">
+            ✓ Anonymous search works — the test query matched {{ searchServerHits() }} accounts.
+          </p>
+        }
+        @case ('no-results') {
+          <p class="fail small">
+            This server answered but returned nothing for a well-known account. Its search index is
+            empty or restricted — not usable as a search server.
+          </p>
+        }
+        @case ('auth-required') {
+          <p class="fail small">
+            This server requires a login for search, so it can't be used anonymously.
+          </p>
+        }
+        @case ('unreachable') {
+          <p class="fail small">Couldn't reach that server's search API.</p>
+        }
+      }
+    </div>
+  }
+
   @if (saveDialogOpen()) {
     <div class="save-dialog">
       <input

@@ -10,6 +10,8 @@
   <span class="muted small">The software this client ships, and how it handles data.</span>
 </a>
 
+@let searchHost = searchServer.host();
+
 @if (serverAbout.hasRules()) {
   <a class="doc-row" routerLink="/server-rules">
     <span class="doc-title">Server rules</span>
@@ -21,5 +23,20 @@
   <a class="doc-row" routerLink="/terms">
     <span class="doc-title">Terms of Service</span>
     <span class="muted small">Your instance's terms of service.</span>
+  </a>
+}
+
+<!-- With a separate search server in play, its rules and terms apply to you too. -->
+@if (searchServerAbout.hasRules()) {
+  <a class="doc-row" routerLink="/server-rules" [queryParams]="{ server: 'search' }">
+    <span class="doc-title">Server rules — {{ searchHost }}</span>
+    <span class="muted small">The rules published by your search server.</span>
+  </a>
+}
+
+@if (searchServerAbout.hasTerms()) {
+  <a class="doc-row" routerLink="/terms" [queryParams]="{ server: 'search' }">
+    <span class="doc-title">Terms of Service — {{ searchHost }}</span>
+    <span class="muted small">Your search server's terms of service.</span>
   </a>
 }

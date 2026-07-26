@@ -37,6 +37,17 @@
     <a class="donate-link" [href]="donateServerUrl()" target="_blank" rel="noopener noreferrer">
       💙 Donate to {{ homeHost() || 'your server' }}
     </a>
+    @if (showSearchServerDonate()) {
+      <a
+        class="donate-link search-server-donate"
+        [href]="searchServer.donateUrl()"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        🔍 Donate to {{ searchServer.host() }}
+        <span class="muted small">Your search server</span>
+      </a>
+    }
     <a
       class="donate-link"
       href="https://joinmastodon.org/sponsors"
@@ -83,8 +94,8 @@
     >
       <h3 id="share-server-title">Share this server</h3>
       <p class="muted small">
-        This link opens Mawkingbird anonymously on {{ homeHost() }}. Copy it to share — it won't take
-        you anywhere.
+        This link opens Mawkingbird anonymously on {{ homeHost() }}. Copy it to share — it won't
+        take you anywhere.
       </p>
       <div class="share-url-row">
         <input

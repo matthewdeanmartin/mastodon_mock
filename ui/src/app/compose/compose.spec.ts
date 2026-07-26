@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
@@ -7,7 +7,7 @@ import { ClientPrefs } from '../client-prefs';
 import { Status } from '../models';
 import { Auth } from '../auth';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
-import { Compose, PostTarget } from './compose';
+import { Compose, PostTarget, describePostFailure } from './compose';
 
 /** Expose the protected internals for white-box testing. */
 interface ComposeInternals {
@@ -880,5 +880,115 @@ describe('Compose', () => {
     // The caller's multi-mention seed wins (e.g. group chat), not the single handle.
     expect(internals(f).text()).toBe('@alice@dmv.community @bob@x.social ');
     expect(internals(f).showReplyMentionHint()).toBe(true);
+  });
+});
+
+describe('describePostFailure', () => {
+  // The bug this guards: every post-failure handler threw the error away, so a
+  // server that said exactly why it refused (too long, contains a link,
+  // moderated) produced a silent no-op and the user retried forever.
+  it('surfaces the server-supplied reason', () => {
+    const err = new HttpErrorResponse({
+      status: 422,
+      error: { error: "Links aren't allowed in posts.", code: 'url_not_allowed' },
+    });
+    expect(describePostFailure(err).message).toBe("Links aren't allowed in posts.");
+  });
+
+  it('parses a JSON body that arrived as a string', () => {
+    // Angular leaves the body unparsed when the error response's content type
+    // isn't JSON, which real servers get wrong often enough to matter.
+    const err = new HttpErrorResponse({
+      status: 422,
+      error: '{"error":"Too long","code":"unprocessable"}',
+    });
+    expect(describePostFailure(err).message).toBe('Too long');
+  });
+
+  it('prefers error_description when a server sends both', () => {
+    const err = new HttpErrorResponse({
+      status: 400,
+      error: { error: 'invalid_request', error_description: 'Status is over the limit.' },
+    });
+    expect(describePostFailure(err).message).toBe('Status is over the limit.');
+  });
+
+  it('explains an opaque CORS/network failure rather than blaming the post', () => {
+    expect(describePostFailure(new HttpErrorResponse({ status: 0 })).message).toContain(
+      "Couldn't reach the server",
+    );
+  });
+
+  it('points a rejected token at reauthentication', () => {
+    expect(describePostFailure(new HttpErrorResponse({ status: 401 })).message).toContain(
+      'reauthenticate',
+    );
+  });
+
+  it('falls back to the status code when the body is unusable', () => {
+    const err = new HttpErrorResponse({ status: 503, error: '<html>gateway</html>' });
+    expect(describePostFailure(err).message).toContain('503');
+  });
+
+  // Server-side validation evolves. A client that only understands the codes it
+  // was written against gets steadily less useful as new rules appear, so every
+  // unrecognized field is surfaced rather than dropped.
+  it('surfaces fields it has never seen as labelled detail rows', () => {
+    const err = new HttpErrorResponse({
+      status: 422,
+      error: {
+        error: 'That word is not in the dictionary.',
+        code: 'word_not_recognized',
+        rejected_word: 'speedbomber21',
+        suggestion: 'Describe the behaviour instead of naming the person.',
+      },
+    });
+
+    const failure = describePostFailure(err);
+    expect(failure.message).toBe('That word is not in the dictionary.');
+    const labels = failure.details.map((d) => d.label);
+    expect(labels).toContain('Rejected word');
+    expect(labels).toContain('Suggestion');
+    expect(failure.details.find((d) => d.label === 'Rejected word')?.value).toBe('speedbomber21');
+  });
+
+  it('renders an array value as a readable list', () => {
+    const err = new HttpErrorResponse({
+      status: 422,
+      error: { error: 'Some words were rejected.', unknown_words: ['asdf', 'qwerty'] },
+    });
+    expect(describePostFailure(err).details[0].value).toBe('asdf, qwerty');
+  });
+
+  it('flattens a nested object rather than printing [object Object]', () => {
+    const err = new HttpErrorResponse({
+      status: 429,
+      error: { error: 'Slow down.', limits: { per_minute: 5, retry_after: 30 } },
+    });
+    const value = describePostFailure(err).details[0].value;
+    expect(value).toContain('Per minute: 5');
+    expect(value).toContain('Retry after: 30');
+  });
+
+  // request_id is for a bug report, not for the person trying to post.
+  it('hides plumbing fields from the user', () => {
+    const err = new HttpErrorResponse({
+      status: 422,
+      error: { error: 'Nope.', request_id: 'abc123', field: 'status' },
+    });
+    const labels = describePostFailure(err).details.map((d) => d.label);
+    expect(labels).not.toContain('Request id');
+    expect(labels).toContain('Field');
+  });
+
+  // A body with no recognized message field still has to reach the user.
+  it('still reports a body that names no known message field', () => {
+    const err = new HttpErrorResponse({
+      status: 422,
+      error: { reason_code: 'moderation_hold', review_eta: 'about an hour' },
+    });
+    const failure = describePostFailure(err);
+    expect(failure.message).toContain('rejected');
+    expect(failure.details).toHaveLength(2);
   });
 });

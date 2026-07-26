@@ -182,6 +182,40 @@ export class Auth {
     return choice.token !== null && this.switchTo(choice.token);
   }
 
+  /**
+   * Prepare to sign in again as a saved account whose token was rejected.
+   *
+   * Points the app at that account's instance and clears the active token,
+   * *without* deleting the saved session — if the user abandons the login page
+   * the account is still in the switcher. Deliberately does not activate the
+   * dead token: leaving a known-bad token active makes every subsequent request
+   * 401 and the app look broken.
+   */
+  prepareReauth(token: string): void {
+    const session = this.sessions().find((s) => s.token === token);
+    if (session?.server !== undefined) {
+      this.server.setBaseUrl(session.server);
+    }
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ACCOUNT_MODE_KEY);
+    this.mode.set(null);
+    this.token.set(null);
+    this.mastodonAccount.set(null);
+  }
+
+  /**
+   * Drop the active identity without touching the saved stable. Used when a
+   * switch fails and there is nothing to revert to, so the app must not be left
+   * holding a token its server rejects.
+   */
+  exitToLoggedOut(): void {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ACCOUNT_MODE_KEY);
+    this.mode.set(null);
+    this.token.set(null);
+    this.mastodonAccount.set(null);
+  }
+
   /** Forget one saved session. If it was active, fall back to another (or sign out). */
   removeSession(token: string): void {
     const remaining = this.sessions().filter((s) => s.token !== token);

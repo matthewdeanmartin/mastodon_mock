@@ -10,10 +10,11 @@ import {
   provideRouter,
 } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Account, SearchResults, Status, Tag } from '../../models';
 import { Search } from './search';
 import { Auth } from '../../auth';
+import { SearchServer } from '../../search-server';
 
 /** Exposes Search's protected signals for white-box testing. */
 interface SearchInternals {
@@ -27,6 +28,12 @@ interface SearchInternals {
   followersMax: WritableSignal<string>;
   accountItems: WritableSignal<{ account: Account; matchingPosts: Status[] }[]>;
   visibleAccounts(): { account: Account; matchingPosts: Status[] }[];
+  searchServerInput: WritableSignal<string>;
+  searchServerStatus: WritableSignal<string>;
+  searchServerHits: WritableSignal<number>;
+  applySearchServer(): Promise<void>;
+  clearSearchServer(): void;
+  searchHost(): string;
   run(): void;
   onChanged(updated: Status): void;
   onDeleted(removed: Status): void;
@@ -457,6 +464,87 @@ describe('Search', () => {
           .map((i) => i.account.id),
       ).toEqual(['econ1']);
       httpMock.expectNone((r) => r.url === '/api/v2/search');
+    });
+  });
+
+  describe('search server picker', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    /** Stub global fetch, which the canary probe uses (not HttpClient). */
+    function stubProbe(body: unknown, status = 200): void {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({ ok: status < 300, status, json: async () => body }) as Response),
+      );
+    }
+
+    it('adopts a server whose anonymous search returns results', async () => {
+      const fixture = setUp();
+      stubProbe({ accounts: [{ id: '1' }, { id: '2' }] });
+
+      internals(fixture).searchServerInput.set('mastodon.social');
+      await internals(fixture).applySearchServer();
+
+      expect(internals(fixture).searchServerStatus()).toBe('ok');
+      expect(internals(fixture).searchServerHits()).toBe(2);
+      expect(TestBed.inject(SearchServer).baseUrl()).toBe('https://mastodon.social');
+    });
+
+    it('refuses a server that is reachable but returns nothing', async () => {
+      const fixture = setUp();
+      stubProbe({ accounts: [] });
+
+      internals(fixture).searchServerInput.set('empty.example');
+      await internals(fixture).applySearchServer();
+
+      expect(internals(fixture).searchServerStatus()).toBe('no-results');
+      // Crucially, an unusable server must not become the search server.
+      expect(TestBed.inject(SearchServer).active()).toBe(false);
+    });
+
+    it('refuses a server that requires a login for search', async () => {
+      const fixture = setUp();
+      stubProbe({ error: 'unauthorized' }, 401);
+
+      internals(fixture).searchServerInput.set('closed.example');
+      await internals(fixture).applySearchServer();
+
+      expect(internals(fixture).searchServerStatus()).toBe('auth-required');
+      expect(TestBed.inject(SearchServer).active()).toBe(false);
+    });
+
+    it('routes anonymous search at the search server once one is set', async () => {
+      const fixture = setUp();
+      stubProbe({ accounts: [{ id: '1' }] });
+
+      internals(fixture).searchServerInput.set('mastodon.social');
+      await internals(fixture).applySearchServer();
+
+      expect(internals(fixture).searchHost()).toBe('https://mastodon.social');
+    });
+
+    it('clearing sends search back to the primary server', async () => {
+      const fixture = setUp();
+      stubProbe({ accounts: [{ id: '1' }] });
+      internals(fixture).searchServerInput.set('mastodon.social');
+      await internals(fixture).applySearchServer();
+
+      internals(fixture).clearSearchServer();
+
+      expect(TestBed.inject(SearchServer).active()).toBe(false);
+      expect(internals(fixture).searchServerInput()).toBe('');
+    });
+
+    it('an empty box clears rather than probing', async () => {
+      const fixture = setUp();
+      stubProbe({ accounts: [{ id: '1' }] });
+      internals(fixture).searchServerInput.set('mastodon.social');
+      await internals(fixture).applySearchServer();
+
+      internals(fixture).searchServerInput.set('   ');
+      await internals(fixture).applySearchServer();
+
+      expect(TestBed.inject(SearchServer).active()).toBe(false);
     });
   });
 });
