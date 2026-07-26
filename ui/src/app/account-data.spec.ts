@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { deleteAccountData, inspectAccountData, keyBelongsToScope, scopeForAccount } from './account-data';
+import {
+  deleteAccountData,
+  inspectAccountData,
+  keyBelongsToScope,
+  scopeForAccount,
+} from './account-data';
 import { scopeSuffixForToken } from './account-scope';
 
 describe('account-data', () => {

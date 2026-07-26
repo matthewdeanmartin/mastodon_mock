@@ -1,5 +1,9 @@
 import { ANONYMOUS_SCOPE_SUFFIX, scopeSuffixForToken } from './account-scope';
-import { formatBytes, inspectLocalStorage, StorageReport } from './observability/local-storage-inspector';
+import {
+  formatBytes,
+  inspectLocalStorage,
+  StorageReport,
+} from './observability/local-storage-inspector';
 
 /**
  * Finding and deleting the browser-local data belonging to one saved account.

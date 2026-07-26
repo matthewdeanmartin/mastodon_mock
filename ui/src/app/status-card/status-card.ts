@@ -21,14 +21,7 @@ import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
-import {
-  FilterContext,
-  FilterResult,
-  MediaAttachment,
-  Poll,
-  Status,
-  Translation,
-} from '../models';
+import { FilterContext, FilterResult, MediaAttachment, Poll, Status, Translation } from '../models';
 import { MutedPosts } from '../muted-posts';
 import { LocalModeration } from '../local-moderation';
 import { ProviderCapabilities } from '../providers/provider';

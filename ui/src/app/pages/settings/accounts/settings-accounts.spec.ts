@@ -62,9 +62,14 @@ describe('SettingsAccounts', () => {
     });
   });
 
-  // Auth reads the account mode from localStorage at construction, so a token or
-  // mode left behind here would make unrelated suites think they are signed in.
-  afterEach(() => localStorage.clear());
+  // Auth is a root singleton whose `mode` signal is seeded from localStorage at
+  // construction. Clearing storage alone would leave an already-built Auth still
+  // reporting "signed in", so reset the injector too — otherwise later suites
+  // (Anonymous capabilities, StatusCard) inherit this file's logged-in state.
+  afterEach(() => {
+    localStorage.clear();
+    TestBed.resetTestingModule();
+  });
 
   it('lists every saved login plus the permanent Anonymous account', () => {
     seedTwoAccounts();
@@ -140,7 +145,11 @@ describe('SettingsAccounts', () => {
     internals(fixture).confirm();
 
     expect(localStorage.getItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_B)}`)).toBeNull();
-    expect(TestBed.inject(Auth).sessions().map((s) => s.token)).toEqual([TOKEN_A]);
+    expect(
+      TestBed.inject(Auth)
+        .sessions()
+        .map((s) => s.token),
+    ).toEqual([TOKEN_A]);
   });
 
   it('cancelling deletes nothing', () => {

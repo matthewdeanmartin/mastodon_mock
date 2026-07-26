@@ -927,9 +927,7 @@ describe('StatusCard', () => {
 
   it('says so when an attachment has no alt text, rather than showing a blank row', () => {
     TestBed.inject(ClientPrefs).setShowImages(false);
-    const f = setUp(
-      makeStatus({ media_attachments: [{ ...makeMedia('a'), description: null }] }),
-    );
+    const f = setUp(makeStatus({ media_attachments: [{ ...makeMedia('a'), description: null }] }));
     const row = (f.nativeElement as HTMLElement).querySelector('.media-alt-row');
 
     expect(row?.textContent).toContain('No description provided');
