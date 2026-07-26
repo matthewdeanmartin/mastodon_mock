@@ -48,7 +48,12 @@ function bskyStatus(overrides: Partial<Status> = {}): Status {
 }
 
 describe('StatusActions', () => {
-  let api: { favourite: ReturnType<typeof vi.fn>; unfavourite: ReturnType<typeof vi.fn> };
+  let api: {
+    favourite: ReturnType<typeof vi.fn>;
+    unfavourite: ReturnType<typeof vi.fn>;
+    reblog: ReturnType<typeof vi.fn>;
+    unreblog: ReturnType<typeof vi.fn>;
+  };
   let bsky: {
     like: ReturnType<typeof vi.fn>;
     repost: ReturnType<typeof vi.fn>;
@@ -56,7 +61,7 @@ describe('StatusActions', () => {
   };
 
   beforeEach(() => {
-    api = { favourite: vi.fn(), unfavourite: vi.fn() };
+    api = { favourite: vi.fn(), unfavourite: vi.fn(), reblog: vi.fn(), unreblog: vi.fn() };
     bsky = { like: vi.fn(), repost: vi.fn(), deleteRecord: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
@@ -74,6 +79,36 @@ describe('StatusActions', () => {
     expect(await firstValueFrom(actions.toggleFavourite(makeStatus()))).toBe(updated);
     expect(api.favourite).toHaveBeenCalledWith('1');
     expect(bsky.like).not.toHaveBeenCalled();
+  });
+
+  // The anonymous adapter namespaces ids as `anonymous-mastodon:<host>:<rawId>` so
+  // several sources can share a feed. That prefix is ours, not the server's: sending
+  // it back 404s. These two pin the unwrap for both actions, because a like that
+  // silently 404s looks exactly like a like that was never sent.
+  it('favourites a namespaced anonymous status against the raw server id', async () => {
+    const status = makeStatus({
+      id: 'anonymous-mastodon:localhost:8080:01JQZ',
+      provider: 'anonymous-mastodon',
+      providerRef: { server: 'http://localhost:8080', statusId: '01JQZ', accountId: 'a' },
+    });
+    api.favourite.mockReturnValue(of(status));
+
+    const actions = TestBed.inject(StatusActions);
+    await firstValueFrom(actions.toggleFavourite(status));
+    expect(api.favourite).toHaveBeenCalledWith('01JQZ');
+  });
+
+  it('reblogs a namespaced anonymous status against the raw server id', async () => {
+    const status = makeStatus({
+      id: 'anonymous-mastodon:localhost:8080:01JQZ',
+      provider: 'anonymous-mastodon',
+      providerRef: { server: 'http://localhost:8080', statusId: '01JQZ', accountId: 'a' },
+    });
+    api.reblog.mockReturnValue(of(status));
+
+    const actions = TestBed.inject(StatusActions);
+    await firstValueFrom(actions.toggleReblog(status));
+    expect(api.reblog).toHaveBeenCalledWith('01JQZ');
   });
 
   it('likes a Bluesky post via a like record and stores the record uri for undo', async () => {

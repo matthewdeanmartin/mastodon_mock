@@ -21,7 +21,14 @@ import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
-import { FilterContext, FilterResult, Poll, Status, Translation } from '../models';
+import {
+  FilterContext,
+  FilterResult,
+  MediaAttachment,
+  Poll,
+  Status,
+  Translation,
+} from '../models';
 import { MutedPosts } from '../muted-posts';
 import { LocalModeration } from '../local-moderation';
 import { ProviderCapabilities } from '../providers/provider';
@@ -140,6 +147,23 @@ export class StatusCard {
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
+
+  /**
+   * Icon standing in for one attachment when images are off. Mastodon's media
+   * types are image / video / gifv / audio / unknown; picking a matching glyph
+   * keeps the text-only list honest about what is actually being hidden.
+   */
+  protected mediaIcon(media: MediaAttachment): string {
+    switch (media.type) {
+      case 'video':
+      case 'gifv':
+        return '🎬';
+      case 'audio':
+        return '🔊';
+      default:
+        return '🖼️';
+    }
+  }
 
   /** ⭐ or ❤️, per the Mockingbird Blue preference. */
   protected favIcon = computed(() => (this.prefs.favStyle() === 'heart' ? '❤️' : '⭐'));

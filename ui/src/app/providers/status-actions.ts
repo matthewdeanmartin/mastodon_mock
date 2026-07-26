@@ -2,8 +2,27 @@ import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { Api } from '../api';
 import { Status } from '../models';
+import { AnonymousProviderRef } from './anonymous/anonymous-mastodon-provider';
 import { BlueskyApi } from './bluesky/bluesky-api';
 import { BskyRef } from './bluesky/bluesky-types';
+
+/**
+ * The id the origin server knows this status by.
+ *
+ * `adaptAnonymousStatus` namespaces ids as `anonymous-mastodon:<host>:<rawId>` so
+ * several sources can share one feed without colliding. That prefix is a client-side
+ * construction — sending it back produces a 404 for a status id the server has never
+ * heard of. The raw id is kept on `providerRef.statusId` for exactly this.
+ *
+ * Same accessor as `Profile.nativeStatusId` and the equivalents in the thread and tag
+ * pages; those unwrap for navigation, this one for writes.
+ */
+function nativeId(status: Status): string {
+  const ref = status.providerRef as Partial<AnonymousProviderRef> | undefined;
+  return status.provider === 'anonymous-mastodon' && typeof ref?.statusId === 'string'
+    ? ref.statusId
+    : status.id;
+}
 
 /**
  * Routes favourite/boost toggles to the network a status came from, so
@@ -39,7 +58,8 @@ export class StatusActions {
         })),
       );
     }
-    return status.favourited ? this.api.unfavourite(status.id) : this.api.favourite(status.id);
+    const id = nativeId(status);
+    return status.favourited ? this.api.unfavourite(id) : this.api.favourite(id);
   }
 
   toggleReblog(status: Status): Observable<Status> {
@@ -64,6 +84,7 @@ export class StatusActions {
         })),
       );
     }
-    return status.reblogged ? this.api.unreblog(status.id) : this.api.reblog(status.id);
+    const id = nativeId(status);
+    return status.reblogged ? this.api.unreblog(id) : this.api.reblog(id);
   }
 }

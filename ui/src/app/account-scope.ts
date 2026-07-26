@@ -33,8 +33,20 @@ export function accountScopeSuffix(): string {
   if (!token) {
     return '';
   }
-  return `_${hash(token)}`;
+  return scopeSuffixForToken(token);
 }
+
+/**
+ * The suffix a *given* token's data is stored under, without making that token
+ * active. Needed to find (and delete) the local data of an account other than
+ * the one currently signed in — see the Signed-in accounts settings page.
+ */
+export function scopeSuffixForToken(token: string): string {
+  return token ? `_${hash(token)}` : '';
+}
+
+/** The suffix the one browser-local Anonymous account stores its data under. */
+export const ANONYMOUS_SCOPE_SUFFIX = '_anonymous';
 
 /** Build a per-account storage key from a base key. */
 export function scopedKey(baseKey: string): string {

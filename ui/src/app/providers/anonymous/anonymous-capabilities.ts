@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { Auth } from '../../auth';
 import { ProviderId } from '../../models';
-import { PROVIDER_CAPS, ProviderCapabilities } from '../provider';
+import { capabilitiesFor, ProviderCapabilities } from '../provider';
 
 /**
  * Central policy for features that require a real signed-in identity.
@@ -40,10 +40,22 @@ export class AnonymousCapabilities {
     return !this.active;
   }
 
+  /**
+   * What the viewer can do to a post from `provider`.
+   *
+   * `this.active` means Anonymous mode: no token at all, reads go out through
+   * `externalFetch()`, and every write would be a 401. That is the only case that
+   * takes the buttons away.
+   *
+   * When a token *is* held, `anonymous-mastodon` posts are writable like any other.
+   * That provider covers a Mastodon-compatible server targeted directly — including
+   * a textboard like mawkingbird_server, where a durable session identity replies,
+   * likes, boosts, and follows exactly like a logged-in Mastodon account. Returning
+   * a flat `false` for the provider used to make likes and boosts unreachable
+   * against our own server: `StatusCard.toggleFavourite` returns early on
+   * `!caps.favourite`, so the click produced no request and no error to show.
+   */
   statusCaps(provider: ProviderId): ProviderCapabilities {
-    if (this.active) {
-      return { reply: false, favourite: false, reblog: false };
-    }
-    return PROVIDER_CAPS[provider];
+    return capabilitiesFor(provider, !this.active);
   }
 }

@@ -300,6 +300,49 @@
   color: var(--accent);
 }
 
+/* Images-off mode: alt text stands in for the picture. Laid out as readable
+   prose rows rather than chips, since the description is the content here. */
+.media-alt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.media-alt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.media-alt-row:hover {
+  border-color: var(--accent);
+}
+
+.media-alt-icon {
+  flex: 0 0 auto;
+  line-height: 1.4;
+}
+
+.media-alt-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.media-alt-missing {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

@@ -208,14 +208,32 @@
             }
           </div>
         } @else {
-          <button
-            type="button"
-            class="media-chip"
-            (click)="openLightbox(0, $event)"
-            [attr.aria-label]="display.media_attachments.length + ' hidden images, click to view'"
-          >
-            🖼️ {{ display.media_attachments.length }}
-          </button>
+          <!-- Images off: one row per attachment, each an icon plus its alt text.
+               The alt text is the *point* of this mode — it's what the author wrote
+               to describe the picture, so a reader who turned images off still gets
+               the content rather than an opaque "3 images" count. Attachments with
+               no description say so, which quietly surfaces missing alt text. -->
+          <div class="media-alt-list">
+            @for (m of display.media_attachments; track m.id; let i = $index) {
+              <button
+                type="button"
+                class="media-alt-row"
+                (click)="openLightbox(i, $event)"
+                [attr.aria-label]="
+                  m.description
+                    ? 'View image: ' + m.description
+                    : 'View image ' + (i + 1) + ' (no description provided)'
+                "
+              >
+                <span class="media-alt-icon" aria-hidden="true">{{ mediaIcon(m) }}</span>
+                @if (m.description) {
+                  <span class="media-alt-text">{{ m.description }}</span>
+                } @else {
+                  <span class="media-alt-text media-alt-missing">No description provided</span>
+                }
+              </button>
+            }
+          </div>
         }
       }
       <div class="actions">

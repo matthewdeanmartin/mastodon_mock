@@ -52,6 +52,7 @@ export class SettingsShell {
     { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },
     { label: 'Internationalization', path: 'i18n', exact: true, anonymous: true },
     { label: 'Local storage', path: 'storage', exact: true, anonymous: true },
+    { label: 'Signed-in accounts', path: 'accounts', exact: true, anonymous: true },
     { label: 'Posting defaults', path: 'posting', exact: true },
     { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
     { label: 'Approve follow requests', path: 'follows', exact: true },

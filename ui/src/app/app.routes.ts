@@ -132,6 +132,14 @@ export const routes: Routes = [
               import('./pages/settings/storage/settings-storage').then((m) => m.SettingsStorage),
           },
           {
+            // Account-level cleanup of saved credentials and their local data —
+            // the coarse counterpart to the key-by-key 'storage' page above.
+            path: 'accounts',
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/accounts/settings-accounts').then((m) => m.SettingsAccounts),
+          },
+          {
             path: 'posting',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Posting defaults', preloadSettings: true },

@@ -47,6 +47,7 @@ describe('SettingsShell', () => {
       'Appearance',
       'Internationalization',
       'Local storage',
+      'Signed-in accounts',
       'Feature flags',
     ]);
   });

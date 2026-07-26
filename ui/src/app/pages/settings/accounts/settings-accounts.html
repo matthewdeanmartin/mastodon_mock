@@ -1,0 +1,85 @@
+<div class="settings-page">
+  <div class="page-head">
+    <div>
+      <h1>Signed-in accounts</h1>
+      <p class="muted">
+        Every credential saved in this browser, and the local data each one owns. Use this to
+        clean up duplicate logins, or to reset one account's local data without signing out of
+        it.
+      </p>
+    </div>
+  </div>
+
+  @if (notice()) {
+    <p class="accounts-notice ok small">{{ notice() }}</p>
+  }
+
+  <div class="accounts-list">
+    @for (row of accounts(); track row.key) {
+      <div class="account-row" [class.is-active]="row.active">
+        <div class="account-identity">
+          @if (row.account?.avatar_static || row.account?.avatar; as avatar) {
+            <img class="avatar" [src]="avatar" alt="" decoding="async" />
+          } @else {
+            <span class="avatar avatar-blank" aria-hidden="true">?</span>
+          }
+          <span class="names">
+            <span class="name">
+              {{ label(row) }}
+              @if (row.active) {
+                <span class="badge">Signed in</span>
+              }
+              @if (row.kind === 'anonymous') {
+                <span class="badge badge-quiet">Local only</span>
+              }
+            </span>
+            <span class="acct muted small">{{ handle(row) }}</span>
+            <span class="usage muted small">
+              {{ row.keyCount }} {{ row.keyCount === 1 ? 'key' : 'keys' }} ·
+              {{ formatBytes(row.bytes) }}
+            </span>
+          </span>
+        </div>
+
+        <div class="account-actions">
+          @if (canModify(row)) {
+            <button
+              class="btn btn-outline btn-sm danger"
+              type="button"
+              [disabled]="!row.keyCount"
+              (click)="askDeleteData(row)"
+            >
+              Delete data
+            </button>
+            <button
+              class="btn btn-outline btn-sm danger"
+              type="button"
+              (click)="askDeleteDataAndLogout(row)"
+            >
+              {{ row.kind === 'anonymous' ? 'Delete data & leave' : 'Delete data & log out' }}
+            </button>
+          } @else {
+            <span class="muted small blocked">{{ blockedReason(row) }}</span>
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <p class="muted small footnote">
+    Deleting data removes this browser's saved settings for that account — RSS feeds, linked
+    accounts, local moderation and similar. It never touches anything on the server. For a
+    key-by-key view of the current account, see
+    <span class="nowrap">Local storage</span>.
+  </p>
+</div>
+
+@if (pending()) {
+  <app-confirm-dialog
+    [title]="dialogTitle()"
+    [message]="dialogMessage()"
+    confirmLabel="Delete"
+    (confirmed)="confirm()"
+    (cancelled)="cancel()"
+  />
+}

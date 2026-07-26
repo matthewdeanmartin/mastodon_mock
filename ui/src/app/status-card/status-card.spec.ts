@@ -909,6 +909,61 @@ describe('StatusCard', () => {
     expect(thumbs).toHaveLength(2);
   });
 
+  // ------------------------------------------------------------ images-off mode
+
+  it('replaces thumbnails with one alt-text row per attachment when images are off', () => {
+    TestBed.inject(ClientPrefs).setShowImages(false);
+    const f = setUp(makeStatus({ media_attachments: [makeMedia('a'), makeMedia('b')] }));
+    const el = f.nativeElement as HTMLElement;
+
+    expect(el.querySelectorAll('.media-thumb')).toHaveLength(0);
+    const rows = el.querySelectorAll('.media-alt-row');
+    expect(rows).toHaveLength(2);
+    // The author's description is the content in this mode, so it must be shown.
+    expect(rows[0].textContent).toContain('image a');
+    expect(rows[1].textContent).toContain('image b');
+    expect(rows[0].querySelector('.media-alt-icon')?.textContent).toContain('🖼️');
+  });
+
+  it('says so when an attachment has no alt text, rather than showing a blank row', () => {
+    TestBed.inject(ClientPrefs).setShowImages(false);
+    const f = setUp(
+      makeStatus({ media_attachments: [{ ...makeMedia('a'), description: null }] }),
+    );
+    const row = (f.nativeElement as HTMLElement).querySelector('.media-alt-row');
+
+    expect(row?.textContent).toContain('No description provided');
+    expect(row?.getAttribute('aria-label')).toContain('no description provided');
+  });
+
+  it('uses a media-type icon so video and audio are not mislabelled as pictures', () => {
+    TestBed.inject(ClientPrefs).setShowImages(false);
+    const f = setUp(
+      makeStatus({
+        media_attachments: [
+          { ...makeMedia('v'), type: 'video' },
+          { ...makeMedia('s'), type: 'audio' },
+        ],
+      }),
+    );
+    const icons = (f.nativeElement as HTMLElement).querySelectorAll('.media-alt-icon');
+
+    expect(icons[0].textContent).toContain('🎬');
+    expect(icons[1].textContent).toContain('🔊');
+  });
+
+  it('an alt-text row still opens that image in the lightbox', () => {
+    TestBed.inject(ClientPrefs).setShowImages(false);
+    const f = setUp(makeStatus({ media_attachments: [makeMedia('a'), makeMedia('b')] }));
+
+    (f.nativeElement as HTMLElement)
+      .querySelectorAll<HTMLButtonElement>('.media-alt-row')[1]
+      .click();
+    f.detectChanges();
+
+    expect(internals(f).lightboxIndex()).toBe(1);
+  });
+
   it('mounts the lightbox only after an image is opened', () => {
     const f = setUp(makeStatus({ media_attachments: [makeMedia('a')] }));
     expect((f.nativeElement as HTMLElement).querySelector('app-lightbox')).toBeNull();
