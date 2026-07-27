@@ -6,6 +6,8 @@ import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { ClientPrefs } from '../../client-prefs';
+import { LocalModeration } from '../../local-moderation';
+import { MutedPosts } from '../../muted-posts';
 import { Status } from '../../models';
 import { Algo } from './algo';
 
@@ -61,6 +63,11 @@ describe('Algo page', () => {
 
   function text(): string {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+
+  /** The "why you're seeing this" lines currently rendered, one per feed item. */
+  function labels(): HTMLElement[] {
+    return [...fixture.nativeElement.querySelectorAll('.algo-source')] as HTMLElement[];
   }
 
   function chip(label: string): HTMLButtonElement {
@@ -216,5 +223,65 @@ describe('Algo page', () => {
   it('empty state nudges toward follows and hashtags', () => {
     fixture.detectChanges();
     expect(text()).toContain('follow some people and hashtags');
+  });
+
+  // Each item wraps its card in a "why you're seeing this" line. A card that
+  // renders as nothing used to leave that line stranded — a run of bare "Top
+  // post from your feed" labels with no post under any of them.
+  describe('posts whose card renders nothing', () => {
+    it('drops the source label too when the post is muted', () => {
+      feed.posts.set([
+        makePost('kept', 'original', true, '<p>still here</p>'),
+        makePost('hushed', 'original', true, '<p>never again</p>'),
+      ]);
+      TestBed.inject(MutedPosts).mute('hushed');
+      fixture.detectChanges();
+
+      expect(text()).toContain('still here');
+      expect(text()).not.toContain('never again');
+      expect(labels()).toHaveLength(1);
+    });
+
+    it('drops the source label too when the author is locally blocked', () => {
+      const blocked = makePost('blocked', 'original', true, '<p>from a blocked author</p>');
+      blocked.status.account = {
+        id: 'b',
+        username: 'b',
+        acct: 'b',
+        display_name: 'B',
+      } as never;
+      feed.posts.set([makePost('kept', 'original', true, '<p>still here</p>'), blocked]);
+      TestBed.inject(LocalModeration).block(blocked.status.account);
+      fixture.detectChanges();
+
+      expect(text()).toContain('still here');
+      expect(text()).not.toContain('from a blocked author');
+      expect(labels()).toHaveLength(1);
+    });
+
+    it('drops the source label too when a hide-action filter matches', () => {
+      const filtered = makePost('filtered', 'original', true, '<p>filtered away</p>');
+      filtered.status.filtered = [
+        {
+          filter: { id: 'f1', title: 'No sports', context: ['home'], filter_action: 'hide' },
+          keyword_matches: ['sports'],
+        },
+      ] as never;
+      feed.posts.set([makePost('kept', 'original', true, '<p>still here</p>'), filtered]);
+      fixture.detectChanges();
+
+      expect(text()).toContain('still here');
+      expect(text()).not.toContain('filtered away');
+      expect(labels()).toHaveLength(1);
+    });
+
+    it('falls through to the empty state when every card would render nothing', () => {
+      feed.posts.set([makePost('hushed', 'original', true, '<p>never again</p>')]);
+      TestBed.inject(MutedPosts).mute('hushed');
+      fixture.detectChanges();
+
+      expect(labels()).toHaveLength(0);
+      expect(text()).toContain('follow some people and hashtags');
+    });
   });
 });

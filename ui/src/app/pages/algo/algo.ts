@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit } from '@angular/core';
+import { Component, computed, effect, inject, OnInit } from '@angular/core';
 import { AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
 import { isCalmHidden } from '../../sentiment';
@@ -6,6 +6,7 @@ import { FeedLanguageFilter } from '../../trend-language-filter';
 import { Status } from '../../models';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { StatusCard } from '../../status-card/status-card';
+import { StatusVisibility } from '../../status-visibility';
 import { Auth } from '../../auth';
 
 const SOURCE_LABELS: Record<AlgoSource, string> = {
@@ -36,6 +37,7 @@ export class Algo implements OnInit {
   protected prefs = inject(ClientPrefs);
   protected auth = inject(Auth);
   private feedLangFilter = inject(FeedLanguageFilter);
+  private visibility = inject(StatusVisibility);
   private diagnostics = inject(PageDiagnostics);
 
   /** Whether a post survives the audience + tags chips (calm applied separately). */
@@ -46,7 +48,14 @@ export class Algo implements OnInit {
     return p.source !== 'hashtag' || this.prefs.algoTags();
   }
 
-  /** The cached feed with the audience, tags, calm, and language filters applied. */
+  /**
+   * The cached feed with the audience, tags, calm, and language filters applied.
+   *
+   * The {@link StatusVisibility} check is not optional: each item wraps its card
+   * in a "why you're seeing this" line, and a card that self-suppresses (muted
+   * post, locally blocked author, hide-action filter) renders nothing — leaving
+   * the label stranded over empty space. Drop the whole item instead.
+   */
   protected visible = computed(() =>
     this.feed
       .posts()
@@ -54,9 +63,51 @@ export class Algo implements OnInit {
         (p) =>
           this.passesChips(p) &&
           !(this.prefs.algoCalm() && isCalmHidden(p.status)) &&
-          this.feedLangFilter.shouldShow(p.status),
+          this.feedLangFilter.shouldShow(p.status) &&
+          !this.visibility.rendersNothing(p.status),
       ),
   );
+
+  /**
+   * Posts dropped purely because their card would render nothing, tallied by
+   * reason. Recomputes with the feed, so the log below reports the live state.
+   */
+  private suppressed = computed(() => {
+    const tally: Record<string, number> = {};
+    for (const p of this.feed.posts()) {
+      const reason = this.visibility.hiddenReason(p.status);
+      if (reason) {
+        tally[reason] = (tally[reason] ?? 0) + 1;
+      }
+    }
+    return tally;
+  });
+
+  /**
+   * One console line per render pass whenever the pool shrinks, naming every
+   * stage that dropped posts. An Algo feed that looks emptier than its "N posts"
+   * meta line claims is otherwise silent — this says which filter ate them.
+   */
+  private logFunnel = effect(() => {
+    const pool = this.feed.posts();
+    if (this.feed.loading() || !pool.length) {
+      return;
+    }
+    const visible = this.visible().length;
+    if (visible === pool.length) {
+      return;
+    }
+    this.diagnostics.info('Algo', 'feed:funnel', {
+      pool: pool.length,
+      visible,
+      chips: pool.filter((p) => !this.passesChips(p)).length,
+      calm: this.calmHidden(),
+      language: pool.filter((p) => !this.feedLangFilter.shouldShow(p.status)).length,
+      cardRendersNothing: this.suppressed(),
+      audience: this.prefs.algoAudience(),
+      tags: this.prefs.algoTags(),
+    });
+  });
 
   /** How many posts calm mode is currently hiding, for the chip hint. */
   protected calmHidden = computed(() => {

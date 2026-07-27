@@ -44,10 +44,15 @@ const NO_WRITES: ProviderCapabilities = { reply: false, favourite: false, reblog
 /**
  * Capabilities for one status, given whether this browser holds a token.
  *
- * Only `anonymous-mastodon` is conditional. A status of that provider is writable
- * when we are authenticated: the token belongs to the server the status came from,
- * because that is the server the session was opened against. Without a token the
- * fetch was anonymous and every write would be a 401, so the buttons come off.
+ * The token is what makes the difference, not the provider. With one, an
+ * `anonymous-mastodon` status is writable like any other: the token belongs to
+ * the server the status came from, because that is the server the session was
+ * opened against. Without one we are in Anonymous mode — every read went out
+ * through `externalFetch()` and every write would be a 401 — so the buttons come
+ * off for every provider, including a status left tagged `mastodon` or carrying
+ * no provider at all (an older cache entry). Narrowing this to
+ * `anonymous-mastodon` alone let those slip through with live-looking reply,
+ * boost, and favourite buttons that could only ever fail.
  *
  * Restrictions the *server* imposes (a `no_interactions` moderation restriction, a
  * read-only identity) are deliberately not modelled here. The server is the only
@@ -58,11 +63,10 @@ export function capabilitiesFor(
   provider: ProviderId | undefined,
   authenticated: boolean,
 ): ProviderCapabilities {
-  const base = PROVIDER_CAPS[provider ?? 'mastodon'] ?? PROVIDER_CAPS.mastodon;
-  if (provider === 'anonymous-mastodon' && !authenticated) {
+  if (!authenticated) {
     return NO_WRITES;
   }
-  return base;
+  return PROVIDER_CAPS[provider ?? 'mastodon'] ?? PROVIDER_CAPS.mastodon;
 }
 
 /**

@@ -47,6 +47,10 @@ export class AnonymousCapabilities {
    * `externalFetch()`, and every write would be a 401. That is the only case that
    * takes the buttons away.
    *
+   * It takes them away for *every* provider, not just `anonymous-mastodon`: a
+   * status still tagged `mastodon` (or carrying no provider) is just as
+   * unwritable without a token.
+   *
    * When a token *is* held, `anonymous-mastodon` posts are writable like any other.
    * That provider covers a Mastodon-compatible server targeted directly — including
    * a textboard like mawkingbird_server, where a durable session identity replies,

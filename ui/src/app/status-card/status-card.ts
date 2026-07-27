@@ -24,6 +24,7 @@ import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, MediaAttachment, Poll, Status, Translation } from '../models';
 import { MutedPosts } from '../muted-posts';
 import { LocalModeration } from '../local-moderation';
+import { StatusVisibility } from '../status-visibility';
 import { ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
@@ -132,6 +133,7 @@ export class StatusCard {
   private router = inject(Router);
   private mutedPosts = inject(MutedPosts);
   private localMod = inject(LocalModeration);
+  private visibility = inject(StatusVisibility);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   private anonymousPublic = inject(AnonymousPublicApi);
@@ -169,18 +171,7 @@ export class StatusCard {
    * this post") or has locally blocked/muted its author. Reading the moderation
    * signals here means the card disappears the moment the viewer acts.
    */
-  protected mutedLocally = computed(() => {
-    const map = this.mutedPosts.muted();
-    const s = this.status();
-    const shown = s.reblog ?? s;
-    if ((map[shown.id] ?? 0) > Date.now()) {
-      return true;
-    }
-    // Re-read the moderation map so this recomputes when it changes, then test
-    // both the post's author and (for a boost) whoever boosted it.
-    this.localMod.entries();
-    return this.localMod.isSuppressed(shown.account) || this.localMod.isSuppressed(s.account);
-  });
+  protected mutedLocally = computed(() => this.visibility.mutedLocally(this.status()));
 
   /** Whether the viewer has locally blocked this card's author. */
   protected authorBlockedLocally = computed(() => {
@@ -290,17 +281,9 @@ export class StatusCard {
   // --- content filters (server-computed `filtered`, applied client-side) ---
 
   /** Matched filters that apply in this timeline's context. */
-  private activeFilters = computed<FilterResult[]>(() => {
-    const s = this.status();
-    const results = s.reblog
-      ? [...(s.filtered ?? []), ...(s.reblog.filtered ?? [])]
-      : (s.filtered ?? []);
-    return results.filter(
-      (result) =>
-        Array.isArray(result?.filter?.context) &&
-        result.filter.context.includes(this.filterContext()),
-    );
-  });
+  private activeFilters = computed<FilterResult[]>(() =>
+    this.visibility.activeFilters(this.status(), this.filterContext()),
+  );
 
   /** A hide-action filter matched: the post renders as nothing at all. */
   protected hiddenByFilter = computed(() =>

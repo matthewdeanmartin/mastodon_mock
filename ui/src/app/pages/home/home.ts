@@ -12,6 +12,7 @@ import { FeedLanguageFilter } from '../../trend-language-filter';
 import { CommandBar } from '../../command-bar/command-bar';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
+import { StatusVisibility } from '../../status-visibility';
 import { Announcements } from '../../announcements/announcements';
 import { Streaming } from '../../streaming';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
@@ -65,6 +66,7 @@ export class Home implements OnInit, OnDestroy {
   protected auth = inject(Auth);
   protected prefs = inject(ClientPrefs);
   private feedLangFilter = inject(FeedLanguageFilter);
+  private visibility = inject(StatusVisibility);
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private diagnostics = inject(HomeDiagnostics);
@@ -114,6 +116,14 @@ export class Home implements OnInit, OnDestroy {
    * the reader chose to keep, instead of an abrupt wall. Fetched once per cap.
    */
   protected bookmarkTail = signal<Status[]>([]);
+  /**
+   * The tail minus bookmarks whose card would render nothing. Each one carries a
+   * "🔖 From your bookmarks" label of its own, so a self-suppressing card would
+   * strand the label over empty space — see {@link StatusVisibility}.
+   */
+  protected visibleBookmarkTail = computed(() =>
+    this.bookmarkTail().filter((s) => !this.visibility.rendersNothing(s)),
+  );
   /** Ticks so `capActive` re-evaluates the cooldown without a user action. */
   private now = signal(Date.now());
   private clock: ReturnType<typeof setInterval> | null = null;

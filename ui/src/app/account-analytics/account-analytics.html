@@ -15,11 +15,13 @@
         Reach is estimated, not measured — a cheap peek.
       </span>
       @if (hasMore()) {
-        <span class="load-more">
+        <span class="load-more" role="group" aria-label="Get more posts">
           @if (loadingMore()) {
             <span class="muted">Fetching more…</span>
           } @else {
-            <label>Get more posts:</label>
+            <!-- A caption for a button group, not a form control — the group's
+                 own `aria-label` below is what carries it to assistive tech. -->
+            <span>Get more posts:</span>
             @for (n of loadMoreChoices; track n) {
               <button
                 type="button"
