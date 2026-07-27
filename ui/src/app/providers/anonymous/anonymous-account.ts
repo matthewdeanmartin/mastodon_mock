@@ -117,6 +117,14 @@ export class AnonymousAccount {
   readonly server = computed(() => this.state()?.server ?? DEFAULT_SERVER);
   readonly account = computed(() => this.state()?.account ?? defaultAccount(this.server()));
 
+  /**
+   * Whether this identity has ever been used in this browser. `account()` always
+   * answers with a default so callers never handle null, which means it cannot
+   * distinguish "set up" from "never touched" — the left rail needs to, so it
+   * doesn't advertise a card for an identity the user has never entered.
+   */
+  readonly activated = computed(() => this.state() !== null);
+
   /** Activate the identity, optionally moving its home-instance context. */
   activate(server?: string): void {
     const normalized =

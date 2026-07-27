@@ -44,6 +44,12 @@ To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use th
 ng test
 ```
 
+Spec files share a single jsdom realm, so a global mutated in one file leaks into
+the next. If a whole spec file fails intermittently but passes when run on its
+own, read
+[docs/shared-jsdom-realm-in-tests.md](docs/shared-jsdom-realm-in-tests.md) before
+writing it off as flaky.
+
 ## Running end-to-end tests
 
 For end-to-end (e2e) testing, run:

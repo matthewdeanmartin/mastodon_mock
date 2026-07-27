@@ -7,6 +7,19 @@ export interface BskyAuthor {
   avatar?: string;
 }
 
+/** `app.bsky.actor.defs#profileViewDetailed` — the fields the rail card shows. */
+export interface BskyProfile {
+  did: string;
+  handle: string;
+  displayName?: string;
+  description?: string;
+  avatar?: string;
+  banner?: string;
+  followersCount?: number;
+  followsCount?: number;
+  postsCount?: number;
+}
+
 export interface BskyFacet {
   index: { byteStart: number; byteEnd: number };
   features: {

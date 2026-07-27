@@ -1,16 +1,14 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AccountHoverCard } from '../../account-hover-card/account-hover-card';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, Tag } from '../../models';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
-import { HumanCountPipe } from '../../human-count.pipe';
 import { Terminology } from '../../terminology';
-import { VerifiedBadge } from '../../verified-badge/verified-badge';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
-import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
+import { ProfileStack } from './profile-stack/profile-stack';
 
 interface SuggestionCandidate {
   account: Account;
@@ -26,14 +24,15 @@ function accountKey(account: Account): string {
 }
 
 /**
- * Left sidebar: the signed-in user's profile card (2018-Twitter style), a
- * "Who to follow" widget, and trending hashtags beneath it. Suggestions are
- * derived synthetically: accounts whose posts were boosted by other people on
- * the user's home timeline, uniquified, minus yourself and anyone you follow.
+ * Left sidebar: the stack of connected-identity cards (2018-Twitter style, one
+ * per network — see {@link ProfileStack}), a "Who to follow" widget, and
+ * trending hashtags beneath it. Suggestions are derived synthetically: accounts
+ * whose posts were boosted by other people on the user's home timeline,
+ * uniquified, minus yourself and anyone you follow.
  */
 @Component({
   selector: 'app-left-rail',
-  imports: [RouterLink, VerifiedBadge, AccountHoverCard, HumanCountPipe],
+  imports: [RouterLink, AccountHoverCard, ProfileStack],
   templateUrl: './left-rail.html',
   styleUrl: './left-rail.css',
 })
@@ -43,7 +42,6 @@ export class LeftRail implements OnInit {
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private anonymousFollows = inject(AnonymousFollows);
   private anonymous = inject(AnonymousAccount);
-  private anonymousTags = inject(AnonymousTags);
   protected words = inject(Terminology).words;
   private candidates = new Map<string, SuggestionCandidate>();
 
@@ -51,12 +49,6 @@ export class LeftRail implements OnInit {
   /** Ids the user followed from this widget (flips the button to "Following"). */
   protected followed = signal<Set<string>>(new Set());
   protected trends = signal<Tag[]>([]);
-  protected followingCount = computed(() =>
-    this.auth.isAnonymous
-      ? this.anonymousFollows.count()
-      : (this.auth.account()?.following_count ?? 0),
-  );
-  protected hashtagCount = signal(0);
 
   /** Most recent day's use count for a trending tag, if the server provides one. */
   uses(tag: Tag): string | null {
@@ -64,14 +56,6 @@ export class LeftRail implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this.auth.isAnonymous) {
-      this.hashtagCount.set(this.anonymousTags.count());
-    } else {
-      this.api.followedTags().subscribe({
-        next: (tags) => this.hashtagCount.set(tags.length),
-        error: () => this.hashtagCount.set(0),
-      });
-    }
     this.api.trendingTags().subscribe({
       next: (tags) => this.trends.set(tags),
       error: () => {

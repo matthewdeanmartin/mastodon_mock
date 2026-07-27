@@ -21,8 +21,12 @@ describe('rateLimitInterceptor', () => {
   });
 
   afterEach(() => {
-    httpMock.verify();
+    // Restore the clock *before* the assertion that can throw. `verify()` raises
+    // on an outstanding request, and an afterEach that throws skips the rest of
+    // itself — which would leave this realm's clock frozen for every later test
+    // in the file (spec files share a realm: the builder sets `isolate: false`).
     vi.useRealTimers();
+    httpMock.verify();
   });
 
   it('retries a rate-limited GET once after Retry-After', async () => {

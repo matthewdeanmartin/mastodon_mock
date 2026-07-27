@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, Observable, switchMap, throwError } from 'rxjs';
 import { externalFetch } from '../external-fetch';
 import { BlueskySession } from './bluesky-session';
-import { BskyFacet, BskyThreadNode, BskyTimeline } from './bluesky-types';
+import { BskyFacet, BskyProfile, BskyThreadNode, BskyTimeline } from './bluesky-types';
 
 interface CreateRecordResponse {
   uri: string;
@@ -80,6 +80,16 @@ export class BlueskyApi {
   /** Delete any owned record (a like, a repost, a post) by its at-uri. */
   deleteRecord(atUri: string): Observable<unknown> {
     return this.request('com.atproto.repo.deleteRecord', parseAtUri(atUri));
+  }
+
+  /**
+   * A detailed actor profile — bio, avatar, banner and the three counts. Defaults
+   * to the linked account itself, which is what the left rail's card wants.
+   */
+  getProfile(actor?: string): Observable<BskyProfile> {
+    const target = actor ?? this.session.session()?.did ?? '';
+    const params = new HttpParams().set('actor', target);
+    return this.get<BskyProfile>('app.bsky.actor.getProfile', params);
   }
 
   resolveHandle(handle: string): Observable<{ did: string }> {

@@ -5,6 +5,7 @@ import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { Server } from '../../server';
+import { stubLocation } from '../../testing/stub-location';
 import { Login } from './login';
 
 const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
@@ -50,14 +51,7 @@ describe('Login', () => {
     httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
 
     const hrefSetter = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: {
-        set href(v: string) {
-          hrefSetter(v);
-        },
-      },
-      writable: true,
-    });
+    stubLocation({ onHref: hrefSetter });
 
     fixture.componentInstance.startOAuth();
 

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stubLocation } from './testing/stub-location';
 import { UpdateRecovery } from './update-recovery';
 
 /**
@@ -8,18 +9,15 @@ import { UpdateRecovery } from './update-recovery';
  */
 describe('UpdateRecovery', () => {
   let recovery: UpdateRecovery;
-  let reloadSpy: ReturnType<typeof vi.fn>;
+  let reloadSpy: ReturnType<typeof vi.fn<() => void>>;
   const storageKey = 'mockingbird.update-recovery';
 
   beforeEach(() => {
     sessionStorage.clear();
     vi.useFakeTimers();
     reloadSpy = vi.fn();
-    // jsdom's location.reload isn't configurable directly; redefine it.
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...window.location, reload: reloadSpy },
-    });
+    // jsdom's location.reload isn't configurable directly; swap the object out.
+    stubLocation({ onReload: reloadSpy });
     TestBed.configureTestingModule({ providers: [UpdateRecovery] });
     recovery = TestBed.inject(UpdateRecovery);
   });
