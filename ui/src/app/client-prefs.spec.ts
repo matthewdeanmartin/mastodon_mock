@@ -194,4 +194,51 @@ describe('ClientPrefs', () => {
     const other = recreate();
     expect(other.hiddenProviders()).toEqual([]);
   });
+
+  it('persists thoughtful posting, off by default', () => {
+    const prefs = create();
+    expect(prefs.thoughtfulPosting()).toBe(false);
+    prefs.setThoughtfulPosting(true);
+    TestBed.tick();
+
+    expect(recreate().thoughtfulPosting()).toBe(true);
+  });
+
+  // ------------------------------------------------- cached posting default
+  //
+  // A mirror of the server's `source.privacy`, so the composer can open on the
+  // user's real default without spending a request to find out what it is.
+
+  it('defaults to public with nothing cached', () => {
+    expect(create().defaultVisibility()).toBe('public');
+  });
+
+  it('caches a visibility and survives a rebuild', () => {
+    localStorage.setItem(TOKEN_KEY, 'token-one');
+    const prefs = create();
+    prefs.setDefaultVisibility('private');
+    TestBed.tick();
+
+    expect(recreate().defaultVisibility()).toBe('private');
+  });
+
+  it('ignores a value that is not a visibility rather than resetting the cache', () => {
+    const prefs = create();
+    prefs.setDefaultVisibility('unlisted');
+    // A partial response shouldn't silently widen the user's default back to public.
+    prefs.setDefaultVisibility(undefined);
+    prefs.setDefaultVisibility('nonsense');
+    prefs.setDefaultVisibility(null);
+    expect(prefs.defaultVisibility()).toBe('unlisted');
+  });
+
+  it("does not leak one account's posting default to another", () => {
+    localStorage.setItem(TOKEN_KEY, 'token-one');
+    const one = create();
+    one.setDefaultVisibility('direct');
+    TestBed.tick();
+
+    localStorage.setItem(TOKEN_KEY, 'token-two');
+    expect(recreate().defaultVisibility()).toBe('public');
+  });
 });

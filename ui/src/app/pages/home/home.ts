@@ -96,6 +96,21 @@ export class Home implements OnInit, OnDestroy {
     { initialValue: undefined },
   );
 
+  /**
+   * Whether this page was opened to finish a specific draft.
+   *
+   * Under thoughtful posting, Home normally shows a Write button instead of a
+   * composer — but "Edit for post" routes *here* to do the publishing, and a
+   * cycle whose final step is hidden is not a cycle. Arriving with a draft or a
+   * pending handoff therefore un-gates the composer: the deliberation already
+   * happened, in the gap between saving it and coming back.
+   *
+   * Latched at construction rather than computed live, because the composer
+   * drains the handoff as it seeds — a live read would swap the composer back
+   * out from under the user mid-edit.
+   */
+  protected readonly fromDraft = signal(this.drafts.hasHandoff());
+
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
   protected live = signal(false);

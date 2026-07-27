@@ -5,6 +5,7 @@ import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../../client-prefs';
+import { Drafts } from '../../drafts';
 import { HomeDiagnostics } from '../../home-diagnostics';
 import { Status } from '../../models';
 import { Streaming } from '../../streaming';
@@ -422,5 +423,42 @@ describe('Home', () => {
     home.eliza.unfollow();
     fixture.detectChanges();
     expect(home.visible().some((s) => s.id.startsWith('eliza:'))).toBe(false);
+  });
+
+  // --------------------------------------------------------- thoughtful posting
+
+  it('replaces the writing box with a Write button when thoughtful posting is on', () => {
+    TestBed.inject(ClientPrefs).setThoughtfulPosting(true);
+    const fixture = setUp();
+
+    expect(fixture.nativeElement.querySelector('app-compose')).toBeNull();
+    const write = fixture.nativeElement.querySelector('.write-btn');
+    expect(write).not.toBeNull();
+    expect(write.getAttribute('href')).toContain('/drafts');
+  });
+
+  // The publish step of write -> draft -> edit -> publish happens here. Hiding
+  // the composer when you arrive holding a draft would leave the cycle with no
+  // way to finish.
+  it('still shows a live composer when arriving to finish a handed-off draft', () => {
+    TestBed.inject(ClientPrefs).setThoughtfulPosting(true);
+    TestBed.inject(Drafts).handoff({
+      segments: ['ready to go out'],
+      spoilerText: '',
+      sensitive: false,
+      visibility: 'public',
+      poll: null,
+    });
+
+    const fixture = setUp();
+
+    expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.write-btn')).toBeNull();
+  });
+
+  it('leaves Home alone when the pref is off', () => {
+    const fixture = setUp();
+    expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.write-btn')).toBeNull();
   });
 });

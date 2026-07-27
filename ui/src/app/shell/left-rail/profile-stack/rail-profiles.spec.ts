@@ -76,15 +76,17 @@ describe('RailProfiles', () => {
 
     rail.load();
     flushFollowedTags();
-    httpMock.expectOne((req) => req.url.includes('app.bsky.actor.getProfile')).flush({
-      did: BSKY.did,
-      handle: BSKY.handle,
-      displayName: 'Matt 🦋',
-      description: 'skeets only',
-      followersCount: 9,
-      followsCount: 8,
-      postsCount: 7,
-    });
+    httpMock
+      .expectOne((req) => req.url.includes('app.bsky.actor.getProfile'))
+      .flush({
+        did: BSKY.did,
+        handle: BSKY.handle,
+        displayName: 'Matt 🦋',
+        description: 'skeets only',
+        followersCount: 9,
+        followsCount: 8,
+        postsCount: 7,
+      });
 
     const bsky = rail.profiles()[1];
     expect(bsky.key).toBe('bluesky:did:plc:matt');

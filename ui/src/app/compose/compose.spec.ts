@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../client-prefs';
+import { Drafts } from '../drafts';
 import { Status } from '../models';
 import { Auth } from '../auth';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
@@ -40,6 +41,12 @@ interface ComposeInternals {
   pasteExpiry: WritableSignal<string>;
   pasteProviderId: WritableSignal<string>;
   onPasteProviderChange(providerId: string): void;
+  onPasteExpiryChange(expiry: string): void;
+  onTargetChange(target: PostTarget): void;
+  onVisibilityChange(visibility: string): void;
+  pendingSelfCleanup: WritableSignal<string | null>;
+  selfCleanupError: WritableSignal<string | null>;
+  deleteSelfDraftCopy(): void;
   showTargetPicker: Signal<boolean>;
   crossPostError: Signal<string | null>;
   toggleCw(): void;
@@ -586,6 +593,84 @@ describe('Compose', () => {
     httpMock.expectNone(CREATE_RECORD);
   });
 
+  // ------------------------------------------------- paste visibility clamping
+  //
+  // Paste services only speak public/unlisted, so selecting Paste has to narrow
+  // whatever the user picked. The bug these cover is that it used to be a
+  // one-way trip: coming back to Fedi left the post silently downgraded to
+  // unlisted, quietly overriding a deliberate choice.
+
+  it('restores the pre-paste visibility when the target leaves paste', () => {
+    const f = setUp();
+    internals(f).onVisibilityChange('private');
+    internals(f).onTargetChange('paste');
+    expect(internals(f).visibility()).toBe('unlisted');
+
+    internals(f).onTargetChange('fedi');
+    expect(internals(f).visibility()).toBe('private');
+  });
+
+  it('restores what the user chose before ANY paste clamp, across providers', () => {
+    const f = setUp();
+    internals(f).onVisibilityChange('direct');
+    internals(f).onTargetChange('paste');
+    internals(f).onPasteProviderChange('rentry');
+    internals(f).onPasteProviderChange('pastepile');
+
+    internals(f).onTargetChange('fedi');
+    expect(internals(f).visibility()).toBe('direct');
+  });
+
+  it('a hand-picked visibility on paste outranks the stashed one', () => {
+    const f = setUp();
+    internals(f).onVisibilityChange('private');
+    internals(f).onTargetChange('paste');
+    // The user deliberately chooses public while on Paste.
+    internals(f).onVisibilityChange('public');
+
+    internals(f).onTargetChange('fedi');
+    expect(internals(f).visibility()).toBe('public');
+  });
+
+  it('falls back to the account posting default when nothing was stashed', () => {
+    TestBed.inject(ClientPrefs).setDefaultVisibility('private');
+    const f = setUp();
+    // Straight to paste from the default public — a clamp happens, but then the
+    // user picks by hand, dropping the stash.
+    internals(f).onTargetChange('paste');
+    internals(f).onVisibilityChange('unlisted');
+
+    internals(f).onTargetChange('fedi');
+    expect(internals(f).visibility()).toBe('private');
+  });
+
+  it('leaving burn expiry gives back the visibility burn narrowed', () => {
+    const f = setUp();
+    internals(f).onTargetChange('paste');
+    internals(f).onPasteProviderChange('pastepile');
+    internals(f).onVisibilityChange('public');
+
+    internals(f).onPasteExpiryChange('burn');
+    expect(internals(f).visibility()).toBe('unlisted');
+
+    internals(f).onPasteExpiryChange('1w');
+    expect(internals(f).visibility()).toBe('public');
+  });
+
+  it('a composer that never touches paste keeps its visibility', () => {
+    const f = setUp();
+    internals(f).onVisibilityChange('private');
+    internals(f).onTargetChange('bsky');
+    internals(f).onTargetChange('fedi');
+    expect(internals(f).visibility()).toBe('private');
+  });
+
+  it('opens on the account posting default rather than assuming public', () => {
+    TestBed.inject(ClientPrefs).setDefaultVisibility('unlisted');
+    const f = setUp();
+    expect(internals(f).visibility()).toBe('unlisted');
+  });
+
   it('target=paste creates a Pastepile paste, stores its edit key, and emits a status', () => {
     const f = setUp();
     const posted: Status[] = [];
@@ -880,6 +965,171 @@ describe('Compose', () => {
     // The caller's multi-mention seed wins (e.g. group chat), not the single handle.
     expect(internals(f).text()).toBe('@alice@dmv.community @bob@x.social ');
     expect(internals(f).showReplyMentionHint()).toBe(true);
+  });
+
+  // ------------------------------------------------- "Edit for post" handoff
+  //
+  // The one destructive path in the whole drafts feature. The ordering is the
+  // point: publish first, offer to delete second. Delete-then-publish is what
+  // the mastodon.social folk recipe does, and it is how people lose posts.
+
+  it('seeds from a pending handoff and offers cleanup only after publishing', () => {
+    const drafts = TestBed.inject(Drafts);
+    drafts.handoff(
+      {
+        segments: ['promoted from a private note'],
+        spoilerText: '',
+        sensitive: false,
+        visibility: 'public',
+        poll: null,
+      },
+      'self-99',
+    );
+
+    const f = setUp();
+    expect(internals(f).text()).toBe('promoted from a private note');
+    // Nothing offered yet — the post hasn't happened.
+    expect(internals(f).pendingSelfCleanup()).toBeNull();
+
+    internals(f).submit();
+    httpMock.expectOne('/api/v1/statuses').flush({ id: 'new-1' });
+
+    expect(internals(f).pendingSelfCleanup()).toBe('self-99');
+  });
+
+  it('never offers cleanup when the publish fails', () => {
+    const drafts = TestBed.inject(Drafts);
+    drafts.handoff(
+      {
+        segments: ['this will not post'],
+        spoilerText: '',
+        sensitive: false,
+        visibility: 'public',
+        poll: null,
+      },
+      'self-99',
+    );
+    const f = setUp();
+
+    internals(f).submit();
+    httpMock.expectOne('/api/v1/statuses').error(new ProgressEvent('500'));
+
+    // The private copy is still the only copy — it must survive.
+    expect(internals(f).pendingSelfCleanup()).toBeNull();
+  });
+
+  it('deletes the private copy on confirm', () => {
+    const f = setUp();
+    internals(f).pendingSelfCleanup.set('self-99');
+
+    internals(f).deleteSelfDraftCopy();
+
+    httpMock.expectOne({ url: '/api/v1/statuses/self-99', method: 'DELETE' }).flush({});
+    expect(internals(f).pendingSelfCleanup()).toBeNull();
+  });
+
+  it('reports a failed cleanup rather than pretending the copy is gone', () => {
+    const f = setUp();
+    internals(f).pendingSelfCleanup.set('self-99');
+
+    internals(f).deleteSelfDraftCopy();
+    httpMock
+      .expectOne({ url: '/api/v1/statuses/self-99', method: 'DELETE' })
+      .error(new ProgressEvent('500'));
+
+    expect(internals(f).selfCleanupError()).toContain('still in your messages');
+  });
+
+  it('a handoff seeds exactly once and does not survive into the next composer', () => {
+    const drafts = TestBed.inject(Drafts);
+    drafts.handoff({
+      segments: ['one shot'],
+      spoilerText: '',
+      sensitive: false,
+      visibility: 'public',
+      poll: null,
+    });
+
+    expect(internals(setUp()).text()).toBe('one shot');
+    // Drained: a second composer starts empty rather than re-seeding.
+    expect(drafts.takeHandoff()).toBeNull();
+  });
+
+  // -------------------------------------------------------- thoughtful posting
+  //
+  // The gate's whole value is that it cannot be walked around. These assert the
+  // *absence* of a network call, which is the only thing that really proves it.
+
+  it('a gated composer saves a draft instead of posting', () => {
+    TestBed.inject(ClientPrefs).setThoughtfulPosting(true);
+    const drafts = TestBed.inject(Drafts);
+    const f = TestBed.createComponent(Compose);
+    f.componentRef.setInput('gateable', true);
+    f.detectChanges();
+
+    internals(f).text.set('a thought worth sitting on');
+    internals(f).submit();
+
+    // Nothing was published — httpMock.verify() in afterEach enforces it.
+    expect(drafts.drafts()).toHaveLength(1);
+    expect(drafts.drafts()[0].segments[0]).toBe('a thought worth sitting on');
+    expect(internals(f).text()).toBe('');
+  });
+
+  it('an opted-in composer still posts normally while the pref is off', () => {
+    const f = TestBed.createComponent(Compose);
+    f.componentRef.setInput('gateable', true);
+    f.detectChanges();
+
+    internals(f).text.set('ordinary post');
+    internals(f).submit();
+
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(0);
+  });
+
+  // Replies are urgent; mellowing them in a queue destroys what they're for.
+  // A mount that never opts in must be untouched even with the pref on.
+  it('a reply is never gated, even with thoughtful posting on', () => {
+    TestBed.inject(ClientPrefs).setThoughtfulPosting(true);
+    const f = TestBed.createComponent(Compose);
+    f.componentRef.setInput('inReplyToId', 'parent-1');
+    f.detectChanges();
+
+    internals(f).text.set('urgent reply');
+    internals(f).submit();
+
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '2' });
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(0);
+  });
+
+  it('a non-opted-in top-level composer (paste share, chat) is not gated', () => {
+    TestBed.inject(ClientPrefs).setThoughtfulPosting(true);
+    const f = setUp();
+
+    internals(f).text.set('sharing a paste link');
+    internals(f).submit();
+
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '3' });
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(0);
+  });
+
+  it('a reply composer never swallows a top-level handoff', () => {
+    const drafts = TestBed.inject(Drafts);
+    drafts.handoff({
+      segments: ['meant for the main box'],
+      spoilerText: '',
+      sensitive: false,
+      visibility: 'public',
+      poll: null,
+    });
+
+    const f = TestBed.createComponent(Compose);
+    f.componentRef.setInput('inReplyToId', 'parent-1');
+    f.detectChanges();
+
+    expect(internals(f).text()).not.toContain('meant for the main box');
+    expect(drafts.takeHandoff()).not.toBeNull();
   });
 });
 

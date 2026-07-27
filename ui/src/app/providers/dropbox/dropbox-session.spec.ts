@@ -16,7 +16,11 @@ describe('DropboxSession', () => {
     sessionStorage.setItem('mockingbird_dropbox_oauth_state', 'expected-state');
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({ access_token: 'short-lived-token', expires_in: 14400, account_id: 'dbid:1' }),
+        JSON.stringify({
+          access_token: 'short-lived-token',
+          expires_in: 14400,
+          account_id: 'dbid:1',
+        }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
@@ -54,12 +58,14 @@ describe('DropboxSession', () => {
       'mockingbird_dropbox_token',
       JSON.stringify({ accessToken: 'token', expiresAt: Date.now() + 3_600_000 }),
     );
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({ entries: [{ '.tag': 'folder', id: 'id:1', name: 'Photos' }] }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ entries: [{ '.tag': 'folder', id: 'id:1', name: 'Photos' }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const entries = await TestBed.inject(DropboxSession).listRoot();

@@ -101,6 +101,10 @@
   color: var(--danger, #c33);
 }
 
+.paste-notice {
+  color: var(--accent);
+}
+
 @media (max-width: 600px) {
   .feed-row,
   .paste-card-head {

@@ -189,3 +189,22 @@ a.eliza-invite {
 a.eliza-invite:hover {
   background: var(--accent-soft, rgba(128, 128, 128, 0.06));
 }
+
+/* Thoughtful posting's stand-in for the writing box. Deliberately a single
+   quiet row: the point of the mode is that Home stops inviting you to type. */
+.write-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.write-btn {
+  text-decoration: none;
+}
+
+.write-note {
+  color: var(--muted);
+  font-size: 13px;
+}

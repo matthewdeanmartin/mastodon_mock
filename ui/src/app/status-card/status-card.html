@@ -621,8 +621,11 @@
 
       @if (quoting()) {
         <div class="inline-compose" (click)="$event.stopPropagation()">
+          <!-- A quote is a fresh statement to your own audience, not a reply to
+               a conversation, so it goes through Drafts like any other post. -->
           <app-compose
             [quotedStatusId]="display.id"
+            [gateable]="true"
             placeholder="Add a comment"
             (posted)="onQuoted($event)"
           />

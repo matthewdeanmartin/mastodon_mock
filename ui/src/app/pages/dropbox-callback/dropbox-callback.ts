@@ -12,8 +12,16 @@ import { DropboxSession } from '../../providers/dropbox/dropbox-session';
     </main>
   `,
   styles: `
-    :host { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-    .callback-card { max-width: 480px; text-align: center; }
+    :host {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .callback-card {
+      max-width: 480px;
+      text-align: center;
+    }
   `,
 })
 export class DropboxCallback implements OnInit {

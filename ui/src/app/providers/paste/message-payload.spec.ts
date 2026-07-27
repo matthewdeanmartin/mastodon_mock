@@ -93,10 +93,7 @@ describe('message-payload', () => {
   });
 
   it('is not sensitive when there is no CW', () => {
-    const status = messageStatus(
-      { content: 'plain', spoiler: '', language: 'plaintext' },
-      null,
-    );
+    const status = messageStatus({ content: 'plain', spoiler: '', language: 'plaintext' }, null);
     expect(status.sensitive).toBe(false);
     expect(status.spoiler_text).toBe('');
   });

@@ -193,6 +193,25 @@ a.tab:hover {
   border-bottom: 1px solid var(--border);
 }
 
+/*
+ * A quiet explanation under a page title.
+ *
+ * Deliberately NOT placed inside .page-head: anything nested there inherits its
+ * 18px/800, so a paragraph of reference text ends up rendering as loud as the
+ * title it explains. This is text you read once and then stop seeing, so it
+ * matches the register of the compact empty states ("No featured hashtags.")
+ * rather than shouting a caveat at every visit.
+ */
+.page-note {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .list-row {
   display: block;
   padding: 14px 16px;

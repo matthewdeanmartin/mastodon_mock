@@ -207,6 +207,20 @@
         />
         Require alt text on every image before posting
       </label>
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.thoughtfulPosting()"
+          (ngModelChange)="prefs.setThoughtfulPosting($event)"
+          name="thoughtful_posting"
+        />
+        Thoughtful posting: nothing publishes straight from a box
+      </label>
+      <span class="hint">
+        Home gets a Write button instead of a writing box, and that editor only saves. You post
+        later, from Drafts. Replies, chats and paste shares are never held back — they're urgent, or
+        already deliberate.
+      </span>
     </div>
   </div>
 

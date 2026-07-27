@@ -39,10 +39,25 @@
   </a>
 }
 
-<app-compose [initialDraft]="openedDraft()" (posted)="onPosted($event)" />
+<!-- Thoughtful posting replaces the writing box with a way in to the
+     write → draft → edit → publish cycle. Home is still where you land; only
+     the shortcut from "urge to write" to "published" is removed. -->
+@if (prefs.thoughtfulPosting() && !fromDraft() && !openedDraft()) {
+  <div class="write-cta">
+    <a class="btn write-btn" routerLink="/drafts" [queryParams]="{ write: 1 }">✍ Write</a>
+    <span class="write-note">Posts go through Drafts first.</span>
+  </div>
+} @else {
+  <!-- Un-gated when finishing a draft: that IS the deliberate publish step. -->
+  <app-compose
+    [gateable]="!fromDraft() && !openedDraft()"
+    [initialDraft]="openedDraft()"
+    (posted)="onPosted($event)"
+  />
 
-@if (auth.isAnonymous && eliza.following()) {
-  <app-local-compose (posted)="onLocalPosted()" />
+  @if (auth.isAnonymous && eliza.following()) {
+    <app-local-compose (posted)="onLocalPosted()" />
+  }
 }
 
 <app-command-bar

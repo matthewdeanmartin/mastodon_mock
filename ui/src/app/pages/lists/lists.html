@@ -35,9 +35,7 @@
 
   <div class="section-head">Saved searches</div>
   @if (!saved.count()) {
-    <p class="muted center small">
-      None yet — save one from <a routerLink="/search">search</a>.
-    </p>
+    <p class="muted center small">None yet — save one from <a routerLink="/search">search</a>.</p>
   } @else {
     @for (s of saved.all(); track s.id) {
       <a class="list-row" [routerLink]="['/search']" [queryParams]="{ saved: s.id }">

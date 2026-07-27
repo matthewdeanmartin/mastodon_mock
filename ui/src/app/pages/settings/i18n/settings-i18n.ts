@@ -8,8 +8,29 @@ import { KnownLanguages, UI_LANGUAGE } from '../../../trend-language-filter';
 
 /** Languages offered in the "add a language" picker — the ones we can name. */
 const PICKER_ORDER: LangCode[] = [
-  'en', 'es', 'fr', 'de', 'pt', 'it', 'nl', 'sv', 'da', 'no', 'fi', 'pl',
-  'tr', 'ru', 'uk', 'el', 'ja', 'ko', 'zh', 'ar', 'he', 'hi', 'th',
+  'en',
+  'es',
+  'fr',
+  'de',
+  'pt',
+  'it',
+  'nl',
+  'sv',
+  'da',
+  'no',
+  'fi',
+  'pl',
+  'tr',
+  'ru',
+  'uk',
+  'el',
+  'ja',
+  'ko',
+  'zh',
+  'ar',
+  'he',
+  'hi',
+  'th',
 ];
 
 /**

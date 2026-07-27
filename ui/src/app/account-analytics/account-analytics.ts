@@ -269,9 +269,7 @@ export class AccountAnalytics implements OnInit {
    * text plus its Mastodon-declared `language` as an authoritative prior.
    */
   protected languages = computed<LangShare[]>(() =>
-    detectLanguageMix(
-      this.posts().map((s) => ({ text: stripHtml(s.content), meta: s.language })),
-    ),
+    detectLanguageMix(this.posts().map((s) => ({ text: stripHtml(s.content), meta: s.language }))),
   );
 
   langName(code: LangShare['lang']): string {

@@ -102,9 +102,9 @@ export function messageStatusRouteRef(payload: MessagePayload): string {
 export function parseMessageStatusRouteRef(id: string): MessagePayload | null {
   if (!id.startsWith(MESSAGE_STATUS_PREFIX)) return null;
   try {
-    const parsed = JSON.parse(base64UrlDecode(id.slice(MESSAGE_STATUS_PREFIX.length))) as Partial<
-      MessagePayload
-    >;
+    const parsed = JSON.parse(
+      base64UrlDecode(id.slice(MESSAGE_STATUS_PREFIX.length)),
+    ) as Partial<MessagePayload>;
     if (typeof parsed?.content !== 'string') return null;
     return {
       content: parsed.content,

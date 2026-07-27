@@ -18,10 +18,9 @@
           Exclude languages I don't know from trending tags
         </label>
         <span class="hint">
-          Hides trending hashtags that are clearly in a script for a language you
-          haven't listed (e.g. Japanese or Arabic tags). Tags in the Latin
-          alphabet, or ones we can't identify, are always kept. Applies
-          everywhere trending tags appear.
+          Hides trending hashtags that are clearly in a script for a language you haven't listed
+          (e.g. Japanese or Arabic tags). Tags in the Latin alphabet, or ones we can't identify, are
+          always kept. Applies everywhere trending tags appear.
         </span>
       </div>
     </div>
@@ -39,9 +38,9 @@
           Hide posts in languages I don't know (Home and Algo)
         </label>
         <span class="hint">
-          Removes posts confidently in a language you haven't listed, or that
-          mislabel their own language. Posts whose language can't be determined
-          are always kept. Also toggleable with the 🌐 button on Home and Algo.
+          Removes posts confidently in a language you haven't listed, or that mislabel their own
+          language. Posts whose language can't be determined are always kept. Also toggleable with
+          the 🌐 button on Home and Algo.
         </span>
       </div>
     </div>
@@ -52,8 +51,8 @@
       <span class="slabel">Languages you know</span>
       <div class="scontrol">
         <span class="hint">
-          We infer these from your interface language, your browser, and your
-          posting default. Add any others you read.
+          We infer these from your interface language, your browser, and your posting default. Add
+          any others you read.
         </span>
 
         <div class="lang-chips">
@@ -92,12 +91,15 @@
       <span class="slabel">Inferred from</span>
       <div class="scontrol">
         <ul class="infer-list">
-          <li>Interface language: <strong>{{ name(uiLanguage) }}</strong></li>
+          <li>
+            Interface language: <strong>{{ name(uiLanguage) }}</strong>
+          </li>
           <li>
             Browser:
             @if (browserLangs.length) {
               @for (c of browserLangs; track c; let last = $last) {
-                <strong>{{ name(c) }}</strong>{{ last ? '' : ', ' }}
+                <strong>{{ name(c) }}</strong
+                >{{ last ? '' : ', ' }}
               }
             } @else {
               <span class="hint">none reported</span>

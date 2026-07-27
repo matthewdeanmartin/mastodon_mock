@@ -88,7 +88,9 @@ export class DropboxSession {
     const verifier = sessionStorage.getItem(VERIFIER_KEY);
     if (!code || !state || !expectedState || state !== expectedState || !verifier) {
       this.clearPendingAuthorization();
-      throw new Error('Dropbox returned an invalid or expired authorization response. Please try again.');
+      throw new Error(
+        'Dropbox returned an invalid or expired authorization response. Please try again.',
+      );
     }
 
     try {

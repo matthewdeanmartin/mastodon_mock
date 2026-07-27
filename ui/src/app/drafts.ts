@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { computed, Injectable, signal } from '@angular/core';
 
 /** Poll state carried in a draft (mirrors the composer's poll builder). */
 export interface DraftPoll {
@@ -31,6 +31,18 @@ export interface Draft {
 }
 
 export type DraftSnapshot = Omit<Draft, 'id' | 'updatedAt'>;
+
+/** A post handed from /drafts to the composer by "Edit for post". */
+export interface DraftHandoff {
+  snapshot: DraftSnapshot;
+  /**
+   * Set when this came from a post-to-self draft. Publishing it for real leaves
+   * a duplicate private copy sitting in the DM tab, so the composer offers to
+   * delete that copy — but only *after* the publish succeeds. See the composer's
+   * `pendingSelfCleanup`.
+   */
+  selfStatusId?: string;
+}
 
 const DRAFTS_KEY = 'mockingbird_drafts';
 const AUTOSAVE_KEY = 'mockingbird_compose_autosave';
@@ -71,6 +83,41 @@ export class Drafts {
   remove(id: string): void {
     this.drafts.update((list) => list.filter((d) => d.id !== id));
     this.persist();
+  }
+
+  // --- composer handoff ---
+
+  /**
+   * A snapshot waiting to be picked up by the next composer that opens.
+   *
+   * "Edit for post" has to move a whole post — segments, spoiler, poll, paste
+   * metadata — from /drafts across a route change into the composer. Putting
+   * that in the URL is out (a 500-character post is not a query param), and
+   * saving it as a real draft is out too, because the whole point is that the
+   * source is left alone rather than converted. So it rides in memory for the
+   * one navigation, and the composer drains it on seed.
+   *
+   * Deliberately not persisted: a snapshot that outlived a reload would
+   * reappear in an unrelated composer later, which is worse than losing a
+   * navigation that failed anyway.
+   */
+  private readonly handoffSlot = signal<DraftHandoff | null>(null);
+
+  /** Whether a snapshot is waiting, without consuming it. */
+  readonly hasHandoff = computed(() => this.handoffSlot() !== null);
+
+  /** Park a snapshot for the next composer to open. */
+  handoff(snapshot: DraftSnapshot, selfStatusId?: string): void {
+    this.handoffSlot.set({ snapshot, selfStatusId });
+  }
+
+  /** Take the parked handoff, if any, clearing it so it seeds exactly once. */
+  takeHandoff(): DraftHandoff | null {
+    const handoff = this.handoffSlot();
+    if (handoff) {
+      this.handoffSlot.set(null);
+    }
+    return handoff;
   }
 
   // --- autosave slots ---

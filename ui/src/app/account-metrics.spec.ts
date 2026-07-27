@@ -56,9 +56,7 @@ function postDaysAgo(daysAgo: number, now = Date.now(), overrides: Partial<Statu
 describe('estimatePostReach', () => {
   it('reaches a baseline fraction of followers with no engagement', () => {
     const post = makeStatus();
-    expect(estimatePostReach(post, 1000)).toBe(
-      Math.round(1000 * REACH_MODEL.organicReachFraction),
-    );
+    expect(estimatePostReach(post, 1000)).toBe(Math.round(1000 * REACH_MODEL.organicReachFraction));
   });
 
   it('adds boost audience on top of own audience', () => {
@@ -110,9 +108,7 @@ describe('computeLiveliness', () => {
 
   it('treats a busy-but-old account as dormant', () => {
     // 1000-post-equivalent burst, all in 2023, nothing since: the classic ghost.
-    const posts = Array.from({ length: 100 }, (_, i) =>
-      postDaysAgo(900 + i, now.getTime()),
-    );
+    const posts = Array.from({ length: 100 }, (_, i) => postDaysAgo(900 + i, now.getTime()));
     const live = computeLiveliness(posts, now);
     expect(live.label).toBe('Dormant');
     expect(live.score).toBeLessThan(10);

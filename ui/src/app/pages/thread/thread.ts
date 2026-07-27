@@ -27,10 +27,7 @@ import { ElizaService } from '../../eliza/eliza.service';
 import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { isElizaId } from '../../eliza/eliza-identity';
-import {
-  messageStatus,
-  parseMessageStatusRouteRef,
-} from '../../providers/paste/message-payload';
+import { messageStatus, parseMessageStatusRouteRef } from '../../providers/paste/message-payload';
 
 @Component({
   selector: 'app-thread',

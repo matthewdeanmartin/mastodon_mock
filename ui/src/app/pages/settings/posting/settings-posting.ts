@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../../../api';
+import { ClientPrefs } from '../../../client-prefs';
 
 /** Posting defaults: visibility, sensitive-by-default, language. */
 @Component({
@@ -10,6 +11,7 @@ import { Api } from '../../../api';
 })
 export class SettingsPosting implements OnInit {
   private api = inject(Api);
+  private prefs = inject(ClientPrefs);
 
   protected privacy = signal('public');
   protected sensitive = signal(false);
@@ -41,6 +43,9 @@ export class SettingsPosting implements OnInit {
       next: () => {
         this.saving.set(false);
         this.saved.set(true);
+        // Write through to the composer's cached default so a changed default
+        // takes effect on the next compose rather than the next login.
+        this.prefs.setDefaultVisibility(this.privacy());
       },
       error: () => this.saving.set(false),
     });

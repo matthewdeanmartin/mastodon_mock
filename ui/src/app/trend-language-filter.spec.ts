@@ -10,10 +10,21 @@ import {
 } from './trend-language-filter';
 
 function tag(name: string): Tag {
-  return { id: name, name, url: `https://x/tags/${name}`, following: false, featuring: false, history: [] };
+  return {
+    id: name,
+    name,
+    url: `https://x/tags/${name}`,
+    following: false,
+    featuring: false,
+    history: [],
+  };
 }
 
-function post(content: string, language: string | null = null, overrides: Partial<Status> = {}): Status {
+function post(
+  content: string,
+  language: string | null = null,
+  overrides: Partial<Status> = {},
+): Status {
   return {
     id: Math.random().toString(36).slice(2),
     created_at: '2026-01-01T00:00:00Z',

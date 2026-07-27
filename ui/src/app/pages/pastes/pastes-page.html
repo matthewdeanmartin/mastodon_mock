@@ -1,12 +1,10 @@
-<div class="page-head">
-  <h2>Pastes</h2>
-  <p class="muted">
-    Paste links and edit keys are saved only in this browser. Clearing site data removes your
-    ability to edit or delete them. Short-link services (TinyURL) are permanent and public: those
-    links cannot be edited or deleted afterwards. Your use of each service is governed by its own
-    terms — see <a routerLink="/credits">Credits &amp; Privacy</a>.
-  </p>
-</div>
+<div class="page-head"><h2>Pastes</h2></div>
+<p class="page-note">
+  Paste links and edit keys are saved only in this browser. Clearing site data removes your ability
+  to edit or delete them. Short-link services (TinyURL) are permanent and public: those links cannot
+  be edited or deleted afterwards. Your use of each service is governed by its own terms — see
+  <a routerLink="/credits">Credits &amp; Privacy</a>.
+</p>
 
 <div class="paste-tabs" role="tablist">
   <button
@@ -33,6 +31,10 @@
 
 @if (error(); as message) {
   <p class="paste-error" role="alert">{{ message }}</p>
+}
+
+@if (notice(); as message) {
+  <p class="paste-notice" role="status">✓ {{ message }}</p>
 }
 
 @if (tab() === 'feeds') {
@@ -129,6 +131,22 @@
                 title="Post a link to this paste on Mastodon or Bluesky"
               >
                 {{ sharing() === paste.slug ? 'Close share' : 'Share ↗' }}
+              </button>
+              <button
+                class="btn btn-outline btn-sm"
+                type="button"
+                (click)="editForPost(paste)"
+                title="Open in the composer with a live Post button — this paste stays put"
+              >
+                Edit for post
+              </button>
+              <button
+                class="btn btn-outline btn-sm"
+                type="button"
+                (click)="convertToDraft(paste)"
+                title="Copy into your local drafts — this paste stays put"
+              >
+                💾 To draft
               </button>
               @if (!isImmutable(paste.providerId)) {
                 <button class="btn btn-outline btn-sm" type="button" (click)="beginEdit(paste)">

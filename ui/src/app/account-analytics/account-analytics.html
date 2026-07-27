@@ -27,7 +27,17 @@
                 type="button"
                 class="load-more-btn"
                 (click)="loadMore(n)"
-                [title]="'Fetch ' + n + ' more page' + (n === 1 ? '' : 's') + ' (' + n + ' API call' + (n === 1 ? '' : 's') + ')'"
+                [title]="
+                  'Fetch ' +
+                  n +
+                  ' more page' +
+                  (n === 1 ? '' : 's') +
+                  ' (' +
+                  n +
+                  ' API call' +
+                  (n === 1 ? '' : 's') +
+                  ')'
+                "
               >
                 +{{ n }}
               </button>
@@ -121,7 +131,10 @@
           <h3 class="chart-title muted">By week</h3>
           <div class="bars" role="img" aria-label="Posts per week">
             @for (b of weekly(); track b.startIso) {
-              <div class="bar-col" [title]="b.label + ': ' + b.posts + ' posts, ~' + fmt(b.reach) + ' reach'">
+              <div
+                class="bar-col"
+                [title]="b.label + ': ' + b.posts + ' posts, ~' + fmt(b.reach) + ' reach'"
+              >
                 <div class="bar" [style.height.%]="(b.posts / weeklyPeak()) * 100"></div>
               </div>
             }
@@ -132,7 +145,10 @@
           <h3 class="chart-title muted">By month</h3>
           <div class="bars labelled" role="img" aria-label="Posts per month">
             @for (b of monthly(); track b.startIso) {
-              <div class="bar-col" [title]="b.label + ': ' + b.posts + ' posts, ~' + fmt(b.reach) + ' reach'">
+              <div
+                class="bar-col"
+                [title]="b.label + ': ' + b.posts + ' posts, ~' + fmt(b.reach) + ' reach'"
+              >
                 <div class="bar" [style.height.%]="(b.posts / monthlyPeak()) * 100"></div>
                 <span class="bar-label muted">{{ b.label }}</span>
               </div>
@@ -155,8 +171,8 @@
     <section class="section">
       <h2>Languages</h2>
       <p class="muted small">
-        Inferred from the sample's text and each post's declared language — script,
-        accents and common words, not a full model. A rough read.
+        Inferred from the sample's text and each post's declared language — script, accents and
+        common words, not a full model. A rough read.
       </p>
       <div class="lang-list">
         @for (l of languages(); track l.lang) {

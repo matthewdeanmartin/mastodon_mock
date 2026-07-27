@@ -15,6 +15,7 @@ import { Api } from '../api';
 import { PageDiagnostics } from '../page-diagnostics';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
+import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import { CustomEmojis } from '../custom-emojis';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
@@ -231,7 +232,7 @@ function dragHasFiles(event: DragEvent): boolean {
 
 @Component({
   selector: 'app-compose',
-  imports: [FormsModule, EmojiPicker],
+  imports: [FormsModule, EmojiPicker, ConfirmDialog],
   templateUrl: './compose.html',
   styleUrl: './compose.css',
 })
@@ -271,8 +272,13 @@ export class Compose implements OnDestroy {
    * delete the handle to reply silently; {@link showReplyMentionHint} explains it.
    */
   readonly replyToHandle = input('');
-  /** Optional initial visibility (e.g. 'direct' for a conversation reply). */
-  readonly initialVisibility = input('public');
+  /**
+   * Optional initial visibility (e.g. 'direct' for a conversation reply). Empty
+   * means "no opinion" — the composer then opens on the account's own posting
+   * default (`ClientPrefs.defaultVisibility`), which is what a top-level compose
+   * wants. A caller that passes a value is always obeyed.
+   */
+  readonly initialVisibility = input('');
   /** Pin visibility to initialVisibility (no picker) — e.g. private chats stay direct. */
   readonly lockVisibility = input(false);
   /** A saved draft to open in the composer (it is consumed from the drafts list). */
@@ -283,7 +289,22 @@ export class Compose implements OnDestroy {
    * horizontal space is scarce (/conversations).
    */
   readonly compact = input(false);
+  /**
+   * Whether this mount participates in "thoughtful posting" (see
+   * {@link ClientPrefs.thoughtfulPosting}). Opt-in, and deliberately so: a
+   * surface that should have been gated but isn't merely behaves as it always
+   * has, while a surface that shouldn't have been gated but is would silently
+   * stop someone replying. Only Home and the quote composers opt in — replies,
+   * chats, and the paste-share composer never do.
+   */
+  readonly gateable = input(false);
   readonly posted = output<Status>();
+
+  /**
+   * True when this composer must not publish: it saves a draft instead, and the
+   * post happens later from /drafts. The whole point is the gap in between.
+   */
+  protected gated = computed(() => this.gateable() && this.prefs.thoughtfulPosting());
 
   protected readonly visibilities = VISIBILITIES;
   protected readonly pollExpiry = POLL_EXPIRY;
@@ -295,6 +316,19 @@ export class Compose implements OnDestroy {
 
   // Visibility + content warning.
   protected visibility = signal<string>('public');
+
+  /**
+   * The visibility in effect before a paste-driven clamp overwrote it.
+   *
+   * Paste services only understand `public`/`unlisted` (and burn-after-reading
+   * only `unlisted`), so selecting Paste has to narrow whatever the user had.
+   * Without this, switching Fedi → Paste → Fedi silently left the post on
+   * `unlisted` — a real downgrade of a deliberate choice, and the reason this
+   * exists. Null means "nothing to put back": either no clamp has happened, or
+   * the user has since picked a visibility by hand while on Paste, which
+   * outranks anything we remembered for them.
+   */
+  private stashedVisibility: string | null = null;
 
   /**
    * Selected post language: an ISO 639-1 code, or '' for "Not specified" (let
@@ -368,12 +402,20 @@ export class Compose implements OnDestroy {
       }
       this.seededKey = key;
       this.text.set(initialText);
-      this.visibility.set(initialVisibility);
-      const saved = draft ?? this.drafts.loadAutosave(this.contextKey());
+      // No caller opinion means a top-level compose: open on the account's own
+      // posting default rather than assuming `public`.
+      this.visibility.set(initialVisibility || this.prefs.defaultVisibility());
+      this.stashedVisibility = null;
+      // A handoff from "Edit for post" outranks a stale autosave: the user just
+      // asked for this specific post, and it only ever seeds once. An explicitly
+      // opened draft still wins over both.
+      const handoff = this.acceptsHandoff() ? this.drafts.takeHandoff() : null;
+      this.selfDraftOrigin = handoff?.selfStatusId ?? null;
+      const saved = draft ?? handoff?.snapshot ?? this.drafts.loadAutosave(this.contextKey());
       if (saved && draftHasContent(saved)) {
         this.diagnostics.info('Paste', 'draft:restore', {
           context: this.contextKey(),
-          source: draft ? 'draft' : 'autosave',
+          source: draft ? 'draft' : handoff ? 'handoff' : 'autosave',
           target: saved.target ?? 'fedi',
           provider: saved.pasteProviderId ?? this.pasteProviders.default.id,
         });
@@ -408,6 +450,52 @@ export class Compose implements OnDestroy {
         this.autosaveTimer = null;
         this.drafts.autosave(key, snapshot);
       }, 500);
+    });
+  }
+
+  /**
+   * The self-draft this composer's text came from, if any.
+   *
+   * A post-to-self draft is a real status. Publishing it for real leaves the
+   * private copy behind as a duplicate — the mastodon.social folk recipe deals
+   * with that by deleting and re-drafting, which is destructive *before* the
+   * post exists. We do the opposite: publish first, then offer to delete. That
+   * way a failed publish can never destroy the only copy of the text.
+   */
+  private selfDraftOrigin: string | null = null;
+
+  /** The self-draft copy the user is being asked about, after a successful post. */
+  protected pendingSelfCleanup = signal<string | null>(null);
+  protected selfCleanupError = signal<string | null>(null);
+
+  /**
+   * A real post went out. If its text came from a post-to-self draft, the
+   * private copy is now a duplicate — ask whether to remove it.
+   *
+   * Called only where a `Status` actually exists. Not on a *scheduled* result
+   * (nothing is published yet, so the copy is still the live version), and not
+   * on a paste or a Bluesky post — pasting a private note somewhere public is
+   * no reason to delete the private note.
+   */
+  private offerSelfCleanup(): void {
+    if (this.selfDraftOrigin) {
+      this.pendingSelfCleanup.set(this.selfDraftOrigin);
+      this.selfDraftOrigin = null;
+    }
+  }
+
+  /** Delete the private copy the just-published post came from. */
+  deleteSelfDraftCopy(): void {
+    const id = this.pendingSelfCleanup();
+    this.pendingSelfCleanup.set(null);
+    if (!id) {
+      return;
+    }
+    this.api.deleteStatus(id).subscribe({
+      error: () =>
+        this.selfCleanupError.set(
+          "The private draft copy couldn't be deleted — it's still in your messages.",
+        ),
     });
   }
 
@@ -596,17 +684,64 @@ export class Compose implements OnDestroy {
     return hasText || hasMedia || hasPoll;
   });
 
+  /**
+   * Narrow the visibility to what the paste target can express, remembering what
+   * was there so {@link restoreVisibility} can put it back. Only the *first*
+   * clamp stashes: going rentry → tinyurl → fedi must restore what the user
+   * chose before any of it, not the value the previous paste provider forced.
+   *
+   * Only applies while Paste is the live target. Provider/expiry state is also
+   * touched when a saved draft is restored ({@link applySnapshot}), and a fedi
+   * draft saved as `private` must not be narrowed to `unlisted` just because
+   * the composer set up its paste controls on the way past.
+   */
+  private clampVisibilityForPaste(allowed: readonly string[]): void {
+    const current = this.visibility();
+    if (this.target() !== 'paste' || allowed.includes(current)) {
+      return;
+    }
+    this.stashedVisibility ??= current;
+    this.visibility.set(allowed[0] ?? 'unlisted');
+  }
+
+  /**
+   * Put back the visibility a paste clamp took away. With nothing stashed (the
+   * composer never went near Paste, or the user has since chosen by hand) this
+   * falls back to the account's posting default, so a fresh paste-first
+   * composer — the anonymous default, see {@link target} — still lands somewhere
+   * the user chose rather than on `unlisted`.
+   */
+  private restoreVisibility(): void {
+    this.visibility.set(this.stashedVisibility ?? this.prefs.defaultVisibility());
+    this.stashedVisibility = null;
+  }
+
+  /** A hand-picked visibility is the user's real intent; forget what we stashed. */
+  onVisibilityChange(visibility: string): void {
+    this.visibility.set(visibility);
+    this.stashedVisibility = null;
+  }
+
   onTargetChange(target: PostTarget): void {
     if (target === 'paste' && !this.featureFlags.enabled('pastebin')) {
       return;
     }
+    const wasPaste = this.target() === 'paste';
     this.target.set(target);
     if (target === 'paste') {
-      const provider = this.selectedPasteProvider();
-      if (!provider.visibilities.includes(this.visibility() as 'public' | 'unlisted')) {
-        this.visibility.set(provider.visibilities[0] ?? 'unlisted');
-      }
+      this.clampVisibilityForPaste(this.pasteVisibilities());
+    } else if (wasPaste) {
+      this.restoreVisibility();
     }
+  }
+
+  /**
+   * What the selected provider allows, tightened to `unlisted` only for
+   * burn-after-reading — a burn link that is also listed publicly defeats the
+   * point of burning it.
+   */
+  private pasteVisibilities(): readonly string[] {
+    return this.pasteExpiry() === 'burn' ? ['unlisted'] : this.selectedPasteProvider().visibilities;
   }
 
   onPasteProviderChange(providerId: string): void {
@@ -619,9 +754,7 @@ export class Compose implements OnDestroy {
     if (!provider.expiries.some((expiry) => expiry.value === this.pasteExpiry())) {
       this.pasteExpiry.set(provider.expiries[0]?.value ?? '1w');
     }
-    if (!provider.visibilities.includes(this.visibility() as 'public' | 'unlisted')) {
-      this.visibility.set(provider.visibilities[0] ?? 'unlisted');
-    }
+    this.clampVisibilityForPaste(this.pasteVisibilities());
     this.diagnostics.info('Paste', 'provider:change', {
       requestedProvider: providerId,
       previousProvider: previousProviderId,
@@ -633,9 +766,15 @@ export class Compose implements OnDestroy {
   }
 
   onPasteExpiryChange(expiry: PasteExpiry): void {
+    const wasBurn = this.pasteExpiry() === 'burn';
     this.pasteExpiry.set(expiry);
     if (expiry === 'burn') {
-      this.visibility.set('unlisted');
+      this.clampVisibilityForPaste(['unlisted']);
+    } else if (wasBurn) {
+      // Leaving burn widens the options again; give back what burn narrowed,
+      // then re-clamp in case the provider itself doesn't allow it.
+      this.restoreVisibility();
+      this.clampVisibilityForPaste(this.pasteVisibilities());
     }
   }
 
@@ -918,6 +1057,18 @@ export class Compose implements OnDestroy {
     return 'new';
   }
 
+  /**
+   * Whether this composer should pick up a pending "Edit for post" handoff.
+   *
+   * Only a top-level composer. Dropping a drafted post into a reply or quote box
+   * would attach it to a conversation the user never chose — and with several
+   * composers alive at once (a thread page mounts one per card), the first one
+   * to seed would silently swallow it.
+   */
+  private acceptsHandoff(): boolean {
+    return this.contextKey() === 'new';
+  }
+
   private snapshot(): DraftSnapshot {
     return {
       segments: this.segments(),
@@ -1059,6 +1210,13 @@ export class Compose implements OnDestroy {
     if (!this.canSubmit()) {
       return;
     }
+    // Enforced here, not just in the template. The gate is the feature — a
+    // hotkey, an Enter handler, or a future call site must not be able to
+    // publish around it. Saving is what this composer does instead.
+    if (this.gated()) {
+      this.saveDraft();
+      return;
+    }
     // Language sanity check: if the user picked a specific language and the text
     // confidently reads as a *different* one, pause and let them fix it or post
     // anyway. Only fires when both are known and disagree — never on unsure text
@@ -1195,6 +1353,7 @@ export class Compose implements OnDestroy {
             this.flashScheduled(`Scheduled for ${when.toLocaleString()} — see it under Drafts.`);
           } else {
             this.flashScheduled('That was under ~5 minutes away, so it was posted right away.');
+            this.offerSelfCleanup();
             this.posted.emit(result);
           }
         },
@@ -1335,6 +1494,7 @@ export class Compose implements OnDestroy {
   private postRest(root: Status, previous: Status, rest: string[]): void {
     if (!rest.length) {
       this.reset();
+      this.offerSelfCleanup();
       this.posted.emit(root);
       return;
     }

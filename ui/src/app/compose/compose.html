@@ -245,7 +245,7 @@
         <select
           class="visibility-select"
           [ngModel]="visibility()"
-          (ngModelChange)="visibility.set($event)"
+          (ngModelChange)="onVisibilityChange($event)"
           title="Visibility"
         >
           @if (targetIncludesPaste()) {
@@ -315,7 +315,9 @@
             📊
           </button>
 
-          @if (!inReplyToId() && !quotedStatusId()) {
+          <!-- Scheduling is a way to publish without deciding now, which is the
+               one thing a gated composer must not offer. -->
+          @if (!inReplyToId() && !quotedStatusId() && !gated()) {
             <button
               class="tool-btn"
               [class.on]="scheduleOpen()"
@@ -405,21 +407,30 @@
       <span class="muted" [class.over-limit]="overLimit()">
         {{ targetIncludesPaste() ? pasteBytes() + ' bytes' : text().length }}
       </span>
-      <button class="btn" [disabled]="!canSubmit()" (click)="submit()">
+      <!-- Thoughtful posting: this composer saves, it does not publish. The
+           post happens later from /drafts, which is the entire point. -->
+      <button
+        class="btn"
+        [disabled]="!canSubmit()"
+        [title]="gated() ? 'Saves to Drafts — post it from there when you\'re ready' : ''"
+        (click)="submit()"
+      >
         {{
           uploading()
             ? 'Uploading…'
-            : inReplyToId()
-              ? 'Reply'
-              : quotedStatusId()
-                ? 'Quote'
-                : scheduleActive()
-                  ? 'Schedule'
-                  : targetIncludesPaste()
-                    ? 'Paste'
-                    : thread().length
-                      ? words().PostAll
-                      : words().Post
+            : gated()
+              ? 'Save draft'
+              : inReplyToId()
+                ? 'Reply'
+                : quotedStatusId()
+                  ? 'Quote'
+                  : scheduleActive()
+                    ? 'Schedule'
+                    : targetIncludesPaste()
+                      ? 'Paste'
+                      : thread().length
+                        ? words().PostAll
+                        : words().Post
         }}
       </button>
     </div>
@@ -477,6 +488,24 @@
 
   @if (draftSaved()) {
     <div class="thread-hint muted">Saved to drafts.</div>
+  }
+
+  <!-- Publish-then-offer, never delete-then-publish: the private copy only goes
+       away once a real post exists. -->
+  @if (pendingSelfCleanup()) {
+    <app-confirm-dialog
+      title="Delete the private draft copy?"
+      message="Your post is published. The private note you drafted it from is still in your messages as a duplicate."
+      confirmLabel="Delete"
+      (confirmed)="deleteSelfDraftCopy()"
+      (cancelled)="pendingSelfCleanup.set(null)"
+    />
+  }
+
+  @if (selfCleanupError()) {
+    <div class="post-error" role="alert">
+      <span class="post-error-text">{{ selfCleanupError() }}</span>
+    </div>
   }
 
   @if (scheduledFlash(); as flash) {

@@ -13,9 +13,28 @@ const PREFS_KEY = 'mockingbird_client_prefs';
  */
 const HIDDEN_PROVIDERS_KEY_BASE = 'mockingbird_hidden_providers';
 
+/**
+ * The account's own posting default (`source.privacy`), mirrored locally so the
+ * composer can open on it without a request. Necessarily per-account, and for
+ * the same reason as {@link HIDDEN_PROVIDERS_KEY_BASE} it gets its own scoped
+ * key rather than a slot in the shared prefs blob.
+ */
+const DEFAULT_VISIBILITY_KEY_BASE = 'mockingbird_default_visibility';
+
 const PROVIDER_IDS: ProviderId[] = ['mastodon', 'anonymous-mastodon', 'bluesky', 'rss', 'paste'];
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
+
+/** Mastodon's four post visibilities, in descending reach. */
+export const VISIBILITY_VALUES = ['public', 'unlisted', 'private', 'direct'] as const;
+export type Visibility = (typeof VISIBILITY_VALUES)[number];
+
+/** Narrow an untrusted value (stored JSON, an API `source.privacy`) to a visibility. */
+export function asVisibility(value: unknown): Visibility | null {
+  return typeof value === 'string' && (VISIBILITY_VALUES as readonly string[]).includes(value)
+    ? (value as Visibility)
+    : null;
+}
 
 /** When the blue verification check shows on other accounts. */
 export type VerifiedMode = 'fixed' | 'famous' | 'everyone';
@@ -112,6 +131,7 @@ interface StoredPrefs {
   postNoun?: PostNoun;
   zenMode?: boolean;
   requireAltText?: boolean;
+  thoughtfulPosting?: boolean;
   customBg?: CustomColor;
   customLink?: CustomColor;
   customSidebar?: CustomColor;
@@ -193,6 +213,16 @@ export class ClientPrefs {
   /** Providers filtered OUT of the home feed via the command-bar chips. */
   readonly hiddenProviders = signal<ProviderId[]>([]);
 
+  /**
+   * The account's posting default (`source.privacy`), cached from the last
+   * `verify_credentials`. This is a *mirror*, not a preference: the server owns
+   * the value and Settings → Posting is where it is changed. It exists so the
+   * composer can open on the user's real default without spending a request on
+   * the hot path — see {@link setDefaultVisibility}. Anonymous sessions have no
+   * server-side default and keep the `public` fallback.
+   */
+  readonly defaultVisibility = signal<Visibility>('public');
+
   // Chat-list filters.
   readonly chatAudience = signal<ChatAudience>('everyone');
   readonly chatKind = signal<ChatKindFilter>('all');
@@ -221,6 +251,20 @@ export class ClientPrefs {
   readonly zenMode = signal<boolean>(false);
   /** Opt-in: refuse to post while any attached image lacks alt text. */
   readonly requireAltText = signal<boolean>(false);
+
+  /**
+   * Thoughtful posting: nothing publishes straight from a text box.
+   *
+   * With this on, Home has no composer — just a Write button that opens an
+   * editor at the top of /drafts, and that editor only saves. Posting happens
+   * later, deliberately, from a draft row. The gap between writing something and
+   * coming back to it is the entire feature.
+   *
+   * Replies, chats, and the paste-share composer are never gated: replies are
+   * urgent, and a paste link was already a deliberate act. See the composer's
+   * `gateable` input for which surfaces opt in.
+   */
+  readonly thoughtfulPosting = signal<boolean>(false);
 
   // Custom colors (null = keep the theme's own value).
   readonly customBg = signal<CustomColor>(null);
@@ -403,6 +447,10 @@ export class ClientPrefs {
     this.requireAltText.set(on);
   }
 
+  setThoughtfulPosting(on: boolean): void {
+    this.thoughtfulPosting.set(on);
+  }
+
   setCustomBg(color: CustomColor): void {
     this.customBg.set(normalizeColor(color));
   }
@@ -437,6 +485,20 @@ export class ClientPrefs {
   removeKnownLanguage(code: string): void {
     const bare = code.toLowerCase().split(/[-_]/)[0];
     this.knownLanguages.update((list) => list.filter((c) => c !== bare));
+  }
+
+  /**
+   * Mirror the account's posting default. Called wherever a credential account
+   * lands (login, boot, account switch, saving Settings → Posting). An
+   * unrecognized or absent value leaves the previous cache alone rather than
+   * resetting it: a partial response should not silently widen the user's
+   * default back to `public`.
+   */
+  setDefaultVisibility(privacy: unknown): void {
+    const visibility = asVisibility(privacy);
+    if (visibility) {
+      this.defaultVisibility.set(visibility);
+    }
   }
 
   toggleProvider(id: ProviderId): void {
@@ -501,6 +563,7 @@ export class ClientPrefs {
       this.readerTextAlign.set(stored.readerTextAlign);
     }
     this.loadHiddenProviders(stored);
+    this.loadDefaultVisibility();
     if (stored.chatAudience === 'everyone' || stored.chatAudience === 'mutuals') {
       this.chatAudience.set(stored.chatAudience);
     }
@@ -533,6 +596,7 @@ export class ClientPrefs {
     }
     this.loadBool(stored.zenMode, this.zenMode);
     this.loadBool(stored.requireAltText, this.requireAltText);
+    this.loadBool(stored.thoughtfulPosting, this.thoughtfulPosting);
     this.customBg.set(normalizeColor(stored.customBg ?? null));
     this.customLink.set(normalizeColor(stored.customLink ?? null));
     this.customSidebar.set(normalizeColor(stored.customSidebar ?? null));
@@ -574,6 +638,7 @@ export class ClientPrefs {
       postNoun: this.postNoun(),
       zenMode: this.zenMode(),
       requireAltText: this.requireAltText(),
+      thoughtfulPosting: this.thoughtfulPosting(),
       customBg: this.customBg(),
       customLink: this.customLink(),
       customSidebar: this.customSidebar(),
@@ -587,6 +652,25 @@ export class ClientPrefs {
       scopedKey(HIDDEN_PROVIDERS_KEY_BASE),
       JSON.stringify(this.hiddenProviders()),
     );
+    localStorage.setItem(scopedKey(DEFAULT_VISIBILITY_KEY_BASE), this.defaultVisibility());
+  }
+
+  /**
+   * Load this account's cached posting default. Stored as a bare string (not
+   * JSON) so a hand-inspected localStorage entry reads as `private` rather than
+   * `"private"`; anything unrecognized falls back to `public`.
+   */
+  private loadDefaultVisibility(): void {
+    let stored: string | null;
+    try {
+      stored = localStorage.getItem(scopedKey(DEFAULT_VISIBILITY_KEY_BASE));
+    } catch {
+      return;
+    }
+    const visibility = asVisibility(stored);
+    if (visibility) {
+      this.defaultVisibility.set(visibility);
+    }
   }
 
   /**

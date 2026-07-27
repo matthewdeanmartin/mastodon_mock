@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
+import { ClientPrefs } from './client-prefs';
 import { Account } from './models';
 import { AnonymousAccount } from './providers/anonymous/anonymous-account';
 import { Server } from './server';
@@ -51,6 +52,7 @@ function loadSessions(): Session[] {
 export class Auth {
   private server = inject(Server);
   private anonymous = inject(AnonymousAccount);
+  private prefs = inject(ClientPrefs);
 
   readonly mode = signal<AccountMode | null>(
     localStorage.getItem(ACCOUNT_MODE_KEY) === 'anonymous'
@@ -136,6 +138,10 @@ export class Auth {
     }
     this.mastodonAccount.set(account);
     this.account.set(account);
+    // Mirror the server-side posting default so the composer can open on it
+    // without a request. `source` is only populated on verify_credentials, so
+    // this quietly no-ops for the account snapshots that lack it.
+    this.prefs.setDefaultVisibility(account?.source?.privacy);
     const token = this.token();
     if (account && token) {
       this.persistSessions(this.sessions().map((s) => (s.token === token ? { ...s, account } : s)));

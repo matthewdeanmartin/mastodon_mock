@@ -1,8 +1,11 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { ClientPrefs } from '../../client-prefs';
 import { Compose } from '../../compose/compose';
+import { Drafts } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
+import { toSnapshot } from '../drafts/draft-items';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
 import { PasteHistory, PasteRecord } from '../../providers/paste/paste-history';
 import { FeedPasteProvider } from '../../providers/paste/paste-provider';
@@ -21,6 +24,12 @@ export class PastesPage {
   protected history = inject(PasteHistory);
   protected providers = inject(PasteProviderRegistry);
   private feeds = inject(PasteFeedSubscriptions);
+  private drafts = inject(Drafts);
+  private prefs = inject(ClientPrefs);
+  private router = inject(Router);
+
+  /** Transient "that worked, and your paste survived" confirmation. */
+  protected notice = signal<string | null>(null);
 
   /** Active tab; mirrors the Lists page split (My Pastes | Public Paste Feeds). */
   protected tab = signal<PasteTab>('mine');
@@ -141,6 +150,22 @@ export class PastesPage {
         this.error.set('The provider could not delete that paste. It may already have expired.');
       },
     });
+  }
+
+  /**
+   * Copy a paste into a browser-local draft. The paste is deliberately left at
+   * its provider — converting must never be how you lose the thing you
+   * converted. Same rule, and same `toSnapshot`, as the /drafts page.
+   */
+  convertToDraft(record: PasteRecord): void {
+    this.drafts.save(toSnapshot({ kind: 'paste', record }, this.prefs.defaultVisibility()));
+    this.notice.set('Copied to your local drafts. This paste is still here too.');
+  }
+
+  /** Load the paste into the composer with a live Post button, leaving it in place. */
+  editForPost(record: PasteRecord): void {
+    this.drafts.handoff(toSnapshot({ kind: 'paste', record }, this.prefs.defaultVisibility()));
+    void this.router.navigate(['/home']);
   }
 
   forget(record: PasteRecord): void {
