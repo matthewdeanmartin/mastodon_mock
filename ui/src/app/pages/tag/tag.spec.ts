@@ -11,6 +11,8 @@ import { Auth } from '../../auth';
 
 interface TagInternals {
   tag: WritableSignal<string>;
+  tab: WritableSignal<'posts' | 'members' | 'analytics'>;
+  setTab(tab: 'posts' | 'members' | 'analytics'): void;
   tagInfo: WritableSignal<TagEntity | null>;
   statuses: WritableSignal<Status[]>;
   loading: WritableSignal<boolean>;
@@ -230,5 +232,64 @@ describe('Tag (timeline)', () => {
         .statuses()
         .map((s) => s.id),
     ).toEqual(['2']);
+  });
+
+  // ---------------------------------------------------------------- tabs
+
+  it('starts on the Feed tab and offers Members and Analytics', () => {
+    const fixture = setUpWithTag('news');
+    httpMock.expectOne('/api/v1/tags/news').flush(makeTagEntity('news'));
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/news'))
+      .flush([makeStatus('1')]);
+    fixture.detectChanges();
+
+    const tabs = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.tab')].map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(tabs).toEqual(['Feed', 'Members', 'Analytics']);
+    expect(internals(fixture).tab()).toBe('posts');
+  });
+
+  it('does not sample the feed until a tab that needs it is opened', () => {
+    const fixture = setUpWithTag('news');
+    httpMock.expectOne('/api/v1/tags/news').flush(makeTagEntity('news'));
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/news'))
+      .flush([makeStatus('1')]);
+    fixture.detectChanges();
+
+    // The Feed tab's own page is the only request so far.
+    httpMock.verify();
+
+    internals(fixture).setTab('analytics');
+    fixture.detectChanges();
+
+    // Now it samples, at the 40-post page cap rather than the feed's 20.
+    const req = httpMock.expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/news'));
+    expect(req.request.params.get('limit')).toBe('40');
+    req.flush([makeStatus('1')]);
+
+    // Plus the one batched relationships call that resolves "followed by you".
+    httpMock.expectOne((r) => r.url.startsWith('/api/v1/accounts/relationships')).flush([]);
+  });
+
+  it('samples the feed when the Members tab is opened', () => {
+    const fixture = setUpWithTag('news');
+    httpMock.expectOne('/api/v1/tags/news').flush(makeTagEntity('news'));
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/news'))
+      .flush([makeStatus('1')]);
+    fixture.detectChanges();
+
+    internals(fixture).setTab('members');
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/news'))
+      .flush([makeStatus('1')]);
+    httpMock.expectOne((r) => r.url.startsWith('/api/v1/accounts/relationships')).flush([]);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('@user');
   });
 });

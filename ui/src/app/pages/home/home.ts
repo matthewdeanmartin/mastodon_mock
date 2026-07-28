@@ -9,7 +9,10 @@ import { ClientPrefs, FEED_MAX_COOLDOWN_MS } from '../../client-prefs';
 import { Status } from '../../models';
 import { isCalmHidden } from '../../sentiment';
 import { FeedLanguageFilter } from '../../trend-language-filter';
-import { CommandBar } from '../../command-bar/command-bar';
+import { CommandBar, FeedView } from '../../command-bar/command-bar';
+import { FeedAnalytics } from '../../feed-analytics/feed-analytics';
+import { FeedMembers } from '../../feed-members/feed-members';
+import { FeedSource } from '../../feed-sample';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
 import { StatusVisibility } from '../../status-visibility';
@@ -56,6 +59,8 @@ const BOOKMARK_TAIL_SIZE = 40;
     RouterLink,
     LocalCompose,
     StarterKitPost,
+    FeedAnalytics,
+    FeedMembers,
   ],
   templateUrl: './home.html',
   styleUrl: './home.css',
@@ -163,6 +168,26 @@ export class Home implements OnInit, OnDestroy {
       [...injected, ...base].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)),
     );
   });
+
+  /** Which view the command bar's Members/Analytics toggles have selected. */
+  protected view = signal<FeedView>('feed');
+
+  protected setView(view: FeedView): void {
+    this.view.set(view);
+  }
+
+  /**
+   * Home as a feed source. It is the most synthetic feed in the client — a
+   * server timeline merged with foreign providers, local practice posts and
+   * Eliza, filtered by the command-bar chips, then re-sorted. No `max_id`
+   * reproduces that, so Members and Analytics work off exactly what's on
+   * screen: {@link visible}. "Load more" widens them for free.
+   */
+  protected feedSource = computed<FeedSource>(() => ({
+    type: 'home',
+    query: 'your home timeline',
+    posts: this.visible(),
+  }));
 
   protected toggleBoosts(): void {
     this.showBoosts.update((show) => !show);

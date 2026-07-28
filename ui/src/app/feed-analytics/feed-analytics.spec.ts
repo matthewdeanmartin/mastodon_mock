@@ -279,3 +279,66 @@ describe('FeedAnalytics', () => {
     expect(component.visible('authors', posts)).toHaveLength(20);
   });
 });
+
+describe('FeedAnalytics — synthetic feeds', () => {
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [FeedAnalytics],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: Auth, useValue: { isAnonymous: true } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  function mountSupplied(posts: Status[]): ComponentFixture<FeedAnalytics> {
+    const fixture = TestBed.createComponent(FeedAnalytics);
+    fixture.componentRef.setInput('source', { type: 'home', query: 'home', posts });
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('analyzes the posts it was handed, without paging or requests', () => {
+    const fixture = mountSupplied([makeStatus('1'), makeStatus('2'), makeStatus('3')]);
+
+    expect(internals(fixture).posts()).toHaveLength(3);
+    expect(internals(fixture).apiCalls()).toBe(0);
+    expect(internals(fixture).report().meta.sampleSize).toBe(3);
+    http.expectNone(() => true);
+  });
+
+  it('hides the sample-size controls, since paging means nothing here', () => {
+    const fixture = mountSupplied([makeStatus('1')]);
+    const html = fixture.nativeElement as HTMLElement;
+
+    expect(html.querySelector('.sample-controls')).toBeNull();
+    expect(html.textContent).toContain('posts currently loaded');
+    expect(html.textContent).toContain('not the whole feed');
+  });
+
+  it('re-analyzes when the supplied posts change', () => {
+    const fixture = TestBed.createComponent(FeedAnalytics);
+    fixture.componentRef.setInput('source', {
+      type: 'home',
+      query: 'home',
+      posts: [makeStatus('1')],
+    });
+    fixture.detectChanges();
+    expect(internals(fixture).posts()).toHaveLength(1);
+
+    fixture.componentRef.setInput('source', {
+      type: 'home',
+      query: 'home',
+      posts: [makeStatus('1'), makeStatus('2')],
+    });
+    fixture.detectChanges();
+    expect(internals(fixture).posts()).toHaveLength(2);
+  });
+});

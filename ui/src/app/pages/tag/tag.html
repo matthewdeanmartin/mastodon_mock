@@ -21,14 +21,20 @@
 
 <div class="tabs">
   <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Feed</button>
+  <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
+    Members
+  </button>
   <button class="tab" [class.active]="tab() === 'analytics'" (click)="setTab('analytics')">
     Analytics
   </button>
 </div>
 
-@if (tab() === 'analytics') {
-  <!-- Mounting the component starts collection, so it stays off the Feed tab. -->
-  <app-feed-analytics [source]="analyticsSource()" />
+<!-- Mounting either component starts its own collection, so both stay off the
+     Feed tab until opened. -->
+@if (tab() === 'members') {
+  <app-feed-members [source]="feedSource()" />
+} @else if (tab() === 'analytics') {
+  <app-feed-analytics [source]="feedSource()" />
 } @else if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!statuses().length) {

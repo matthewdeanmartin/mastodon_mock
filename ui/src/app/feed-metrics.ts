@@ -565,24 +565,36 @@ function analyzeComposition(
   };
 }
 
+/**
+ * Who wrote the posts, ranked by how many they contributed. Exported because
+ * "the accounts in this feed" is useful on its own — a hashtag or a synthetic
+ * feed has no membership list, so its members *are* the people posting in it.
+ * Reads through boosts, so a boosted post credits whoever wrote it.
+ */
+export function feedAuthors(posts: Status[]): AuthorRow[] {
+  const total = posts.length;
+  const byAuthor = new Map<string, { account: Account; count: number }>();
+  for (const post of posts) {
+    const author = feedSubject(post).account;
+    const entry = byAuthor.get(author.id);
+    if (entry) {
+      entry.count += 1;
+    } else {
+      byAuthor.set(author.id, { account: author, count: 1 });
+    }
+  }
+  return [...byAuthor.values()]
+    .map((a) => ({ ...a, share: share(a.count, total) }))
+    .sort((a, b) => b.count - a.count || a.account.acct.localeCompare(b.account.acct));
+}
+
 function analyzeAccounts(
   posts: Status[],
   subjects: Status[],
   viewer: FeedViewerContext,
 ): AccountMetrics {
   const total = posts.length;
-  const byAuthor = new Map<string, { account: Account; count: number }>();
-  for (const s of subjects) {
-    const entry = byAuthor.get(s.account.id);
-    if (entry) {
-      entry.count += 1;
-    } else {
-      byAuthor.set(s.account.id, { account: s.account, count: 1 });
-    }
-  }
-  const authors: AuthorRow[] = [...byAuthor.values()]
-    .map((a) => ({ ...a, share: share(a.count, total) }))
-    .sort((a, b) => b.count - a.count || a.account.acct.localeCompare(b.account.acct));
+  const authors = feedAuthors(posts);
 
   const topN = (n: number) =>
     authors.slice(0, n).reduce((sum, a) => sum + a.count, 0) / Math.max(1, total);
@@ -657,6 +669,8 @@ interface TagUsage {
 const TAG_DOMINANCE = 0.8;
 /** How many tags the co-occurrence scan considers, to keep it O(k²) on k small. */
 const PAIR_TAG_LIMIT = 25;
+/** Joins two tags into one map key. A space can't occur inside a hashtag. */
+const PAIR_SEP = ' ';
 
 function analyzeHashtags(subjects: Status[], parsed: ParsedContent[]): HashtagMetrics {
   const total = subjects.length;
@@ -689,7 +703,7 @@ function analyzeHashtags(subjects: Status[], parsed: ParsedContent[]): HashtagMe
     const sorted = [...tags].sort().slice(0, PAIR_TAG_LIMIT);
     for (let a = 0; a < sorted.length; a++) {
       for (let b = a + 1; b < sorted.length; b++) {
-        bump(pairs, `${sorted[a]} ${sorted[b]}`);
+        bump(pairs, sorted[a] + PAIR_SEP + sorted[b]);
       }
     }
   });
@@ -717,7 +731,7 @@ function analyzeHashtags(subjects: Status[], parsed: ParsedContent[]): HashtagMe
     dominatedTags: rows.filter((r) => r.dominatedBy),
     pairs: [...pairs.entries()]
       .map(([key, count]) => {
-        const [a, b] = key.split(' ');
+        const [a, b] = key.split(PAIR_SEP);
         return { a, b, count };
       })
       .filter((p) => p.count > 1)

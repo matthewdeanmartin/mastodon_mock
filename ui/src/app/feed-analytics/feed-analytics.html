@@ -8,33 +8,43 @@
   } @else {
     <div class="sample-note muted">
       <span>
-        Analytics for the <strong>{{ posts().length }} posts sampled</strong> from this
-        {{ report().meta.feedType }} feed ({{ report().meta.feedQuery }}) — not the whole feed.
-        Spans {{ sampleSpan() }}, collected {{ report().meta.collectedAt | humanTime }} in
-        {{ report().meta.apiCalls }} API {{ report().meta.apiCalls === 1 ? 'call' : 'calls' }}.
+        @if (paged()) {
+          Analytics for the <strong>{{ posts().length }} posts sampled</strong> from this
+          {{ report().meta.feedType }} feed ({{ report().meta.feedQuery }}) — not the whole feed.
+          Spans {{ sampleSpan() }}, collected {{ report().meta.collectedAt | humanTime }} in
+          {{ report().meta.apiCalls }} API {{ report().meta.apiCalls === 1 ? 'call' : 'calls' }}.
+        } @else {
+          <!-- A synthetic feed has no cursor that would reproduce the merge, so
+               the sample is exactly what the page has already loaded. -->
+          Analytics for the <strong>{{ posts().length }} posts currently loaded</strong> in this
+          {{ report().meta.feedType }} feed ({{ report().meta.feedQuery }}) — not the whole feed.
+          Spans {{ sampleSpan() }}. Load more posts in the feed to widen it.
+        }
       </span>
-      <span class="sample-controls" role="group" aria-label="Sample size">
-        <span>Sample:</span>
-        @for (n of sampleChoices; track n) {
+      @if (paged()) {
+        <span class="sample-controls" role="group" aria-label="Sample size">
+          <span>Sample:</span>
+          @for (n of sampleChoices; track n) {
+            <button
+              type="button"
+              class="load-more-btn"
+              [class.active]="sampleSize() === n"
+              [title]="'Sample ' + n + ' posts'"
+              (click)="setSampleSize(n)"
+            >
+              {{ n }}
+            </button>
+          }
           <button
             type="button"
             class="load-more-btn"
-            [class.active]="sampleSize() === n"
-            [title]="'Sample ' + n + ' posts'"
-            (click)="setSampleSize(n)"
+            title="Collect a fresh sample"
+            (click)="refresh()"
           >
-            {{ n }}
+            ↻
           </button>
-        }
-        <button
-          type="button"
-          class="load-more-btn"
-          title="Collect a fresh sample"
-          (click)="refresh()"
-        >
-          ↻
-        </button>
-      </span>
+        </span>
+      }
     </div>
 
     @if (report().highlights.length) {

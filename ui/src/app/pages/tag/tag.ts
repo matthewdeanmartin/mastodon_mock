@@ -3,7 +3,9 @@ import { ActivatedRoute } from '@angular/router';
 import { Api } from '../../api';
 import { Status, Tag as TagEntity } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
-import { FeedAnalytics, FeedSource } from '../../feed-analytics/feed-analytics';
+import { FeedAnalytics } from '../../feed-analytics/feed-analytics';
+import { FeedMembers } from '../../feed-members/feed-members';
+import { FeedSource } from '../../feed-sample';
 import { Auth } from '../../auth';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
@@ -11,12 +13,12 @@ import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-a
 import { AnonymousProviderRef } from '../../providers/anonymous/anonymous-mastodon-provider';
 import { Observable } from 'rxjs';
 
-/** Posts per request when sampling the tag for analytics — Mastodon's cap. */
-const ANALYTICS_PAGE_SIZE = 40;
+/** Posts per request when sampling the tag — Mastodon's cap. */
+const SAMPLE_PAGE_SIZE = 40;
 
 @Component({
   selector: 'app-tag',
-  imports: [StatusCard, FeedAnalytics],
+  imports: [StatusCard, FeedAnalytics, FeedMembers],
   templateUrl: './tag.html',
   styleUrl: './tag.css',
 })
@@ -35,22 +37,22 @@ export class Tag implements OnInit {
   protected followError = signal<string | null>(null);
   protected loadingMore = signal(false);
   protected exhausted = signal(false);
-  protected tab = signal<'posts' | 'analytics'>('posts');
+  protected tab = signal<'posts' | 'members' | 'analytics'>('posts');
 
   /**
-   * The feed the analytics tab samples. Rebuilt whenever the tag changes so the
-   * report restarts; pages at Mastodon's 40-post cap, so 100 posts costs three
-   * calls rather than five. The tab is only rendered once opened, so building
-   * this signal doesn't fetch anything on its own.
+   * The feed the Members and Analytics tabs sample. Rebuilt whenever the tag
+   * changes so both restart; pages at Mastodon's 40-post cap, so 100 posts
+   * costs three calls rather than five. Both tabs are only rendered once
+   * opened, so building this signal doesn't fetch anything on its own.
    */
-  protected analyticsSource = computed<FeedSource>(() => {
+  protected feedSource = computed<FeedSource>(() => {
     const tag = this.tag();
     return {
       type: 'hashtag',
       query: '#' + tag,
-      pageSize: ANALYTICS_PAGE_SIZE,
+      pageSize: SAMPLE_PAGE_SIZE,
       fetch: (after: Status | null) =>
-        this.getTimeline(tag, after ? this.nativeStatusId(after) : undefined, ANALYTICS_PAGE_SIZE),
+        this.getTimeline(tag, after ? this.nativeStatusId(after) : undefined, SAMPLE_PAGE_SIZE),
     };
   });
 
@@ -65,7 +67,7 @@ export class Tag implements OnInit {
     });
   }
 
-  setTab(tab: 'posts' | 'analytics'): void {
+  setTab(tab: 'posts' | 'members' | 'analytics'): void {
     this.tab.set(tab);
   }
 

@@ -29,6 +29,8 @@ interface HomeInternals {
   loadMore(): void;
   toggleBoosts(): void;
   toggleReplies(): void;
+  view: WritableSignal<'feed' | 'members' | 'analytics'>;
+  setView(view: 'feed' | 'members' | 'analytics'): void;
 }
 
 function internals(fixture: ComponentFixture<Home>): HomeInternals {
@@ -460,5 +462,66 @@ describe('Home', () => {
     const fixture = setUp();
     expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.write-btn')).toBeNull();
+  });
+
+  // ---------------------------------------------------------------- feed views
+
+  it('offers Members and Analytics in the command bar, starting on the feed', () => {
+    const fixture = setUp();
+
+    const labels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.command-bar .btn')]
+      .map((b) => b.textContent?.trim())
+      .join(' ');
+    expect(labels).toContain('Members');
+    expect(labels).toContain('Analytics');
+    expect(internals(fixture).view()).toBe('feed');
+  });
+
+  it('swaps the timeline for the members view, off the posts already loaded', () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([makeStatus('a'), makeStatus('b')]);
+    fixture.detectChanges();
+
+    internals(fixture).setView('members');
+    fixture.detectChanges();
+    // The feed itself is never re-fetched; the only call is the batched
+    // relationships lookup that marks who you already follow.
+    httpMock.expectOne((r) => r.url.startsWith('/api/v1/accounts/relationships')).flush([]);
+    fixture.detectChanges();
+
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.querySelectorAll('.member-row').length).toBeGreaterThan(0);
+    expect(html.querySelector('app-status-card')).toBeNull();
+  });
+
+  it('analyzes the loaded home feed without paging it', () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([makeStatus('a'), makeStatus('b')]);
+    fixture.detectChanges();
+
+    internals(fixture).setView('analytics');
+    fixture.detectChanges();
+    httpMock.expectOne((r) => r.url.startsWith('/api/v1/accounts/relationships')).flush([]);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('2 posts currently loaded');
+    expect(text).toContain('not the whole feed');
+  });
+
+  it('returns to the feed when the active view is toggled off', () => {
+    const fixture = setUp();
+    internals(fixture).setView('members');
+    fixture.detectChanges();
+    expect(internals(fixture).view()).toBe('members');
+
+    internals(fixture).setView('feed');
+    fixture.detectChanges();
+    expect(internals(fixture).view()).toBe('feed');
+    expect((fixture.nativeElement as HTMLElement).querySelector('.home-filters')).not.toBeNull();
   });
 });

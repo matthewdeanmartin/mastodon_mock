@@ -15,9 +15,9 @@ interface ListTimelineInternals {
   title: WritableSignal<string>;
   statuses: WritableSignal<Status[]>;
   loading: WritableSignal<boolean>;
-  tab: WritableSignal<'posts' | 'members'>;
+  tab: WritableSignal<'posts' | 'members' | 'analytics'>;
   members: WritableSignal<Account[]>;
-  setTab(tab: 'posts' | 'members'): void;
+  setTab(tab: 'posts' | 'members' | 'analytics'): void;
   removeMember(account: Account): void;
   onBulkAdded(): void;
 }
@@ -276,5 +276,60 @@ describe('ListTimeline', () => {
         .members()
         .map((m) => m.id),
     ).toEqual(['b']);
+  });
+
+  // ---------------------------------------------------------------- analytics tab
+
+  it('offers Posts, Members and Analytics', () => {
+    const fixture = setUpWithList('7');
+    httpMock.expectOne('/api/v1/lists/7').flush({ id: '7', title: 'Friends' });
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/list/7'))
+      .flush([makeStatus('1')]);
+    fixture.detectChanges();
+
+    const tabs = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.tab')].map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(tabs).toEqual(['Posts', 'Members', 'Analytics']);
+  });
+
+  it('pages the list timeline at the 40-post cap once Analytics is opened', () => {
+    const fixture = setUpWithList('7');
+    httpMock.expectOne('/api/v1/lists/7').flush({ id: '7', title: 'Friends' });
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/list/7'))
+      .flush([makeStatus('1')]);
+    fixture.detectChanges();
+
+    internals(fixture).setTab('analytics');
+    fixture.detectChanges();
+
+    const req = httpMock.expectOne((r) => r.url.startsWith('/api/v1/timelines/list/7'));
+    expect(req.request.params.get('limit')).toBe('40');
+    req.flush([makeStatus('1')]);
+    httpMock.expectOne((r) => r.url.startsWith('/api/v1/accounts/relationships')).flush([]);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('posts sampled');
+  });
+
+  it('analyzes an anonymous list from the posts on screen, since it has no cursor', () => {
+    let follows!: AnonymousFollows;
+    const fixture = setUpWithList('local-1', () => {
+      localStorage.setItem('mastodon_mock_account_mode', 'anonymous');
+      follows = TestBed.inject(AnonymousFollows);
+      TestBed.inject(AnonymousLists);
+    });
+    expect(follows).toBeDefined();
+
+    internals(fixture).statuses.set([makeStatus('1'), makeStatus('2')]);
+    internals(fixture).setTab('analytics');
+    fixture.detectChanges();
+
+    // Synthetic: no request at all, and it says so rather than claiming a sample.
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('posts currently loaded');
+    expect((fixture.nativeElement as HTMLElement).querySelector('.sample-controls')).toBeNull();
   });
 });

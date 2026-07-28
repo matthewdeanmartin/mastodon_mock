@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Account, Status } from '../../models';
@@ -15,10 +15,15 @@ import {
 } from '../../providers/anonymous/anonymous-mastodon-provider';
 import { AnonymousFeedCorpus } from '../../providers/anonymous/anonymous-feed-corpus';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
+import { FeedAnalytics } from '../../feed-analytics/feed-analytics';
+import { FeedSource } from '../../feed-sample';
+
+/** Posts per request when sampling the list — Mastodon's cap. */
+const SAMPLE_PAGE_SIZE = 40;
 
 @Component({
   selector: 'app-list-timeline',
-  imports: [RouterLink, StatusCard, BulkAddDialog, ConfirmDialog],
+  imports: [RouterLink, StatusCard, BulkAddDialog, ConfirmDialog, FeedAnalytics],
   templateUrl: './list-timeline.html',
   styleUrl: './list-timeline.css',
 })
@@ -39,7 +44,31 @@ export class ListTimeline implements OnInit {
   protected exhausted = signal(true);
   protected warnings = signal<string[]>([]);
   private anonymousFeed: AnonymousFollowFeedSession | null = null;
-  protected tab = signal<'posts' | 'members'>('posts');
+  protected tab = signal<'posts' | 'members' | 'analytics'>('posts');
+
+  /**
+   * The feed the Analytics tab samples.
+   *
+   * A signed-in list is a real server timeline, so it pages. An anonymous list
+   * isn't — it's synthesised by merging one fetch per followed account, and
+   * there is no cursor that reproduces that merge. So the anonymous case hands
+   * over the posts already on screen, and the report covers however many that
+   * is (see `feed-sample.ts`).
+   */
+  protected feedSource = computed<FeedSource>(() => {
+    const id = this.listId();
+    const name = this.title() || 'List';
+    if (this.auth.isAnonymous) {
+      return { type: 'list', query: name, posts: this.statuses() };
+    }
+    return {
+      type: 'list',
+      query: name,
+      pageSize: SAMPLE_PAGE_SIZE,
+      fetch: (after: Status | null) =>
+        this.api.listTimeline(id, after?.id ?? undefined, SAMPLE_PAGE_SIZE),
+    };
+  });
 
   // Members are fetched lazily, the first time the tab is opened.
   protected members = signal<Account[]>([]);
@@ -146,7 +175,7 @@ export class ListTimeline implements OnInit {
       : ['/accounts', account.id];
   }
 
-  setTab(tab: 'posts' | 'members'): void {
+  setTab(tab: 'posts' | 'members' | 'analytics'): void {
     this.tab.set(tab);
     if (tab === 'members' && this.membersLoadedFor !== this.listId()) {
       this.loadMembers();

@@ -4,6 +4,9 @@ import { ClientPrefs } from '../client-prefs';
 import { ProviderId } from '../models';
 import { ProviderRegistry } from '../providers/provider-registry';
 
+/** What the host page is showing in place of its timeline. */
+export type FeedView = 'feed' | 'members' | 'analytics';
+
 /**
  * The timeline command bar: Go Live (owned by the host page), plus the global
  * feed toggles — Reader mode, images on/off, and text size (shown in reader).
@@ -86,6 +89,29 @@ import { ProviderRegistry } from '../providers/provider-registry';
           </button>
         }
       }
+      @if (showFeedViews()) {
+        <!-- Views over the feed the page already has, not navigation: they swap
+             what the timeline area shows, so they read as toggles like the rest
+             of the bar. -->
+        <button
+          class="btn btn-outline"
+          [class.active]="view() === 'members'"
+          [attr.aria-pressed]="view() === 'members'"
+          (click)="setView('members')"
+          title="Who is in this feed — the accounts whose posts are loaded"
+        >
+          👥 Members
+        </button>
+        <button
+          class="btn btn-outline"
+          [class.active]="view() === 'analytics'"
+          [attr.aria-pressed]="view() === 'analytics'"
+          (click)="setView('analytics')"
+          title="Analytics for the posts currently loaded in this feed"
+        >
+          📊 Analytics
+        </button>
+      }
       @if (prefs.feedReader()) {
         <span class="font-controls">
           <button
@@ -145,10 +171,21 @@ export class CommandBar {
   readonly showLangFilter = input(false);
   /** Show the 😌 Calm toggle (Home; Algo has its own chip). */
   readonly showCalm = input(false);
+  /** Show the 👥 Members / 📊 Analytics view toggles (Home). */
+  readonly showFeedViews = input(false);
+  /** Which view the host page is currently showing. */
+  readonly view = input<FeedView>('feed');
   readonly toggleLive = output<void>();
   readonly refresh = output<void>();
   /** A source filter changed; merged feeds need to refetch their active sources. */
   readonly providerVisibilityChanged = output<void>();
+  /** The viewer picked a different view of the feed. */
+  readonly viewChange = output<FeedView>();
+
+  /** Clicking the active view returns to the feed, so both buttons toggle. */
+  protected setView(view: FeedView): void {
+    this.viewChange.emit(this.view() === view ? 'feed' : view);
+  }
 
   protected toggleProvider(id: ProviderId): void {
     this.prefs.toggleProvider(id);

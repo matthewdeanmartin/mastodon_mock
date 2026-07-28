@@ -1,0 +1,63 @@
+@if (loading()) {
+  <p class="muted center">Looking at who's posting…</p>
+} @else if (error()) {
+  <p class="muted center">Couldn't sample this feed — try again later.</p>
+} @else if (!authors().length) {
+  <p class="muted center">Nobody has posted here yet.</p>
+} @else {
+  <div class="sample-note muted">
+    <span>
+      <!-- Emergent membership, not a roster: say so plainly. -->
+      The {{ authors().length }} {{ authors().length === 1 ? 'account' : 'accounts' }} that wrote
+      the {{ posts().length }} posts sampled from this feed. There's no membership list for a feed
+      like this — these are just the people posting in it right now.
+    </span>
+    @if (paged()) {
+      <span class="sample-controls" role="group" aria-label="Sample size">
+        <span>Sample:</span>
+        @for (n of sampleChoices; track n) {
+          <button
+            type="button"
+            class="sample-btn"
+            [class.active]="sampleSize() === n"
+            [title]="'Sample ' + n + ' posts'"
+            (click)="setSampleSize(n)"
+          >
+            {{ n }}
+          </button>
+        }
+        <button type="button" class="sample-btn" title="Look again" (click)="refresh()">↻</button>
+      </span>
+    }
+  </div>
+
+  @for (row of authors(); track row.account.id) {
+    <div class="member-row">
+      <a class="member-link" [routerLink]="['/accounts', row.account.id]">
+        <img
+          class="avatar"
+          [src]="row.account.avatar_static || row.account.avatar"
+          [alt]="row.account.username"
+          loading="lazy"
+          decoding="async"
+        />
+        <span class="names">
+          <span class="name">
+            {{ row.account.display_name || row.account.username }}
+            @if (row.account.bot) {
+              <span class="bot-tag" title="This account is marked as automated">bot</span>
+            }
+            @if (knowsFollows() && isFollowed(row)) {
+              <span class="follow-tag" title="You follow this account">following</span>
+            }
+          </span>
+          <span class="acct muted">&#64;{{ row.account.acct }}</span>
+        </span>
+      </a>
+      <span class="share muted" [title]="pct(row.share) + '% of the sampled posts'">
+        {{ row.count }} {{ row.count === 1 ? 'post' : 'posts' }}
+        <small>{{ pct(row.share) }}%</small>
+      </span>
+    </div>
+  }
+}

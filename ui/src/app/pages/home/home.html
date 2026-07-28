@@ -67,123 +67,134 @@
   [showLangFilter]="true"
   [showCalm]="true"
   [showRefresh]="!live()"
+  [showFeedViews]="true"
+  [view]="view()"
   (refresh)="load(true)"
   (toggleLive)="toggleLive()"
   (providerVisibilityChanged)="load()"
+  (viewChange)="setView($event)"
 />
 
-<div class="home-filters" role="group" aria-label="Timeline filters">
-  <button
-    type="button"
-    class="btn btn-outline btn-sm"
-    [class.active]="showBoosts()"
-    [attr.aria-pressed]="showBoosts()"
-    (click)="toggleBoosts()"
-  >
-    🔁 Retweets
-  </button>
-  <button
-    type="button"
-    class="btn btn-outline btn-sm"
-    [class.active]="showReplies()"
-    [attr.aria-pressed]="showReplies()"
-    (click)="toggleReplies()"
-  >
-    💬 Replies
-  </button>
-</div>
+<!-- Members and Analytics are views *of the loaded feed*, so they replace the
+     timeline rather than navigating away — the command bar toggles back. -->
+@if (view() === 'members') {
+  <app-feed-members [source]="feedSource()" />
+} @else if (view() === 'analytics') {
+  <app-feed-analytics [source]="feedSource()" />
+} @else {
+  <div class="home-filters" role="group" aria-label="Timeline filters">
+    <button
+      type="button"
+      class="btn btn-outline btn-sm"
+      [class.active]="showBoosts()"
+      [attr.aria-pressed]="showBoosts()"
+      (click)="toggleBoosts()"
+    >
+      🔁 Retweets
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm"
+      [class.active]="showReplies()"
+      [attr.aria-pressed]="showReplies()"
+      (click)="toggleReplies()"
+    >
+      💬 Replies
+    </button>
+  </div>
 
-@if (auth.isAnonymous && anonymousProvider.errors().length) {
-  <aside class="muted" role="status">
-    @for (warning of anonymousProvider.errors(); track warning) {
-      <div>{{ warning }}</div>
+  @if (auth.isAnonymous && anonymousProvider.errors().length) {
+    <aside class="muted" role="status">
+      @for (warning of anonymousProvider.errors(); track warning) {
+        <div>{{ warning }}</div>
+      }
+      <a routerLink="/settings/follows">Review followed sources or retry the public API</a>
+    </aside>
+  }
+
+  @if (!loading() && showOnboarding()) {
+    @if (!eliza.following()) {
+      <a class="starter-pack-post eliza-invite" routerLink="/eliza">
+        <img class="starter-pack-avatar" src="eliza-avatar.svg" width="40" height="40" alt="" />
+        <div class="starter-pack-content">
+          <div class="starter-pack-author">
+            <strong>Eliza</strong>
+            <span class="muted">&#64;eliza</span>
+          </div>
+          <p class="eliza-invite-copy">
+            New here, or no one to follow yet? I'm your practice friend — follow me and you can
+            post, reply, and chat, all safely in your browser.
+          </p>
+        </div>
+      </a>
     }
-    <a routerLink="/settings/follows">Review followed sources or retry the public API</a>
-  </aside>
-}
-
-@if (!loading() && showOnboarding()) {
-  @if (!eliza.following()) {
-    <a class="starter-pack-post eliza-invite" routerLink="/eliza">
-      <img class="starter-pack-avatar" src="eliza-avatar.svg" width="40" height="40" alt="" />
+    <article class="starter-pack-post starter-pack-universal">
+      <div class="starter-pack-avatar" aria-hidden="true">M</div>
       <div class="starter-pack-content">
         <div class="starter-pack-author">
-          <strong>Eliza</strong>
-          <span class="muted">&#64;eliza</span>
+          <strong>Mawkingbird</strong>
+          <span class="muted">&#64;mawkingbird</span>
         </div>
-        <p class="eliza-invite-copy">
-          New here, or no one to follow yet? I'm your practice friend — follow me and you can post,
-          reply, and chat, all safely in your browser.
+        <a routerLink="/collections/starter">
+          Get your account started with the universal starter kit
+        </a>
+      </div>
+    </article>
+    @for (kit of shippedStarterKits; track kit.id) {
+      <app-starter-kit-post [kit]="kit" />
+    }
+  }
+
+  @if (loading()) {
+    <p class="muted center">Loading…</p>
+  } @else if (!visible().length) {
+    <p class="muted center">
+      @if (auth.isAnonymous) {
+        Follow a public Mastodon account from Search or its profile to build this feed. Posts are
+        fetched only when you load or refresh this page.
+      } @else {
+        Your home timeline is empty.
+        <a routerLink="/find-people">Find people to follow</a>, or post something.
+      }
+    </p>
+  } @else {
+    @for (s of visible(); track s.id) {
+      <app-status-card
+        [status]="s"
+        (changed)="onChanged(s, $event)"
+        (deleted)="onDeleted($event)"
+        (replied)="onPosted($event)"
+      />
+    }
+
+    @if (capActive()) {
+      @if (visibleBookmarkTail().length) {
+        <div class="feed-cap">
+          <div class="feed-cap-rule">—— some posts you saved for later ——</div>
+        </div>
+        @for (s of visibleBookmarkTail(); track s.id) {
+          <div class="bookmark-label muted">🔖 From your bookmarks</div>
+          <app-status-card
+            [status]="s"
+            (changed)="onBookmarkChanged(s, $event)"
+            (deleted)="onBookmarkDeleted($event)"
+            (replied)="onPosted($event)"
+          />
+        }
+      }
+      <div class="feed-cap">
+        <div class="feed-cap-rule">—— that’s the end of your feed for now ——</div>
+        <p class="feed-cap-msg">
+          You’ve had enough for now, bub. Take it easy.
+          <span class="muted">Resets in ~{{ capMinutesLeft() }} min, or on reload.</span>
         </p>
       </div>
-    </a>
-  }
-  <article class="starter-pack-post starter-pack-universal">
-    <div class="starter-pack-avatar" aria-hidden="true">M</div>
-    <div class="starter-pack-content">
-      <div class="starter-pack-author">
-        <strong>Mawkingbird</strong>
-        <span class="muted">&#64;mawkingbird</span>
-      </div>
-      <a routerLink="/collections/starter">
-        Get your account started with the universal starter kit
-      </a>
-    </div>
-  </article>
-  @for (kit of shippedStarterKits; track kit.id) {
-    <app-starter-kit-post [kit]="kit" />
-  }
-}
-
-@if (loading()) {
-  <p class="muted center">Loading…</p>
-} @else if (!visible().length) {
-  <p class="muted center">
-    @if (auth.isAnonymous) {
-      Follow a public Mastodon account from Search or its profile to build this feed. Posts are
-      fetched only when you load or refresh this page.
+    } @else if (autoLoading()) {
+      <p class="muted center">Loading more…</p>
+    } @else if (canLoadMore()) {
+      <button class="btn btn-outline more" (click)="loadMore()">Load more</button>
     } @else {
-      Your home timeline is empty.
-      <a routerLink="/find-people">Find people to follow</a>, or post something.
+      <p class="muted center small">You’re all caught up.</p>
     }
-  </p>
-} @else {
-  @for (s of visible(); track s.id) {
-    <app-status-card
-      [status]="s"
-      (changed)="onChanged(s, $event)"
-      (deleted)="onDeleted($event)"
-      (replied)="onPosted($event)"
-    />
-  }
-
-  @if (capActive()) {
-    @if (visibleBookmarkTail().length) {
-      <div class="feed-cap">
-        <div class="feed-cap-rule">—— some posts you saved for later ——</div>
-      </div>
-      @for (s of visibleBookmarkTail(); track s.id) {
-        <div class="bookmark-label muted">🔖 From your bookmarks</div>
-        <app-status-card
-          [status]="s"
-          (changed)="onBookmarkChanged(s, $event)"
-          (deleted)="onBookmarkDeleted($event)"
-          (replied)="onPosted($event)"
-        />
-      }
-    }
-    <div class="feed-cap">
-      <div class="feed-cap-rule">—— that’s the end of your feed for now ——</div>
-      <p class="feed-cap-msg">
-        You’ve had enough for now, bub. Take it easy.
-        <span class="muted">Resets in ~{{ capMinutesLeft() }} min, or on reload.</span>
-      </p>
-    </div>
-  } @else if (autoLoading()) {
-    <p class="muted center">Loading more…</p>
-  } @else if (canLoadMore()) {
-    <button class="btn btn-outline more" (click)="loadMore()">Load more</button>
-  } @else {
-    <p class="muted center small">You’re all caught up.</p>
   }
 }

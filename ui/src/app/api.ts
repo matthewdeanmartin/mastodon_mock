@@ -378,10 +378,13 @@ export class Api {
     return this.http.get<UserList>(`/api/v1/lists/${id}`);
   }
 
-  listTimeline(id: string, maxId?: string): Observable<Status[]> {
-    return this.http.get<Status[]>(`/api/v1/timelines/list/${id}`, {
-      params: this.pageParams(maxId),
-    });
+  /** `limit` is capped at 40 by Mastodon; analytics pages at the cap to halve calls. */
+  listTimeline(id: string, maxId?: string, limit?: number): Observable<Status[]> {
+    let params = this.pageParams(maxId);
+    if (limit) {
+      params = params.set('limit', String(limit));
+    }
+    return this.http.get<Status[]>(`/api/v1/timelines/list/${id}`, { params });
   }
 
   // create_list / update_list take form-encoded params, not JSON.

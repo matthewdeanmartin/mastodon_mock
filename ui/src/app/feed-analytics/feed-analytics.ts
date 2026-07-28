@@ -1,36 +1,20 @@
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Observable } from 'rxjs';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { HumanTimePipe } from '../human-time.pipe';
 import { Status } from '../models';
 import { StatusCard } from '../status-card/status-card';
 import { FeedReport, analyzeFeed, pct } from '../feed-metrics';
+import { FeedSource, isSupplied, sampleFeed } from '../feed-sample';
 import { LANG_NAMES } from '../language-detect';
 
-/**
- * A feed is anything that pages statuses newest-first. The host page supplies
- * one of these; the component knows nothing about hashtags, lists or timelines,
- * only how to page and how to name what it paged.
- */
-export interface FeedSource {
-  /** Feed kind, e.g. "hashtag" — shown in the provenance line. */
-  type: string;
-  /** What identifies this feed within its kind, e.g. "#angular". */
-  query: string;
-  /** Posts per request. Mastodon caps timelines at 40; most default to 20. */
-  pageSize: number;
-  /** Fetch the page of posts older than `after` (null = newest page). */
-  fetch(after: Status | null): Observable<Status[]>;
-}
+export type { FeedSource } from '../feed-sample';
 
-/** Sample sizes the user can pick between. */
+/** Sample sizes the user can pick between on a paged feed. */
 export const SAMPLE_CHOICES = [50, 100, 200] as const;
-/** Default sample: 100 posts, five requests at Mastodon's default page size. */
+/** Default sample: 100 posts, three requests at Mastodon's 40-post page cap. */
 export const DEFAULT_SAMPLE = 100;
-/** Hard stop on paging, so a feed that pages forever can't burn the budget. */
-const MAX_PAGES = 20;
 /** Authors resolved per relationships call — Mastodon accepts them batched. */
 const RELATIONSHIP_BATCH = 80;
 /** How many rows the long tables show before "show all". */
@@ -39,10 +23,10 @@ const PREVIEW_ROWS = 8;
 /**
  * Analytics for a sampled feed — the counterpart to `AccountAnalytics`, which
  * profiles one account's own output. Everything is computed client-side from
- * the posts this component pages in (see `feed-metrics.ts`); no per-post
- * requests are made, so the whole report costs 3–10 calls.
+ * the posts in the sample (see `feed-metrics.ts`); no per-post requests are
+ * made, so a paged feed costs 3–10 calls and a synthetic one costs none.
  *
- * Fetching starts when the component mounts, so keep it behind a lazily-shown
+ * Collection starts when the component mounts, so keep it behind a lazily-shown
  * tab rather than rendering it alongside the feed itself.
  */
 @Component({
@@ -90,38 +74,18 @@ export class FeedAnalytics {
     this.posts.set([]);
     this.apiCalls.set(0);
     this.followingIds.set(null);
-    this.page(source, size, [], 0);
-  }
-
-  private page(source: FeedSource, size: number, acc: Status[], pages: number): void {
-    source.fetch(acc.at(-1) ?? null).subscribe({
-      next: (batch) => {
-        this.apiCalls.update((n) => n + 1);
-        // De-duplicate: overlapping pages are normal when a feed gains posts
-        // mid-collection, and a repeated post would double-count everywhere.
-        const seen = new Set(acc.map((s) => s.id));
-        const all = [...acc, ...batch.filter((s) => !seen.has(s.id))];
-        const exhausted = batch.length < source.pageSize;
-        if (exhausted || all.length >= size || pages + 1 >= MAX_PAGES) {
-          this.finish(all.slice(0, size));
-          return;
-        }
-        this.page(source, size, all, pages + 1);
-      },
-      error: () => {
-        // A mid-collection failure still leaves a usable (smaller) sample.
-        this.finish(acc.slice(0, size));
-        this.error.set(acc.length === 0);
-      },
+    sampleFeed(source, size).subscribe((sample) => {
+      this.posts.set(sample.posts);
+      this.apiCalls.set(sample.apiCalls);
+      this.error.set(sample.failed);
+      this.collectedAt.set(new Date().toISOString());
+      this.loading.set(false);
+      this.resolveFollows(sample.posts);
     });
   }
 
-  private finish(posts: Status[]): void {
-    this.posts.set(posts);
-    this.collectedAt.set(new Date().toISOString());
-    this.loading.set(false);
-    this.resolveFollows(posts);
-  }
+  /** Synthetic feeds are handed over whole, so there is no sample size to pick. */
+  protected paged = computed(() => !isSupplied(this.source()));
 
   /**
    * Followed-vs-unfollowed is the one metric the status payload can't answer.

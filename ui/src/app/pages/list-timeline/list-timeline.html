@@ -26,9 +26,15 @@
   <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
     Members
   </button>
+  <button class="tab" [class.active]="tab() === 'analytics'" (click)="setTab('analytics')">
+    Analytics
+  </button>
 </div>
 
-@if (tab() === 'posts') {
+@if (tab() === 'analytics') {
+  <!-- Mounting the component starts collection, so it stays off the other tabs. -->
+  <app-feed-analytics [source]="feedSource()" />
+} @else if (tab() === 'posts') {
   @if (loading()) {
     <p class="muted center">Loading…</p>
   } @else if (!statuses().length) {
