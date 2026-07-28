@@ -224,5 +224,48 @@
         }
       }
     </section>
+
+    @if (heatmap().weeks.length) {
+      <section class="section">
+        <h2>Posting calendar</h2>
+        <p class="muted small">
+          One square per day, darker means more posts. Covers only the
+          {{ heatmap().days }} days the sample spans — {{ heatmap().activeDays }} of them had posts.
+          Fetch more posts above to stretch it further back.
+        </p>
+        <div class="lawn-scroll">
+          <div class="lawn">
+            <div class="lawn-months" aria-hidden="true">
+              @for (m of heatmap().months; track m.weekIndex) {
+                <span class="lawn-month" [style.grid-column]="m.weekIndex + 1">{{ m.label }}</span>
+              }
+            </div>
+            <div class="lawn-grid" role="img" [attr.aria-label]="heatmapSummary()">
+              @for (week of heatmap().weeks; track week[0].dayIso) {
+                <div class="lawn-week">
+                  @for (day of week; track day.dayIso) {
+                    <span
+                      class="lawn-day"
+                      [class]="'heat-' + day.level"
+                      [title]="
+                        day.label + ': ' + day.posts + (day.posts === 1 ? ' post' : ' posts')
+                      "
+                    ></span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="lawn-legend muted">
+          <span>Less</span>
+          @for (level of heatLevels; track level) {
+            <span class="lawn-day" [class]="'heat-' + level"></span>
+          }
+          <span>More</span>
+          <span class="lawn-peak">Busiest day: {{ heatmap().peak }} posts</span>
+        </div>
+      </section>
+    }
   }
 </div>

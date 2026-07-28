@@ -295,3 +295,114 @@ export function hourHistogram(posts: Status[]): { hour: number; posts: number }[
   }
   return counts.map((posts, hour) => ({ hour, posts }));
 }
+
+// ---------------------------------------------------------------------------
+// Contribution heatmap ("the lawn")
+// ---------------------------------------------------------------------------
+
+/** One day cell in the heatmap. */
+export interface HeatmapDay {
+  /** Local midnight of the day, ISO — also the cell's track key. */
+  dayIso: string;
+  /** Localised date, for the tooltip. */
+  label: string;
+  posts: number;
+  /** 0 (none) to 4 (busiest), for CSS shading. */
+  level: number;
+}
+
+/** A calendar heatmap: weeks as columns, Sunday-first days as rows. */
+export interface Heatmap {
+  /** Columns, oldest week first; each holds exactly 7 days (Sun → Sat). */
+  weeks: HeatmapDay[][];
+  /** Month labels positioned by the column their month starts in. */
+  months: { label: string; weekIndex: number }[];
+  /** Busiest single day in the range, for the legend. */
+  peak: number;
+  /** How many days the grid spans, padding included. */
+  days: number;
+  /** Days in the range with at least one post. */
+  activeDays: number;
+}
+
+const HEATMAP_LEVELS = 4;
+const DAY_TOOLTIP_OPTS: Intl.DateTimeFormatOptions = {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+};
+const HEATMAP_MONTH_OPTS: Intl.DateTimeFormatOptions = { month: 'short' };
+
+function localMidnight(value: string | number | Date): Date {
+  const d = new Date(value);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * A GitHub-style contribution grid over **exactly the span the sample covers** —
+ * from the Sunday on or before the oldest post to the Saturday on or after the
+ * newest. Deliberately not a fixed 52-week year: the sample is ~100 posts, so
+ * for a busy account that is a few weeks and drawing an empty year would imply
+ * silence we never observed. Widening the window is the caller's job (the
+ * "get more posts" control), and the grid grows with it.
+ *
+ * Shading is relative to the sample's own busiest day, so the lawn always uses
+ * its full range of greens regardless of how prolific the account is.
+ */
+export function postHeatmap(posts: Status[]): Heatmap {
+  if (!posts.length) {
+    return { weeks: [], months: [], peak: 0, days: 0, activeDays: 0 };
+  }
+
+  const counts = new Map<number, number>();
+  let oldest = Infinity;
+  let newest = -Infinity;
+  for (const p of posts) {
+    const day = localMidnight(p.created_at).getTime();
+    counts.set(day, (counts.get(day) ?? 0) + 1);
+    oldest = Math.min(oldest, day);
+    newest = Math.max(newest, day);
+  }
+
+  // Pad out to whole weeks so every column is a full Sunday→Saturday strip.
+  const start = new Date(oldest);
+  start.setDate(start.getDate() - start.getDay());
+  const end = new Date(newest);
+  end.setDate(end.getDate() + (6 - end.getDay()));
+
+  const peak = Math.max(...counts.values());
+  const weeks: HeatmapDay[][] = [];
+  const months: { label: string; weekIndex: number }[] = [];
+  let week: HeatmapDay[] = [];
+  let days = 0;
+  let lastMonth = -1;
+
+  for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const day = new Date(cursor);
+    const posts = counts.get(day.getTime()) ?? 0;
+    week.push({
+      dayIso: day.toISOString(),
+      label: day.toLocaleDateString([], DAY_TOOLTIP_OPTS),
+      posts,
+      // Ceil so any activity at all is visible, never washed out to level 0.
+      level: posts ? Math.max(1, Math.ceil((posts / peak) * HEATMAP_LEVELS)) : 0,
+    });
+    days += 1;
+    if (day.getDay() === 0 && day.getMonth() !== lastMonth) {
+      lastMonth = day.getMonth();
+      months.push({
+        label: day.toLocaleDateString([], HEATMAP_MONTH_OPTS),
+        weekIndex: weeks.length,
+      });
+    }
+    if (week.length === 7) {
+      weeks.push(week);
+      week = [];
+    }
+  }
+  if (week.length) {
+    weeks.push(week);
+  }
+
+  return { weeks, months, peak, days, activeDays: counts.size };
+}

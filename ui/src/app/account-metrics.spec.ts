@@ -11,6 +11,7 @@ import {
   hasWeeklyRange,
   hourHistogram,
   monthlyActivity,
+  postHeatmap,
   sampleSpanDays,
   weekdayHistogram,
   weeklyActivity,
@@ -200,5 +201,61 @@ describe('histograms', () => {
     const hist = hourHistogram(posts);
     expect(hist).toHaveLength(24);
     expect(hist.reduce((s, b) => s + b.posts, 0)).toBe(10);
+  });
+});
+
+/** A post made at local noon on the given local date, so no TZ edge cases. */
+function postOn(year: number, month: number, day: number): Status {
+  return makeStatus({ created_at: new Date(year, month - 1, day, 12, 0, 0).toISOString() });
+}
+
+describe('postHeatmap', () => {
+  it('is empty for an empty sample', () => {
+    expect(postHeatmap([])).toEqual({ weeks: [], months: [], peak: 0, days: 0, activeDays: 0 });
+  });
+
+  it('pads the range out to whole Sunday-to-Saturday weeks', () => {
+    // 2026-03-11 is a Wednesday; a single post still yields one full week.
+    const map = postHeatmap([postOn(2026, 3, 11)]);
+    expect(map.weeks).toHaveLength(1);
+    expect(map.weeks[0]).toHaveLength(7);
+    expect(map.days).toBe(7);
+    expect(new Date(map.weeks[0][0].dayIso).getDay()).toBe(0);
+    expect(new Date(map.weeks[0][6].dayIso).getDay()).toBe(6);
+  });
+
+  it('covers only the span the sample spans, not a fixed year', () => {
+    const map = postHeatmap([postOn(2026, 3, 11), postOn(2026, 3, 25)]);
+    expect(map.weeks).toHaveLength(3);
+    expect(map.activeDays).toBe(2);
+  });
+
+  it('counts posts per day and shades relative to the busiest one', () => {
+    const map = postHeatmap([
+      postOn(2026, 3, 11),
+      postOn(2026, 3, 11),
+      postOn(2026, 3, 11),
+      postOn(2026, 3, 11),
+      postOn(2026, 3, 13),
+    ]);
+    const days = map.weeks.flat();
+    expect(map.peak).toBe(4);
+    expect(days.find((d) => d.posts === 4)?.level).toBe(4);
+    expect(days.find((d) => d.posts === 1)?.level).toBe(1);
+    expect(days.filter((d) => d.posts === 0).every((d) => d.level === 0)).toBe(true);
+  });
+
+  it('never washes a day with activity down to level 0', () => {
+    const many = Array.from({ length: 40 }, () => postOn(2026, 3, 11));
+    const map = postHeatmap([...many, postOn(2026, 3, 13)]);
+    expect(map.weeks.flat().find((d) => d.posts === 1)?.level).toBe(1);
+  });
+
+  it('labels months in column order', () => {
+    const map = postHeatmap([postOn(2026, 2, 20), postOn(2026, 4, 10)]);
+    expect(map.months.length).toBeGreaterThanOrEqual(3);
+    expect(map.months[0].weekIndex).toBe(0);
+    const indexes = map.months.map((m) => m.weekIndex);
+    expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
   });
 });

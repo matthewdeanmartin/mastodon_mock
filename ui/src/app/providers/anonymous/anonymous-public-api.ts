@@ -119,8 +119,9 @@ export class AnonymousPublicApi {
       .pipe(timeout(REQUEST_TIMEOUT_MS));
   }
 
-  getTagTimeline(server: string, name: string, maxId?: string): Observable<Status[]> {
-    let params = new HttpParams().set('limit', '20');
+  /** `limit` is capped at 40 by Mastodon; analytics pages at the cap to halve calls. */
+  getTagTimeline(server: string, name: string, maxId?: string, limit = 20): Observable<Status[]> {
+    let params = new HttpParams().set('limit', String(limit));
     if (maxId) params = params.set('max_id', maxId);
     return this.http
       .get<Status[]>(`${server}/api/v1/timelines/tag/${encodeURIComponent(name)}`, {

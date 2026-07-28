@@ -279,3 +279,81 @@
   border-radius: 12px;
   overflow: hidden;
 }
+
+/* --- Posting calendar ("the lawn") --- */
+
+/* The grid is sized by its week count, so a wide sample scrolls sideways
+   rather than squashing the squares into unreadable slivers. */
+.lawn-scroll {
+  overflow-x: auto;
+  padding: 4px 0 2px;
+}
+
+.lawn {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: min-content;
+}
+
+.lawn-months {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 14px;
+  height: 14px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.lawn-month {
+  grid-row: 1;
+  white-space: nowrap;
+}
+
+.lawn-grid {
+  display: flex;
+  gap: 3px;
+}
+
+.lawn-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lawn-day {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--hover);
+  flex: none;
+}
+
+/* Four steps of the accent colour; level 0 stays the empty-cell grey. */
+.lawn-day.heat-1 {
+  background: color-mix(in srgb, var(--accent) 28%, var(--col-bg));
+}
+
+.lawn-day.heat-2 {
+  background: color-mix(in srgb, var(--accent) 52%, var(--col-bg));
+}
+
+.lawn-day.heat-3 {
+  background: color-mix(in srgb, var(--accent) 76%, var(--col-bg));
+}
+
+.lawn-day.heat-4 {
+  background: var(--accent);
+}
+
+.lawn-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 11.5px;
+}
+
+.lawn-peak {
+  margin-left: auto;
+}

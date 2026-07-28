@@ -1,8 +1,9 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Api } from '../../api';
 import { Status, Tag as TagEntity } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
+import { FeedAnalytics, FeedSource } from '../../feed-analytics/feed-analytics';
 import { Auth } from '../../auth';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
@@ -10,9 +11,12 @@ import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-a
 import { AnonymousProviderRef } from '../../providers/anonymous/anonymous-mastodon-provider';
 import { Observable } from 'rxjs';
 
+/** Posts per request when sampling the tag for analytics — Mastodon's cap. */
+const ANALYTICS_PAGE_SIZE = 40;
+
 @Component({
   selector: 'app-tag',
-  imports: [StatusCard],
+  imports: [StatusCard, FeedAnalytics],
   templateUrl: './tag.html',
   styleUrl: './tag.css',
 })
@@ -31,15 +35,38 @@ export class Tag implements OnInit {
   protected followError = signal<string | null>(null);
   protected loadingMore = signal(false);
   protected exhausted = signal(false);
+  protected tab = signal<'posts' | 'analytics'>('posts');
+
+  /**
+   * The feed the analytics tab samples. Rebuilt whenever the tag changes so the
+   * report restarts; pages at Mastodon's 40-post cap, so 100 posts costs three
+   * calls rather than five. The tab is only rendered once opened, so building
+   * this signal doesn't fetch anything on its own.
+   */
+  protected analyticsSource = computed<FeedSource>(() => {
+    const tag = this.tag();
+    return {
+      type: 'hashtag',
+      query: '#' + tag,
+      pageSize: ANALYTICS_PAGE_SIZE,
+      fetch: (after: Status | null) =>
+        this.getTimeline(tag, after ? this.nativeStatusId(after) : undefined, ANALYTICS_PAGE_SIZE),
+    };
+  });
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       const tag = params.get('tag');
       if (tag) {
         this.tag.set(tag);
+        this.tab.set('posts');
         this.load(tag);
       }
     });
+  }
+
+  setTab(tab: 'posts' | 'analytics'): void {
+    this.tab.set(tab);
   }
 
   load(tag: string): void {
@@ -99,10 +126,10 @@ export class Tag implements OnInit {
       : this.api.getTag(name);
   }
 
-  private getTimeline(name: string, maxId?: string): Observable<Status[]> {
+  private getTimeline(name: string, maxId?: string, limit?: number): Observable<Status[]> {
     return this.auth.isAnonymous
-      ? this.anonymousPublic.getTagTimeline(this.anonymous.server(), name, maxId)
-      : this.api.tagTimeline(name, maxId);
+      ? this.anonymousPublic.getTagTimeline(this.anonymous.server(), name, maxId, limit)
+      : this.api.tagTimeline(name, maxId, limit);
   }
 
   private nativeStatusId(status: Status): string {

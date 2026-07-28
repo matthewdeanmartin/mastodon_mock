@@ -19,7 +19,17 @@
   <p class="muted center" role="alert">{{ error }}</p>
 }
 
-@if (loading()) {
+<div class="tabs">
+  <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Feed</button>
+  <button class="tab" [class.active]="tab() === 'analytics'" (click)="setTab('analytics')">
+    Analytics
+  </button>
+</div>
+
+@if (tab() === 'analytics') {
+  <!-- Mounting the component starts collection, so it stays off the Feed tab. -->
+  <app-feed-analytics [source]="analyticsSource()" />
+} @else if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!statuses().length) {
   <p class="muted center">No statuses tagged #{{ tag() }}.</p>

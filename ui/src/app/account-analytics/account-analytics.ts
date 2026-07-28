@@ -9,12 +9,14 @@ import { Account, Status } from '../models';
 import { StatusCard } from '../status-card/status-card';
 import {
   ActivityBucket,
+  Heatmap,
   Liveliness,
   computeLiveliness,
   estimateTotalReach,
   hasMonthlyRange,
   hasWeeklyRange,
   monthlyActivity,
+  postHeatmap,
   weekdayHistogram,
   weeklyActivity,
 } from '../account-metrics';
@@ -296,6 +298,24 @@ export class AccountAnalytics implements OnInit {
       return null;
     }
     return list.reduce((best, a) => (a.followers_count > best.followers_count ? a : best));
+  });
+
+  // --- Contribution heatmap ---
+
+  /**
+   * The "lawn". Covers only the span the sample covers, so a busy account gets
+   * a few dense weeks rather than a mostly-empty year — use "get more posts"
+   * above to widen it.
+   */
+  protected heatmap = computed<Heatmap>(() => postHeatmap(this.posts()));
+
+  /** Levels 0–4, for the legend swatches. */
+  protected readonly heatLevels = [0, 1, 2, 3, 4];
+
+  /** The grid is decorative per-cell; this sentence is what screen readers get. */
+  protected heatmapSummary = computed(() => {
+    const map = this.heatmap();
+    return `Posting calendar: ${this.posts().length} posts across ${map.days} days, ${map.activeDays} of which had posts. Busiest day: ${map.peak}.`;
   });
 
   /** Compact display for tile values: 12,345 → 12.3K. */
