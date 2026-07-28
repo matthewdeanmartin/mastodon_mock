@@ -1,4 +1,10 @@
-import { sanitizePath } from './analytics-tracker';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subject } from 'rxjs';
+import { AnalyticsTracker, sanitizePath } from './analytics-tracker';
+import { ClientPrefs } from './client-prefs';
 
 describe('sanitizePath', () => {
   it('collapses account ids', () => {
@@ -42,5 +48,80 @@ describe('sanitizePath', () => {
 
   it('does not treat a bare collection route as an id', () => {
     expect(sanitizePath('/lists')).toBe('/lists');
+  });
+});
+
+describe('AnalyticsTracker opt-out', () => {
+  let router: { events: Subject<unknown> };
+
+  function setUp(analyticsOn: boolean): AnalyticsTracker {
+    localStorage.clear();
+    localStorage.setItem('mockingbird_client_prefs', JSON.stringify({ analytics: analyticsOn }));
+    router = { events: new Subject<unknown>() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: Router, useValue: router },
+      ],
+    });
+    const tracker = TestBed.inject(AnalyticsTracker);
+    tracker.start();
+    return tracker;
+  }
+
+  function navigate(): void {
+    router.events.next(new NavigationEnd(1, '/home', '/home'));
+  }
+
+  function injectedScript(): HTMLScriptElement | null {
+    return document.head.querySelector('script[data-goatcounter]');
+  }
+
+  afterEach(() => {
+    injectedScript()?.remove();
+    delete (window as { goatcounter?: unknown }).goatcounter;
+    localStorage.clear();
+  });
+
+  it('injects nothing at all when analytics are off', () => {
+    // The whole point of the opt-out: not "we suppress the call" but "the
+    // third-party script is never fetched or executed".
+    setUp(false);
+    navigate();
+    expect(injectedScript()).toBeNull();
+    expect((window as { goatcounter?: unknown }).goatcounter).toBeUndefined();
+  });
+
+  it('injects the same-origin script once when analytics are on', () => {
+    setUp(true);
+    navigate();
+    navigate();
+
+    const script = injectedScript();
+    expect(script).not.toBeNull();
+    // Same-origin and relative, so it resolves under <base href> and stays
+    // inside `script-src 'self'`.
+    expect(script!.getAttribute('src')).toBe('vendor/count.js');
+    expect(script!.getAttribute('src')).not.toContain('//');
+    expect(document.head.querySelectorAll('script[data-goatcounter]').length).toBe(1);
+  });
+
+  it('stops counting as soon as the pref is turned off', () => {
+    setUp(true);
+    navigate();
+    const counted: string[] = [];
+    (window as { goatcounter?: { count?: (v: { path: string }) => void } }).goatcounter = {
+      count: (v) => counted.push(v.path),
+    };
+
+    navigate();
+    expect(counted).toEqual(['/home']);
+
+    // Turning it off mid-session takes effect on the very next view.
+    TestBed.inject(ClientPrefs).setAnalytics(false);
+    navigate();
+    expect(counted).toEqual(['/home']);
   });
 });

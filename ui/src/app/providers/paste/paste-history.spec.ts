@@ -2,6 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PasteHistory, PasteRecord } from './paste-history';
 
+/** Edit codes are stored apart from the records — see storage-registry.ts. */
+function storedEditKeys(): Record<string, string> {
+  return JSON.parse(localStorage.getItem('mockingbird_paste_edit_keys') ?? '{}');
+}
+
 function created(slug: string) {
   return {
     slug,
@@ -51,7 +56,9 @@ describe('PasteHistory', () => {
 
     const stored = JSON.parse(localStorage.getItem('mockingbird_pastes') ?? '[]');
     expect(stored[0].providerId).toBe('pastepile');
-    expect(stored[0].editKey).toBe('secret');
+    // The edit code is a capability, so it must NOT be in the record blob.
+    expect(stored[0].editKey).toBeUndefined();
+    expect(storedEditKeys()['abc']).toBe('secret');
   });
 
   it('updates and forgets a record', () => {

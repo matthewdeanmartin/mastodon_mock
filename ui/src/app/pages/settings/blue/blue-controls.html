@@ -411,4 +411,25 @@
       </span>
     </div>
   </div>
+
+  <div class="srow">
+    <span class="slabel">Analytics</span>
+    <div class="scontrol">
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.analytics()"
+          (ngModelChange)="prefs.setAnalytics($event)"
+          name="analytics"
+        />
+        Count my page views
+      </label>
+      <span class="hint">
+        Anonymous page counts only — which kinds of page get used, never which account, post or tag
+        you looked at, and never a query string. Turn this off and the analytics script is never
+        loaded at all: nothing is fetched, counted or sent. The script is served from this site, not
+        from a third party.
+      </span>
+    </div>
+  </div>
 </div>

@@ -88,9 +88,11 @@ describe('RaindropSession', () => {
     session.connect(' test-token ');
 
     expect(session.connected()).toBe(true);
-    expect(localStorage.getItem('mockingbird_raindrop_token')).toBe(
-      JSON.stringify({ accessToken: 'test-token' }),
-    );
+    // Stored alongside a connected-at stamp, which drives credential retention.
+    expect(JSON.parse(localStorage.getItem('mockingbird_raindrop_token')!)).toEqual({
+      accessToken: 'test-token',
+      connectedAt: expect.any(Number),
+    });
     expect(localStorage.getItem('mockingbird_raindrop_credentials')).toBeNull();
 
     session.disconnect();

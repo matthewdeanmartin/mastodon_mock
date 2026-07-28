@@ -107,7 +107,7 @@ export class PastesPage {
     this.busy.set(record.slug);
     this.error.set(null);
     provider
-      .update(record.slug, record.editKey, {
+      .update(record.slug, this.history.editKeyFor(record.slug), {
         title: this.editTitle().trim(),
         content: this.editContent(),
         language: this.editLanguage(),
@@ -140,7 +140,7 @@ export class PastesPage {
     }
     this.busy.set(record.slug);
     this.error.set(null);
-    provider.delete(record.slug, record.editKey).subscribe({
+    provider.delete(record.slug, this.history.editKeyFor(record.slug)).subscribe({
       next: () => {
         this.history.remove(record.slug);
         this.busy.set(null);

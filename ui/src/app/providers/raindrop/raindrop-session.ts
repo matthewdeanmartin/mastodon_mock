@@ -1,11 +1,19 @@
 import { Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
 import { Status } from '../../models';
+import {
+  credentialExpired,
+  credentialExpiresAt,
+  ensureStamped,
+  ExpiringCredential,
+  ExpiringConnection,
+  stampCredential,
+} from '../credential-lifetime';
 
 const TOKEN_KEY_BASE = 'mockingbird_raindrop_token';
 const LEGACY_CREDENTIALS_KEY_BASE = 'mockingbird_raindrop_credentials';
 
-interface StoredRaindropToken {
+interface StoredRaindropToken extends ExpiringCredential {
   accessToken: string;
 }
 
@@ -18,10 +26,11 @@ export type RaindropBookmarkTarget = 'post' | 'external-link';
 
 /** Browser-only Raindrop.io connection using the account's non-expiring Test token. */
 @Injectable({ providedIn: 'root' })
-export class RaindropSession {
+export class RaindropSession implements ExpiringConnection {
   private readonly tokenKey = scopedKey(TOKEN_KEY_BASE);
   private readonly legacyCredentialsKey = scopedKey(LEGACY_CREDENTIALS_KEY_BASE);
   private token = signal<StoredRaindropToken | null>(readToken(this.tokenKey));
+
   readonly connected = signal(this.token() !== null);
 
   constructor() {
@@ -34,10 +43,23 @@ export class RaindropSession {
     if (!trimmed) {
       throw new Error('Paste the Test token from your Raindrop.io app settings.');
     }
-    const token = { accessToken: trimmed };
+    const token = stampCredential({ accessToken: trimmed });
     localStorage.setItem(this.tokenKey, JSON.stringify(token));
     this.token.set(token);
     this.connected.set(true);
+  }
+
+  /** When this token ages out under the retention policy, or null. */
+  expiresAt(): number | null {
+    return credentialExpiresAt(this.token()?.connectedAt);
+  }
+
+  /** Drop the token if it has outlived the retention policy. */
+  enforceLifetime(): void {
+    const token = this.token();
+    if (token && credentialExpired(token.connectedAt)) {
+      this.disconnect();
+    }
   }
 
   async addBookmark(
@@ -113,9 +135,18 @@ function readToken(key: string): StoredRaindropToken | null {
     const parsed = JSON.parse(
       localStorage.getItem(key) ?? 'null',
     ) as Partial<StoredRaindropToken> | null;
-    return typeof parsed?.accessToken === 'string' && parsed.accessToken
-      ? { accessToken: parsed.accessToken }
-      : null;
+    if (typeof parsed?.accessToken !== 'string' || !parsed.accessToken) {
+      return null;
+    }
+    const stored = ensureStamped(key, {
+      accessToken: parsed.accessToken,
+      connectedAt: parsed.connectedAt,
+    });
+    if (credentialExpired(stored.connectedAt)) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return stored;
   } catch {
     localStorage.removeItem(key);
     return null;

@@ -9,6 +9,11 @@ import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-ca
 import { DropboxEntry, DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 import { GitHubSession } from '../../../providers/github/github-session';
+import {
+  CREDENTIAL_LIFETIME_OPTIONS,
+  CredentialLifetime,
+  CredentialLifetimeStore,
+} from '../../../providers/credential-lifetime';
 
 /**
  * Connections: the other places your people post. Mastodon is home; everything
@@ -29,8 +34,11 @@ export class SettingsConnections implements OnInit {
   protected dropbox = inject(DropboxSession);
   protected raindrop = inject(RaindropSession);
   protected github = inject(GitHubSession);
+  protected lifetimes = inject(CredentialLifetimeStore);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+
+  protected readonly lifetimeOptions = CREDENTIAL_LIFETIME_OPTIONS;
 
   protected feedUrl = signal('');
   protected adding = signal(false);
@@ -57,6 +65,13 @@ export class SettingsConnections implements OnInit {
   protected githubNotice = signal<string | null>(null);
 
   ngOnInit(): void {
+    // Tell the policy store which connectors it governs, then apply the current
+    // policy: each session already dropped an over-age credential when it was
+    // constructed, but a session built before the user shortened the window (or
+    // one whose page has been open a long time) is re-checked here.
+    this.lifetimes.govern([this.github, this.raindrop, this.bsky]);
+    this.lifetimes.enforceAll();
+
     const result = this.route.snapshot.queryParamMap.get('dropbox');
     if (result === 'connected') {
       this.dropboxNotice.set('Dropbox connected.');
@@ -68,6 +83,27 @@ export class SettingsConnections implements OnInit {
     if (result) {
       void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
     }
+  }
+
+  /**
+   * Change how long pasted credentials are kept. Shortening the window applies
+   * at once, so anything already past the new limit disconnects here rather
+   * than surviving until the next reload.
+   */
+  setLifetime(lifetime: CredentialLifetime): void {
+    this.lifetimes.set(lifetime);
+  }
+
+  /** "12 March 2026", or null when nothing is connected / the policy is "never". */
+  protected expiryLabel(expiresAt: number | null): string | null {
+    if (expiresAt === null) {
+      return null;
+    }
+    return new Date(expiresAt).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
   }
 
   connectRaindrop(): void {

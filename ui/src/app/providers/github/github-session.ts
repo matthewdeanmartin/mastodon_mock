@@ -1,12 +1,30 @@
 import { Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
+import {
+  credentialExpired,
+  credentialExpiresAt,
+  ensureStamped,
+  ExpiringCredential,
+  ExpiringConnection,
+  stampCredential,
+} from '../credential-lifetime';
 
-const TOKEN_KEY_BASE = 'mockingbird_github_token';
+/**
+ * Split so a settings export can carry the linked identity without the token:
+ * the user profile is `private`, the PAT is `secret`. See `storage-registry.ts`.
+ */
+const USER_KEY_BASE = 'mockingbird_github_user';
+const CREDENTIALS_KEY_BASE = 'mockingbird_github_credentials';
 const API_ROOT = 'https://api.github.com';
 const API_VERSION = '2026-03-10';
 
-interface StoredGitHubToken {
+/** The secret half, plus the retention stamp that governs it. */
+interface StoredGitHubCredentials extends ExpiringCredential {
   accessToken: string;
+}
+
+/** Both halves rejoined, as the service holds them in memory. */
+interface StoredGitHubToken extends StoredGitHubCredentials {
   user: GitHubUser;
 }
 
@@ -107,9 +125,10 @@ interface GitHubGraphQlResponse {
 
 /** Browser-only GitHub REST session using a user-supplied classic token. */
 @Injectable({ providedIn: 'root' })
-export class GitHubSession {
-  private readonly tokenKey = scopedKey(TOKEN_KEY_BASE);
-  private token = signal<StoredGitHubToken | null>(readToken(this.tokenKey));
+export class GitHubSession implements ExpiringConnection {
+  private readonly userKey = scopedKey(USER_KEY_BASE);
+  private readonly credentialsKey = scopedKey(CREDENTIALS_KEY_BASE);
+  private token = signal<StoredGitHubToken | null>(readToken(this.userKey, this.credentialsKey));
 
   readonly user = signal<GitHubUser | null>(this.token()?.user ?? null);
   readonly connected = signal(this.token() !== null);
@@ -123,12 +142,27 @@ export class GitHubSession {
     }
 
     const user = await githubRequest<GitHubUser>('/user', trimmed);
-    const stored = { accessToken: trimmed, user };
-    localStorage.setItem(this.tokenKey, JSON.stringify(stored));
+    const credentials = stampCredential({ accessToken: trimmed });
+    localStorage.setItem(this.userKey, JSON.stringify(user));
+    localStorage.setItem(this.credentialsKey, JSON.stringify(credentials));
+    const stored: StoredGitHubToken = { ...credentials, user };
     this.token.set(stored);
     this.user.set(user);
     this.connected.set(true);
     return user;
+  }
+
+  /** When this token ages out under the retention policy, or null. */
+  expiresAt(): number | null {
+    return credentialExpiresAt(this.token()?.connectedAt);
+  }
+
+  /** Drop the token if it has outlived the retention policy. */
+  enforceLifetime(): void {
+    const token = this.token();
+    if (token && credentialExpired(token.connectedAt)) {
+      this.disconnect();
+    }
   }
 
   async runProof(): Promise<void> {
@@ -205,7 +239,8 @@ export class GitHubSession {
   }
 
   disconnect(): void {
-    localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.userKey);
+    localStorage.removeItem(this.credentialsKey);
     this.token.set(null);
     this.user.set(null);
     this.connected.set(false);
@@ -346,21 +381,36 @@ async function githubError(response: Response): Promise<string> {
   }
 }
 
-function readToken(key: string): StoredGitHubToken | null {
+/**
+ * Rejoin the two halves. A profile with no token is not a usable connection, so
+ * the orphan is cleared — the state a machine that imported settings but has not
+ * reconnected GitHub yet will be in.
+ */
+function readToken(userKey: string, credentialsKey: string): StoredGitHubToken | null {
   try {
-    const parsed = JSON.parse(
-      localStorage.getItem(key) ?? 'null',
-    ) as Partial<StoredGitHubToken> | null;
+    const user = JSON.parse(localStorage.getItem(userKey) ?? 'null') as GitHubUser | null;
+    const credentials = JSON.parse(
+      localStorage.getItem(credentialsKey) ?? 'null',
+    ) as Partial<StoredGitHubCredentials> | null;
     if (
-      typeof parsed?.accessToken !== 'string' ||
-      !parsed.accessToken ||
-      typeof parsed.user?.login !== 'string'
+      typeof credentials?.accessToken !== 'string' ||
+      !credentials.accessToken ||
+      typeof user?.login !== 'string'
     ) {
+      localStorage.removeItem(userKey);
+      localStorage.removeItem(credentialsKey);
       return null;
     }
-    return parsed as StoredGitHubToken;
+    const stamped = ensureStamped(credentialsKey, credentials as StoredGitHubCredentials);
+    if (credentialExpired(stamped.connectedAt)) {
+      localStorage.removeItem(userKey);
+      localStorage.removeItem(credentialsKey);
+      return null;
+    }
+    return { ...stamped, user };
   } catch {
-    localStorage.removeItem(key);
+    localStorage.removeItem(userKey);
+    localStorage.removeItem(credentialsKey);
     return null;
   }
 }

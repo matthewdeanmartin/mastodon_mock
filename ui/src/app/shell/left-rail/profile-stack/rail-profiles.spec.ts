@@ -7,6 +7,7 @@ import { Account } from '../../../models';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
 import { BskySession } from '../../../providers/bluesky/bluesky-session';
 import { RailProfiles } from './rail-profiles';
+import { seedBskySession } from '../../../testing/seed-storage';
 
 const ME = {
   id: '7',
@@ -70,7 +71,7 @@ describe('RailProfiles', () => {
   });
 
   it('adds a Bluesky card once its profile answers', () => {
-    localStorage.setItem('mockingbird_bsky_session', JSON.stringify(BSKY));
+    seedBskySession(BSKY);
     TestBed.inject(Auth).account.set(ME);
     const rail = TestBed.inject(RailProfiles);
 
@@ -98,7 +99,7 @@ describe('RailProfiles', () => {
   });
 
   it('keeps the Bluesky card, without counts, when its profile fetch fails', () => {
-    localStorage.setItem('mockingbird_bsky_session', JSON.stringify(BSKY));
+    seedBskySession(BSKY);
     TestBed.inject(Auth).account.set(ME);
     const rail = TestBed.inject(RailProfiles);
 

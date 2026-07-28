@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scopeSuffixForToken } from '../../../account-scope';
 import { Auth } from '../../../auth';
 import { SettingsAccounts } from './settings-accounts';
+import { seedSessions } from '../../../testing/seed-storage';
 
 /** Exposes the component's protected members for white-box testing. */
 interface Internals {
@@ -41,13 +42,10 @@ describe('SettingsAccounts', () => {
 
   /** Two saved logins, A active, each owning one scoped key. */
   function seedTwoAccounts(): void {
-    localStorage.setItem(
-      'mastodon_mock_sessions',
-      JSON.stringify([
-        { token: TOKEN_A, server: '', account: { id: '1', username: 'ann', acct: 'ann' } },
-        { token: TOKEN_B, server: '', account: { id: '2', username: 'bob', acct: 'bob' } },
-      ]),
-    );
+    seedSessions([
+      { token: TOKEN_A, server: '', account: { id: '1', username: 'ann', acct: 'ann' } },
+      { token: TOKEN_B, server: '', account: { id: '2', username: 'bob', acct: 'bob' } },
+    ] as never);
     localStorage.setItem('mastodon_mock_token', TOKEN_A);
     localStorage.setItem('mastodon_mock_account_mode', 'mastodon');
     localStorage.setItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_A)}`, '["a"]');
@@ -75,11 +73,8 @@ describe('SettingsAccounts', () => {
     seedTwoAccounts();
     const rows = internals(setUp()).accounts();
 
-    expect(rows.map((r) => r.key)).toEqual([
-      `mastodon:${TOKEN_A}`,
-      `mastodon:${TOKEN_B}`,
-      'anonymous',
-    ]);
+    // Rows are keyed by the session's local id, never by its bearer token.
+    expect(rows.map((r) => r.key)).toEqual(['mastodon:s0', 'mastodon:s1', 'anonymous']);
   });
 
   it('marks the signed-in account and reports each account’s data size', () => {
@@ -100,10 +95,7 @@ describe('SettingsAccounts', () => {
   });
 
   it('allows acting on the active account when it is the only saved login', () => {
-    localStorage.setItem(
-      'mastodon_mock_sessions',
-      JSON.stringify([{ token: TOKEN_A, server: '', account: null }]),
-    );
+    seedSessions([{ token: TOKEN_A, server: '', account: null }]);
     localStorage.setItem('mastodon_mock_token', TOKEN_A);
     localStorage.setItem('mastodon_mock_account_mode', 'mastodon');
 

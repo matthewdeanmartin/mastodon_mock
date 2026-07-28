@@ -188,7 +188,7 @@ export class Shell implements OnInit {
             return;
           }
           this.deadSession.set({
-            key: `mastodon:${session.token}`,
+            key: `mastodon:${session.id}`,
             kind: 'mastodon',
             token: session.token,
             server: session.server ?? '',
@@ -212,7 +212,7 @@ export class Shell implements OnInit {
       'kind' in target
         ? target
         : {
-            key: `mastodon:${target.token}`,
+            key: `mastodon:${target.id}`,
             kind: 'mastodon',
             token: target.token,
             server: target.server ?? '',

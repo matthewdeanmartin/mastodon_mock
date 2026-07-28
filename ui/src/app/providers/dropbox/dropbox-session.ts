@@ -1,5 +1,6 @@
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { codeChallengeFor, createCodeVerifier, createOAuthState, statesMatch } from '../../pkce';
 
 const TOKEN_KEY = 'mockingbird_dropbox_token';
 const VERIFIER_KEY = 'mockingbird_dropbox_pkce_verifier';
@@ -55,9 +56,9 @@ export class DropboxSession {
       throw new Error('Dropbox has not been configured for this build yet.');
     }
 
-    const verifier = randomBase64Url(64);
-    const state = randomBase64Url(32);
-    const challenge = await sha256Base64Url(verifier);
+    const verifier = createCodeVerifier();
+    const state = createOAuthState();
+    const challenge = await codeChallengeFor(verifier);
     sessionStorage.setItem(VERIFIER_KEY, verifier);
     sessionStorage.setItem(STATE_KEY, state);
 
@@ -86,7 +87,7 @@ export class DropboxSession {
     const state = params.get('state');
     const expectedState = sessionStorage.getItem(STATE_KEY);
     const verifier = sessionStorage.getItem(VERIFIER_KEY);
-    if (!code || !state || !expectedState || state !== expectedState || !verifier) {
+    if (!code || !statesMatch(expectedState, state) || !verifier) {
       this.clearPendingAuthorization();
       throw new Error(
         'Dropbox returned an invalid or expired authorization response. Please try again.',
@@ -179,24 +180,6 @@ function readToken(): StoredDropboxToken | null {
     sessionStorage.removeItem(TOKEN_KEY);
     return null;
   }
-}
-
-function randomBase64Url(byteLength: number): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
-  return bytesToBase64Url(bytes);
-}
-
-async function sha256Base64Url(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return bytesToBase64Url(new Uint8Array(digest));
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 async function dropboxError(response: Response, fallback: string): Promise<string> {

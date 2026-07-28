@@ -10,6 +10,11 @@ import { Auth } from '../auth';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { Compose, PostTarget, describePostFailure } from './compose';
 
+/** Edit codes are stored apart from the records — see storage-registry.ts. */
+function storedEditKeys(): Record<string, string> {
+  return JSON.parse(localStorage.getItem('mockingbird_paste_edit_keys') ?? '{}');
+}
+
 /** Expose the protected internals for white-box testing. */
 interface ComposeInternals {
   text: WritableSignal<string>;
@@ -704,7 +709,8 @@ describe('Compose', () => {
 
     expect(posted[0].provider).toBe('paste');
     const stored = JSON.parse(localStorage.getItem('mockingbird_pastes') ?? '[]');
-    expect(stored[0].editKey).toBe('secret');
+    expect(stored[0].editKey).toBeUndefined();
+    expect(Object.values(storedEditKeys())).toContain('secret');
     expect(internals(f).text()).toBe('');
   });
 
@@ -729,7 +735,8 @@ describe('Compose', () => {
 
     const stored = JSON.parse(localStorage.getItem('mockingbird_pastes') ?? '[]');
     expect(stored[0].providerId).toBe('rentry');
-    expect(stored[0].editKey).toBe('rentry-secret');
+    expect(stored[0].editKey).toBeUndefined();
+    expect(Object.values(storedEditKeys())).toContain('rentry-secret');
     expect(stored[0].expiry).toBe('never');
     expect(stored[0].visibility).toBe('unlisted');
   });

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from './auth';
 import { Server } from './server';
+import { seedSessions } from './testing/seed-storage';
 
 /**
  * Auth session/server linkage. The core account-switching bug was that a token's instance
@@ -43,10 +44,7 @@ describe('Auth + Server linkage', () => {
 
   it('backfills server for a legacy session that predates the field', () => {
     // Simulate a session saved before `server` existed (no server key).
-    localStorage.setItem(
-      'mastodon_mock_sessions',
-      JSON.stringify([{ token: 'legacy', account: null }]),
-    );
+    seedSessions([{ token: 'legacy', account: null }]);
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [Auth, Server] });
     server = TestBed.inject(Server);

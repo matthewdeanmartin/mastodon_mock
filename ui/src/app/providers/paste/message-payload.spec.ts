@@ -43,6 +43,52 @@ describe('message-payload', () => {
     expect(parseMessageParams(new URLSearchParams('foo=bar'))).toBeNull();
   });
 
+  describe('nesting inside another URL', () => {
+    // The message URL is handed to a shortener as the value of `?url=`, so it
+    // gets decoded by a stranger before anyone reads it back. `+` is the trap:
+    // RFC 3986 calls it a literal plus, form-encoding calls it a space, and the
+    // hops disagree — which is how a recipe turned into
+    // "Tofu+salad+sandwich+recipe%3A%0A". Encoding space as %20 removes the
+    // ambiguity, so the result must survive either convention.
+    const multiline = 'Tofu salad sandwich recipe:\n- tofu\n- salad\n- bread';
+
+    it('never encodes a space as +', () => {
+      const url = buildMessageUrl(
+        { title: 'a b', content: multiline, language: 'plaintext' },
+        BASE,
+      );
+      expect(url).not.toContain('+');
+      expect(url).toContain('%20');
+    });
+
+    it('survives a recipient that treats + as a literal', () => {
+      const target = buildMessageUrl(
+        { title: '', content: multiline, language: 'plaintext' },
+        BASE,
+      );
+      const nested = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(target)}`;
+      const stored = decodeURIComponent(nested.split('url=')[1]);
+      expect(parseMessageParams(new URL(stored).searchParams)?.content).toBe(multiline);
+    });
+
+    it('survives a recipient that treats + as a space', () => {
+      const target = buildMessageUrl(
+        { title: '', content: multiline, language: 'plaintext' },
+        BASE,
+      );
+      const nested = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(target)}`;
+      const stored = decodeURIComponent(nested.split('url=')[1].replace(/\+/g, ' '));
+      expect(parseMessageParams(new URL(stored).searchParams)?.content).toBe(multiline);
+    });
+
+    it('still reads a legacy link that used + for spaces', () => {
+      // Old links are already out there; readers must not regress.
+      expect(parseMessageParams(new URLSearchParams('m=Tofu+salad%3A%0A-+tofu'))?.content).toBe(
+        'Tofu salad:\n- tofu',
+      );
+    });
+  });
+
   it('preserves an empty message (m= present but blank)', () => {
     const payload = parseMessageParams(new URLSearchParams('m='));
     expect(payload).toEqual({ content: '', spoiler: '', language: 'plaintext' });

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BlueskyChatApi } from './bluesky-chat-api';
 import { BlueskySession, BskySession } from './bluesky-session';
 import { BskyConvoList, BskyMessageView } from './bluesky-types';
+import { seedBskySession } from '../../testing/seed-storage';
 
 const SERVICE = 'https://bsky.social';
 /** Chat calls go to the account's real PDS, never the entryway (it 501s). */
@@ -37,7 +38,7 @@ describe('BlueskyChatApi', () => {
   afterEach(() => httpMock.verify());
 
   function seed(overrides: Partial<BskySession> = {}): BlueskyChatApi {
-    localStorage.setItem('mockingbird_bsky_session', JSON.stringify(storedSession(overrides)));
+    seedBskySession(storedSession(overrides));
     return TestBed.inject(BlueskyChatApi);
   }
 

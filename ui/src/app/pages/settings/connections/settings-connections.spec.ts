@@ -24,12 +24,22 @@ describe('SettingsConnections', () => {
     session: WritableSignal<BskySession | null>;
     login: ReturnType<typeof vi.fn>;
     unlink: ReturnType<typeof vi.fn>;
+    // The page governs this session under the credential-retention policy, so
+    // the stub has to answer both halves of that contract.
+    expiresAt: ReturnType<typeof vi.fn>;
+    enforceLifetime: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
     localStorage.clear();
     fetchFeed = vi.fn();
-    bskySession = { session: signal<BskySession | null>(null), login: vi.fn(), unlink: vi.fn() };
+    bskySession = {
+      session: signal<BskySession | null>(null),
+      login: vi.fn(),
+      unlink: vi.fn(),
+      expiresAt: vi.fn(() => null),
+      enforceLifetime: vi.fn(),
+    };
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),

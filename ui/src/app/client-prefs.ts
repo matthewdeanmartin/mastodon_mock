@@ -130,6 +130,7 @@ interface StoredPrefs {
   favStyle?: FavStyle;
   postNoun?: PostNoun;
   zenMode?: boolean;
+  analytics?: boolean;
   requireAltText?: boolean;
   thoughtfulPosting?: boolean;
   customBg?: CustomColor;
@@ -249,6 +250,15 @@ export class ClientPrefs {
   readonly postNoun = signal<PostNoun>('post');
   /** Zen mode: both sidebars disappear, leaving just the feed column. */
   readonly zenMode = signal<boolean>(false);
+  /**
+   * Whether anonymous page-view analytics run at all.
+   *
+   * Opt-out rather than opt-in, but a real one: when this is off the analytics
+   * script is never injected, so nothing is loaded, counted or sent — see
+   * {@link AnalyticsTracker}. Stored app-wide, not per account, because it is a
+   * statement about this browser rather than about an identity.
+   */
+  readonly analytics = signal<boolean>(true);
   /** Opt-in: refuse to post while any attached image lacks alt text. */
   readonly requireAltText = signal<boolean>(false);
 
@@ -443,6 +453,11 @@ export class ClientPrefs {
     this.zenMode.set(on);
   }
 
+  /** Turn page-view analytics on or off. Takes effect on the next page view. */
+  setAnalytics(on: boolean): void {
+    this.analytics.set(on);
+  }
+
   setRequireAltText(on: boolean): void {
     this.requireAltText.set(on);
   }
@@ -595,6 +610,7 @@ export class ClientPrefs {
       this.postNoun.set(stored.postNoun);
     }
     this.loadBool(stored.zenMode, this.zenMode);
+    this.loadBool(stored.analytics, this.analytics);
     this.loadBool(stored.requireAltText, this.requireAltText);
     this.loadBool(stored.thoughtfulPosting, this.thoughtfulPosting);
     this.customBg.set(normalizeColor(stored.customBg ?? null));
@@ -637,6 +653,7 @@ export class ClientPrefs {
       favStyle: this.favStyle(),
       postNoun: this.postNoun(),
       zenMode: this.zenMode(),
+      analytics: this.analytics(),
       requireAltText: this.requireAltText(),
       thoughtfulPosting: this.thoughtfulPosting(),
       customBg: this.customBg(),

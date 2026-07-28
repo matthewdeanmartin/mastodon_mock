@@ -62,7 +62,7 @@ export class SettingsAccounts {
     const mode = this.auth.mode();
     const activeToken = this.auth.token();
     const rows: StoredAccount[] = this.auth.sessions().map((session) => ({
-      key: `mastodon:${session.token}`,
+      key: `mastodon:${session.id}`,
       token: session.token,
       kind: 'mastodon' as const,
       account: session.account,

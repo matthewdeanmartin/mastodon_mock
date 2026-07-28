@@ -3,8 +3,19 @@ import { PageDiagnostics } from '../../page-diagnostics';
 import { PasteCreateInput, PasteCreated } from './paste-provider';
 
 const PASTES_KEY = 'mockingbird_pastes';
+/**
+ * Edit codes, split out of {@link PASTES_KEY} and keyed by slug.
+ *
+ * An edit code is a bearer capability: whoever holds it can rewrite or delete
+ * that paste on the provider. It looked like an innocuous field on a history
+ * record, which is exactly why it needed separating — a settings export that
+ * carried "my pastes" would otherwise hand out edit rights to every one of
+ * them. See `storage-registry.ts`.
+ */
+const EDIT_KEYS_KEY = 'mockingbird_paste_edit_keys';
 
-export interface PasteRecord extends PasteCreateInput, PasteCreated {
+/** A saved paste. Deliberately without its edit code — see {@link EDIT_KEYS_KEY}. */
+export interface PasteRecord extends PasteCreateInput, Omit<PasteCreated, 'editKey'> {
   providerId: string;
   providerLabel: string;
   createdAt: string;
@@ -16,6 +27,15 @@ function load(): PasteRecord[] {
     return Array.isArray(parsed) ? (parsed as PasteRecord[]) : [];
   } catch {
     return [];
+  }
+}
+
+function loadEditKeys(): Record<string, string> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(EDIT_KEYS_KEY) ?? '{}');
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
   }
 }
 
@@ -32,19 +52,31 @@ export class PasteHistory {
    */
   readonly persistError = signal<string | null>(null);
 
+  /** Edit codes by slug. Never rendered, never exported — only handed to providers. */
+  private editKeys = loadEditKeys();
+
+  /** The edit code for a paste, or '' when there is none (e.g. TinyURL). */
+  editKeyFor(slug: string): string {
+    return this.editKeys[slug] ?? '';
+  }
+
   add(
     providerId: string,
     providerLabel: string,
     input: PasteCreateInput,
     created: PasteCreated,
   ): PasteRecord {
+    const { editKey, ...rest } = created;
     const record: PasteRecord = {
       providerId,
       providerLabel,
       ...input,
-      ...created,
+      ...rest,
       createdAt: new Date().toISOString(),
     };
+    if (editKey) {
+      this.editKeys = { ...this.editKeys, [record.slug]: editKey };
+    }
     this.persist([record, ...this.records()]);
     return record;
   }
@@ -102,9 +134,20 @@ export class PasteHistory {
     );
   }
 
+  /**
+   * Write the records and, alongside them, the edit codes for exactly the
+   * records that survived. Eviction under quota pressure drops records; their
+   * edit codes go with them, so the secret store never outlives what it unlocks.
+   */
   private tryWrite(records: PasteRecord[]): boolean {
+    const slugs = new Set(records.map((record) => record.slug));
+    const keys = Object.fromEntries(
+      Object.entries(this.editKeys).filter(([slug]) => slugs.has(slug)),
+    );
     try {
       localStorage.setItem(PASTES_KEY, JSON.stringify(records));
+      localStorage.setItem(EDIT_KEYS_KEY, JSON.stringify(keys));
+      this.editKeys = keys;
       return true;
     } catch {
       return false;

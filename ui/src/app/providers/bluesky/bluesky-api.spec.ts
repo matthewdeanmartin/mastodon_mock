@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BlueskyApi } from './bluesky-api';
 import { BlueskySession, BskySession } from './bluesky-session';
+import { bskySessionStored, seedBskySession, storedBskyProfile } from '../../testing/seed-storage';
 
 const SERVICE = 'https://bsky.social';
 
@@ -51,17 +52,17 @@ describe('BlueskySession', () => {
     expect(done).toBe(true);
     expect(session.linked()).toBe(true);
     expect(session.session()?.displayName).toBe('Me');
-    expect(JSON.parse(localStorage.getItem('mockingbird_bsky_session')!).did).toBe('did:plc:me');
+    expect(storedBskyProfile()!['did']).toBe('did:plc:me');
   });
 
   it('unlink drops the session and storage', () => {
-    localStorage.setItem('mockingbird_bsky_session', JSON.stringify(storedSession()));
+    seedBskySession(storedSession());
     const session = TestBed.inject(BlueskySession);
     expect(session.linked()).toBe(true);
 
     session.unlink();
     expect(session.linked()).toBe(false);
-    expect(localStorage.getItem('mockingbird_bsky_session')).toBeNull();
+    expect(bskySessionStored()).toBe(false);
   });
 });
 
@@ -70,7 +71,7 @@ describe('BlueskyApi', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem('mockingbird_bsky_session', JSON.stringify(storedSession()));
+    seedBskySession(storedSession());
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });

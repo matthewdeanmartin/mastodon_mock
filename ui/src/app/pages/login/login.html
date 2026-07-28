@@ -163,6 +163,25 @@
             @if (oauthError()) {
               <p class="error">{{ oauthError() }}</p>
             }
+            <fieldset class="access-choice">
+              <legend class="muted small">How much access to grant this app</legend>
+              @for (choice of accessChoices; track choice.value) {
+                <label class="access-option">
+                  <input
+                    type="radio"
+                    name="oauthAccess"
+                    [value]="choice.value"
+                    [checked]="oauthAccess() === choice.value"
+                    (change)="oauthAccess.set(choice.value)"
+                    [disabled]="oauthWorking()"
+                  />
+                  <span>
+                    <strong>{{ choice.label }}</strong>
+                    <span class="muted small">{{ choice.hint }}</span>
+                  </span>
+                </label>
+              }
+            </fieldset>
             <button class="btn btn-hero" [disabled]="oauthWorking()" (click)="startOAuth()">
               {{ oauthWorking() ? 'Redirecting…' : 'Sign in with ' + serverHostLabel() }}
             </button>
@@ -356,5 +375,28 @@
       </p>
     }
   </div>
+
+  <!--
+    Analytics opt-out, offered here rather than only in settings: a visitor who
+    has not signed in yet is exactly the person most likely to want it, and they
+    should not have to create an account to find the switch.
+  -->
+  <div class="login-privacy">
+    <label class="checkline">
+      <input
+        type="checkbox"
+        name="analytics"
+        [ngModel]="prefs.analytics()"
+        (ngModelChange)="prefs.setAnalytics($event)"
+      />
+      Count my page views
+    </label>
+    <p class="muted small">
+      Anonymous page counts only — which kinds of page get used, never which account, post or tag
+      you looked at. Unchecking this means the analytics script is never loaded: nothing is fetched,
+      counted or sent. You can change it later in Settings.
+    </p>
+  </div>
+
   <app-app-footer />
 </div>

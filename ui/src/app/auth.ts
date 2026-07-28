@@ -6,12 +6,24 @@ import { Server } from './server';
 
 const TOKEN_KEY = 'mastodon_mock_token';
 const SESSIONS_KEY = 'mastodon_mock_sessions';
+/**
+ * Bearer tokens, split out of {@link SESSIONS_KEY} and keyed by session id.
+ *
+ * The session list — which accounts, on which instances — is exactly what a
+ * settings export wants to carry, and the token is exactly what it must never
+ * carry. Keeping them in one object made that impossible to express, so the
+ * secret lives here and the two are joined by `Session.id`. See
+ * `storage-registry.ts`.
+ */
+const SESSION_TOKENS_KEY = 'mastodon_mock_session_tokens';
 export const ACCOUNT_MODE_KEY = 'mastodon_mock_account_mode';
 
 export type AccountMode = 'mastodon' | 'anonymous';
 
 /** A saved login: a token plus a snapshot of the account it belongs to. */
 export interface Session {
+  /** Stable local id joining this session to its token in storage. */
+  id: string;
   token: string;
   /**
    * Instance this token belongs to (base URL, e.g. "https://mastodon.social"; "" means
@@ -33,14 +45,38 @@ export interface AccountChoice {
   account: Account | null;
 }
 
+/** The non-secret half of a saved session, as persisted. */
+type StoredSession = Omit<Session, 'token'>;
+
+/**
+ * Rejoin the session list with its tokens.
+ *
+ * A session whose token is missing is dropped: without it there is nothing to
+ * authenticate with, so keeping the row would only offer the user a login that
+ * cannot work. That is also what happens after importing settings on a new
+ * machine — the accounts come back as soon as they are signed into again.
+ */
 function loadSessions(): Session[] {
   try {
-    const raw = localStorage.getItem(SESSIONS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    const rows = JSON.parse(localStorage.getItem(SESSIONS_KEY) ?? '[]') as unknown;
+    const tokens = JSON.parse(localStorage.getItem(SESSION_TOKENS_KEY) ?? '{}') as Record<
+      string,
+      string
+    >;
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+    return (rows as StoredSession[])
+      .filter((row) => typeof row?.id === 'string' && typeof tokens[row.id] === 'string')
+      .map((row) => ({ ...row, token: tokens[row.id] }));
   } catch {
     return [];
   }
+}
+
+/** A fresh session id. Opaque and local — never derived from the token. */
+function newSessionId(): string {
+  return crypto.randomUUID();
 }
 
 /**
@@ -78,7 +114,7 @@ export class Auth {
     const choices: AccountChoice[] = this.sessions()
       .filter((s) => this.mode() !== 'mastodon' || s.token !== this.token())
       .map((s) => ({
-        key: `mastodon:${s.token}`,
+        key: `mastodon:${s.id}`,
         kind: 'mastodon' as const,
         token: s.token,
         server: s.server ?? '',
@@ -121,7 +157,10 @@ export class Auth {
     const server = this.server.baseUrl();
     const existing = this.sessions().find((s) => s.token === token);
     if (!existing) {
-      this.persistSessions([...this.sessions(), { token, server, account: null }]);
+      this.persistSessions([
+        ...this.sessions(),
+        { id: newSessionId(), token, server, account: null },
+      ]);
     } else if (existing.server === undefined) {
       // Backfill the server for a legacy session created before this field existed.
       this.persistSessions(this.sessions().map((s) => (s.token === token ? { ...s, server } : s)));
@@ -286,8 +325,15 @@ export class Auth {
     this.mastodonAccount.set(null);
   }
 
+  /**
+   * Persist the stable list and the tokens to separate keys, so the list can be
+   * exported and the tokens never can.
+   */
   private persistSessions(sessions: Session[]): void {
     this.sessions.set(sessions);
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+    const rows: StoredSession[] = sessions.map(({ token: _token, ...rest }) => rest);
+    const tokens = Object.fromEntries(sessions.map((s) => [s.id, s.token]));
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(rows));
+    localStorage.setItem(SESSION_TOKENS_KEY, JSON.stringify(tokens));
   }
 }

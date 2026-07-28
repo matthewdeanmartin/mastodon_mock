@@ -680,18 +680,28 @@ export class Api {
     });
   }
 
+  /**
+   * Redeem an authorization code. `codeVerifier` is the PKCE secret that was
+   * hashed into the `code_challenge` on the authorize request; instances that
+   * support PKCE (Mastodon 4.3+) bind the code to it, and instances that don't
+   * ignore the extra parameter — so it is always sent.
+   */
   exchangeCode(params: {
     clientId: string;
     clientSecret: string;
     redirectUri: string;
     code: string;
+    codeVerifier?: string;
   }): Observable<OAuthTokenResponse> {
-    const body = new HttpParams()
+    let body = new HttpParams()
       .set('grant_type', 'authorization_code')
       .set('client_id', params.clientId)
       .set('client_secret', params.clientSecret)
       .set('redirect_uri', params.redirectUri)
       .set('code', params.code);
+    if (params.codeVerifier) {
+      body = body.set('code_verifier', params.codeVerifier);
+    }
     return this.http.post<OAuthTokenResponse>('/oauth/token', body);
   }
 

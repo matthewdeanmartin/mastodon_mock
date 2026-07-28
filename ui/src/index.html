@@ -5,6 +5,59 @@
     <title>Mawkingbird</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!--
+      Content-Security-Policy. This app is served as static files with no
+      backend we control, so the policy ships as a meta tag; see
+      docs/security.md for the header-only directives (frame-ancestors) that a
+      host which *can* set headers should add on top.
+
+      script-src is the directive that matters here. Everything this app holds —
+      Mastodon bearer tokens, Bluesky JWTs, connector tokens — lives in this
+      origin's localStorage, so any script that runs here can read all of it.
+      The allowlist is therefore exactly 'self' and nothing else: no third-party
+      origin can execute here, so no third party — and no future owner of a
+      third party's expired domain — can read any of it. Analytics is served
+      from our own origin (public/vendor/count.js, refreshed at build time by
+      scripts/vendor-analytics.mjs) for precisely that reason.
+
+      There is also deliberately no 'unsafe-inline' and no 'unsafe-eval': the
+      scripts that used to be inline in this file now live in boot.js.
+
+      style-src needs 'unsafe-inline' because Angular injects component styles
+      as <style> elements at runtime; removing it requires a per-response nonce,
+      which a static host cannot generate.
+
+      connect-src / img-src are deliberately wide: the user points this client
+      at an arbitrary Mastodon instance and subscribes to arbitrary RSS feeds,
+      so the hosts cannot be enumerated in advance. http: and ws: are allowed so
+      a localhost instance still works during development.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob: https: http:;
+        font-src 'self' data:;
+        connect-src 'self' https: http: ws: wss:;
+        media-src 'self' data: blob: https: http:;
+        worker-src 'self' blob:;
+        manifest-src 'self';
+        form-action 'self';
+        base-uri 'self';
+        object-src 'none';
+        frame-src 'none';
+      "
+    />
+
+    <!--
+      Outbound links go to arbitrary sites, and some in-app URLs carry content in
+      the query string (/message/?m=…). Send only the origin cross-origin.
+    -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
 
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -13,39 +66,15 @@
     <link rel="manifest" href="/site.webmanifest" />
 
     <!--
-      SPA deep-link restore. GitHub Pages' single root 404.html
-      (404-subpath-redirect.html) bounces an unknown deep link to the owning
-      app's index with the original path stashed as ?spa=…; here we restore it
-      into history before Angular's router reads location, so refreshing or
-      chunk-reloading a deep URL lands back on that same route (and on the right
-      deployment — /canary/… stays under /canary/). Runs synchronously ahead of
-      the app bundle.
-    -->
-    <script>
-      (function () {
-        var params = new URLSearchParams(window.location.search);
-        var target = params.get('spa');
-        // Same-origin absolute path only: leading "/" but not "//" (which would
-        // be a protocol-relative cross-origin URL).
-        if (target && target.charAt(0) === '/' && target.charAt(1) !== '/') {
-          history.replaceState(null, '', target);
-        }
-      })();
-    </script>
+      SPA deep-link restore. Must run synchronously ahead of the app bundle, so
+      this is a blocking script; the src is relative so it resolves against
+      <base href> (/canary/ loads its own copy).
 
-    <!--
-      GoatCounter analytics. no_onload disables its built-in auto-count and
-      hashchange listener; this is a path-based Angular SPA, so page views are
-      counted on router NavigationEnd instead (see analytics-tracker.ts).
+      Analytics is deliberately NOT loaded here. analytics-tracker.ts injects it
+      on the first counted page view, and only when the user has not opted out —
+      so opting out means the script is never fetched or run at all.
     -->
-    <script>
-      window.goatcounter = { no_onload: true };
-    </script>
-    <script
-      data-goatcounter="https://mawkingbird.goatcounter.com/count"
-      async
-      src="//gc.zgo.at/count.js"
-    ></script>
+    <script src="boot.js"></script>
   </head>
   <body>
     <app-root></app-root>

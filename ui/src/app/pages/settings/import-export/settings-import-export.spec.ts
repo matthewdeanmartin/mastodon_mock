@@ -11,6 +11,7 @@ import { followingAccountsCsv, SettingsImportExport } from './settings-import-ex
 import { GitHubFriendDiscovery } from './github-friend-discovery';
 import { TwitterArchiveSummary } from '../../../twitter-archive';
 import { TwitterFriendDiscovery } from './twitter-friend-discovery';
+import { seedGitHubConnection } from '../../../testing/seed-storage';
 
 /** Exposes SettingsImportExport's protected signals for white-box testing. */
 interface SettingsImportExportInternals {
@@ -110,18 +111,12 @@ describe('SettingsImportExport', () => {
   });
 
   it('renders GitHub matches as local profiles and follows them in place', async () => {
-    localStorage.setItem(
-      'mockingbird_github_token',
-      JSON.stringify({
-        accessToken: 'ghp_test',
-        user: {
-          login: 'viewer',
-          avatar_url: '',
-          html_url: 'https://github.com/viewer',
-          name: 'Viewer',
-        },
-      }),
-    );
+    seedGitHubConnection('ghp_test', {
+      login: 'viewer',
+      avatar_url: '',
+      html_url: 'https://github.com/viewer',
+      name: 'Viewer',
+    });
     const fixture = setUp();
     const discovery = TestBed.inject(GitHubFriendDiscovery);
     const account = {
@@ -208,18 +203,12 @@ describe('SettingsImportExport', () => {
   });
 
   it('shows separate GitHub friends and stars actions before any import is prepared', () => {
-    localStorage.setItem(
-      'mockingbird_github_token',
-      JSON.stringify({
-        accessToken: 'ghp_test',
-        user: {
-          login: 'viewer',
-          avatar_url: '',
-          html_url: 'https://github.com/viewer',
-          name: 'Viewer',
-        },
-      }),
-    );
+    seedGitHubConnection('ghp_test', {
+      login: 'viewer',
+      avatar_url: '',
+      html_url: 'https://github.com/viewer',
+      name: 'Viewer',
+    });
 
     const fixture = setUp();
     const githubSection = (fixture.nativeElement as HTMLElement).querySelector('#github-friends')!;
@@ -341,18 +330,12 @@ describe('SettingsImportExport', () => {
   });
 
   it('hides already-followed GitHub matches without changing their discovery order', () => {
-    localStorage.setItem(
-      'mockingbird_github_token',
-      JSON.stringify({
-        accessToken: 'ghp_test',
-        user: {
-          login: 'viewer',
-          avatar_url: '',
-          html_url: 'https://github.com/viewer',
-          name: 'Viewer',
-        },
-      }),
-    );
+    seedGitHubConnection('ghp_test', {
+      login: 'viewer',
+      avatar_url: '',
+      html_url: 'https://github.com/viewer',
+      name: 'Viewer',
+    });
     const fixture = setUp();
     const discovery = TestBed.inject(GitHubFriendDiscovery);
     const account = (id: string) =>

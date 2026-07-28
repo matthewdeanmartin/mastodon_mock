@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitHubSession } from './github-session';
+import { gitHubConnectionStored, storedGitHubToken } from '../../testing/seed-storage';
 
 const USER = {
   login: 'octocat',
@@ -25,7 +26,7 @@ describe('GitHubSession', () => {
 
     expect(session.connected()).toBe(true);
     expect(session.user()?.login).toBe('octocat');
-    expect(localStorage.getItem('mockingbird_github_token')).toContain('ghp_secret');
+    expect(storedGitHubToken()).toBe('ghp_secret');
     expect(fetch).toHaveBeenCalledWith(
       'https://api.github.com/user',
       expect.objectContaining({
@@ -43,7 +44,7 @@ describe('GitHubSession', () => {
     await expect(session.connect('bad-token')).rejects.toThrow('GitHub rejected that token');
 
     expect(session.connected()).toBe(false);
-    expect(localStorage.getItem('mockingbird_github_token')).toBeNull();
+    expect(gitHubConnectionStored()).toBe(false);
   });
 
   it('proves notification and following API calls work directly from the browser', async () => {
@@ -174,6 +175,6 @@ describe('GitHubSession', () => {
 
     expect(session.connected()).toBe(false);
     expect(session.user()).toBeNull();
-    expect(localStorage.getItem('mockingbird_github_token')).toBeNull();
+    expect(gitHubConnectionStored()).toBe(false);
   });
 });

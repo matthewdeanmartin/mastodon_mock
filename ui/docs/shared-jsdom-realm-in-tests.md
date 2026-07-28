@@ -13,7 +13,7 @@ npx ng test --no-watch --include src/app/the-noisy-one.spec.ts
 ```
 
 Passing in isolation and failing in the full suite is the signature. Do not
-re-run and move on: the cause is in a *different* file, and it will come back.
+re-run and move on: the cause is in a _different_ file, and it will come back.
 
 ## Symptom
 
@@ -61,11 +61,11 @@ Two specs replaced `window.location` and never put it back:
 From that point on, every later file in the same worker saw a `location` with no
 `origin`, which breaks anything building an absolute URL:
 
-| File | Code | Failure |
-|---|---|---|
-| `rate-limit.interceptor.ts` | `new URL(req.url, location.origin)` | throws `Invalid URL`, so the request is never dispatched and `expectOne` finds nothing |
-| `streaming.ts` | `toWs(location.origin)` | no socket is ever constructed, so `lastSocket()` is `undefined` |
-| `right-rail` | `` `${location.origin}/anonymous` `` | interpolates the literal string `"undefined"` |
+| File                        | Code                                 | Failure                                                                                |
+| --------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------- |
+| `rate-limit.interceptor.ts` | `new URL(req.url, location.origin)`  | throws `Invalid URL`, so the request is never dispatched and `expectOne` finds nothing |
+| `streaming.ts`              | `toWs(location.origin)`              | no socket is ever constructed, so `lastSocket()` is `undefined`                        |
+| `right-rail`                | `` `${location.origin}/anonymous` `` | interpolates the literal string `"undefined"`                                          |
 
 ### Why it looked random
 
@@ -81,7 +81,7 @@ fixed. It survived a long time for exactly that reason.
 
 ## The jsdom `Location` trap
 
-Neither obvious way of copying `window.location` works, and both fail *silently*
+Neither obvious way of copying `window.location` works, and both fail _silently_
 in the file that does it:
 
 ```ts
@@ -102,7 +102,7 @@ them onto a plain one. That is what `src/app/testing/stub-location.ts` does.
 ## What is in place now
 
 **`src/test-setup.ts`** captures the pristine `location` descriptor before any
-spec runs and restores it before *every* test. A forgotten cleanup now breaks
+spec runs and restores it before _every_ test. A forgotten cleanup now breaks
 only the test that forgot, so the failure lands on the culprit instead of a
 stranger. The descriptor is stashed on `globalThis` rather than in a module
 const, because the builder can execute the setup file more than once per worker
@@ -113,7 +113,7 @@ const, because the builder can execute the setup file more than once per worker
 ```ts
 import { stubLocation } from '../../testing/stub-location';
 
-stubLocation({ onHref: hrefSpy });   // intercept a redirect
+stubLocation({ onHref: hrefSpy }); // intercept a redirect
 stubLocation({ onReload: reloadSpy }); // intercept a reload
 ```
 
@@ -124,7 +124,7 @@ teardown — `test-setup.ts` removes it before the next test.
 
 - **Do not hand-roll a `location` stub.** Use `stubLocation`.
 - **Restore any other global you mutate, in an `afterEach`** — and put the
-  restore *first*, before anything that can throw. `rate-limit.interceptor.spec`
+  restore _first_, before anything that can throw. `rate-limit.interceptor.spec`
   had `httpMock.verify()` ahead of `vi.useRealTimers()`; because a throwing
   `afterEach` skips its own remainder, a verify failure would have left the clock
   frozen for the rest of the file.
@@ -135,12 +135,12 @@ teardown — `test-setup.ts` removes it before the next test.
   services are fine: `TestBed` builds a fresh injector per test.
 - **Fake timers are safe across files.** Verified with a two-file probe: Vitest
   restores them between files even under `isolate: false`. They are still not
-  safe *within* a file if an `afterEach` throws before restoring them.
+  safe _within_ a file if an `afterEach` throws before restoring them.
 
 ## Diagnosing the next one
 
 Guessing is expensive; instrument instead. The trick is to catch the test that
-*breaks* the global rather than the one that trips over it. Add a temporary hook
+_breaks_ the global rather than the one that trips over it. Add a temporary hook
 to `src/test-setup.ts`:
 
 ```ts

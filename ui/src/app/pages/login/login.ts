@@ -8,6 +8,8 @@ import { DevUser } from '../../models';
 import { Server, SERVER_PRESETS } from '../../server';
 import { MastodonServers, ServerSuggestion } from '../../mastodon-servers';
 import { normalizeHostUrl } from '../../host-url';
+import { ClientPrefs } from '../../client-prefs';
+import { codeChallengeFor, createCodeVerifier, createOAuthState, statesMatch } from '../../pkce';
 import { probeServerAvailability } from '../../server-availability';
 import { environment } from '../../../environments/environment';
 import { brandLogoSrc } from '../../build-flavor';
@@ -16,13 +18,54 @@ import { ServerDiscovery } from '../../server-discovery/server-discovery';
 
 const OAUTH_APP_KEY = 'mastodon_mock_oauth_app';
 
+/**
+ * The in-flight OAuth attempt, held in sessionStorage between the redirect out
+ * to the instance and the callback here.
+ *
+ * `state` and `codeVerifier` are what make this flow safe for a client that
+ * cannot keep a secret: `state` proves the callback belongs to the flow this
+ * browser started (without it, an attacker can hand us a code minted for their
+ * own account and silently sign the user into it), and `codeVerifier` is the
+ * PKCE secret that binds the code to this browser. Both are single-use — the
+ * whole record is cleared once the callback is handled, success or failure.
+ */
 interface StoredApp {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  state: string;
+  codeVerifier: string;
+  /** Instance the flow was started against; the code is only valid there. */
+  server: string;
 }
 
 type Tab = 'signin' | 'mock' | 'init';
+
+/** How much authority to request from the instance during OAuth. */
+export type OAuthAccess = 'full' | 'read';
+
+/**
+ * OAuth scope strings per access level. `read write follow` is what a Mastodon
+ * client normally needs; `read` alone yields a token the instance will reject
+ * for every write endpoint, which is exactly the point.
+ */
+const ACCESS_SCOPES: Record<OAuthAccess, string> = {
+  full: 'read write follow',
+  read: 'read',
+};
+
+const ACCESS_CHOICES: { value: OAuthAccess; label: string; hint: string }[] = [
+  {
+    value: 'full',
+    label: 'Full access',
+    hint: 'Read, post, reply, follow — everything the app does.',
+  },
+  {
+    value: 'read',
+    label: 'Read only',
+    hint: "Browse and read. This app won't be able to post, reply or follow as you.",
+  },
+];
 
 /**
  * Something that could plausibly be an instance host (with or without scheme): a dotted
@@ -128,6 +171,22 @@ export class Login implements OnInit, OnDestroy {
   );
   protected oauthWorking = signal(false);
   protected oauthError = signal<string | null>(null);
+
+  /**
+   * How much authority to ask the instance for.
+   *
+   * A stranger's web client asking for write access to your account is a fair
+   * thing to hesitate over, and "read only" is a real answer rather than a
+   * placebo: the scope is requested at app-registration time, so the token the
+   * instance issues genuinely cannot post, follow or change anything. The
+   * trade-off is that the parts of the app that write will fail, which is why
+   * the option says so rather than hiding it.
+   */
+  protected oauthAccess = signal<OAuthAccess>('full');
+  protected readonly accessChoices = ACCESS_CHOICES;
+
+  /** Analytics opt-out, offered before signing in rather than buried in settings. */
+  protected prefs = inject(ClientPrefs);
 
   ngOnInit(): void {
     // Already signed in? Landing on /login (bookmark, stale tab, back button) shouldn't
@@ -517,17 +576,38 @@ export class Login implements OnInit, OnDestroy {
 
   // ---------- Full OAuth flow ----------
 
-  /** If we just came back from /oauth/authorize with a ?code=, exchange it for a token. */
+  /**
+   * If we just came back from /oauth/authorize with a ?code=, exchange it for a
+   * token — but only after proving the callback belongs to the flow we started.
+   *
+   * The pending record is consumed up front, so a code is never redeemed twice
+   * and a failed attempt cannot leave usable client credentials sitting in
+   * sessionStorage for a later injected code to pick up.
+   */
   private handleOAuthCallback(): void {
-    const code = this.route.snapshot.queryParamMap.get('code');
+    const params = this.route.snapshot.queryParamMap;
+    const code = params.get('code');
     if (!code) {
       return;
     }
-    const raw = sessionStorage.getItem(OAUTH_APP_KEY);
-    if (!raw) {
+    const app = this.takePendingOAuth();
+    if (!app) {
+      // A code with nothing pending is either a stale tab or someone else's
+      // code pushed at us. Either way there is nothing legitimate to redeem.
+      this.oauthError.set('That sign-in link is no longer valid. Start again from this page.');
       return;
     }
-    const app: StoredApp = JSON.parse(raw);
+    if (!statesMatch(app.state, params.get('state'))) {
+      this.oauthError.set(
+        'Sign-in could not be verified (state mismatch) and was stopped. Start again from this page.',
+      );
+      return;
+    }
+    // The code is only redeemable at the instance that issued it; if the
+    // selected server drifted (another tab, a restored session), put it back.
+    if (this.server.baseUrl() !== app.server) {
+      this.server.setBaseUrl(app.server);
+    }
     this.oauthWorking.set(true);
     this.api
       .exchangeCode({
@@ -535,11 +615,11 @@ export class Login implements OnInit, OnDestroy {
         clientSecret: app.clientSecret,
         redirectUri: app.redirectUri,
         code,
+        codeVerifier: app.codeVerifier,
       })
       .subscribe({
         next: (tok) => {
           this.oauthWorking.set(false);
-          sessionStorage.removeItem(OAUTH_APP_KEY);
           this.router.navigate([], { queryParams: {} });
           this.token.set(tok.access_token);
           this.submit();
@@ -551,30 +631,65 @@ export class Login implements OnInit, OnDestroy {
       });
   }
 
+  /** Read and clear the pending OAuth record; returns null if absent or corrupt. */
+  private takePendingOAuth(): StoredApp | null {
+    const raw = sessionStorage.getItem(OAUTH_APP_KEY);
+    sessionStorage.removeItem(OAUTH_APP_KEY);
+    if (!raw) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw) as Partial<StoredApp>;
+      return typeof parsed.clientId === 'string' &&
+        typeof parsed.redirectUri === 'string' &&
+        typeof parsed.state === 'string' &&
+        parsed.state.length > 0
+        ? (parsed as StoredApp)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Register a throwaway app, then redirect through the server's account-picker. */
   startOAuth(): void {
     this.oauthError.set(null);
     this.oauthWorking.set(true);
     // Resolve against <base href> (the app may be served from a sub-path like /_ui/).
     const redirectUri = new URL('login', document.baseURI).toString();
-    this.api.registerApp(this.appName(), redirectUri).subscribe({
+    const server = this.server.baseUrl();
+    // Scope is fixed here, at registration: the instance mints the token against
+    // the app's registered scopes, so a read-only choice cannot be widened later
+    // by this client.
+    this.api.registerApp(this.appName(), redirectUri, ACCESS_SCOPES[this.oauthAccess()]).subscribe({
       next: (app) => {
-        const stored: StoredApp = {
-          clientId: app.client_id,
-          clientSecret: app.client_secret,
-          redirectUri,
-        };
-        sessionStorage.setItem(OAUTH_APP_KEY, JSON.stringify(stored));
-        const params = new URLSearchParams({
-          client_id: app.client_id,
-          redirect_uri: redirectUri,
-          response_type: 'code',
-          scope: app.scopes.join(' '),
+        // PKCE: only the challenge travels to the instance; the verifier stays here.
+        const state = createOAuthState();
+        const codeVerifier = createCodeVerifier();
+        void codeChallengeFor(codeVerifier).then((codeChallenge) => {
+          const stored: StoredApp = {
+            clientId: app.client_id,
+            clientSecret: app.client_secret,
+            redirectUri,
+            state,
+            codeVerifier,
+            server,
+          };
+          sessionStorage.setItem(OAUTH_APP_KEY, JSON.stringify(stored));
+          const params = new URLSearchParams({
+            client_id: app.client_id,
+            redirect_uri: redirectUri,
+            response_type: 'code',
+            scope: app.scopes.join(' '),
+            state,
+            code_challenge: codeChallenge,
+            code_challenge_method: 'S256',
+          });
+          // The instance itself handles this redirect in the user's browser, so it works
+          // even when redirectUri points back at an unreachable local dev server.
+          const authorizeBase = server || window.location.origin;
+          window.location.href = `${authorizeBase}/oauth/authorize?${params.toString()}`;
         });
-        // The instance itself handles this redirect in the user's browser, so it works
-        // even when redirectUri points back at an unreachable local dev server.
-        const authorizeBase = this.server.baseUrl() || window.location.origin;
-        window.location.href = `${authorizeBase}/oauth/authorize?${params.toString()}`;
       },
       error: () => {
         this.oauthWorking.set(false);

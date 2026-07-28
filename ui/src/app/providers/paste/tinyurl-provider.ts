@@ -69,7 +69,13 @@ export class TinyurlProvider implements PasteProvider {
 
   create(input: PasteCreateInput): Observable<PasteCreated> {
     const target = buildMessageUrl(input);
-    const params = new HttpParams().set('url', target);
+    // The URL is encoded here rather than handed to `HttpParams`, whose default
+    // codec deliberately leaves `@ : $ , ; + = ? /` unescaped for readability.
+    // That is fine for ordinary parameters and wrong for a nested URL: the `?`
+    // and `=` blur the boundary between our query and the shortener's, and a
+    // literal `+` is ambiguous between "plus" and "space" at every later hop.
+    // `HttpParams` with a pre-encoded string keeps the value exactly as built.
+    const params = new HttpParams({ fromString: `url=${encodeURIComponent(target)}` });
     return this.http
       .get(CREATE_URL, { params, responseType: 'text', context: externalFetch() })
       .pipe(

@@ -53,10 +53,38 @@ export function buildMessageUrl(
   base: string = deploymentBase(),
 ): string {
   const url = new URL('message/', base);
-  url.searchParams.set('m', input.content);
-  if (input.title.trim()) url.searchParams.set('cw', input.title.trim());
-  if (input.language && input.language !== 'plaintext') url.searchParams.set('l', input.language);
+  // Built by hand rather than with `searchParams.set`, which encodes a space as
+  // `+`. This URL's whole job is to survive being passed as the *value* of
+  // another query parameter (the shortener's `?url=`), and `+` does not survive
+  // that: RFC 3986 says `+` is a literal in a query string, form-encoding says
+  // it is a space, and the two hops disagree. `%20` means space everywhere, so
+  // the round trip stops depending on who decodes it.
+  //
+  // Only the encoding changes — readers still parse with URLSearchParams, which
+  // handles `%20`, `+` and percent-escapes alike, so nothing here unescapes
+  // twice and old links keep working.
+  const params = [`m=${strictEncode(input.content)}`];
+  if (input.title.trim()) params.push(`cw=${strictEncode(input.title.trim())}`);
+  if (input.language && input.language !== 'plaintext') {
+    params.push(`l=${strictEncode(input.language)}`);
+  }
+  url.search = params.join('&');
   return url.toString();
+}
+
+/**
+ * Percent-encode for a query-string value with no exceptions — notably encoding
+ * space as `%20` and never as `+`.
+ *
+ * `encodeURIComponent` already leaves `!'()*` unescaped; those are sub-delims
+ * and legal in a query, but they are escaped here too so the result is inert
+ * however many times it is nested inside another URL.
+ */
+function strictEncode(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
 }
 
 /** Read the message fields out of the reader page's query params. */

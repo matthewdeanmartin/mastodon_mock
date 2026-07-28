@@ -8,6 +8,40 @@
 </div>
 
 <section class="conn-section">
+  <h2>🔑 How long to keep credentials</h2>
+  <p class="muted">
+    GitHub, Raindrop.io and Bluesky are connected by pasting a long-lived secret. There is no server
+    here to hold those, so they sit in this browser until something removes them. Pick how long that
+    should be — when a connection reaches its limit it is disconnected and the credential is deleted
+    from this browser. Reconnecting takes a few seconds and restarts the clock.
+  </p>
+  <p class="muted">
+    This does not apply to Dropbox, which uses a proper OAuth flow with short-lived tokens that
+    expire on their own, or to RSS feeds, which carry no credential at all.
+  </p>
+  <div class="lifetime-options" role="group" aria-label="Credential retention">
+    @for (option of lifetimeOptions; track option.value) {
+      <label class="lifetime-option">
+        <input
+          type="radio"
+          name="credentialLifetime"
+          [value]="option.value"
+          [checked]="lifetimes.lifetime() === option.value"
+          (change)="setLifetime(option.value)"
+        />
+        <span>{{ option.label }}</span>
+      </label>
+    }
+  </div>
+  @if (lifetimes.lifetime() === 'never') {
+    <p class="muted lifetime-warning">
+      Nothing will expire on its own. Revoke tokens at the provider when you stop using a
+      connection.
+    </p>
+  }
+</section>
+
+<section class="conn-section">
   <h2>📡 RSS feeds</h2>
   <p class="muted">
     Any RSS or Atom feed becomes posts in your home feed, read-only, with an "Open original" link.
@@ -75,6 +109,9 @@
       </button>
       <button class="btn btn-outline" type="button" (click)="disconnectGitHub()">Disconnect</button>
     </div>
+    @if (expiryLabel(github.expiresAt()); as expiry) {
+      <p class="muted small">This token is deleted from this browser on {{ expiry }}.</p>
+    }
     <p class="muted small">
       Looking for the same people on Mastodon?
       <a [routerLink]="['/settings/import-export']" fragment="github-friends">
@@ -199,6 +236,9 @@
         Disconnect
       </button>
     </div>
+    @if (expiryLabel(raindrop.expiresAt()); as expiry) {
+      <p class="muted small">This token is deleted from this browser on {{ expiry }}.</p>
+    }
   } @else {
     <form class="raindrop-form" (ngSubmit)="connectRaindrop()">
       <input
@@ -239,6 +279,11 @@
         Bluesky. Unlinking forgets the tokens here — you can also revoke the app password on
         bsky.app.
       </p>
+      @if (expiryLabel(bsky.expiresAt()); as expiry) {
+        <p class="muted small">
+          This link is dropped and the tokens deleted from this browser on {{ expiry }}.
+        </p>
+      }
     } @else {
       <p class="muted">
         Link with an <strong>app password</strong> — made at bsky.app → Settings → Privacy and
