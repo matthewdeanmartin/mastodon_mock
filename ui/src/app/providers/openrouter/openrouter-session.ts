@@ -1,5 +1,11 @@
 import { Injectable, signal } from '@angular/core';
-import { codeChallengeFor, createCodeVerifier, createOAuthState, statesMatch } from '../../pkce';
+import {
+  appCallbackUrl,
+  codeChallengeFor,
+  createCodeVerifier,
+  createOAuthState,
+  statesMatch,
+} from '../../pkce';
 import {
   credentialExpired,
   credentialExpiresAt,
@@ -178,9 +184,15 @@ export class OpenRouterSession implements ExpiringConnection {
  *
  * OpenRouter appends `?code=…` (or `&code=…`) to whatever it is given, so a
  * query parameter of ours survives the round trip.
+ *
+ * Built via {@link appCallbackUrl} rather than `location.origin`: canary lives
+ * at `/canary/` on the same origin as production, and an origin-only callback
+ * would hand the code to whichever deployment owns the site root.
  */
 function redirectUri(state: string): string {
-  return `${location.origin}/integrations/openrouter/callback?state=${encodeURIComponent(state)}`;
+  const url = new URL(appCallbackUrl('integrations/openrouter/callback'));
+  url.searchParams.set('state', state);
+  return url.toString();
 }
 
 function readKey(): StoredOpenRouterKey | null {

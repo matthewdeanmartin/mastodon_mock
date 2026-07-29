@@ -60,8 +60,30 @@ describe('OpenRouterSession', () => {
     // The state is not a top-level param — it rides in the callback URL.
     expect(url.searchParams.get('state')).toBeNull();
     const callback = new URL(url.searchParams.get('callback_url')!);
-    expect(callback.pathname).toBe('/integrations/openrouter/callback');
+    expect(callback.pathname).toContain('integrations/openrouter/callback');
     expect(callback.searchParams.get('state')).toBe(sessionStorage.getItem(STATE_KEY));
+  });
+
+  it('returns to THIS deployment, not whichever one owns the site root', async () => {
+    // Canary is https://mawkingbird.com/canary/ on the same origin as production.
+    // Building the callback from location.origin sent the code to production,
+    // which has no pending verifier and fails the flow. The base href is the
+    // only thing that distinguishes the two.
+    const base = document.createElement('base');
+    base.href = 'https://mawkingbird.com/canary/';
+    document.head.appendChild(base);
+    try {
+      await session().connect();
+
+      const url = new URL(navigatedTo[0]);
+      expect(url.searchParams.get('callback_url')).toContain(
+        'https://mawkingbird.com/canary/integrations/openrouter/callback',
+      );
+    } finally {
+      // Specs share one jsdom realm — a stray <base> would rewrite every
+      // relative URL in every later file. See docs/shared-jsdom-realm-in-tests.md.
+      base.remove();
+    }
   });
 
   it('keeps the verifier in this browser and sends only the challenge', async () => {

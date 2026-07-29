@@ -190,6 +190,30 @@ Remember the shared jsdom realm (`ui/docs/shared-jsdom-realm-in-tests.md`).
 - Credits render sensibly for a key with a cap, a key without one, and a failed lookup.
 - Removing another signed-in account leaves the OpenRouter connection intact.
 
+## Bug found in testing: canary sent the code to production (fixed)
+
+Reported by Matthew after deploying: authorizing from canary came back on production.
+
+**Cause.** `redirectUri()` built the callback from `location.origin`. Canary and production
+are the *same origin* — `https://mawkingbird.com/canary/` and `https://mawkingbird.com/` (see
+`.github/workflows/mockingbird-canary.yml`) — and `location.origin` discards the path
+entirely. So canary asked OpenRouter to return to the site root, which is production's SPA,
+which has no pending PKCE verifier and correctly refuses the code.
+
+**Fix.** `appCallbackUrl()` in `src/app/pkce.ts`, built on `document.baseURI`, which resolves
+the `<base href>` Angular was compiled with. This is not a new idea — `login.ts` already does
+`new URL('login', document.baseURI)` for the Mastodon OAuth flow. The OpenRouter session was
+copied from `DropboxSession`, which is where the `location.origin` pattern came from.
+
+A regression spec installs `<base href="https://mawkingbird.com/canary/">` and asserts the
+callback keeps the `/canary/` prefix.
+
+**Still outstanding: `DropboxSession` has the identical bug** (`dropbox-session.ts:173`).
+It is not fixed here because Dropbox validates redirect URIs against an allowlist in the App
+Console — changing the URI breaks Dropbox entirely until
+`https://mawkingbird.com/canary/integrations/dropbox/callback` is registered there. That is a
+console change plus a code change, and it needs to happen in that order.
+
 ## Deviations from the plan as written
 
 - **`OpenRouterModelChoice` is its own service**, not a field on the models service. The

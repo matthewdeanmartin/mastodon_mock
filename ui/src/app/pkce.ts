@@ -72,3 +72,25 @@ export function statesMatch(expected: string | null, received: string | null): b
   }
   return diff === 0;
 }
+
+/**
+ * An absolute URL for an in-app OAuth callback route, honouring the base href.
+ *
+ * **Do not build these from `location.origin`.** Mawkingbird is deployed more
+ * than once per origin: production is `https://mawkingbird.com/` and canary is
+ * `https://mawkingbird.com/canary/` on the *same* origin (see
+ * `.github/workflows/mockingbird-canary.yml`), and the embedded mock build is
+ * served from `/_ui/`. `location.origin` discards that path entirely, so a
+ * callback built from it sends the user to whichever deployment happens to own
+ * the site root — from canary, that is production, which then has no pending
+ * PKCE verifier and fails the flow.
+ *
+ * `document.baseURI` resolves the `<base href>` Angular was built with, so this
+ * returns the callback belonging to *this* copy of the app.
+ *
+ * @param path Route path without a leading slash, e.g.
+ *   `integrations/openrouter/callback`.
+ */
+export function appCallbackUrl(path: string): string {
+  return new URL(path.replace(/^\//, ''), document.baseURI).toString();
+}
