@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { RaindropSession } from '../../../../providers/raindrop/raindrop-session';
 import { expiryLabel } from '../expiry-label';
+import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 
 /** Settings → Connections → Raindrop.io. Test-token paste; no OAuth (see the copy). */
 @Component({
@@ -19,6 +20,9 @@ export class ConnectionRaindrop implements OnInit {
   protected raindropNotice = signal<string | null>(null);
 
   protected readonly expiryLabel = expiryLabel;
+
+  /** The storage-scope sentence shown under the heading. */
+  protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;
 
   ngOnInit(): void {
     // Deep-link case: re-check against a policy shortened on the catalog page.

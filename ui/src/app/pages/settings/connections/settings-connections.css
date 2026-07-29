@@ -123,6 +123,13 @@
   color: #2b8a3e;
 }
 
+/* Who the connection belongs to. Neutral by design — it is information, not a
+   status, and must not compete with the connected/not-connected pill. */
+.pill-scope {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
 .pill-off {
   border-color: rgb(208 138 0 / 45%);
   background: rgb(208 138 0 / 10%);

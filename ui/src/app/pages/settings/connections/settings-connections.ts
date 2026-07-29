@@ -5,12 +5,17 @@ import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-ca
 import { DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 import { GitHubSession } from '../../../providers/github/github-session';
+import { OpenRouterSession } from '../../../providers/openrouter/openrouter-session';
 import {
   CREDENTIAL_LIFETIME_OPTIONS,
   CredentialLifetime,
   CredentialLifetimeStore,
 } from '../../../providers/credential-lifetime';
-import { CONNECTION_CATALOG, ConnectionCatalogEntry } from './connection-catalog';
+import {
+  CONNECTION_CATALOG,
+  CONNECTION_SCOPE_COPY,
+  ConnectionCatalogEntry,
+} from './connection-catalog';
 
 /** A catalog entry joined to the live state only the injector can supply. */
 export interface ConnectionCatalogRow {
@@ -44,9 +49,11 @@ export class SettingsConnections implements OnInit {
   private dropbox = inject(DropboxSession);
   private raindrop = inject(RaindropSession);
   private github = inject(GitHubSession);
+  private openrouter = inject(OpenRouterSession);
   protected lifetimes = inject(CredentialLifetimeStore);
 
   protected readonly lifetimeOptions = CREDENTIAL_LIFETIME_OPTIONS;
+  protected readonly scopeCopy = CONNECTION_SCOPE_COPY;
 
   /**
    * The catalog joined to live connected/available state.
@@ -66,6 +73,8 @@ export class SettingsConnections implements OnInit {
               ? null
               : 'Not available for the browser-local Anonymous account.',
           };
+        case 'openrouter':
+          return { entry, connected: this.openrouter.connected(), unavailableReason: null };
         case 'raindrop':
           return { entry, connected: this.raindrop.connected(), unavailableReason: null };
         case 'github':
@@ -91,7 +100,7 @@ export class SettingsConnections implements OnInit {
     // This is the only page that governs the full set, because it owns the
     // policy picker below. A child page reached by deep link enforces its own
     // session on init instead.
-    this.lifetimes.govern([this.github, this.raindrop, this.bsky]);
+    this.lifetimes.govern([this.github, this.raindrop, this.bsky, this.openrouter]);
     this.lifetimes.enforceAll();
   }
 

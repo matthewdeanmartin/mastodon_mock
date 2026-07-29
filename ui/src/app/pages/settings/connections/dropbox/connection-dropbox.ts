@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DropboxEntry, DropboxSession } from '../../../../providers/dropbox/dropbox-session';
+import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 
 /**
  * Settings → Connections → Dropbox. The OAuth round trip lands back here (see
@@ -21,6 +22,9 @@ export class ConnectionDropbox implements OnInit {
   protected dropboxError = signal<string | null>(null);
   protected dropboxNotice = signal<string | null>(null);
   protected dropboxEntries = signal<DropboxEntry[] | null>(null);
+
+  /** The storage-scope sentence shown under the heading. */
+  protected readonly scopeDetail = CONNECTION_SCOPE_COPY.session.detail;
 
   ngOnInit(): void {
     const result = this.route.snapshot.queryParamMap.get('dropbox');

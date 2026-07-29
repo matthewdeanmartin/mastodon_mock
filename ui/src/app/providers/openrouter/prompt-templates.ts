@@ -1,0 +1,188 @@
+import { Injectable, signal } from '@angular/core';
+
+/**
+ * The prompts behind the two LLM helpers, editable by the user.
+ *
+ * Both helpers are two-pass — the model proposes, the Mastodon API grades, the
+ * model revises — which naively wants four prompts. It gets two, because the
+ * person editing them should have two things to read and get right, not four.
+ * The second pass reuses the same template with `{{feedback}}` filled in; on the
+ * first pass that placeholder is empty and the paragraph around it collapses.
+ *
+ * Overrides live in one unscoped `localStorage` key, matching the OpenRouter
+ * connection they belong to (see {@link OpenRouterSession} for why that is
+ * unscoped). Sensitivity `setting`: a tuned prompt is exactly the kind of thing
+ * worth publishing in a "here is my setup" gist.
+ */
+
+const PROMPTS_KEY = 'mockingbird_openrouter_prompts';
+
+export type PromptTemplateId = 'search' | 'tag';
+
+export interface PromptTemplateSpec {
+  id: PromptTemplateId;
+  label: string;
+  /** What this prompt is for, in one sentence, for the settings page. */
+  description: string;
+  /** Placeholder names, without braces. Shown to the user while editing. */
+  placeholders: string[];
+}
+
+export const PROMPT_TEMPLATES: readonly PromptTemplateSpec[] = [
+  {
+    id: 'search',
+    label: 'Search helper',
+    description:
+      'Turns what you typed into five runnable Mastodon search queries, then improves them once if they returned too little.',
+    placeholders: ['request', 'feedback'],
+  },
+  {
+    id: 'tag',
+    label: 'Tag helper',
+    description:
+      'Suggests hashtags for a post you are writing, then improves them once if the suggested tags turn out to be dead.',
+    placeholders: ['post', 'feedback'],
+  },
+];
+
+/**
+ * The shipped prompts.
+ *
+ * They spell the DSL out operator by operator because the model cannot see
+ * `mastodon-query-serializer.ts`, and a query using an operator Mastodon does
+ * not support fails silently by returning *more* than asked for — the same trap
+ * documented in `sprint/search-2-serializer-and-explain.md`.
+ */
+export const DEFAULT_PROMPTS: Record<PromptTemplateId, string> = {
+  search: `You write search queries for Mastodon, using its search syntax.
+
+Supported operators — use ONLY these:
+  +word            the word must appear
+  "exact phrase"   the phrase must appear
+  -word            the word must NOT appear
+  from:@user@host  posted by this account
+  before:YYYY-MM-DD / after:YYYY-MM-DD
+  language:xx      two-letter language code
+  has:media        has an image, video or audio
+  has:poll         has a poll
+  is:reply / -is:reply
+  is:sensitive / -is:sensitive
+  in:public        search all public posts
+  in:library       search only posts you wrote or interacted with
+
+Rules:
+- Return exactly 5 queries, ordered most to least likely to be what they meant.
+- Vary them: a narrow one, a couple of middling ones, and a broad fallback.
+- Never invent an operator that is not listed above.
+- Do not guess an account handle unless the request names one.
+- Bare words are fine; not every query needs an operator.
+
+What the person is looking for:
+{{request}}
+
+{{feedback}}`,
+
+  tag: `You suggest hashtags for a post being written on Mastodon.
+
+On Mastodon, hashtags are the main way people find posts outside their follows,
+so a good tag is one that other people actually browse.
+
+Rules:
+- Return exactly 5 hashtags, without the leading #.
+- Prefer established, general tags over clever or invented ones.
+- CamelCase multi-word tags (e.g. NaturePhotography) — it helps screen readers.
+- No punctuation, spaces or emoji inside a tag.
+- Suggest tags for what the post is *about*, not words that merely appear in it.
+
+The post:
+{{post}}
+
+{{feedback}}`,
+};
+
+/**
+ * Fill `{{placeholders}}` in a template.
+ *
+ * Unknown placeholders are deliberately left intact: a typo should show up as a
+ * visible `{{requst}}` in the preview, not vanish into an empty prompt that
+ * quietly produces worse results. Blank values collapse surrounding whitespace
+ * so the empty first-pass `{{feedback}}` does not leave a hole in the prompt.
+ */
+export function renderTemplate(template: string, vars: Record<string, string>): string {
+  const filled = template.replace(/\{\{(\w+)\}\}/g, (match, name: string) =>
+    name in vars ? vars[name] : match,
+  );
+  return filled.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+@Injectable({ providedIn: 'root' })
+export class PromptTemplateStore {
+  private overrides = signal<Partial<Record<PromptTemplateId, string>>>(read());
+
+  readonly templates = PROMPT_TEMPLATES;
+
+  /** The active text: the user's version if they have one, else the default. */
+  text(id: PromptTemplateId): string {
+    return this.overrides()[id] ?? DEFAULT_PROMPTS[id];
+  }
+
+  /** Whether this template has been edited away from the shipped text. */
+  isCustom(id: PromptTemplateId): boolean {
+    return this.overrides()[id] !== undefined;
+  }
+
+  set(id: PromptTemplateId, text: string): void {
+    const trimmed = text.trim();
+    // Saving the default back is a reset, not a customisation — otherwise the
+    // "customised" marker lies and the user can never get rid of it.
+    if (!trimmed || trimmed === DEFAULT_PROMPTS[id].trim()) {
+      this.reset(id);
+      return;
+    }
+    this.write({ ...this.overrides(), [id]: trimmed });
+  }
+
+  reset(id: PromptTemplateId): void {
+    const next = { ...this.overrides() };
+    delete next[id];
+    this.write(next);
+  }
+
+  /** The rendered prompt for one helper, ready to send. */
+  render(id: PromptTemplateId, vars: Record<string, string>): string {
+    return renderTemplate(this.text(id), vars);
+  }
+
+  private write(next: Partial<Record<PromptTemplateId, string>>): void {
+    try {
+      if (Object.keys(next).length === 0) {
+        localStorage.removeItem(PROMPTS_KEY);
+      } else {
+        localStorage.setItem(PROMPTS_KEY, JSON.stringify(next));
+      }
+    } catch {
+      // Non-persistent, but honour it for this session.
+    }
+    this.overrides.set(next);
+  }
+}
+
+function read(): Partial<Record<PromptTemplateId, string>> {
+  try {
+    const raw = localStorage.getItem(PROMPTS_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Partial<Record<PromptTemplateId, string>> = {};
+    for (const spec of PROMPT_TEMPLATES) {
+      const value = parsed[spec.id];
+      if (typeof value === 'string' && value.trim()) {
+        out[spec.id] = value;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}

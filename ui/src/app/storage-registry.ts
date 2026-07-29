@@ -443,6 +443,49 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'In-flight Mastodon OAuth attempt: client secret, PKCE verifier and state.',
   },
   {
+    // Unscoped on purpose, unlike every other credential here. An LLM key
+    // belongs to the human, not to a Mastodon persona: it is the same key
+    // whether you are signed in as your main, your alt, or Anonymous, so
+    // scoping it would only mean reconnecting once per identity. The knock-on
+    // is that per-account data deletion (Signed-in accounts) does not remove
+    // it — which is the intended behavior, and pinned by a spec.
+    base: 'mockingbird_openrouter_key',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: 'OpenRouter API key from the PKCE flow. Can spend the user’s OpenRouter credits. Shared by every account in this browser.',
+  },
+  {
+    base: 'mockingbird_openrouter_model',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'setting',
+    note: 'Chosen OpenRouter model id for the prompt helpers.',
+  },
+  {
+    base: 'mockingbird_openrouter_prompts',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'setting',
+    note: 'User-edited prompt templates for the search and tag helpers. Only present for templates edited away from the shipped default.',
+  },
+  {
+    base: 'mockingbird_openrouter_pkce_verifier',
+    storage: 'session',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: 'PKCE verifier for the in-flight OpenRouter authorization.',
+  },
+  {
+    // OpenRouter's authorize step takes no `state` parameter, so ours travels
+    // inside callback_url. This is the copy we check the return against.
+    base: 'mockingbird_openrouter_oauth_state',
+    storage: 'session',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: 'Anti-CSRF state for the in-flight OpenRouter authorization.',
+  },
+  {
     base: 'mockingbird_dropbox_token',
     storage: 'session',
     suffix: 'none',

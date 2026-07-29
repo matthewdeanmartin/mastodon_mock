@@ -35,6 +35,11 @@ export const routes: Routes = [
       import('./pages/dropbox-callback/dropbox-callback').then((m) => m.DropboxCallback),
   },
   {
+    path: 'integrations/openrouter/callback',
+    loadComponent: () =>
+      import('./pages/openrouter-callback/openrouter-callback').then((m) => m.OpenRouterCallback),
+  },
+  {
     path: 'fail-whale',
     loadComponent: () =>
       import('./pages/fail-whale-demo/fail-whale-demo').then((m) => m.FailWhaleDemo),
@@ -137,6 +142,13 @@ export const routes: Routes = [
                 loadComponent: () =>
                   import('./pages/settings/connections/raindrop/connection-raindrop').then(
                     (m) => m.ConnectionRaindrop,
+                  ),
+              },
+              {
+                path: 'openrouter',
+                loadComponent: () =>
+                  import('./pages/settings/connections/openrouter/connection-openrouter').then(
+                    (m) => m.ConnectionOpenRouter,
                   ),
               },
               {

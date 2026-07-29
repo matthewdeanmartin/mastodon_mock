@@ -7,6 +7,7 @@ import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-ca
 import { DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { GitHubSession } from '../../../providers/github/github-session';
 import { CredentialLifetimeStore } from '../../../providers/credential-lifetime';
+import { CONNECTION_CATALOG } from './connection-catalog';
 import { SettingsConnections } from './settings-connections';
 
 describe('SettingsConnections (catalog)', () => {
@@ -76,7 +77,7 @@ describe('SettingsConnections (catalog)', () => {
     const fixture = setUp();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
-    expect(cards(fixture)).toHaveLength(4);
+    expect(cards(fixture)).toHaveLength(CONNECTION_CATALOG.length);
     for (const label of ['Bluesky', 'Raindrop.io', 'GitHub', 'Dropbox']) {
       expect(text).toContain(label);
     }
@@ -84,6 +85,15 @@ describe('SettingsConnections (catalog)', () => {
     expect(text).toContain('Bluesky posts merged into your home timeline');
     expect(text).toContain('Read your unread notifications');
     expect(text).not.toContain('app password');
+  });
+
+  it('says who each connection belongs to', () => {
+    const fixture = setUp();
+    // Account-scoped credentials (scopedKey) vs Dropbox's unscoped sessionStorage.
+    expect(cardFor(fixture, 'Bluesky').textContent).toContain('This account');
+    expect(cardFor(fixture, 'GitHub').textContent).toContain('This account');
+    expect(cardFor(fixture, 'Raindrop.io').textContent).toContain('This account');
+    expect(cardFor(fixture, 'Dropbox').textContent).toContain('This tab only');
   });
 
   it('each card links to that connector’s own page', () => {
@@ -117,8 +127,8 @@ describe('SettingsConnections (catalog)', () => {
     expect(bluesky.classList).toContain('unavailable');
     expect(bluesky.textContent).toContain('Anonymous account');
 
-    // Still four cards: unavailable is a state, not a removal.
-    expect(cards(fixture)).toHaveLength(4);
+    // Nothing disappeared: unavailable is a state, not a removal.
+    expect(cards(fixture)).toHaveLength(CONNECTION_CATALOG.length);
   });
 
   it('governs every credential-bearing session and enforces on init', () => {
@@ -127,7 +137,8 @@ describe('SettingsConnections (catalog)', () => {
     setUp();
 
     expect(govern).toHaveBeenCalledOnce();
-    expect(govern.mock.calls[0][0]).toHaveLength(3);
+    // Every connector holding a durable credential: all but session-only Dropbox.
+    expect(govern.mock.calls[0][0]).toHaveLength(4);
     expect(enforceAll).toHaveBeenCalled();
   });
 

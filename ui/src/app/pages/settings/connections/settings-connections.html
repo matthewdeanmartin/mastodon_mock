@@ -30,6 +30,9 @@
             } @else {
               <span class="pill">Not connected</span>
             }
+            <span class="pill pill-scope" [title]="scopeCopy[row.entry.scope].detail">
+              {{ scopeCopy[row.entry.scope].label }}
+            </span>
           </span>
           <span class="muted catalog-pitch">{{ row.entry.pitch }}</span>
           @if (row.unavailableReason; as reason) {

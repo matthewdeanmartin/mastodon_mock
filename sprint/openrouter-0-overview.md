@@ -115,19 +115,22 @@ direction to fail.
    deliberate exception to `scopedKey()` — see sprint 2 §5 for the three consequences.
 9. **Helper buttons are hidden when OpenRouter isn't connected.** No upsell, no teaser.
    Connections are a power-user surface and power users find the Connections tab.
-10. **The refine round trip is conditional, and the condition is a stated rule.**
-   Search helper: skip refinement if **all five** suggested queries return ≥5 results.
-   Tag helper: skip refinement if **every** suggested tag has recorded activity.
-   Both thresholds live in one named constant each, not scattered in the call site.
+10. **Grading is short-circuited, not exhaustive** (Matthew, 2026-07-28, superseding the
+   original "grade all five" rule). Try suggestions **in order and stop at the first that
+   succeeds** — the prompt already returns them most-likely-first, so the first one that
+   works is also the most specific one that works. Cost drops from 5 API calls every time to
+   1 in the common case. The refine round trip then has a sharper trigger: it fires only when
+   **everything** failed, which is exactly the case where the model misunderstood.
+   Thresholds live in one named constant each, not scattered at the call site.
 
 ## Sprints
 
 | # | File | Theme | Ships | Risk |
 |---|---|---|---|---|
 | 1 | `openrouter-1-catalog-and-rss-tab.md` | Connections becomes a catalog; RSS moves to its own settings tab | ✅ **DONE** 2026-07-28 | none — pure refactor of existing code |
-| 2 | `openrouter-2-pkce-and-models.md` | `OpenRouterSession` (PKCE), connection detail page, model picker, credits | A working connection | PKCE `state` gap; credits three-state |
-| 3 | `openrouter-3-prompt-templates.md` | `PromptTemplateStore`, template editor UI, `OpenRouterResponses` call + JSON-shape guard | The plumbing both helpers need | LLM returns non-JSON — contained by a strict parser + one retry |
-| 4 | `openrouter-4-search-helper.md` | Search helper dialog: prose → 5 DSL queries → grade → conditional refine | Feature 1 | Grading costs N searches against the API budget (sprint 3 of the search effort) |
+| 2 | `openrouter-2-pkce-and-models.md` | `OpenRouterSession` (PKCE), connection detail page, model picker, credits | ✅ **DONE** 2026-07-28 | PKCE `state` gap; credits three-state |
+| 3 | `openrouter-3-prompt-templates.md` | `PromptTemplateStore`, template editor UI, chat-completions call + JSON-shape guard | ✅ **DONE** 2026-07-28 | LLM returns non-JSON — contained by a strict parser + one retry |
+| 4 | `openrouter-4-search-helper.md` | Search helper dialog: prose → 5 DSL queries → **try in order, stop at first success** → conditional refine | ✅ **DONE** 2026-07-28 | Grading cost, solved by short-circuiting: 1 call typical, 5 worst case |
 | 5 | `openrouter-5-tag-helper.md` | Tag helper dialog on compose: post → tags → activity check → conditional refine | Feature 2 | none new |
 
 Sprint 1 is deliberately first and deliberately boring: sprints 2–5 each add UI to the

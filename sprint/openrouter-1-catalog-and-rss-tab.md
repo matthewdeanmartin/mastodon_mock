@@ -77,6 +77,12 @@ Becomes short. It renders:
 
 - The page head (kept, with the "Mastodon is home" framing — but the RSS clause drops out
   of the intro copy, since RSS is leaving).
+- **A scope badge on every card** (added mid-sprint, from Matthew): "This account" /
+  "All accounts" / "This tab only". Three values, not two, because Dropbox keeps its token
+  in *unscoped `sessionStorage`* — it is neither per-account nor durable. The badge is a
+  claim about how the session actually stores its credential, so `ConnectionCatalogEntry.scope`
+  and the session's storage must be changed together; a spec pins the four current values.
+  Each connector page repeats the claim as a full sentence under its heading.
 - **The catalog list, first** (per Matthew: "I want there to be a catalog 1st"): one card per
   entry — emoji + label, a `Connected` / `Not connected` pill, the pitch, the `enables` list,
   and the whole card is a `routerLink` to `/settings/connections/<id>`.

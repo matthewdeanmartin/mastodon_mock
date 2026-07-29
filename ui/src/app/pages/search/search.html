@@ -28,6 +28,17 @@
       <option value="hashtags">Hashtags</option>
     </select>
     <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
+    @if (canUseSearchHelper()) {
+      <button
+        class="btn btn-outline"
+        type="button"
+        title="Describe what you're looking for and get a query"
+        aria-label="Help me search"
+        (click)="searchHelperOpen.set(true)"
+      >
+        🤖
+      </button>
+    }
     @if (type() === 'statuses' || type() === 'accounts') {
       <button
         class="btn btn-outline"
@@ -756,3 +767,10 @@
     </div>
   </div>
 </div>
+
+@if (searchHelperOpen()) {
+  <app-search-helper-dialog
+    (useQuery)="useSuggestedQuery($event)"
+    (closed)="searchHelperOpen.set(false)"
+  />
+}

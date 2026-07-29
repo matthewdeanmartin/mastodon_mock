@@ -190,6 +190,39 @@ Remember the shared jsdom realm (`ui/docs/shared-jsdom-realm-in-tests.md`).
 - Credits render sensibly for a key with a cap, a key without one, and a failed lookup.
 - Removing another signed-in account leaves the OpenRouter connection intact.
 
+## Deviations from the plan as written
+
+- **`OpenRouterModelChoice` is its own service**, not a field on the models service. The
+  chosen model is a *setting* that outlives any search and is read by the helpers in sprints
+  4/5; the search service is a stateless cache in front of a public endpoint. Merging them
+  would make every helper import the search machinery to read one string.
+- **`stubLocation` gained an `onAssign` option.** The session navigates with
+  `location.assign` (as `DropboxSession` does), and the existing helper hard-coded that to a
+  no-op, so the authorize URL was unobservable. Chromium also refuses to let `location.assign`
+  be overwritten at all, so the browser-level check fulfils the request at the network layer
+  instead — noted here because the next connector with an OAuth redirect will hit both.
+- **Credits treats 401 as "revoked", not just "unknown"**, and disconnects. Not in the plan,
+  but a key OpenRouter no longer recognises is not a connection, and leaving the page claiming
+  "Connected" while every call fails is the worse lie.
+- **The model picker renders before you connect.** Planned, but worth restating: the models
+  endpoint needs no auth, so the page shows the default model and its live pricing to someone
+  who has not authorized anything. It is the honest way to answer "what am I signing up for?".
+
+## Verified at runtime
+
+Driven in a real browser against the live API (24 checks, all passing):
+
+- Catalog entry present, badged **All accounts**, pitching both helpers.
+- Model search hits `/api/v1/models` three times across the session; **every** request carried
+  `q=`, `limit=20` and `supported_parameters=structured_outputs`. The no-unfiltered-request
+  rule holds in practice, not just in the unit spec.
+- Live pricing renders: `262,144 token context · in $0.10 / M tokens · out $0.34 / M tokens`.
+- Choosing a model persists it to an **unscoped** key, survives reload, and resets cleanly.
+- Clicking Connect produces a real authorize URL with `code_challenge_method=S256`, a
+  challenge, and a `callback_url` carrying our `state` — with no verifier anywhere in it.
+- A tampered `state` on the callback stores no key, shows the error, clears the pending flow,
+  and leaves the page reading "not connected".
+
 ## Explicitly deferred
 
 - Prompt templates, the responses call, and any inference — sprint 3.

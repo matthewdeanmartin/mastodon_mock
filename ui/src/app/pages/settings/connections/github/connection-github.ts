@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { GitHubSession } from '../../../../providers/github/github-session';
 import { expiryLabel } from '../expiry-label';
+import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 
 /** Settings → Connections → GitHub. Token paste, validation, and the API proof. */
 @Component({
@@ -20,6 +21,9 @@ export class ConnectionGitHub implements OnInit {
   protected githubNotice = signal<string | null>(null);
 
   protected readonly expiryLabel = expiryLabel;
+
+  /** The storage-scope sentence shown under the heading. */
+  protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;
 
   ngOnInit(): void {
     // The catalog page governs the whole set for the policy picker; this page

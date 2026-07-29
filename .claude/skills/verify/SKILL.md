@@ -39,6 +39,14 @@ uv venv pwenv && uv pip install --python pwenv/Scripts/python.exe playwright
 
 ## Gotchas
 
+- **`npm run test:ci` wipes `_ui_dist`. Always build AFTER testing, never before.**
+  The Angular test builder cleans the same output path the app build writes to, leaving
+  `_ui_dist/browser` holding only `vendor/`. Symptom: `/_ui/` 404s right after a full quality
+  gate that ended with tests. Check with
+  `(Get-ChildItem mastodon_mock\_ui_dist\browser | Measure-Object).Count` — ~190 is healthy,
+  1 means it was cleaned. Correct order: `lint` → `test:ci` → `build` → restart server.
+- **Restart the server after every rebuild.** `ui.py` resolves `_ui_dist/browser` at import,
+  so a server started against a missing dist keeps 404ing no matter how often you rebuild.
 - A CORS-enabled local test server (e.g. for RSS feeds) must send
   `Access-Control-Allow-Origin: *`; plain `python -m http.server` does not.
 - `text=fail whale` matches the footer's "Fail whale" demo link — check for the

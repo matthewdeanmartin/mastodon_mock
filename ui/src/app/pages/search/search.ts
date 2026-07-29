@@ -22,6 +22,8 @@ import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 import { AccountResultCard } from './account-result-card';
+import { SearchHelperDialog } from './search-helper-dialog/search-helper-dialog';
+import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
 import { AccountSearchStore } from './account-search-store';
 import {
   AccountFacet,
@@ -88,7 +90,7 @@ const LOAD_MORE_HARD_CAP = 30;
 
 @Component({
   selector: 'app-search',
-  imports: [FormsModule, RouterLink, StatusCard, FindPeople, AccountResultCard],
+  imports: [FormsModule, RouterLink, StatusCard, FindPeople, AccountResultCard, SearchHelperDialog],
   templateUrl: './search.html',
   styleUrl: './search.css',
 })
@@ -115,6 +117,32 @@ export class Search implements OnInit, OnDestroy {
   }
 
   protected query = signal('');
+
+  // --- LLM search helper (sprint openrouter-4) ---
+  private openrouter = inject(OpenRouterSession);
+  protected searchHelperOpen = signal(false);
+
+  /**
+   * Whether to offer the 🤖 helper at all.
+   *
+   * Hidden rather than disabled when OpenRouter isn't connected (connections are
+   * a power-user surface; power users find the Connections tab). Also hidden for
+   * Anonymous: the helper emits DSL operators like `from:` that only work in
+   * server-side full-text search, which mastodon.social does not give logged-out
+   * visitors — anonymous post search here is a hashtag transform instead. Offering
+   * queries the user cannot run would be worse than offering nothing.
+   */
+  protected canUseSearchHelper = computed(
+    () => this.openrouter.connected() && !this.capabilities.active,
+  );
+
+  /** Take a query from the helper dialog and run it through the normal path. */
+  useSuggestedQuery(query: string): void {
+    this.searchHelperOpen.set(false);
+    this.type.set('statuses');
+    this.query.set(query);
+    this.run();
+  }
   protected results = signal<SearchResults | null>(null);
   protected searching = signal(false);
   protected type = signal<SearchType>('accounts');

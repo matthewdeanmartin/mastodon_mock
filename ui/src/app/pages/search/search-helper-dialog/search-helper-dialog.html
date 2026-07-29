@@ -1,0 +1,81 @@
+<!-- A real button, not a div: clicking away must also be reachable by keyboard.
+     Escape closes too, via the host listener. -->
+<button class="sh-backdrop" type="button" aria-label="Close" (click)="close()"></button>
+<section class="sh-dialog" role="dialog" aria-modal="true" aria-labelledby="sh-title">
+  <div class="sh-head">
+    <h2 id="sh-title">🤖 Help me search</h2>
+    <button class="icon-close" type="button" aria-label="Close" (click)="close()">×</button>
+  </div>
+
+  <p class="muted">
+    Describe what you're after in a sentence. You'll get a Mastodon search query you can edit before
+    running it.
+  </p>
+
+  <form class="sh-ask" (ngSubmit)="ask()">
+    <textarea
+      rows="3"
+      name="request"
+      aria-label="What are you looking for?"
+      placeholder="posts from my friend about rust compilers last month"
+      [ngModel]="request()"
+      (ngModelChange)="request.set($event)"
+      [disabled]="busy()"
+    ></textarea>
+    <button class="btn" type="submit" [disabled]="!request().trim() || busy()">
+      {{ busy() ? 'Thinking…' : 'Suggest queries' }}
+    </button>
+  </form>
+
+  @if (busy()) {
+    <p class="muted small" role="status">
+      Asking the model, then trying its suggestions until one returns results.
+    </p>
+  }
+
+  @if (error(); as msg) {
+    <p class="sh-error" role="alert">{{ msg }}</p>
+  }
+
+  @if (result(); as res) {
+    <p class="sh-summary" role="status">{{ summary(res) }}</p>
+
+    <ul class="sh-attempts">
+      @for (attempt of res.attempts; track attempt.query) {
+        <li
+          class="sh-attempt"
+          [class.sh-attempt-win]="attempt.query === res.winner"
+          [class.sh-attempt-dead]="attempt.count === 0"
+        >
+          <button type="button" class="sh-attempt-query" (click)="pick(attempt)">
+            <code>{{ attempt.query }}</code>
+          </button>
+          <span class="muted small">{{ outcomeLabel(attempt) }}</span>
+        </li>
+      }
+    </ul>
+    @if (res.attempts.length < res.queries.length) {
+      <p class="muted small">
+        The remaining {{ res.queries.length - res.attempts.length }} suggestion(s) weren't tried —
+        this one already worked.
+      </p>
+    }
+
+    <label class="sh-edit">
+      <span>Your query</span>
+      <textarea
+        rows="2"
+        name="draft"
+        [ngModel]="draft()"
+        (ngModelChange)="draft.set($event)"
+      ></textarea>
+    </label>
+
+    <div class="sh-actions">
+      <button class="btn" type="button" (click)="use()" [disabled]="!draft().trim()">
+        Use search
+      </button>
+      <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
+    </div>
+  }
+</section>

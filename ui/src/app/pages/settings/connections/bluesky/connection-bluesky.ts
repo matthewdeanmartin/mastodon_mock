@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { BlueskySession } from '../../../../providers/bluesky/bluesky-session';
 import { AnonymousCapabilities } from '../../../../providers/anonymous/anonymous-capabilities';
 import { expiryLabel } from '../expiry-label';
+import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 
 /** Settings → Connections → Bluesky. App-password link; the only read/write connector. */
 @Component({
@@ -23,6 +24,9 @@ export class ConnectionBluesky implements OnInit {
   protected bskyError = signal<string | null>(null);
 
   protected readonly expiryLabel = expiryLabel;
+
+  /** The storage-scope sentence shown under the heading. */
+  protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;
 
   ngOnInit(): void {
     // Deep-link case: re-check against a policy shortened on the catalog page.

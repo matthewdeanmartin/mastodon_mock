@@ -34,6 +34,8 @@ const COPIED_KEYS = [
 export interface LocationStubOptions {
   /** Called instead of navigating when code assigns `location.href`. */
   onHref?: (url: string) => void;
+  /** Called instead of navigating when code calls `location.assign(url)`. */
+  onAssign?: (url: string) => void;
   /** Called instead of reloading when code calls `location.reload()`. */
   onReload?: () => void;
 }
@@ -46,7 +48,7 @@ export function stubLocation(options: LocationStubOptions = {}): void {
     stub[key] = real[key];
   }
   stub['toString'] = () => real.href;
-  stub['assign'] = () => undefined;
+  stub['assign'] = options.onAssign ?? (() => undefined);
   stub['replace'] = () => undefined;
   stub['reload'] = options.onReload ?? (() => undefined);
   if (options.onHref) {
