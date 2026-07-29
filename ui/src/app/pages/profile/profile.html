@@ -45,16 +45,28 @@
           <details class="account-danger-menu">
             <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
             <div class="account-danger-panel">
+              <!-- Constructive action first. The rest of this menu is
+                   report/mute/block, so the one thing a reader actually wants was
+                   buried under three ways to make someone disappear.
+
+                   Anonymous only, and that is a safety property rather than an
+                   unfinished edge: an anonymous follow is a localStorage write, so
+                   cloning twenty sends zero requests to anyone's server. The same
+                   button signed in would be twenty POST /follow calls back to back,
+                   which is indistinguishable from a follow-bot. Do not "finish"
+                   this by adding a delay and enabling it for authenticated users —
+                   see sprint/anonymous-great-2-clone-friends.md. -->
+              @if (canCloneFriends()) {
+                <button class="menu-neutral" type="button" (click)="openCloneFriends()">
+                  Clone friends list
+                </button>
+              }
               @if (capabilities.canManageRelationships) {
-                <button type="button" (click)="showReport.set(true)">Report account</button>
                 @if (relationship()?.following) {
                   <button class="menu-neutral" type="button" (click)="toggleAccountBoosts()">
                     {{ relationship()?.showing_reblogs === false ? 'Show' : 'Hide' }}
                     {{ words().boosts }}
                   </button>
-                }
-                @if (relationship()?.followed_by) {
-                  <button type="button" (click)="requestRemoveFollower()">Remove follower</button>
                 }
               }
               @if (useLocalModeration ? localMuted() : relationship()?.muting) {
@@ -74,6 +86,15 @@
                     : 'Block account'
                 }}
               </button>
+              <!-- Reporting and removing a follower keep their canManageRelationships
+                   guard; they sit last because they are the rarest, not because they
+                   matter least. -->
+              @if (capabilities.canManageRelationships) {
+                @if (relationship()?.followed_by) {
+                  <button type="button" (click)="requestRemoveFollower()">Remove follower</button>
+                }
+                <button type="button" (click)="showReport.set(true)">Report account</button>
+              }
             </div>
           </details>
           @if (capabilities.canFollow) {
@@ -409,6 +430,14 @@
       [accountId]="a.id"
       [account]="a"
       (closed)="showLists.set(false)"
+    />
+  }
+  @if (showCloneFriends()) {
+    <app-clone-friends-dialog
+      [account]="a"
+      [publicRef]="cloneRef()"
+      (closed)="showCloneFriends.set(false)"
+      (cloned)="onCloned()"
     />
   }
   @if (showBlockConfirm()) {

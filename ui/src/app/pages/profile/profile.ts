@@ -30,6 +30,7 @@ import { AccountStatusesOptions } from '../../api';
 import { Observable } from 'rxjs';
 import { ElizaService } from '../../eliza/eliza.service';
 import { isElizaId } from '../../eliza/eliza-identity';
+import { CloneFriendsDialog } from './clone-friends-dialog/clone-friends-dialog';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analytics';
@@ -46,6 +47,7 @@ type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analyti
     PeopleBrowser,
     AccountAnalytics,
     NgOptimizedImage,
+    CloneFriendsDialog,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
@@ -148,6 +150,57 @@ export class Profile implements OnInit, OnDestroy {
   /** True when this profile is Eliza's — unlocks her local "Message" button. */
   protected isEliza = computed(() => isElizaId(this.account()?.id));
 
+  // --- clone friends list (anonymous-great sprint 2) ---
+
+  protected showCloneFriends = signal(false);
+
+  /**
+   * Whether to offer "Clone friends list".
+   *
+   * **Anonymous only, and that is the safety property — not an unfinished edge.**
+   * An anonymous follow is a row in `localStorage`, so adopting twenty accounts
+   * sends zero write requests to anybody's server. The same button for a signed-in
+   * user would fire twenty `POST /accounts/:id/follow` calls back to back, which is
+   * indistinguishable from a follow-bot and is how people get suspended. This
+   * feature is safe *because* it is anonymous-only; do not later add a rate limiter
+   * and turn it on for authenticated users.
+   *
+   * Also requires the profile to follow somebody (nothing to clone otherwise) and
+   * not to be an RSS pseudo-profile, which has no follow graph at all.
+   */
+  protected canCloneFriends = computed(
+    () =>
+      this.capabilities.active &&
+      !this.isRss() &&
+      !this.isSelf() &&
+      (this.account()?.following_count ?? 0) > 0,
+  );
+
+  protected openCloneFriends(): void {
+    this.showCloneFriends.set(true);
+  }
+
+  /**
+   * The public reference the dialog reads `/following` through.
+   *
+   * A signal, unlike the existing `publicRef` getter, because the template binds it
+   * as an input and a plain getter would not notify on change. Anonymous profiles
+   * reached cross-instance carry a `{ server, id }` ref, and reading their follows
+   * has to go to that server rather than ours.
+   */
+  protected cloneRef = signal<AnonymousPublicRef | null>(null);
+
+  /**
+   * The dialog reports how many it followed; the page just closes it.
+   *
+   * Nothing on this profile needs refreshing: cloning @alice's friends does not
+   * change your relationship to @alice, and `AnonymousFollows.follow` has already
+   * invalidated the home-feed cache, which is the state that actually moved.
+   */
+  protected onCloned(): void {
+    this.showCloneFriends.set(false);
+  }
+
   /** Discoverable Mastodon 4.6 Collections curated by this profile. */
   protected collections = signal<Collection[]>([]);
 
@@ -192,6 +245,8 @@ export class Profile implements OnInit, OnDestroy {
     this.followError.set(null);
     this.isRss.set(false);
     this.publicProfileRef = null;
+    this.cloneRef.set(null);
+    this.showCloneFriends.set(false);
     this.collections.set([]);
     this.rssFeedUrl.set(null);
     this.tab.set('posts');
@@ -243,6 +298,7 @@ export class Profile implements OnInit, OnDestroy {
 
   private loadAnonymousPublicProfile(ref: AnonymousPublicRef): void {
     this.publicProfileRef = ref;
+    this.cloneRef.set(ref);
     this.featured.set([]);
     this.routeLoadSub.add(
       this.anonymousPublic.getAccount(ref).subscribe({

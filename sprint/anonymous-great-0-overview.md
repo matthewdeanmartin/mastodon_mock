@@ -106,7 +106,7 @@ The spillover to signed-in users is not a side effect, it is the reason the orde
 | # | File | Theme | Ships | Risk |
 |---|---|---|---|---|
 | 1 | `anonymous-great-1-search-truth.md` | `SearchCapability` probe; "search disabled" ≠ "no results"; search-server discovery; persistent reject list | ✅ **DONE** 2026-07-29 | Low. Extends an existing probe; one extra API call, only on a zero-result search |
-| 2 | `anonymous-great-2-clone-friends.md` | Profile `•••` menu reorder; clone the viewed account's follows into `AnonymousFollows` | PLANNED | The bulk-follow blast radius, contained by decision 3 (anonymous-only, zero writes) |
+| 2 | `anonymous-great-2-clone-friends.md` | Profile `•••` menu reorder; clone the viewed account's follows into `AnonymousFollows` | ✅ **DONE** 2026-07-29 | The bulk-follow blast radius, contained by decision 3 (anonymous-only, zero writes) |
 | 3 | `anonymous-great-3-ai-translation.md` | `OpenRouterChat.complete()` text path; third prompt template; 🤖🌐 on every post; ask/always-AI/always-server | PLANNED | First non-JSON LLM call in the app — no schema to hide behind |
 
 Sprints 2 and 3 are independent of each other and of 1.

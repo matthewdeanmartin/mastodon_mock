@@ -1,6 +1,6 @@
 # Anonymous Great — Sprint 2: clone friends list
 
-Status: PLANNED (2026-07-29). Roadmap: `anonymous-great-0-overview.md`.
+Status: COMPLETE (implemented 2026-07-29; 1837 tests, lint and storage-registry clean). Roadmap: `anonymous-great-0-overview.md`.
 
 ## The premise
 
@@ -64,8 +64,8 @@ Shipping signals:
 
 | Signal | Rejects when | Message |
 |---|---|---|
-| `dormant` | `last_status_at` older than ~120 days, or missing entirely | `hasn't posted since March` |
-| `too-quiet` | `statuses_count` under ~20 | `has only 3 posts` |
+| `dormant` | `last_status_at` older than 120 days, missing, or unparseable | `hasn't posted in 8 months` / `has never posted` |
+| `too-quiet` | `statuses_count` under 20 (a missing count is not evidence) | `has only 3 posts` |
 
 The two are independent and both matter: a year-dormant account with 40,000 posts is still
 dormant, and a brand-new account that posted twice yesterday is still not worth a slot.
@@ -81,14 +81,24 @@ feature exists to escape the celebrity-only default), `bot` (a good bot is a fin
 Pure. Given the pages fetched so far, the viewer's existing follows and the remaining slot
 count, decide who gets adopted and whether to fetch another page.
 
+**As shipped** (`CloneSelection`, not `CloneCandidates`; two fields were added once the
+dialog needed to explain itself):
+
 ```ts
-export interface CloneCandidates {
+export interface CloneSelection {
   adopt: Account[];
   skipped: { account: Account; reason: string }[];
-  /** True when we want more and the last page was full. */
+  /** Already followed — counted, but NOT reported as a rejection. */
+  alreadyFollowing: number;
+  /** True when we want more, the last page was full, and pages remain. */
   wantsAnotherPage: boolean;
+  /** True when the slot cap, not the target, was the binding constraint. */
+  limitedBySlots: boolean;
 }
 ```
+
+`alreadyFollowing` is separate from `skipped` deliberately: "you already follow them" is
+not a quality rejection and must not read as one in the dialog.
 
 Rules:
 - Drop anyone already followed (`AnonymousFollows.isFollowing`) and the viewer themself.
@@ -108,9 +118,10 @@ New order, per the TODO:
 3. **Mute**
 4. **Block**
 
-Report and Remove follower stay where their `canManageRelationships` guard puts them. The
-constructive action goes first because it is the one a reader actually wants; the menu is
-currently ordered worst-first.
+**As shipped:** Report and Remove follower keep their `canManageRelationships` guard and moved
+to the *end* of the menu — they are the rarest actions, and leaving Report at the top would
+have kept the menu ordered worst-first. Final order is clone → (un)hide boosts → mute →
+block → remove follower → report.
 
 ## The dialog
 

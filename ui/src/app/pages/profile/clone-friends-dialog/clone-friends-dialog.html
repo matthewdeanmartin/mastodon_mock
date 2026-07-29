@@ -1,0 +1,102 @@
+<!-- A real button, not a div: clicking away must be reachable by keyboard too.
+     Escape closes as well, via the host listener. -->
+<button class="cf-backdrop" type="button" aria-label="Close" (click)="close()"></button>
+<section class="cf-dialog" role="dialog" aria-modal="true" aria-labelledby="cf-title">
+  <div class="cf-head">
+    <h2 id="cf-title">Clone {{ handle() }}'s friends list</h2>
+    <button class="icon-close" type="button" aria-label="Close" (click)="close()">×</button>
+  </div>
+
+  @switch (phase()) {
+    @case ('loading') {
+      <p class="muted" role="status">
+        Reading who {{ handle() }} follows…
+        @if (pages() > 1) {
+          <span class="small">page {{ pages() }} of up to {{ maxPages }}</span>
+        }
+      </p>
+      <p class="muted small">
+        Accounts that stopped posting are skipped — following one costs an API call every time your
+        feed refreshes.
+      </p>
+    }
+
+    @case ('error') {
+      <p class="cf-error" role="alert">{{ error() }}</p>
+      <div class="cf-actions">
+        <button class="btn btn-outline" type="button" (click)="close()">Close</button>
+      </div>
+    }
+
+    @case ('confirm') {
+      @if (selection(); as sel) {
+        <p class="cf-summary">{{ summary() }}</p>
+
+        @if (sel.limitedBySlots && sel.adopt.length) {
+          <p class="cf-note">
+            You have {{ remainingSlots() }} of {{ followLimit }} follow slots left, so only
+            {{ sel.adopt.length }} will be added.
+          </p>
+        }
+
+        @if (sel.adopt.length) {
+          <ul class="cf-list">
+            @for (account of sel.adopt; track account.id) {
+              <li>
+                <span class="cf-name">{{ account.display_name || account.username }}</span>
+                <span class="muted small">&#64;{{ account.acct }}</span>
+              </li>
+            }
+          </ul>
+        }
+
+        <!-- The filtering is shown, not hidden: "6 of 63" invites "why only 6?", and
+             the answer should already be on screen. -->
+        @if (sel.skipped.length) {
+          <details class="cf-skipped" [open]="showSkipped()">
+            <summary (click)="showSkipped.set(!showSkipped())">
+              {{ sel.skipped.length }} skipped
+            </summary>
+            <ul>
+              @for (item of sel.skipped; track item.account.id) {
+                <li>
+                  <span class="muted small">&#64;{{ item.account.acct }}</span>
+                  <span class="muted small">{{ item.reason }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        <div class="cf-actions">
+          @if (sel.adopt.length) {
+            <button class="btn" type="button" (click)="confirm()">
+              Follow {{ sel.adopt.length }}
+            </button>
+          }
+          <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
+        </div>
+      }
+    }
+
+    @case ('following') {
+      <p class="muted" role="status">
+        Following… {{ progress() }} of {{ selection()?.adopt?.length ?? 0 }}
+      </p>
+    }
+
+    @case ('done') {
+      <p class="cf-summary" role="status">
+        Followed {{ progress() }} account{{ progress() === 1 ? '' : 's' }}.
+      </p>
+      @if (error(); as msg) {
+        <p class="cf-error" role="alert">{{ msg }}</p>
+      }
+      <p class="muted small">Your home feed will rebuild the next time you open it.</p>
+      <div class="cf-actions">
+        <a class="btn" routerLink="/" (click)="close()">Go to Home</a>
+        <button class="btn btn-outline" type="button" (click)="close()">Close</button>
+      </div>
+    }
+  }
+</section>

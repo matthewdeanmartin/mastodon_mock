@@ -577,3 +577,94 @@ describe('Profile — Eliza', () => {
     httpMock.verify(); // still no follow/unfollow calls
   });
 });
+
+/**
+ * "Clone friends list" — the menu entry and, above all, the guard on it.
+ *
+ * The anonymous-only rule is a safety property, not unfinished scope: cloning
+ * twenty anonymous follows writes twenty localStorage rows, while the same button
+ * signed in would fire twenty POST /follow calls and look exactly like a
+ * follow-bot. A refactor that "tidies up" the guard must fail loudly here.
+ */
+describe('Profile — clone friends list', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => localStorage.clear());
+  afterEach(() => httpMock.verify());
+
+  function setUp(options: { anonymous: boolean; followingCount?: number }) {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: '900' })) },
+        },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    const auth = TestBed.inject(Auth);
+    if (options.anonymous) {
+      auth.enterAnonymous('https://mastodon.social');
+    } else {
+      auth.setToken('a-token');
+      auth.setAccount({ id: 'me', username: 'me' } as Account);
+    }
+
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+
+    httpMock.expectOne('/api/v1/accounts/900').flush({
+      id: '900',
+      username: 'eve',
+      acct: 'eve@mastodon.social',
+      fields: [],
+      following_count: options.followingCount ?? 40,
+    } as unknown as Account);
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/accounts/900/statuses' && !r.params.has('pinned'))
+      .flush([]);
+    // The remaining optional loads (pinned, relationships, collections, featured)
+    // differ by mode; drain whatever this configuration asked for.
+    for (const request of httpMock.match(() => true)) {
+      request.flush([]);
+    }
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  /** The menu is rendered inline, so the label is enough to assert presence. */
+  function menuHasClone(fixture: { nativeElement: unknown }): boolean {
+    const panel = (fixture.nativeElement as HTMLElement).querySelector('.account-danger-panel');
+    return !!panel?.textContent?.includes('Clone friends list');
+  }
+
+  it('offers the entry to an anonymous viewer', () => {
+    expect(menuHasClone(setUp({ anonymous: true }))).toBe(true);
+  });
+
+  it('does NOT offer it when signed in — bulk server-side following is the whole risk', () => {
+    const fixture = setUp({ anonymous: false });
+    const panel = (fixture.nativeElement as HTMLElement).querySelector('.account-danger-panel');
+
+    // Assert the menu is really there first: a test that passes because the whole
+    // panel is missing would prove nothing about the guard.
+    expect(panel?.textContent).toContain('Block account');
+    expect(menuHasClone(fixture)).toBe(false);
+  });
+
+  it('hides it when the account follows nobody, since there is nothing to clone', () => {
+    expect(menuHasClone(setUp({ anonymous: true, followingCount: 0 }))).toBe(false);
+  });
+
+  it('puts the constructive action above the ways to make someone disappear', () => {
+    const fixture = setUp({ anonymous: true });
+    const text =
+      (fixture.nativeElement as HTMLElement).querySelector('.account-danger-panel')?.textContent ??
+      '';
+
+    expect(text.indexOf('Clone friends list')).toBeLessThan(text.indexOf('Block account'));
+    expect(text.indexOf('Clone friends list')).toBeLessThan(text.indexOf('Mute for'));
+  });
+});
