@@ -32,12 +32,12 @@ export class DropboxCallback implements OnInit {
   async ngOnInit(): Promise<void> {
     try {
       await this.dropbox.finishAuthorization(new URLSearchParams(location.search));
-      await this.router.navigate(['/settings/connections'], {
+      await this.router.navigate(['/settings/connections/dropbox'], {
         queryParams: { dropbox: 'connected' },
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Dropbox authorization failed.';
-      await this.router.navigate(['/settings/connections'], {
+      await this.router.navigate(['/settings/connections/dropbox'], {
         queryParams: { dropbox: 'error', message },
       });
     }

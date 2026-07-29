@@ -103,12 +103,56 @@ export const routes: Routes = [
               import('./pages/settings/blue/settings-blue').then((m) => m.SettingsBlue),
           },
           {
+            // Componentless parent: the catalog is the '' child and each
+            // connector is a sibling, so a connector's page replaces the
+            // catalog rather than nesting under it. Only the catalog is
+            // preloaded — the point of the split is that you don't download
+            // Bluesky's page to look at the list.
             path: 'connections',
+            children: [
+              {
+                path: '',
+                data: { preloadSettings: true },
+                loadComponent: () =>
+                  import('./pages/settings/connections/settings-connections').then(
+                    (m) => m.SettingsConnections,
+                  ),
+              },
+              {
+                path: 'github',
+                loadComponent: () =>
+                  import('./pages/settings/connections/github/connection-github').then(
+                    (m) => m.ConnectionGitHub,
+                  ),
+              },
+              {
+                path: 'dropbox',
+                loadComponent: () =>
+                  import('./pages/settings/connections/dropbox/connection-dropbox').then(
+                    (m) => m.ConnectionDropbox,
+                  ),
+              },
+              {
+                path: 'raindrop',
+                loadComponent: () =>
+                  import('./pages/settings/connections/raindrop/connection-raindrop').then(
+                    (m) => m.ConnectionRaindrop,
+                  ),
+              },
+              {
+                path: 'bluesky',
+                loadComponent: () =>
+                  import('./pages/settings/connections/bluesky/connection-bluesky').then(
+                    (m) => m.ConnectionBluesky,
+                  ),
+              },
+            ],
+          },
+          {
+            path: 'rss',
             data: { preloadSettings: true },
             loadComponent: () =>
-              import('./pages/settings/connections/settings-connections').then(
-                (m) => m.SettingsConnections,
-              ),
+              import('./pages/settings/rss/settings-rss').then((m) => m.SettingsRss),
           },
           {
             path: 'privacy',

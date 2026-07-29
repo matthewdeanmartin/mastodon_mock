@@ -44,6 +44,7 @@ describe('SettingsShell', () => {
       'Anonymous',
       'Mockingbird Blue',
       'Connections',
+      'RSS feeds',
       'Appearance',
       'Internationalization',
       'Local storage',

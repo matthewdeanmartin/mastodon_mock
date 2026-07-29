@@ -1,0 +1,69 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>🦋 Bluesky</h1>
+  <p>
+    Your Bluesky timeline is merged into home, and replies, likes and reposts on 🦋 posts go back to
+    Bluesky.
+  </p>
+</div>
+
+@if (!capabilities.canUseBluesky) {
+  <p class="feed-error">
+    Bluesky isn't available for the browser-local Anonymous account. Sign in with a Mastodon account
+    to link it.
+  </p>
+} @else if (bsky.session(); as session) {
+  <div class="bsky-linked">
+    <img class="bsky-avatar" [src]="session.avatar || ''" alt="" decoding="async" />
+    <span class="names">
+      <span class="name">{{ session.displayName || session.handle }}</span>
+      <span class="muted small">&#64;{{ session.handle }}</span>
+    </span>
+    <button class="btn btn-outline btn-sm" (click)="unlinkBluesky()">Unlink</button>
+  </div>
+  <p class="muted small">
+    Unlinking forgets the tokens here — you can also revoke the app password on bsky.app.
+  </p>
+  @if (expiryLabel(bsky.expiresAt()); as expiry) {
+    <p class="muted small">
+      This link is dropped and the tokens deleted from this browser on {{ expiry }}.
+    </p>
+  }
+} @else {
+  <p class="muted">
+    Link with an <strong>app password</strong> — made at bsky.app → Settings → Privacy and security
+    → App Passwords. It's revocable and is never your real password. Check
+    <em>"Allow access to your direct messages"</em> when creating it if you want your Bluesky DMs in
+    Chat.
+  </p>
+  <form class="bsky-form" (ngSubmit)="linkBluesky()">
+    <input
+      type="text"
+      name="bskyHandle"
+      placeholder="you.bsky.social"
+      [ngModel]="bskyHandle()"
+      (ngModelChange)="bskyHandle.set($event)"
+      [disabled]="bskyLinking()"
+    />
+    <input
+      type="password"
+      name="bskyPassword"
+      placeholder="app password"
+      autocomplete="off"
+      [ngModel]="bskyPassword()"
+      (ngModelChange)="bskyPassword.set($event)"
+      [disabled]="bskyLinking()"
+    />
+    <button
+      class="btn"
+      type="submit"
+      [disabled]="!bskyHandle().trim() || !bskyPassword() || bskyLinking()"
+    >
+      {{ bskyLinking() ? 'Linking…' : 'Link Bluesky' }}
+    </button>
+  </form>
+  @if (bskyError(); as msg) {
+    <p class="feed-error">{{ msg }}</p>
+  }
+}

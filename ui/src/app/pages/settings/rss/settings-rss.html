@@ -1,0 +1,48 @@
+<div class="spage-head">
+  <h1>📡 RSS feeds</h1>
+  <p>
+    Any RSS or Atom feed becomes posts in your home feed, read-only, with an "Open original" link.
+    No account, no credential — a feed URL is all it takes.
+  </p>
+  <p class="muted">
+    Mockingbird has no server, so a feed only works if its site allows browser (CORS) access. Plenty
+    don't. You'll know right away when you add one, because adding it fetches it.
+  </p>
+  <p class="muted small">Up to 10 feeds can be saved in this browser.</p>
+</div>
+
+<form class="add-feed" (ngSubmit)="addFeed()">
+  <input
+    type="url"
+    name="feedUrl"
+    placeholder="https://example.com/feed.xml"
+    [ngModel]="feedUrl()"
+    (ngModelChange)="feedUrl.set($event)"
+    [disabled]="adding()"
+  />
+  <button class="btn" type="submit" [disabled]="!feedUrl().trim() || adding()">
+    {{ adding() ? 'Checking…' : 'Add feed' }}
+  </button>
+</form>
+@if (error(); as msg) {
+  <p class="feed-error">{{ msg }}</p>
+}
+
+@if (subs.feeds().length) {
+  <ul class="feed-list">
+    @for (f of subs.feeds(); track f.url) {
+      <li class="feed-row">
+        <label class="feed-toggle">
+          <input type="checkbox" [checked]="f.enabled" (change)="toggle(f)" />
+          <span class="names">
+            <span class="name">{{ f.title || f.url }}</span>
+            <span class="muted small">{{ f.url }}</span>
+          </span>
+        </label>
+        <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
+      </li>
+    }
+  </ul>
+} @else {
+  <p class="muted">No feeds yet.</p>
+}

@@ -1,238 +1,14 @@
+/* Retention policy sits below the catalog: the question "what can I connect?"
+   comes before "how long are credentials kept?". */
 .conn-section {
-  margin-bottom: 28px;
+  margin: 28px 0;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
 }
 
 .conn-section h2 {
   font-size: 17px;
   margin: 0 0 6px;
-}
-
-.add-feed {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0;
-}
-
-.add-feed input {
-  flex: 1;
-  min-width: 0;
-}
-
-.feed-error {
-  color: #d63b3b;
-  font-size: 13px;
-}
-
-.feed-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.feed-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.feed-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  min-width: 0;
-}
-
-.feed-toggle .names {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.feed-toggle .names span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.coming-soon {
-  opacity: 0.85;
-}
-
-.bsky-form {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0;
-  flex-wrap: wrap;
-}
-
-.bsky-form input {
-  flex: 1;
-  min-width: 160px;
-}
-
-.bsky-linked {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-}
-
-.bsky-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: #0085ff;
-}
-
-.bsky-linked .names {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.dropbox-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 12px 0 6px;
-}
-
-.connection-ok {
-  color: #2b8a3e;
-  font-size: 13px;
-}
-
-.raindrop-form,
-.raindrop-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 0;
-  flex-wrap: wrap;
-}
-
-.raindrop-form input {
-  flex: 1;
-  min-width: 180px;
-}
-
-.github-form,
-.github-linked {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 0;
-  flex-wrap: wrap;
-}
-
-.github-form input {
-  flex: 1;
-  min-width: 220px;
-}
-
-.github-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-}
-
-.github-linked .names {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 140px;
-}
-
-.github-proof {
-  margin: 10px 0;
-  padding: 10px 12px;
-  border: 1px solid rgb(43 138 62 / 35%);
-  border-radius: 6px;
-  background: rgb(43 138 62 / 8%);
-  font-size: 13px;
-}
-
-.setup-steps {
-  padding-left: 20px;
-}
-
-.setup-steps li + li {
-  margin-top: 5px;
-}
-
-.credential-warning {
-  padding: 9px 11px;
-  border-left: 3px solid #d08a00;
-  background: rgb(208 138 0 / 9%);
-}
-
-.dropbox-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgb(0 0 0 / 55%);
-}
-
-.dropbox-modal {
-  width: min(520px, 100%);
-  max-height: min(680px, 85vh);
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px;
-  background: var(--surface, #fff);
-  color: var(--text);
-  box-shadow: 0 18px 60px rgb(0 0 0 / 35%);
-}
-
-.dropbox-modal-head,
-.dropbox-modal-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.dropbox-modal-head h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.icon-close {
-  border: 0;
-  padding: 0 5px;
-  background: transparent;
-  color: inherit;
-  font-size: 28px;
-  cursor: pointer;
-}
-
-.dropbox-list {
-  list-style: none;
-  margin: 14px 0;
-  padding: 0;
-  border-top: 1px solid var(--border);
-}
-
-.dropbox-list li {
-  display: flex;
-  gap: 9px;
-  padding: 9px 2px;
-  border-bottom: 1px solid var(--border);
-}
-
-.dropbox-modal-foot {
-  justify-content: flex-end;
-  margin-top: 14px;
 }
 
 /* Credential retention policy picker. */
@@ -256,4 +32,105 @@
 
 .lifetime-warning {
   margin-top: 8px;
+}
+
+/* The catalog. */
+.catalog {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.catalog-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.catalog-card:hover,
+.catalog-card:focus-visible {
+  border-color: var(--accent, #1d9bf0);
+  background: rgb(125 125 125 / 6%);
+}
+
+.catalog-card.unavailable {
+  opacity: 0.6;
+}
+
+.catalog-emoji {
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.catalog-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.catalog-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.catalog-label {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.catalog-pitch,
+.catalog-reason {
+  display: block;
+}
+
+.catalog-enables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.enable {
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.pill {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pill-on {
+  border-color: rgb(43 138 62 / 45%);
+  background: rgb(43 138 62 / 10%);
+  color: #2b8a3e;
+}
+
+.pill-off {
+  border-color: rgb(208 138 0 / 45%);
+  background: rgb(208 138 0 / 10%);
+  color: #a06a00;
+}
+
+.catalog-card .chev {
+  align-self: center;
+  font-size: 20px;
+  opacity: 0.5;
 }

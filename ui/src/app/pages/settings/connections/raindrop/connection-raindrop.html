@@ -1,0 +1,54 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>💧 Raindrop.io bookmarks</h1>
+  <p>
+    Add Raindrop.io as a second bookmark provider. When you bookmark a post, you can save the post
+    itself or unwrap it and save its first external link. Hashtags and links back to your Mastodon
+    instance are skipped.
+  </p>
+</div>
+
+<ol class="setup-steps muted small">
+  <li>Create or open an app in Raindrop.io's App Management Console.</li>
+  <li>Copy the <strong>Test token</strong> shown in that app's settings.</li>
+  <li>Paste the Test token below and choose “Save connection”.</li>
+</ol>
+<p class="muted small">
+  Client ID/secret OAuth is intentionally not used here: Raindrop's OAuth token exchange does not
+  permit browser CORS. Their Test token is the supported shortcut when an app only accesses its
+  owner's account; bookmark API calls still go directly from this browser to Raindrop.io.
+</p>
+<p class="credential-warning small">
+  The Test token grants access to your Raindrop.io account and is stored in this browser's
+  localStorage. Only use this on a device and browser profile you trust. You can replace the token
+  in Raindrop.io to revoke access.
+</p>
+
+@if (raindrop.connected()) {
+  <div class="raindrop-actions">
+    <span class="connection-ok">Connected</span>
+    <button class="btn btn-outline" type="button" (click)="disconnectRaindrop()">Disconnect</button>
+  </div>
+  @if (expiryLabel(raindrop.expiresAt()); as expiry) {
+    <p class="muted small">This token is deleted from this browser on {{ expiry }}.</p>
+  }
+} @else {
+  <form class="raindrop-form" (ngSubmit)="connectRaindrop()">
+    <input
+      type="password"
+      name="raindropToken"
+      placeholder="Raindrop.io Test token"
+      autocomplete="off"
+      [ngModel]="raindropToken()"
+      (ngModelChange)="raindropToken.set($event)"
+    />
+    <button class="btn" type="submit" [disabled]="!raindropToken().trim()">Save connection</button>
+  </form>
+}
+@if (raindropNotice(); as msg) {
+  <p class="connection-ok" role="status">{{ msg }}</p>
+}
+@if (raindropError(); as msg) {
+  <p class="feed-error" role="alert">{{ msg }}</p>
+}

@@ -1,50 +1,52 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlueskySession, BskySession } from '../../../providers/bluesky/bluesky-session';
-import { RssFetch } from '../../../providers/rss/rss-fetch';
-import { RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
+import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
+import { DropboxSession } from '../../../providers/dropbox/dropbox-session';
+import { GitHubSession } from '../../../providers/github/github-session';
+import { CredentialLifetimeStore } from '../../../providers/credential-lifetime';
 import { SettingsConnections } from './settings-connections';
-import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 
-/** Expose the protected signals — ngModel writes are async in specs. */
-interface ConnectionsInternals {
-  feedUrl: WritableSignal<string>;
-  bskyHandle: WritableSignal<string>;
-  bskyPassword: WritableSignal<string>;
-  raindropToken: WritableSignal<string>;
-}
-
-describe('SettingsConnections', () => {
-  let fetchFeed: ReturnType<typeof vi.fn>;
+describe('SettingsConnections (catalog)', () => {
   let bskySession: {
     session: WritableSignal<BskySession | null>;
-    login: ReturnType<typeof vi.fn>;
-    unlink: ReturnType<typeof vi.fn>;
-    // The page governs this session under the credential-retention policy, so
-    // the stub has to answer both halves of that contract.
     expiresAt: ReturnType<typeof vi.fn>;
     enforceLifetime: ReturnType<typeof vi.fn>;
   };
+  let githubSession: {
+    connected: WritableSignal<boolean>;
+    expiresAt: ReturnType<typeof vi.fn>;
+    enforceLifetime: ReturnType<typeof vi.fn>;
+  };
+  let dropboxSession: { connected: WritableSignal<boolean>; configured: boolean };
+  let capabilities: { canUseBluesky: boolean };
 
   beforeEach(() => {
     localStorage.clear();
-    fetchFeed = vi.fn();
     bskySession = {
       session: signal<BskySession | null>(null),
-      login: vi.fn(),
-      unlink: vi.fn(),
       expiresAt: vi.fn(() => null),
       enforceLifetime: vi.fn(),
     };
+    // The page governs this session under the credential-retention policy, so
+    // the stub has to answer both halves of that contract.
+    githubSession = {
+      connected: signal(false),
+      expiresAt: vi.fn(() => null),
+      enforceLifetime: vi.fn(),
+    };
+    dropboxSession = { connected: signal(false), configured: true };
+    capabilities = { canUseBluesky: true };
+
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        { provide: RssFetch, useValue: { fetchFeed } },
         { provide: BlueskySession, useValue: bskySession },
+        { provide: GitHubSession, useValue: githubSession },
+        { provide: DropboxSession, useValue: dropboxSession },
+        { provide: AnonymousCapabilities, useValue: capabilities },
       ],
     });
   });
@@ -55,158 +57,93 @@ describe('SettingsConnections', () => {
     return fixture;
   }
 
-  function typeUrl(fixture: ComponentFixture<SettingsConnections>, url: string): void {
-    (fixture.componentInstance as unknown as ConnectionsInternals).feedUrl.set(url);
-    fixture.detectChanges();
+  function cards(fixture: ComponentFixture<SettingsConnections>): HTMLAnchorElement[] {
+    return [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
+        'a.catalog-card',
+      ),
+    ];
   }
 
-  function submit(fixture: ComponentFixture<SettingsConnections>): void {
-    (fixture.nativeElement as HTMLElement)
-      .querySelector('form')!
-      .dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
+  function cardFor(
+    fixture: ComponentFixture<SettingsConnections>,
+    label: string,
+  ): HTMLAnchorElement {
+    return cards(fixture).find((card) => card.textContent?.includes(label))!;
   }
 
-  it('validates a feed by fetching it and stores it with the discovered title', () => {
-    fetchFeed.mockReturnValue(of({ title: 'My Blog', link: null, items: [] }));
+  it('lists every connector with its pitch and what it enables', () => {
     const fixture = setUp();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
-    typeUrl(fixture, 'https://blog.example.com/feed.xml');
-    submit(fixture);
-
-    const subs = TestBed.inject(RssSubscriptions);
-    expect(subs.feeds()).toEqual([
-      { url: 'https://blog.example.com/feed.xml', title: 'My Blog', enabled: true },
-    ]);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('My Blog');
+    expect(cards(fixture)).toHaveLength(4);
+    for (const label of ['Bluesky', 'Raindrop.io', 'GitHub', 'Dropbox']) {
+      expect(text).toContain(label);
+    }
+    // The catalog's whole job is saying what you get, not how to set it up.
+    expect(text).toContain('Bluesky posts merged into your home timeline');
+    expect(text).toContain('Read your unread notifications');
+    expect(text).not.toContain('app password');
   });
 
-  it('surfaces fetch errors (CORS and friends) without storing the feed', () => {
-    fetchFeed.mockReturnValue(throwError(() => new Error("Couldn't reach this feed")));
+  it('each card links to that connector’s own page', () => {
     const fixture = setUp();
-
-    typeUrl(fixture, 'https://nocors.example.com/feed');
-    submit(fixture);
-
-    expect(TestBed.inject(RssSubscriptions).feeds()).toEqual([]);
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector('.feed-error')?.textContent,
-    ).toContain("Couldn't reach this feed");
+    expect(cardFor(fixture, 'GitHub').getAttribute('href')).toBe('/settings/connections/github');
+    expect(cardFor(fixture, 'Bluesky').getAttribute('href')).toBe('/settings/connections/bluesky');
   });
 
-  it('rejects non-http URLs and duplicates without fetching', () => {
+  it('shows connected state per connector, live', () => {
     const fixture = setUp();
-    typeUrl(fixture, 'not-a-url');
-    submit(fixture);
-    expect(fetchFeed).not.toHaveBeenCalled();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.feed-error')).toBeTruthy();
+    expect(cardFor(fixture, 'GitHub').textContent).toContain('Not connected');
 
-    TestBed.inject(RssSubscriptions).add('https://a.example/feed', 'A');
-    typeUrl(fixture, 'https://a.example/feed');
-    submit(fixture);
-    expect(fetchFeed).not.toHaveBeenCalled();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('already subscribed');
+    githubSession.connected.set(true);
+    fixture.detectChanges();
+    expect(cardFor(fixture, 'GitHub').textContent).toContain('Connected');
+    // Unrelated connectors are unmoved.
+    expect(cardFor(fixture, 'Dropbox').textContent).toContain('Not connected');
   });
 
-  it('toggles and removes stored feeds', () => {
-    const subs = TestBed.inject(RssSubscriptions);
-    subs.add('https://a.example/feed', 'Feed A');
+  it('renders an unavailable connector greyed with the reason rather than hiding it', () => {
+    dropboxSession.configured = false;
+    capabilities.canUseBluesky = false;
     const fixture = setUp();
+
+    const dropbox = cardFor(fixture, 'Dropbox');
+    expect(dropbox.classList).toContain('unavailable');
+    expect(dropbox.textContent).toContain('Unavailable');
+    expect(dropbox.textContent).toContain('app key is missing');
+
+    const bluesky = cardFor(fixture, 'Bluesky');
+    expect(bluesky.classList).toContain('unavailable');
+    expect(bluesky.textContent).toContain('Anonymous account');
+
+    // Still four cards: unavailable is a state, not a removal.
+    expect(cards(fixture)).toHaveLength(4);
+  });
+
+  it('governs every credential-bearing session and enforces on init', () => {
+    const enforceAll = vi.spyOn(TestBed.inject(CredentialLifetimeStore), 'enforceAll');
+    const govern = vi.spyOn(TestBed.inject(CredentialLifetimeStore), 'govern');
+    setUp();
+
+    expect(govern).toHaveBeenCalledOnce();
+    expect(govern.mock.calls[0][0]).toHaveLength(3);
+    expect(enforceAll).toHaveBeenCalled();
+  });
+
+  it('writes the retention policy through the store', () => {
+    const fixture = setUp();
+    const lifetimes = TestBed.inject(CredentialLifetimeStore);
     const el = fixture.nativeElement as HTMLElement;
 
-    el.querySelector<HTMLInputElement>('.feed-row input[type="checkbox"]')!.click();
-    fixture.detectChanges();
-    expect(subs.feeds()[0].enabled).toBe(false);
-
-    [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Remove'))!.click();
-    fixture.detectChanges();
-    expect(subs.feeds()).toEqual([]);
-    expect(el.textContent).toContain('No feeds yet');
-  });
-
-  // ---------------------------------------------------------------- Bluesky
-
-  function fillBsky(fixture: ComponentFixture<SettingsConnections>, handle: string, pw: string) {
-    const c = fixture.componentInstance as unknown as ConnectionsInternals;
-    c.bskyHandle.set(handle);
-    c.bskyPassword.set(pw);
-    fixture.detectChanges();
-  }
-
-  function submitBsky(fixture: ComponentFixture<SettingsConnections>): void {
-    (fixture.nativeElement as HTMLElement)
-      .querySelector('form.bsky-form')!
-      .dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
-  }
-
-  it('links Bluesky with a stripped @handle and shows the linked identity', () => {
-    const linked: BskySession = {
-      service: 'https://bsky.social',
-      handle: 'me.bsky.social',
-      did: 'did:plc:me',
-      accessJwt: 'a',
-      refreshJwt: 'r',
-      displayName: 'Me!',
-    };
-    bskySession.login.mockImplementation(() => {
-      bskySession.session.set(linked);
-      return of(linked);
-    });
-    const fixture = setUp();
-
-    fillBsky(fixture, '@me.bsky.social', 'app-pass');
-    submitBsky(fixture);
-
-    expect(bskySession.login).toHaveBeenCalledWith('me.bsky.social', 'app-pass');
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('Me!');
-    expect(el.textContent).toContain('@me.bsky.social');
-    expect(el.textContent).toContain('Unlink');
-  });
-
-  it('shows a friendly error when Bluesky rejects the credentials', () => {
-    bskySession.login.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 401, error: {} })),
-    );
-    const fixture = setUp();
-
-    fillBsky(fixture, 'me.bsky.social', 'wrong');
-    submitBsky(fixture);
-
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
-      'rejected that handle/app password',
-    );
-  });
-
-  it('unlink calls the session service', () => {
-    bskySession.session.set({
-      service: 'https://bsky.social',
-      handle: 'me.bsky.social',
-      did: 'did:plc:me',
-      accessJwt: 'a',
-      refreshJwt: 'r',
-    });
-    const fixture = setUp();
-    const el = fixture.nativeElement as HTMLElement;
-
-    [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Unlink'))!.click();
-    expect(bskySession.unlink).toHaveBeenCalled();
-  });
-
-  it('connects Raindrop.io with a browser-compatible Test token', () => {
-    const fixture = setUp();
-    const component = fixture.componentInstance as unknown as ConnectionsInternals;
-    component.raindropToken.set('test-token');
+    const thirtyDays = [...el.querySelectorAll<HTMLInputElement>('.lifetime-option input')].find(
+      (input) => input.value === '30d',
+    )!;
+    thirtyDays.dispatchEvent(new Event('change'));
     fixture.detectChanges();
 
-    (fixture.nativeElement as HTMLElement)
-      .querySelector<HTMLFormElement>('form.raindrop-form')!
-      .dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
-
-    expect(TestBed.inject(RaindropSession).connected()).toBe(true);
-    expect(localStorage.getItem('mockingbird_raindrop_token')).toContain('test-token');
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Connected');
+    expect(lifetimes.lifetime()).toBe('30d');
+    // Shortening the window must re-check what is already stored, not wait for a reload.
+    expect(bskySession.enforceLifetime).toHaveBeenCalled();
   });
 });

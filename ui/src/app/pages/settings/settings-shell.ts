@@ -44,8 +44,11 @@ export class SettingsShell {
     { label: 'Anonymous', path: 'anonymous', exact: true, anonymous: true, anonymousOnly: true },
     // Client-side premium-style features; the same controls also live in Appearance.
     { label: 'Mockingbird Blue', path: 'blue', exact: true, anonymous: true },
-    // Client-side (localStorage): RSS feeds now, Bluesky next. Works anywhere.
-    { label: 'Connections', path: 'connections', exact: true, anonymous: true },
+    // Client-side (localStorage) accounts on other services: Bluesky, GitHub,
+    // Raindrop.io, Dropbox. Not exact — the catalog's child pages live under it.
+    { label: 'Connections', path: 'connections', exact: false, anonymous: true },
+    // Many feeds rather than one account, so deliberately not a "connection".
+    { label: 'RSS feeds', path: 'rss', exact: true, anonymous: true },
     { label: 'Privacy and reach', path: 'privacy', exact: true },
     // Appearance is client-side (theme/accent/undo-send in localStorage) and works
     // against any instance; the page hides its server-backed rows off-mock itself.
