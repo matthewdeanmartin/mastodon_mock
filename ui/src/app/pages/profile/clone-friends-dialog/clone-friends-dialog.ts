@@ -10,7 +10,6 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { Api } from '../../../api';
 import { Account } from '../../../models';
 import { Auth } from '../../../auth';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
@@ -25,10 +24,12 @@ import {
   CLONE_PAGE_SIZE,
   CloneSelection,
   describeSelection,
+  followsAreHidden,
+  homeServerFor,
   selectCloneCandidates,
 } from '../clone-friends';
 
-type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error';
+type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error' | 'hidden';
 
 /**
  * "Clone friends list" — adopt the accounts this profile follows.
@@ -54,7 +55,6 @@ type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error';
   styleUrl: './clone-friends-dialog.css',
 })
 export class CloneFriendsDialog implements OnInit {
-  private api = inject(Api);
   private auth = inject(Auth);
   private anonymous = inject(AnonymousAccount);
   private anonymousPublic = inject(AnonymousPublicApi);
@@ -72,6 +72,12 @@ export class CloneFriendsDialog implements OnInit {
   protected phase = signal<Phase>('loading');
   protected error = signal<string | null>(null);
   protected selection = signal<CloneSelection | null>(null);
+  /** The server the list was read from — named, because which one it was matters. */
+  protected sourceHost = signal('');
+  /** True when we fell back to a relay's partial view of the follow graph. */
+  protected partial = signal(false);
+  /** The resolved read source; candidate ids belong to this server's namespace. */
+  private source = signal<AnonymousPublicRef | null>(null);
   /** Pages fetched, shown while loading so a three-page walk doesn't look stuck. */
   protected pages = signal(0);
   /** How many have been followed so far, during the `following` phase. */
@@ -112,8 +118,13 @@ export class CloneFriendsDialog implements OnInit {
     const target = this.account();
     const candidates: Account[] = [];
     try {
+      const source = await this.resolveSource(target);
+      this.source.set(source.ref);
+      this.sourceHost.set(source.host);
+      this.partial.set(source.partial);
+
       for (let page = 0; page < CLONE_MAX_PAGES; page += 1) {
-        const batch = await this.fetchPage(target.id, candidates.at(-1)?.id);
+        const batch = await this.fetchPage(source.ref, candidates.at(-1)?.id);
         candidates.push(...batch);
         this.pages.set(page + 1);
 
@@ -121,7 +132,7 @@ export class CloneFriendsDialog implements OnInit {
           candidates,
           pagesFetched: page + 1,
           lastPageFull: batch.length >= CLONE_PAGE_SIZE,
-          isFollowing: (account) => this.follows.isFollowing(account, this.readServer()),
+          isFollowing: (account) => this.follows.isFollowing(account, source.ref.server),
           remainingSlots: this.remainingSlots(),
           viewerId: this.auth.account()?.id,
         });
@@ -130,6 +141,13 @@ export class CloneFriendsDialog implements OnInit {
           break;
         }
       }
+
+      // An account that advertises follows but hands back an empty list is refusing,
+      // not empty. Saying "nothing new to follow" there is simply false.
+      if (followsAreHidden(target, candidates.length, this.pages())) {
+        this.phase.set('hidden');
+        return;
+      }
       this.phase.set('confirm');
     } catch {
       this.error.set(`Couldn't load the accounts ${this.handle()} follows.`);
@@ -137,20 +155,50 @@ export class CloneFriendsDialog implements OnInit {
     }
   }
 
-  private fetchPage(id: string, maxId?: string): Promise<Account[]> {
-    const ref = this.publicRef();
-    // Anonymous reads go out through the public-API service (no token, cross-origin);
-    // a signed-in viewer can only reach this dialog in tests, but the branch keeps
-    // the component honest rather than assuming.
-    return firstValueFrom(
-      ref
-        ? this.anonymousPublic.getAccountFollowing(ref, maxId)
-        : this.api.accountFollowing(id, maxId),
-    );
+  /**
+   * Find the server that holds the authoritative follow list, and resolve the
+   * account's id *there*.
+   *
+   * Two calls in the cross-instance case (lookup, then the list), and worth every
+   * bit of the second one: read through a relay and you get only the slice of the
+   * graph that relay federated, which made the whole feature look broken.
+   *
+   * If the home server can't be reached — blocked, down, CORS — we fall back to the
+   * partial view rather than failing outright, and set {@link partial} so the dialog
+   * says the list is incomplete instead of implying it is the truth.
+   */
+  private async resolveSource(
+    target: Account,
+  ): Promise<{ ref: AnonymousPublicRef; host: string; partial: boolean }> {
+    const current = this.publicRef();
+    const currentServer = current?.server ?? this.anonymous.server();
+    const home = homeServerFor(target, currentServer);
+    const bare = (value: string) => value.replace(/^https?:\/\//, '').toLowerCase();
+
+    // Already reading the account's own server: nothing to resolve.
+    if (bare(home) === bare(currentServer) && current) {
+      return { ref: current, host: bare(home), partial: false };
+    }
+
+    try {
+      const canonical = await firstValueFrom(
+        this.anonymousPublic.lookupAccount(home, target.username),
+      );
+      return {
+        ref: { server: home, id: canonical.id },
+        host: bare(home),
+        partial: false,
+      };
+    } catch {
+      if (!current) {
+        throw new Error('No readable source for this account.');
+      }
+      return { ref: current, host: bare(currentServer), partial: true };
+    }
   }
 
-  private readServer(): string {
-    return this.publicRef()?.server ?? this.anonymous.server();
+  private fetchPage(ref: AnonymousPublicRef, maxId?: string): Promise<Account[]> {
+    return firstValueFrom(this.anonymousPublic.getAccountFollowing(ref, maxId));
   }
 
   /**
@@ -164,7 +212,10 @@ export class CloneFriendsDialog implements OnInit {
     }
     this.phase.set('following');
     this.progress.set(0);
-    const server = this.readServer();
+    // The server these ids came from, not the browsing server: AnonymousFollows
+    // stores it as the read-ref it will later fetch each feed through, and an id
+    // from one instance does not resolve on another.
+    const server = this.source()?.server ?? this.anonymous.server();
     let followed = 0;
     for (const account of selection.adopt) {
       const result = this.follows.follow(account, server);

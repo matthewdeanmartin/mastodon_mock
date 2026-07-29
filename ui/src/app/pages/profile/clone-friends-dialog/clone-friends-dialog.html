@@ -10,7 +10,11 @@
   @switch (phase()) {
     @case ('loading') {
       <p class="muted" role="status">
-        Reading who {{ handle() }} follows…
+        Reading who {{ handle() }} follows
+        @if (sourceHost()) {
+          from {{ sourceHost() }}
+        }
+        …
         @if (pages() > 1) {
           <span class="small">page {{ pages() }} of up to {{ maxPages }}</span>
         }
@@ -28,9 +32,37 @@
       </div>
     }
 
+    <!-- hide_collections: the profile advertises follows and the API hands back an
+         empty list. That is a refusal, and calling it "nothing to follow" was the
+         bug — the list exists, we are just not allowed to see it. -->
+    @case ('hidden') {
+      <p class="cf-summary" role="status">{{ handle() }} doesn't share who they follow.</p>
+      <p class="muted small">
+        Their profile lists {{ account().following_count }} follows, but
+        {{ sourceHost() || 'their server' }} returns none of them — Mastodon lets an account keep
+        its follow list private. There is nothing to clone here.
+      </p>
+      <div class="cf-actions">
+        <button class="btn btn-outline" type="button" (click)="close()">Close</button>
+      </div>
+    }
+
     @case ('confirm') {
       @if (selection(); as sel) {
         <p class="cf-summary">{{ summary() }}</p>
+
+        <!-- Which server answered is load-bearing information here: a relay only
+             knows the part of the follow graph it federated, so a short list from
+             one is not evidence about the account. -->
+        @if (partial()) {
+          <p class="cf-note">
+            Couldn't reach {{ handle() }}'s own server, so this list comes from
+            {{ sourceHost() }} and shows only the follows that server knows about. The real list is
+            probably longer.
+          </p>
+        } @else if (sourceHost()) {
+          <p class="muted small">Read from {{ sourceHost() }}, where the full list lives.</p>
+        }
 
         @if (sel.limitedBySlots && sel.adopt.length) {
           <p class="cf-note">

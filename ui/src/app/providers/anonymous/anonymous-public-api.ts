@@ -32,6 +32,30 @@ export class AnonymousPublicApi {
       );
   }
 
+  /**
+   * Resolve a handle into the account as its **own** server sees it.
+   *
+   * Account ids are local to an instance, and so are relationships: asking server X
+   * about a remote account's followers or follows returns only the part of that
+   * graph X happens to have federated. The account's home server is the only place
+   * the list is complete, and `/api/v1/accounts/lookup` is public, so this is how
+   * we get there — the same route `AnonymousMastodonProvider` already uses to read
+   * a canonical timeline.
+   *
+   * `acct` must be the bare username for accounts local to `server`.
+   */
+  lookupAccount(server: string, acct: string): Observable<Account> {
+    return this.http
+      .get<Account>(`${server}/api/v1/accounts/lookup`, {
+        params: new HttpParams().set('acct', acct),
+        context: externalFetch(),
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((account) => adaptAnonymousAccount(account, server)),
+      );
+  }
+
   getAccountFollowers(ref: AnonymousPublicRef, maxId?: string): Observable<Account[]> {
     return this.getAccountPeople(ref, 'followers', maxId);
   }

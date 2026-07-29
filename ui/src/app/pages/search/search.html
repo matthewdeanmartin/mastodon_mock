@@ -107,13 +107,25 @@
       (click)="toggleSearchServer()"
       [attr.aria-expanded]="searchServerOpen()"
     >
-      🔍 Search server:
-      <strong>{{ searchServer.host() || 'this server' }}</strong>
+      <!-- Always the actual host, never "this server": the whole point of the chip
+           is to answer "where am I searching?" from the search page, without
+           going to Settings to look it up. -->
+      🔍 Searching:
+      <strong>{{ searchHostLabel() }}</strong>
       ▾
     </button>
     @if (searchServer.active()) {
       <span class="muted small search-server-note">
-        Searching anonymously on {{ searchServer.host() }} — public results only.
+        Public results only. Feeds and profiles still come from
+        {{ browsingHostLabel() }}.
+      </span>
+    } @else {
+      <span class="muted small search-server-note">
+        {{
+          capabilities.active
+            ? 'The server you are browsing. Point search elsewhere if it has search turned off.'
+            : 'Your own server.'
+        }}
       </span>
     }
   </div>

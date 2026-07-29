@@ -1,8 +1,9 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Relationship } from '../../models';
 import { AccountSearchCriteria } from './mawkingbird-search';
 import { AccountFacetKind, AccountWithMatches } from './account-refine';
 import { AccountSortKey } from './search-sort';
+import { SearchServer } from '../../search-server';
 
 /**
  * A snapshot of a completed account search, held in memory so returning to the
@@ -41,15 +42,31 @@ export interface AccountSearchSnapshot {
 
 @Injectable({ providedIn: 'root' })
 export class AccountSearchStore {
+  private searchServer = inject(SearchServer);
   private snapshot: AccountSearchSnapshot | null = null;
+  /** The search-server epoch the snapshot was fetched under. */
+  private epoch = 0;
 
   save(snapshot: AccountSearchSnapshot): void {
     this.snapshot = snapshot;
+    this.epoch = this.searchServer.epoch();
   }
 
-  /** The stored snapshot if it matches `query`, else null. Non-consuming — the
-   *  caller decides whether to clear after restoring. */
+  /**
+   * The stored snapshot if it matches `query`, else null. Non-consuming — the
+   * caller decides whether to clear after restoring.
+   *
+   * A snapshot from a different search server is refused however well the query
+   * matches: account ids are local to an instance, so restoring kolectiva's results
+   * while search now points at mastodon.social gives cards that link to whatever
+   * account happens to hold that id there. Silently wrong beats visibly empty only
+   * if you never click anything.
+   */
   take(query: string): AccountSearchSnapshot | null {
+    if (this.epoch !== this.searchServer.epoch()) {
+      this.clear();
+      return null;
+    }
     if (this.snapshot && this.snapshot.query === query) {
       return this.snapshot;
     }

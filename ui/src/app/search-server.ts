@@ -54,15 +54,35 @@ export class SearchServer {
     return host ? `https://${host}/about` : null;
   });
 
+  /**
+   * Bumped every time the search server actually changes.
+   *
+   * Anything holding results from a search — cards, snapshots, relationship maps —
+   * is only valid for the instance that produced them, because account and status
+   * ids are local to an instance. Stamping cached results with the epoch they were
+   * fetched under makes "this is from the old server" checkable, instead of relying
+   * on every call site remembering to clear. Getting that wrong sends a user to a
+   * different person's profile, so it should not be a thing anyone has to remember.
+   */
+  readonly epoch = signal(0);
+
   setBaseUrl(value: string): void {
     const normalized = normalizeHostUrl(value);
+    if (normalized === this.baseUrl()) {
+      return;
+    }
     localStorage.setItem(SEARCH_SERVER_KEY, normalized);
     this.baseUrl.set(normalized);
+    this.epoch.update((n) => n + 1);
   }
 
   /** Go back to searching on the primary server. */
   clear(): void {
     localStorage.removeItem(SEARCH_SERVER_KEY);
+    if (!this.baseUrl()) {
+      return;
+    }
     this.baseUrl.set('');
+    this.epoch.update((n) => n + 1);
   }
 }

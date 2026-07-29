@@ -160,6 +160,24 @@ export class Search implements OnInit, OnDestroy {
   }
 
   /**
+   * The host searches actually go to, always named.
+   *
+   * Never "this server". An anonymous visitor has no home server to be relative to,
+   * and even a signed-in user cannot be expected to remember what they set on the
+   * settings page — which was the complaint. Naming it is one word longer and
+   * removes a trip to Settings.
+   */
+  protected searchHostLabel = computed(() => this.searchServer.host() ?? this.browsingHostLabel());
+
+  /** Where everything that is not search comes from. */
+  protected browsingHostLabel = computed(() =>
+    (this.capabilities.active ? this.anonymous.server() : this.server.baseUrl()).replace(
+      /^https?:\/\//,
+      '',
+    ),
+  );
+
+  /**
    * Why the page is empty, when "No results." would be a lie.
    *
    * Null in the honest case (search works, nothing matched) and while nothing has
@@ -944,6 +962,29 @@ export class Search implements OnInit, OnDestroy {
     this.searchServer.setBaseUrl(base);
     this.searchServerInput.set(this.searchServer.host() ?? '');
     this.searchCapability.reset();
+    this.discardResultsFromOldServer();
+  }
+
+  /**
+   * Throw away results minted by the server we just stopped using.
+   *
+   * Account and status ids are local to an instance. Keeping the previous server's
+   * results on screen after switching means every card links into the *new*
+   * server's namespace with the *old* server's ids — which is how you click a
+   * result and land on somebody else's profile, or a "no such account" page.
+   * There is no way to translate the ids, so the honest move is to drop them.
+   */
+  private discardResultsFromOldServer(): void {
+    this.accountStore.clear();
+    this.results.set(null);
+    this.accountItems.set([]);
+    this.accountSearchRan.set(false);
+    this.relationships.set({});
+    this.expandedAccounts.set(new Set());
+    // Clearing the executed query means a re-run is treated as a fresh search
+    // rather than deduped as "same query, same type, nothing to do".
+    this.executedQuery = '';
+    this.urlQuery = '';
   }
 
   /** Take the host the discovery component found. */
@@ -965,8 +1006,10 @@ export class Search implements OnInit, OnDestroy {
     this.searchServerHits.set(0);
     this.searchServerPostHits.set(null);
     // Same reasoning as adoptSearchServer: the host changed, so the per-host
-    // verdicts no longer describe where search goes.
+    // verdicts no longer describe where search goes and the loaded ids belong to
+    // an instance we are no longer talking to.
     this.searchCapability.reset();
+    this.discardResultsFromOldServer();
     this.diagnostics.info('Search', 'user:search-server-clear', {});
   }
 
@@ -1518,7 +1561,10 @@ export class Search implements OnInit, OnDestroy {
       return;
     }
     if (this.capabilities.active) {
-      const server = this.anonymous.server();
+      // resultServer(), not the browsing server: these ids came from wherever the
+      // search ran, and AnonymousFollows uses this to derive the host and the
+      // read-ref it will later fetch the feed through.
+      const server = this.resultServer();
       const map: Record<string, Relationship> = {};
       for (const a of accounts) {
         map[a.id] = this.anonymousFollows.relationship(a, server);
@@ -1552,7 +1598,7 @@ export class Search implements OnInit, OnDestroy {
 
   onFollow(account: Account): void {
     if (this.capabilities.active) {
-      const result = this.anonymousFollows.follow(account, this.anonymous.server());
+      const result = this.anonymousFollows.follow(account, this.resultServer());
       if (result.ok) {
         this.relationships.update((cur) => ({ ...cur, [account.id]: result.relationship }));
       }
@@ -1571,7 +1617,7 @@ export class Search implements OnInit, OnDestroy {
 
   onUnfollow(account: Account): void {
     if (this.capabilities.active) {
-      const rel = this.anonymousFollows.unfollow(account, this.anonymous.server());
+      const rel = this.anonymousFollows.unfollow(account, this.resultServer());
       this.relationships.update((cur) => ({ ...cur, [account.id]: rel }));
       return;
     }
@@ -1586,17 +1632,34 @@ export class Search implements OnInit, OnDestroy {
       });
   }
 
+  /**
+   * Where a result card should link.
+   *
+   * The server in the ref must be **the server that minted the id**, which is the
+   * search server when one is configured — not the browsing server. Getting this
+   * wrong is not a cosmetic bug: account ids are local to an instance, so a
+   * kolectiva id looked up on mastodon.social silently resolves to a *different
+   * account* or 404s. That was the "clicked a result and got the wrong profile"
+   * report, and `search-server.ts` had already written down the hazard
+   * ("IDs minted by the search server don't resolve there") before the code walked
+   * into it anyway.
+   */
   accountLink(account: Account): (string | number)[] {
     return this.capabilities.active
       ? [
           '/accounts',
           anonymousAccountRouteRef({
-            server: this.anonymous.server(),
+            server: this.resultServer(),
             id: account.id,
             originalUrl: account.url || undefined,
           }),
         ]
       : ['/accounts', account.id];
+  }
+
+  /** The instance whose namespace the current results' ids belong to. */
+  private resultServer(): string {
+    return this.searchServer.baseUrl() || this.anonymous.server();
   }
 
   onChanged(updated: Status): void {

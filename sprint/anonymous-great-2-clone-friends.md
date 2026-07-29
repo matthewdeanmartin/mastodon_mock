@@ -136,6 +136,57 @@ Confirm, then report. Bulk actions do not happen on a single click.
 - **Slot pressure:** when remaining slots < requested, say so up front — `You have 8 of 50
   follow slots left, so 8 will be added.`
 
+## Post-ship corrections (2026-07-29, from Matthew's testing)
+
+Three bugs, one of them making the feature actively misleading.
+
+### 1. Reading a relay returns a slice of the follow graph, not the graph
+
+`/api/v1/accounts/:id/following` asked of server X about an account that lives on server Y
+returns **only the follows X has federated** — an arbitrary and usually tiny subset. Browsing
+via kolectiva.social, an account with 800 follows yielded five candidates, four of which the
+quality gate then rejected: "1 to follow, 4 too little activity" for somebody with hundreds
+of live friends.
+
+**Fix: ask the account's own server.** `homeServerFor()` derives the canonical origin from
+`account.url` (falling back to the host in `acct`), then `/api/v1/accounts/lookup?acct=<user>`
+resolves the account's *home* id, and `/following` runs there. Two calls, authoritative list.
+The lookup route is public and already used by `AnonymousMastodonProvider` for canonical
+timelines, so no new machinery.
+
+**Considered and rejected: querying the biggest few instances and merging.** It costs N times
+the requests, still returns a union of partial views rather than the real list, needs every
+one of those servers to be unblocked, and would silently under-report whenever a followed
+account happens to be obscure. Asking the authoritative source is cheaper *and* correct.
+
+When the home server can't be reached (blocked, down, CORS), the dialog falls back to the
+partial view and **says so** rather than presenting it as the list.
+
+### 2. A private follow list is a refusal, not an absence
+
+`hide_collections` makes `/following` return `[]` while the profile keeps advertising
+`following_count: 800`. That was reported as "no one new to follow", which is false — the list
+exists, we are not allowed to see it. `followsAreHidden()` detects the signature (count > 0,
+first page literally empty) and the dialog says the account doesn't share who they follow.
+
+### 3. Search-server ids leaked into browsing-server links
+
+Not strictly this sprint's bug, but it broke this feature's inputs. `search.ts accountLink()`
+built the anonymous route ref with `anonymous.server()` while the id came from the *search*
+server — so clicking a result opened a different account or a "no such account" page. Same
+error in `loadRelationships`/`onFollow`/`onUnfollow`, where the wrong server got stored as the
+follow's `readRef` and broke later feed reads.
+
+`search-server.ts` had already written the hazard down ("IDs minted by the search server don't
+resolve there") and the code walked into it anyway. Now:
+
+- One `resultServer()` helper is used everywhere an id from the current results is paired
+  with a server.
+- `SearchServer` carries an **`epoch`** that increments whenever the server actually changes,
+  and `AccountSearchStore` stamps snapshots with it and refuses to restore across epochs.
+  This is structural on purpose: a call site that forgets to clear a cache sends a user to
+  someone else's profile, so it should not be a thing anyone has to remember.
+
 ## Files
 
 - **New:** `ui/src/app/follow-quality.ts` + `.spec.ts`

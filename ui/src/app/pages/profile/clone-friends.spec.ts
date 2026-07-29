@@ -4,6 +4,8 @@ import {
   CLONE_MAX_PAGES,
   CLONE_TARGET,
   describeSelection,
+  followsAreHidden,
+  homeServerFor,
   selectCloneCandidates,
 } from './clone-friends';
 
@@ -232,5 +234,58 @@ describe('describeSelection', () => {
     const selection = select({ candidates: [good('1')], remainingSlots: 0 });
 
     expect(describeSelection(selection, '@alice')).toContain('no follow slots left');
+  });
+});
+
+describe('homeServerFor', () => {
+  it('prefers the canonical profile URL, which is where the full list lives', () => {
+    // The whole point: reading a relay gives you only what the relay federated.
+    expect(
+      homeServerFor(good('1', { url: 'https://kolectiva.social/@admin' }), 'https://relay.example'),
+    ).toBe('https://kolectiva.social');
+  });
+
+  it('falls back to the host in the handle when there is no URL', () => {
+    expect(
+      homeServerFor(
+        good('1', { url: '', acct: 'admin@Kolectiva.Social' }),
+        'https://relay.example',
+      ),
+    ).toBe('https://kolectiva.social');
+  });
+
+  it('falls back to the server we already read through for a local account', () => {
+    // A bare acct means the account is local to whoever answered.
+    expect(homeServerFor(good('1', { url: '', acct: 'admin' }), 'https://relay.example')).toBe(
+      'https://relay.example',
+    );
+  });
+
+  it('survives a malformed URL rather than throwing mid-clone', () => {
+    expect(
+      homeServerFor(
+        good('1', { url: 'not a url', acct: 'admin@home.example' }),
+        'https://relay.example',
+      ),
+    ).toBe('https://home.example');
+  });
+});
+
+describe('followsAreHidden', () => {
+  it('detects hide_collections: the profile claims follows, the API returns none', () => {
+    // Reported as "no one new to follow", which was false — the list is private.
+    expect(followsAreHidden(good('1', { following_count: 800 }), 0, 1)).toBe(true);
+  });
+
+  it('is not hidden when the account genuinely follows nobody', () => {
+    expect(followsAreHidden(good('1', { following_count: 0 }), 0, 1)).toBe(false);
+  });
+
+  it('is not hidden when candidates came back and were merely filtered', () => {
+    expect(followsAreHidden(good('1', { following_count: 800 }), 40, 1)).toBe(false);
+  });
+
+  it('claims nothing before a page has actually been fetched', () => {
+    expect(followsAreHidden(good('1', { following_count: 800 }), 0, 0)).toBe(false);
   });
 });

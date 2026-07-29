@@ -18,6 +18,54 @@ import { rejectionReason } from '../../follow-quality';
 export const CLONE_TARGET = 20;
 
 /**
+ * Where an account's follow list is actually complete.
+ *
+ * **This is the difference between the feature working and the feature lying.**
+ * `/api/v1/accounts/:id/following` asked of server X about an account that lives on
+ * server Y returns only the follows X has federated — an arbitrary, usually tiny
+ * subset. Read kolectiva.social about an account with 800 follows and you get the
+ * handful of them kolectiva happens to know, which is why the dialog reported
+ * "1 to follow, 4 too quiet" for an account with hundreds of live friends.
+ *
+ * The account's own server has the whole list, so that is who we ask. Derived from
+ * `account.url`, which is the canonical profile URL, falling back to the host in
+ * `acct` and finally to the server we already read through.
+ *
+ * (Considered and rejected: querying the biggest few instances and merging. It costs
+ * N times as many requests, still returns a union of partial views rather than the
+ * real list, and needs every one of those servers to be unblocked. Asking the
+ * authoritative source is two calls and is *correct* rather than merely bigger.)
+ */
+export function homeServerFor(account: Account, fallbackServer: string): string {
+  try {
+    if (account.url) {
+      return new URL(account.url).origin;
+    }
+  } catch {
+    // Fall through to the handle.
+  }
+  const acct = typeof account.acct === 'string' ? account.acct : '';
+  const host = acct.includes('@') ? acct.split('@').at(-1) : null;
+  if (host) {
+    return `https://${host.toLowerCase()}`;
+  }
+  return fallbackServer;
+}
+
+/**
+ * Did the server tell us this account's follows are none of our business?
+ *
+ * Mastodon's `hide_collections` makes `/following` return an empty array while the
+ * profile keeps advertising `following_count`. That is a *refusal*, not an absence,
+ * and reporting it as "nothing new to follow" is the wrong statement — the user's
+ * complaint. The signature: the account claims follows, and a first page came back
+ * with literally nothing in it.
+ */
+export function followsAreHidden(account: Account, fetched: number, pagesFetched: number): boolean {
+  return pagesFetched > 0 && fetched === 0 && (account.following_count ?? 0) > 0;
+}
+
+/**
  * Hard ceiling on pages fetched.
  *
  * An account following 5,000 people is not worth a 60-page walk, and the app's
