@@ -1,0 +1,86 @@
+<div class="sdiscovery" aria-live="polite">
+  @switch (state()) {
+    @case ('idle') {
+      <button class="btn btn-outline" type="button" (click)="startSearch()">
+        {{ startLabel() }}
+      </button>
+      <p class="muted small sd-note">
+        Checks randomly selected servers for one that answers search anonymously — both accounts and
+        posts. Nothing changes until you approve one.
+      </p>
+    }
+    @case ('searching') {
+      <div class="sd-searching">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>
+          Looking for a server that allows search…
+          <span class="muted small">{{ tried() }} tried</span>
+        </span>
+        <button class="text-button" type="button" (click)="cancel()">Cancel</button>
+      </div>
+      @if (directorySource() === 'bundled') {
+        <p class="muted small sd-note">Using the bundled Mastodon server directory.</p>
+      }
+    }
+    @case ('found') {
+      @if (candidate(); as server) {
+        <div class="sd-candidate">
+          <strong>{{ server.domain }} allows anonymous search</strong>
+          <span class="muted small">
+            Found {{ server.accounts }} accounts and {{ server.statuses }} posts for the test
+            queries.
+          </span>
+          <span class="muted small">
+            @if (server.category) {
+              {{ server.category }}
+            }
+            @if (sizeLabel(server.users)) {
+              · {{ sizeLabel(server.users) }}
+            }
+          </span>
+          @if (server.description) {
+            <p>{{ server.description }}</p>
+          }
+          <div class="sd-actions">
+            <button class="btn" type="button" (click)="useCandidate()">
+              Use this search server
+            </button>
+            <button class="btn btn-outline" type="button" (click)="startSearch(false)">
+              Keep looking
+            </button>
+          </div>
+        </div>
+      }
+    }
+    @case ('exhausted') {
+      <p class="muted small">
+        Couldn’t find a server that allows anonymous search right now. Your search server has not
+        changed.
+      </p>
+      <button class="btn btn-outline" type="button" (click)="startSearch()">Search again</button>
+    }
+  }
+
+  <!-- The hunt shows its work. Fifty silent probes look broken; a list of hosts and
+       why each was skipped looks like progress, and it is. -->
+  @if (attempts().length) {
+    <ul class="sd-attempts">
+      @for (attempt of attempts(); track attempt.domain) {
+        <li>
+          <code>{{ attempt.domain }}</code>
+          <span class="muted small">{{ attempt.reason }}</span>
+        </li>
+      }
+    </ul>
+  }
+
+  @if (rejectCount()) {
+    <p class="muted small sd-rejects">
+      Skipping {{ rejectCount() }} server{{ rejectCount() === 1 ? '' : 's' }} already checked and
+      rejected.
+      <button class="text-button" type="button" (click)="forgetRejects()">
+        Forget them and re-check
+      </button>
+    </p>
+  }
+</div>

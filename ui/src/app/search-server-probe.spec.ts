@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { probeSearchServer } from './search-server-probe';
+import { isUsableSearchServer, probeSearchServer } from './search-server-probe';
 
 /** Minimal stand-in for the bits of Response the probe reads. */
 function jsonResponse(body: unknown, status = 200): Response {
@@ -90,5 +90,85 @@ describe('probeSearchServer', () => {
     );
 
     expect((await probeSearchServer('https://nope.example')).status).toBe('unreachable');
+  });
+
+  // --- the post canary: the no-Elasticsearch case ---
+
+  it('probes posts separately once account search has proved itself', async () => {
+    const types: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        types.push(new URL(url).searchParams.get('type') ?? '');
+        return jsonResponse({ accounts: [{ id: '1' }], statuses: [{ id: '9' }] });
+      }),
+    );
+
+    const result = await probeSearchServer('https://good.example');
+
+    expect(types).toEqual(['accounts', 'statuses']);
+    expect(result.statuses).toBe(1);
+    expect(isUsableSearchServer(result)).toBe(true);
+  });
+
+  it('catches the server that answers account search but has no post index', async () => {
+    // The signature of a Mastodon install with no Elasticsearch: accounts fine,
+    // statuses an empty 200 forever. Nothing errors, which is what makes it nasty.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        new URL(url).searchParams.get('type') === 'accounts'
+          ? jsonResponse({ accounts: [{ id: '1' }] })
+          : jsonResponse({ statuses: [] }),
+      ),
+    );
+
+    const result = await probeSearchServer('https://no-es.example');
+
+    expect(result.status).toBe('ok');
+    expect(result.accounts).toBe(1);
+    expect(result.statuses).toBe(0);
+    // Reachable and useful for accounts, but not adoptable as a search server.
+    expect(isUsableSearchServer(result)).toBe(false);
+  });
+
+  it('spends nothing on a post probe when the server refused account search', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({}, 403));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await probeSearchServer('https://closed.example');
+
+    expect(result.statuses).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('records a refused post probe as zero, not as "never asked"', async () => {
+    // The distinction matters: the host answered accounts, so this is a finding
+    // about its post search, not missing information.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        new URL(url).searchParams.get('type') === 'accounts'
+          ? jsonResponse({ accounts: [{ id: '1' }] })
+          : jsonResponse({}, 401),
+      ),
+    );
+
+    expect((await probeSearchServer('https://half.example')).statuses).toBe(0);
+  });
+});
+
+describe('isUsableSearchServer', () => {
+  it('requires both halves of search to work', () => {
+    expect(isUsableSearchServer({ status: 'ok', accounts: 3, statuses: 5 })).toBe(true);
+    expect(isUsableSearchServer({ status: 'ok', accounts: 3, statuses: 0 })).toBe(false);
+    expect(isUsableSearchServer({ status: 'ok', accounts: 0, statuses: 5 })).toBe(false);
+    expect(isUsableSearchServer({ status: 'auth-required', accounts: 0, statuses: null })).toBe(
+      false,
+    );
+  });
+
+  it('does not count an unprobed post search as working', () => {
+    expect(isUsableSearchServer({ status: 'ok', accounts: 3, statuses: null })).toBe(false);
   });
 });

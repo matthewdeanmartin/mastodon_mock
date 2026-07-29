@@ -31,6 +31,8 @@ interface SearchInternals {
   searchServerInput: WritableSignal<string>;
   searchServerStatus: WritableSignal<string>;
   searchServerHits: WritableSignal<number>;
+  searchServerPostHits: WritableSignal<number | null>;
+  emptyExplanation(): string | null;
   applySearchServer(): Promise<void>;
   clearSearchServer(): void;
   searchHost(): string;
@@ -545,6 +547,71 @@ describe('Search', () => {
       await internals(fixture).applySearchServer();
 
       expect(TestBed.inject(SearchServer).active()).toBe(false);
+    });
+
+    it('adopts a hand-typed accounts-only server but reports the missing post index', async () => {
+      // The user named this host explicitly, so we take it — but a server with no
+      // full-text index would otherwise make every post search look merely unlucky.
+      const fixture = setUp();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) =>
+          new URL(url).searchParams.get('type') === 'accounts'
+            ? ({
+                ok: true,
+                status: 200,
+                json: async () => ({ accounts: [{ id: '1' }] }),
+              } as Response)
+            : ({ ok: true, status: 200, json: async () => ({ statuses: [] }) } as Response),
+        ),
+      );
+
+      internals(fixture).searchServerInput.set('no-es.example');
+      await internals(fixture).applySearchServer();
+
+      expect(internals(fixture).searchServerStatus()).toBe('ok');
+      expect(internals(fixture).searchServerPostHits()).toBe(0);
+      expect(TestBed.inject(SearchServer).baseUrl()).toBe('https://no-es.example');
+    });
+  });
+
+  describe('empty results that are not really empty', () => {
+    it('says nothing before a probe has grounds to say anything', () => {
+      const fixture = setUp();
+      // The explanation must never appear on a page we have not checked.
+      expect(internals(fixture).emptyExplanation()).toBeNull();
+    });
+
+    it('names the missing post index when a zero-result post search is explained', async () => {
+      const fixture = setUp();
+      internals(fixture).query.set('rust');
+      internals(fixture).type.set('statuses');
+      internals(fixture).run();
+
+      // The search itself comes back empty...
+      httpMock
+        .expectOne((r) => r.url === '/api/v2/search')
+        .flush({ accounts: [], statuses: [], hashtags: [] });
+
+      // ...which triggers the capability probe. It runs the two canaries in
+      // sequence — accounts first, and posts only once accounts have proved the
+      // server answers at all — so they must be flushed in that order.
+      const flushProbe = async (type: string, results: Partial<SearchResults>) => {
+        let request!: ReturnType<HttpTestingController['expectOne']>;
+        await vi.waitFor(() => {
+          request = httpMock.expectOne(
+            (r) => r.url === '/api/v2/search' && r.params.get('type') === type,
+          );
+        });
+        request.flush({ accounts: [], statuses: [], hashtags: [], ...results });
+      };
+
+      await flushProbe('accounts', { accounts: [makeAccount()] });
+      await flushProbe('statuses', { statuses: [] });
+
+      await vi.waitFor(() => {
+        expect(internals(fixture).emptyExplanation()).toContain("Post search isn't available");
+      });
     });
   });
 });

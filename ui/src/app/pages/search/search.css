@@ -603,3 +603,17 @@
   font-weight: 700;
   margin: 0 3px;
 }
+
+/* Why the result set is empty, when "No results." would be a lie. An explanation
+   of what you are looking at, so it reads as information rather than an error. */
+.search-unavailable {
+  max-width: 46em;
+  margin: 8px auto 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--hover);
+  color: var(--text);
+  font-size: 14px;
+  text-align: center;
+}

@@ -156,9 +156,20 @@
           <p class="muted small">Running a test search…</p>
         }
         @case ('ok') {
-          <p class="ok small">
-            ✓ Anonymous search works — the test query matched {{ searchServerHits() }} accounts.
-          </p>
+          <!-- Account search and post search fail separately: a server with no
+               full-text index answers the first perfectly and the second never.
+               A host typed in by hand is still adopted — but we say what it does. -->
+          @if (searchServerPostHits() === 0) {
+            <p class="fail small">
+              ⚠ Account search works here ({{ searchServerHits() }} matched), but this server has no
+              full-text post index — post searches will keep coming back empty.
+            </p>
+          } @else {
+            <p class="ok small">
+              ✓ Anonymous search works — the test query matched {{ searchServerHits() }} accounts
+              and {{ searchServerPostHits() }} posts.
+            </p>
+          }
         }
         @case ('no-results') {
           <p class="fail small">
@@ -175,6 +186,12 @@
           <p class="fail small">Couldn't reach that server's search API.</p>
         }
       }
+
+      <!-- Don't know a host that allows search? Neither does anybody. Go find one. -->
+      <app-search-server-discovery
+        [currentServer]="searchServer.host() ?? ''"
+        (selected)="useDiscoveredSearchServer($event)"
+      />
     </div>
   }
 
@@ -720,6 +737,10 @@
           <p class="muted center">Searching…</p>
         } @else {
           <p class="muted center">No people found.</p>
+          <!-- "No people found" is only the truth when search actually ran. -->
+          @if (emptyExplanation(); as why) {
+            <p class="search-unavailable" role="status">{{ why }}</p>
+          }
         }
       }
 
@@ -771,6 +792,18 @@
 
         @if (type() !== 'accounts' && !r.hashtags.length && !r.statuses.length) {
           <p class="muted center">No results.</p>
+          <!-- Three different things produce an empty result set and only one of
+               them is "nobody posted about this". Say which one this was. -->
+          @if (emptyExplanation(); as why) {
+            <p class="search-unavailable" role="status">{{ why }}</p>
+            @if (!searchServerOpen()) {
+              <p class="center">
+                <button class="btn btn-outline" type="button" (click)="toggleSearchServer()">
+                  Choose a search server
+                </button>
+              </p>
+            }
+          }
         }
       }
     </div>

@@ -69,4 +69,63 @@
     <p class="muted">Enter a server domain if you already know where you want to browse.</p>
     <app-server-picker (picked)="useServer($event)" />
   </section>
+
+  <!-- Search is the one call that can be pointed somewhere else, because plenty of
+       servers turn it off for logged-out visitors while serving everything else
+       fine. Feeds, profiles and your account stay put. -->
+  <section class="ssection">
+    <h2>Search server</h2>
+    <p class="muted">
+      Many servers disable search for logged-out visitors, and many more have no full-text post
+      index at all. Search — and only search — can be sent to a server that allows it.
+    </p>
+
+    <div class="current-card">
+      <div>
+        @if (searchServer.host(); as host) {
+          <strong>{{ host }}</strong>
+          <div class="muted small">Searches go here. Everything else uses your own server.</div>
+        } @else {
+          <strong>Your own server</strong>
+          <div class="muted small">No separate search server configured.</div>
+        }
+      </div>
+      @if (searchServer.active()) {
+        <button class="btn btn-outline btn-sm" type="button" (click)="clearSearchServer()">
+          Use my own server
+        </button>
+      }
+    </div>
+
+    <app-search-server-discovery
+      [currentServer]="searchServer.host() ?? ''"
+      (selected)="useSearchServer($event)"
+    />
+
+    <!-- The skip list, made visible. A cache you can't see, with a button that
+         says only "Clear", is a mystery; a count and a sample is a fact. -->
+    @if (rejects.count()) {
+      <details class="reject-list">
+        <summary>
+          {{ rejects.count() }} server{{ rejects.count() === 1 ? '' : 's' }} checked and rejected
+        </summary>
+        <p class="muted small">
+          These are skipped when hunting for a search server, so a second hunt doesn't re-probe the
+          same servers. A server that turns search on later won't be found again until you forget
+          them.
+        </p>
+        <ul>
+          @for (server of rejects.recent(); track server.domain) {
+            <li>
+              <code>{{ server.domain }}</code>
+              <span class="muted small">{{ rejectReason(server.status) }}</span>
+            </li>
+          }
+        </ul>
+        <button class="btn btn-outline btn-sm" type="button" (click)="forgetRejects()">
+          Forget all {{ rejects.count() }} and re-check
+        </button>
+      </details>
+    }
+  </section>
 </div>

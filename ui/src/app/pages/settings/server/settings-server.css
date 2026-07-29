@@ -48,3 +48,37 @@
     flex-direction: column;
   }
 }
+
+/* The rejected-search-server list. Collapsed by default: it is evidence, not
+   something to scroll past on the way to the controls. */
+.reject-list {
+  margin-top: 14px;
+}
+
+.reject-list summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.reject-list ul {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.reject-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.reject-list code {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

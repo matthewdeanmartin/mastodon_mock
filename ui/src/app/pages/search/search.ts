@@ -71,6 +71,9 @@ import { SavedSearches } from './saved-searches';
 import { decodeSearchFromParams, encodeSearchToParams } from './search-url';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { SearchServer } from '../../search-server';
+import { SearchCapability } from '../../search-capability';
+import { SearchServerDiscovery } from '../../search-server-discovery/search-server-discovery';
+import { Server } from '../../server';
 import { probeSearchServer, SearchServerStatus } from '../../search-server-probe';
 import { normalizeHostUrl } from '../../host-url';
 
@@ -100,6 +103,7 @@ const LOAD_MORE_HARD_CAP = 30;
     AccountResultCard,
     SearchHelperDialog,
     SearchSyntaxHelp,
+    SearchServerDiscovery,
   ],
   templateUrl: './search.html',
   styleUrl: './search.css',
@@ -137,6 +141,70 @@ export class Search implements OnInit, OnDestroy {
    * no key and no network — the syntax is the same whoever is looking at it.
    */
   protected syntaxHelpOpen = signal(false);
+
+  // --- is search even on here? (anonymous-great sprint 1) ---
+  // An empty result set used to render as "No results.", which is a different
+  // claim from the truth when the server refuses search or has no post index.
+  private searchCapability = inject(SearchCapability);
+  private server = inject(Server);
+
+  /**
+   * The host whose search capability we are describing.
+   *
+   * The configured search server wins, because that is where the request went.
+   * Otherwise it is wherever `Api` is pointed — the anonymous instance when
+   * browsing anonymously, the signed-in server otherwise.
+   */
+  private capabilityHost(): string {
+    return this.searchServer.host() ?? this.server.baseUrl().replace(/^https?:\/\//, '');
+  }
+
+  /**
+   * Why the page is empty, when "No results." would be a lie.
+   *
+   * Null in the honest case (search works, nothing matched) and while nothing has
+   * been probed — the message must never appear before we have grounds for it.
+   * Recomputes on its own when a probe lands: `peek` reads the service's signal.
+   */
+  protected emptyExplanation = computed<string | null>(() => {
+    const host = this.capabilityHost();
+    const ability = this.searchCapability.peek(host);
+    // Accounts searches are judged on the accounts canary, posts on the post one.
+    const relevant = this.type() === 'accounts' ? ability.accounts : ability.statuses;
+    switch (relevant) {
+      case 'checking':
+        return `Checking whether search is available on ${host}…`;
+      case 'refused':
+        return this.capabilities.active
+          ? `${host} doesn't allow search without an account. Pick a search server below to search from instead.`
+          : `${host} refused this search. The server may restrict search, or your login may not have search permission.`;
+      case 'unreachable':
+        return `Couldn't reach ${host} to check whether search is working. Your connection or the server may be having trouble.`;
+      case 'empty':
+        // Accounts and posts fail separately, so say which one is missing. A
+        // server with no Elasticsearch answers account search perfectly and
+        // returns nothing for posts, forever, without erroring.
+        if (this.type() === 'accounts') {
+          return null; // An empty account index is indistinguishable from no match.
+        }
+        return ability.accounts === 'works'
+          ? `Post search isn't available on ${host}. This server can search accounts and hashtags, but has no full-text post index. A different search server would fix this.`
+          : `Search doesn't appear to be working on ${host}. A different search server would fix this.`;
+      default:
+        return null;
+    }
+  });
+
+  /**
+   * A search came back with nothing — find out whether that was the truth.
+   *
+   * Deliberately lazy: zero results is the only outcome where the answer changes
+   * what we display, so this is the only place that asks. One extra call, cached
+   * per host for the session.
+   */
+  private async explainEmptyResult(): Promise<void> {
+    await this.searchCapability.ensure(this.capabilityHost());
+  }
 
   /**
    * Whether to offer the 🤖 helper at all.
@@ -817,6 +885,14 @@ export class Search implements OnInit, OnDestroy {
   protected searchServerStatus = signal<SearchServerStatus>('idle');
   /** Result count from the canary probe, shown as evidence the index is live. */
   protected searchServerHits = signal(0);
+  /**
+   * Posts the full-text canary matched, or null when it wasn't reached.
+   *
+   * Kept separate from the account count because a server can pass one and fail the
+   * other — the no-Elasticsearch case. A hand-typed host that only does account
+   * search is still adopted (the user asked for it by name), but we say so.
+   */
+  protected searchServerPostHits = signal<number | null>(null);
   protected searchServerOpen = signal(false);
   private searchServerProbeSeq = 0;
 
@@ -839,18 +915,45 @@ export class Search implements OnInit, OnDestroy {
     const seq = ++this.searchServerProbeSeq;
     this.searchServerStatus.set('checking');
     this.searchServerHits.set(0);
+    this.searchServerPostHits.set(null);
     const probe = await probeSearchServer(base);
     if (seq !== this.searchServerProbeSeq) {
       return; // superseded by a newer attempt
     }
     this.searchServerStatus.set(probe.status);
     this.searchServerHits.set(probe.accounts);
+    this.searchServerPostHits.set(probe.statuses);
     this.diagnostics.info('Search', 'user:search-server-probe', {
       host: base,
       status: probe.status,
+      statuses: probe.statuses,
     });
     if (probe.status === 'ok') {
-      this.searchServer.setBaseUrl(base);
+      this.adoptSearchServer(base);
+    }
+  }
+
+  /**
+   * Adopt a search server and drop what we thought we knew about search here.
+   *
+   * The capability cache is keyed by host, and the host just changed — without the
+   * reset, a "post search isn't available" message earned by the previous server
+   * would sit under the results of the new one.
+   */
+  private adoptSearchServer(base: string): void {
+    this.searchServer.setBaseUrl(base);
+    this.searchServerInput.set(this.searchServer.host() ?? '');
+    this.searchCapability.reset();
+  }
+
+  /** Take the host the discovery component found. */
+  useDiscoveredSearchServer(base: string): void {
+    this.adoptSearchServer(base);
+    this.searchServerStatus.set('ok');
+    this.diagnostics.info('Search', 'user:search-server-discovered', { host: base });
+    // The reason they went looking was an empty result set. Run it again.
+    if (this.executedQuery) {
+      this.run();
     }
   }
 
@@ -860,6 +963,10 @@ export class Search implements OnInit, OnDestroy {
     this.searchServerInput.set('');
     this.searchServerStatus.set('idle');
     this.searchServerHits.set(0);
+    this.searchServerPostHits.set(null);
+    // Same reasoning as adoptSearchServer: the host changed, so the per-host
+    // verdicts no longer describe where search goes.
+    this.searchCapability.reset();
     this.diagnostics.info('Search', 'user:search-server-clear', {});
   }
 
@@ -1030,10 +1137,16 @@ export class Search implements OnInit, OnDestroy {
         });
         // Eagerly page up to the budget so client-side faceting has a corpus.
         this.maybeAutoFill(r.statuses.length > 0);
+        if (!r.statuses.length && !r.hashtags.length) {
+          void this.explainEmptyResult();
+        }
       },
       error: (error: unknown) => {
         this.searching.set(false);
         this.diagnostics.error('Search', 'load:error', error, { type });
+        // A failed search is the other way to end up with an empty page, and the
+        // reason is just as worth naming.
+        void this.explainEmptyResult();
       },
     });
   }
@@ -1141,6 +1254,9 @@ export class Search implements OnInit, OnDestroy {
           accounts: this.accountItems().length,
           callsUsed: this.callsUsed(),
         });
+        if (!this.accountItems().length) {
+          void this.explainEmptyResult();
+        }
       }
     };
     const mergeIn = (authors: AccountWithMatches[], addedCost: number): void => {

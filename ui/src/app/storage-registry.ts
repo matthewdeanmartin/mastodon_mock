@@ -355,6 +355,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Optional separate search instance. Names a host, but choosing one is a config tip worth sharing.',
   },
   {
+    base: 'mockingbird_search_server_rejects_v1',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'setting',
+    note: 'Servers already checked and rejected as search servers, so a hunt does not re-probe the same duds. Clearable from Settings → Server.',
+  },
+  {
     base: 'mockingbird_follow_nudge_dismissed',
     storage: 'local',
     suffix: 'none',
