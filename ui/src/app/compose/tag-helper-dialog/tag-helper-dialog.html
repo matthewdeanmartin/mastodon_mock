@@ -1,0 +1,69 @@
+<!-- A real button, not a div: clicking away must be reachable by keyboard too. -->
+<button class="th-backdrop" type="button" aria-label="Close" (click)="close()"></button>
+<section class="th-dialog" role="dialog" aria-modal="true" aria-labelledby="th-title">
+  <div class="th-head">
+    <h2 id="th-title">🤖#️⃣ Suggest hashtags</h2>
+    <button class="icon-close" type="button" aria-label="Close" (click)="close()">×</button>
+  </div>
+
+  <p class="muted">
+    Tags are how people find posts outside their follows. These are checked against this server, so
+    you can tell a tag people read from one that only sounds right.
+  </p>
+
+  @if (!result() && !busy()) {
+    <button class="btn" type="button" (click)="suggest()" [disabled]="!post().trim()">
+      Suggest tags for this post
+    </button>
+    @if (!post().trim()) {
+      <p class="muted small">Write something first.</p>
+    }
+  }
+
+  @if (busy()) {
+    <p class="muted small" role="status">Asking the model, then checking each tag for activity…</p>
+  }
+
+  @if (error(); as msg) {
+    <p class="th-error" role="alert">{{ msg }}</p>
+  }
+
+  @if (result(); as res) {
+    <p class="th-summary" role="status">{{ summary(res) }}</p>
+
+    <ul class="th-tags">
+      @for (check of res.checked; track check.tag) {
+        <li class="th-tag" [class.th-tag-dead]="!isLive(check)">
+          <label class="th-tag-pick">
+            <input type="checkbox" [checked]="selected(check)" (change)="toggle(check)" />
+            <span class="th-tag-name">#{{ check.tag }}</span>
+          </label>
+          <span class="muted small">
+            {{ usesLabel(check) }}
+            @if (check.similar.length) {
+              · also: {{ check.similar.join(', ') }}
+            }
+          </span>
+        </li>
+      }
+    </ul>
+
+    <label class="th-edit">
+      <span>Your tags</span>
+      <input
+        type="text"
+        name="draft"
+        [ngModel]="draft()"
+        (ngModelChange)="draft.set($event)"
+        placeholder="rust compilers"
+      />
+    </label>
+
+    <div class="th-actions">
+      <button class="btn" type="button" (click)="use()" [disabled]="!draft().trim()">
+        Use tags
+      </button>
+      <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
+    </div>
+  }
+</section>

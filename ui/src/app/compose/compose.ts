@@ -16,6 +16,8 @@ import { PageDiagnostics } from '../page-diagnostics';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
+import { TagHelperDialog } from './tag-helper-dialog/tag-helper-dialog';
+import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { CustomEmojis } from '../custom-emojis';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
@@ -232,7 +234,7 @@ function dragHasFiles(event: DragEvent): boolean {
 
 @Component({
   selector: 'app-compose',
-  imports: [FormsModule, EmojiPicker, ConfirmDialog],
+  imports: [FormsModule, EmojiPicker, ConfirmDialog, TagHelperDialog],
   templateUrl: './compose.html',
   styleUrl: './compose.css',
 })
@@ -310,6 +312,40 @@ export class Compose implements OnDestroy {
   protected readonly pollExpiry = POLL_EXPIRY;
 
   protected text = signal('');
+
+  // --- LLM tag helper (sprint openrouter-5) ---
+  private openrouter = inject(OpenRouterSession);
+  protected tagHelperOpen = signal(false);
+
+  /**
+   * Hidden rather than disabled when OpenRouter isn't connected: connections are
+   * a power-user surface, and a button that only explains why it doesn't work is
+   * worse than no button (decision 9 in sprint/openrouter-0-overview.md).
+   */
+  protected canUseTagHelper = computed(() => this.openrouter.connected());
+
+  /**
+   * Append suggested tags to the post, skipping any already present.
+   *
+   * Appending rather than replacing: the user may have written tags inline, and
+   * silently rewriting someone's post is not this feature's job.
+   */
+  useSuggestedTags(tags: string[]): void {
+    this.tagHelperOpen.set(false);
+    const current = this.text();
+    const existing = new Set(
+      (current.match(/#[\p{L}\p{N}_]+/gu) ?? []).map((t) => t.slice(1).toLowerCase()),
+    );
+    const additions = tags
+      .map((tag) => tag.replace(/^#/, '').trim())
+      .filter((tag) => tag && !existing.has(tag.toLowerCase()))
+      .map((tag) => `#${tag}`);
+    if (!additions.length) {
+      return;
+    }
+    const separator = !current.trim() ? '' : /\s$/.test(current) ? '' : ' ';
+    this.text.set(current + separator + additions.join(' '));
+  }
   /** Extra thread boxes ("tweet storm"): each is one additional self-reply post. */
   protected thread = signal<string[]>([]);
   protected submitting = signal(false);

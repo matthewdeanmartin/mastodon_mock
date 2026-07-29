@@ -244,6 +244,13 @@ export interface MastodonNotification {
 export interface Hashtag {
   name: string;
   url: string;
+  /**
+   * Usage history, when the server sends it. `/api/v2/search?type=hashtags`
+   * returns Tag entities, which carry history — this type was narrower than
+   * the payload. Optional because not every source populates it (the mock
+   * returns an empty array, and older servers may omit it entirely).
+   */
+  history?: TrendingTagHistory[];
 }
 
 export interface AnnouncementReaction {

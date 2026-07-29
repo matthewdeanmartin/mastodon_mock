@@ -131,7 +131,7 @@ direction to fail.
 | 2 | `openrouter-2-pkce-and-models.md` | `OpenRouterSession` (PKCE), connection detail page, model picker, credits | ✅ **DONE** 2026-07-28 | PKCE `state` gap; credits three-state |
 | 3 | `openrouter-3-prompt-templates.md` | `PromptTemplateStore`, template editor UI, chat-completions call + JSON-shape guard | ✅ **DONE** 2026-07-28 | LLM returns non-JSON — contained by a strict parser + one retry |
 | 4 | `openrouter-4-search-helper.md` | Search helper dialog: prose → 5 DSL queries → **try in order, stop at first success** → conditional refine | ✅ **DONE** 2026-07-28 | Grading cost, solved by short-circuiting: 1 call typical, 5 worst case |
-| 5 | `openrouter-5-tag-helper.md` | Tag helper dialog on compose: post → tags → activity check → conditional refine | Feature 2 | none new |
+| 5 | `openrouter-5-tag-helper.md` | Tag helper dialog on compose: post → tags → activity check → conditional refine | ✅ **DONE** 2026-07-28 | none new |
 
 Sprint 1 is deliberately first and deliberately boring: sprints 2–5 each add UI to the
 Connections tab, and doing them on top of the current 363-line template would mean building

@@ -365,6 +365,17 @@
           }
         </span>
 
+        @if (canUseTagHelper()) {
+          <button
+            class="tool-btn"
+            type="button"
+            (click)="tagHelperOpen.set(true)"
+            title="Suggest hashtags for this post"
+          >
+            🤖#️⃣
+          </button>
+        }
+
         @if (!targetIncludesPaste()) {
           <button
             class="tool-btn thread-btn"
@@ -561,3 +572,11 @@
     </div>
   }
 </div>
+
+@if (tagHelperOpen()) {
+  <app-tag-helper-dialog
+    [post]="text()"
+    (useTags)="useSuggestedTags($event)"
+    (closed)="tagHelperOpen.set(false)"
+  />
+}
