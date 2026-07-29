@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { describeAttempts, gradeUntilSuccess, SEARCH_SUCCESS_THRESHOLD } from './search-helper';
+import {
+  describeAttempts,
+  describeContext,
+  gradeUntilSuccess,
+  SEARCH_SUCCESS_THRESHOLD,
+  thresholdFor,
+} from './search-helper';
 
 describe('gradeUntilSuccess', () => {
   /** A probe that answers from a lookup table and records what it was asked. */
@@ -115,5 +121,55 @@ describe('describeAttempts', () => {
 
   it('is empty when there is nothing to report', () => {
     expect(describeAttempts([])).toBe('');
+  });
+});
+
+describe('thresholdFor', () => {
+  it('holds post search to a real result set', () => {
+    expect(thresholdFor('statuses')).toBe(SEARCH_SUCCESS_THRESHOLD);
+  });
+
+  it('accepts a single hit for accounts and hashtags', () => {
+    // There is often exactly one account you meant. Demanding five would
+    // reject the right answer in favour of a vaguer one.
+    expect(thresholdFor('accounts')).toBe(1);
+    expect(thresholdFor('hashtags')).toBe(1);
+  });
+});
+
+describe('describeContext', () => {
+  it('tells the model the operators are off the table for account search', () => {
+    const text = describeContext({ target: 'accounts' });
+
+    expect(text).toContain('Accounts');
+    expect(text).toContain('do NOT apply');
+  });
+
+  it('says hashtags want bare words without the #', () => {
+    expect(describeContext({ target: 'hashtags' })).toContain('without the leading #');
+  });
+
+  it('leaves post search with its full operator set', () => {
+    const text = describeContext({ target: 'statuses' });
+
+    expect(text).toContain('Posts');
+    expect(text).not.toContain('do NOT apply');
+  });
+
+  it('lists what the advanced form already set, so the query does not repeat it', () => {
+    const text = describeContext({
+      target: 'statuses',
+      filters: ['Language: en', 'From account: @a@b.social'],
+    });
+
+    expect(text).toContain('- Language: en');
+    expect(text).toContain('- From account: @a@b.social');
+    expect(text).toContain('do not repeat them');
+  });
+
+  it('says nothing about filters when none are set', () => {
+    expect(describeContext({ target: 'statuses', filters: ['', '  '] })).not.toContain(
+      'do not repeat',
+    );
   });
 });

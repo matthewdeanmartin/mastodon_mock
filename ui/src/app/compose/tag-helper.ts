@@ -170,12 +170,21 @@ export class TagHelper {
     };
   }
 
-  private suggest(post: string, feedback: string): Promise<string[]> {
-    return this.chat.suggest({
+  /**
+   * The tag list, discarding the reply's `problem` field.
+   *
+   * A post always has *something* taggable, so an objection here is a model
+   * misfiring rather than a real limit — unlike the search helper, which has to
+   * surface it. An objection with no tags surfaces as an empty list, which the
+   * dialog already renders as "nothing to suggest".
+   */
+  private async suggest(post: string, feedback: string): Promise<string[]> {
+    const reply = await this.chat.suggest({
       prompt: this.prompts.render('tag', { post, feedback }),
       schemaName: 'mastodon_hashtags',
       max: TAG_SUGGESTION_COUNT,
     });
+    return reply.suggestions;
   }
 
   /**

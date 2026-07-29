@@ -1,11 +1,6 @@
-import { Component, HostListener, inject, output, signal } from '@angular/core';
+import { Component, HostListener, inject, input, effect, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  GradedQuery,
-  SEARCH_SUCCESS_THRESHOLD,
-  SearchHelper,
-  SearchHelperResult,
-} from '../search-helper';
+import { GradedQuery, SearchContext, SearchHelper, SearchHelperResult } from '../search-helper';
 
 /**
  * "Describe what you're looking for" → a runnable Mastodon query.
@@ -25,11 +20,19 @@ import {
 export class SearchHelperDialog {
   private helper = inject(SearchHelper);
 
+  /**
+   * Whatever is in the search box, and the state of the widgets around it.
+   *
+   * Opening the helper with an empty box and a placeholder full of someone
+   * else's example made the user retype what they had already typed. Their
+   * words are the better starting point, even when they are only two of them.
+   */
+  readonly seed = input('');
+  readonly context = input.required<SearchContext>();
+
   /** The chosen query. The page fills its search box and runs the normal path. */
   readonly useQuery = output<string>();
   readonly closed = output<void>();
-
-  protected readonly threshold = SEARCH_SUCCESS_THRESHOLD;
 
   protected request = signal('');
   protected busy = signal(false);
@@ -37,6 +40,18 @@ export class SearchHelperDialog {
   protected result = signal<SearchHelperResult | null>(null);
   /** The editable query. Seeded from the winner, then owned by the user. */
   protected draft = signal('');
+
+  constructor() {
+    // Seeding once on open, not tracking: the search box keeps changing while
+    // this is up (the page rewrites it when a query is used) and dragging the
+    // textarea along would overwrite whatever the user was typing.
+    effect(() => {
+      const seed = this.seed().trim();
+      if (seed) {
+        this.request.set(seed);
+      }
+    });
+  }
 
   async ask(): Promise<void> {
     const request = this.request().trim();
@@ -47,7 +62,7 @@ export class SearchHelperDialog {
     this.error.set(null);
     this.result.set(null);
     try {
-      const result = await this.helper.run(request);
+      const result = await this.helper.run(request, this.context());
       this.result.set(result);
       // Seed with whatever worked; failing that, the model's best guess, so the
       // user always has something to edit rather than an empty box.
@@ -106,7 +121,7 @@ export class SearchHelperDialog {
   protected summary(result: SearchHelperResult): string {
     const calls = `${result.callsUsed} search${result.callsUsed === 1 ? '' : 'es'}`;
     if (!result.winner) {
-      return `Nothing returned ${this.threshold}+ results, even after rewriting. Edit the best guess below — ${calls} tried.`;
+      return `Nothing returned ${result.threshold}+ results, even after rewriting. Edit the best guess below — ${calls} tried.`;
     }
     const position = result.attempts.length;
     const which = position === 1 ? 'The first suggestion worked' : `Suggestion ${position} worked`;

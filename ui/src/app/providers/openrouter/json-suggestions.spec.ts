@@ -1,5 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { parseSuggestions, suggestionSchema, SuggestionParseError } from './json-suggestions';
+import {
+  parseSuggestionReply,
+  parseSuggestions,
+  suggestionSchema,
+  SuggestionParseError,
+} from './json-suggestions';
+
+describe('parseSuggestionReply', () => {
+  it("carries the model's objection back with an empty list", () => {
+    const reply = parseSuggestionReply({
+      suggestions: [],
+      problem: 'This searches Mastodon, not Google.',
+    });
+
+    expect(reply.suggestions).toEqual([]);
+    expect(reply.problem).toBe('This searches Mastodon, not Google.');
+  });
+
+  it('accepts an objection with no suggestions key at all', () => {
+    expect(parseSuggestionReply({ problem: 'Too vague to guess at.' })).toEqual({
+      suggestions: [],
+      problem: 'Too vague to guess at.',
+    });
+  });
+
+  it('treats the empty problem of a successful reply as no objection', () => {
+    // The happy path sends `problem: ""` on every call, because the schema
+    // requires the field. It must never render as an objection.
+    expect(parseSuggestionReply({ suggestions: ['a'], problem: '   ' })).toEqual({
+      suggestions: ['a'],
+      problem: null,
+    });
+  });
+
+  it('reads the objection from the other names models reach for', () => {
+    expect(parseSuggestionReply({ suggestions: [], error: 'Not a search.' }).problem).toBe(
+      'Not a search.',
+    );
+  });
+
+  it('truncates an objection that turned into an essay', () => {
+    const long = 'x'.repeat(900);
+    expect(parseSuggestionReply({ problem: long }).problem).toHaveLength(400);
+  });
+
+  it('still refuses a reply that is neither a list nor an objection', () => {
+    expect(() => parseSuggestionReply({ mood: 'unhelpful' })).toThrow(SuggestionParseError);
+  });
+});
 
 describe('parseSuggestions', () => {
   it('takes the object structured output gives us', () => {
@@ -28,6 +76,14 @@ describe('parseSuggestions', () => {
 
   it('accepts a bare array, which is unambiguous enough not to reject', () => {
     expect(parseSuggestions(['a', 'b'])).toEqual(['a', 'b']);
+  });
+
+  it('raises the objection as the error, for callers with nowhere to show it', () => {
+    // The tag helper takes this path: it cannot render a `problem`, so the
+    // sentence is better off inside the error it already displays.
+    expect(() => parseSuggestions({ suggestions: [], problem: 'Not a search.' })).toThrow(
+      'Not a search.',
+    );
   });
 
   it('accepts a differently-named single array key', () => {
@@ -85,7 +141,11 @@ describe('suggestionSchema', () => {
     expect(schema.name).toBe('search_queries');
     expect(schema.strict).toBe(true);
     expect(schema.schema.additionalProperties).toBe(false);
-    expect(schema.schema.required).toEqual(['suggestions']);
     expect(schema.schema.properties.suggestions.items).toEqual({ type: 'string' });
+    // `problem` is required, not optional: `strict: true` means every property
+    // must be listed, and a plain always-present string is the shape every
+    // provider honours.
+    expect(schema.schema.required).toEqual(['suggestions', 'problem']);
+    expect(schema.schema.properties.problem.type).toBe('string');
   });
 });

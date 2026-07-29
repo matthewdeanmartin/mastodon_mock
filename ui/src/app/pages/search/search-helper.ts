@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../api';
 import { OpenRouterChat } from '../../providers/openrouter/openrouter-chat';
+import { SuggestionReply } from '../../providers/openrouter/json-suggestions';
 import { PromptTemplateStore } from '../../providers/openrouter/prompt-templates';
 
 /**
@@ -22,6 +23,16 @@ import { PromptTemplateStore } from '../../providers/openrouter/prompt-templates
 
 /** A query "works" when it returns at least this many results. */
 export const SEARCH_SUCCESS_THRESHOLD = 5;
+
+/**
+ * The same, for accounts and hashtags.
+ *
+ * Five is the right bar for post search, where a thin result set usually means
+ * the query was over-specified. It is the wrong bar for the other two: there is
+ * often exactly one account you meant, and demanding five more would reject the
+ * correct answer in favour of a vaguer one.
+ */
+export const SEARCH_SUCCESS_THRESHOLD_NARROW = 1;
 
 /** How many candidates to ask for, and therefore the worst-case probe count. */
 export const SEARCH_QUERY_COUNT = 5;
@@ -53,6 +64,69 @@ export interface SearchHelperResult {
   refined: boolean;
   /** Total probes across both passes. */
   callsUsed: number;
+  /** The bar a query had to clear, which varies by target. */
+  threshold: number;
+  /**
+   * The model's objection, when it had one — "this isn't Google".
+   *
+   * Not an error: the request was understood and answered, just not with a
+   * query. The dialog shows it and, when there are no candidates, stops there.
+   */
+  problem: string | null;
+}
+
+/** Which of the three search modes the page is in. */
+export type SearchTargetKind = 'accounts' | 'statuses' | 'hashtags';
+
+/**
+ * The state of the search widgets, as the model needs to see it.
+ *
+ * Without this the helper always wrote post queries, because that is what the
+ * prompt describes — so picking "Accounts" in the dropdown and asking for help
+ * produced five post queries that the accounts endpoint then matched against
+ * display names, badly. What the user has already set is part of the request.
+ */
+export interface SearchContext {
+  target: SearchTargetKind;
+  /** Advanced-form fields already set, as ready-to-read "Label: value" lines. */
+  filters?: string[];
+}
+
+/** The bar for one target. Posts want a real result set; the others want a hit. */
+export function thresholdFor(target: SearchTargetKind): number {
+  return target === 'statuses' ? SEARCH_SUCCESS_THRESHOLD : SEARCH_SUCCESS_THRESHOLD_NARROW;
+}
+
+/** What each mode wants back, in the model's terms. */
+const TARGET_BRIEF: Record<SearchTargetKind, string> = {
+  statuses:
+    'The search box is set to Posts, so full-text post search is running and every operator above is available.',
+  accounts:
+    'The search box is set to Accounts, so the query is matched against display names, @handles and bios. ' +
+    'The operators above do NOT apply here — return plain words, names, or handle fragments only.',
+  hashtags:
+    'The search box is set to Hashtags, so the query is matched against tag names. ' +
+    'The operators above do NOT apply here — return single words without the leading #.',
+};
+
+/**
+ * The `{{context}}` block: what the widgets are already set to.
+ *
+ * Stated as fact rather than instruction. The model is being told what is on
+ * screen, and the prompt around it decides what to do about that — which keeps
+ * the behaviour editable in Settings rather than compiled in here.
+ */
+export function describeContext(context: SearchContext): string {
+  const lines = [TARGET_BRIEF[context.target]];
+  const filters = (context.filters ?? []).filter((line) => line.trim());
+  if (filters.length) {
+    lines.push(
+      '',
+      'The advanced form already sets these, so do not repeat them in the query:',
+      ...filters.map((line) => `- ${line}`),
+    );
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -134,40 +208,76 @@ export class SearchHelper {
    * query that returns results, a second round trip buys nothing and costs a
    * request plus a wait.
    */
-  async run(request: string): Promise<SearchHelperResult> {
-    const probe = (query: string) => this.countResults(query);
+  async run(request: string, context: SearchContext): Promise<SearchHelperResult> {
+    const threshold = thresholdFor(context.target);
+    const probe = (query: string) => this.countResults(query, context.target);
+    const grade = (queries: string[]) => gradeUntilSuccess(queries, probe, { threshold });
 
-    const queries = await this.suggest(request, '');
-    const first = await gradeUntilSuccess(queries, probe);
-    if (first.winner) {
-      return { queries, ...first, refined: false };
+    const first = await this.suggest(request, context, '');
+    // An objection ends it. Grading queries the model already disowned would
+    // spend API calls to confirm what it just said.
+    if (first.problem && !first.suggestions.length) {
+      return {
+        queries: [],
+        attempts: [],
+        winner: null,
+        refined: false,
+        callsUsed: 0,
+        threshold,
+        problem: first.problem,
+      };
     }
 
-    const feedback = describeAttempts(first.attempts);
-    const refinedQueries = await this.suggest(request, feedback);
-    const second = await gradeUntilSuccess(refinedQueries, probe);
+    const queries = first.suggestions;
+    const firstPass = await grade(queries);
+    if (firstPass.winner) {
+      return { queries, ...firstPass, refined: false, threshold, problem: first.problem };
+    }
+
+    const feedback = describeAttempts(firstPass.attempts, threshold);
+    const second = await this.suggest(request, context, feedback);
+    const secondPass = await grade(second.suggestions);
     return {
-      queries: refinedQueries,
-      attempts: second.attempts,
-      winner: second.winner,
+      queries: second.suggestions,
+      attempts: secondPass.attempts,
+      winner: secondPass.winner,
       refined: true,
-      callsUsed: first.callsUsed + second.callsUsed,
+      callsUsed: firstPass.callsUsed + secondPass.callsUsed,
+      threshold,
+      problem: second.problem ?? first.problem,
     };
   }
 
-  private suggest(request: string, feedback: string): Promise<string[]> {
+  private suggest(
+    request: string,
+    context: SearchContext,
+    feedback: string,
+  ): Promise<SuggestionReply> {
     return this.chat.suggest({
-      prompt: this.prompts.render('search', { request, feedback }),
+      prompt: this.prompts.render('search', {
+        request,
+        feedback,
+        context: describeContext(context),
+      }),
       schemaName: 'mastodon_search_queries',
       max: SEARCH_QUERY_COUNT,
     });
   }
 
-  /** How many statuses one query returns, capped at the threshold we care about. */
-  private async countResults(query: string): Promise<number> {
-    const results = await firstValueFrom(
-      this.api.search(query, 'statuses', { limit: PROBE_LIMIT }),
-    );
+  /**
+   * How many results one query returns, capped at the threshold we care about.
+   *
+   * Probes the endpoint the user is actually searching: grading an account
+   * query against post search would fail every candidate for the wrong reason.
+   */
+  private async countResults(query: string, target: SearchTargetKind): Promise<number> {
+    const results = await firstValueFrom(this.api.search(query, target, { limit: PROBE_LIMIT }));
+    if (target === 'accounts') {
+      return results.accounts?.length ?? 0;
+    }
+    if (target === 'hashtags') {
+      return results.hashtags?.length ?? 0;
+    }
     return results.statuses?.length ?? 0;
   }
 }

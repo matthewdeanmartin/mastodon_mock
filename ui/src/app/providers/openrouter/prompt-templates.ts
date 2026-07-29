@@ -34,7 +34,7 @@ export const PROMPT_TEMPLATES: readonly PromptTemplateSpec[] = [
     label: 'Search helper',
     description:
       'Turns what you typed into five runnable Mastodon search queries, then improves them once if they returned too little.',
-    placeholders: ['request', 'feedback'],
+    placeholders: ['request', 'context', 'feedback'],
   },
   {
     id: 'tag',
@@ -76,6 +76,17 @@ Rules:
 - Never invent an operator that is not listed above.
 - Do not guess an account handle unless the request names one.
 - Bare words are fine; not every query needs an operator.
+- Respect the current state of the search form, described below.
+
+If you cannot answer, say so in "problem" and return no queries. Do that when
+the request asks for another service (Google, the web, YouTube), for something
+this search cannot express (sorting, counting, anything about a specific user's
+followers), or is too vague to guess at. One short sentence, addressed to the
+person, saying what this search can do instead. Otherwise leave "problem" empty
+— never use it to add commentary to a working answer.
+
+The current state of the search form:
+{{context}}
 
 What the person is looking for:
 {{request}}

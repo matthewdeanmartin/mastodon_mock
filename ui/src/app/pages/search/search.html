@@ -39,6 +39,15 @@
         🤖
       </button>
     }
+    <button
+      class="btn btn-outline"
+      type="button"
+      title="What you can type in a post search"
+      aria-label="Search syntax help"
+      (click)="syntaxHelpOpen.set(true)"
+    >
+      Syntax?
+    </button>
     @if (type() === 'statuses' || type() === 'accounts') {
       <button
         class="btn btn-outline"
@@ -770,7 +779,13 @@
 
 @if (searchHelperOpen()) {
   <app-search-helper-dialog
+    [seed]="query()"
+    [context]="searchHelperContext()"
     (useQuery)="useSuggestedQuery($event)"
     (closed)="searchHelperOpen.set(false)"
   />
+}
+
+@if (syntaxHelpOpen()) {
+  <app-search-syntax-help (closed)="syntaxHelpOpen.set(false)" />
 }

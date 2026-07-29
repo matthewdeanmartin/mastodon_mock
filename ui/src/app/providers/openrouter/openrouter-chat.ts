@@ -1,7 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { OpenRouterSession, openRouterError } from './openrouter-session';
 import { OpenRouterModelChoice } from './openrouter-model-choice';
-import { parseSuggestions, suggestionSchema, SuggestionParseError } from './json-suggestions';
+import {
+  parseSuggestionReply,
+  suggestionSchema,
+  SuggestionParseError,
+  SuggestionReply,
+} from './json-suggestions';
 
 /**
  * The one inference call in the app.
@@ -26,7 +31,8 @@ const MAX_TOKENS = 700;
  * second attempt still has a chance of being parseable.
  */
 const JSON_ONLY_NUDGE =
-  '\n\nReply with JSON only, in the form {"suggestions": ["...", "..."]}. No prose, no code fences.';
+  '\n\nReply with JSON only, in the form {"suggestions": ["...", "..."], "problem": ""}. ' +
+  'No prose, no code fences.';
 
 export interface SuggestOptions {
   /** The fully rendered prompt. */
@@ -53,8 +59,12 @@ export class OpenRouterChat {
    * way a schema could cause — a provider that rejects `json_schema`, or a
    * reply that came back unparseable. The retry carries an explicit
    * "JSON only" instruction instead.
+   *
+   * Returns the model's objection alongside its list: a request the DSL cannot
+   * express is an answer, not a failure, and throwing would lose the sentence
+   * that explains it.
    */
-  async suggest(options: SuggestOptions): Promise<string[]> {
+  async suggest(options: SuggestOptions): Promise<SuggestionReply> {
     const key = this.session.apiKey();
     if (!key) {
       throw new Error('Connect OpenRouter first.');
@@ -74,7 +84,7 @@ export class OpenRouterChat {
     key: string,
     options: SuggestOptions,
     withSchema: boolean,
-  ): Promise<string[]> {
+  ): Promise<SuggestionReply> {
     const body: Record<string, unknown> = {
       model: this.choice.modelId(),
       max_tokens: MAX_TOKENS,
@@ -111,7 +121,7 @@ export class OpenRouterChat {
     }
 
     const content = ((await response.json()) as ChatResponse).choices?.[0]?.message?.content;
-    return parseSuggestions(content, options.max);
+    return parseSuggestionReply(content, options.max);
   }
 
   /** Turn an HTTP failure into something the user can act on. */

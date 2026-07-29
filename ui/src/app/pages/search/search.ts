@@ -23,6 +23,8 @@ import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-a
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 import { AccountResultCard } from './account-result-card';
 import { SearchHelperDialog } from './search-helper-dialog/search-helper-dialog';
+import { SearchContext } from './search-helper';
+import { SearchSyntaxHelp } from './search-syntax-help/search-syntax-help';
 import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
 import { AccountSearchStore } from './account-search-store';
 import {
@@ -90,7 +92,15 @@ const LOAD_MORE_HARD_CAP = 30;
 
 @Component({
   selector: 'app-search',
-  imports: [FormsModule, RouterLink, StatusCard, FindPeople, AccountResultCard, SearchHelperDialog],
+  imports: [
+    FormsModule,
+    RouterLink,
+    StatusCard,
+    FindPeople,
+    AccountResultCard,
+    SearchHelperDialog,
+    SearchSyntaxHelp,
+  ],
   templateUrl: './search.html',
   styleUrl: './search.css',
 })
@@ -123,6 +133,12 @@ export class Search implements OnInit, OnDestroy {
   protected searchHelperOpen = signal(false);
 
   /**
+   * The search-syntax cheat-sheet. Unlike the 🤖 helper this needs no account,
+   * no key and no network — the syntax is the same whoever is looking at it.
+   */
+  protected syntaxHelpOpen = signal(false);
+
+  /**
    * Whether to offer the 🤖 helper at all.
    *
    * Hidden rather than disabled when OpenRouter isn't connected (connections are
@@ -136,13 +152,59 @@ export class Search implements OnInit, OnDestroy {
     () => this.openrouter.connected() && !this.capabilities.active,
   );
 
-  /** Take a query from the helper dialog and run it through the normal path. */
+  /**
+   * Take a query from the helper dialog and run it through the normal path.
+   *
+   * The search type is left alone: the helper was asked for a query *for the
+   * mode the user is in*, so switching them to Posts afterwards would discard
+   * the very thing they picked the Accounts dropdown to say.
+   */
   useSuggestedQuery(query: string): void {
     this.searchHelperOpen.set(false);
-    this.type.set('statuses');
     this.query.set(query);
     this.run();
   }
+
+  /**
+   * What the helper needs to know about the form: the mode, and what is set.
+   *
+   * Only fields the user has actually filled in are listed. A dump of every
+   * default ("Language: Any language", "Replies: include") would be longer than
+   * the request and would read to the model as constraints that were chosen.
+   */
+  protected searchHelperContext = computed<SearchContext>(() => {
+    const target = this.type();
+    const filters: string[] = [];
+    if (target === 'statuses') {
+      const push = (label: string, value: string) => {
+        if (value) {
+          filters.push(`${label}: ${value}`);
+        }
+      };
+      push('Exact phrase', this.exactPhrase().trim());
+      push('Excluding words', this.excludeWords().trim());
+      push('From account', this.author().trim());
+      push('Posted after', this.after());
+      push('Posted before', this.before());
+      push('Language', this.language());
+      if (this.contentType() !== 'any') {
+        push('Content type', this.contentType());
+      }
+      if (this.replies() !== 'include') {
+        push('Replies', this.replies());
+      }
+      if (this.sensitive() !== 'include') {
+        push('Sensitive posts', this.sensitive());
+      }
+      if (this.scope() !== 'all') {
+        push('Scope', this.scope());
+      }
+    } else if (target === 'accounts' && this.accountSource() !== 'both') {
+      const source = this.accountSources.find((option) => option.value === this.accountSource());
+      filters.push(`Matching against: ${source?.label ?? this.accountSource()}`);
+    }
+    return { target, filters };
+  });
   protected results = signal<SearchResults | null>(null);
   protected searching = signal(false);
   protected type = signal<SearchType>('accounts');

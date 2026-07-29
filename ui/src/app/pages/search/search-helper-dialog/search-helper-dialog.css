@@ -21,7 +21,7 @@
   padding: 18px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--surface, #fff);
+  background: var(--col-bg);
   color: var(--text);
   box-shadow: 0 18px 60px rgb(0 0 0 / 35%);
 }
@@ -60,19 +60,34 @@
   padding: 9px 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface, #fff);
+  background: var(--col-bg);
   color: var(--text);
   font: inherit;
   resize: vertical;
 }
 
-.sh-ask button {
-  align-self: flex-start;
+/* Placeholder text inherits `color` in some engines, which is `--text` here —
+   white on white in the dark theme. State it. */
+.sh-ask textarea::placeholder,
+.sh-edit textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
 }
 
 .sh-error {
   color: #d63b3b;
   font-size: 13px;
+}
+
+/* The model declining is information, not a failure — it must not read as red. */
+.sh-problem {
+  margin: 14px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--hover);
+  color: var(--text);
+  font-size: 14px;
 }
 
 .sh-summary {

@@ -52,7 +52,7 @@ describe('OpenRouterChat', () => {
   it('sends the chosen model, the prompt, and a strict schema', async () => {
     fetchMock.mockResolvedValue(reply({ suggestions: ['a', 'b'] }));
 
-    expect(await chat().suggest(ask)).toEqual(['a', 'b']);
+    expect((await chat().suggest(ask)).suggestions).toEqual(['a', 'b']);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
@@ -70,7 +70,7 @@ describe('OpenRouterChat', () => {
       .mockResolvedValueOnce(reply('I cannot help with that.'))
       .mockResolvedValueOnce(reply({ suggestions: ['a'] }));
 
-    expect(await chat().suggest(ask)).toEqual(['a']);
+    expect((await chat().suggest(ask)).suggestions).toEqual(['a']);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const second = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
@@ -83,7 +83,7 @@ describe('OpenRouterChat', () => {
       .mockResolvedValueOnce(errorReply(400, 'response_format is not supported'))
       .mockResolvedValueOnce(reply({ suggestions: ['a'] }));
 
-    expect(await chat().suggest(ask)).toEqual(['a']);
+    expect((await chat().suggest(ask)).suggestions).toEqual(['a']);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
