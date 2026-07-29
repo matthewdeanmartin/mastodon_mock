@@ -45,9 +45,10 @@ uv venv pwenv && uv pip install --python pwenv/Scripts/python.exe playwright
   gate that ended with tests. Check with
   `(Get-ChildItem mastodon_mock\_ui_dist\browser | Measure-Object).Count` — ~190 is healthy,
   1 means it was cleaned. Correct order: `lint` → `test:ci` → `build` → restart server.
-  A **lingering node process** from an earlier test run can clean it again later, long after
-  that command returned — if the dist empties with no build in sight, check
-  `Get-Process node` and kill strays before rebuilding.
+  Worse, the test builder's cleanup fires **asynchronously**, so it can wipe a build that
+  finished *after* `test:ci` returned. Chaining `test:ci; build` in one command is not safe.
+  The reliable sequence before driving the app is:
+  `Get-Process node | Stop-Process -Force` → `npm run build` → check the count → restart.
 - **Restart the server after every rebuild.** `ui.py` resolves `_ui_dist/browser` at import,
   so a server started against a missing dist keeps 404ing no matter how often you rebuild.
 - A CORS-enabled local test server (e.g. for RSS feeds) must send

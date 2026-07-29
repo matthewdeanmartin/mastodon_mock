@@ -103,9 +103,13 @@ best guess is still offered when everything fails; Escape closes the dialog.
 
 ## Deviations from the plan as written
 
-- **The dialog lists every attempt as a clickable candidate**, not just the winner. The
-  winner is the app's opinion; picking a "worse" query that returned two good results is a
-  legitimate choice and costs nothing to allow.
+- **The dialog lists every *suggestion*, not just the tried ones** (Matthew, after seeing it:
+  "need to show all suggested queries, but yes only 1 might have been tested"). Short-circuit
+  grading saves API calls; it should not decide what the user is allowed to see. Each row is
+  labelled with what happened to it — a result count, "no results", "search failed", or
+  **"not tried"** — and every row is clickable, so an untried candidate can be chosen
+  directly. Untried rows are italic and dimmed *less* than dead ones: nothing is known about
+  them, which is not the same as knowing they are empty.
 - **A failed probe records `count: null` and the walk continues.** One flaky request should
   not discard four good candidates, and "the search failed" is honest where "0 results" would
   be a lie.

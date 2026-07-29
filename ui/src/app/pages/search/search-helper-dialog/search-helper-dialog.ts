@@ -60,8 +60,20 @@ export class SearchHelperDialog {
   }
 
   /** Put a specific candidate in the editor without running anything. */
-  pick(attempt: GradedQuery): void {
-    this.draft.set(attempt.query);
+  pick(query: string): void {
+    this.draft.set(query);
+  }
+
+  /**
+   * What happened to one suggestion, or undefined when it was never tried.
+   *
+   * Every suggestion is listed, not just the tried ones: short-circuiting saves
+   * API calls, but the untried candidates are still the model's suggestions and
+   * are often what you actually want. "Not tried" is a state, not a reason to
+   * hide something.
+   */
+  protected attemptFor(result: SearchHelperResult, query: string): GradedQuery | undefined {
+    return result.attempts.find((attempt) => attempt.query === query);
   }
 
   use(): void {
@@ -76,8 +88,11 @@ export class SearchHelperDialog {
     this.closed.emit();
   }
 
-  /** "3 results" / "no results" / "search failed" for one attempt. */
-  protected outcomeLabel(attempt: GradedQuery): string {
+  /** "3 results" / "no results" / "search failed" / "not tried" for one suggestion. */
+  protected outcomeLabel(attempt: GradedQuery | undefined): string {
+    if (!attempt) {
+      return 'not tried';
+    }
     if (attempt.count === null) {
       return 'search failed';
     }
