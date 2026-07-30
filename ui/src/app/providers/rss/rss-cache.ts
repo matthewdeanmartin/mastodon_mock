@@ -55,15 +55,28 @@ const FEED_STORE = 'feeds';
  */
 export const FAILURE_COOLDOWN_MS = 15 * 60 * 1000;
 
-/** One cached feed, as persisted. */
+/**
+ * One cached feed, as persisted.
+ *
+ * A record may exist purely to hold {@link failedAt} — a feed that has only
+ * ever failed has no content, and `fetchedAt` of 0 marks that. Use
+ * {@link hasContent} rather than testing `feed` directly: an empty
+ * {@link ParsedFeed} placeholder is truthy and reads as a real (but empty)
+ * feed, which is exactly the bug that made proxied feeds show zero posts.
+ */
 export interface CachedFeedRecord {
   /** The feed URL — the key path. */
   url: string;
   feed: ParsedFeed;
-  /** Epoch ms of the successful fetch this came from. */
+  /** Epoch ms of the successful fetch this came from, or 0 if never fetched. */
   fetchedAt: number;
   /** Epoch ms of the last failed attempt, for the cooldown. */
   failedAt?: number;
+}
+
+/** Whether a record actually holds a feed someone once fetched successfully. */
+function hasContent(record: CachedFeedRecord | null): record is CachedFeedRecord {
+  return record !== null && record.fetchedAt > 0;
 }
 
 /** A cache hit handed back to callers. */
@@ -118,6 +131,9 @@ export class RssCache {
    */
   private dbPromise: Promise<IDBDatabase | null> | null = null;
 
+  /** Route key -> epoch ms at which that route may be tried again. */
+  private cooldowns = new Map<string, number>();
+
   private db(): Promise<IDBDatabase | null> {
     this.dbPromise ??= openDatabase();
     return this.dbPromise;
@@ -131,7 +147,10 @@ export class RssCache {
    */
   async get(url: string, ttlMs: number): Promise<CachedFeed | null> {
     const record = await this.record(url);
-    if (!record) {
+    // A failure-only record is not a cache hit. Returning its empty placeholder
+    // feed would render as "this feed has no posts", which is indistinguishable
+    // from a real empty feed and hides the actual error.
+    if (!hasContent(record)) {
       return null;
     }
     const age = Date.now() - record.fetchedAt;
@@ -145,12 +164,35 @@ export class RssCache {
   /**
    * Whether a recent failure means we should not hit the network yet.
    *
-   * Only applies when the last attempt actually failed; a successful fetch
-   * clears the marker, so one bad day does not mute a feed that has recovered.
+   * `key` identifies a *route* (see `routeKey` in rss-fetch), not just a feed:
+   * a direct fetch that failed on CORS must not suppress the proxied retry,
+   * since they fail for entirely unrelated reasons.
+   *
+   * In memory only, and deliberately so. A cooldown is a "don't hammer this for
+   * the next quarter hour" note whose whole purpose is served within one
+   * session; persisting it would mean a feed that failed once stayed muted
+   * across a reload, with no way for the user to tell why.
    */
-  async inCooldown(url: string, now: number = Date.now()): Promise<boolean> {
-    const record = await this.record(url);
-    return record?.failedAt !== undefined && now - record.failedAt < FAILURE_COOLDOWN_MS;
+  async inCooldown(key: string, now: number = Date.now()): Promise<boolean> {
+    const until = this.cooldowns.get(key);
+    if (until === undefined) {
+      return false;
+    }
+    if (now >= until) {
+      this.cooldowns.delete(key);
+      return false;
+    }
+    return true;
+  }
+
+  /** Start (or restart) the cooldown for one route. */
+  startCooldown(key: string, now: number = Date.now()): void {
+    this.cooldowns.set(key, now + FAILURE_COOLDOWN_MS);
+  }
+
+  /** Clear a route's cooldown — a success on that route proves it works. */
+  clearCooldown(key: string): void {
+    this.cooldowns.delete(key);
   }
 
   /** Store a successful read, clearing any failure marker. */
@@ -159,19 +201,17 @@ export class RssCache {
   }
 
   /**
-   * Record that a fetch failed, without disturbing the cached content.
+   * Note that a route failed, so it is not retried for {@link FAILURE_COOLDOWN_MS}.
    *
-   * The existing feed and its `fetchedAt` are preserved so the stale copy stays
-   * available and its true age is still reported.
+   * Deliberately writes nothing to IndexedDB. An earlier version stored a
+   * placeholder record here, which was a real bug: the empty `ParsedFeed` it
+   * invented was later served as though it were cached content, so a feed that
+   * had failed once rendered as a feed with zero posts instead of reporting the
+   * error. Failures are now purely an in-memory cooldown, and the stored
+   * records only ever hold feeds that were genuinely fetched.
    */
-  async markFailure(url: string): Promise<void> {
-    const existing = await this.record(url);
-    await this.write(FEED_STORE, {
-      url,
-      feed: existing?.feed ?? { title: '', link: null, items: [] },
-      fetchedAt: existing?.fetchedAt ?? 0,
-      failedAt: Date.now(),
-    });
+  markFailure(key: string): void {
+    this.startCooldown(key);
   }
 
   /** Drop one feed's entry — used by "refresh now" and on unsubscribe. */

@@ -31,6 +31,7 @@ import { Observable } from 'rxjs';
 import { ElizaService } from '../../eliza/eliza.service';
 import { isElizaId } from '../../eliza/eliza-identity';
 import { CloneFriendsDialog } from './clone-friends-dialog/clone-friends-dialog';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analytics';
@@ -55,6 +56,7 @@ type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analyti
 export class Profile implements OnInit, OnDestroy {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
+  private diagnostics = inject(PageDiagnostics);
   protected words = inject(Terminology).words;
   protected auth = inject(Auth);
   private localMod = inject(LocalModeration);
@@ -339,11 +341,18 @@ export class Profile implements OnInit, OnDestroy {
         this.statuses.set(statuses);
         this.loading.set(false);
         this.statusesLoading.set(false);
+        // One line per profile open. An empty feed that parsed is worth saying
+        // out loud: it looks identical to a failure on screen.
+        this.diagnostics.info('Profile', 'rss:loaded', {
+          feed: feedUrl,
+          items: statuses.length,
+        });
       },
-      error: () => {
+      error: (error: unknown) => {
         if (seq !== this.loadSeq) {
           return;
         }
+        this.diagnostics.error('Profile', 'rss:load-failed', error, { feed: feedUrl });
         // No account to show; the template falls back to "Account not found".
         this.loading.set(false);
         this.statusesLoading.set(false);

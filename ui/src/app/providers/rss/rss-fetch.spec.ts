@@ -24,9 +24,13 @@ class FakeRssCache {
   records = new Map<string, CachedFeedRecord>();
   putCount = 0;
 
+  /** Route key -> epoch ms until which that route is cooling down. */
+  cooldowns = new Map<string, number>();
+
   async get(url: string, ttlMs: number): Promise<CachedFeed | null> {
     const record = this.records.get(url);
-    if (!record) {
+    // Mirrors the real cache: a record with no successful fetch is not a hit.
+    if (!record || record.fetchedAt <= 0) {
       return null;
     }
     return {
@@ -36,9 +40,9 @@ class FakeRssCache {
     };
   }
 
-  async inCooldown(url: string): Promise<boolean> {
-    const record = this.records.get(url);
-    return record?.failedAt !== undefined && Date.now() - record.failedAt < 15 * 60 * 1000;
+  async inCooldown(key: string): Promise<boolean> {
+    const until = this.cooldowns.get(key);
+    return until !== undefined && Date.now() < until;
   }
 
   async put(url: string, feed: ParsedFeed): Promise<void> {
@@ -46,14 +50,12 @@ class FakeRssCache {
     this.records.set(url, { url, feed, fetchedAt: Date.now() });
   }
 
-  async markFailure(url: string): Promise<void> {
-    const existing = this.records.get(url);
-    this.records.set(url, {
-      url,
-      feed: existing?.feed ?? { title: '', link: null, items: [] },
-      fetchedAt: existing?.fetchedAt ?? 0,
-      failedAt: Date.now(),
-    });
+  markFailure(key: string): void {
+    this.cooldowns.set(key, Date.now() + 15 * 60 * 1000);
+  }
+
+  clearCooldown(key: string): void {
+    this.cooldowns.delete(key);
   }
 
   async evict(url: string): Promise<void> {
@@ -231,6 +233,70 @@ describe('RssFetch', () => {
 
     // A day-old article beats an error message.
     expect((await result).title).toBe('Yesterday');
+  });
+
+  it('never serves an empty placeholder as though it were the feed', async () => {
+    // Regression. A failed fetch used to write a record holding an empty
+    // ParsedFeed; the next read treated that husk as a cache hit, so a feed
+    // that had failed once rendered as "0 posts" instead of reporting an error.
+    // The symptom was maddening because the subscription's title was correct —
+    // it had been captured by a *different*, successful fetch.
+    const first = new Promise<Error>((resolve) => {
+      fetcher.fetchFeed('https://example.com/feed.xml').subscribe({ error: resolve });
+    });
+    await settle();
+    http.expectOne(() => true).flush('', { status: 522, statusText: 'Origin Down' });
+    await first;
+
+    // Nothing readable was stored, so the feed is not "cached and empty".
+    expect(await cache.get('https://example.com/feed.xml', 24 * 60 * 60 * 1000)).toBeNull();
+
+    // And the next read reports the throttle rather than yielding zero items.
+    const second = await new Promise<Error>((resolve) => {
+      fetcher.fetchFeed('https://example.com/feed.xml').subscribe({
+        next: () => resolve(new Error('served a feed instead of failing')),
+        error: resolve,
+      });
+    });
+    expect(second.message).toMatch(/isn't being retried yet|couldn't be read/i);
+    http.verify();
+  });
+
+  it('a failed direct fetch does not block the proxied retry of the same feed', async () => {
+    // Regression, and the reason a proxied feed showed nothing: adding a
+    // CORS-blocked feed fails directly, then the user retries via proxy. A
+    // feed-wide cooldown suppressed that retry, so the feed never loaded.
+    settings.select('allorigins');
+
+    const direct = new Promise<Error>((resolve) => {
+      fetcher.fetchFeed('https://example.com/feed.xml').subscribe({ error: resolve });
+    });
+    await settle();
+    http.expectOne('https://example.com/feed.xml').error(new ProgressEvent('error'), { status: 0 });
+    await direct;
+
+    // The proxied route is a different route and must still be attempted.
+    fetcher.fetchFeed('https://example.com/feed.xml', { useProxy: true }).subscribe();
+    await settle();
+    http
+      .expectOne('https://api.allorigins.win/raw?url=https%3A%2F%2Fexample.com%2Ffeed.xml')
+      .flush(FEED_XML);
+    http.verify();
+  });
+
+  it("a successful fetch clears that route's cooldown", async () => {
+    fetcher.fetchFeed('https://example.com/feed.xml').subscribe({ error: () => undefined });
+    await settle();
+    http.expectOne(() => true).flush('', { status: 500, statusText: 'Server Error' });
+    await settle();
+    expect(await cache.inCooldown('direct:https://example.com/feed.xml')).toBe(true);
+
+    // forceRefresh ignores the cooldown; succeeding must clear it.
+    fetcher.fetchFeed('https://example.com/feed.xml', { forceRefresh: true }).subscribe();
+    await settle();
+    http.expectOne(() => true).flush(FEED_XML);
+    await settle();
+    expect(await cache.inCooldown('direct:https://example.com/feed.xml')).toBe(false);
   });
 
   it('stops hitting a failing feed for a cooldown period', async () => {

@@ -13,10 +13,11 @@ import {
   throwError,
 } from 'rxjs';
 import { ClientPrefs } from '../../client-prefs';
+import { PageDiagnostics } from '../../page-diagnostics';
 import { CorsProxy } from '../cors-proxy/cors-proxy';
 import { CorsProxyUsageStore } from '../cors-proxy/cors-proxy-usage';
 import { externalFetch } from '../external-fetch';
-import { RssCache } from './rss-cache';
+import { FAILURE_COOLDOWN_MS, RssCache } from './rss-cache';
 import { ParsedFeed, parseFeed } from './rss-parser';
 
 /**
@@ -47,6 +48,15 @@ import { ParsedFeed, parseFeed } from './rss-parser';
  * downloads (the item, then its comment feed) with nothing shared or retained —
  * which is how a free proxy's rate limit gets exhausted by ordinary reading.
  */
+/**
+ * How long a repeated diagnostic stays silent.
+ *
+ * Long enough that browsing around a set of feeds does not narrate itself,
+ * short enough that a developer reading the console after a few minutes of use
+ * still sees the current state rather than only the first page load.
+ */
+const LOG_QUIET_MS = 60_000;
+
 @Injectable({ providedIn: 'root' })
 export class RssFetch {
   private http = inject(HttpClient);
@@ -54,6 +64,7 @@ export class RssFetch {
   private proxyUsage = inject(CorsProxyUsageStore);
   private cache = inject(RssCache);
   private prefs = inject(ClientPrefs);
+  private diagnostics = inject(PageDiagnostics);
 
   /**
    * Requests currently on the wire, by feed URL.
@@ -63,6 +74,29 @@ export class RssFetch {
    * proxy configuration change mid-flight.
    */
   private inFlight = new Map<string, Observable<ParsedFeed>>();
+
+  /**
+   * When each diagnostic key was last emitted, for rate-limiting the log.
+   *
+   * Cache hits are the common case by design — every view that shows a feed
+   * resolves it from cache — so logging each one would bury the events that
+   * actually matter (a fetch, a failure, a throttle). Each distinct fact is
+   * said at most once per {@link LOG_QUIET_MS}.
+   *
+   * A full page navigation rebuilds this service and legitimately starts the
+   * window again; within a session, repeated renders stay quiet.
+   */
+  private lastLoggedAt = new Map<string, number>();
+
+  private logOnce(key: string, event: string, details: Record<string, unknown>): void {
+    const previous = this.lastLoggedAt.get(key);
+    const now = Date.now();
+    if (previous !== undefined && now - previous < LOG_QUIET_MS) {
+      return;
+    }
+    this.lastLoggedAt.set(key, now);
+    this.diagnostics.info('RSS', event, details);
+  }
 
   /**
    * Fetch and parse one feed.
@@ -91,18 +125,54 @@ export class RssFetch {
 
     // `defer` so the cache lookup happens per subscription rather than at call
     // time — callers build these observables and subscribe later.
+    const viaProxy = options.useProxy === true;
+
     return defer(() =>
       from(this.cache.get(url, ttlMs)).pipe(
         switchMap((cached) => {
           if (cached && !cached.stale) {
+            // Logged at most once per feed per session (see `logged`), so a
+            // timeline that renders twenty cached items stays quiet.
+            this.logOnce(`hit:${url}`, 'cache-hit', {
+              feed: url,
+              items: cached.feed.items.length,
+              ageMinutes: Math.round((Date.now() - cached.fetchedAt) / 60000),
+            });
             return of(cached.feed);
           }
-          return from(this.shouldSkipNetwork(url, options.forceRefresh === true)).pipe(
+          return from(this.shouldSkipNetwork(url, options.forceRefresh === true, viaProxy)).pipe(
             switchMap((skip) => {
               // Throttled or recently failed: the stale copy is the best answer
               // available, and going to the network would only deepen the hole.
+              //
+              // `cached` is null when the feed has only ever failed, so this
+              // never hands back an empty placeholder — a feed that has never
+              // been read successfully must report the failure, not render as
+              // an empty feed with zero posts.
               if (skip && cached) {
+                this.logOnce(`cooldown:${routeKey(url, viaProxy)}`, 'serving-stale-in-cooldown', {
+                  feed: url,
+                  viaProxy,
+                  ageMinutes: Math.round((Date.now() - cached.fetchedAt) / 60000),
+                  note: 'A recent fetch failed; not retrying for a few minutes.',
+                });
                 return of(cached.feed);
+              }
+              if (skip) {
+                // Nothing cached and still cooling down: report the throttle
+                // rather than rendering an empty feed.
+                this.logOnce(`blocked:${routeKey(url, viaProxy)}`, 'fetch-suppressed', {
+                  feed: url,
+                  viaProxy,
+                  note: 'A recent fetch failed and nothing is cached yet.',
+                });
+                return throwError(
+                  () =>
+                    new Error(
+                      "This feed couldn't be read a moment ago, so it isn't being retried yet. " +
+                        'Use Refresh on Settings → RSS to try again now.',
+                    ),
+                );
               }
               return this.networkFetch(url, options).pipe(
                 catchError((error: unknown) => {
@@ -126,12 +196,28 @@ export class RssFetch {
     );
   }
 
-  /** Whether a recent failure means this feed should be left alone for now. */
-  private async shouldSkipNetwork(url: string, forceRefresh: boolean): Promise<boolean> {
+  /**
+   * Whether a recent failure means this feed should be left alone for now.
+   *
+   * A cooldown only ever suppresses a *repeat of the route that failed*. The
+   * direct and proxied routes fail for unrelated reasons — a direct fetch that
+   * failed on CORS says nothing about whether the proxy can read the feed — so
+   * a direct failure must not block the proxied retry the user just asked for,
+   * which is precisely the sequence "add a blocked feed, then retry via proxy"
+   * performs.
+   *
+   * Keyed per route rather than per feed, because the *content* is shared
+   * between routes even though the failures are not.
+   */
+  private async shouldSkipNetwork(
+    url: string,
+    forceRefresh: boolean,
+    viaProxy: boolean,
+  ): Promise<boolean> {
     if (forceRefresh) {
       return false;
     }
-    return this.cache.inCooldown(url);
+    return this.cache.inCooldown(routeKey(url, viaProxy));
   }
 
   /**
@@ -144,15 +230,40 @@ export class RssFetch {
       return existing;
     }
 
+    const viaProxy = options.useProxy === true;
+    const key = routeKey(url, viaProxy);
+    const startedAt = Date.now();
+
     const request = this.buildRequest(url, options).pipe(
-      switchMap((feed) => from(this.cache.put(url, feed)).pipe(map(() => feed))),
+      switchMap((feed) => {
+        // This route works, so anything it was cooling down from is moot.
+        this.cache.clearCooldown(key);
+        this.diagnostics.info('RSS', 'fetched', {
+          feed: url,
+          viaProxy,
+          items: feed.items.length,
+          ms: Date.now() - startedAt,
+        });
+        return from(this.cache.put(url, feed)).pipe(map(() => feed));
+      }),
       catchError((error: unknown) => {
         // A misconfigured proxy is not the feed failing, so it must not start a
         // cooldown — the user fixes the setting and expects the next try to go.
         if (isConfigurationError(error)) {
+          this.diagnostics.warn('RSS', 'proxy-refused', {
+            feed: url,
+            reason: error instanceof Error ? error.message : String(error),
+          });
           return throwError(() => error);
         }
-        return from(this.cache.markFailure(url)).pipe(switchMap(() => throwError(() => error)));
+        this.cache.markFailure(key);
+        this.diagnostics.error('RSS', 'fetch-failed', error, {
+          feed: url,
+          viaProxy,
+          ms: Date.now() - startedAt,
+          note: `Not retrying this route for ${Math.round(FAILURE_COOLDOWN_MS / 60000)} minutes.`,
+        });
+        return throwError(() => error);
       }),
       // The in-flight entry must be dropped however the request ends, or one
       // failure would be replayed to every later caller.
@@ -208,6 +319,16 @@ export class RssFetch {
  * hiding one behind a stale cached copy would leave someone staring at
  * yesterday's articles wondering why their new proxy never took effect.
  */
+/**
+ * Cooldown identity: one feed has two independent routes.
+ *
+ * A direct fetch blocked by CORS says nothing about whether the proxy can read
+ * the same feed, so the failure of one must never suppress the other.
+ */
+function routeKey(url: string, viaProxy: boolean): string {
+  return `${viaProxy ? 'proxy' : 'direct'}:${url}`;
+}
+
 function isConfigurationError(error: unknown): boolean {
   // Matched by name rather than `instanceof` so this module needn't import the
   // cors-proxy package just for a type guard.
