@@ -342,3 +342,84 @@
   background: #e0245e;
   color: #fff;
 }
+
+/* ------------------------------------------------------------- explanatory */
+/* A short "what am I looking at" line under a section heading. */
+.section-note {
+  margin: -2px 0 12px;
+  max-width: 76ch;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- doc links */
+/* The "?" that opens docs.joinmastodon.org for an endpoint. Small and quiet
+   until hovered: it sits in a dense table and must not compete with the data. */
+.doc-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.doc-link:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Section-level match only — we know the family, not the operation. */
+.doc-link.approx {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+/* The operation's plain-English summary — the answer to "what even is this
+   endpoint", which is the whole point of the docs link.
+ *
+ * On its own line under the path, not beside it: the endpoint column sits in a
+ * fixed-width centre column between two sidebars, so anything added
+ * horizontally pushes the timing numbers out of view. Vertically it costs a
+ * line of height and nothing else. */
+.doc-summary {
+  display: block;
+  margin-top: 2px;
+}
+
+.obs-table td.endpoint {
+  max-width: 320px;
+}
+
+/* ------------------------------------------------------------ client errors */
+/* Wraps (against the table's default nowrap) and stays narrow, so the
+   first/last timestamps — which tell you whether a bug is historic or happening
+   right now — keep their place on screen. */
+.client-error {
+  max-width: 300px;
+  white-space: normal;
+}
+
+.cerr-type {
+  font-weight: 700;
+  color: #e0245e;
+  margin-right: 6px;
+}
+
+.cerr-msg {
+  overflow-wrap: anywhere;
+}
+
+.cerr-where {
+  display: block;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}

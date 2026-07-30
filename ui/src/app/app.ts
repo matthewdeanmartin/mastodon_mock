@@ -6,6 +6,7 @@ import { AnalyticsTracker } from './analytics-tracker';
 import { ClientPrefs } from './client-prefs';
 import { FailWhale } from './fail-whale/fail-whale';
 import { InstanceStatus } from './instance-status';
+import { RouteLog } from './observability/route-log';
 import { ServerHealth } from './server-health';
 import { UpdateOverlay } from './update-overlay/update-overlay';
 import { UpdateRecovery } from './update-recovery';
@@ -30,10 +31,14 @@ export class App {
   private readonly instanceStatus = inject(InstanceStatus);
   private readonly recovery = inject(UpdateRecovery);
   private readonly analytics = inject(AnalyticsTracker);
+  private readonly routeLog = inject(RouteLog);
 
   constructor() {
     // Count page views on every router navigation (GoatCounter, no_onload).
     this.analytics.start();
+    // The user's own copy of the same idea: per-route visits and time spent,
+    // kept locally for the Observability page and never sent anywhere.
+    this.routeLog.start();
     // Set the tab title from the build flavor (mastodon_mock vs Mocking Bird).
     this.title.setTitle(environment.brand);
     // Arm the deployment-recovery loop guard: if we got here after an

@@ -1,6 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ApiMetrics, EndpointStat, normalizeEndpoint } from './api-metrics';
+import {
+  ApiMetrics,
+  ClientErrorGroup,
+  EndpointStat,
+  describeError,
+  normalizeEndpoint,
+  normalizeErrorMessage,
+} from './api-metrics';
 import { Server } from '../server';
 
 function storageKey(server: string): string {
@@ -33,6 +40,49 @@ describe('normalizeEndpoint', () => {
   it('keeps route names that merely contain letters and digits but are short', () => {
     expect(normalizeEndpoint('/api/v2/search')).toBe('/api/v2/search');
     expect(normalizeEndpoint('/api/v1/trends/tags')).toBe('/api/v1/trends/tags');
+  });
+});
+
+describe('normalizeErrorMessage', () => {
+  it('blanks URLs, uuids, long ids and numbers so one bug is one group', () => {
+    expect(normalizeErrorMessage('GET https://example.test/a/b failed')).toBe('GET <url> failed');
+    expect(normalizeErrorMessage('missing 123e4567-e89b-12d3-a456-426614174000')).toBe(
+      'missing <uuid>',
+    );
+    expect(normalizeErrorMessage('status 110447291640403778 not found')).toBe(
+      'status <n> not found',
+    );
+    expect(normalizeErrorMessage('chunk a1b2c3d4e5f6g7 failed')).toBe('chunk <id> failed');
+    expect(normalizeErrorMessage('retry 3 of 10')).toBe('retry <n> of <n>');
+    // The unit stays; only the varying number goes.
+    expect(normalizeErrorMessage('Timeout after 3000ms')).toBe('Timeout after <n>ms');
+  });
+
+  it('collapses whitespace and caps length', () => {
+    expect(normalizeErrorMessage('a\n  b\tc')).toBe('a b c');
+    expect(normalizeErrorMessage('x'.repeat(500)).length).toBe(200);
+  });
+});
+
+describe('describeError', () => {
+  it('reads name, message and the first stack frame off an Error', () => {
+    const error = new TypeError('bad');
+    error.stack = 'TypeError: bad\n    at doThing (main.js:1:2)\n    at other (main.js:3:4)';
+    expect(describeError(error)).toEqual({
+      type: 'TypeError',
+      message: 'bad',
+      where: 'at doThing (main.js:1:2)',
+    });
+  });
+
+  it('labels thrown strings and plain objects rather than losing them', () => {
+    expect(describeError('oops')).toEqual({ type: 'string', message: 'oops', where: '' });
+    expect(describeError({ message: 'from an object' })).toMatchObject({
+      type: 'Object',
+      message: 'from an object',
+    });
+    expect(describeError({ a: 1 })).toMatchObject({ type: 'Object', message: '{"a":1}' });
+    expect(describeError(null)).toMatchObject({ message: 'null' });
   });
 });
 
@@ -153,6 +203,69 @@ describe('ApiMetrics', () => {
 
     server.setBaseUrl('https://mastodon.social');
     expect(metrics.totals().count).toBe(2);
+  });
+
+  // ------------------------------------------------------------ client errors
+
+  function group(type: string): ClientErrorGroup | undefined {
+    return metrics.clientErrors().find((g) => g.type === type);
+  }
+
+  it('groups repeated client errors of the same kind into one counted row', () => {
+    metrics.recordClientError('angular', new TypeError('Cannot read properties of undefined'));
+    metrics.recordClientError('angular', new TypeError('Cannot read properties of undefined'));
+
+    expect(metrics.clientErrors().length).toBe(1);
+    expect(group('TypeError')?.count).toBe(2);
+    expect(metrics.clientErrorTotals()).toEqual({ occurrences: 2, kinds: 1 });
+  });
+
+  it('separates client errors by type even when the message matches', () => {
+    metrics.recordClientError('angular', new TypeError('boom'));
+    metrics.recordClientError('window-error', new RangeError('boom'));
+    expect(metrics.clientErrors().length).toBe(2);
+    expect(group('RangeError')?.source).toBe('window-error');
+  });
+
+  it('groups messages that differ only in ids, numbers or URLs', () => {
+    metrics.recordClientError('angular', new Error('Failed to load https://a.example/x.js'));
+    metrics.recordClientError('angular', new Error('Failed to load https://b.example/y.js'));
+    metrics.recordClientError('angular', new Error('Timeout after 3000ms'));
+    metrics.recordClientError('angular', new Error('Timeout after 9000ms'));
+
+    expect(metrics.clientErrors().length).toBe(2);
+    expect(metrics.clientErrors().every((g) => g.count === 2)).toBe(true);
+  });
+
+  it('survives a thrown non-Error without breaking the caller', () => {
+    expect(() => metrics.recordClientError('unhandled-rejection', 'plain string')).not.toThrow();
+    expect(() => metrics.recordClientError('unhandled-rejection', { code: 42 })).not.toThrow();
+    expect(metrics.clientErrorTotals().occurrences).toBe(2);
+  });
+
+  it('persists client-error groups and reloads them', () => {
+    metrics.recordClientError('angular', new TypeError('nope'));
+    metrics.recordClientError('angular', new TypeError('nope'));
+    // reset() would clear them, so flush by way of a fresh blob read instead:
+    // pagehide is what flushes in the browser, and the spec can call it.
+    window.dispatchEvent(new Event('pagehide'));
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [ApiMetrics, Server] });
+    TestBed.inject(Server).setBaseUrl('https://mastodon.social');
+    const reloaded = TestBed.inject(ApiMetrics);
+
+    const restored = reloaded.clientErrors();
+    expect(restored.length).toBe(1);
+    expect(restored[0].count).toBe(2);
+    expect(restored[0].type).toBe('TypeError');
+  });
+
+  it('reset clears client errors along with everything else', () => {
+    metrics.recordClientError('angular', new Error('x'));
+    metrics.reset();
+    expect(metrics.clientErrors().length).toBe(0);
+    expect(metrics.clientErrorTotals().occurrences).toBe(0);
   });
 
   it('deletes the old global metrics blob instead of migrating it', () => {

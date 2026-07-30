@@ -136,6 +136,24 @@
                 <td class="endpoint">
                   <span class="method" [attr.data-method]="method(s.key)">{{ method(s.key) }}</span>
                   <code>{{ endpoint(s.key) }}</code>
+                  <!-- Straight to the anchor for this operation on
+                       docs.joinmastodon.org; dimmed when we could only place
+                       the call in a section rather than match it exactly. -->
+                  @if (doc(s.key); as d) {
+                    <a
+                      class="doc-link"
+                      [class.approx]="d.match === 'section'"
+                      [href]="d.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      [title]="docTitle(s.key)"
+                      [attr.aria-label]="'Documentation for ' + s.key"
+                      >?</a
+                    >
+                    @if (d.summary) {
+                      <span class="doc-summary muted small">{{ d.summary }}</span>
+                    }
+                  }
                 </td>
                 <td class="num">{{ s.count.toLocaleString() }}</td>
                 <td class="num">{{ round(mean(s)) }} ms</td>
@@ -169,6 +187,18 @@
             </span>
             <span class="method" [attr.data-method]="e.method">{{ e.method }}</span>
             <code class="err-endpoint">{{ e.endpoint }}</code>
+            @if (doc(e.method + ' ' + e.endpoint); as d) {
+              <a
+                class="doc-link"
+                [class.approx]="d.match === 'section'"
+                [href]="d.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                [title]="docTitle(e.method + ' ' + e.endpoint)"
+                [attr.aria-label]="'Documentation for ' + e.method + ' ' + e.endpoint"
+                >?</a
+              >
+            }
             <span class="err-msg muted">{{ e.message }}</span>
             <span class="err-time muted small">{{ time(e.at) }}</span>
           </li>
@@ -176,6 +206,56 @@
       </ul>
     } @else {
       <p class="muted center">Nothing has gone wrong recently. 🎉</p>
+    }
+  </section>
+
+  <!-- =========================== Client errors =========================== -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>Client errors</h2>
+      <span class="muted small">
+        {{ clientErrorTotals().occurrences.toLocaleString() }} occurrence{{
+          clientErrorTotals().occurrences === 1 ? '' : 's'
+        }}
+        · {{ clientErrorTotals().kinds }} kind{{ clientErrorTotals().kinds === 1 ? '' : 's' }}
+      </span>
+    </div>
+    <p class="muted small section-note">
+      JavaScript errors from the app itself, grouped by type and message — counted rather than
+      stored one by one, so a bug that fires a thousand times stays one row. Ids, numbers and URLs
+      in the message are replaced with placeholders to make that grouping work.
+    </p>
+    @if (clientErrors().length) {
+      <div class="table-wrap">
+        <table class="obs-table">
+          <thead>
+            <tr>
+              <th>Error</th>
+              <th class="num">Count</th>
+              <th class="num">First</th>
+              <th class="num">Last</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (g of clientErrors(); track g.type + g.message) {
+              <tr class="row-bad" [title]="clientErrorDetail(g)">
+                <td class="client-error">
+                  <span class="cerr-type">{{ g.type }}</span>
+                  <span class="cerr-msg">{{ g.message }}</span>
+                  @if (g.where) {
+                    <code class="cerr-where muted small">{{ g.where }}</code>
+                  }
+                </td>
+                <td class="num err">{{ g.count.toLocaleString() }}</td>
+                <td class="num muted small">{{ stamp(g.firstAt) }}</td>
+                <td class="num muted small">{{ stamp(g.lastAt) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="muted center">No client-side errors recorded. 🎉</p>
     }
   </section>
 
@@ -228,6 +308,129 @@
       </div>
     } @else {
       <p class="muted center">Local storage is empty.</p>
+    }
+  </section>
+
+  <!-- ============================= IndexedDB ============================= -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>IndexedDB &amp; quota</h2>
+      <div class="section-actions">
+        <span class="muted small">{{ quotaLabel() }}</span>
+        <button
+          class="btn btn-outline btn-sm"
+          (click)="refreshIndexedDb()"
+          [disabled]="idbLoading()"
+        >
+          {{ idbLoading() ? 'Scanning…' : 'Refresh' }}
+        </button>
+      </div>
+    </div>
+    <p class="muted small section-note">
+      This app keeps its data in local storage, not IndexedDB — so an entry here is something else
+      on this origin. The quota figure covers <em>all</em> browser storage for this site, which is
+      what the browser actually checks before evicting anything.
+    </p>
+    @if (idb(); as report) {
+      @if (report.quota.persisted) {
+        <p class="muted small">
+          Storage is persistent: this origin is exempt from automatic eviction.
+        </p>
+      }
+      @if (!report.supported) {
+        <p class="muted center">{{ report.note }}</p>
+      } @else if (report.databases.length) {
+        <div class="table-wrap">
+          <table class="obs-table">
+            <thead>
+              <tr>
+                <th>Database</th>
+                <th class="num">Version</th>
+                <th>Object stores</th>
+                <th class="num">Records</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (db of report.databases; track db.name) {
+                <tr [class.row-bad]="!!db.error">
+                  <td class="storage-key">
+                    <code>{{ db.name }}</code>
+                  </td>
+                  <td class="num muted">{{ db.version ?? '—' }}</td>
+                  <td class="muted small">{{ storeSummary(db) }}</td>
+                  <td class="num">{{ db.error ? '—' : totalRecords(db).toLocaleString() }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="muted center">No IndexedDB databases on this origin.</p>
+      }
+    } @else {
+      <p class="muted center">Scanning…</p>
+    }
+  </section>
+
+  <!-- ============================= Route log ============================= -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>Route log</h2>
+      <div class="section-actions">
+        <span class="muted small">
+          {{ routeTotals().visits.toLocaleString() }} visits ·
+          {{ formatDuration(routeTotals().totalMs) }} total · {{ routeTotals().routes }} routes
+        </span>
+        <button class="btn btn-outline btn-sm" (click)="refreshRoutes()">Refresh</button>
+        <button class="btn btn-outline btn-sm danger" (click)="resetRoutes()">Reset</button>
+      </div>
+    </div>
+    <p class="muted small section-note">
+      Where you spend your time in this app — your own analytics, kept in this browser and never
+      sent anywhere. Paths are recorded as shapes (<code>/accounts/:id</code>), so it counts that
+      you opened profiles, not whose. Time doesn’t accrue while the tab is in the background.
+    </p>
+    @if (routeRows().length) {
+      <div class="table-wrap">
+        <table class="obs-table">
+          <thead>
+            <tr>
+              <th>Route</th>
+              <th
+                class="num sortable"
+                (click)="setRouteSort('visits')"
+                [class.on]="routeSortKey() === 'visits'"
+              >
+                Visits
+              </th>
+              <th
+                class="num sortable"
+                (click)="setRouteSort('time')"
+                [class.on]="routeSortKey() === 'time'"
+              >
+                Time
+              </th>
+              <th class="num">Avg</th>
+              <th class="num">Last</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of routeRows(); track r.path) {
+              <tr [title]="'Last visited ' + when(r.lastAt)">
+                <td class="endpoint">
+                  <code>{{ r.path }}</code>
+                </td>
+                <td class="num">{{ r.visits.toLocaleString() }}</td>
+                <td class="num">{{ formatDuration(r.totalMs) }}</td>
+                <td class="num muted">{{ formatDuration(avgDwell(r)) }}</td>
+                <td class="num muted small">{{ stamp(r.lastAt) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="muted center">No navigations recorded yet.</p>
     }
   </section>
 </div>

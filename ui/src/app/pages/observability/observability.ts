@@ -3,15 +3,24 @@ import {
   ApiError,
   ApiMetrics,
   BUCKET_MS,
+  ClientErrorGroup,
   EndpointStat,
   TimeBucket,
 } from '../../observability/api-metrics';
+import { EndpointDoc, endpointDoc } from '../../observability/api-docs';
+import {
+  DatabaseInfo,
+  IndexedDbReport,
+  inspectIndexedDb,
+  totalRecords,
+} from '../../observability/indexed-db-inspector';
 import {
   StorageEntry,
   StorageReport,
   formatBytes,
   inspectLocalStorage,
 } from '../../observability/local-storage-inspector';
+import { RouteLog, RouteStat, formatDuration } from '../../observability/route-log';
 
 /** How the endpoint table is sorted. */
 type SortKey = 'count' | 'avg' | 'max' | 'errors';
@@ -28,11 +37,24 @@ const CHART_W = 720;
 const CHART_H = 160;
 const CHART_PAD = 4;
 
+/** How the route table is sorted. */
+type RouteSortKey = 'visits' | 'time';
+
 /**
- * The Observability page: API-call metrics (per-endpoint stats + a
- * calls-over-time chart), a recent-error log, and a localStorage inspector with
- * per-key sizes and delete buttons. All data comes from {@link ApiMetrics} (see
- * that service for the compact storage scheme) and a live localStorage scan.
+ * The Observability page — everything this browser knows about how the app is
+ * behaving, and how it's being used:
+ *
+ *  - **API calls** — per-endpoint stats, a calls-over-time chart, and a link
+ *    from every endpoint to its official documentation ({@link endpointDoc}).
+ *  - **Recent errors** — the last failing API calls.
+ *  - **Client errors** — JS exceptions grouped by kind, with counts.
+ *  - **Local storage** — per-key sizes, with delete.
+ *  - **IndexedDB** — databases, stores, record counts, and the origin's quota.
+ *  - **Route log** — visits and time spent per route.
+ *
+ * Data comes from {@link ApiMetrics} and {@link RouteLog} (see those services
+ * for the count-don't-store storage schemes) plus live storage scans. Nothing
+ * on this page is sent anywhere.
  */
 @Component({
   selector: 'app-observability',
@@ -42,11 +64,21 @@ const CHART_PAD = 4;
 })
 export class Observability {
   private metrics = inject(ApiMetrics);
+  private routeLog = inject(RouteLog);
 
   protected readonly totals = this.metrics.totals;
   protected readonly errors = this.metrics.errors;
+  protected readonly clientErrors = this.metrics.clientErrors;
+  protected readonly clientErrorTotals = this.metrics.clientErrorTotals;
   protected readonly serverLabel = this.metrics.serverLabel;
   protected readonly formatBytes = formatBytes;
+  protected readonly formatDuration = formatDuration;
+
+  constructor() {
+    // Bank the time spent getting here, so this page's own row isn't stale.
+    this.routeLog.refresh();
+    void this.refreshIndexedDb();
+  }
 
   protected readonly sortKey = signal<SortKey>('count');
 
@@ -114,6 +146,139 @@ export class Observability {
 
   protected time(at: number): string {
     return new Date(at).toLocaleTimeString();
+  }
+
+  protected when(at: number): string {
+    return new Date(at).toLocaleString();
+  }
+
+  /**
+   * Compact date + time for a table column ("Jul 30, 7:37 AM"). The full
+   * timestamp is still in the row's tooltip; the column just has to fit.
+   */
+  protected stamp(at: number): string {
+    return new Date(at).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
+  // -------------------------------------------------------------- docs links
+
+  /**
+   * The documentation link for an endpoint key, or null if it isn't a Mastodon
+   * endpoint. Memoized because the table re-renders on every sort and every
+   * recorded call, and a miss walks the whole shape bucket.
+   */
+  private readonly docCache = new Map<string, EndpointDoc | null>();
+
+  protected doc(key: string): EndpointDoc | null {
+    const cached = this.docCache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const found = endpointDoc(key);
+    this.docCache.set(key, found);
+    return found;
+  }
+
+  /** Tooltip for the docs link: what the call does, and how sure we are. */
+  protected docTitle(key: string): string {
+    const d = this.doc(key);
+    if (!d) {
+      return '';
+    }
+    return d.match === 'exact'
+      ? `${d.summary || 'View documentation'} — opens docs.joinmastodon.org`
+      : 'No exact match; opens the documentation section for this API family';
+  }
+
+  // ----------------------------------------------------------- client errors
+
+  /** Full detail for a client-error row's hover tooltip. */
+  protected clientErrorDetail(g: ClientErrorGroup): string {
+    return [
+      `${g.type}: ${g.message}`,
+      g.where ? g.where : null,
+      `${g.count} occurrence${g.count === 1 ? '' : 's'} (${g.source})`,
+      `first ${this.when(g.firstAt)}`,
+      `last ${this.when(g.lastAt)}`,
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n');
+  }
+
+  // --------------------------------------------------------------- IndexedDB
+
+  protected readonly idb = signal<IndexedDbReport | null>(null);
+  protected readonly idbLoading = signal(false);
+  protected readonly totalRecords = totalRecords;
+
+  async refreshIndexedDb(): Promise<void> {
+    this.idbLoading.set(true);
+    try {
+      this.idb.set(await inspectIndexedDb());
+    } finally {
+      this.idbLoading.set(false);
+    }
+  }
+
+  /** `"12.4 MB of 2.1 GB (0.6%)"`, or a shorter form when the browser is coy. */
+  protected quotaLabel(): string {
+    const q = this.idb()?.quota;
+    if (!q || q.usage === null) {
+      return 'Storage usage unavailable in this browser.';
+    }
+    const used = formatBytes(q.usage);
+    if (q.quota === null) {
+      return `${used} used`;
+    }
+    const pct = q.ratio === null ? '' : ` (${(q.ratio * 100).toFixed(1)}%)`;
+    return `${used} of ${formatBytes(q.quota)}${pct}`;
+  }
+
+  protected storeSummary(db: DatabaseInfo): string {
+    if (db.error) {
+      return db.error;
+    }
+    if (!db.stores.length) {
+      return 'no object stores';
+    }
+    return db.stores.map((s) => `${s.name} (${s.count ?? '?'})`).join(', ');
+  }
+
+  // --------------------------------------------------------------- route log
+
+  protected readonly routeTotals = this.routeLog.totals;
+  protected readonly routeSortKey = signal<RouteSortKey>('visits');
+
+  protected readonly routeRows = computed<RouteStat[]>(() => {
+    const key = this.routeSortKey();
+    const stats = [...this.routeLog.stats()];
+    return stats.sort((a, b) => (key === 'time' ? b.totalMs - a.totalMs : b.visits - a.visits));
+  });
+
+  setRouteSort(key: RouteSortKey): void {
+    this.routeSortKey.set(key);
+  }
+
+  /** Average time per visit — the "is this a glance or a session" number. */
+  protected avgDwell(s: RouteStat): number {
+    return s.visits ? s.totalMs / s.visits : 0;
+  }
+
+  refreshRoutes(): void {
+    this.routeLog.refresh();
+  }
+
+  resetRoutes(): void {
+    if (!confirm('Clear the route log (visit counts and time spent)?')) {
+      return;
+    }
+    this.routeLog.reset();
+    this.refreshStorage();
   }
 
   /** Full, multi-line error detail for the row's hover tooltip. */
@@ -209,6 +374,9 @@ export class Observability {
     if (key.startsWith('mockingbird_api_metrics:')) {
       return 'this page’s metrics';
     }
+    if (key === 'mockingbird_route_log') {
+      return 'this page’s route log';
+    }
     if (key.startsWith('mockingbird_')) {
       return 'Mockingbird';
     }
@@ -229,7 +397,11 @@ export class Observability {
   // ------------------------------------------------------------------- reset
 
   resetMetrics(): void {
-    if (!confirm('Clear all collected API metrics, the timeline, and the error log?')) {
+    if (
+      !confirm(
+        'Clear all collected API metrics, the timeline, and both error logs for this server?',
+      )
+    ) {
       return;
     }
     this.metrics.reset();

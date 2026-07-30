@@ -49,7 +49,11 @@ export function inspectLocalStorage(
   return { entries, totalBytes };
 }
 
-/** Human-readable byte size (B / KB / MB). */
+/**
+ * Human-readable byte size (B / KB / MB / GB). The GB tier is there for the
+ * storage *quota*, which is a share of the disk and routinely runs to several
+ * gigabytes; no single localStorage key will ever get near it.
+ */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -57,5 +61,8 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }

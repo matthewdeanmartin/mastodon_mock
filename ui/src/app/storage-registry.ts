@@ -268,6 +268,16 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     // has no business in a "here is my setup" gist even though it is dull.
     note: 'How many times each right-rail house ad was clicked, and when. Local only — never sent anywhere.',
   },
+  {
+    base: 'mockingbird_route_log',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    // Route shapes only (ids are sanitized out), but "which parts of the app do
+    // I use, and for how long" is still a description of the person's habits —
+    // exactly the sort of dull-looking thing that has no place in a public gist.
+    note: 'Per-route visit counts and time spent, for the Observability page. Paths are sanitized (no ids or queries). Local only — never sent anywhere.',
+  },
 
   // ---- content: text the user wrote ----
   {
@@ -433,7 +443,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'instance',
     sensitivity: 'cache',
-    note: 'Local API timing metrics, one entry per instance. The trailing colon is part of the base — keys are `…metrics:<host>`.',
+    note: 'Local API timing metrics and grouped client-error counts, one entry per instance. The trailing colon is part of the base — keys are `…metrics:<host>`.',
   },
   {
     base: 'mockingbird_api_metrics',

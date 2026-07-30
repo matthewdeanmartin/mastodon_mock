@@ -16,7 +16,8 @@
     "format": "prettier --write \"src/**/*.{ts,html,css,scss}\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\"",
     "servers:snapshot": "node scripts/update-server-snapshot.mjs",
-    "check:storage": "node scripts/check-storage-registry.mjs"
+    "check:storage": "node scripts/check-storage-registry.mjs",
+    "gen:api-docs": "node scripts/gen-api-docs.mjs"
   },
   "private": true,
   "packageManager": "npm@11.17.0",
