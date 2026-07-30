@@ -100,6 +100,40 @@ describe('RaindropSession', () => {
     expect(localStorage.getItem('mockingbird_raindrop_token')).toBeNull();
   });
 
+  it('is shared by every account in the browser, signed in or not', () => {
+    // Unscoped: connect while signed in as one account, and the token is the
+    // same one the next account (and Anonymous) sees. Raindrop is the person's
+    // bookmark drawer, not a per-persona identity.
+    localStorage.setItem('mastodon_mock_token', 'token-for-account-one');
+    new RaindropSession().connect('test-token');
+
+    localStorage.setItem('mastodon_mock_account_mode', 'anonymous');
+    expect(new RaindropSession().connected()).toBe(true);
+  });
+
+  it('adopts a token stored under the old per-account key', () => {
+    // Before unscoping, the key carried a hash of the active token. Users who
+    // had already connected must not be silently logged out of Raindrop.
+    localStorage.setItem('mastodon_mock_account_mode', 'anonymous');
+    localStorage.setItem(
+      'mockingbird_raindrop_token_anonymous',
+      JSON.stringify({ accessToken: 'legacy-token', connectedAt: Date.now() }),
+    );
+
+    const session = new RaindropSession();
+
+    expect(session.connected()).toBe(true);
+    expect(JSON.parse(localStorage.getItem('mockingbird_raindrop_token')!)).toMatchObject({
+      accessToken: 'legacy-token',
+    });
+
+    // Disconnecting has to clear both, or a reload adopts the old copy again.
+    session.disconnect();
+    expect(localStorage.getItem('mockingbird_raindrop_token')).toBeNull();
+    expect(localStorage.getItem('mockingbird_raindrop_token_anonymous')).toBeNull();
+    expect(new RaindropSession().connected()).toBe(false);
+  });
+
   it('saves a post directly with the Test token', async () => {
     const fetchMock = vi
       .fn()

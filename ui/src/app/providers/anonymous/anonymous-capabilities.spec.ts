@@ -32,7 +32,9 @@ describe('AnonymousCapabilities', () => {
     expect(capabilities.canFollow).toBe(true);
     expect(capabilities.canUseServerActions).toBe(false);
     expect(capabilities.canBookmark).toBe(true);
-    expect(capabilities.canUseBluesky).toBe(false);
+    // Bluesky brings its own credential, so it is not identity-dependent on
+    // Mastodon at all — Anonymous gets its own link like any other account.
+    expect(capabilities.canUseBluesky).toBe(true);
     expect(capabilities.statusCaps('mastodon')).toEqual({
       reply: false,
       favourite: false,

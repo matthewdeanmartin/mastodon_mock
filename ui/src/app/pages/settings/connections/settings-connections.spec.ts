@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlueskySession, BskySession } from '../../../providers/bluesky/bluesky-session';
-import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
 import { DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { GitHubSession } from '../../../providers/github/github-session';
 import { CredentialLifetimeStore } from '../../../providers/credential-lifetime';
@@ -22,7 +21,6 @@ describe('SettingsConnections (catalog)', () => {
     enforceLifetime: ReturnType<typeof vi.fn>;
   };
   let dropboxSession: { connected: WritableSignal<boolean>; configured: boolean };
-  let capabilities: { canUseBluesky: boolean };
 
   beforeEach(() => {
     localStorage.clear();
@@ -39,7 +37,6 @@ describe('SettingsConnections (catalog)', () => {
       enforceLifetime: vi.fn(),
     };
     dropboxSession = { connected: signal(false), configured: true };
-    capabilities = { canUseBluesky: true };
 
     TestBed.configureTestingModule({
       providers: [
@@ -47,7 +44,6 @@ describe('SettingsConnections (catalog)', () => {
         { provide: BlueskySession, useValue: bskySession },
         { provide: GitHubSession, useValue: githubSession },
         { provide: DropboxSession, useValue: dropboxSession },
-        { provide: AnonymousCapabilities, useValue: capabilities },
       ],
     });
   });
@@ -89,11 +85,14 @@ describe('SettingsConnections (catalog)', () => {
 
   it('says who each connection belongs to', () => {
     const fixture = setUp();
-    // Account-scoped credentials (scopedKey) vs Dropbox's unscoped sessionStorage.
-    expect(cardFor(fixture, 'Bluesky').textContent).toContain('This account');
-    expect(cardFor(fixture, 'GitHub').textContent).toContain('This account');
-    expect(cardFor(fixture, 'Raindrop.io').textContent).toContain('This account');
-    expect(cardFor(fixture, 'Dropbox').textContent).toContain('This tab only');
+    // Bluesky asserts who this persona also is, so it is the per-account one
+    // (scopedKey). Raindrop and OpenRouter belong to the human, so they are
+    // unscoped; Dropbox is unscoped too but lives in sessionStorage.
+    expect(cardFor(fixture, 'Bluesky').textContent).toContain('One per account');
+    expect(cardFor(fixture, 'GitHub').textContent).toContain('One per account');
+    expect(cardFor(fixture, 'Raindrop.io').textContent).toContain('All accounts');
+    expect(cardFor(fixture, 'OpenRouter').textContent).toContain('All accounts');
+    expect(cardFor(fixture, 'Dropbox').textContent).toContain('All accounts, this tab');
   });
 
   it('each card links to that connector’s own page', () => {
@@ -115,17 +114,12 @@ describe('SettingsConnections (catalog)', () => {
 
   it('renders an unavailable connector greyed with the reason rather than hiding it', () => {
     dropboxSession.configured = false;
-    capabilities.canUseBluesky = false;
     const fixture = setUp();
 
     const dropbox = cardFor(fixture, 'Dropbox');
     expect(dropbox.classList).toContain('unavailable');
     expect(dropbox.textContent).toContain('Unavailable');
     expect(dropbox.textContent).toContain('app key is missing');
-
-    const bluesky = cardFor(fixture, 'Bluesky');
-    expect(bluesky.classList).toContain('unavailable');
-    expect(bluesky.textContent).toContain('Anonymous account');
 
     // Nothing disappeared: unavailable is a state, not a removal.
     expect(cards(fixture)).toHaveLength(CONNECTION_CATALOG.length);

@@ -27,7 +27,7 @@ describe('SettingsShell', () => {
     expect(labels).toContain('Approve follow requests');
     expect(labels).toContain('Import/Export');
     // Mock build shows the _mock-backed pages too.
-    expect(labels).toContain('Invite people');
+    expect(labels).toContain('Invite links');
   });
 
   it('shows only browser-local settings in Anonymous', () => {

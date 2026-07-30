@@ -1,6 +1,6 @@
 # Anonymous Great — Sprint 1: search that tells the truth
 
-Status: COMPLETE (implemented 2026-07-29; 1787 tests, lint and storage-registry clean). Roadmap: `anonymous-great-0-overview.md`.
+Status: COMPLETE (implemented 2026-07-29; revised 2026-07-30 — see "Post-ship correction" below; 1910 tests, lint and storage-registry clean). Roadmap: `anonymous-great-0-overview.md`.
 
 ## The bug
 
@@ -193,3 +193,54 @@ Pure and heavily covered:
 4. Signed in on a server without Elasticsearch, search posts: "Post search is not available
    on <host>." Switch the search type to Accounts; results appear. This is the spillover —
    the same fix, no anonymous mode involved.
+
+## Post-ship correction (2026-07-30): the canary was testing for something nobody has
+
+Field result from sweeping the ~300 servers in the directory: **not one of them serves
+anonymous full-text post search.** The original post canary was a bare word (`mastodon`)
+against `type=statuses`, which is exactly the thing that is universally off — full text
+needs Elasticsearch *and* a token. So the bar every candidate was measured against was one
+every candidate failed. A test nothing passes sorts nothing; the hunt was rejecting the
+whole directory and the "no post index" message was technically true of everywhere.
+
+What actually varies is what a server does with a **hashtag** query, and there are three
+live behaviours:
+
+1. Posts come back. The only useful one, and the bar now.
+2. Nothing comes back.
+3. Only a list of matching hashtag *names* comes back, and no posts.
+
+Outcome 3 is the one worth the extra code: the server recognised the tag, answered 200, and
+returned a payload that looks like a result set until you notice there is nothing in it to
+read. Silently treating that as "no results" tells the user to try different words when no
+words will ever work here.
+
+### As changed
+
+- **`POST_CANARIES = ['#mastodon', '#news']`** — hashtags, not bare words. Two of them, tried
+  in order, and only when the first yields no posts. Rejections are *persisted*, so a single
+  quiet tag would otherwise cost a usable server until the user found the Clear button.
+- **The post canary sends no `type` parameter.** Asking for `type=statuses` makes a
+  tags-only server answer with an empty payload, collapsing outcomes 2 and 3 into one. One
+  request, both facts.
+- **`SearchServerProbe` gains `hashtags: number | null`** alongside `statuses`, and
+  `isTagsOnly(probe)` names the combination. `isUsableSearchServer` is unchanged —
+  `statuses > 0` was already the right bar; only what we ask to get there moved.
+- **`SearchCapability` gains a `tags-only` ability** and the same hashtag canary, because the
+  two files must agree about a host or "search is broken here" and "this server is no good"
+  contradict each other. The search page now says *"<host> recognises the hashtag but won't
+  serve the posts behind it"* — a statement about the server, where the old copy implied the
+  user should try harder.
+- **The hunt narrates it**: `tags-only.example — hashtags only, no posts` scrolls past, which
+  is the failure most easily mistaken for success and therefore the one worth naming.
+
+### Still true, and still a seam
+
+Anonymous post search in the app does not go through `/api/v2/search` at all — it is
+`AnonymousPublicApi.searchPostsByHashtags`, one `/api/v1/timelines/tag/:name` call per query
+word. So the capability probe and the real anonymous request still hit different endpoints.
+The hashtag canary narrows that gap a great deal (both now ask "give me the posts for this
+tag") but does not close it: a server could serve tag timelines while refusing tag search, or
+the reverse. Probing the endpoint the anonymous path actually uses would close it, and would
+cost a second probe shape. Left as is, noted here, because the current probe is now measuring
+something real rather than something nobody offers.

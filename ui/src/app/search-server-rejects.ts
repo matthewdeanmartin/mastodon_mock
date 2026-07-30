@@ -5,7 +5,7 @@ import { SearchServerStatus } from './search-server-probe';
  * Search servers we already checked and can't use.
  *
  * Hunting for a search server means walking a directory of ~1000 instances, most
- * of which will refuse anonymous search or have no post index. Without a memory,
+ * of which will refuse anonymous search or return no posts at all. Without a memory,
  * every hunt re-probes the same duds — and each probe is a real cross-origin
  * request with a real timeout, so the second hunt is exactly as slow as the first.
  *

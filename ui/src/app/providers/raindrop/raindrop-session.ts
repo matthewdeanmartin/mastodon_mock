@@ -24,18 +24,28 @@ interface RaindropErrorResponse {
 
 export type RaindropBookmarkTarget = 'post' | 'external-link';
 
-/** Browser-only Raindrop.io connection using the account's non-expiring Test token. */
+/**
+ * Browser-only Raindrop.io connection using the account's non-expiring Test token.
+ *
+ * The token is stored **unscoped** — one Raindrop.io connection per browser,
+ * shared by every Mastodon account including Anonymous. Raindrop is a private
+ * bookmark drawer belonging to the person at the keyboard, not a public identity
+ * attached to a persona (that distinction is what {@link ConnectionScope} is
+ * about), so making each alt paste the same Test token bought nothing: any of
+ * them could read the others' copy out of this same localStorage regardless.
+ */
 @Injectable({ providedIn: 'root' })
 export class RaindropSession implements ExpiringConnection {
-  private readonly tokenKey = scopedKey(TOKEN_KEY_BASE);
-  private readonly legacyCredentialsKey = scopedKey(LEGACY_CREDENTIALS_KEY_BASE);
-  private token = signal<StoredRaindropToken | null>(readToken(this.tokenKey));
+  private readonly tokenKey = TOKEN_KEY_BASE;
+  private token = signal<StoredRaindropToken | null>(adoptScopedToken(this.tokenKey));
 
   readonly connected = signal(this.token() !== null);
 
   constructor() {
-    // Do not retain client secrets saved by the superseded OAuth implementation.
-    localStorage.removeItem(this.legacyCredentialsKey);
+    // Do not retain client secrets saved by the superseded OAuth implementation,
+    // under either the current or the old per-account key.
+    localStorage.removeItem(LEGACY_CREDENTIALS_KEY_BASE);
+    localStorage.removeItem(scopedKey(LEGACY_CREDENTIALS_KEY_BASE));
   }
 
   connect(accessToken: string): void {
@@ -104,7 +114,10 @@ export class RaindropSession implements ExpiringConnection {
 
   disconnect(): void {
     localStorage.removeItem(this.tokenKey);
-    localStorage.removeItem(this.legacyCredentialsKey);
+    // Also clear the pre-unscoping copy, so "Disconnect" cannot be undone by a
+    // reload that finds the old key and adopts it again.
+    localStorage.removeItem(scopedKey(TOKEN_KEY_BASE));
+    localStorage.removeItem(LEGACY_CREDENTIALS_KEY_BASE);
     this.token.set(null);
     this.connected.set(false);
   }
@@ -128,6 +141,29 @@ export function firstExternalLink(content: string, instanceUrl: string): string 
     }
   }
   return null;
+}
+
+/**
+ * Read the unscoped token, migrating the signed-in account's old per-account one
+ * up to it if that is all there is.
+ *
+ * Raindrop used to store under `scopedKey(TOKEN_KEY_BASE)`. Without this, every
+ * existing user would silently look disconnected and have to go find their Test
+ * token again. The old key is left in place rather than deleted: another account
+ * in this browser may still be holding the only copy of *its* token there, and
+ * whichever one signs in next adopts it the same way. `disconnect()` clears
+ * both, so forgetting still means forgetting.
+ */
+function adoptScopedToken(key: string): StoredRaindropToken | null {
+  const current = readToken(key);
+  if (current) {
+    return current;
+  }
+  const legacy = readToken(scopedKey(key));
+  if (legacy) {
+    localStorage.setItem(key, JSON.stringify(legacy));
+  }
+  return legacy;
 }
 
 function readToken(key: string): StoredRaindropToken | null {

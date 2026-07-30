@@ -1,0 +1,179 @@
+<h1 class="page-title">Invite people to Mastodon</h1>
+<p class="muted">
+  Invite your friends elsewhere to come find you on Mastodon. Pick a message, edit it here if you
+  like, then post it on X or Bluesky. Mawkingbird doesn’t connect to either account — the button
+  just opens their composer with the text filled in, and you send it.
+</p>
+
+<div class="tabs" role="tablist" aria-label="Where to invite from">
+  <button
+    class="tab"
+    type="button"
+    role="tab"
+    id="invite-tab-x"
+    [attr.aria-selected]="network() === 'x'"
+    [class.active]="network() === 'x'"
+    (click)="setNetwork('x')"
+  >
+    Twitter (X)
+  </button>
+  <button
+    class="tab"
+    type="button"
+    role="tab"
+    id="invite-tab-bluesky"
+    [attr.aria-selected]="network() === 'bluesky'"
+    [class.active]="network() === 'bluesky'"
+    (click)="setNetwork('bluesky')"
+  >
+    Bluesky
+  </button>
+</div>
+
+<div class="invite-intro" role="tabpanel" [attr.aria-labelledby]="'invite-tab-' + network()">
+  @if (network() === 'x') {
+    <p class="muted small">
+      These ask people to join Mastodon and come find you. Your X followers probably don’t have a
+      fediverse account yet, so each one links somewhere they can start.
+    </p>
+  } @else {
+    <p class="muted small">
+      Bluesky people don’t need convincing about the open social web — they’re just missing the
+      friends who went to Mastodon. These lead with the fact that anyone can read Mastodon through
+      Mawkingbird with no account at all, on
+      <code>{{ homeHost() || 'mastodon.social' }}</code
+      >.
+    </p>
+  }
+
+  <label class="profile-toggle">
+    <input
+      type="checkbox"
+      [checked]="naming()"
+      [disabled]="!hasProfile()"
+      (change)="toggleProfile($any($event.target).checked)"
+    />
+    <span>
+      Include my Mastodon profile
+      @if (hasProfile()) {
+        <span class="muted small">— {{ profileUrl() }}</span>
+      } @else {
+        <span class="muted small">
+          — unavailable: the Anonymous account is browser-local, so there’s no profile page to link
+          to. <a routerLink="/login">Sign in</a> to include one.
+        </span>
+      }
+    </span>
+  </label>
+  <p class="muted small">
+    Only your public profile link goes in the post. Nothing else about this browser — no tokens, no
+    server API URLs, no account IDs — is ever put in the message.
+  </p>
+
+  <button class="btn btn-outline btn-sm" type="button" (click)="shuffle()">
+    Shuffle — show a different one first
+  </button>
+</div>
+
+<ul class="invite-list">
+  @for (card of cards(); track card.variation.id) {
+    <li class="invite-card">
+      <div class="invite-head">
+        <h2>{{ card.variation.title }}</h2>
+        <span
+          class="count"
+          [class.over]="card.overLimit"
+          [attr.aria-label]="
+            card.length +
+            ' of about ' +
+            limits[card.variation.network] +
+            ' characters' +
+            (card.overLimit ? ' — too long' : '')
+          "
+        >
+          @if (card.overLimit) {
+            ⚠
+          }
+          {{ card.length }}/{{ limits[card.variation.network] }}
+        </span>
+      </div>
+
+      <label class="sr-only" [attr.for]="'invite-text-' + card.variation.id">
+        {{ card.variation.title }} — invitation text, editable
+      </label>
+      <textarea
+        class="invite-text"
+        rows="9"
+        [id]="'invite-text-' + card.variation.id"
+        [value]="card.text"
+        (input)="onEdit(card.variation.id, $any($event.target).value)"
+      ></textarea>
+
+      @if (card.overLimit) {
+        <p class="warn small">
+          Longer than {{ card.variation.network === 'x' ? 'X' : 'Bluesky' }} normally allows. Both
+          networks count links their own way, so this is an estimate — but consider dropping a
+          sentence. Keep the profile link if you can; it’s the part that helps people find you.
+        </p>
+      }
+
+      <div class="invite-actions">
+        <a
+          class="btn"
+          [href]="card.intentUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          [attr.aria-label]="postLabel(card)"
+          (click)="onIntentOpen(card)"
+        >
+          {{ card.variation.network === 'x' ? 'Post on X' : 'Post on Bluesky' }} ↗
+        </a>
+        <button class="btn btn-outline" type="button" (click)="copy(card)">Copy text</button>
+        @if (card.edited) {
+          <button class="link" type="button" (click)="reset(card.variation.id)">
+            Reset to the original wording
+          </button>
+        }
+        @if (copied() === card.variation.id) {
+          <span class="copy-note" role="status">✓ Invitation copied</span>
+        }
+        @if (copyFailed() === card.variation.id) {
+          <span class="copy-note warn" role="status">Couldn’t use the clipboard</span>
+        }
+      </div>
+    </li>
+  }
+</ul>
+
+@if (fallbackText(); as text) {
+  <div
+    class="overlay"
+    role="presentation"
+    tabindex="-1"
+    (click)="closeFallback()"
+    (keyup.escape)="closeFallback()"
+  >
+    <div
+      class="dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="invite-copy-fallback-title"
+      (click)="$event.stopPropagation()"
+      (keyup)="$event.stopPropagation()"
+    >
+      <h2 id="invite-copy-fallback-title">Copy this by hand</h2>
+      <p class="muted small">
+        This browser wouldn’t give Mawkingbird clipboard access. Select the text below and copy it
+        yourself.
+      </p>
+      <textarea class="invite-text" rows="9" readonly>{{ text }}</textarea>
+      <button class="btn" type="button" (click)="closeFallback()">Done</button>
+    </div>
+  </div>
+}
+
+<p class="muted small footnote">
+  Looking for invite links to your own server instead?
+  <a routerLink="/settings/invites">Settings → Invites</a> generates those. To find people you
+  already know, try <a routerLink="/settings/import-export">Find my friends</a>.
+</p>

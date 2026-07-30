@@ -1,9 +1,10 @@
 import { Component, inject, input, OnDestroy, output, signal } from '@angular/core';
 import { MastodonServers, ServerSuggestion } from '../mastodon-servers';
 import {
+  isTagsOnly,
   isUsableSearchServer,
   probeSearchServer,
-  SearchServerStatus,
+  SearchServerProbe,
 } from '../search-server-probe';
 import { rejectReason, SearchServerRejects } from '../search-server-rejects';
 
@@ -12,7 +13,7 @@ type DiscoveryState = 'idle' | 'searching' | 'found' | 'exhausted';
 export interface DiscoveredSearchServer extends ServerSuggestion {
   /** Accounts the canary matched — evidence the index is live, not just reachable. */
   accounts: number;
-  /** Posts the full-text canary matched. Non-zero is the bar for adoption. */
+  /** Posts the hashtag canary matched. Non-zero is the bar for adoption. */
   statuses: number;
 }
 
@@ -32,9 +33,11 @@ const VISIBLE_ATTEMPTS = 6;
  * already mounted in two places (`login.html`, `settings-server.html`) and the
  * random-walk-with-three-workers shape is proven. Three things differ:
  *
- *  - The bar is {@link isUsableSearchServer}, not reachability. Accounts *and* posts
- *    must come back. Hashtag search is not evidence: every server answers it,
- *    including the ones with no index at all.
+ *  - The bar is {@link isUsableSearchServer}, not reachability: accounts *and* posts
+ *    must come back. Posts are asked for by hashtag, because anonymous full-text
+ *    search is off on every server in the directory, and a *list of matching tag
+ *    names* does not count — plenty of hosts answer a tag query with the tag and no
+ *    timeline, which looks like a result set and isn't one.
  *  - Failures are recorded in {@link SearchServerRejects}, so the next hunt starts
  *    where this one left off instead of re-probing the same ~1000 duds.
  *  - It narrates. A sweep through fifty servers that says only "searching…" looks
@@ -177,13 +180,15 @@ export class SearchServerDiscovery implements OnDestroy {
       if (this.searchAbort?.signal.aborted) {
         return;
       }
-      this.recordRejection(domain, probe.status);
+      this.recordRejection(domain, probe);
     }
   }
 
-  private recordRejection(domain: string, status: SearchServerStatus): void {
-    this.rejects.add(domain, status);
-    const reason = rejectReason(status);
+  private recordRejection(domain: string, probe: SearchServerProbe): void {
+    this.rejects.add(domain, probe.status);
+    // Tags-only is worth naming while it scrolls past: it is the failure that looks
+    // most like success, so seeing it go by is what makes the bar legible.
+    const reason = isTagsOnly(probe) ? 'hashtags only, no posts' : rejectReason(probe.status);
     this.attempts.update((list) => [{ domain, reason }, ...list].slice(0, VISIBLE_ATTEMPTS));
   }
 }

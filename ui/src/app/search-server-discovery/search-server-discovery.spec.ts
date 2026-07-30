@@ -130,9 +130,9 @@ describe('SearchServerDiscovery', () => {
     expect((directory.shuffled.mock.calls[0][0] as Set<string>).has('current.example')).toBe(true);
   });
 
-  it('rejects a server that can search accounts but has no post index', async () => {
-    // The no-Elasticsearch case. Reachable, answers, and still not adoptable —
-    // adopting it is precisely how you end up with a silently dead search page.
+  it('rejects a server that can search accounts but serves no posts', async () => {
+    // Reachable, answers, and still not adoptable — adopting it is precisely how you
+    // end up with a silently dead search page.
     directory.shuffled.mockImplementation(() => [
       { domain: 'no-es.example', description: '', category: '', users: 20_000 },
     ]);
@@ -155,6 +155,30 @@ describe('SearchServerDiscovery', () => {
     });
     expect(rejects.has('no-es.example')).toBe(true);
     expect(rejects.all()[0].status).toBe('ok');
+  });
+
+  it('names the tags-only failure while it scrolls past', async () => {
+    // A payload with the tag in it and no posts is the failure most likely to be
+    // mistaken for success, so the hunt says which one it was.
+    directory.shuffled.mockImplementation(() => [
+      { domain: 'tags-only.example', description: '', category: '', users: 20_000 },
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        new URL(url).searchParams.get('type') === 'accounts'
+          ? jsonResponse({ accounts: [{ id: '1' }] })
+          : jsonResponse({ statuses: [], hashtags: [{ name: 'mastodon' }] }),
+      ),
+    );
+    const fixture = TestBed.createComponent(SearchServerDiscovery);
+    fixture.detectChanges();
+
+    start(fixture);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('hashtags only, no posts');
+    });
   });
 
   it('shows what it walked past, so a long hunt does not look stuck', async () => {

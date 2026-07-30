@@ -36,7 +36,7 @@ describe('ConnectionBluesky', () => {
       providers: [
         provideRouter([]),
         { provide: BlueskySession, useValue: bskySession },
-        { provide: AnonymousCapabilities, useValue: { canUseBluesky: true } },
+        { provide: AnonymousCapabilities, useValue: { canUseBluesky: true, active: false } },
       ],
     });
   });
@@ -120,12 +120,17 @@ describe('ConnectionBluesky', () => {
     expect(bskySession.enforceLifetime).toHaveBeenCalled();
   });
 
-  it('refuses to offer linking to the Anonymous account', () => {
-    TestBed.overrideProvider(AnonymousCapabilities, { useValue: { canUseBluesky: false } });
+  it('still offers linking to the Anonymous account, and says why that works', () => {
+    // Bluesky needs no Mastodon token, so anonymous sessions get a link of their
+    // own — and the page says so rather than leaving people guessing.
+    TestBed.overrideProvider(AnonymousCapabilities, {
+      useValue: { canUseBluesky: true, active: true },
+    });
     const fixture = setUp();
     const el = fixture.nativeElement as HTMLElement;
 
-    expect(el.querySelector('form.bsky-form')).toBeNull();
-    expect(el.textContent).toContain("isn't available for the browser-local Anonymous account");
+    expect(el.querySelector('form.bsky-form')).not.toBeNull();
+    expect(el.textContent).toContain('while you');
+    expect(el.textContent).toContain("doesn't involve a Mastodon account");
   });
 });

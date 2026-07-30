@@ -361,3 +361,40 @@
   margin-top: 4px;
   line-height: 1.5;
 }
+
+/* Link to /invites, sitting above the "find people" tools. */
+.invite-callout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px;
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.invite-callout:hover {
+  background: var(--hover);
+  text-decoration: none;
+}
+
+.invite-callout-emoji {
+  flex: none;
+  font-size: 22px;
+}
+
+.invite-callout-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.invite-callout-arrow {
+  flex: none;
+  font-size: 18px;
+  font-weight: 700;
+}

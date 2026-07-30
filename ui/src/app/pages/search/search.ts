@@ -74,7 +74,7 @@ import { SearchServer } from '../../search-server';
 import { SearchCapability } from '../../search-capability';
 import { SearchServerDiscovery } from '../../search-server-discovery/search-server-discovery';
 import { Server } from '../../server';
-import { probeSearchServer, SearchServerStatus } from '../../search-server-probe';
+import { isTagsOnly, probeSearchServer, SearchServerStatus } from '../../search-server-probe';
 import { normalizeHostUrl } from '../../host-url';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
@@ -198,15 +198,18 @@ export class Search implements OnInit, OnDestroy {
           : `${host} refused this search. The server may restrict search, or your login may not have search permission.`;
       case 'unreachable':
         return `Couldn't reach ${host} to check whether search is working. Your connection or the server may be having trouble.`;
+      case 'tags-only':
+        // The strongest evidence there is: the server recognised the hashtag,
+        // named it back, and handed over no posts. Nothing the user types will
+        // change that, so say so instead of implying they should try harder.
+        return `${host} recognises the hashtag but won't serve the posts behind it. A different search server would fix this.`;
       case 'empty':
-        // Accounts and posts fail separately, so say which one is missing. A
-        // server with no Elasticsearch answers account search perfectly and
-        // returns nothing for posts, forever, without erroring.
+        // Accounts and posts fail separately, so say which one is missing.
         if (this.type() === 'accounts') {
           return null; // An empty account index is indistinguishable from no match.
         }
         return ability.accounts === 'works'
-          ? `Post search isn't available on ${host}. This server can search accounts and hashtags, but has no full-text post index. A different search server would fix this.`
+          ? `Post search isn't available on ${host}. It can find accounts, but returns no posts even for a common hashtag — anonymous full-text search is off on almost every server. A different search server would fix this.`
           : `Search doesn't appear to be working on ${host}. A different search server would fix this.`;
       default:
         return null;
@@ -904,13 +907,16 @@ export class Search implements OnInit, OnDestroy {
   /** Result count from the canary probe, shown as evidence the index is live. */
   protected searchServerHits = signal(0);
   /**
-   * Posts the full-text canary matched, or null when it wasn't reached.
+   * Posts the hashtag canary matched, or null when it wasn't reached.
    *
    * Kept separate from the account count because a server can pass one and fail the
-   * other — the no-Elasticsearch case. A hand-typed host that only does account
-   * search is still adopted (the user asked for it by name), but we say so.
+   * other, and that is the normal case rather than the odd one. A hand-typed host
+   * that only does account search is still adopted (the user asked for it by name),
+   * but we say what it does.
    */
   protected searchServerPostHits = signal<number | null>(null);
+  /** Whether that probe was the tags-only kind, for the warning's wording. */
+  protected searchServerTagsOnly = signal(false);
   protected searchServerOpen = signal(false);
   private searchServerProbeSeq = 0;
 
@@ -934,6 +940,7 @@ export class Search implements OnInit, OnDestroy {
     this.searchServerStatus.set('checking');
     this.searchServerHits.set(0);
     this.searchServerPostHits.set(null);
+    this.searchServerTagsOnly.set(false);
     const probe = await probeSearchServer(base);
     if (seq !== this.searchServerProbeSeq) {
       return; // superseded by a newer attempt
@@ -941,10 +948,12 @@ export class Search implements OnInit, OnDestroy {
     this.searchServerStatus.set(probe.status);
     this.searchServerHits.set(probe.accounts);
     this.searchServerPostHits.set(probe.statuses);
+    this.searchServerTagsOnly.set(isTagsOnly(probe));
     this.diagnostics.info('Search', 'user:search-server-probe', {
       host: base,
       status: probe.status,
       statuses: probe.statuses,
+      hashtags: probe.hashtags,
     });
     if (probe.status === 'ok') {
       this.adoptSearchServer(base);
@@ -1005,6 +1014,7 @@ export class Search implements OnInit, OnDestroy {
     this.searchServerStatus.set('idle');
     this.searchServerHits.set(0);
     this.searchServerPostHits.set(null);
+    this.searchServerTagsOnly.set(false);
     // Same reasoning as adoptSearchServer: the host changed, so the per-host
     // verdicts no longer describe where search goes and the loaded ids belong to
     // an instance we are no longer talking to.

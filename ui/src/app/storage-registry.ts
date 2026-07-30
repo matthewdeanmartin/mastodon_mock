@@ -120,9 +120,9 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
   {
     base: 'mockingbird_raindrop_token',
     storage: 'local',
-    suffix: 'account',
+    suffix: 'none',
     sensitivity: 'secret',
-    note: 'Raindrop.io test token.',
+    note: 'Raindrop.io test token. Unscoped: one bookmark drawer per browser, shared by every account. An account-suffixed copy from before that change is adopted on first read and may linger.',
   },
   {
     base: 'mockingbird_paste_edit_keys',

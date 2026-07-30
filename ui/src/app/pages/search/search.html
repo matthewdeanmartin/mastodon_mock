@@ -168,17 +168,23 @@
           <p class="muted small">Running a test search…</p>
         }
         @case ('ok') {
-          <!-- Account search and post search fail separately: a server with no
-               full-text index answers the first perfectly and the second never.
-               A host typed in by hand is still adopted — but we say what it does. -->
-          @if (searchServerPostHits() === 0) {
+          <!-- Account search and post search fail separately, and post search is the
+               one that usually fails: the probe asks for a common hashtag, because
+               anonymous full-text search is off practically everywhere. A host typed
+               in by hand is still adopted — but we say what it does. -->
+          @if (searchServerTagsOnly()) {
             <p class="fail small">
-              ⚠ Account search works here ({{ searchServerHits() }} matched), but this server has no
-              full-text post index — post searches will keep coming back empty.
+              ⚠ Account search works here ({{ searchServerHits() }} matched), but a hashtag search
+              comes back with the tag name and no posts — post searches will look empty.
+            </p>
+          } @else if (searchServerPostHits() === 0) {
+            <p class="fail small">
+              ⚠ Account search works here ({{ searchServerHits() }} matched), but this server
+              returned no posts for a common hashtag — post searches will keep coming back empty.
             </p>
           } @else {
             <p class="ok small">
-              ✓ Anonymous search works — the test query matched {{ searchServerHits() }} accounts
+              ✓ Anonymous search works — the test queries matched {{ searchServerHits() }} accounts
               and {{ searchServerPostHits() }} posts.
             </p>
           }

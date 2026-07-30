@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpParams, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { WritableSignal } from '@angular/core';
@@ -32,6 +32,7 @@ interface SearchInternals {
   searchServerStatus: WritableSignal<string>;
   searchServerHits: WritableSignal<number>;
   searchServerPostHits: WritableSignal<number | null>;
+  searchServerTagsOnly: WritableSignal<boolean>;
   emptyExplanation(): string | null;
   applySearchServer(): Promise<void>;
   clearSearchServer(): void;
@@ -549,10 +550,8 @@ describe('Search', () => {
       expect(TestBed.inject(SearchServer).active()).toBe(false);
     });
 
-    it('adopts a hand-typed accounts-only server but reports the missing post index', async () => {
-      // The user named this host explicitly, so we take it — but a server with no
-      // full-text index would otherwise make every post search look merely unlucky.
-      const fixture = setUp();
+    /** Accounts work; the hashtag canary answers with whatever `postCanary` says. */
+    function stubAccountsOnlyProbe(postCanary: unknown) {
       vi.stubGlobal(
         'fetch',
         vi.fn(async (url: string) =>
@@ -562,16 +561,35 @@ describe('Search', () => {
                 status: 200,
                 json: async () => ({ accounts: [{ id: '1' }] }),
               } as Response)
-            : ({ ok: true, status: 200, json: async () => ({ statuses: [] }) } as Response),
+            : ({ ok: true, status: 200, json: async () => postCanary } as Response),
         ),
       );
+    }
+
+    it('adopts a hand-typed accounts-only server but reports the missing post search', async () => {
+      // The user named this host explicitly, so we take it — but a server that
+      // serves no posts would otherwise make every post search look merely unlucky.
+      const fixture = setUp();
+      stubAccountsOnlyProbe({ statuses: [], hashtags: [] });
 
       internals(fixture).searchServerInput.set('no-es.example');
       await internals(fixture).applySearchServer();
 
       expect(internals(fixture).searchServerStatus()).toBe('ok');
       expect(internals(fixture).searchServerPostHits()).toBe(0);
+      expect(internals(fixture).searchServerTagsOnly()).toBe(false);
       expect(TestBed.inject(SearchServer).baseUrl()).toBe('https://no-es.example');
+    });
+
+    it('flags the tags-only server, whose payload otherwise looks like a result set', async () => {
+      const fixture = setUp();
+      stubAccountsOnlyProbe({ statuses: [], hashtags: [{ name: 'mastodon' }] });
+
+      internals(fixture).searchServerInput.set('tags-only.example');
+      await internals(fixture).applySearchServer();
+
+      expect(internals(fixture).searchServerPostHits()).toBe(0);
+      expect(internals(fixture).searchServerTagsOnly()).toBe(true);
     });
   });
 
@@ -582,35 +600,61 @@ describe('Search', () => {
       expect(internals(fixture).emptyExplanation()).toBeNull();
     });
 
-    it('names the missing post index when a zero-result post search is explained', async () => {
+    /**
+     * Drive a zero-result post search through to its capability probe.
+     *
+     * The probe runs its two canaries in sequence — accounts first, posts only once
+     * accounts have proved the server answers at all — so they must be flushed in
+     * that order. The post canary carries no `type` (it asks for a hashtag and needs
+     * to see whether tag names came back instead of posts), so it is matched on the
+     * absence of the parameter.
+     */
+    async function probeEmptyPostSearch(
+      postCanary: Partial<SearchResults>,
+    ): Promise<ReturnType<typeof setUp>> {
       const fixture = setUp();
       internals(fixture).query.set('rust');
       internals(fixture).type.set('statuses');
       internals(fixture).run();
 
-      // The search itself comes back empty...
       httpMock
         .expectOne((r) => r.url === '/api/v2/search')
         .flush({ accounts: [], statuses: [], hashtags: [] });
 
-      // ...which triggers the capability probe. It runs the two canaries in
-      // sequence — accounts first, and posts only once accounts have proved the
-      // server answers at all — so they must be flushed in that order.
-      const flushProbe = async (type: string, results: Partial<SearchResults>) => {
+      const flushProbe = async (
+        match: (params: HttpParams) => boolean,
+        results: Partial<SearchResults>,
+      ) => {
         let request!: ReturnType<HttpTestingController['expectOne']>;
         await vi.waitFor(() => {
-          request = httpMock.expectOne(
-            (r) => r.url === '/api/v2/search' && r.params.get('type') === type,
-          );
+          request = httpMock.expectOne((r) => r.url === '/api/v2/search' && match(r.params));
         });
         request.flush({ accounts: [], statuses: [], hashtags: [], ...results });
       };
 
-      await flushProbe('accounts', { accounts: [makeAccount()] });
-      await flushProbe('statuses', { statuses: [] });
+      await flushProbe((p) => p.get('type') === 'accounts', { accounts: [makeAccount()] });
+      await flushProbe((p) => p.get('type') === null, postCanary);
+      return fixture;
+    }
+
+    it('names post search as the missing half when nothing comes back at all', async () => {
+      const fixture = await probeEmptyPostSearch({ statuses: [], hashtags: [] });
 
       await vi.waitFor(() => {
         expect(internals(fixture).emptyExplanation()).toContain("Post search isn't available");
+      });
+    });
+
+    it('says the hashtag matched when the server returned the tag and no posts', async () => {
+      // The distinction the user has to act on: this server understood the query
+      // perfectly and still has nothing to show, so retyping will not help.
+      const fixture = await probeEmptyPostSearch({
+        statuses: [],
+        hashtags: [{ name: 'rust', url: 'https://example.social/tags/rust' }],
+      });
+
+      await vi.waitFor(() => {
+        expect(internals(fixture).emptyExplanation()).toContain('recognises the hashtag');
       });
     });
   });

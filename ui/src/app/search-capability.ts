@@ -10,8 +10,12 @@ import { Api } from './api';
  *
  *  1. Nobody posted about this. The honest case.
  *  2. The server refuses search without a token — 401/403/422.
- *  3. The server has no Elasticsearch: `type=accounts` works, `type=statuses`
- *     returns `[]` for every query, forever, with no error at all.
+ *  3. The server serves no post search: `type=accounts` works, statuses come back
+ *     `[]` for every query, forever, with no error at all. Anonymously this is the
+ *     rule rather than the exception — full-text needs both Elasticsearch and a
+ *     token — and it is why the post canary here is a hashtag, matching
+ *     `search-server-probe.ts`. Some servers answer a tag query with posts, some
+ *     with nothing, and some with a list of tag *names* and no posts.
  *
  * Case 3 is the common one, and it hits **signed-in users identically** — a token
  * does not conjure a search index. So this probe deliberately goes through
@@ -31,8 +35,14 @@ export type SearchAbility =
   | 'checking'
   /** Returned results. Search is on. */
   | 'works'
-  /** Answered 200 with nothing. For posts, this is the no-Elasticsearch signature. */
+  /** Answered 200 with nothing. For posts, the no-post-search signature. */
   | 'empty'
+  /**
+   * Posts only: the server matched the hashtag and returned tag names, no posts.
+   * Distinct from `empty` because it proves the query was understood — the page
+   * being blank is a limit of the server, not a gap in what people have written.
+   */
+  | 'tags-only'
   /** Explicitly refused (401/403/422), or the token isn't allowed to search. */
   | 'refused'
   /** Couldn't be reached (network, CORS, 5xx). */
@@ -46,13 +56,17 @@ export interface HostCapability {
 const UNKNOWN: HostCapability = { accounts: 'unknown', statuses: 'unknown' };
 
 /**
- * Canaries, matching `search-server-probe.ts`.
+ * Canaries, matching `search-server-probe.ts` — the two files must measure the same
+ * thing, or "search is broken here" and "this server is no good" disagree about the
+ * same host.
  *
- * Not a stop word: some configurations strip those, so an empty result would say
- * more about the analyzer than about the index.
+ * The account canary is not a stop word: some configurations strip those, so an empty
+ * result would say more about the analyzer than about the index. The post canary is a
+ * common hashtag, because a bare word returns nothing anywhere anonymously and a test
+ * everything fails cannot explain anything.
  */
 const ACCOUNT_CANARY = 'Gargron';
-const POST_CANARY = 'mastodon';
+const POST_CANARY = '#mastodon';
 
 /** Only ever asked whether anything came back, so one result is plenty. */
 const PROBE_LIMIT = 1;
@@ -134,11 +148,22 @@ export class SearchCapability {
   }
 
   private async canary(type: 'accounts' | 'statuses'): Promise<SearchAbility> {
-    const query = type === 'accounts' ? ACCOUNT_CANARY : POST_CANARY;
+    const accounts = type === 'accounts';
+    const query = accounts ? ACCOUNT_CANARY : POST_CANARY;
     try {
-      const results = await firstValueFrom(this.api.search(query, type, { limit: PROBE_LIMIT }));
-      const list = type === 'accounts' ? results.accounts : results.statuses;
-      return (list?.length ?? 0) > 0 ? 'works' : 'empty';
+      // The post canary sends no `type`: restricting to statuses makes a server that
+      // would have answered with hashtag names return nothing instead, and that is
+      // the distinction worth a whole enum value.
+      const results = await firstValueFrom(
+        this.api.search(query, accounts ? 'accounts' : undefined, { limit: PROBE_LIMIT }),
+      );
+      if (accounts) {
+        return (results.accounts?.length ?? 0) > 0 ? 'works' : 'empty';
+      }
+      if ((results.statuses?.length ?? 0) > 0) {
+        return 'works';
+      }
+      return (results.hashtags?.length ?? 0) > 0 ? 'tags-only' : 'empty';
     } catch (error: unknown) {
       return refused(error) ? 'refused' : 'unreachable';
     }

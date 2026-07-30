@@ -9,12 +9,18 @@
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
-@if (!capabilities.canUseBluesky) {
-  <p class="feed-error">
-    Bluesky isn't available for the browser-local Anonymous account. Sign in with a Mastodon account
-    to link it.
+<!-- Worth saying out loud: this is the one connector that works without a
+     Mastodon account at all, and anonymous is the mode people try first. -->
+@if (capabilities.active) {
+  <p class="muted small">
+    This works while you're browsing anonymously — the app password goes straight to Bluesky and
+    doesn't involve a Mastodon account. Your Bluesky posts merge into home, and you can reply, like
+    and repost them. Bluesky DMs are the exception: those live in Chat, which anonymous sessions
+    don't have.
   </p>
-} @else if (bsky.session(); as session) {
+}
+
+@if (bsky.session(); as session) {
   <div class="bsky-linked">
     <img class="bsky-avatar" [src]="session.avatar || ''" alt="" decoding="async" />
     <span class="names">

@@ -4,12 +4,12 @@ import { of, throwError } from 'rxjs';
 import { Api } from './api';
 import { SearchCapability } from './search-capability';
 
-/** The two fields the probe reads off a SearchResults payload. */
-function results(accounts: number, statuses: number) {
+/** The three fields the probe reads off a SearchResults payload. */
+function results(accounts: number, statuses: number, hashtags = 0) {
   return {
     accounts: Array.from({ length: accounts }, (_, i) => ({ id: `a${i}` })),
     statuses: Array.from({ length: statuses }, (_, i) => ({ id: `s${i}` })),
-    hashtags: [],
+    hashtags: Array.from({ length: hashtags }, (_, i) => ({ name: `t${i}` })),
   };
 }
 
@@ -48,9 +48,9 @@ describe('SearchCapability', () => {
     });
   });
 
-  it('catches the no-Elasticsearch server: accounts work, posts are empty', async () => {
-    // The case this whole service exists for. Nothing errors; the post index is
-    // simply not there, and the old code rendered that as "No results."
+  it('catches the no-post-search server: accounts work, posts are empty', async () => {
+    // The case this whole service exists for. Nothing errors; the posts are simply
+    // not served, and the old code rendered that as "No results."
     search.mockImplementation((_q: string, type: string) =>
       of(type === 'accounts' ? results(1, 0) : results(0, 0)),
     );
@@ -59,6 +59,31 @@ describe('SearchCapability', () => {
       accounts: 'works',
       statuses: 'empty',
     });
+  });
+
+  it('distinguishes a tags-only answer from an empty one', async () => {
+    // The tag matched and no posts came with it: the query was understood, so the
+    // blank page is the server's limit and not a gap in what people have written.
+    search.mockImplementation((_q: string, type: string) =>
+      of(type === 'accounts' ? results(1, 0) : results(0, 0, 1)),
+    );
+
+    expect(await capability().ensure('tags-only.example')).toEqual({
+      accounts: 'works',
+      statuses: 'tags-only',
+    });
+  });
+
+  it('asks for posts by hashtag with no type, so tag names are visible', async () => {
+    // A bare word returns nothing anonymously anywhere, and type=statuses would
+    // hide the tags-only case behind an empty payload.
+    search.mockReturnValue(of(results(1, 1)));
+
+    await capability().ensure('good.example');
+
+    const [query, type] = search.mock.calls[1];
+    expect(query).toMatch(/^#/);
+    expect(type).toBeUndefined();
   });
 
   it('reports refused when the server demands a token', async () => {
@@ -97,7 +122,7 @@ describe('SearchCapability', () => {
 
     await capability().ensure('good.example');
 
-    expect(search.mock.calls.map((call) => call[1])).toEqual(['accounts', 'statuses']);
+    expect(search.mock.calls.map((call) => call[1])).toEqual(['accounts', undefined]);
   });
 
   it('caches per host, so a second zero-result search costs nothing', async () => {

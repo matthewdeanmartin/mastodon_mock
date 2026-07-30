@@ -65,7 +65,9 @@ export class SettingsShell {
     { label: 'Automatic post deletion', path: 'deletion', exact: true, mockOnly: true },
     { label: 'Account', path: 'account', exact: true },
     { label: 'Import/Export', path: 'import-export', exact: true },
-    { label: 'Invite people', path: 'invites', exact: true, mockOnly: true },
+    // "Invite links", not "Invite people": /invites is the page that invites
+    // people, and two menu entries reading the same thing is a maze.
+    { label: 'Invite links', path: 'invites', exact: true, mockOnly: true },
     { label: 'Feature flags', path: 'feature-flags', exact: true, anonymous: true },
     { label: 'Development', path: 'development', exact: true, mockOnly: true },
   ].filter(

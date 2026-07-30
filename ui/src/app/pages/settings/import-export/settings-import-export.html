@@ -4,6 +4,20 @@
 </div>
 
 <div class="spage-body">
+  <!-- The other half of this page's job. Everything below finds people already
+       on Mastodon; when they aren't there yet, the answer is to invite them. -->
+  <a class="invite-callout" routerLink="/invites">
+    <span class="invite-callout-emoji" aria-hidden="true">📣</span>
+    <span class="invite-callout-body">
+      <strong>Can’t find someone? Invite them.</strong>
+      <span class="muted small">
+        Prewritten posts for X and Bluesky that ask your friends to come over — or just to visit
+        with no account at all.
+      </span>
+    </span>
+    <span class="invite-callout-arrow" aria-hidden="true">→</span>
+  </a>
+
   <section id="import-friends" class="friend-section">
     <h2>Import Friends</h2>
     <p class="muted small">
@@ -97,6 +111,10 @@
       <code>tweets.js</code>, and <code>deleted-tweets.js</code> in your browser; nothing is
       uploaded. You can also select those files directly from the archive's <code>data</code>
       folder.
+    </p>
+    <p class="muted small">
+      The ones you don’t find here haven’t joined yet —
+      <a routerLink="/invites">invite them from X</a>.
     </p>
     <div class="import-actions">
       <label class="btn btn-outline file-btn">

@@ -1,7 +1,6 @@
 import { Component, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
-import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
 import { DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 import { GitHubSession } from '../../../providers/github/github-session';
@@ -44,7 +43,6 @@ export interface ConnectionCatalogRow {
   styleUrl: './settings-connections.css',
 })
 export class SettingsConnections implements OnInit {
-  private capabilities = inject(AnonymousCapabilities);
   private bsky = inject(BlueskySession);
   private dropbox = inject(DropboxSession);
   private raindrop = inject(RaindropSession);
@@ -66,13 +64,9 @@ export class SettingsConnections implements OnInit {
     CONNECTION_CATALOG.map((entry) => {
       switch (entry.id) {
         case 'bluesky':
-          return {
-            entry,
-            connected: this.bsky.session() !== null,
-            unavailableReason: this.capabilities.canUseBluesky
-              ? null
-              : 'Not available for the browser-local Anonymous account.',
-          };
+          // Available to every account including Anonymous: the app password is
+          // its own credential and needs no Mastodon token.
+          return { entry, connected: this.bsky.session() !== null, unavailableReason: null };
         case 'openrouter':
           return { entry, connected: this.openrouter.connected(), unavailableReason: null };
         case 'raindrop':

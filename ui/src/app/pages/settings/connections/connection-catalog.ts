@@ -29,11 +29,21 @@ export type ConnectionId = 'github' | 'dropbox' | 'raindrop' | 'bluesky' | 'open
  * Who a connection belongs to — which is a question users actually ask, and
  * which the app answers three different ways.
  *
- * `account` is the norm: the credential is stored under {@link scopedKey}, so
- * your alt has its own (or none). `browser` is the deliberate exception for a
- * credential that belongs to the *human* rather than to a persona — an LLM key
- * works the same whoever you are signed in as. `session` means it never reaches
- * localStorage at all and dies with the tab.
+ * `browser` is the common case, and the right default: these credentials belong
+ * to the *human* sitting here, not to a persona. An LLM key or a bookmarking
+ * token works the same whoever you are signed in as, and re-pasting it for every
+ * alt is busywork with no privacy benefit — the alt could read the other copy
+ * out of the same localStorage anyway.
+ *
+ * `account` is the exception, for a connection that is itself an identity. A
+ * Bluesky link says "this Mastodon persona is also that Bluesky handle", which
+ * is a claim about *one* persona, so it is stored under {@link scopedKey} and
+ * your alt gets its own or none. That includes the browser-local Anonymous
+ * account, which gets one of its own too.
+ *
+ * `session` is also shared by every account, but never reaches localStorage —
+ * it dies with the tab. Used where the provider hands out short-lived OAuth
+ * tokens and there is nothing worth keeping.
  */
 export type ConnectionScope = 'account' | 'browser' | 'session';
 
@@ -46,9 +56,9 @@ export interface ConnectionScopeCopy {
 
 export const CONNECTION_SCOPE_COPY: Record<ConnectionScope, ConnectionScopeCopy> = {
   account: {
-    label: 'This account',
+    label: 'One per account',
     detail:
-      'Stored against the Mastodon account you are signed in as. Your other accounts each get their own.',
+      'Stored against the account you are signed in as — including Anonymous. Each of your accounts links its own, or none.',
   },
   browser: {
     label: 'All accounts',
@@ -56,8 +66,9 @@ export const CONNECTION_SCOPE_COPY: Record<ConnectionScope, ConnectionScopeCopy>
       'Shared by every account in this browser, including Anonymous — it belongs to you, not to one profile.',
   },
   session: {
-    label: 'This tab only',
-    detail: 'Never written to long-term storage. Closing the tab disconnects it.',
+    label: 'All accounts, this tab',
+    detail:
+      'Shared by every account in this browser, but never written to long-term storage — closing the tab disconnects it.',
   },
 };
 
@@ -94,6 +105,9 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
     label: 'Bluesky',
     emoji: '🦋',
     pitch: 'Your Bluesky account, read and write.',
+    // The one genuinely per-persona connection: it asserts who this Mastodon
+    // account also is. One Bluesky handle per Mastodon account, Anonymous
+    // included — see AnonymousCapabilities.canUseBluesky.
     scope: 'account',
     enables: [
       'Bluesky posts merged into your home timeline',
@@ -119,7 +133,9 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
     label: 'Raindrop.io',
     emoji: '💧',
     pitch: 'The Raindrop.io bookmarking service.',
-    scope: 'account',
+    // Your bookmark drawer, not one persona's — see RaindropSession for why the
+    // token is stored unscoped.
+    scope: 'browser',
     enables: [
       'A second place to save bookmarks',
       "Save a post's first external link instead of the post itself",

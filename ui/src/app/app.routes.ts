@@ -325,6 +325,13 @@ export const routes: Routes = [
         path: 'starter-kits',
         loadComponent: () => import('./pages/starter-kits/starter-kits').then((m) => m.StarterKits),
       },
+      // Outbound recruiting: prewritten posts for X and Bluesky. Available to
+      // Anonymous too — the Bluesky pitch ("no account needed") is exactly what
+      // someone browsing anonymously is living proof of.
+      {
+        path: 'invites',
+        loadComponent: () => import('./pages/invites/invites').then((m) => m.Invites),
+      },
       // Feeds hub: lists, saved searches, server feeds, collections and tags in
       // one page. `/feeds/lists` and `/feeds/tags` are filtered views of the same
       // component (see Feeds.only). These literal segments MUST precede the

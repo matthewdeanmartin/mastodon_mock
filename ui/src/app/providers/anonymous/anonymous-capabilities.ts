@@ -36,9 +36,18 @@ export class AnonymousCapabilities {
 
   readonly canBookmark = true;
 
-  get canUseBluesky(): boolean {
-    return !this.active;
-  }
+  /**
+   * Bluesky is a *separate* account with its own credential, so nothing about it
+   * needs a Mastodon token — the app password talks straight to bsky.social
+   * through `externalFetch`. Gating it on being signed in here was an over-broad
+   * reading of "Anonymous can't write": it made the anonymous session, which is
+   * the one people try first, the only one that couldn't show a real timeline.
+   *
+   * Storage is still per-account (`scopedKey`), so Anonymous gets exactly one
+   * Bluesky link of its own — the same one-each rule every other account gets,
+   * not a shared one.
+   */
+  readonly canUseBluesky = true;
 
   /**
    * What the viewer can do to a post from `provider`.

@@ -1,5 +1,4 @@
 import { computed, inject, Injectable } from '@angular/core';
-import { Auth } from '../auth';
 import { BlueskyProvider } from './bluesky/bluesky-provider';
 import { FeedProvider } from './provider';
 import { RssProvider } from './rss/rss-provider';
@@ -13,7 +12,6 @@ import { FeatureFlags } from '../feature-flags';
  */
 @Injectable({ providedIn: 'root' })
 export class ProviderRegistry {
-  private auth = inject(Auth);
   private bluesky = inject(BlueskyProvider);
   private rss = inject(RssProvider);
   private anonymousMastodon = inject(AnonymousMastodonProvider);
@@ -22,13 +20,18 @@ export class ProviderRegistry {
 
   readonly all: FeedProvider[] = [this.anonymousMastodon, this.bluesky, this.rss, this.paste];
 
-  /** Providers the user has actually connected (feeds added, account linked…). */
+  /**
+   * Providers the user has actually connected (feeds added, account linked…).
+   *
+   * Bluesky used to be filtered out for the Anonymous account. It isn't any
+   * more: the link carries its own credential and needs no Mastodon token, and
+   * an anonymous session merging in a real Bluesky timeline is the whole pitch
+   * the Invites page makes to Bluesky users. See
+   * AnonymousCapabilities.canUseBluesky.
+   */
   readonly linked = computed(() =>
     this.all.filter(
-      (p) =>
-        p.linked() &&
-        (!this.auth.isAnonymous || p.id !== 'bluesky') &&
-        (p.id !== 'paste' || this.featureFlags.enabled('pastebin')),
+      (p) => p.linked() && (p.id !== 'paste' || this.featureFlags.enabled('pastebin')),
     ),
   );
 }
