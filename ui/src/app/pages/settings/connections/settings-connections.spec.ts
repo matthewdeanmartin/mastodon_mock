@@ -131,8 +131,10 @@ describe('SettingsConnections (catalog)', () => {
     setUp();
 
     expect(govern).toHaveBeenCalledOnce();
-    // Every connector holding a durable credential: all but session-only Dropbox.
-    expect(govern.mock.calls[0][0]).toHaveLength(4);
+    // Every connector holding a durable credential: all but session-only
+    // Dropbox, plus the CORS proxy, whose API key is billable and ages out on
+    // the same policy as the pasted tokens.
+    expect(govern.mock.calls[0][0]).toHaveLength(5);
     expect(enforceAll).toHaveBeenCalled();
   });
 

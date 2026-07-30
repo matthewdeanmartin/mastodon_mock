@@ -9,6 +9,26 @@ export interface RssFeedSub {
   url: string;
   title: string;
   enabled: boolean;
+  /**
+   * Fetch this feed through the configured CORS proxy instead of directly.
+   *
+   * Opt-in per feed and absent by default, which is what makes the upgrade
+   * safe: a subscription stored before this field existed reads as `undefined`
+   * and keeps fetching directly. Turning it on is always a deliberate act on
+   * one feed the user has watched fail — the app never enables it on their
+   * behalf, because doing so would silently route a request through a third
+   * party they did not choose.
+   */
+  useProxy?: boolean;
+}
+
+/** A URL's hostname, or null when it isn't a parseable absolute URL. */
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
 }
 
 function loadFeeds(key: string): RssFeedSub[] {
@@ -40,14 +60,24 @@ export class RssSubscriptions {
     return this.feeds().some((f) => f.url === url);
   }
 
-  add(url: string, title: string): string | null {
+  /**
+   * Subscribe to a feed.
+   *
+   * `useProxy` is recorded only when the caller has just *proved* the proxy
+   * fetches this feed, so a subscription never claims a route that has not
+   * worked at least once.
+   */
+  add(url: string, title: string, useProxy = false): string | null {
     if (this.has(url)) {
       return null;
     }
     if (this.feeds().length >= RSS_SUBSCRIPTION_LIMIT) {
       return `You can subscribe to up to ${RSS_SUBSCRIPTION_LIMIT} RSS feeds.`;
     }
-    this.persist([...this.feeds(), { url, title, enabled: true }]);
+    this.persist([
+      ...this.feeds(),
+      { url, title, enabled: true, ...(useProxy ? { useProxy } : {}) },
+    ]);
     return null;
   }
 
@@ -57,6 +87,40 @@ export class RssSubscriptions {
 
   setEnabled(url: string, enabled: boolean): void {
     this.persist(this.feeds().map((f) => (f.url === url ? { ...f, enabled } : f)));
+  }
+
+  /** Route this feed through the configured CORS proxy, or stop doing so. */
+  setUseProxy(url: string, useProxy: boolean): void {
+    this.persist(this.feeds().map((f) => (f.url === url ? { ...f, useProxy } : f)));
+  }
+
+  /** How many feeds currently go through a proxy — for the settings summary. */
+  proxiedCount(): number {
+    return this.feeds().filter((f) => f.useProxy).length;
+  }
+
+  /**
+   * Whether a URL should be fetched through the proxy, by subscription.
+   *
+   * Several read paths (a feed-as-profile page, a single item, a comment feed)
+   * receive only a URL, with no subscription in hand. Resolving the flag from
+   * the URL keeps one feed's setting consistent however it is reached, instead
+   * of the timeline honouring it and a click-through silently not.
+   *
+   * A comment feed usually lives on the same host as the feed that linked it,
+   * so it inherits that feed's setting via `hostFallback` — the alternative is
+   * comments that fail on exactly the feeds the user fixed.
+   */
+  usesProxy(url: string, hostFallback = true): boolean {
+    const exact = this.feeds().find((f) => f.url === url);
+    if (exact) {
+      return exact.useProxy === true;
+    }
+    if (!hostFallback) {
+      return false;
+    }
+    const host = hostOf(url);
+    return host !== null && this.feeds().some((f) => f.useProxy && hostOf(f.url) === host);
   }
 
   private persist(feeds: RssFeedSub[]): void {

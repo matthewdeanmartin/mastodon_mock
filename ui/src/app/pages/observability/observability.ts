@@ -8,6 +8,9 @@ import {
   TimeBucket,
 } from '../../observability/api-metrics';
 import { EndpointDoc, endpointDoc } from '../../observability/api-docs';
+import { CorsProxySettings } from '../../providers/cors-proxy/cors-proxy-settings';
+import { CorsProxyUsageStore } from '../../providers/cors-proxy/cors-proxy-usage';
+import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import {
   DatabaseInfo,
   IndexedDbReport,
@@ -65,6 +68,9 @@ type RouteSortKey = 'visits' | 'time';
 export class Observability {
   private metrics = inject(ApiMetrics);
   private routeLog = inject(RouteLog);
+  private proxyUsageStore = inject(CorsProxyUsageStore);
+  private proxySettings = inject(CorsProxySettings);
+  private rssSubs = inject(RssSubscriptions);
 
   protected readonly totals = this.metrics.totals;
   protected readonly errors = this.metrics.errors;
@@ -73,6 +79,14 @@ export class Observability {
   protected readonly serverLabel = this.metrics.serverLabel;
   protected readonly formatBytes = formatBytes;
   protected readonly formatDuration = formatDuration;
+
+  protected readonly proxyUsage = this.proxyUsageStore.usage;
+  protected readonly proxyLabel = computed(() => this.proxySettings.chosen()?.label ?? null);
+  protected readonly proxiedFeedCount = computed(() => this.rssSubs.proxiedCount());
+
+  resetProxyUsage(): void {
+    this.proxyUsageStore.reset();
+  }
 
   constructor() {
     // Bank the time spent getting here, so this page's own row isn't stale.

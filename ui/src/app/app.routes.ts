@@ -158,6 +158,13 @@ export const routes: Routes = [
                     (m) => m.ConnectionBluesky,
                   ),
               },
+              {
+                path: 'cors-proxy',
+                loadComponent: () =>
+                  import('./pages/settings/connections/cors-proxy/connection-cors-proxy').then(
+                    (m) => m.ConnectionCorsProxy,
+                  ),
+              },
             ],
           },
           {

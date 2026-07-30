@@ -54,7 +54,7 @@ export class RssProvider implements FeedProvider {
     const failures: string[] = [];
     return forkJoin(
       feeds.map((sub) =>
-        this.fetch.fetchFeed(sub.url).pipe(
+        this.fetch.fetchFeed(sub.url, { useProxy: sub.useProxy === true }).pipe(
           map((feed) => feedToStatuses(sub.url, feed, fetchedAt)),
           catchError((err: Error) => {
             failures.push(`${sub.title || sub.url}: ${err.message}`);
@@ -76,7 +76,7 @@ export class RssProvider implements FeedProvider {
    */
   getFeed(feedUrl: string): Observable<{ account: Account; statuses: Status[] }> {
     const fetchedAt = new Date().toISOString();
-    return this.fetch.fetchFeed(feedUrl).pipe(
+    return this.fetch.fetchFeed(feedUrl, { useProxy: this.subs.usesProxy(feedUrl) }).pipe(
       map((feed) => ({
         account: feedAccount(feedUrl, feed),
         statuses: feedToStatuses(feedUrl, feed, fetchedAt),
@@ -91,7 +91,7 @@ export class RssProvider implements FeedProvider {
    */
   getFeedItem(feedUrl: string, guid: string): Observable<RssItemView> {
     const fetchedAt = new Date().toISOString();
-    return this.fetch.fetchFeed(feedUrl).pipe(
+    return this.fetch.fetchFeed(feedUrl, { useProxy: this.subs.usesProxy(feedUrl) }).pipe(
       map((feed) => {
         const item = feed.items.find((i) => i.guid === guid);
         if (!item) {
@@ -119,20 +119,32 @@ export class RssProvider implements FeedProvider {
     parentStatusId: string,
   ): Observable<Status[]> {
     const fetchedAt = new Date().toISOString();
-    return this.fetch.fetchFeed(commentsFeedUrl).pipe(
-      map((feed) => {
-        // Comment feeds carry their own channel title; attribute each comment to
-        // its own author (dc:creator) so the thread reads like a real discussion.
-        const channel = feedAccount(commentsFeedUrl, feed);
-        return feed.items
-          .map((item: ParsedItem) =>
-            itemToStatus(item, feedUrl, commentAccount(item, commentsFeedUrl, channel), fetchedAt, {
-              inReplyToId: parentStatusId,
-              isComment: true,
-            }),
-          )
-          .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
-      }),
-    );
+    return this.fetch
+      .fetchFeed(commentsFeedUrl, {
+        // Falls back to the parent feed's setting when the comment feed shares its
+        // host, so comments work on exactly the feeds the user already fixed.
+        useProxy: this.subs.usesProxy(commentsFeedUrl) || this.subs.usesProxy(feedUrl),
+      })
+      .pipe(
+        map((feed) => {
+          // Comment feeds carry their own channel title; attribute each comment to
+          // its own author (dc:creator) so the thread reads like a real discussion.
+          const channel = feedAccount(commentsFeedUrl, feed);
+          return feed.items
+            .map((item: ParsedItem) =>
+              itemToStatus(
+                item,
+                feedUrl,
+                commentAccount(item, commentsFeedUrl, channel),
+                fetchedAt,
+                {
+                  inReplyToId: parentStatusId,
+                  isComment: true,
+                },
+              ),
+            )
+            .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+        }),
+      );
   }
 }

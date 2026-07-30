@@ -131,6 +131,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     sensitivity: 'secret',
     note: 'Per-paste edit codes. A bearer capability: whoever holds one can rewrite or delete that paste. Split out of mockingbird_pastes.',
   },
+  {
+    base: 'mockingbird_cors_proxy_key',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: "CORS proxy API key, plus the header name a custom proxy wants it in. Billable on a paid plan, so it is retention-governed like the other pasted tokens. Unscoped: the subscription belongs to the human, not to one persona. Split out of mockingbird_cors_proxy so the proxy choice itself stays exportable.",
+  },
 
   // ---- private: discloses something about the person ----
   {
@@ -201,7 +208,14 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'account',
     sensitivity: 'private',
-    note: 'Subscribed feed URLs — what the user reads. Also near-secret: private feed URLs (Feedbin, Miniflux, Google Alerts) routinely embed an API key in the URL itself.',
+    note: 'Subscribed feed URLs — what the user reads. Also near-secret: private feed URLs (Feedbin, Miniflux, Google Alerts) routinely embed an API key in the URL itself. Each feed also carries its opt-in flag for the CORS proxy.',
+  },
+  {
+    base: 'mockingbird_cors_proxy',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: "Which CORS proxy is selected, and a self-hosted proxy's URL template. Not secret — the key half lives in mockingbird_cors_proxy_key — but a custom template names a host the user runs.",
   },
   {
     base: 'mockingbird_paste_feeds',
@@ -423,6 +437,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'none',
     sensitivity: 'cache',
     note: 'Cached instance /about payloads.',
+  },
+  {
+    base: 'mockingbird_cors_proxy_usage',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'cache',
+    note: 'Counts of proxied requests and failures, for the Observability page. Diagnostics, not settings — resetting them loses nothing. Deliberately counters only: no URLs, so it never records which feeds were read.',
   },
   {
     base: 'mockingbird_search_server_about_v1',

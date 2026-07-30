@@ -259,6 +259,44 @@
     }
   </section>
 
+  <!-- =========================== CORS proxy ============================== -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>CORS proxy</h2>
+      @if (proxyLabel(); as label) {
+        <span class="muted small">{{ label }}</span>
+      }
+    </div>
+    <p class="muted small section-note">
+      Requests this browser sent through a third-party CORS proxy, which can read every address it
+      is given and every response it returns. Counts only — the addresses are deliberately not
+      recorded here.
+    </p>
+    @if (proxyUsage().requests) {
+      <div class="tiles">
+        <div class="tile">
+          <div class="tile-value">{{ proxyUsage().requests.toLocaleString() }}</div>
+          <div class="tile-label muted">proxied requests</div>
+        </div>
+        <div class="tile" [class.tile-bad]="proxyUsage().failures > 0">
+          <div class="tile-value">{{ proxyUsage().failures.toLocaleString() }}</div>
+          <div class="tile-label muted">failed</div>
+        </div>
+        <div class="tile">
+          <div class="tile-value">{{ proxiedFeedCount() }}</div>
+          <div class="tile-label muted">feeds set to use it</div>
+        </div>
+      </div>
+      <div class="section-actions">
+        <button class="btn btn-outline btn-sm" type="button" (click)="resetProxyUsage()">
+          Reset counters
+        </button>
+      </div>
+    } @else {
+      <p class="muted center">Nothing has been sent through a CORS proxy.</p>
+    }
+  </section>
+
   <!-- ========================== Local storage ============================ -->
   <section class="obs-section">
     <div class="section-head">

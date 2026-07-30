@@ -1,5 +1,6 @@
 import { WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
@@ -18,7 +19,8 @@ describe('SettingsRss', () => {
     localStorage.clear();
     fetchFeed = vi.fn();
     TestBed.configureTestingModule({
-      providers: [{ provide: RssFetch, useValue: { fetchFeed } }],
+      // The page links to the CORS proxy settings, so it needs a router.
+      providers: [provideRouter([]), { provide: RssFetch, useValue: { fetchFeed } }],
     });
   });
 

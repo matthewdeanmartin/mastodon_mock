@@ -11,6 +11,20 @@
   <p class="muted small">Up to 10 feeds can be saved in this browser.</p>
 </div>
 
+<p class="proxy-summary muted small">
+  @if (proxyLabel(); as label) {
+    Feeds that block browser access can be routed through <strong>{{ label }}</strong
+    >, per feed, below.
+  } @else if (proxyIncomplete()) {
+    Your CORS proxy is selected but not finished — it still needs a key or a valid address.
+  } @else {
+    No CORS proxy is set up. Without one, feeds that block browser access can't be read at all.
+  }
+  <a [routerLink]="['/settings/connections/cors-proxy']">
+    {{ proxyLabel() ? 'Change' : 'Set one up' }}
+  </a>
+</p>
+
 <form class="add-feed" (ngSubmit)="addFeed()">
   <input
     type="url"
@@ -27,6 +41,14 @@
 @if (error(); as msg) {
   <p class="feed-error">{{ msg }}</p>
 }
+@if (retryable()) {
+  <p class="retry-line">
+    <button class="btn btn-outline btn-sm" type="button" (click)="retryViaProxy()">
+      Try again via {{ proxyLabel() }}
+    </button>
+    <span class="muted small"> The proxy will see this feed's address and its contents. </span>
+  </p>
+}
 
 @if (subs.feeds().length) {
   <ul class="feed-list">
@@ -35,11 +57,24 @@
         <label class="feed-toggle">
           <input type="checkbox" [checked]="f.enabled" (change)="toggle(f)" />
           <span class="names">
-            <span class="name">{{ f.title || f.url }}</span>
+            <span class="name">
+              {{ f.title || f.url }}
+              @if (f.useProxy) {
+                <span class="proxy-badge" title="Fetched through your CORS proxy">via proxy</span>
+              }
+            </span>
             <span class="muted small">{{ f.url }}</span>
           </span>
         </label>
-        <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
+        <span class="feed-actions">
+          @if (proxyLabel()) {
+            <label class="proxy-switch muted small" [title]="'Fetch through ' + proxyLabel()">
+              <input type="checkbox" [checked]="f.useProxy === true" (change)="toggleProxy(f)" />
+              <span>Proxy</span>
+            </label>
+          }
+          <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
+        </span>
       </li>
     }
   </ul>

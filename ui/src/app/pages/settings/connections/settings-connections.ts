@@ -5,6 +5,7 @@ import { DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 import { GitHubSession } from '../../../providers/github/github-session';
 import { OpenRouterSession } from '../../../providers/openrouter/openrouter-session';
+import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import {
   CREDENTIAL_LIFETIME_OPTIONS,
   CredentialLifetime,
@@ -48,6 +49,7 @@ export class SettingsConnections implements OnInit {
   private raindrop = inject(RaindropSession);
   private github = inject(GitHubSession);
   private openrouter = inject(OpenRouterSession);
+  private corsProxy = inject(CorsProxySettings);
   protected lifetimes = inject(CredentialLifetimeStore);
 
   protected readonly lifetimeOptions = CREDENTIAL_LIFETIME_OPTIONS;
@@ -81,6 +83,12 @@ export class SettingsConnections implements OnInit {
               ? null
               : 'Not configured for this build — the Dropbox app key is missing.',
           };
+        case 'cors-proxy':
+          // "Connected" here means a proxy is selected *and* complete enough to
+          // use — a proxy that needs a key and has none is configured, not
+          // working, and saying otherwise would explain nothing when a feed
+          // still fails.
+          return { entry, connected: this.corsProxy.usable(), unavailableReason: null };
       }
     }),
   );
@@ -94,7 +102,13 @@ export class SettingsConnections implements OnInit {
     // This is the only page that governs the full set, because it owns the
     // policy picker below. A child page reached by deep link enforces its own
     // session on init instead.
-    this.lifetimes.govern([this.github, this.raindrop, this.bsky, this.openrouter]);
+    this.lifetimes.govern([
+      this.github,
+      this.raindrop,
+      this.bsky,
+      this.openrouter,
+      this.corsProxy,
+    ]);
     this.lifetimes.enforceAll();
   }
 

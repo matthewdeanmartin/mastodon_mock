@@ -20,10 +20,25 @@
  * A connection is *one account*. Anything that is a list of many things (RSS
  * feeds, paste providers) is not a connection and does not belong in this
  * catalog — it gets its own settings page.
+ *
+ * **One deliberate exception: `cors-proxy`.** It is a picker over a catalog of
+ * services, so by the rule above it belongs on its own page. It lives here
+ * anyway, because what the user configures *is* one thing — a single proxy,
+ * optionally with a paid API key, that every feature routes through — and
+ * because the key it holds is a credential that must sit under the same
+ * retention policy as the tokens on this page. Choosing one of several vendors
+ * is not the same as maintaining a list; the paste providers, where all three
+ * stay live at once, are the case the rule is really aimed at.
  */
 
 /** Route segment under `/settings/connections`, and the entry's identity. */
-export type ConnectionId = 'github' | 'dropbox' | 'raindrop' | 'bluesky' | 'openrouter';
+export type ConnectionId =
+  | 'github'
+  | 'dropbox'
+  | 'raindrop'
+  | 'bluesky'
+  | 'openrouter'
+  | 'cors-proxy';
 
 /**
  * Who a connection belongs to — which is a question users actually ask, and
@@ -156,5 +171,18 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
     pitch: 'An app-specific folder in your Dropbox.',
     scope: 'session',
     enables: ['Browse those files from Mawkingbird'],
+  },
+  {
+    id: 'cors-proxy',
+    label: 'CORS proxy',
+    emoji: '🔀',
+    pitch: 'A relay for sites that refuse to talk to browsers directly.',
+    // The key belongs to whoever pays for the proxy, not to a persona — same
+    // reasoning as OpenRouter. See CorsProxySettings.
+    scope: 'browser',
+    enables: [
+      'Read RSS feeds whose publishers block cross-origin access',
+      'Use your own proxy, or a paid one, instead of a rate-limited free service',
+    ],
   },
 ];
