@@ -355,6 +355,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Optional separate search instance. Names a host, but choosing one is a config tip worth sharing.',
   },
   {
+    base: 'mockingbird_translation_preference',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'setting',
+    note: 'Which translator the 🌐 button uses: your server, AI via OpenRouter, or ask each time. Absent means the default (your server).',
+  },
+  {
     base: 'mockingbird_search_server_rejects_v1',
     storage: 'local',
     suffix: 'none',

@@ -19,6 +19,7 @@ import {
   PromptTemplateId,
   PromptTemplateStore,
 } from '../../../../providers/openrouter/prompt-templates';
+import { TranslationPreference } from '../../../../translation-preference';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
 
@@ -39,6 +40,7 @@ export class ConnectionOpenRouter implements OnInit {
   protected models = inject(OpenRouterModels);
   protected choice = inject(OpenRouterModelChoice);
   protected prompts = inject(PromptTemplateStore);
+  protected translatePref = inject(TranslationPreference);
   private credits = inject(OpenRouterCredits);
   private route = inject(ActivatedRoute);
   private router = inject(Router);

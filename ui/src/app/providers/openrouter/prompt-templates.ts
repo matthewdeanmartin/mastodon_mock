@@ -1,13 +1,18 @@
 import { Injectable, signal } from '@angular/core';
 
 /**
- * The prompts behind the two LLM helpers, editable by the user.
+ * The prompts behind the LLM helpers, editable by the user.
  *
- * Both helpers are two-pass — the model proposes, the Mastodon API grades, the
- * model revises — which naively wants four prompts. It gets two, because the
- * person editing them should have two things to read and get right, not four.
- * The second pass reuses the same template with `{{feedback}}` filled in; on the
- * first pass that placeholder is empty and the paragraph around it collapses.
+ * The search and tag helpers are two-pass — the model proposes, the Mastodon API
+ * grades, the model revises — which naively wants four prompts. They get two,
+ * because the person editing them should have two things to read and get right, not
+ * four. The second pass reuses the same template with `{{feedback}}` filled in; on
+ * the first pass that placeholder is empty and the paragraph around it collapses.
+ *
+ * The translator is single-pass and has no `{{feedback}}` slot: there is nothing to
+ * grade a translation against. It is also the only one that answers with prose
+ * rather than a JSON list, which is why its reply goes through
+ * `text-completion.ts` instead of `json-suggestions.ts`.
  *
  * Overrides live in one unscoped `localStorage` key, matching the OpenRouter
  * connection they belong to (see {@link OpenRouterSession} for why that is
@@ -17,7 +22,7 @@ import { Injectable, signal } from '@angular/core';
 
 const PROMPTS_KEY = 'mockingbird_openrouter_prompts';
 
-export type PromptTemplateId = 'search' | 'tag';
+export type PromptTemplateId = 'search' | 'tag' | 'translate';
 
 export interface PromptTemplateSpec {
   id: PromptTemplateId;
@@ -42,6 +47,13 @@ export const PROMPT_TEMPLATES: readonly PromptTemplateSpec[] = [
     description:
       'Suggests hashtags for a post you are writing, then improves them once if the suggested tags turn out to be dead.',
     placeholders: ['post', 'feedback'],
+  },
+  {
+    id: 'translate',
+    label: 'Translator',
+    description:
+      'Translates a post into your language. The only prompt here that answers with prose rather than a list, so it has no {{feedback}} pass — there is nothing to grade a translation against.',
+    placeholders: ['text', 'target'],
   },
 ];
 
@@ -109,6 +121,22 @@ The post:
 {{post}}
 
 {{feedback}}`,
+
+  translate: `Translate the social media post below into {{target}}.
+
+Rules:
+- Reply with the translation and nothing else: no preamble, no notes, no quotes
+  around it, no explanation of your choices.
+- Leave @handles, #hashtags, URLs and emoji exactly as they are. They are not words.
+- Keep the tone. A blunt post stays blunt; a joke stays a joke. Do not smooth it out
+  and do not make it more polite than the original.
+- Keep the line breaks roughly as they are.
+- If the post is already in {{target}}, reply with it unchanged rather than
+  paraphrasing it.
+- If it is too short or too garbled to translate, reply with it unchanged.
+
+The post:
+{{text}}`,
 };
 
 /**

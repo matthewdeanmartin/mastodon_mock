@@ -7,6 +7,7 @@ import {
   SuggestionParseError,
   SuggestionReply,
 } from './json-suggestions';
+import { cleanTextCompletion } from './text-completion';
 
 /**
  * The one inference call in the app.
@@ -27,6 +28,12 @@ const CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MAX_TOKENS = 700;
 
 /**
+ * Prose needs more room than a list of five queries, but a Mastodon post is at most
+ * a few thousand characters, so this is still a bill guard rather than a real limit.
+ */
+const MAX_COMPLETION_TOKENS = 1500;
+
+/**
  * Appended on the retry when a provider rejected the schema outright, so the
  * second attempt still has a chance of being parseable.
  */
@@ -41,6 +48,14 @@ export interface SuggestOptions {
   schemaName: string;
   /** How many suggestions to ask for and accept. */
   max: number;
+}
+
+export interface CompleteOptions {
+  /** The fully rendered prompt. */
+  prompt: string;
+  /** The source text, so the guard can sanity-check the reply's length. */
+  source?: string;
+  maxTokens?: number;
 }
 
 interface ChatResponse {
@@ -78,6 +93,48 @@ export class OpenRouterChat {
       }
       return this.attempt(key, options, false);
     }
+  }
+
+  /**
+   * One prompt in, the model's text out.
+   *
+   * A second method rather than a mode on {@link suggest}, because almost nothing is
+   * shared with it beyond transport: no `response_format`, no schema, no
+   * retry-without-schema (there is nothing to drop), and a completely different
+   * guard. What it does share — the key check, the URL, `max_tokens` discipline and
+   * {@link describeFailure} — is the part worth not duplicating.
+   *
+   * The returned string is **untrusted plain text**. See `text-completion.ts`: it
+   * must be rendered as text, never through the `[innerHTML]` path that server
+   * content uses.
+   */
+  async complete(options: CompleteOptions): Promise<string> {
+    const key = this.session.apiKey();
+    if (!key) {
+      throw new Error('Connect OpenRouter first.');
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.choice.modelId(),
+          max_tokens: options.maxTokens ?? MAX_COMPLETION_TOKENS,
+          messages: [{ role: 'user', content: options.prompt }],
+        }),
+      });
+    } catch {
+      throw new Error("Couldn't reach OpenRouter.");
+    }
+
+    if (!response.ok) {
+      throw new Error(await this.describeFailure(response));
+    }
+
+    const content = ((await response.json()) as ChatResponse).choices?.[0]?.message?.content;
+    return cleanTextCompletion(content, { source: options.source });
   }
 
   private async attempt(

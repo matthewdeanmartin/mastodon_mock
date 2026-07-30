@@ -147,11 +147,46 @@
 </section>
 
 <section class="or-section">
+  <h2>Translation</h2>
+  <p class="muted">
+    Which translator the 🌐 button on a post uses. Your server's own translation is the default: it
+    costs you nothing and it is what you already had. AI translation is opt-in.
+  </p>
+  <p class="muted small">
+    Browsing without an account, this choice doesn't apply — server translation needs a login, so AI
+    is the only translator available and the 🤖🌐 button goes straight to it.
+  </p>
+  <div class="or-translate-options">
+    @for (option of translatePref.options; track option.value) {
+      <label class="or-translate-option" [class.on]="translatePref.choice() === option.value">
+        <input
+          type="radio"
+          name="translator"
+          [value]="option.value"
+          [checked]="translatePref.choice() === option.value"
+          (change)="translatePref.set(option.value)"
+        />
+        <span>
+          <strong>{{ option.label }}</strong>
+          <span class="muted small">{{ option.hint }}</span>
+        </span>
+      </label>
+    }
+  </div>
+</section>
+
+<section class="or-section">
   <h2>Prompts</h2>
   <p class="muted">
-    What the model is actually asked. Both helpers work in two passes — the model proposes, the
-    Mastodon API grades the proposals, and the model gets one chance to improve them — so each
-    prompt has a <code>{{ braced('feedback') }}</code> slot that is empty on the first pass.
+    What the model is actually asked. The search and tag helpers work in two passes — the model
+    proposes, the Mastodon API grades the proposals, and the model gets one chance to improve them —
+    so those two have a <code>{{ braced('feedback') }}</code> slot that is empty on the first pass.
+    The translator has no second pass: there is nothing to grade a translation against.
+  </p>
+  <p class="muted small">
+    Each prompt lists the placeholders it accepts. An unknown one is left visible in the sent prompt
+    rather than silently dropped, so a typo shows up as a stray
+    <code>{{ braced('plcaeholder') }}</code> instead of quietly producing worse answers.
   </p>
 
   @for (template of prompts.templates; track template.id) {

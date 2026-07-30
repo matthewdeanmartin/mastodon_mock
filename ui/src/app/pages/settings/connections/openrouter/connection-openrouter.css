@@ -151,3 +151,36 @@
   margin-top: 8px;
   flex-wrap: wrap;
 }
+
+.or-translate-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.or-translate-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.or-translate-option.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.or-translate-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.or-translate-option input {
+  margin-top: 3px;
+  cursor: pointer;
+}

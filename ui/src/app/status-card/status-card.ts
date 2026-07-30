@@ -22,6 +22,9 @@ import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, MediaAttachment, Poll, Status, Translation } from '../models';
+import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
+import { AiTranslate, AiTranslation } from '../ai-translate';
+import { TranslationPreference } from '../translation-preference';
 import { MutedPosts } from '../muted-posts';
 import { LocalModeration } from '../local-moderation';
 import { StatusVisibility } from '../status-visibility';
@@ -1023,13 +1026,118 @@ export class StatusCard {
       return;
     }
     this.translating.set(true);
+    this.translateError.set(null);
     this.api.translate(this.display.id).subscribe({
       next: (t) => {
         this.translation.set(t);
         this.translating.set(false);
       },
-      error: () => this.translating.set(false),
+      error: () => {
+        this.translating.set(false);
+        // Most servers have no translation provider configured at all, so this is
+        // the common path rather than an edge. Offer the way out instead of
+        // dead-ending on a button that did nothing.
+        this.translateError.set(
+          this.openrouter.connected()
+            ? "Your server couldn't translate this. Try AI translation instead."
+            : "Your server couldn't translate this post.",
+        );
+      },
     });
+  }
+
+  // --- AI translation (anonymous-great sprint 3) ---
+  private openrouter = inject(OpenRouterSession);
+  private aiTranslate = inject(AiTranslate);
+  protected translatePref = inject(TranslationPreference);
+
+  /** Untrusted model output. Rendered as text; never near the `[innerHTML]` path. */
+  protected aiTranslation = signal<AiTranslation | null>(null);
+  protected aiTranslating = signal(false);
+  protected translateError = signal<string | null>(null);
+  protected translateChoiceOpen = signal(false);
+  protected rememberChoice = signal(false);
+
+  /**
+   * Whether to show the 🤖🌐 button.
+   *
+   * For anonymous readers: **always**, connected or not. This is a deliberate
+   * exception to `openrouter-0-overview.md` decision 9 ("helper buttons are hidden
+   * when OpenRouter isn't connected — no upsell, no teaser"). That rule holds where
+   * a helper is an addition to a surface that already works; here `canUseServerActions`
+   * has taken the only translate button away, so hiding this one makes the capability
+   * invisible rather than merely unavailable. Unconnected, it explains itself once.
+   *
+   * For signed-in users the rule stands: the server 🌐 already works, so the AI
+   * button appears only once OpenRouter is connected.
+   */
+  protected showAiTranslate = computed(
+    () => this.capabilities.active || this.openrouter.connected(),
+  );
+
+  /** Drives the dialog's two faces: chooser when connected, upsell when not. */
+  protected openrouterConnected = computed(() => this.openrouter.connected());
+
+  /** The 🌐 click for a signed-in user, routed by preference. */
+  translateByPreference(event: Event): void {
+    event.stopPropagation();
+    switch (this.translatePref.choice()) {
+      case 'ai':
+        void this.runAiTranslate();
+        return;
+      case 'ask':
+        this.translateChoiceOpen.set(true);
+        return;
+      default:
+        this.toggleTranslate(event);
+    }
+  }
+
+  /** Chosen from the ask-dialog. Optionally remembered. */
+  chooseTranslator(which: 'server' | 'ai', event: Event): void {
+    event.stopPropagation();
+    this.translateChoiceOpen.set(false);
+    if (this.rememberChoice()) {
+      this.translatePref.set(which);
+    }
+    if (which === 'ai') {
+      void this.runAiTranslate();
+    } else {
+      this.toggleTranslate(event);
+    }
+  }
+
+  /**
+   * Translate with the chosen model, or explain why we can't.
+   *
+   * Unconnected is not an error state — it is a thing the user hasn't set up yet, so
+   * it gets a sentence and a link rather than red text.
+   */
+  async runAiTranslate(): Promise<void> {
+    if (this.aiTranslation()) {
+      this.aiTranslation.set(null);
+      return;
+    }
+    if (!this.openrouter.connected()) {
+      this.translateChoiceOpen.set(true);
+      return;
+    }
+    this.aiTranslating.set(true);
+    this.translateError.set(null);
+    try {
+      this.aiTranslation.set(await this.aiTranslate.translateHtml(this.display.content));
+    } catch (error: unknown) {
+      this.translateError.set(
+        error instanceof Error ? error.message : "The model couldn't translate this.",
+      );
+    } finally {
+      this.aiTranslating.set(false);
+    }
+  }
+
+  onAiTranslateClick(event: Event): void {
+    event.stopPropagation();
+    void this.runAiTranslate();
   }
 
   // --- polls ---

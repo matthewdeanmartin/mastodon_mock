@@ -1,6 +1,6 @@
 # Anonymous Great — Sprint 3: AI translation
 
-Status: PLANNED (2026-07-29). Roadmap: `anonymous-great-0-overview.md`.
+Status: COMPLETE (implemented 2026-07-29; 1900 tests, lint and storage-registry clean). Roadmap: `anonymous-great-0-overview.md`.
 Depends on the OpenRouter connection (`openrouter-0-overview.md`, sprints 1–5, all DONE).
 
 ## The premise
@@ -102,6 +102,29 @@ and therefore the first one a user could run up a bill with by clicking around. 
 connection page's credits display already exists (`openrouter-credits.ts`); the ask-dialog
 mentions that AI translation spends OpenRouter credits, once, in the chooser — not on every
 translate.
+
+## As shipped — divergences worth knowing
+
+- **AI translations are a separate type, not a `Translation`.** `AiTranslation { text, model,
+  target }` rather than reusing the server's shape. `Translation.content` is HTML that
+  `status-card` pipes through `applyMinimalMarkdown` into `[innerHTML]`; giving model output
+  the same type would make the unsafe path a plausible mistake. A distinct type means the
+  compiler enforces what a comment could only request. The AI text renders in its own block
+  with `{{ }}`, and a test asserts an `<img onerror=…>` payload appears as literal text with
+  no element created.
+- **`htmlToPlainText` lives in `ai-translate.ts`.** Tags come off before the prompt: sending
+  markup wastes tokens and invites the model to translate it. Block ends become newlines, or
+  the last word of one paragraph fuses to the first of the next.
+- **The button visibility rule is narrower than the sketch.** Anonymous: always shown
+  (decision 8). Signed in: shown only when OpenRouter is connected **and** the preference is
+  `ai` — otherwise the server 🌐 alone is on screen, routed by preference. Two translate
+  buttons side by side for someone who chose "always server" would be clutter, not a choice.
+- **A bare preamble is returned verbatim, not rejected.** `"Sure! Here it is:"` with nothing
+  after it is indistinguishable from a legitimate one-line reply ending in a colon. Stripping
+  it needs a heuristic that also eats real content; the cost of not stripping is a visibly
+  useless translation the user retries, which beats silently deleting a post body.
+- **Target language comes from `ClientPrefs.knownLanguages()[0]`**, falling back to the
+  browser locale. Never a hardcoded `en`.
 
 ## Files
 

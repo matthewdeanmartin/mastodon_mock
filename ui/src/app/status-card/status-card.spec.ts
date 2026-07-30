@@ -12,6 +12,9 @@ import {
   parseAnonymousAccountRouteRef,
   parseAnonymousStatusRouteRef,
 } from '../providers/anonymous/anonymous-route-ref';
+import { AiTranslate } from '../ai-translate';
+import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
+import { TranslationPreference } from '../translation-preference';
 
 /** Expose protected signals/methods for white-box testing. */
 interface StatusCardInternals {
@@ -1264,5 +1267,165 @@ describe('StatusCard reader mode (expand all)', () => {
     );
 
     expect(fixture.nativeElement.textContent).toContain('still render this');
+  });
+});
+
+/**
+ * AI translation (anonymous-great sprint 3).
+ *
+ * Two properties matter more than the rest and both get a test: an anonymous reader
+ * always has the button, and model output is never rendered as HTML.
+ */
+describe('StatusCard — AI translation', () => {
+  let httpMock: HttpTestingController;
+  let translateHtml: ReturnType<typeof vi.fn>;
+  /** Flipped by tests that need a connected key; the default is "not set up yet". */
+  let connected = false;
+
+  beforeEach(() => {
+    localStorage.clear();
+    translateHtml = vi.fn();
+    connected = false;
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: AiTranslate, useValue: { translateHtml } },
+        { provide: OpenRouterSession, useValue: { connected: () => connected } },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  function setUp(status = makeStatus()): ComponentFixture<StatusCard> {
+    const fixture = TestBed.createComponent(StatusCard);
+    fixture.componentRef.setInput('status', status);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function aiButton(fixture: ComponentFixture<StatusCard>): HTMLButtonElement | null {
+    return (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      '[aria-label="Translate with AI"]',
+    );
+  }
+
+  it('offers AI translation to an anonymous reader even with OpenRouter unconnected', () => {
+    // The deliberate exception to "no upsell, no teaser": anonymous readers have no
+    // other translate button, so hiding this makes the capability invisible rather
+    // than merely unavailable.
+    TestBed.inject(Auth).enterAnonymous();
+
+    expect(aiButton(setUp())).not.toBeNull();
+  });
+
+  it('explains itself instead of doing nothing when OpenRouter is unconnected', async () => {
+    TestBed.inject(Auth).enterAnonymous();
+    const fixture = setUp();
+
+    aiButton(fixture)!.click();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Connect OpenRouter');
+    });
+    // And it did not pretend to translate.
+    expect(translateHtml).not.toHaveBeenCalled();
+  });
+
+  it('hides the AI button for a signed-in user on the server default', () => {
+    // The spillover must not be a regression: signed-in behaviour is unchanged
+    // unless the user opts in. `connected = true` matters — without it this would
+    // pass merely because there is no key, proving nothing about the preference.
+    connected = true;
+    const auth = TestBed.inject(Auth);
+    auth.setToken('a-token');
+    auth.setAccount(makeAccount('me') as never);
+    const fixture = setUp();
+
+    expect(TestBed.inject(TranslationPreference).choice()).toBe('server');
+    // The server's own 🌐 is still there; only the AI one is absent.
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[title="Translate"]'),
+    ).not.toBeNull();
+    expect(aiButton(fixture)).toBeNull();
+  });
+
+  it('shows the AI button for a signed-in user who opted in', () => {
+    connected = true;
+    const auth = TestBed.inject(Auth);
+    auth.setToken('a-token');
+    auth.setAccount(makeAccount('me') as never);
+    TestBed.inject(TranslationPreference).set('ai');
+
+    expect(aiButton(setUp())).not.toBeNull();
+  });
+
+  it('renders the translation as text, never as markup', async () => {
+    // The one hard rule of this sprint. Server content goes through
+    // applyMinimalMarkdown into [innerHTML], which is safe only because the server
+    // sanitized it; model output has been sanitized by nobody.
+    TestBed.inject(Auth).enterAnonymous();
+    connected = true;
+    translateHtml.mockResolvedValue({
+      text: '<img src=x onerror=alert(1)> hola',
+      model: 'test/model',
+      target: 'Spanish',
+    });
+    const fixture = setUp();
+    const component = fixture.componentInstance as unknown as { runAiTranslate(): Promise<void> };
+
+    await component.runAiTranslate();
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    const block = element.querySelector('.ai-translation-text')!;
+
+    // The tag is literal text in the DOM, not an element.
+    expect(block.textContent).toContain('<img src=x onerror=alert(1)>');
+    expect(block.querySelector('img')).toBeNull();
+  });
+
+  it('names the model that produced the translation', async () => {
+    TestBed.inject(Auth).enterAnonymous();
+    connected = true;
+    translateHtml.mockResolvedValue({ text: 'hola', model: 'google/gemma', target: 'Spanish' });
+    const fixture = setUp();
+    const component = fixture.componentInstance as unknown as { runAiTranslate(): Promise<void> };
+
+    await component.runAiTranslate();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('google/gemma');
+    expect(text).toContain('machine translation');
+  });
+
+  it('surfaces a model failure rather than silently doing nothing', async () => {
+    TestBed.inject(Auth).enterAnonymous();
+    connected = true;
+    translateHtml.mockRejectedValue(new Error('Your OpenRouter credits have run out.'));
+    const fixture = setUp();
+    const component = fixture.componentInstance as unknown as { runAiTranslate(): Promise<void> };
+
+    await component.runAiTranslate();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('credits have run out');
+  });
+
+  it('toggles back to the original on a second click', async () => {
+    TestBed.inject(Auth).enterAnonymous();
+    connected = true;
+    translateHtml.mockResolvedValue({ text: 'hola', model: 'm', target: 'Spanish' });
+    const fixture = setUp();
+    const component = fixture.componentInstance as unknown as { runAiTranslate(): Promise<void> };
+
+    await component.runAiTranslate();
+    await component.runAiTranslate();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.ai-translation')).toBeNull();
   });
 });
