@@ -1,3 +1,16 @@
+/*
+ * The centre column has no horizontal padding of its own (see `.column` in
+ * shell.css) — every page insets its own blocks. Doing it per block rather than
+ * on a wrapper is the point: padding lives inside the element, so a section's
+ * border-bottom still spans the full width of the column while its text stays
+ * clear of the rail. `.tabs` is the one thing left flush, because each `.tab`
+ * carries its own padding and the rule under them is meant to reach both edges.
+ */
+.page-title,
+.page-intro {
+  padding: 0 16px;
+}
+
 .page-title {
   margin: 0 0 4px;
 }
@@ -31,7 +44,7 @@
   flex-direction: column;
   gap: 10px;
   align-items: flex-start;
-  padding: 14px 0;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -58,7 +71,7 @@
 }
 
 .invite-card {
-  padding: 16px 0;
+  padding: 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -160,5 +173,5 @@ a.btn:hover {
 }
 
 .footnote {
-  padding: 16px 0 32px;
+  padding: 16px 16px 32px;
 }
