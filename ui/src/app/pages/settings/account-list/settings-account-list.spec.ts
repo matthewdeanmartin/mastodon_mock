@@ -12,6 +12,10 @@ interface SettingsAccountListInternals {
   kind: WritableSignal<'mutes' | 'blocks'>;
   accounts: WritableSignal<Account[]>;
   undo(acc: Account): void;
+  amnestyAction(): string;
+  amnestyLabel(): string;
+  asking: WritableSignal<boolean>;
+  askAmnesty(): void;
 }
 
 function internals(fixture: ComponentFixture<SettingsAccountList>): SettingsAccountListInternals {
@@ -63,6 +67,34 @@ describe('SettingsAccountList', () => {
     fixture.detectChanges();
     httpMock.expectOne('/api/v1/mutes').flush([makeAccount('1')]);
     expect(internals(fixture).accounts().length).toBe(1);
+  });
+
+  it('offers the amnesty matching the list it is showing', () => {
+    configure('blocks');
+    const fixture = TestBed.createComponent(SettingsAccountList);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/blocks').flush([makeAccount('1')]);
+
+    expect(internals(fixture).amnestyAction()).toBe('block-amnesty');
+    expect(internals(fixture).amnestyLabel()).toBe('Unblock everyone');
+  });
+
+  it('asks before running an amnesty, and issues no request until confirmed', () => {
+    configure('mutes');
+    const fixture = TestBed.createComponent(SettingsAccountList);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/mutes').flush([makeAccount('1')]);
+
+    internals(fixture).askAmnesty();
+    fixture.detectChanges();
+
+    expect(internals(fixture).asking()).toBe(true);
+    // The point of the dialog: opening it changes nothing. Any reads the
+    // preview makes are fine; a write would not be.
+    expect(httpMock.match((r) => r.method === 'POST')).toEqual([]);
+    for (const read of httpMock.match(() => true)) {
+      read.flush([]);
+    }
   });
 
   it('unblocks and removes the row for kind=blocks', () => {

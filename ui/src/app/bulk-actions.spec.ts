@@ -1,0 +1,276 @@
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { TestBed } from '@angular/core/testing';
+import { of, throwError } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Api } from './api';
+import { Auth } from './auth';
+import { BulkActions, bulkAction, formatEta } from './bulk-actions';
+import { Account, Relationship } from './models';
+
+function account(id: string, acct = `user${id}`): Account {
+  return { id, acct, username: acct, display_name: acct } as Account;
+}
+
+function relationship(id: string, showing_reblogs: boolean | undefined): Relationship {
+  return { id, following: true, showing_reblogs } as Relationship;
+}
+
+/**
+ * A stand-in Api whose calls are vi.fn()s the tests program per case. The
+ * parameter lists are spelled out so `mockImplementation` can read the
+ * arguments — several tests assert on which ids were requested.
+ */
+function fakeApi() {
+  return {
+    accountFollowing: vi.fn((_id: string, _maxId?: string, _limit?: number) => of([] as Account[])),
+    relationships: vi.fn((_ids: string[]) => of([] as Relationship[])),
+    follow: vi.fn((_id: string, _options?: { reblogs?: boolean }) => of({} as Relationship)),
+    accountListPage: vi.fn((_kind: 'mutes' | 'blocks', _maxId?: string, _limit?: number) =>
+      of({ accounts: [] as Account[], nextMaxId: null as string | null }),
+    ),
+    unmuteAccount: vi.fn((_id: string) => of({} as Relationship)),
+    unblockAccount: vi.fn((_id: string) => of({} as Relationship)),
+  };
+}
+
+describe('formatEta', () => {
+  it('reads as an estimate at every scale', () => {
+    expect(formatEta(4_000)).toBe('about 4s');
+    expect(formatEta(130_000)).toBe('about 2m 10s');
+    expect(formatEta(3_840_000)).toBe('about 1h 04m');
+  });
+});
+
+describe('bulkAction', () => {
+  it('describes the destructive actions as recoverable only from a backup', () => {
+    for (const id of ['mute-amnesty', 'block-amnesty'] as const) {
+      const spec = bulkAction(id);
+      expect(spec.danger).toBe(true);
+      expect(spec.backup).toBeTruthy();
+      expect(spec.effects.join(' ')).toContain('backed up');
+    }
+  });
+
+  it('promises the retweet actions do not unfollow anyone', () => {
+    expect(bulkAction('reblogs-off').effects.join(' ')).toContain('nobody is unfollowed');
+    expect(bulkAction('reblogs-off').danger).toBe(false);
+  });
+});
+
+describe('BulkActions', () => {
+  let bulk: BulkActions;
+  let api: ReturnType<typeof fakeApi>;
+
+  beforeEach(() => {
+    api = fakeApi();
+    TestBed.configureTestingModule({
+      providers: [
+        BulkActions,
+        { provide: Api, useValue: api },
+        { provide: Auth, useValue: { account: () => account('me') } },
+      ],
+    });
+    bulk = TestBed.inject(BulkActions);
+    // No spacing and no real waiting; the pacing itself is not under test here.
+    bulk.delayMs = 0;
+    bulk.maxWaitMs = 1;
+  });
+
+  // ------------------------------------------------------------- retweets
+
+  it('writes only to the follows whose retweet setting is actually wrong', async () => {
+    const follows = [account('1'), account('2'), account('3')];
+    api.accountFollowing.mockReturnValueOnce(of(follows));
+    api.relationships.mockReturnValueOnce(
+      of([relationship('1', true), relationship('2', false), relationship('3', true)]),
+    );
+
+    const preview = await bulk.preview('reblogs-off');
+
+    expect(preview.targets).toBe(2);
+    expect(preview.alreadyCorrect).toBe(1);
+
+    await bulk.start('reblogs-off');
+
+    expect(api.follow).toHaveBeenCalledTimes(2);
+    expect(api.follow).toHaveBeenCalledWith('1', { reblogs: false });
+    expect(api.follow).toHaveBeenCalledWith('3', { reblogs: false });
+    expect(bulk.job()).toMatchObject({ phase: 'done', done: 2, changed: 2, skipped: 1, failed: 0 });
+  });
+
+  it('treats an absent showing_reblogs as "on", matching Mastodon default', async () => {
+    api.accountFollowing.mockReturnValueOnce(of([account('1')]));
+    api.relationships.mockReturnValueOnce(of([relationship('1', undefined)]));
+
+    // Turning them OFF must still reach this account...
+    expect((await bulk.preview('reblogs-off')).targets).toBe(1);
+
+    api.accountFollowing.mockReturnValueOnce(of([account('1')]));
+    api.relationships.mockReturnValueOnce(of([relationship('1', undefined)]));
+    // ...and turning them ON must skip it, since they are already on.
+    expect((await bulk.preview('reblogs-on')).targets).toBe(0);
+  });
+
+  it('pages the follow list and batches the relationship lookups', async () => {
+    const page1 = Array.from({ length: 80 }, (_, i) => account(`a${i}`));
+    const page2 = [account('b0')];
+    api.accountFollowing.mockReturnValueOnce(of(page1)).mockReturnValueOnce(of(page2));
+    api.relationships.mockImplementation((ids: string[]) =>
+      of(ids.map((id) => relationship(id, true))),
+    );
+
+    const preview = await bulk.preview('reblogs-off');
+
+    expect(api.accountFollowing).toHaveBeenCalledTimes(2);
+    // 81 accounts at 40 ids per request.
+    expect(api.relationships).toHaveBeenCalledTimes(3);
+    expect(preview.targets).toBe(81);
+  });
+
+  it('does no work when everyone is already correct', async () => {
+    api.accountFollowing.mockReturnValueOnce(of([account('1')]));
+    api.relationships.mockReturnValueOnce(of([relationship('1', false)]));
+
+    const preview = await bulk.preview('reblogs-off');
+
+    expect(preview.targets).toBe(0);
+    await bulk.start('reblogs-off');
+    expect(api.follow).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------- amnesty
+
+  it('unmutes everyone and stops when the list comes back empty', async () => {
+    api.accountListPage
+      .mockReturnValueOnce(of({ accounts: [account('1'), account('2')], nextMaxId: null }))
+      .mockReturnValue(of({ accounts: [], nextMaxId: null }));
+
+    await bulk.start('mute-amnesty');
+
+    expect(api.unmuteAccount).toHaveBeenCalledTimes(2);
+    expect(bulk.job()).toMatchObject({ phase: 'done', changed: 2, total: 2 });
+    expect(bulk.percent()).toBe(1);
+  });
+
+  it('follows Link cursors so a multi-page list is read in full', async () => {
+    api.accountListPage
+      .mockReturnValueOnce(of({ accounts: [account('1')], nextMaxId: '99' }))
+      .mockReturnValueOnce(of({ accounts: [account('2')], nextMaxId: null }));
+
+    const preview = await bulk.preview('block-amnesty');
+
+    expect(preview.targets).toBe(2);
+    expect(preview.approximate).toBe(false);
+    expect(api.accountListPage).toHaveBeenLastCalledWith('blocks', '99', 80);
+  });
+
+  it('stops instead of looping when a pass changes nothing', async () => {
+    // A server that accepts the unblock but keeps listing the account.
+    api.accountListPage.mockReturnValue(of({ accounts: [account('1')], nextMaxId: null }));
+    api.unblockAccount.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+    await bulk.start('block-amnesty');
+
+    expect(bulk.job()?.phase).toBe('done');
+    expect(bulk.job()?.failed).toBe(1);
+    expect(api.unblockAccount).toHaveBeenCalledTimes(1);
+  });
+
+  // --------------------------------------------------------------- errors
+
+  it('records a failure and carries on to the next account', async () => {
+    api.accountListPage
+      .mockReturnValueOnce(
+        of({ accounts: [account('1'), account('2'), account('3')], nextMaxId: null }),
+      )
+      .mockReturnValue(of({ accounts: [], nextMaxId: null }));
+    api.unmuteAccount
+      .mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 404 })))
+      .mockReturnValue(of({} as Relationship));
+
+    await bulk.start('mute-amnesty');
+
+    expect(api.unmuteAccount).toHaveBeenCalledTimes(3);
+    expect(bulk.job()).toMatchObject({ phase: 'done', failed: 1, changed: 2 });
+  });
+
+  it('pauses on a 429 and retries the same account rather than failing it', async () => {
+    const rateLimited = new HttpErrorResponse({
+      status: 429,
+      headers: new HttpHeaders({ 'Retry-After': '0' }),
+    });
+    api.accountListPage
+      .mockReturnValueOnce(of({ accounts: [account('1')], nextMaxId: null }))
+      .mockReturnValue(of({ accounts: [], nextMaxId: null }));
+    api.unmuteAccount
+      .mockReturnValueOnce(throwError(() => rateLimited))
+      .mockReturnValue(of({} as Relationship));
+
+    await bulk.start('mute-amnesty');
+
+    expect(api.unmuteAccount).toHaveBeenCalledTimes(2);
+    expect(bulk.job()).toMatchObject({ phase: 'done', changed: 1, failed: 0 });
+  });
+
+  it('reports a preview failure instead of pretending there is nothing to do', async () => {
+    api.accountListPage.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+
+    const preview = await bulk.preview('mute-amnesty');
+
+    expect(preview.error).toContain('503');
+    expect(preview.targets).toBe(0);
+  });
+
+  // ------------------------------------------------------- control + state
+
+  it('refuses to start a second job while one is running', async () => {
+    api.accountListPage.mockReturnValue(of({ accounts: [], nextMaxId: null }));
+    const first = bulk.start('mute-amnesty');
+    await bulk.start('block-amnesty');
+    await first;
+    expect(bulk.job()?.action).toBe('mute-amnesty');
+  });
+
+  it('stops after the in-flight write when cancelled', async () => {
+    api.accountListPage
+      .mockReturnValueOnce(of({ accounts: [account('1'), account('2')], nextMaxId: null }))
+      .mockReturnValue(of({ accounts: [], nextMaxId: null }));
+    api.unmuteAccount.mockImplementation(() => {
+      bulk.cancel();
+      return of({} as Relationship);
+    });
+
+    await bulk.start('mute-amnesty');
+
+    expect(api.unmuteAccount).toHaveBeenCalledTimes(1);
+    expect(bulk.job()?.phase).toBe('cancelled');
+  });
+
+  it('keeps a finished job visible until dismissed, and never drops a running one', async () => {
+    api.accountListPage.mockReturnValue(of({ accounts: [], nextMaxId: null }));
+    await bulk.start('mute-amnesty');
+    expect(bulk.job()).not.toBeNull();
+    bulk.dismiss();
+    expect(bulk.job()).toBeNull();
+  });
+
+  it('builds a Mastodon-compatible CSV backup from the whole list', async () => {
+    api.accountListPage
+      .mockReturnValueOnce(of({ accounts: [account('1', 'bob@a.test')], nextMaxId: '7' }))
+      .mockReturnValueOnce(of({ accounts: [account('2', 'eve@b.test')], nextMaxId: null }));
+
+    const { csv, count } = await bulk.backupCsv('mute-amnesty');
+
+    expect(count).toBe(2);
+    expect(csv.split('\n')).toEqual([
+      'Account address,Hide notifications',
+      'bob@a.test,true',
+      'eve@b.test,true',
+    ]);
+  });
+
+  it('reports no percentage until the total is known', async () => {
+    expect(bulk.percent()).toBeNull();
+    expect(bulk.etaMs()).toBeNull();
+  });
+});

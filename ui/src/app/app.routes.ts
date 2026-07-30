@@ -249,6 +249,17 @@ export const routes: Routes = [
               ),
           },
           {
+            // Whole-account operations (retweets for every follow, mute/block
+            // amnesty). Server-backed throughout, so Anonymous can't use it.
+            path: 'bulk-actions',
+            canActivate: [anonymousUnavailableGuard],
+            data: { anonymousFeature: 'Bulk actions', preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/bulk-actions/settings-bulk-actions').then(
+                (m) => m.SettingsBulkActions,
+              ),
+          },
+          {
             path: 'filters',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Content filters', preloadSettings: true },

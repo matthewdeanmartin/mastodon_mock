@@ -534,6 +534,35 @@ export class Api {
     return this.http.get<Account[]>('/api/v1/blocks');
   }
 
+  /**
+   * One page of the mute or block list, plus where the next page starts.
+   *
+   * These two lists are the app's only `Link`-paginated reads. Everywhere else
+   * pages by the last item's own id, which cannot work here: Mastodon paginates
+   * mutes and blocks by *relationship* id, a value that appears nowhere in the
+   * account objects it returns. The cursor is only ever in the `Link` header, so
+   * reading the whole list means reading that header.
+   *
+   * A server that returns no `Link` (our mock, which answers with the entire
+   * list at once) simply yields `nextMaxId: null` and the caller stops.
+   */
+  accountListPage(
+    kind: 'mutes' | 'blocks',
+    maxId?: string,
+    limit = 80,
+  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
+    return this.http.get<Account[]>(`/api/v1/${kind}`, { params, observe: 'response' }).pipe(
+      map((response) => ({
+        accounts: response.body ?? [],
+        nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
+      })),
+    );
+  }
+
   /** Mute an account, optionally auto-expiring after `duration` seconds. */
   muteAccount(id: string, duration?: number): Observable<Relationship> {
     return this.http.post<Relationship>(
@@ -803,4 +832,35 @@ export class Api {
     }
     return params;
   }
+}
+
+/**
+ * Pull the `max_id` cursor out of a `Link: <…>; rel="next"` header.
+ *
+ * Only the cursor is taken, never the URL itself: the `next` link is an absolute
+ * address on whatever host the server thinks it is, and re-issuing that verbatim
+ * would skip the server-rewriting and auth interceptors that make every other
+ * call in this file work. Feeding the id back into a normal relative request
+ * keeps one code path.
+ *
+ * Returns null when there is no header, no `next` relation, or no usable id —
+ * all of which mean the same thing to a caller: stop.
+ */
+export function nextMaxIdFrom(linkHeader: string | null): string | null {
+  if (!linkHeader) {
+    return null;
+  }
+  for (const part of linkHeader.split(',')) {
+    const match = part.match(/<([^>]+)>\s*;\s*rel="?next"?/i);
+    if (!match) {
+      continue;
+    }
+    try {
+      const maxId = new URL(match[1], 'https://placeholder.invalid').searchParams.get('max_id');
+      return maxId || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }

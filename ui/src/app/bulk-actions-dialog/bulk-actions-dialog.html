@@ -1,0 +1,80 @@
+<div
+  class="overlay"
+  role="presentation"
+  tabindex="-1"
+  (click)="cancelled.emit()"
+  (keyup.escape)="cancelled.emit()"
+>
+  <div
+    class="dialog bulk-dialog"
+    role="alertdialog"
+    aria-labelledby="bulk-dialog-title"
+    (click)="$event.stopPropagation()"
+    (keyup)="$event.stopPropagation()"
+  >
+    <h3 id="bulk-dialog-title">{{ spec().title }}</h3>
+
+    @if (loading()) {
+      <p class="muted">Checking how many accounts this affects…</p>
+    } @else if (preview()?.error; as error) {
+      <p class="bulk-error">Couldn’t check what this would do: {{ error }}</p>
+      <p class="muted small">Nothing has been changed.</p>
+    } @else {
+      <p class="bulk-summary">{{ summary() }}</p>
+
+      @if (!noWork()) {
+        <ul class="bulk-effects">
+          @for (effect of spec().effects; track effect) {
+            <li>{{ effect }}</li>
+          }
+        </ul>
+
+        @if (spec().backup) {
+          <div class="bulk-backup">
+            @if (backup(); as saved) {
+              <p class="small backup-done">
+                Saved a copy of {{ saved.count.toLocaleString() }}
+                {{ saved.count === 1 ? 'account' : 'accounts' }} to your downloads.
+              </p>
+            } @else {
+              <p class="small muted">
+                Download the list first and you can put it back later with Import/Export.
+              </p>
+              <button
+                class="btn btn-outline btn-sm"
+                type="button"
+                [disabled]="backupBusy()"
+                (click)="downloadBackup()"
+              >
+                {{ backupBusy() ? 'Preparing…' : 'Download this list first' }}
+              </button>
+            }
+            @if (backupError()) {
+              <p class="small bulk-error">{{ backupError() }}</p>
+            }
+          </div>
+        }
+      }
+    }
+
+    <div class="confirm-actions">
+      @if (noWork() || preview()?.error) {
+        <button class="btn" type="button" (click)="cancelled.emit()">Close</button>
+        @if (preview()?.error) {
+          <button class="btn btn-outline" type="button" (click)="load()">Try again</button>
+        }
+      } @else {
+        <button class="btn btn-outline" type="button" (click)="cancelled.emit()">Cancel</button>
+        <button
+          class="btn"
+          [class.btn-danger]="spec().danger"
+          type="button"
+          [disabled]="loading()"
+          (click)="confirmed.emit()"
+        >
+          {{ spec().confirmLabel }}
+        </button>
+      }
+    </div>
+  </div>
+</div>

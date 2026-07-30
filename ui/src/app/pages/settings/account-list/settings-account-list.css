@@ -40,3 +40,37 @@
   padding: 4px 8px;
   font-size: 0.85em;
 }
+
+/* --------------------------------------------------------------- amnesty */
+.amnesty-bar {
+  padding: 0 22px;
+}
+
+.amnesty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid color-mix(in srgb, #e0245e 40%, var(--border));
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.amnesty-row p {
+  margin: 0;
+}
+
+.amnesty-row .btn {
+  flex: none;
+}
+
+.btn.danger {
+  color: #e0245e;
+  border-color: #e0245e;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: #e0245e;
+  color: #fff;
+}

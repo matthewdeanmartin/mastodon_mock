@@ -63,6 +63,9 @@ export class SettingsShell {
     { label: 'Approve follow requests', path: 'follows', exact: true },
     { label: 'Muted accounts', path: 'mutes', exact: true },
     { label: 'Blocked accounts', path: 'blocks', exact: true },
+    // Sits under the two lists it can empty, and next to the follow-wide
+    // retweet switches, because that is what all four of them operate on.
+    { label: 'Bulk actions', path: 'bulk-actions', exact: true },
     { label: 'Filters', path: 'filters', exact: false },
     { label: 'Automatic post deletion', path: 'deletion', exact: true, mockOnly: true },
     { label: 'Account', path: 'account', exact: true },

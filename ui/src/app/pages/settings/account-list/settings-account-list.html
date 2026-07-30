@@ -3,6 +3,36 @@
   <p>{{ subtitle }}</p>
 </div>
 
+<!-- Amnesty: clear the whole list at once. Offered here as well as on the Bulk
+     actions tab, because this page is where wanting it occurs to people. -->
+<div class="amnesty-bar">
+  <app-bulk-progress />
+  @if (accounts().length || amnestyRunning()) {
+    <div class="amnesty-row">
+      <p class="muted small">
+        Done with this list? {{ amnestyLabel() }} at once — you’ll be shown exactly how many
+        accounts that is, and offered a backup, before anything changes.
+      </p>
+      <button
+        class="btn btn-outline btn-sm danger"
+        type="button"
+        [disabled]="amnestyRunning()"
+        (click)="askAmnesty()"
+      >
+        {{ amnestyRunning() ? 'Running…' : amnestyLabel() }}
+      </button>
+    </div>
+  }
+</div>
+
+@if (asking()) {
+  <app-bulk-actions-dialog
+    [action]="amnestyAction()"
+    (confirmed)="confirmAmnesty()"
+    (cancelled)="cancelAmnesty()"
+  />
+}
+
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!accounts().length) {

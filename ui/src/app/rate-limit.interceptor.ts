@@ -33,6 +33,17 @@ export class RateLimitCoordinator {
     return waitMs;
   }
 
+  /**
+   * How long the server says to wait, without recording anything.
+   *
+   * {@link observe} is the interceptor's path and has the side effect of arming
+   * the cooldown; a caller that only wants to *report* the wait (a long-running
+   * bulk job showing a countdown) must not arm it a second time.
+   */
+  retryDelayMs(headers: HttpHeaders): number {
+    return this.waitFromHeaders(headers);
+  }
+
   private waitFromHeaders(headers: HttpHeaders): number {
     const retryAfter = headers.get('Retry-After');
     if (retryAfter) {

@@ -1,0 +1,55 @@
+.bulk-body {
+  padding: 0 22px 22px;
+}
+
+.bulk-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bulk-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+/* The two irreversible ones read differently from the two reversible ones. */
+.bulk-card.danger {
+  border-color: color-mix(in srgb, #e0245e 45%, var(--border));
+}
+
+.bulk-card-text {
+  min-width: 0;
+}
+
+.bulk-card h2 {
+  font-size: 15px;
+  margin: 0 0 2px;
+}
+
+.bulk-card p {
+  margin: 0;
+}
+
+.bulk-card .btn {
+  flex: none;
+}
+
+.btn.danger {
+  color: #e0245e;
+  border-color: #e0245e;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: #e0245e;
+  color: #fff;
+}
+
+.footnote {
+  margin-top: 16px;
+}

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Api } from './api';
+import { Api, nextMaxIdFrom } from './api';
 import { Relationship, Status } from './models';
 
 /**
@@ -204,5 +204,49 @@ describe('Api service (HTTP isolated)', () => {
 
     req.flush(relStub({ blocking: false }));
     expect(rel!.blocking).toBe(false);
+  });
+
+  // ------------------------------------------------- mute/block list paging
+
+  it('accountListPage: asks for a page and reports the next cursor from Link', () => {
+    let page: { accounts: unknown[]; nextMaxId: string | null } | undefined;
+    api.accountListPage('mutes', '55', 80).subscribe((p) => (page = p));
+
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/mutes');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('limit')).toBe('80');
+    expect(req.request.params.get('max_id')).toBe('55');
+
+    req.flush([], {
+      headers: {
+        Link: '<https://x.test/api/v1/mutes?max_id=42>; rel="next", <https://x.test/api/v1/mutes?since_id=99>; rel="prev"',
+      },
+    });
+    expect(page!.nextMaxId).toBe('42');
+  });
+
+  it('accountListPage: reports no cursor when the server sends no Link', () => {
+    let page: { nextMaxId: string | null } | undefined;
+    api.accountListPage('blocks').subscribe((p) => (page = p));
+    httpMock.expectOne((r) => r.url === '/api/v1/blocks').flush([]);
+    expect(page!.nextMaxId).toBeNull();
+  });
+});
+
+describe('nextMaxIdFrom', () => {
+  it('takes the max_id of the next relation only', () => {
+    expect(
+      nextMaxIdFrom(
+        '<https://x.test/api/v1/mutes?max_id=7>; rel="next", <https://x.test/api/v1/mutes?min_id=9>; rel="prev"',
+      ),
+    ).toBe('7');
+  });
+
+  it('is unfazed by unquoted rel, missing header, or a link with no cursor', () => {
+    expect(nextMaxIdFrom('<https://x.test/api/v1/blocks?max_id=3>; rel=next')).toBe('3');
+    expect(nextMaxIdFrom(null)).toBeNull();
+    expect(nextMaxIdFrom('<https://x.test/api/v1/blocks>; rel="next"')).toBeNull();
+    expect(nextMaxIdFrom('<https://x.test/api/v1/blocks?min_id=3>; rel="prev"')).toBeNull();
+    expect(nextMaxIdFrom('garbage')).toBeNull();
   });
 });
