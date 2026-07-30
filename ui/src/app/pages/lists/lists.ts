@@ -9,6 +9,7 @@ import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 import { SavedSearches } from '../search/saved-searches';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
+import { RssCache } from '../../providers/rss/rss-cache';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { PageDiagnostics } from '../../page-diagnostics';
 
@@ -32,6 +33,7 @@ export class Lists implements OnInit {
   private anonymousTags = inject(AnonymousTags);
   protected saved = inject(SavedSearches);
   private rssSubs = inject(RssSubscriptions);
+  private rssCache = inject(RssCache);
   private diagnostics = inject(PageDiagnostics);
   private route = inject(ActivatedRoute);
 
@@ -357,5 +359,7 @@ export class Lists implements OnInit {
     // The store owns persistence and its signal drives `rssFeeds`, so the row
     // disappears without any local list surgery.
     this.rssSubs.remove(feed.url);
+    // Reclaim the cached copy; an unsubscribed feed should not keep megabytes.
+    void this.rssCache.evict(feed.url);
   }
 }

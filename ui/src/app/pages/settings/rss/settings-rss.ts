@@ -1,7 +1,9 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { ClientPrefs, RSS_CACHE_TTL_OPTIONS } from '../../../client-prefs';
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
+import { RssCache } from '../../../providers/rss/rss-cache';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 
@@ -24,10 +26,18 @@ import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscri
   templateUrl: './settings-rss.html',
   styleUrl: './settings-rss.css',
 })
-export class SettingsRss {
+export class SettingsRss implements OnInit {
   private rssFetch = inject(RssFetch);
   protected subs = inject(RssSubscriptions);
   protected proxySettings = inject(CorsProxySettings);
+  protected prefs = inject(ClientPrefs);
+  private cache = inject(RssCache);
+
+  protected readonly ttlOptions = RSS_CACHE_TTL_OPTIONS;
+  /** URL of the feed currently being force-refreshed, if any. */
+  protected refreshing = signal<string | null>(null);
+  /** How much is cached, or null before the count comes back. */
+  protected cacheSummary = signal<string | null>(null);
 
   protected feedUrl = signal('');
   protected adding = signal(false);
@@ -55,6 +65,13 @@ export class SettingsRss {
   protected readonly proxyIncomplete = computed(
     () => this.proxySettings.currentId() !== null && !this.proxySettings.usable(),
   );
+
+  ngOnInit(): void {
+    // Not in the constructor: the lookup is asynchronous, and resolving it
+    // after a spec's TestBed has been torn down triggers "cannot configure the
+    // test module" in whatever test runs next.
+    void this.loadCacheSummary();
+  }
 
   addFeed(): void {
     const url = this.feedUrl().trim();
@@ -118,6 +135,9 @@ export class SettingsRss {
 
   remove(feed: RssFeedSub): void {
     this.subs.remove(feed.url);
+    // Reclaim the cached copy too: an unsubscribed feed's megabytes have no
+    // reason to keep sitting in IndexedDB.
+    void this.cache.evict(feed.url).then(() => this.loadCacheSummary());
   }
 
   toggle(feed: RssFeedSub): void {
@@ -126,5 +146,54 @@ export class SettingsRss {
 
   toggleProxy(feed: RssFeedSub): void {
     this.subs.setUseProxy(feed.url, feed.useProxy !== true);
+  }
+
+  /** The select hands back a string; the preference is a number of hours. */
+  setTtl(hours: string | number): void {
+    this.prefs.setRssCacheTtlHours(Number(hours));
+  }
+
+  /** Re-read one feed now, ignoring both the cache and any failure cooldown. */
+  refresh(feed: RssFeedSub): void {
+    if (this.refreshing()) {
+      return;
+    }
+    this.refreshing.set(feed.url);
+    this.error.set(null);
+    this.rssFetch
+      .fetchFeed(feed.url, { useProxy: feed.useProxy === true, forceRefresh: true })
+      .subscribe({
+        next: (parsed) => {
+          this.subs.recordFetch(feed.url, parsed.title, parsed.items.length);
+          this.refreshing.set(null);
+          void this.loadCacheSummary();
+        },
+        error: (err: Error) => {
+          this.error.set(err.message);
+          this.refreshing.set(null);
+        },
+      });
+  }
+
+  async clearCache(): Promise<void> {
+    await this.cache.clear();
+    await this.loadCacheSummary();
+  }
+
+  /**
+   * Count what's cached, for the line above the feed list.
+   *
+   * Deliberately a count and not a byte total: `entries()` would have to
+   * deserialize every cached feed to measure it, which is exactly the work the
+   * cache exists to avoid. The Observability page reports real IndexedDB usage.
+   */
+  private async loadCacheSummary(): Promise<void> {
+    const entries = await this.cache.entries();
+    const cached = entries.filter((entry) => entry.fetchedAt > 0).length;
+    this.cacheSummary.set(
+      cached
+        ? `${cached} feed${cached === 1 ? '' : 's'} cached in this browser.`
+        : 'Nothing cached yet.',
+    );
   }
 }

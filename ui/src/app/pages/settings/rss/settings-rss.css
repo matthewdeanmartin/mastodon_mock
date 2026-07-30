@@ -49,6 +49,42 @@
   white-space: nowrap;
 }
 
+.cache-controls {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 12px 0;
+}
+
+.cache-ttl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.cache-ttl select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.cache-controls p {
+  margin: 8px 0 0;
+}
+
+.cache-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .proxy-summary {
   display: flex;
   align-items: baseline;

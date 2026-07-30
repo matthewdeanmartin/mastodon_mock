@@ -43,6 +43,20 @@ export type ReaderTextAlign = 'left' | 'justify';
 
 // Chat-list filters (the toggles above the conversation list).
 export type ChatAudience = 'everyone' | 'mutuals';
+
+/**
+ * How long a fetched RSS feed may be reused. `0` refetches every time.
+ *
+ * Offered as a fixed list rather than a free number so the stored value is
+ * always one the UI can name back to the user.
+ */
+export const RSS_CACHE_TTL_OPTIONS: readonly { hours: number; label: string }[] = [
+  { hours: 0, label: 'Always refetch (not recommended)' },
+  { hours: 1, label: '1 hour' },
+  { hours: 6, label: '6 hours' },
+  { hours: 24, label: '24 hours' },
+  { hours: 24 * 7, label: '7 days' },
+];
 export type ChatKindFilter = 'all' | 'private' | 'public' | 'bsky';
 
 /** Algo-feed audience chip: everything, or only posts authored by follows. */
@@ -121,6 +135,7 @@ interface StoredPrefs {
   showImages?: boolean;
   hiddenProviders?: ProviderId[];
   chatAudience?: ChatAudience;
+  rssCacheTtlHours?: number;
   chatKind?: ChatKindFilter;
   feedMin?: number;
   feedMax?: number;
@@ -226,6 +241,18 @@ export class ClientPrefs {
 
   // Chat-list filters.
   readonly chatAudience = signal<ChatAudience>('everyone');
+
+  /**
+   * How long a fetched RSS feed is reused before going back to the network.
+   *
+   * Twenty-four hours by default. Feeds are polled by every view that shows
+   * them and are frequently read through a shared CORS proxy with a low rate
+   * limit, so the cost of re-fetching is borne by a third party and paid in
+   * throttling; almost no feed publishes often enough for a shorter window to
+   * show the reader anything new. `0` means "always refetch", kept as an escape
+   * hatch for someone debugging their own feed.
+   */
+  readonly rssCacheTtlHours = signal<number>(24);
   readonly chatKind = signal<ChatKindFilter>('all');
 
   // Algo-feed filters.
@@ -397,6 +424,12 @@ export class ClientPrefs {
   setChatAudience(who: ChatAudience): void {
     if (who === 'everyone' || who === 'mutuals') {
       this.chatAudience.set(who);
+    }
+  }
+
+  setRssCacheTtlHours(hours: number): void {
+    if (RSS_CACHE_TTL_OPTIONS.some((option) => option.hours === hours)) {
+      this.rssCacheTtlHours.set(hours);
     }
   }
 
@@ -583,6 +616,12 @@ export class ClientPrefs {
       this.chatAudience.set(stored.chatAudience);
     }
     if (
+      typeof stored.rssCacheTtlHours === 'number' &&
+      RSS_CACHE_TTL_OPTIONS.some((option) => option.hours === stored.rssCacheTtlHours)
+    ) {
+      this.rssCacheTtlHours.set(stored.rssCacheTtlHours);
+    }
+    if (
       stored.chatKind === 'all' ||
       stored.chatKind === 'private' ||
       stored.chatKind === 'public' ||
@@ -644,6 +683,7 @@ export class ClientPrefs {
       feedReader: this.feedReader(),
       showImages: this.showImages(),
       chatAudience: this.chatAudience(),
+      rssCacheTtlHours: this.rssCacheTtlHours(),
       chatKind: this.chatKind(),
       feedMin: this.feedMin(),
       feedMax: this.feedMax(),

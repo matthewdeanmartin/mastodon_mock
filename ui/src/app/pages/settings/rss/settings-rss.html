@@ -25,6 +25,37 @@
   </a>
 </p>
 
+<div class="cache-controls">
+  <label class="cache-ttl">
+    <span>Reuse a fetched feed for</span>
+    <!-- Plain string values rather than [ngValue]: the stored preference is a
+         number, but a string-valued <option> is what both the DOM and anyone
+         scripting this page expect. setTtl coerces. -->
+    <select
+      [ngModel]="prefs.rssCacheTtlHours().toString()"
+      (ngModelChange)="setTtl($event)"
+      name="rssCacheTtl"
+    >
+      @for (option of ttlOptions; track option.hours) {
+        <option [value]="option.hours.toString()">{{ option.label }}</option>
+      }
+    </select>
+  </label>
+  <p class="muted small">
+    Feeds are re-read by every view that shows them. Without a cache that is a request per visit —
+    enough to exhaust a free CORS proxy's rate limit just by reading. Cached feeds are kept in this
+    browser's IndexedDB, which has room for feeds far too large for ordinary settings storage.
+  </p>
+  @if (cacheSummary(); as summary) {
+    <p class="cache-summary muted small">
+      {{ summary }}
+      <button class="btn btn-outline btn-sm" type="button" (click)="clearCache()">
+        Clear cache
+      </button>
+    </p>
+  }
+</div>
+
 <form class="add-feed" (ngSubmit)="addFeed()">
   <input
     type="url"
@@ -82,6 +113,17 @@
             title="Open this feed's page"
             >Open</a
           >
+          <!-- Bypasses the cache for this one feed. Without it a cached feed
+               cannot be updated before its TTL expires, which matters when you
+               have just published something and want to see it. -->
+          <button
+            class="btn btn-outline btn-sm"
+            [disabled]="refreshing() === f.url"
+            (click)="refresh(f)"
+            title="Fetch this feed again now"
+          >
+            {{ refreshing() === f.url ? 'Refreshing…' : 'Refresh' }}
+          </button>
           <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
         </span>
       </li>

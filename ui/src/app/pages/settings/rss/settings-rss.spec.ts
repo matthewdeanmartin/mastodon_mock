@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RssCache } from '../../../providers/rss/rss-cache';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 import { SettingsRss } from './settings-rss';
@@ -19,8 +20,21 @@ describe('SettingsRss', () => {
     localStorage.clear();
     fetchFeed = vi.fn();
     TestBed.configureTestingModule({
-      // The page links to the CORS proxy settings, so it needs a router.
-      providers: [provideRouter([]), { provide: RssFetch, useValue: { fetchFeed } }],
+      providers: [
+        // The page links to the CORS proxy settings, so it needs a router.
+        provideRouter([]),
+        { provide: RssFetch, useValue: { fetchFeed } },
+        // IndexedDB isn't available here, and an async cache read resolving
+        // after teardown breaks whichever spec runs next.
+        {
+          provide: RssCache,
+          useValue: {
+            entries: () => Promise.resolve([]),
+            evict: () => Promise.resolve(),
+            clear: () => Promise.resolve(),
+          },
+        },
+      ],
     });
   });
 

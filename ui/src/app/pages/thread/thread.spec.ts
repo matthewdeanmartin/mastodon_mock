@@ -10,6 +10,7 @@ import { Auth } from '../../auth';
 import { Account, Context, Status } from '../../models';
 import { Thread } from './thread';
 import { anonymousStatusRouteRef } from '../../providers/anonymous/anonymous-route-ref';
+import { settleRssCache } from '../../testing/settle-rss-cache';
 
 interface ThreadInternals {
   status: WritableSignal<Status | null>;
@@ -385,11 +386,16 @@ describe('Thread', () => {
   </channel>
 </rss>`;
 
-  it('opens an RSS item in reader mode by default and loads its comment feed as replies', () => {
+  it('opens an RSS item in reader mode by default and loads its comment feed as replies', async () => {
     const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
 
+    // The feed cache is consulted before the network, so the request is issued
+    // on a microtask rather than synchronously during setUp.
+    await settleRssCache();
     httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
+    await settleRssCache();
     httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
+    await settleRssCache();
     fixture.detectChanges();
 
     const parentId = 'rss:https://blog.example.com/feed.xml::g1';
@@ -409,7 +415,7 @@ describe('Thread', () => {
     expect(el.querySelector('.reader-original')).not.toBeNull();
   });
 
-  it('shows the no-comment-feed note for RSS items without one', () => {
+  it('shows the no-comment-feed note for RSS items without one', async () => {
     const feedNoComments = `<?xml version="1.0"?>
 <rss version="2.0"><channel><title>B</title>
   <item><title>Post</title><link>https://b.example/p</link><guid>g9</guid>
@@ -417,7 +423,9 @@ describe('Thread', () => {
 </channel></rss>`;
     const fixture = setUpWithId('rss:https://b.example/feed::g9');
 
+    await settleRssCache();
     httpMock.expectOne('https://b.example/feed').flush(feedNoComments);
+    await settleRssCache();
     fixture.detectChanges();
 
     expect(internals(fixture).descendants()).toHaveLength(0);

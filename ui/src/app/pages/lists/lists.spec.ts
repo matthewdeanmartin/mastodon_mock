@@ -5,6 +5,7 @@ import { WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Collection, UserList } from '../../models';
+import { RssCache } from '../../providers/rss/rss-cache';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { Lists } from './lists';
 
@@ -71,7 +72,13 @@ describe('Lists', () => {
     // would otherwise show up as a row in every test after it.
     localStorage.clear();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        // No IndexedDB in this environment; unsubscribing evicts through this.
+        { provide: RssCache, useValue: { evict: () => Promise.resolve() } },
+      ],
     });
     httpMock = TestBed.inject(HttpTestingController);
   });

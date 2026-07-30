@@ -2,13 +2,15 @@
  * Read-only inspection of this origin's IndexedDB and its overall storage
  * budget, for the Observability page.
  *
- * The app itself writes nothing to IndexedDB — everything durable lives in
- * localStorage (see `storage-registry.ts`). That is exactly why this is worth
- * showing: IndexedDB is where a dependency, a browser extension's page script,
- * or a future feature would quietly put megabytes, and localStorage's own few-MB
- * budget is not the whole story. `navigator.storage.estimate()` reports the
- * origin's *total* usage against its quota, which is the number that actually
- * predicts an eviction.
+ * Almost everything durable lives in localStorage (see `storage-registry.ts`).
+ * The one exception is the RSS feed cache (`mockingbird_rss`), which is here
+ * precisely because a single feed can be megabytes — far past what localStorage
+ * can hold for the whole origin. That is also why this report is worth showing:
+ * IndexedDB is where that cache, a dependency, or a browser extension's page
+ * script can quietly put megabytes, and localStorage's own few-MB budget is not
+ * the whole story. `navigator.storage.estimate()` reports the origin's *total*
+ * usage against its quota, which is the number that actually predicts an
+ * eviction.
  *
  * Everything here degrades rather than throws:
  *

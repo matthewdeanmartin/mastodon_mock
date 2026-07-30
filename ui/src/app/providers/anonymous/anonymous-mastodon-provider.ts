@@ -440,7 +440,9 @@ export class AnonymousMastodonProvider implements FeedProvider {
       return throwError(() => new Error('RSS route is temporarily deferred.'));
     }
     const feedUrl = `${source.follow.profileUrl.replace(/\/$/, '')}.rss`;
-    return this.rss.fetchFeed(feedUrl).pipe(
+    // Not a subscription: this is a followed profile's `.rss` fallback, already
+    // rate-managed by the follow store's per-route deferral.
+    return this.rss.fetchFeed(feedUrl, { noCache: true }).pipe(
       map((feed) => {
         source.exhausted = true;
         this.rssFallbacks.add(source.follow.handle);
