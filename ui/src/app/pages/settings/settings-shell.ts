@@ -55,6 +55,8 @@ export class SettingsShell {
     { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },
     { label: 'Internationalization', path: 'i18n', exact: true, anonymous: true },
     { label: 'Local storage', path: 'storage', exact: true, anonymous: true },
+    // Path is 'spotlight' on purpose — see the route's comment in app.routes.ts.
+    { label: 'Ads', path: 'spotlight', exact: true, anonymous: true },
     { label: 'Signed-in accounts', path: 'accounts', exact: true, anonymous: true },
     { label: 'Posting defaults', path: 'posting', exact: true },
     { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },

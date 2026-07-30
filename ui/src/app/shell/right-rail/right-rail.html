@@ -1,11 +1,29 @@
-@for (ad of ads; track ad.url) {
+@for (ad of houseAds.visible(); track ad.id) {
   <section class="card spotlight-card">
-    <a class="spotlight-body" [href]="ad.url" target="_blank" rel="noopener noreferrer">
+    <a
+      class="spotlight-body"
+      [href]="ad.url"
+      target="_blank"
+      rel="noopener noreferrer"
+      (click)="houseAds.recordClick(ad.id)"
+    >
       <span class="spotlight-title">{{ ad.title }}</span>
       <span class="spotlight-text">{{ ad.text }}</span>
       <span class="spotlight-cta">{{ ad.cta }}</span>
     </a>
-    <p class="spotlight-disclosure muted">House ad</p>
+    <p class="spotlight-disclosure muted">
+      <a routerLink="/settings/spotlight">House ad</a>
+      <!-- Outside the link above, or dismissing would open the advertiser. -->
+      <button
+        type="button"
+        class="spotlight-dismiss"
+        [attr.aria-label]="'Dismiss ' + ad.title"
+        title="Hide this until you reload"
+        (click)="houseAds.dismiss(ad.id)"
+      >
+        ✕
+      </button>
+    </p>
   </section>
 }
 

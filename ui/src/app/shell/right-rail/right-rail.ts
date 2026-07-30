@@ -2,7 +2,7 @@ import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
-import { HOUSE_ADS } from '../../house-ads';
+import { HouseAdStore } from '../../house-ad-store';
 import { InstanceInfo } from '../../models';
 import { SearchServer } from '../../search-server';
 import { Server } from '../../server';
@@ -26,7 +26,12 @@ export class RightRail {
   private server = inject(Server);
   protected searchServer = inject(SearchServer);
 
-  protected ads = HOUSE_ADS;
+  /**
+   * The ads, plus which of them are on and which the user has clicked. The rail
+   * asks for a pair and renders it; rotation, the off switches and the click
+   * tally all live in the store, which Settings → Ads drives from the other end.
+   */
+  protected houseAds = inject(HouseAdStore);
 
   /**
    * Anonymous visitors leaning on someone else's search server are consuming a

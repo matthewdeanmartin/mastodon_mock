@@ -259,6 +259,15 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     sensitivity: 'private',
     note: 'Dismissed announcement ids — server-specific, so it points at the instance.',
   },
+  {
+    base: 'mockingbird_house_ad_clicks',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    // Not 'setting': it is a record of what the user did, not a preference, so it
+    // has no business in a "here is my setup" gist even though it is dull.
+    note: 'How many times each right-rail house ad was clicked, and when. Local only — never sent anywhere.',
+  },
 
   // ---- content: text the user wrote ----
   {
@@ -311,6 +320,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'none',
     sensitivity: 'setting',
     note: 'Theme, accent, reader typography, composer behaviour. The bulk of a shareable setup.',
+  },
+  {
+    base: 'mockingbird_house_ads',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'setting',
+    note: 'Whether right-rail house ads show at all, and which ones are switched off individually. Unscoped: an opinion about an ad belongs to the person, not to one persona.',
   },
   {
     base: 'mockingbird_default_visibility',

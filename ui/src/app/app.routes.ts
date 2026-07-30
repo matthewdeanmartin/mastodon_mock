@@ -188,6 +188,18 @@ export const routes: Routes = [
               import('./pages/settings/storage/settings-storage').then((m) => m.SettingsStorage),
           },
           {
+            // 'spotlight', not 'ads': the rail's markup already dodges `ad-*`
+            // class names because blockers hide them (right-rail.spec pins it),
+            // and a deep-linked path containing /ads is the same hazard one
+            // layer out. The page is titled "Ads" where it counts.
+            path: 'spotlight',
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/spotlight/settings-spotlight').then(
+                (m) => m.SettingsSpotlight,
+              ),
+          },
+          {
             // Account-level cleanup of saved credentials and their local data —
             // the coarse counterpart to the key-by-key 'storage' page above.
             path: 'accounts',

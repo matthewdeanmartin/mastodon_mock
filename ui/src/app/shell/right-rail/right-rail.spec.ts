@@ -4,6 +4,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from '../../auth';
+import { HouseAdStore } from '../../house-ad-store';
+import { HOUSE_ADS_SHOWN } from '../../house-ads';
 import { Account } from '../../models';
 import { Server } from '../../server';
 import { RightRail } from './right-rail';
@@ -84,7 +86,7 @@ describe('RightRail', () => {
     expect(internals(fixture).donateServerUrl()).toBe('https://mastodon.social/about');
   });
 
-  it('renders the donate links and three house ads', () => {
+  it('renders the donate links and a rotating pair of house ads', () => {
     TestBed.inject(Auth).account.set({ id: '1', acct: 'matt@elekk.xyz' } as Account);
     const fixture = setUp();
     fixture.detectChanges();
@@ -103,13 +105,58 @@ describe('RightRail', () => {
     expect(shareBtn?.textContent?.trim()).toBe('Share this server');
 
     // House-ad *content* is editorial and changes freely — assert structure, not
-    // specific URLs: three cards, each linking out over https.
+    // specific URLs: HOUSE_ADS_SHOWN cards, each linking out over https.
     const cards = [...el.querySelectorAll('.spotlight-card')];
-    expect(cards).toHaveLength(3);
+    expect(cards).toHaveLength(HOUSE_ADS_SHOWN);
     for (const card of cards) {
       const link = card.querySelector<HTMLAnchorElement>('a[href^="https://"]');
       expect(link).not.toBeNull();
     }
+  });
+
+  it('counts a click on an ad locally, without leaving the rail', () => {
+    const fixture = setUp();
+    fixture.detectChanges();
+    const store = TestBed.inject(HouseAdStore);
+    const clicked = store.visible()[0];
+
+    const card = (fixture.nativeElement as HTMLElement).querySelector('.spotlight-card')!;
+    card.querySelector<HTMLAnchorElement>('a.spotlight-body')!.dispatchEvent(
+      // The anchor is a real outbound link; cancel the navigation jsdom would
+      // complain about and keep the click itself.
+      new MouseEvent('click', { bubbles: true, cancelable: true }),
+    );
+
+    expect(store.rows().find((row) => row.ad.id === clicked.id)!.clicks?.count).toBe(1);
+  });
+
+  it('dismisses one ad without opening it, and refills the slot', () => {
+    const fixture = setUp();
+    fixture.detectChanges();
+    const store = TestBed.inject(HouseAdStore);
+    const dismissed = store.visible()[0];
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('.spotlight-card .spotlight-dismiss')!.click();
+    fixture.detectChanges();
+
+    expect(store.visible().map((ad) => ad.id)).not.toContain(dismissed.id);
+    // A dismiss is not a click on the advertiser.
+    expect(store.totalClicks()).toBe(0);
+    expect(el.querySelectorAll('.spotlight-card')).toHaveLength(HOUSE_ADS_SHOWN);
+  });
+
+  it('renders no ad cards at all once ads are switched off', () => {
+    TestBed.inject(HouseAdStore).setEnabled(false);
+    const fixture = setUp();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelectorAll('.spotlight-card')).toHaveLength(0);
+    // The donate block is not an ad and stays regardless.
+    expect(
+      [...el.querySelectorAll<HTMLAnchorElement>('a[href]')].map((a) => a.getAttribute('href')),
+    ).toContain('https://joinmastodon.org/sponsors');
   });
 
   it('house-ad markup carries no ad-* classes (ad blockers hide those cosmetically)', () => {

@@ -1,0 +1,104 @@
+<div class="spage-head">
+  <h1>Ads</h1>
+  <p>
+    The ads in the right rail are house endorsements — our own projects, and things we think are
+    worth your time. Nobody pays for them, no third party is involved, and nothing about you leaves
+    this browser.
+  </p>
+  <p class="muted small">
+    Only {{ shown }} are shown at a time, and they change every half hour. The donate links further
+    down the rail are not ads and stay put.
+  </p>
+</div>
+
+<div class="spage-body">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Show ads</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [checked]="store.enabled()"
+            (change)="store.setEnabled($any($event.target).checked)"
+          />
+          Show house endorsements in the right rail
+        </label>
+        <span class="hint">
+          Off means none at all, whatever the individual switches below say. Those keep their
+          settings for when you turn it back on.
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <section class="ssection">
+    <h2>Each one</h2>
+    <p class="muted small">
+      Clicks are counted here and nowhere else — there is no server to report them to and no request
+      is made. They're here so you can see which of these you actually found useful.
+    </p>
+
+    <ul class="spotlight-list">
+      @for (row of store.rows(); track row.ad.id) {
+        <li class="spotlight-row" [class.spotlight-off]="row.disabled || !store.enabled()">
+          <label class="spotlight-switch">
+            <input
+              type="checkbox"
+              [checked]="!row.disabled"
+              [disabled]="!store.enabled()"
+              (change)="store.setAdEnabled(row.ad.id, $any($event.target).checked)"
+            />
+            <span class="sr-only">Show “{{ row.ad.title }}”</span>
+          </label>
+
+          <div class="spotlight-detail">
+            <p class="spotlight-name">
+              {{ row.ad.title }}
+              @if (!store.enabled()) {
+                <span class="pill">All ads off</span>
+              } @else if (row.disabled) {
+                <span class="pill">Off</span>
+              } @else if (row.dismissed) {
+                <span class="pill">Dismissed until reload</span>
+              } @else if (row.showing) {
+                <span class="pill pill-on">Showing now</span>
+              } @else {
+                <span class="pill">Up next</span>
+              }
+            </p>
+            <p class="muted small">{{ row.ad.text }}</p>
+            <a class="spotlight-url" [href]="row.ad.url" target="_blank" rel="noopener noreferrer">
+              {{ row.ad.cta }}
+            </a>
+          </div>
+
+          <p class="spotlight-clicks">
+            @if (row.clicks; as clicks) {
+              <strong>{{ clicks.count }}</strong>
+              <span class="muted small">
+                {{ clicks.count === 1 ? 'click' : 'clicks' }}
+                @if (clickedOn(clicks.lastClickedAt); as when) {
+                  · last {{ when }}
+                }
+              </span>
+            } @else {
+              <span class="muted small">Never clicked</span>
+            }
+          </p>
+        </li>
+      }
+    </ul>
+
+    <div class="spotlight-actions">
+      <button class="btn btn-outline btn-sm" type="button" (click)="store.enableAll()">
+        Turn them all back on
+      </button>
+      @if (store.totalClicks()) {
+        <button class="btn btn-outline btn-sm" type="button" (click)="store.clearClicks()">
+          Forget my {{ store.totalClicks() }} click{{ store.totalClicks() === 1 ? '' : 's' }}
+        </button>
+      }
+    </div>
+  </section>
+</div>

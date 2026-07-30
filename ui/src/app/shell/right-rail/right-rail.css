@@ -137,9 +137,39 @@
 }
 
 .spotlight-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin: 0;
   padding: 4px 14px 10px;
   font-size: 11px;
+}
+
+.spotlight-disclosure a {
+  color: inherit;
+}
+
+/* Small, but not smaller than a comfortable target: 24px box around a 11px
+   glyph, so it is hittable on a phone without shouting on a desktop. */
+.spotlight-dismiss {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  margin: -6px -6px -6px 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.spotlight-dismiss:hover {
+  background: var(--hover);
+  color: var(--text);
 }
 
 /* Share-this-server dialog */
