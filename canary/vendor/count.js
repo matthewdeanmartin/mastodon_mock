@@ -2,7 +2,7 @@
  * VENDORED THIRD-PARTY FILE - DO NOT EDIT BY HAND.
  *
  * Source:    https://gc.zgo.at/count.js
- * Retrieved: 2026-07-28T15:54:38.729Z
+ * Retrieved: 2026-07-30T19:32:07.239Z
  * sha256:    792b7abd26c1fb6a (of the body below, this header excluded)
  *
  * Refreshed by scripts/vendor-analytics.mjs on every build. Served from our
