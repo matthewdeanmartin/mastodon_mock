@@ -9,6 +9,7 @@ import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 import { SavedSearches } from '../search/saved-searches';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
+import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { PageDiagnostics } from '../../page-diagnostics';
 
 /**
@@ -30,6 +31,7 @@ export class Lists implements OnInit {
   private anonymousLists = inject(AnonymousLists);
   private anonymousTags = inject(AnonymousTags);
   protected saved = inject(SavedSearches);
+  private rssSubs = inject(RssSubscriptions);
   private diagnostics = inject(PageDiagnostics);
   private route = inject(ActivatedRoute);
 
@@ -52,6 +54,17 @@ export class Lists implements OnInit {
    */
   protected serverFeeds = signal<ServerFeedDef[]>([]);
 
+  /**
+   * Subscribed RSS feeds, shown as list rows.
+   *
+   * Every subscription appears, including ones switched off in settings (marked
+   * "· off"), because this page is the inventory of what you follow — a feed
+   * that vanishes when you disable it is a feed you can no longer find to
+   * re-enable. Read straight off the store's signal, so subscribing or
+   * unsubscribing anywhere updates this list with no reload.
+   */
+  protected rssFeeds = this.rssSubs.feeds;
+
   protected lists = signal<UserList[]>([]);
   protected loading = signal(true);
   protected newTitle = signal('');
@@ -69,6 +82,7 @@ export class Lists implements OnInit {
   // Pending deletions awaiting confirmation.
   protected listToDelete = signal<UserList | null>(null);
   protected collectionToDelete = signal<Collection | null>(null);
+  protected rssToRemove = signal<RssFeedSub | null>(null);
   protected showStarterCollection = computed(
     () =>
       !this.collectionsLoading() &&
@@ -317,5 +331,31 @@ export class Lists implements OnInit {
     this.api.deleteCollection(collection.id).subscribe(() => {
       this.collections.update((c) => c.filter((x) => x.id !== collection.id));
     });
+  }
+
+  /** The feed's host, for the row's subtitle. Null when the URL won't parse. */
+  rssHost(url: string): string | null {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return null;
+    }
+  }
+
+  askUnsubscribeRss(feed: RssFeedSub, event: Event): void {
+    // The row is an <a>; without this the click navigates to the feed profile
+    // instead of opening the confirm dialog.
+    event.stopPropagation();
+    event.preventDefault();
+    this.diagnostics.info('Lists', 'user:request-unsubscribe-rss', { url: feed.url });
+    this.rssToRemove.set(feed);
+  }
+
+  removeRss(feed: RssFeedSub): void {
+    this.diagnostics.info('Lists', 'user:confirm-unsubscribe-rss', { url: feed.url });
+    this.rssToRemove.set(null);
+    // The store owns persistence and its signal drives `rssFeeds`, so the row
+    // disappears without any local list surgery.
+    this.rssSubs.remove(feed.url);
   }
 }

@@ -180,6 +180,43 @@
       </p>
     }
   }
+
+  <!-- Last section on the page. RSS feeds are the one kind of feed here that
+       lives entirely in this browser rather than on the server, so they sit
+       after everything the instance provides. -->
+  <div class="section-head">RSS feeds</div>
+  @if (!rssFeeds().length) {
+    <p class="muted center small">
+      None yet — subscribe to any blog or news feed in
+      <a routerLink="/settings/rss">settings</a>.
+    </p>
+  } @else {
+    @for (f of rssFeeds(); track f.url) {
+      <a class="list-row" [routerLink]="['/accounts', 'rss:' + f.url]">
+        <span>
+          {{ f.title || f.url }}
+          <span class="muted small">
+            @if (rssHost(f.url); as host) {
+              · {{ host }}
+            }
+            @if (f.itemCount !== undefined) {
+              · {{ f.itemCount }} item{{ f.itemCount === 1 ? '' : 's' }}
+            }
+            @if (f.useProxy) {
+              · via proxy
+            }
+            @if (!f.enabled) {
+              · off
+            }
+          </span>
+        </span>
+        <button class="del" (click)="askUnsubscribeRss(f, $event)" title="Unsubscribe">✕</button>
+      </a>
+    }
+    <p class="muted center small">
+      Add or remove feeds in <a routerLink="/settings/rss">settings</a>.
+    </p>
+  }
 }
 
 @if (listToDelete(); as l) {
@@ -189,6 +226,19 @@
     confirmLabel="Delete list"
     (confirmed)="remove(l)"
     (cancelled)="listToDelete.set(null)"
+  />
+}
+@if (rssToRemove(); as f) {
+  <app-confirm-dialog
+    title="Unsubscribe from this feed?"
+    [message]="
+      '“' +
+      (f.title || f.url) +
+      '” will be removed from your feeds. You can subscribe again at any time.'
+    "
+    confirmLabel="Unsubscribe"
+    (confirmed)="removeRss(f)"
+    (cancelled)="rssToRemove.set(null)"
   />
 }
 @if (collectionToDelete(); as c) {

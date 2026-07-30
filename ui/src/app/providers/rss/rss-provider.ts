@@ -55,7 +55,12 @@ export class RssProvider implements FeedProvider {
     return forkJoin(
       feeds.map((sub) =>
         this.fetch.fetchFeed(sub.url, { useProxy: sub.useProxy === true }).pipe(
-          map((feed) => feedToStatuses(sub.url, feed, fetchedAt)),
+          map((feed) => {
+            // Banks the title and item count for the Feeds page while we are
+            // here anyway; see RssSubscriptions.recordFetch.
+            this.subs.recordFetch(sub.url, feed.title, feed.items.length);
+            return feedToStatuses(sub.url, feed, fetchedAt);
+          }),
           catchError((err: Error) => {
             failures.push(`${sub.title || sub.url}: ${err.message}`);
             return of<Status[]>([]);
@@ -77,10 +82,13 @@ export class RssProvider implements FeedProvider {
   getFeed(feedUrl: string): Observable<{ account: Account; statuses: Status[] }> {
     const fetchedAt = new Date().toISOString();
     return this.fetch.fetchFeed(feedUrl, { useProxy: this.subs.usesProxy(feedUrl) }).pipe(
-      map((feed) => ({
-        account: feedAccount(feedUrl, feed),
-        statuses: feedToStatuses(feedUrl, feed, fetchedAt),
-      })),
+      map((feed) => {
+        this.subs.recordFetch(feedUrl, feed.title, feed.items.length);
+        return {
+          account: feedAccount(feedUrl, feed),
+          statuses: feedToStatuses(feedUrl, feed, fetchedAt),
+        };
+      }),
     );
   }
 

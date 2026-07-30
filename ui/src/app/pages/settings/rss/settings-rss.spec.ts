@@ -43,15 +43,24 @@ describe('SettingsRss', () => {
   }
 
   it('validates a feed by fetching it and stores it with the discovered title', () => {
-    fetchFeed.mockReturnValue(of({ title: 'My Blog', link: null, items: [] }));
+    fetchFeed.mockReturnValue(
+      of({ title: 'My Blog', link: null, items: [{ guid: 'a' }, { guid: 'b' }] }),
+    );
     const fixture = setUp();
 
     typeUrl(fixture, 'https://blog.example.com/feed.xml');
     submit(fixture);
 
     const subs = TestBed.inject(RssSubscriptions);
+    // itemCount is banked at add time so the Feeds page can show "· 2 items"
+    // without re-fetching every subscription to render one hub page.
     expect(subs.feeds()).toEqual([
-      { url: 'https://blog.example.com/feed.xml', title: 'My Blog', enabled: true },
+      {
+        url: 'https://blog.example.com/feed.xml',
+        title: 'My Blog',
+        enabled: true,
+        itemCount: 2,
+      },
     ]);
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('My Blog');
   });

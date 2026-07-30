@@ -5,6 +5,7 @@ import { WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Collection, UserList } from '../../models';
+import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { Lists } from './lists';
 
 /** Exposes Lists' protected signals for white-box testing. */
@@ -24,6 +25,8 @@ interface ListsInternals {
   createCollection(): void;
   askDeleteCollection(c: Collection, event: Event): void;
   removeCollection(c: Collection): void;
+  askUnsubscribeRss(feed: RssFeedSub, event: Event): void;
+  removeRss(feed: RssFeedSub): void;
 }
 
 function makeCollection(id: string, name = `Collection ${id}`): Collection {
@@ -64,6 +67,9 @@ describe('Lists', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    // RSS subscriptions persist to localStorage, so a feed added by one test
+    // would otherwise show up as a row in every test after it.
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
@@ -111,6 +117,79 @@ describe('Lists', () => {
     expect(internals(fixture).loading()).toBe(true);
     expect(internals(fixture).lists()).toEqual([]);
     httpMock.expectOne('/api/v1/lists').flush([]);
+  });
+
+  // ------------------------------------------------------------------ RSS
+  // The Feeds page is the hub that makes RSS findable: before it existed, a
+  // subscribed feed could only be reached by spotting one of its posts in the
+  // home timeline.
+
+  it('lists subscribed RSS feeds, linking each to its feed profile', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://blog.example.com/feed.xml', 'Example Blog', false, 12);
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('RSS feeds');
+    expect(text).toContain('Example Blog');
+    expect(text).toContain('12 items');
+    expect(text).toContain('blog.example.com');
+
+    // The feed URL is percent-encoded into the route segment, which is what the
+    // profile page's `rss:` parser expects on the way back out.
+    const href = (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLAnchorElement>("a[href*='accounts/rss']")
+      ?.getAttribute('href');
+    expect(href).toBe('/accounts/rss:https:%2F%2Fblog.example.com%2Ffeed.xml');
+  });
+
+  it('still lists a feed that is switched off, marked as off', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://blog.example.com/feed.xml', 'Example Blog');
+    subs.setEnabled('https://blog.example.com/feed.xml', false);
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    fixture.detectChanges();
+
+    // A disabled feed must stay visible, or it can never be found to re-enable.
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Example Blog');
+    expect(text).toContain('· off');
+  });
+
+  it('marks a proxied feed on the row', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://blog.example.com/feed.xml', 'Example Blog', true);
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('via proxy');
+  });
+
+  it('unsubscribes only after the confirmation is accepted', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://blog.example.com/feed.xml', 'Example Blog');
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+
+    const feed = subs.feeds()[0];
+    internals(fixture).askUnsubscribeRss(feed, noopEvent);
+    // Asking must not remove anything on its own.
+    expect(subs.feeds()).toHaveLength(1);
+
+    internals(fixture).removeRss(feed);
+    expect(subs.feeds()).toEqual([]);
+  });
+
+  it('invites you to subscribe when there are no feeds', () => {
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('None yet');
   });
 
   it('populates lists and clears loading on successful fetch', () => {

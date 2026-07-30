@@ -95,7 +95,7 @@ export class SettingsRss {
 
     this.rssFetch.fetchFeed(url, { useProxy }).subscribe({
       next: (feed) => {
-        const limitError = this.subs.add(url, feed.title, useProxy);
+        const limitError = this.subs.add(url, feed.title, useProxy, feed.items.length);
         if (limitError) {
           this.error.set(limitError);
           this.adding.set(false);

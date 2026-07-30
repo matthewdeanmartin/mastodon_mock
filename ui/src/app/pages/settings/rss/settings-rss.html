@@ -73,6 +73,15 @@
               <span>Proxy</span>
             </label>
           }
+          <!-- The way into the feed's profile page. Without this, a subscribed
+               feed can only be reached by finding one of its posts in the home
+               timeline, which makes the whole feature hard to discover. -->
+          <a
+            class="btn btn-outline btn-sm"
+            [routerLink]="['/accounts', 'rss:' + f.url]"
+            title="Open this feed's page"
+            >Open</a
+          >
           <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
         </span>
       </li>

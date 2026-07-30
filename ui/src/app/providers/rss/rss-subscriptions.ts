@@ -20,6 +20,16 @@ export interface RssFeedSub {
    * party they did not choose.
    */
   useProxy?: boolean;
+  /**
+   * How many items the feed held when it was last read.
+   *
+   * Recorded opportunistically — whenever a fetch happens for some
+   * other reason — rather than fetched on demand. The Feeds page wants to show
+   * "· 12 items" next to every subscription, and fetching ten feeds to render
+   * one hub page would be a lot of network for a decoration. Absent until the
+   * feed has been read once, and the UI simply omits the count until then.
+   */
+  itemCount?: number;
 }
 
 /** A URL's hostname, or null when it isn't a parseable absolute URL. */
@@ -67,7 +77,7 @@ export class RssSubscriptions {
    * fetches this feed, so a subscription never claims a route that has not
    * worked at least once.
    */
-  add(url: string, title: string, useProxy = false): string | null {
+  add(url: string, title: string, useProxy = false, itemCount?: number): string | null {
     if (this.has(url)) {
       return null;
     }
@@ -76,7 +86,13 @@ export class RssSubscriptions {
     }
     this.persist([
       ...this.feeds(),
-      { url, title, enabled: true, ...(useProxy ? { useProxy } : {}) },
+      {
+        url,
+        title,
+        enabled: true,
+        ...(useProxy ? { useProxy } : {}),
+        ...(typeof itemCount === 'number' ? { itemCount } : {}),
+      },
     ]);
     return null;
   }
@@ -87,6 +103,31 @@ export class RssSubscriptions {
 
   setEnabled(url: string, enabled: boolean): void {
     this.persist(this.feeds().map((f) => (f.url === url ? { ...f, enabled } : f)));
+  }
+
+  /**
+   * Record what a fetch just learned about a feed: its current title and how
+   * many items it holds.
+   *
+   * Called from the read paths rather than by the Feeds page, so the hub gets
+   * counts for free from browsing you were doing anyway. A feed the user has
+   * never opened simply has no count, and the row omits it.
+   *
+   * Writes only when something actually changed — this runs on every feed load,
+   * and re-serializing the whole subscription list each time would be a
+   * pointless localStorage write on every timeline refresh.
+   */
+  recordFetch(url: string, title: string, itemCount: number): void {
+    const feeds = this.feeds();
+    const existing = feeds.find((f) => f.url === url);
+    if (!existing) {
+      return;
+    }
+    const nextTitle = title.trim() || existing.title;
+    if (existing.itemCount === itemCount && existing.title === nextTitle) {
+      return;
+    }
+    this.persist(feeds.map((f) => (f.url === url ? { ...f, title: nextTitle, itemCount } : f)));
   }
 
   /** Route this feed through the configured CORS proxy, or stop doing so. */
