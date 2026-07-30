@@ -3,6 +3,9 @@
     <div class="bp-head">
       <div>
         <strong>{{ spec()?.label }}</strong>
+        @if (j.targetLabel) {
+          <span class="bp-target muted">· {{ j.targetLabel }}</span>
+        }
         <div class="muted small" role="status" aria-live="polite">{{ status() }}</div>
       </div>
       <div class="bp-actions">

@@ -13,6 +13,13 @@
     (keyup)="$event.stopPropagation()"
   >
     <h3 id="bulk-dialog-title">{{ spec().title }}</h3>
+    <!-- Which list, named. The job can be started from the list page or from
+         Settings, so "this list" alone is not enough to act on. -->
+    @if (target(); as t) {
+      <p class="bulk-target">
+        List: <strong>{{ t.listTitle }}</strong>
+      </p>
+    }
 
     @if (loading()) {
       <p class="muted">Checking how many accounts this affects…</p>

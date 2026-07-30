@@ -56,7 +56,28 @@
 } @else {
   <div class="members-actions">
     <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
+    <!-- Whole-list follow changes. Signed-in only: an Anonymous list is a local
+         set of follows, with no server relationships to change. -->
+    @if (!auth.isAnonymous) {
+      <button
+        class="btn btn-outline"
+        type="button"
+        [disabled]="bulkRunning() || !members().length"
+        (click)="askBulk('list-follow')"
+      >
+        Follow everyone
+      </button>
+      <button
+        class="btn btn-outline danger"
+        type="button"
+        [disabled]="bulkRunning() || !members().length"
+        (click)="askBulk('list-unfollow')"
+      >
+        Unfollow everyone
+      </button>
+    }
   </div>
+  <app-bulk-progress />
   @if (membersLoading()) {
     <p class="muted center">Loading…</p>
   } @else if (!members().length) {
@@ -102,5 +123,13 @@
     confirmLabel="Remove"
     (confirmed)="removeMember(a)"
     (cancelled)="memberToRemove.set(null)"
+  />
+}
+@if (pendingBulk(); as action) {
+  <app-bulk-actions-dialog
+    [action]="action"
+    [target]="bulkTarget()"
+    (confirmed)="confirmBulk()"
+    (cancelled)="cancelBulk()"
   />
 }

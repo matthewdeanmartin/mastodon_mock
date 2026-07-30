@@ -10,11 +10,12 @@
 <div class="bulk-body">
   <app-bulk-progress />
 
+  <h2 class="group-head">Everyone you follow, mute or block</h2>
   <div class="bulk-cards">
-    @for (action of actions; track action.id) {
+    @for (action of accountActions; track action.id) {
       <div class="bulk-card" [class.danger]="action.danger">
         <div class="bulk-card-text">
-          <h2>{{ action.label }}</h2>
+          <h3>{{ action.label }}</h3>
           <p class="muted small">{{ action.blurb }}</p>
         </div>
         <button
@@ -34,6 +35,55 @@
     }
   </div>
 
+  <h2 class="group-head">One of your lists</h2>
+  @if (listsLoading()) {
+    <p class="muted small">Loading your lists…</p>
+  } @else if (!lists().length) {
+    <p class="muted small">
+      You have no lists yet. Make one from the Feeds menu and these actions will apply to it.
+    </p>
+  } @else {
+    <!-- One picker for both list actions: repeating it per card would imply
+         they could run against different lists at the same time. -->
+    <div class="list-picker">
+      <label for="bulk-list">Apply to list</label>
+      <select
+        id="bulk-list"
+        [value]="selectedListId()"
+        [disabled]="running()"
+        (change)="selectList($any($event.target).value)"
+      >
+        @for (list of lists(); track list.id) {
+          <option [value]="list.id">{{ list.title }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="bulk-cards">
+      @for (action of listActions; track action.id) {
+        <div class="bulk-card" [class.danger]="action.danger">
+          <div class="bulk-card-text">
+            <h3>{{ action.label }}</h3>
+            <p class="muted small">{{ action.blurb }}</p>
+          </div>
+          <button
+            class="btn btn-outline btn-sm"
+            [class.danger]="action.danger"
+            type="button"
+            [disabled]="running() || !target()"
+            (click)="ask(action.id)"
+          >
+            @if (running() && activeAction() === action.id) {
+              Running…
+            } @else {
+              Review…
+            }
+          </button>
+        </div>
+      }
+    </div>
+  }
+
   <p class="muted small footnote">
     Every one of these asks for confirmation first, and tells you exactly how many accounts it would
     touch before you agree to it.
@@ -41,5 +91,10 @@
 </div>
 
 @if (pending(); as id) {
-  <app-bulk-actions-dialog [action]="id" (confirmed)="confirm()" (cancelled)="cancel()" />
+  <app-bulk-actions-dialog
+    [action]="id"
+    [target]="target()"
+    (confirmed)="confirm()"
+    (cancelled)="cancel()"
+  />
 }

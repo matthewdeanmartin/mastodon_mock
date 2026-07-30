@@ -8,7 +8,8 @@ import { RateLimitCoordinator } from './rate-limit.interceptor';
 
 /**
  * Bulk relationship operations: turn boosts on or off for everyone you follow,
- * and "amnesty" — unmute or unblock everyone at once.
+ * "amnesty" — unmute or unblock everyone at once — and following or unfollowing
+ * every member of one of your lists.
  *
  * ## Why this is a service and not a component
  *
@@ -42,8 +43,33 @@ import { RateLimitCoordinator } from './rate-limit.interceptor';
  * four minutes otherwise looks broken.
  */
 
-/** The four operations offered. */
-export type BulkActionId = 'reblogs-off' | 'reblogs-on' | 'mute-amnesty' | 'block-amnesty';
+/** The operations offered. */
+export type BulkActionId =
+  | 'reblogs-off'
+  | 'reblogs-on'
+  | 'mute-amnesty'
+  | 'block-amnesty'
+  | 'list-follow'
+  | 'list-unfollow';
+
+/**
+ * The list a list-scoped action applies to.
+ *
+ * Everything else here operates on a set the account already implies — your
+ * follows, your mutes, your blocks. The list actions need to be told *which*
+ * list, and the title travels with the id so the dialog and the progress panel
+ * can name it rather than saying "this list" to someone who started the job on
+ * a different page ten minutes ago.
+ */
+export interface BulkTarget {
+  listId: string;
+  listTitle: string;
+}
+
+/** True for the actions that require a {@link BulkTarget}. */
+export function needsList(action: BulkActionId): boolean {
+  return action === 'list-follow' || action === 'list-unfollow';
+}
 
 /** Static description of one operation, shared by the tab and the dialog. */
 export interface BulkActionSpec {
@@ -127,6 +153,40 @@ export const BULK_ACTIONS: readonly BulkActionSpec[] = [
     backup: 'blocks',
     unit: 'blocked accounts',
   },
+  {
+    id: 'list-follow',
+    label: 'Follow everyone on a list',
+    blurb: 'Follow every account in one of your lists that you are not following yet.',
+    title: 'Follow everyone on this list?',
+    effects: [
+      'Every member of the list you are not already following gets followed.',
+      'Accounts that require approval get a follow request instead, which they can decline.',
+      'Their posts start appearing in your home timeline as well as the list.',
+      'Accounts you already follow are left exactly as they are.',
+    ],
+    confirmLabel: 'Follow everyone',
+    danger: false,
+    unit: 'list members',
+  },
+  {
+    id: 'list-unfollow',
+    label: 'Unfollow everyone on a list',
+    blurb: 'Stop following every account in one of your lists.',
+    title: 'Unfollow everyone on this list?',
+    effects: [
+      'Every member of the list you currently follow gets unfollowed.',
+      'Any pending follow requests to members are withdrawn.',
+      // Mastodon enforces "list members must be follows" and drops them on
+      // unfollow; our mock server keeps them. Hedged deliberately — claiming the
+      // list empties and then watching it not empty reads as a bug, and so does
+      // the reverse. The one thing true everywhere is that the list survives.
+      'Most servers only keep accounts you follow in a list, so the list may end up empty. The list itself is never deleted.',
+      'Nobody is blocked or muted, and nobody is told.',
+    ],
+    confirmLabel: 'Unfollow everyone',
+    danger: true,
+    unit: 'list members',
+  },
 ];
 
 export function bulkAction(id: BulkActionId): BulkActionSpec {
@@ -138,6 +198,8 @@ export type BulkPhase = 'planning' | 'running' | 'paused' | 'done' | 'cancelled'
 
 export interface BulkJob {
   action: BulkActionId;
+  /** Name of the thing being operated on, when the action needs one (a list). */
+  targetLabel?: string;
   phase: BulkPhase;
   /**
    * How many accounts the job will touch, or null while the planning pass is
@@ -218,7 +280,13 @@ export class BulkActions {
    * The plan produced by the last {@link preview}, reused by {@link start} so
    * confirming doesn't repeat a walk of the whole follow list.
    */
-  private plan: { action: BulkActionId; accounts: Account[]; alreadyCorrect: number } | null = null;
+  private plan: {
+    action: BulkActionId;
+    /** Which list the plan was built for; a plan for list A must not run on B. */
+    listId: string | null;
+    accounts: Account[];
+    alreadyCorrect: number;
+  } | null = null;
 
   // -------------------------------------------------------------------- views
 
@@ -262,12 +330,23 @@ export class BulkActions {
    * your 312 friends" instead of a vague warning — and so confirming is
    * immediate.
    */
-  async preview(action: BulkActionId): Promise<BulkPreview> {
+  async preview(action: BulkActionId, target?: BulkTarget): Promise<BulkPreview> {
     this.plan = null;
     try {
+      if (needsList(action)) {
+        if (!target) {
+          throw new Error('No list chosen.');
+        }
+        const members = await this.fetchListMembers(target.listId);
+        const wantFollowing = action === 'list-follow';
+        const targets = await this.needingFollowChange(members, wantFollowing);
+        const alreadyCorrect = members.length - targets.length;
+        this.plan = { action, listId: target.listId, accounts: targets, alreadyCorrect };
+        return { action, targets: targets.length, alreadyCorrect, approximate: false };
+      }
       if (action === 'mute-amnesty' || action === 'block-amnesty') {
         const list = await this.fetchList(action);
-        this.plan = { action, accounts: list.accounts, alreadyCorrect: 0 };
+        this.plan = { action, listId: null, accounts: list.accounts, alreadyCorrect: 0 };
         return {
           action,
           targets: list.accounts.length,
@@ -280,7 +359,7 @@ export class BulkActions {
       const following = await this.fetchAllFollowing();
       const targets = await this.needingReblogChange(following, wanted);
       const alreadyCorrect = following.length - targets.length;
-      this.plan = { action, accounts: targets, alreadyCorrect };
+      this.plan = { action, listId: null, accounts: targets, alreadyCorrect };
       return {
         action,
         targets: targets.length,
@@ -301,13 +380,14 @@ export class BulkActions {
   // ------------------------------------------------------------------- runner
 
   /** Run an action. Resolves when the job finishes, is cancelled, or fails. */
-  async start(action: BulkActionId): Promise<void> {
+  async start(action: BulkActionId, target?: BulkTarget): Promise<void> {
     if (this.running()) {
       return;
     }
     this.cancelRequested = false;
     this.job.set({
       action,
+      targetLabel: target?.listTitle,
       phase: 'planning',
       total: null,
       done: 0,
@@ -319,7 +399,9 @@ export class BulkActions {
     });
 
     try {
-      if (action === 'mute-amnesty' || action === 'block-amnesty') {
+      if (needsList(action)) {
+        await this.runListFollows(action, target);
+      } else if (action === 'mute-amnesty' || action === 'block-amnesty') {
         await this.runAmnesty(action);
       } else {
         await this.runReblogs(action);
@@ -369,6 +451,41 @@ export class BulkActions {
         return;
       }
       await this.write(() => firstValueFrom(this.api.follow(account.id, { reblogs: wanted })));
+      await this.pace();
+    }
+  }
+
+  /**
+   * Follow or unfollow every member of one list.
+   *
+   * The list is read in full first (members, then relationships) so the writes
+   * are only the accounts that need one — following a list of 40 where you
+   * already follow 38 should cost two requests.
+   */
+  private async runListFollows(action: BulkActionId, target?: BulkTarget): Promise<void> {
+    if (!target) {
+      throw new Error('No list chosen.');
+    }
+    const wantFollowing = action === 'list-follow';
+    // Reuse the dialog's plan, but only if it was built for *this* list.
+    const planned =
+      this.plan?.action === action && this.plan.listId === target.listId ? this.plan : null;
+    let targets = planned?.accounts ?? null;
+    let alreadyCorrect = planned?.alreadyCorrect ?? 0;
+    if (!targets) {
+      const members = await this.fetchListMembers(target.listId);
+      targets = await this.needingFollowChange(members, wantFollowing);
+      alreadyCorrect = members.length - targets.length;
+    }
+    this.patch({ phase: 'running', total: targets.length, skipped: alreadyCorrect });
+
+    for (const account of targets) {
+      if (this.cancelRequested) {
+        return;
+      }
+      await this.write(() =>
+        firstValueFrom(wantFollowing ? this.api.follow(account.id) : this.api.unfollow(account.id)),
+      );
       await this.pace();
     }
   }
@@ -537,6 +654,56 @@ export class BulkActions {
       action === 'mute-amnesty' ? `${csvCell(a.acct)},true` : csvCell(a.acct),
     );
     return { csv: [header, ...rows].join('\n'), count: accounts.length };
+  }
+
+  /** Every member of one list, following `Link` cursors to the end. */
+  private async fetchListMembers(listId: string): Promise<Account[]> {
+    const all: Account[] = [];
+    let maxId: string | undefined;
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      if (this.cancelRequested) {
+        break;
+      }
+      const { accounts, nextMaxId } = await firstValueFrom(
+        this.api.listAccountsPage(listId, maxId, LIST_PAGE),
+      );
+      all.push(...accounts);
+      if (!nextMaxId || !accounts.length) {
+        break;
+      }
+      maxId = nextMaxId;
+    }
+    return all;
+  }
+
+  /**
+   * Of these accounts, which need following (or unfollowing).
+   *
+   * A pending follow request counts as "already following" for the follow
+   * direction — re-sending it achieves nothing — and as work for the unfollow
+   * direction, where `unfollow` is also how you withdraw one.
+   */
+  private async needingFollowChange(
+    accounts: Account[],
+    wantFollowing: boolean,
+  ): Promise<Account[]> {
+    const byId = new Map(accounts.map((a) => [a.id, a]));
+    const targets: Account[] = [];
+    for (let i = 0; i < accounts.length; i += RELATIONSHIP_BATCH) {
+      if (this.cancelRequested) {
+        break;
+      }
+      const slice = accounts.slice(i, i + RELATIONSHIP_BATCH);
+      const rels = await firstValueFrom(this.api.relationships(slice.map((a) => a.id)));
+      for (const rel of rels) {
+        const account = byId.get(rel.id);
+        const connected = rel.following || rel.requested;
+        if (account && connected !== wantFollowing) {
+          targets.push(account);
+        }
+      }
+    }
+    return targets;
   }
 
   /** Every account the signed-in user follows, paged to the ceiling. */

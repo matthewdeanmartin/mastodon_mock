@@ -401,6 +401,34 @@ export class Api {
     return this.http.get<Account[]>(`/api/v1/lists/${id}/accounts`);
   }
 
+  /**
+   * One page of a list's members, plus where the next page starts.
+   *
+   * {@link listAccounts} takes whatever the server gives in one response, which
+   * is fine for rendering the Members tab. Anything that acts on *every* member
+   * needs the whole list, and Mastodon caps this endpoint at 80 per page with
+   * the cursor in the `Link` header — see {@link accountListPage} for why the
+   * header is the only place to get it.
+   */
+  listAccountsPage(
+    id: string,
+    maxId?: string,
+    limit = 80,
+  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
+    return this.http
+      .get<Account[]>(`/api/v1/lists/${id}/accounts`, { params, observe: 'response' })
+      .pipe(
+        map((response) => ({
+          accounts: response.body ?? [],
+          nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
+        })),
+      );
+  }
+
   // --- collections (Mastodon 4.6+) ---
   // Note: the local mock's collection endpoints are stateless stubs (empty
   // lists / 404s), so these are mainly exercised against a real server.

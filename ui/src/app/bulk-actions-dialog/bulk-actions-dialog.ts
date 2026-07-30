@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
-import { BulkActionId, BulkActions, BulkPreview, bulkAction } from '../bulk-actions';
+import { BulkActionId, BulkActions, BulkPreview, BulkTarget, bulkAction } from '../bulk-actions';
 
 /**
  * "Here is exactly what is about to happen — do you still want it?" for a bulk
@@ -26,6 +26,8 @@ export class BulkActionsDialog implements OnInit {
   private readonly bulk = inject(BulkActions);
 
   readonly action = input.required<BulkActionId>();
+  /** Required by the list actions; ignored by the rest. */
+  readonly target = input<BulkTarget | undefined>(undefined);
   readonly confirmed = output<void>();
   readonly cancelled = output<void>();
 
@@ -49,7 +51,7 @@ export class BulkActionsDialog implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.preview.set(await this.bulk.preview(this.action()));
+      this.preview.set(await this.bulk.preview(this.action(), this.target()));
     } finally {
       // Never leave the dialog claiming to be busy; a stuck spinner in front of
       // a destructive action is worse than an error message.
@@ -97,6 +99,36 @@ export class BulkActionsDialog implements OnInit {
         return preview.targets
           ? `This will unblock ${about}${count} ${preview.targets === 1 ? 'account' : 'accounts'}.`
           : 'Nothing to do — your block list is already empty.';
+      case 'list-follow': {
+        const members = preview.targets + preview.alreadyCorrect;
+        if (!members) {
+          return 'Nothing to do — this list has no members.';
+        }
+        if (!preview.targets) {
+          return `Nothing to do — you already follow all ${members.toLocaleString()} ${
+            members === 1 ? 'member' : 'members'
+          } of this list.`;
+        }
+        return preview.alreadyCorrect === 0
+          ? `This will follow all ${about}${count} ${
+              preview.targets === 1 ? 'member' : 'members'
+            } of this list.`
+          : `This will follow ${about}${count} of the ${members.toLocaleString()} members of this list. You already follow the other ${preview.alreadyCorrect.toLocaleString()}.`;
+      }
+      case 'list-unfollow': {
+        const members = preview.targets + preview.alreadyCorrect;
+        if (!members) {
+          return 'Nothing to do — this list has no members.';
+        }
+        if (!preview.targets) {
+          return 'Nothing to do — you do not follow anyone on this list.';
+        }
+        return preview.alreadyCorrect === 0
+          ? `This will unfollow all ${about}${count} ${
+              preview.targets === 1 ? 'member' : 'members'
+            } of this list.`
+          : `This will unfollow ${about}${count} of the ${members.toLocaleString()} members of this list. You already do not follow the other ${preview.alreadyCorrect.toLocaleString()}.`;
+      }
     }
   });
 

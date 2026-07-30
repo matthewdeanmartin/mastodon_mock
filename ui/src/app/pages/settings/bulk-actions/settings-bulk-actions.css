@@ -27,9 +27,41 @@
   min-width: 0;
 }
 
-.bulk-card h2 {
+.bulk-card h3 {
   font-size: 15px;
   margin: 0 0 2px;
+}
+
+/* Group heading: quieter than the page title, louder than a card. */
+.group-head {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 22px 0 10px;
+}
+
+.group-head:first-of-type {
+  margin-top: 0;
+}
+
+.list-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.list-picker select {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
 }
 
 .bulk-card p {

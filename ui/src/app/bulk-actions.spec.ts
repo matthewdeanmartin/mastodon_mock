@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from './api';
 import { Auth } from './auth';
-import { BulkActions, bulkAction, formatEta } from './bulk-actions';
+import { BulkActions, BulkTarget, bulkAction, formatEta, needsList } from './bulk-actions';
 import { Account, Relationship } from './models';
 
 function account(id: string, acct = `user${id}`): Account {
@@ -14,6 +14,13 @@ function account(id: string, acct = `user${id}`): Account {
 function relationship(id: string, showing_reblogs: boolean | undefined): Relationship {
   return { id, following: true, showing_reblogs } as Relationship;
 }
+
+/** A relationship expressed in terms of the follow state, for the list actions. */
+function follows(id: string, following: boolean, requested = false): Relationship {
+  return { id, following, requested } as Relationship;
+}
+
+const LIST: BulkTarget = { listId: '7', listTitle: 'Rocketry' };
 
 /**
  * A stand-in Api whose calls are vi.fn()s the tests program per case. The
@@ -28,6 +35,10 @@ function fakeApi() {
     accountListPage: vi.fn((_kind: 'mutes' | 'blocks', _maxId?: string, _limit?: number) =>
       of({ accounts: [] as Account[], nextMaxId: null as string | null }),
     ),
+    listAccountsPage: vi.fn((_id: string, _maxId?: string, _limit?: number) =>
+      of({ accounts: [] as Account[], nextMaxId: null as string | null }),
+    ),
+    unfollow: vi.fn((_id: string) => of({} as Relationship)),
     unmuteAccount: vi.fn((_id: string) => of({} as Relationship)),
     unblockAccount: vi.fn((_id: string) => of({} as Relationship)),
   };
@@ -49,6 +60,23 @@ describe('bulkAction', () => {
       expect(spec.backup).toBeTruthy();
       expect(spec.effects.join(' ')).toContain('backed up');
     }
+  });
+
+  it('warns that unfollowing a list may empty it, without promising the list is deleted', () => {
+    // The surprising consequence, and the one a user would otherwise report as a
+    // bug: most servers only keep accounts you follow in a list. Hedged because
+    // servers differ — our mock keeps the members.
+    const effects = bulkAction('list-unfollow').effects.join(' ');
+    expect(effects).toContain('may end up empty');
+    expect(effects).toContain('never deleted');
+    expect(bulkAction('list-unfollow').danger).toBe(true);
+  });
+
+  it('marks exactly the list actions as needing a list', () => {
+    expect(needsList('list-follow')).toBe(true);
+    expect(needsList('list-unfollow')).toBe(true);
+    expect(needsList('mute-amnesty')).toBe(false);
+    expect(needsList('reblogs-on')).toBe(false);
   });
 
   it('promises the retweet actions do not unfollow anyone', () => {
@@ -267,6 +295,92 @@ describe('BulkActions', () => {
       'bob@a.test,true',
       'eve@b.test,true',
     ]);
+  });
+
+  // ---------------------------------------------------------------- lists
+
+  it('follows only the list members that are not already followed', async () => {
+    api.listAccountsPage.mockReturnValueOnce(
+      of({ accounts: [account('1'), account('2'), account('3')], nextMaxId: null }),
+    );
+    api.relationships.mockReturnValueOnce(
+      of([follows('1', false), follows('2', true), follows('3', false)]),
+    );
+
+    const preview = await bulk.preview('list-follow', LIST);
+    expect(preview).toMatchObject({ targets: 2, alreadyCorrect: 1 });
+
+    await bulk.start('list-follow', LIST);
+
+    expect(api.follow).toHaveBeenCalledTimes(2);
+    expect(api.follow).toHaveBeenCalledWith('1');
+    expect(api.follow).toHaveBeenCalledWith('3');
+    expect(bulk.job()).toMatchObject({ phase: 'done', changed: 2, skipped: 1 });
+  });
+
+  it('unfollows only the list members that are actually followed', async () => {
+    api.listAccountsPage.mockReturnValueOnce(
+      of({ accounts: [account('1'), account('2')], nextMaxId: null }),
+    );
+    api.relationships.mockReturnValueOnce(of([follows('1', true), follows('2', false)]));
+
+    const preview = await bulk.preview('list-unfollow', LIST);
+    expect(preview).toMatchObject({ targets: 1, alreadyCorrect: 1 });
+
+    await bulk.start('list-unfollow', LIST);
+
+    expect(api.unfollow).toHaveBeenCalledExactlyOnceWith('1');
+  });
+
+  it('treats a pending follow request as followed, so it is not re-sent', async () => {
+    api.listAccountsPage.mockReturnValue(of({ accounts: [account('1')], nextMaxId: null }));
+    api.relationships.mockReturnValue(of([follows('1', false, true)]));
+
+    expect((await bulk.preview('list-follow', LIST)).targets).toBe(0);
+    // ...but withdrawing it is real work.
+    expect((await bulk.preview('list-unfollow', LIST)).targets).toBe(1);
+  });
+
+  it('reads every page of a long list', async () => {
+    api.listAccountsPage
+      .mockReturnValueOnce(of({ accounts: [account('1')], nextMaxId: '30' }))
+      .mockReturnValueOnce(of({ accounts: [account('2')], nextMaxId: null }));
+    api.relationships.mockImplementation((ids: string[]) =>
+      of(ids.map((id) => follows(id, false))),
+    );
+
+    expect((await bulk.preview('list-follow', LIST)).targets).toBe(2);
+    expect(api.listAccountsPage).toHaveBeenLastCalledWith('7', '30', 80);
+  });
+
+  it('records the list name on the job so the progress panel can show it', async () => {
+    api.listAccountsPage.mockReturnValue(of({ accounts: [], nextMaxId: null }));
+    await bulk.start('list-follow', LIST);
+    expect(bulk.job()?.targetLabel).toBe('Rocketry');
+  });
+
+  it('refuses a list action with no list rather than acting on the wrong one', async () => {
+    expect((await bulk.preview('list-follow')).error).toBeTruthy();
+    await bulk.start('list-unfollow');
+    expect(bulk.job()).toMatchObject({ phase: 'failed' });
+    expect(api.unfollow).not.toHaveBeenCalled();
+  });
+
+  it('does not reuse a plan built for a different list', async () => {
+    api.listAccountsPage.mockReturnValueOnce(of({ accounts: [account('1')], nextMaxId: null }));
+    api.relationships.mockReturnValue(of([follows('1', false)]));
+    await bulk.preview('list-follow', LIST);
+
+    // Same action, different list: the plan must be re-derived from that list.
+    api.listAccountsPage.mockReturnValueOnce(
+      of({ accounts: [account('9'), account('8')], nextMaxId: null }),
+    );
+    api.relationships.mockReturnValueOnce(of([follows('9', false), follows('8', false)]));
+    await bulk.start('list-follow', { listId: '99', listTitle: 'Other' });
+
+    expect(api.follow).toHaveBeenCalledTimes(2);
+    expect(api.follow).toHaveBeenCalledWith('9');
+    expect(api.follow).not.toHaveBeenCalledWith('1');
   });
 
   it('reports no percentage until the total is known', async () => {

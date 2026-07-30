@@ -1,9 +1,12 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Account, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
+import { BulkActionId, BulkActions, BulkTarget } from '../../bulk-actions';
+import { BulkActionsDialog } from '../../bulk-actions-dialog/bulk-actions-dialog';
+import { BulkProgress } from '../../bulk-progress/bulk-progress';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { ListCollectionConverter } from '../../list-collection-converter';
 import { Auth } from '../../auth';
@@ -23,7 +26,15 @@ const SAMPLE_PAGE_SIZE = 40;
 
 @Component({
   selector: 'app-list-timeline',
-  imports: [RouterLink, StatusCard, BulkAddDialog, ConfirmDialog, FeedAnalytics],
+  imports: [
+    RouterLink,
+    StatusCard,
+    BulkAddDialog,
+    ConfirmDialog,
+    FeedAnalytics,
+    BulkActionsDialog,
+    BulkProgress,
+  ],
   templateUrl: './list-timeline.html',
   styleUrl: './list-timeline.css',
 })
@@ -36,6 +47,7 @@ export class ListTimeline implements OnInit {
   private anonymousLists = inject(AnonymousLists);
   private anonymousProvider = inject(AnonymousMastodonProvider);
   private anonymousCorpus = inject(AnonymousFeedCorpus);
+  private bulk = inject(BulkActions);
 
   protected title = signal('');
   protected statuses = signal<Status[]>([]);
@@ -173,6 +185,53 @@ export class ListTimeline implements OnInit {
           }),
         ]
       : ['/accounts', account.id];
+  }
+
+  // ---------------------------------------------------- bulk member actions
+
+  /**
+   * Follow / unfollow every member, offered on the Members tab.
+   *
+   * Server-backed, so it is signed-in only: an Anonymous list is a local set of
+   * follows this browser keeps, with no relationships on any server to change.
+   */
+  protected readonly bulkRunning = this.bulk.running;
+  protected readonly pendingBulk = signal<BulkActionId | null>(null);
+
+  protected readonly bulkTarget = computed<BulkTarget>(() => ({
+    listId: this.listId(),
+    listTitle: this.title() || 'List',
+  }));
+
+  constructor() {
+    // A finished job has changed who is followed, and for an unfollow-everyone
+    // it has emptied the list itself — so re-read rather than show a stale tab.
+    effect(() => {
+      const phase = this.bulk.job()?.phase;
+      if (phase === 'done' || phase === 'cancelled' || phase === 'failed') {
+        if (this.tab() === 'members' && this.listId()) {
+          this.loadMembers();
+        }
+      }
+    });
+  }
+
+  protected askBulk(action: BulkActionId): void {
+    if (!this.bulkRunning()) {
+      this.pendingBulk.set(action);
+    }
+  }
+
+  protected cancelBulk(): void {
+    this.pendingBulk.set(null);
+  }
+
+  protected confirmBulk(): void {
+    const action = this.pendingBulk();
+    this.pendingBulk.set(null);
+    if (action) {
+      void this.bulk.start(action, this.bulkTarget());
+    }
   }
 
   setTab(tab: 'posts' | 'members' | 'analytics'): void {

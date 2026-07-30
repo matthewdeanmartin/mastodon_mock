@@ -86,3 +86,22 @@
   color: #e0245e;
   background: var(--bg);
 }
+
+/* Members tab toolbar. Wraps rather than overflowing: three buttons plus a
+   narrow column is the case that breaks a single row. */
+.members-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.members-actions .btn.danger {
+  color: #e0245e;
+  border-color: #e0245e;
+}
+
+.members-actions .btn.danger:hover:not(:disabled) {
+  background: #e0245e;
+  color: #fff;
+}

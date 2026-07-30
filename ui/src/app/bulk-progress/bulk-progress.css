@@ -86,3 +86,7 @@
 .bp-failed {
   color: #e0245e;
 }
+
+.bp-target {
+  margin-left: 6px;
+}
