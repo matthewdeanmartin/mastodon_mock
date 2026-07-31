@@ -49,7 +49,8 @@ function slugOf(shortUrl: string): string {
  * A message published as a TinyURL short link.
  *
  * The shortener stores a redirect *target*, so we put the message inside that
- * target: a mawkingbird.com/message/ URL carrying the post fields. Opening the
+ * target: a query-free mawkingbird.com/message/message-status.… URL carrying the post fields.
+ * Opening the
  * short link 301-redirects straight back to that reader page, which rebuilds a
  * Mastodon status — no expand API needed. TinyURL links are permanent and
  * public, so this provider offers no edit, delete, expiry, or public feed.
@@ -69,13 +70,9 @@ export class TinyurlProvider implements PasteProvider {
 
   create(input: PasteCreateInput): Observable<PasteCreated> {
     const target = buildMessageUrl(input);
-    // The URL is encoded here rather than handed to `HttpParams`, whose default
-    // codec deliberately leaves `@ : $ , ; + = ? /` unescaped for readability.
-    // That is fine for ordinary parameters and wrong for a nested URL: the `?`
-    // and `=` blur the boundary between our query and the shortener's, and a
-    // literal `+` is ambiguous between "plus" and "space" at every later hop.
-    // `HttpParams` with a pre-encoded string keeps the value exactly as built.
-    const params = new HttpParams({ fromString: `url=${encodeURIComponent(target)}` });
+    // The target is deliberately query-free, so Angular and TinyURL never have
+    // to agree about how many times a nested `%20`, `+`, `&`, or `=` is decoded.
+    const params = new HttpParams().set('url', target);
     return this.http
       .get(CREATE_URL, { params, responseType: 'text', context: externalFetch() })
       .pipe(

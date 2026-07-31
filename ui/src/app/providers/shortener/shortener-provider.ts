@@ -58,8 +58,8 @@ export type ShortenerId = 'dub' | 'shortio' | 'tly' | 'tinyurl' | 'rebrandly' | 
  *
  * - `message` — the Pastes case, created by {@link TinyurlProvider} (the *paste*
  *   provider, not the shortener one). Here the redirect target is not a
- *   destination at all: it is a `mawkingbird.com/message/?m=…` URL carrying the
- *   post body in its query string. Nobody visits it as a page; the short link
+ *   destination at all: it is a `mawkingbird.com/message/message-status.…` URL
+ *   carrying the post body. Nobody visits it as a page; the short link
  *   *is* the message. There is nothing meaningful to "re-point" it at, and
  *   showing its destination in a UI would show the user a wall of
  *   percent-encoded text.

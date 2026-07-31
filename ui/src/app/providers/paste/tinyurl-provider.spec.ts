@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
+import { parseMessageStatusRouteRef } from './message-payload';
 import { PasteCreated } from './paste-provider';
 import { TinyurlProvider } from './tinyurl-provider';
 
@@ -30,13 +31,20 @@ describe('TinyurlProvider', () => {
     const request = http.expectOne((r) => r.url === 'https://tinyurl.com/api-create.php');
     expect(request.request.responseType).toBe('text');
     const target = request.request.params.get('url')!;
-    expect(target).toContain('/message/');
-    expect(new URL(target).searchParams.get('m')).toBe('why did the chicken cross the road?');
+    const parsedTarget = new URL(target);
+    expect(parsedTarget.pathname).toMatch(/\/message\/message-status\./);
+    expect(parsedTarget.search).toBe('');
+    expect(parseMessageStatusRouteRef(parsedTarget.pathname.split('/').at(-1)!)).toEqual({
+      content: 'why did the chicken cross the road?',
+      spoiler: '',
+      language: 'plaintext',
+    });
+    expect(request.request.urlWithParams).not.toContain('%25');
     request.flush('https://tinyurl.com/22qwvuhy');
 
     expect(result?.url).toBe('https://tinyurl.com/22qwvuhy');
     expect(result?.slug).toBe('22qwvuhy');
-    expect(result?.rawUrl).toContain('/message/');
+    expect(result?.rawUrl).toContain('/message/message-status.');
     expect(result?.editKey).toBe('');
     http.verify();
   });

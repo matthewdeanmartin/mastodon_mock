@@ -11,6 +11,11 @@ describe('application routes', () => {
     expect(routes.find((route) => route.path === 'anonymous')?.loadComponent).toBeDefined();
   });
 
+  it('keeps both current and legacy message links available to Anonymous', () => {
+    expect(routes.find((route) => route.path === 'message/:id')?.canActivate).toBeUndefined();
+    expect(routes.find((route) => route.path === 'message')?.canActivate).toBeUndefined();
+  });
+
   it('keeps public hashtag timelines available to Anonymous', () => {
     const tagRoute = shellChild('tags/:tag');
 

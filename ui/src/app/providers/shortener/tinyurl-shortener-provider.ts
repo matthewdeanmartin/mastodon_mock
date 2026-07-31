@@ -26,7 +26,7 @@ import { ShortenerTransport } from './shortener-transport';
  * same service. The distinction is the one thing to keep straight here:
  *
  * - **That one** encodes a *message* into the redirect target. The destination
- *   is a `mawkingbird.com/message/?m=…` URL carrying a post body; the short link
+ *   is a `mawkingbird.com/message/message-status.…` URL carrying a post body; the short link
  *   *is* the content. It belongs to the Pastes feature.
  * - **This one** shortens a destination someone actually wants to visit. The
  *   target is a real page and the short link is a wrapper around it.

@@ -16,26 +16,29 @@ describe('message-payload', () => {
       BASE,
     );
     const parsed = new URL(url);
-    expect(parsed.origin + parsed.pathname).toBe('https://mawkingbird.com/message/');
-    expect(parsed.searchParams.get('m')).toBe('why did the chicken cross the road?');
-    expect(parsed.searchParams.get('cw')).toBe('spicy take');
-    expect(parsed.searchParams.get('l')).toBe('markdown');
+    expect(parsed.search).toBe('');
+    expect(parsed.pathname).toMatch(/^\/message\/message-status\./);
+    expect(parseMessageStatusRouteRef(parsed.pathname.split('/').at(-1)!)).toEqual({
+      content: 'why did the chicken cross the road?',
+      spoiler: 'spicy take',
+      language: 'markdown',
+    });
   });
 
-  it('omits empty CW and default language', () => {
+  it('preserves empty CW and default language in the route payload', () => {
     const url = buildMessageUrl({ title: '  ', content: 'hello', language: 'plaintext' }, BASE);
     const parsed = new URL(url);
-    expect(parsed.searchParams.has('cw')).toBe(false);
-    expect(parsed.searchParams.has('l')).toBe(false);
-    expect(parsed.searchParams.get('m')).toBe('hello');
+    expect(parseMessageStatusRouteRef(parsed.pathname.split('/').at(-1)!)).toEqual({
+      content: 'hello',
+      spoiler: '',
+      language: 'plaintext',
+    });
   });
 
-  it('round-trips through parseMessageParams', () => {
-    const url = buildMessageUrl(
-      { title: 'cw', content: 'body & <stuff>', language: 'python' },
-      BASE,
+  it('continues to parse the legacy query format', () => {
+    const payload = parseMessageParams(
+      new URLSearchParams('m=body%20%26%20%3Cstuff%3E&cw=cw&l=python'),
     );
-    const payload = parseMessageParams(new URL(url).searchParams);
     expect(payload).toEqual({ content: 'body & <stuff>', spoiler: 'cw', language: 'python' });
   });
 
@@ -44,45 +47,53 @@ describe('message-payload', () => {
   });
 
   describe('nesting inside another URL', () => {
-    // The message URL is handed to a shortener as the value of `?url=`, so it
-    // gets decoded by a stranger before anyone reads it back. `+` is the trap:
-    // RFC 3986 calls it a literal plus, form-encoding calls it a space, and the
-    // hops disagree — which is how a recipe turned into
-    // "Tofu+salad+sandwich+recipe%3A%0A". Encoding space as %20 removes the
-    // ambiguity, so the result must survive either convention.
     const multiline = 'Tofu salad sandwich recipe:\n- tofu\n- salad\n- bread';
 
-    it('never encodes a space as +', () => {
+    it('uses a query-free base64url route segment', () => {
       const url = buildMessageUrl(
         { title: 'a b', content: multiline, language: 'plaintext' },
         BASE,
       );
-      expect(url).not.toContain('+');
-      expect(url).toContain('%20');
+      const parsed = new URL(url);
+      const ref = parsed.pathname.split('/').at(-1)!;
+      expect(parsed.search).toBe('');
+      expect(ref).toMatch(/^message-status\.[A-Za-z0-9_-]+$/);
+      expect(parseMessageStatusRouteRef(ref)?.content).toBe(multiline);
     });
 
-    it('survives a recipient that treats + as a literal', () => {
+    it('survives ordinary outer query serialization without percent nesting', () => {
       const target = buildMessageUrl(
         { title: '', content: multiline, language: 'plaintext' },
         BASE,
       );
-      const nested = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(target)}`;
-      const stored = decodeURIComponent(nested.split('url=')[1]);
-      expect(parseMessageParams(new URL(stored).searchParams)?.content).toBe(multiline);
+      const nested = new URL('https://tinyurl.com/api-create.php');
+      nested.searchParams.set('url', target);
+      const stored = nested.searchParams.get('url')!;
+      const ref = new URL(stored).pathname.split('/').at(-1)!;
+      expect(nested.search).not.toContain('%25');
+      expect(parseMessageStatusRouteRef(ref)?.content).toBe(multiline);
     });
 
-    it('survives a recipient that treats + as a space', () => {
-      const target = buildMessageUrl(
-        { title: '', content: multiline, language: 'plaintext' },
-        BASE,
+    it('repairs newer legacy links that expose percent escapes as text', () => {
+      const params = new URLSearchParams(
+        'm=SMBC%2520robots%250A%250Ahttps%253A%252F%252Fwww.smbc-comics.com%252Fcomic%252Fcrank',
       );
-      const nested = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(target)}`;
-      const stored = decodeURIComponent(nested.split('url=')[1].replace(/\+/g, ' '));
-      expect(parseMessageParams(new URL(stored).searchParams)?.content).toBe(multiline);
+      expect(parseMessageParams(params)?.content).toBe(
+        'SMBC robots\n\nhttps://www.smbc-comics.com/comic/crank',
+      );
     });
 
-    it('still reads a legacy link that used + for spaces', () => {
-      // Old links are already out there; readers must not regress.
+    it('repairs older legacy links that expose encoded pluses as text', () => {
+      const params = new URLSearchParams('m=Today%2BI%2Bsaw%2Btwo%2Bfoxes%2Bon%2Bmy%2Brun.');
+      expect(parseMessageParams(params)?.content).toBe('Today I saw two foxes on my run.');
+    });
+
+    it('does not rewrite an intentional plus expression', () => {
+      expect(parseMessageParams(new URLSearchParams('m=C%2B%2B'))?.content).toBe('C++');
+      expect(parseMessageParams(new URLSearchParams('m=one%2Btwo'))?.content).toBe('one+two');
+    });
+
+    it('still reads correctly form-encoded legacy links', () => {
       expect(parseMessageParams(new URLSearchParams('m=Tofu+salad%3A%0A-+tofu'))?.content).toBe(
         'Tofu salad:\n- tofu',
       );

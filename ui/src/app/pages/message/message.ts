@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Auth } from '../../auth';
 import { StatusCard } from '../../status-card/status-card';
 import { Status } from '../../models';
@@ -7,13 +7,15 @@ import {
   messageStatus,
   messageStatusRouteRef,
   parseMessageParams,
+  parseMessageStatusRouteRef,
 } from '../../providers/paste/message-payload';
 
 /**
  * Landing page for a message shared as a short link.
  *
  * A shortener stores the redirect target, so opening a tinyurl.com/xxxx link
- * 301-redirects straight here to /message/?m=…&cw=… . We decode those params
+ * 301-redirects straight here to /message/message-status.… . Legacy
+ * /message/?m=…&cw=… links remain readable. We decode either representation
  * into a Mastodon status — no network needed. (There's deliberately no expand
  * step: TinyURL has no CORS-open resolve API, and the redirect already delivers
  * the target, so a bare short code is never handed to this page.)
@@ -34,13 +36,15 @@ import {
 })
 export class MessagePage implements OnInit {
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private auth = inject(Auth);
 
   protected status = signal<Status | null>(null);
 
   ngOnInit(): void {
     const params = new URLSearchParams(window.location.search);
-    const payload = parseMessageParams(params);
+    const routeRef = this.route.snapshot.paramMap.get('id') ?? '';
+    const payload = parseMessageStatusRouteRef(routeRef) ?? parseMessageParams(params);
     if (!payload) {
       this.status.set(null);
       return;

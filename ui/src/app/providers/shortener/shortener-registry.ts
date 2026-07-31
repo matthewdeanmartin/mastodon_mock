@@ -151,7 +151,7 @@ export class ShortenerRegistry {
    *
    * These come from `providers/paste/tinyurl-provider.ts`, which is *not* the
    * TinyURL shortener in this folder — see {@link LinkKind}. The redirect target
-   * is a `mawkingbird.com/message/?m=…` URL carrying a post body, so the "link"
+   * is a `mawkingbird.com/message/message-status.…` URL carrying a post body, so the "link"
    * and the "content" are the same object. They are shown here because from the
    * user's side they are short links they made and may want to find again, and
    * marked `kind: 'message'` so the page never offers to re-point one at a

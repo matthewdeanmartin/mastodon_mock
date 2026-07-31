@@ -106,7 +106,7 @@ export class LinksPage implements OnInit {
    * Whether this row is a message-in-a-URL rather than a shortened link.
    *
    * These come from the Pastes feature: the redirect target is a
-   * `mawkingbird.com/message/?m=…` URL holding a post body, so the link *is* the
+   * `mawkingbird.com/message/message-status.…` URL holding a post body, so the link *is* the
    * message. The row shows the message rather than a destination, and offers no
    * editing — there is no destination to re-point.
    */

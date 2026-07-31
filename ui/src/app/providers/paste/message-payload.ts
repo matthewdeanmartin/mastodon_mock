@@ -3,11 +3,11 @@ import { PasteCreateInput } from './paste-provider';
 
 /**
  * The shortener stores a redirect target, so a "paste" is really a message
- * encoded into a mawkingbird.com/message/ URL. These helpers are the single
+ * encoded into a query-free mawkingbird.com/message/ route. These helpers are the single
  * encode/decode contract shared by the shortener provider (writes the target)
  * and the /message reader page (reads it back and rebuilds a Mastodon status).
  *
- * Query params (all optional except `m`):
+ * Legacy query params (all optional except `m`):
  *   m  - message body (plain text)
  *   cw - content warning / spoiler text (shown as the collapsible CW)
  *   l  - language code (default plaintext)
@@ -47,55 +47,56 @@ function deploymentBase(): string {
  * Build the mawkingbird.com/message/ target URL that the shortener will wrap.
  * The compose flow puts any content-warning text in `input.title`, so that maps
  * to the reader's collapsible CW.
+ *
+ * The payload lives in a base64url route segment, not a nested query string.
+ * TinyURL's legacy endpoint preserves percent escapes in its `url=` value
+ * instead of decoding them like an ordinary form parser. A query target therefore
+ * turned spaces into either literal `+` or visible `%20`, depending on which
+ * writer produced it. The route alphabet has no `%`, `+`, `&`, `?`, or `=`, so
+ * there is no second encoding layer for TinyURL to interpret differently.
  */
 export function buildMessageUrl(
   input: Pick<PasteCreateInput, 'title' | 'content' | 'language'>,
   base: string = deploymentBase(),
 ): string {
-  const url = new URL('message/', base);
-  // Built by hand rather than with `searchParams.set`, which encodes a space as
-  // `+`. This URL's whole job is to survive being passed as the *value* of
-  // another query parameter (the shortener's `?url=`), and `+` does not survive
-  // that: RFC 3986 says `+` is a literal in a query string, form-encoding says
-  // it is a space, and the two hops disagree. `%20` means space everywhere, so
-  // the round trip stops depending on who decodes it.
-  //
-  // Only the encoding changes — readers still parse with URLSearchParams, which
-  // handles `%20`, `+` and percent-escapes alike, so nothing here unescapes
-  // twice and old links keep working.
-  const params = [`m=${strictEncode(input.content)}`];
-  if (input.title.trim()) params.push(`cw=${strictEncode(input.title.trim())}`);
-  if (input.language && input.language !== 'plaintext') {
-    params.push(`l=${strictEncode(input.language)}`);
-  }
-  url.search = params.join('&');
-  return url.toString();
+  const payload: MessagePayload = {
+    content: input.content,
+    spoiler: input.title.trim(),
+    language: input.language || 'plaintext',
+  };
+  return new URL(`message/${messageStatusRouteRef(payload)}`, base).toString();
 }
 
-/**
- * Percent-encode for a query-string value with no exceptions — notably encoding
- * space as `%20` and never as `+`.
- *
- * `encodeURIComponent` already leaves `!'()*` unescaped; those are sub-delims
- * and legal in a query, but they are escaped here too so the result is inert
- * however many times it is nested inside another URL.
- */
-function strictEncode(value: string): string {
-  return encodeURIComponent(value).replace(
-    /[!'()*]/g,
-    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
-}
-
-/** Read the message fields out of the reader page's query params. */
+/** Read message fields from the old query-string format. */
 export function parseMessageParams(params: URLSearchParams): MessagePayload | null {
   const content = params.get('m');
   if (content === null) return null;
   return {
-    content,
-    spoiler: params.get('cw') ?? '',
-    language: params.get('l') ?? 'plaintext',
+    content: decodeLegacyQueryValue(content),
+    spoiler: decodeLegacyQueryValue(params.get('cw') ?? ''),
+    language: decodeLegacyQueryValue(params.get('l') ?? 'plaintext'),
   };
+}
+
+/**
+ * Repair the two broken query encodings already present in permanent TinyURLs.
+ *
+ * Newer query links expose one encoded layer (`%20`, `%0A`, …) after
+ * URLSearchParams has decoded the redirect URL. Older links expose prose spaces
+ * as literal plus signs. The latter is intrinsically ambiguous with an intended
+ * plus, so only repair it when at least two pluses join word characters and the
+ * value contains no real whitespace — the characteristic sentence-shaped case.
+ */
+function decodeLegacyQueryValue(value: string): string {
+  if (/%[0-9a-f]{2}/i.test(value)) {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+  const wordJoiners = value.match(/[\p{L}\p{N}]\+(?=[\p{L}\p{N}])/gu)?.length ?? 0;
+  return wordJoiners >= 2 && !/\s/u.test(value) ? value.replaceAll('+', ' ') : value;
 }
 
 /**

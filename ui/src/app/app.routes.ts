@@ -26,6 +26,10 @@ export const routes: Routes = [
   // A message shared as a TinyURL short link. Un-guarded so a shared link opens
   // for anyone, signed in or not.
   {
+    path: 'message/:id',
+    loadComponent: () => import('./pages/message/message').then((m) => m.MessagePage),
+  },
+  {
     path: 'message',
     loadComponent: () => import('./pages/message/message').then((m) => m.MessagePage),
   },
