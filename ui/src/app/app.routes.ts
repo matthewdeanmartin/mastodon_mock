@@ -176,6 +176,13 @@ export const routes: Routes = [
                     (m) => m.ConnectionLinkShortener,
                   ),
               },
+              {
+                path: 'twitter',
+                loadComponent: () =>
+                  import('./pages/settings/connections/twitter/connection-twitter').then(
+                    (m) => m.ConnectionTwitter,
+                  ),
+              },
             ],
           },
           {

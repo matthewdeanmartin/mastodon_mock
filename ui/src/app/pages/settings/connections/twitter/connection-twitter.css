@@ -1,0 +1,84 @@
+/*
+ * Page-specific styling only. The shared connector shell (headings, provider
+ * list, pills, .connection-ok, .feed-error, .credential-warning) lives in
+ * ../connection-page.css and is deliberately not duplicated here.
+ */
+
+/*
+ * The up-front honesty block.
+ *
+ * Styled as information rather than as a warning: it is not telling the user
+ * something is wrong, it is telling them what they are signing up for before
+ * they spend an afternoon on it. Red would be wrong — nothing here is a fault —
+ * but so would burying it in muted small text, since these are the three facts
+ * most likely to make someone decide this connector is not for them.
+ */
+.honesty {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-block: 1rem;
+}
+
+.honesty ul {
+  margin: 0.5rem 0;
+  padding-inline-start: 1.25rem;
+}
+
+.honesty li {
+  margin-block: 0.35rem;
+}
+
+/*
+ * The single "what do I do now" line.
+ *
+ * This connector has five setup stages across two services, which is the most
+ * of anything here. Without one sentence naming the current stage, a user who
+ * steps away mid-setup has to re-derive where they got to from the state of
+ * four separate sections.
+ */
+.next-step {
+  border-inline-start: 3px solid var(--accent, #6364ff);
+  background: color-mix(in srgb, var(--accent, #6364ff) 8%, transparent);
+  border-radius: 4px;
+  padding: 0.6rem 0.85rem;
+  margin-block: 1rem;
+}
+
+.setup,
+.proxy-status {
+  margin-block: 1.5rem;
+}
+
+.field {
+  display: block;
+  margin-block: 0.75rem;
+}
+
+.field-label {
+  display: block;
+  font-weight: 600;
+  margin-block-end: 0.25rem;
+}
+
+.field input {
+  width: 100%;
+  max-width: 32rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg, transparent);
+  color: inherit;
+}
+
+.field .muted {
+  display: block;
+  margin-block-start: 0.3rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0.75rem 0.35rem;
+}
