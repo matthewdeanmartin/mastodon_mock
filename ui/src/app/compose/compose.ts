@@ -33,6 +33,12 @@ import { PasteExpiry } from '../providers/paste/paste-provider';
 import { PasteProviderRegistry } from '../providers/paste/paste-provider-registry';
 import { ShortenerRegistry } from '../providers/shortener/shortener-registry';
 import { ShortenerSettings } from '../providers/shortener/shortener-settings';
+import { CorsProxy } from '../providers/cors-proxy/cors-proxy';
+import { CorsProxyEntry } from '../providers/cors-proxy/cors-proxy-catalog';
+import { ProxyConsentDialog } from '../providers/shortener/proxy-consent-dialog/proxy-consent-dialog';
+import { ShortenerProxyConsent } from '../providers/shortener/proxy-consent';
+import { ShortenerCatalogEntry, shortenerEntry } from '../providers/shortener/shortener-catalog';
+import { ProxyConsentRequired } from '../providers/shortener/shortener-transport';
 import { applyMinimalMarkdown } from '../markdown';
 import { Terminology } from '../terminology';
 import { longUrls, postLength } from './post-length';
@@ -238,7 +244,14 @@ function dragHasFiles(event: DragEvent): boolean {
 
 @Component({
   selector: 'app-compose',
-  imports: [FormsModule, RouterLink, EmojiPicker, ConfirmDialog, TagHelperDialog],
+  imports: [
+    FormsModule,
+    RouterLink,
+    EmojiPicker,
+    ConfirmDialog,
+    TagHelperDialog,
+    ProxyConsentDialog,
+  ],
   templateUrl: './compose.html',
   styleUrl: './compose.css',
 })
@@ -248,6 +261,8 @@ export class Compose implements OnDestroy {
   private prefs = inject(ClientPrefs);
   private shorteners = inject(ShortenerRegistry);
   private shortenerSettings = inject(ShortenerSettings);
+  private shortenerConsent = inject(ShortenerProxyConsent);
+  private corsProxy = inject(CorsProxy);
   private bskyApi = inject(BlueskyApi);
   protected bskySession = inject(BlueskySession);
   private drafts = inject(Drafts);
@@ -706,6 +721,11 @@ export class Compose implements OnDestroy {
 
   protected shortening = signal(false);
   protected shortenError = signal<string | null>(null);
+  protected readonly shortenerConsentPrompt = signal<{
+    shortener: ShortenerCatalogEntry;
+    proxy: CorsProxyEntry;
+    carriesCredential: boolean;
+  } | null>(null);
 
   /** "Saved to drafts" flash after an explicit save. */
   protected draftSaved = signal(false);
@@ -882,6 +902,28 @@ export class Compose implements OnDestroy {
       }
       this.text.set(text);
     } catch (error: unknown) {
+      this.diagnostics.error('Shortener', 'compose:error', error, {
+        provider: this.shortenerSettings.activeId(),
+        proxyConfigured: this.corsProxy.available(),
+      });
+      if (error instanceof ProxyConsentRequired) {
+        const shortener = shortenerEntry(error.shortener);
+        const proxy = this.corsProxy.entry();
+        if (!error.noProxyConfigured && shortener && proxy) {
+          this.shortenerConsentPrompt.set({
+            shortener,
+            proxy,
+            carriesCredential: error.carriesCredential,
+          });
+          return;
+        }
+        this.shortenError.set(
+          `${shortener?.label ?? 'The shortener'} could not be reached directly, and no CORS ` +
+            `proxy is ready. Set one up under Settings → Connections → CORS proxy, or retry later. ` +
+            `Your post is unchanged.`,
+        );
+        return;
+      }
       this.shortenError.set(
         error instanceof Error && error.message
           ? error.message
@@ -889,6 +931,27 @@ export class Compose implements OnDestroy {
       );
     } finally {
       this.shortening.set(false);
+    }
+  }
+
+  protected async acceptShortenerConsent(): Promise<void> {
+    const prompt = this.shortenerConsentPrompt();
+    this.shortenerConsentPrompt.set(null);
+    if (!prompt) {
+      return;
+    }
+    this.shortenerConsent.grant(prompt.shortener.id, prompt.proxy.id);
+    await this.shortenLinks();
+  }
+
+  protected declineShortenerConsent(): void {
+    const prompt = this.shortenerConsentPrompt();
+    this.shortenerConsentPrompt.set(null);
+    if (prompt) {
+      this.shortenError.set(
+        `Not sent through ${prompt.proxy.label}. The direct attempt also failed. Retry later, or ` +
+          `choose a different CORS proxy in Settings. Your post is unchanged.`,
+      );
     }
   }
 

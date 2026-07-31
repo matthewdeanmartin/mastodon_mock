@@ -63,10 +63,10 @@ describe('ShortenerReachability', () => {
 
   it('reports the proxy route when direct fails but the proxy carries it', async () => {
     proxySettings.select('allorigins');
+    TestBed.inject(ShortenerProxyConsent).grant('isgd', 'allorigins');
 
     const promise = firstValueFrom(reachability.probe('isgd'));
     isgdRequest().error(new ProgressEvent('error'), { status: 0 });
-    // is.gd holds no credential, so the proxy leg needs no consent.
     httpMock
       .expectOne((r) => r.url.startsWith('https://api.allorigins.win/raw'))
       .flush({ shorturl: 'https://is.gd/abc' });
@@ -79,6 +79,7 @@ describe('ShortenerReachability', () => {
   it('reports unreachable when the proxy leg fails too', async () => {
     // The AllOrigins-is-500ing case, which is what prompted this probe.
     proxySettings.select('allorigins');
+    TestBed.inject(ShortenerProxyConsent).grant('isgd', 'allorigins');
 
     const promise = firstValueFrom(reachability.probe('isgd'));
     isgdRequest().error(new ProgressEvent('error'), { status: 0 });
@@ -90,6 +91,18 @@ describe('ShortenerReachability', () => {
     expect(result.status).toBe('unreachable');
     // Names the proxy, so the user knows which hop to blame.
     expect(result.message).toContain('AllOrigins');
+  });
+
+  it('reports that configured is not consented for a keyless request', async () => {
+    proxySettings.select('allorigins');
+
+    const promise = firstValueFrom(reachability.probe('isgd'));
+    isgdRequest().error(new ProgressEvent('error'), { status: 0 });
+
+    const result = await promise;
+    expect(result.status).toBe('needs-consent');
+    expect(result.message).toContain('until you consent');
+    httpMock.expectNone((r) => r.url.startsWith('https://api.allorigins.win/raw'));
   });
 
   it('treats a real answer from the service as reachable, whatever it said', async () => {

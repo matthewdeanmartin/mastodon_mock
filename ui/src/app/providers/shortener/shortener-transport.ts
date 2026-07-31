@@ -4,6 +4,7 @@ import { catchError, Observable, tap, throwError, timer } from 'rxjs';
 import { retry } from 'rxjs/operators';
 import { CorsProxy, CorsProxyRefusal } from '../cors-proxy/cors-proxy';
 import { externalFetch } from '../external-fetch';
+import { PageDiagnostics } from '../../page-diagnostics';
 import { ShortenerProxyConsent } from './proxy-consent';
 import {
   LinkProviderError,
@@ -52,11 +53,15 @@ export class ProxyConsentRequired extends Error {
     readonly shortener: ShortenerId,
     /** True when no proxy is configured at all, so the ask is "go configure one". */
     readonly noProxyConfigured: boolean,
+    /** Whether this request would disclose a provider credential. */
+    readonly carriesCredential: boolean,
   ) {
     super(
       noProxyConfigured
         ? 'This service refuses direct browser requests, and no CORS proxy is configured.'
-        : 'This service refuses direct browser requests. Sending your API key through the proxy needs your consent.',
+        : carriesCredential
+          ? 'This service refuses direct browser requests. Sending your API key through the proxy needs your consent.'
+          : 'This service refuses direct browser requests. Sending the destination URL through the proxy needs your consent.',
     );
     this.name = 'ProxyConsentRequired';
   }
@@ -83,21 +88,15 @@ export interface ShortenerRequest {
    * Worth understanding before setting or clearing this. A cross-origin GET with
    * only safelisted headers is sent straight out, and the server needs nothing
    * but `Access-Control-Allow-Origin` on the response. Add one non-safelisted
-   * header — `Accept: application/json` counts — and the browser must first send
+   * header — an `Authorization` header counts — and the browser must first send
    * an `OPTIONS` preflight, which the server has to answer with a matching
    * `Access-Control-Allow-Headers`. A server can therefore be perfectly
    * CORS-friendly and *still* fail, purely because we asked for a header it does
    * not list in its preflight response.
    *
-   * That is exactly is.gd: it returns `Access-Control-Allow-Origin: *`, but its
-   * `OPTIONS` reply carries no `Access-Control-Allow-Headers`, so adding `Accept`
-   * broke a request that works fine without it. The browser reports this as
-   * "ACAO missing" with `Status code: 200` — blocked despite a success status,
-   * which is the signature of a failed preflight rather than a blocked response.
-   *
    * Providers that select JSON through the query string (is.gd's `format=json`)
-   * lose nothing by omitting `Accept`. Providers behind an `Authorization`
-   * header are preflighted no matter what, so this flag would buy them nothing.
+   * lose nothing by omitting `Accept`. `Accept` itself is CORS-safelisted; this
+   * option keeps the whole request simple if provider adapters evolve.
    */
   simpleRequest?: boolean;
 }
@@ -110,6 +109,7 @@ export class ShortenerTransport {
   private settings = inject(ShortenerSettings);
   private proxy = inject(CorsProxy);
   private consent = inject(ShortenerProxyConsent);
+  private diagnostics = inject(PageDiagnostics);
 
   /**
    * Send an authenticated request to the active provider.
@@ -141,16 +141,34 @@ export class ShortenerTransport {
       );
     }
 
-    const direct = () =>
-      this.send<T>(provider, spec, spec.url, this.authHeaders(config.auth, spec)).pipe(
-        tap(() => (this.lastRouteUsed = 'direct')),
+    const direct = () => {
+      this.diagnostics.info('Shortener', 'request:start', {
+        provider,
+        method: spec.method,
+        route: 'direct',
+      });
+      return this.send<T>(provider, spec, spec.url, this.authHeaders(config.auth, spec)).pipe(
+        tap(() => {
+          this.lastRouteUsed = 'direct';
+          this.diagnostics.info('Shortener', 'request:success', { provider, route: 'direct' });
+        }),
       );
+    };
 
     return direct().pipe(
       catchError((error: unknown) => {
         if (!looksCorsBlocked(error)) {
+          this.diagnostics.error('Shortener', 'request:error', error, {
+            provider,
+            route: 'direct',
+          });
           return throwError(() => toLinkProviderError(error, provider, spec.hints));
         }
+        this.diagnostics.warn('Shortener', 'request:opaque-failure', {
+          provider,
+          route: 'direct',
+          hint: 'Browser reported status 0 (CORS, DNS, offline, or blocked request)',
+        });
         return this.viaProxy<T>(provider, spec, config.auth);
       }),
     );
@@ -178,12 +196,10 @@ export class ShortenerTransport {
   /**
    * The proxy leg, taken only after a direct request came back `status: 0`.
    *
-   * `auth` being null is the interesting case. A request with no credential —
-   * is.gd, or TinyURL before a token is added — has nothing to disclose to the
-   * proxy operator, so it skips the consent gate entirely and goes through the
-   * *ordinary* proxy path, the same one an RSS feed uses. Asking someone to
-   * accept the risk of leaking a key they do not have would be a lie, and it
-   * would train them to click through the dialog that matters.
+   * Consent is required even when `auth` is null. A keyless request has no secret
+   * credential, but the proxy still learns the destination URL. The dialog uses
+   * a smaller disclosure for that case instead of treating configuration as
+   * permission.
    */
   private viaProxy<T>(
     provider: ShortenerId,
@@ -192,12 +208,12 @@ export class ShortenerTransport {
   ): Observable<T> {
     const entry = this.proxy.entry();
     if (!entry || !this.proxy.available()) {
-      return throwError(() => new ProxyConsentRequired(provider, true));
+      return throwError(() => new ProxyConsentRequired(provider, true, auth !== null));
     }
 
     const carriesCredential = auth !== null;
-    if (carriesCredential && !this.consent.granted(provider, entry.id)) {
-      return throwError(() => new ProxyConsentRequired(provider, false));
+    if (!this.consent.granted(provider, entry.id)) {
+      return throwError(() => new ProxyConsentRequired(provider, false, carriesCredential));
     }
 
     let proxied: { url: string; headers: HttpHeaders };
@@ -224,11 +240,30 @@ export class ShortenerTransport {
     });
 
     const proxyLabel = entry.label;
+    this.diagnostics.info('Shortener', 'request:start', {
+      provider,
+      method: spec.method,
+      route: 'proxy',
+      proxy: proxyLabel,
+      carriesCredential,
+    });
     return this.send<T>(provider, spec, proxied.url, headers).pipe(
-      tap(() => (this.lastRouteUsed = 'proxy')),
-      catchError((error: unknown) =>
-        throwError(() => this.proxyLegError(error, provider, spec, proxyLabel)),
-      ),
+      tap(() => {
+        this.lastRouteUsed = 'proxy';
+        this.diagnostics.info('Shortener', 'request:success', {
+          provider,
+          route: 'proxy',
+          proxy: proxyLabel,
+        });
+      }),
+      catchError((error: unknown) => {
+        this.diagnostics.error('Shortener', 'request:error', error, {
+          provider,
+          route: 'proxy',
+          proxy: proxyLabel,
+        });
+        return throwError(() => this.proxyLegError(error, provider, spec, proxyLabel));
+      }),
     );
   }
 

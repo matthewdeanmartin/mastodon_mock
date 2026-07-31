@@ -3,8 +3,8 @@ import { CorsProxyId } from '../cors-proxy/cors-proxy-catalog';
 import { ShortenerId } from './shortener-provider';
 
 /**
- * Records that the user knowingly agreed to send a shortener API key through a
- * named CORS proxy.
+ * Records that the user knowingly agreed to send a shortener request through a
+ * named CORS proxy. The request may carry a key, or only the destination URL.
  *
  * ## Why consent has to be stored at all
  *

@@ -76,6 +76,7 @@ export class LinksPage implements OnInit {
   protected readonly consentPrompt = signal<{
     shortener: ShortenerCatalogEntry;
     proxy: CorsProxyEntry;
+    carriesCredential: boolean;
   } | null>(null);
 
   /**
@@ -271,7 +272,7 @@ export class LinksPage implements OnInit {
       return true;
     }
     this.pendingAction = retry;
-    this.consentPrompt.set({ shortener: entry, proxy });
+    this.consentPrompt.set({ shortener: entry, proxy, carriesCredential: error.carriesCredential });
     return true;
   }
 
@@ -293,8 +294,8 @@ export class LinksPage implements OnInit {
     this.pendingAction = null;
     if (prompt) {
       this.error.set(
-        `Not sent. ${prompt.shortener.label} can't be reached from this browser without routing ` +
-          `your key through ${prompt.proxy.label}.`,
+        `Not sent through ${prompt.proxy.label}. The direct attempt also failed. Retry later, or ` +
+          `choose a different CORS proxy in Settings.`,
       );
     }
   }

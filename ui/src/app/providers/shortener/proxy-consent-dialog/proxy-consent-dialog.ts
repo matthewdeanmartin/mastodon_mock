@@ -46,6 +46,8 @@ export class ProxyConsentDialog {
   readonly shortener = input.required<ShortenerCatalogEntry>();
   /** The configured proxy, whose operator would see it. */
   readonly proxy = input.required<CorsProxyEntry>();
+  /** Whether this request includes a shortener API credential. */
+  readonly carriesCredential = input(true);
 
   readonly accepted = output<void>();
   readonly cancelled = output<void>();

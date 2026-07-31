@@ -8,6 +8,8 @@ import { Drafts } from '../drafts';
 import { Status } from '../models';
 import { Auth } from '../auth';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
+import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
+import { ShortenerSettings } from '../providers/shortener/shortener-settings';
 import { Compose, PostTarget, describePostFailure } from './compose';
 
 /** Edit codes are stored apart from the records — see storage-registry.ts. */
@@ -67,6 +69,14 @@ interface ComposeInternals {
   onLanguageChange(code: string): void;
   dismissLangMismatch(): void;
   showReplyMentionHint: Signal<boolean>;
+  shortenError: WritableSignal<string | null>;
+  shortenerConsentPrompt: WritableSignal<{
+    carriesCredential: boolean;
+    proxy: { label: string };
+  } | null>;
+  shortenLinks(): Promise<void>;
+  acceptShortenerConsent(): Promise<void>;
+  declineShortenerConsent(): void;
 }
 
 function internals(fixture: ComponentFixture<Compose>): ComposeInternals {
@@ -127,6 +137,56 @@ describe('Compose', () => {
     internals(f).text.set('Hello');
     internals(f).uploading.set(true);
     expect(internals(f).canSubmit()).toBe(false);
+  });
+
+  // ---------------------------------------------------------- link shortening
+
+  it('asks before a keyless proxy sees the URL, then retries after consent', async () => {
+    TestBed.inject(ShortenerSettings).activate('isgd');
+    TestBed.inject(CorsProxySettings).select('allorigins');
+    const f = setUp();
+    const original = 'See https://example.com/a-very-long-destination-that-needs-shortening';
+    internals(f).text.set(original);
+
+    const firstAttempt = internals(f).shortenLinks();
+    httpMock
+      .expectOne((request) => request.url.startsWith('https://is.gd/create.php'))
+      .error(new ProgressEvent('error'), { status: 0 });
+    await firstAttempt;
+
+    expect(internals(f).shortenerConsentPrompt()?.carriesCredential).toBe(false);
+    expect(internals(f).text()).toBe(original);
+    httpMock.expectNone((request) => request.url.startsWith('https://api.allorigins.win/raw'));
+
+    const retry = internals(f).acceptShortenerConsent();
+    httpMock
+      .expectOne((request) => request.url.startsWith('https://is.gd/create.php'))
+      .error(new ProgressEvent('error'), { status: 0 });
+    httpMock
+      .expectOne((request) => request.url.startsWith('https://api.allorigins.win/raw'))
+      .flush({ shorturl: 'https://is.gd/abc123' });
+    await retry;
+
+    expect(internals(f).text()).toBe('See https://is.gd/abc123');
+    expect(internals(f).shortenerConsentPrompt()).toBeNull();
+  });
+
+  it('keeps the post unchanged and suggests alternatives when proxy consent is declined', async () => {
+    TestBed.inject(ShortenerSettings).activate('isgd');
+    TestBed.inject(CorsProxySettings).select('allorigins');
+    const f = setUp();
+    const original = 'See https://example.com/a-very-long-destination-that-needs-shortening';
+    internals(f).text.set(original);
+
+    const attempt = internals(f).shortenLinks();
+    httpMock
+      .expectOne((request) => request.url.startsWith('https://is.gd/create.php'))
+      .error(new ProgressEvent('error'), { status: 0 });
+    await attempt;
+    internals(f).declineShortenerConsent();
+
+    expect(internals(f).text()).toBe(original);
+    expect(internals(f).shortenError()).toContain('different CORS proxy');
   });
 
   it('canSubmit is true with an open poll that has at least 2 non-empty options', () => {

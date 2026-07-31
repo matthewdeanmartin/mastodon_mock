@@ -164,7 +164,7 @@ const MESSAGES: Record<ReachabilityStatus, (proxy: string) => string> = {
   'needs-proxy': () =>
     'Your browser could not reach this service directly, and no CORS proxy is configured. Most shortener APIs refuse browser requests, so this one likely needs a proxy.',
   'needs-consent': (proxy) =>
-    `Your browser could not reach this service directly. It can be retried through ${proxy}, but that would send your API key to the proxy operator — so it needs your consent first.`,
+    `Your browser could not reach this service directly. It can be retried through ${proxy}, but Mawkingbird will not send the request to that proxy until you consent.`,
   unreachable: (proxy) =>
     `Could not reach this service directly or through ${proxy}. The proxy may be down, or the service may be refusing browser requests entirely.`,
   unknown: () => 'Could not determine whether this service is reachable.',

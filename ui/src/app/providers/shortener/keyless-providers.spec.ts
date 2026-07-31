@@ -8,6 +8,7 @@ import { IsgdProvider } from './isgd-provider';
 import { ShortenerProxyConsent } from './proxy-consent';
 import { LinkProviderError } from './shortener-errors';
 import { ShortenerSettings } from './shortener-settings';
+import { ProxyConsentRequired } from './shortener-transport';
 import { TinyurlShortenerProvider } from './tinyurl-shortener-provider';
 
 /**
@@ -201,14 +202,23 @@ describe('key-less shorteners', () => {
   });
 
   describe('proxying a key-less request', () => {
-    it('goes through the ordinary proxy path with no consent prompt', async () => {
-      // A request carrying no credential has nothing to disclose, so asking the
-      // user to accept the risk of a leak would be a lie.
+    it('requires URL-disclosure consent, then uses the ordinary proxy path', async () => {
       TestBed.inject(CorsProxySettings).select('allorigins');
       settings.activate('isgd');
-      expect(TestBed.inject(ShortenerProxyConsent).granted('isgd', 'allorigins')).toBe(false);
+      const consent = TestBed.inject(ShortenerProxyConsent);
+      expect(consent.granted('isgd', 'allorigins')).toBe(false);
 
-      const promise = firstValueFrom(isgd.createLink({ destinationUrl: 'https://example.com/x' }));
+      const blocked = firstValueFrom(isgd.createLink({ destinationUrl: 'https://example.com/x' }));
+      httpMock
+        .expectOne((r) => r.url.startsWith('https://is.gd/create.php'))
+        .error(new ProgressEvent('error'), { status: 0 });
+      const error = (await blocked.catch((value: unknown) => value)) as ProxyConsentRequired;
+      expect(error).toBeInstanceOf(ProxyConsentRequired);
+      expect(error.carriesCredential).toBe(false);
+      httpMock.expectNone((r) => r.url.startsWith('https://api.allorigins.win/raw'));
+
+      consent.grant('isgd', 'allorigins');
+      const retried = firstValueFrom(isgd.createLink({ destinationUrl: 'https://example.com/x' }));
       httpMock
         .expectOne((r) => r.url.startsWith('https://is.gd/create.php'))
         .error(new ProgressEvent('error'), { status: 0 });
@@ -216,7 +226,7 @@ describe('key-less shorteners', () => {
       const proxied = httpMock.expectOne((r) => r.url.startsWith('https://api.allorigins.win/raw'));
       proxied.flush({ shorturl: 'https://is.gd/abc123' });
 
-      expect((await promise).shortUrl).toBe('https://is.gd/abc123');
+      expect((await retried).shortUrl).toBe('https://is.gd/abc123');
     });
   });
 });

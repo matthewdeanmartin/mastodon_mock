@@ -13,7 +13,9 @@
     (click)="$event.stopPropagation()"
     (keyup)="$event.stopPropagation()"
   >
-    @if (selfHosted()) {
+    @if (!carriesCredential()) {
+      <h3 id="consent-title">Send this link through {{ proxy().label }}?</h3>
+    } @else if (selfHosted()) {
       <h3 id="consent-title">Send your {{ shortener().label }} key through your own proxy?</h3>
     } @else {
       <h3 id="consent-title" class="warn">
@@ -22,20 +24,38 @@
     }
 
     <div id="consent-body">
-      <p>
-        {{ shortener().label }}'s API refuses to answer web browsers directly, so Mawkingbird cannot
-        reach it from this page. The only way to use it here is to route the request through the
-        CORS proxy you have configured&nbsp;— and the request carries your
-        {{ shortener().keyLabel }}.
-      </p>
+      @if (carriesCredential()) {
+        <p>
+          {{ shortener().label }}'s API refuses to answer web browsers directly, so Mawkingbird
+          cannot reach it from this page. The only way to use it here is to route the request
+          through the CORS proxy you have configured&nbsp;— and the request carries your
+          {{ shortener().keyLabel }}.
+        </p>
+      } @else {
+        <p>
+          The browser could not reach {{ shortener().label }} directly. Retrying through
+          {{ proxy().label }} would let its operator see the destination URL you are shortening. No
+          {{ shortener().label }} account or API key is involved, but Mawkingbird still needs your
+          permission before sending the URL to another service.
+        </p>
+        <p class="links">
+          <a [href]="proxy().homepage" target="_blank" rel="noopener noreferrer">
+            About {{ proxy().label }}
+          </a>
+          <span aria-hidden="true">·</span>
+          <a [href]="shortener().privacyUrl" target="_blank" rel="noopener noreferrer">
+            {{ shortener().label }}'s privacy policy
+          </a>
+        </p>
+      }
 
-      @if (selfHosted()) {
+      @if (carriesCredential() && selfHosted()) {
         <p>
           Your proxy is <strong>your own server</strong>. Your key goes to a machine you run, so
           nothing is being disclosed to anyone else. Just make sure the template you configured
           points where you think it does.
         </p>
-      } @else {
+      } @else if (carriesCredential()) {
         <section class="who">
           <h4>Who you would be trusting</h4>
           <p class="operator">{{ proxy().label }}</p>
@@ -96,11 +116,13 @@
       </button>
       <button
         class="btn"
-        [class.btn-danger]="!selfHosted()"
+        [class.btn-danger]="carriesCredential() && !selfHosted()"
         type="button"
         (click)="accepted.emit()"
       >
-        @if (selfHosted()) {
+        @if (!carriesCredential()) {
+          Use {{ proxy().label }}
+        } @else if (selfHosted()) {
           Use my proxy
         } @else {
           I accept the risk

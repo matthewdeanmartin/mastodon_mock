@@ -43,9 +43,8 @@ export interface ShortenerAuth {
  *   else, ever.
  *
  * This drives more than a form field. A key-less provider has no credential to
- * leak, so the CORS-proxy consent dialog must *not* warn about one — see
- * {@link ShortenerProxyConsent}. Crying wolf over a request that carries no
- * secret is how the real warning stops being read.
+ * leak, so the CORS-proxy consent dialog discusses only disclosure of the
+ * destination URL — see {@link ShortenerProxyConsent}.
  */
 export type ShortenerKeyPolicy = 'required' | 'optional' | 'none';
 
@@ -216,11 +215,10 @@ export function shortenerEntry(
  * GitHub, leaving only the explicit, consented path.
  *
  * **is.gd is deliberately not here, and TinyURL is.** The blocklist is about
- * credentials, not about shorteners. is.gd has no accounts, so a proxied request
- * to it carries nothing worth protecting and there is no reason to make the user
- * consent to anything. TinyURL is listed because it *may* carry a token — its
- * key is optional, and the transport only takes the consented path when one is
- * actually present.
+ * credentials, not consent. is.gd has no account credential, so after the user
+ * approves disclosing the destination URL it can use the ordinary proxy path.
+ * TinyURL is listed because it may carry a token and then needs the credentialed
+ * path as well as consent.
  */
 export const SHORTENER_API_HOSTS: readonly string[] = [
   'api.dub.co',

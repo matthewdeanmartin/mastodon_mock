@@ -26,18 +26,12 @@ import { ShortenerTransport } from './shortener-transport';
  *
  * ## The CORS situation
  *
- * is.gd *is* browser-callable: its create endpoint answers with
- * `Access-Control-Allow-Origin: *`. This file previously claimed the opposite,
- * and the claim was self-inflicted — the transport used to attach
- * `Accept: application/json` to every request, which forced a preflight, and
- * is.gd's `OPTIONS` reply carries no `Access-Control-Allow-Headers`. The GET was
- * therefore never sent, and the browser reported "ACAO missing" with
- * `Status code: 200`, which reads like a server-side CORS refusal but is really a
- * failed preflight.
- *
- * Hence `simpleRequest: true` below: no `Accept` header, no preflight, and the
- * response's `ACAO: *` is all that is needed. `format=json` in the query string
- * already selects JSON, so the header was buying nothing.
+ * is.gd's CORS behavior is not a stable API contract. As observed from the
+ * deployed Mawkingbird origin, the create response currently has no
+ * `Access-Control-Allow-Origin`, so the browser hides it as `status: 0` even
+ * though the server answered 200. The transport therefore tries directly, then
+ * offers the configured proxy when the browser reports that opaque failure.
+ * `format=json` selects the response body shape; it does not affect CORS.
  *
  * A proxy is still the fallback if a direct call fails for some other reason
  * (offline, DNS, an ad-blocker) — the browser reports all of those identically as
@@ -118,8 +112,8 @@ export class IsgdProvider implements ShortenerProvider {
         method: 'GET',
         url: `${CREATE_URL}?${params.toString()}`,
         idempotent: false,
-        // No `Accept` header, so the browser skips the preflight is.gd cannot
-        // satisfy. See the CORS note at the top of this file.
+        // The query parameter already selects JSON, so no content-negotiation
+        // header is needed. This does not imply that is.gd will allow CORS.
         simpleRequest: true,
       })
       .pipe(

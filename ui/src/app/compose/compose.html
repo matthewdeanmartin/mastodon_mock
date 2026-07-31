@@ -613,3 +613,13 @@
     (closed)="tagHelperOpen.set(false)"
   />
 }
+
+@if (shortenerConsentPrompt(); as prompt) {
+  <app-proxy-consent-dialog
+    [shortener]="prompt.shortener"
+    [proxy]="prompt.proxy"
+    [carriesCredential]="prompt.carriesCredential"
+    (accepted)="acceptShortenerConsent()"
+    (cancelled)="declineShortenerConsent()"
+  />
+}

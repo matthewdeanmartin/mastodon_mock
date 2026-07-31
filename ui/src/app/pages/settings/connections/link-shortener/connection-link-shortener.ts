@@ -85,7 +85,11 @@ export class ConnectionLinkShortener {
   protected readonly consentPrompt = signal<{
     shortener: ShortenerCatalogEntry;
     proxy: CorsProxyEntry;
+    carriesCredential: boolean;
   } | null>(null);
+
+  /** Which connectivity check should resume after the user grants consent. */
+  private pendingConsentRetry: 'verify' | 'probe' = 'verify';
 
   /** The proxy in play, for the "already consented" note on the page. */
   protected readonly proxyEntry = computed(() => this.proxy.entry());
@@ -222,20 +226,26 @@ export class ConnectionLinkShortener {
     if (!proxy) {
       return;
     }
-    this.consentPrompt.set({ shortener: entry, proxy });
+    this.pendingConsentRetry = 'verify';
+    this.consentPrompt.set({ shortener: entry, proxy, carriesCredential: error.carriesCredential });
   }
 
   /** The user accepted the disclosure: record it and retry the same check. */
   protected async acceptConsent(): Promise<void> {
     const prompt = this.consentPrompt();
+    const retry = this.pendingConsentRetry;
     this.consentPrompt.set(null);
     if (!prompt) {
       return;
     }
     this.consent.grant(prompt.shortener.id, prompt.proxy.id);
-    // Retry with `keep`: the key is untested, not known-bad, so a second CORS
-    // failure should not discard it.
-    await this.verify({ rollbackTo: 'keep' });
+    if (retry === 'probe') {
+      await this.probeReachability();
+    } else {
+      // Retry with `keep`: the key is untested, not known-bad, so a second CORS
+      // failure should not discard it.
+      await this.verify({ rollbackTo: 'keep' });
+    }
   }
 
   protected declineConsent(): void {
@@ -243,8 +253,8 @@ export class ConnectionLinkShortener {
     this.consentPrompt.set(null);
     if (prompt) {
       this.error.set(
-        `Not connected. ${prompt.shortener.label} can't be reached from this browser without ` +
-          `sending your key through ${prompt.proxy.label}.`,
+        `Not sent through ${prompt.proxy.label}. The direct attempt also failed. Retry later, or ` +
+          `choose a different CORS proxy.`,
       );
     }
   }
@@ -291,6 +301,16 @@ export class ConnectionLinkShortener {
       this.lastProbe.set(result);
       if (result.status === 'direct' || result.status === 'proxy') {
         this.notice.set(`${entry.label}: ${result.message}`);
+      } else if (result.status === 'needs-consent') {
+        const proxy = this.proxy.entry();
+        if (proxy) {
+          this.pendingConsentRetry = 'probe';
+          this.consentPrompt.set({
+            shortener: entry,
+            proxy,
+            carriesCredential: this.settings.resolve()?.auth !== null,
+          });
+        }
       } else {
         this.error.set(`${entry.label}: ${result.message}`);
       }

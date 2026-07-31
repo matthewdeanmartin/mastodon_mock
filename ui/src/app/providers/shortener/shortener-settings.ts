@@ -73,9 +73,8 @@ export interface ShortenerConfig {
    *
    * Null is the normal state for is.gd (no accounts exist) and for TinyURL
    * before a token is added. It is not an error case, and the difference matters
-   * beyond the header: a request with no credential has nothing to leak, so the
-   * CORS-proxy consent flow skips the warning entirely rather than asking the
-   * user to accept a risk they are not taking.
+   * beyond the header: the proxy disclosure talks about the destination URL,
+   * not a credential the request does not carry.
    */
   auth: { header: string; value: string } | null;
   /** The configured short domain, or '' when the provider's default is used. */
