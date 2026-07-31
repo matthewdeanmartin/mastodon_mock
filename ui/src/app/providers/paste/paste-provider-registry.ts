@@ -1,38 +1,58 @@
 import { inject, Injectable } from '@angular/core';
-import { CentosProvider } from './centos-provider';
-import { OpensuseProvider } from './opensuse-provider';
 import { FeedPasteProvider, PasteProvider } from './paste-provider';
+import { PastepileMineProvider } from './pastepile-mine-provider';
 import { PastepileProvider } from './pastepile-provider';
 import { RentryProvider } from './rentry-provider';
 import { TinyurlProvider } from './tinyurl-provider';
 
-/** Available paste services. Keeping selection here makes a second service additive. */
+/**
+ * Available paste services. Keeping selection here makes a second service additive.
+ *
+ * ## What earns a place here
+ *
+ * A public feed is only worth having if you can **post to it and then see your
+ * own paste in it**. A feed you cannot post to is a stream of strangers' random
+ * content; posting with no feed is still fine (a note to self, or something you
+ * share on Mastodon yourself), but read-only-plus-feed is the combination with
+ * no use case.
+ *
+ * That rule cost two candidates:
+ *
+ * - **paste.centos.org** (Stikked) gates every endpoint — including
+ *   `/api/create` — behind an `apikey`, and Stikked issues those only from the
+ *   server's admin config. There is no signup, login, or account page. Unless
+ *   you run the instance, the key is unobtainable, so nobody can post.
+ * - **paste.opensuse.org** has a genuine JSON feed but no create API: `POST`
+ *   answers 422 for every body shape, being a Rails form flow behind an
+ *   authenticity token (and an antibot interstitial). The openSUSE OpenID
+ *   Connect credential does not help — it is a browser login client id, not an
+ *   API key, and was rejected as both a bearer token and a parameter.
+ *
+ * Both would have been feed-only, so both are out.
+ */
 @Injectable({ providedIn: 'root' })
 export class PasteProviderRegistry {
   private pastepile = inject(PastepileProvider);
+  private pastepileMine = inject(PastepileMineProvider);
   private rentry = inject(RentryProvider);
   private tinyurl = inject(TinyurlProvider);
-  private opensuse = inject(OpensuseProvider);
-  private centos = inject(CentosProvider);
 
-  // Rentry leads and is the default: it is CORS-clean and editable. Pastepile is
-  // kept for its public feed but has been returning a CORS-less 308 (effectively
-  // offline), so it must not be the default a fresh composer posts to.
-  //
-  // openSUSE is deliberately absent: it is feed-only (no create API), and a
-  // destination the composer cannot actually post to has no business in this
-  // list. CentOS can create, so it is here — it simply refuses until a key is set.
-  readonly all: readonly PasteProvider[] = [this.rentry, this.tinyurl, this.pastepile, this.centos];
+  readonly all: readonly PasteProvider[] = [this.rentry, this.tinyurl, this.pastepile];
 
   /**
-   * Providers offering a public feed to subscribe to.
+   * Feeds to subscribe to. Both are Pastepile, and that is the point.
    *
-   * Every one of these is CORS-blocked at the origin, so reading them requires
-   * the user's own proxy, opted in per feed. That is why they are listed
-   * separately from `all` rather than inferred: appearing here is a claim that
-   * a feed exists, not that it can be read without setup.
+   * Pastepile qualifies precisely because you can post to it and watch your own
+   * paste land in a feed. It was demoted once for "returning a CORS-less 308" —
+   * right about the symptom, wrong about the cause: the apex host redirects to
+   * `www`, and it is the *redirect* that carries no CORS header. Addressed at
+   * `www` it has always been CORS-clean.
+   *
+   * "My pastes" is a separate row rather than a mode of the first, because
+   * wanting your own pastes in the timeline and wanting the public firehose are
+   * different wishes and plenty of people have only the second.
    */
-  readonly feeds: readonly FeedPasteProvider[] = [this.pastepile, this.opensuse, this.centos];
+  readonly feeds: readonly FeedPasteProvider[] = [this.pastepile, this.pastepileMine];
 
   // Typed as the interface (not RentryProvider) so callers keep the full
   // visibility union; narrowing to one provider's literal types breaks them.

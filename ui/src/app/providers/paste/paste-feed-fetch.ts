@@ -44,15 +44,31 @@ export class PasteFeedFetch {
    *
    * @param useProxy Route through the configured CORS proxy. Only ever set from
    * the subscription's own opt-in flag — never inferred from a failure.
+   * @param extraHeaders Request headers the feed itself needs, such as an API
+   * key that only authenticates as a header. Merged *under* the proxy's own
+   * headers so a proxy's auth can never be clobbered by a feed's.
    */
-  json<T>(url: string, useProxy: boolean, label: string): Observable<T> {
+  json<T>(
+    url: string,
+    useProxy: boolean,
+    label: string,
+    extraHeaders?: Record<string, string>,
+  ): Observable<T> {
     let requestUrl = url;
-    let headers: HttpHeaders | undefined;
+    let headers = extraHeaders ? new HttpHeaders(extraHeaders) : undefined;
     if (useProxy) {
       try {
         const proxied = this.corsProxy.proxyRequest(url);
         requestUrl = proxied.url;
+        // The proxy's headers win on collision, and the feed's ride along. Many
+        // proxies drop unknown request headers, so a key sent this way may not
+        // reach the origin — the caller's error copy has to survive that.
         headers = proxied.headers;
+        for (const name of Object.keys(extraHeaders ?? {})) {
+          if (!headers.has(name)) {
+            headers = headers.set(name, (extraHeaders ?? {})[name]);
+          }
+        }
       } catch (error: unknown) {
         // A refusal is the app's own configuration saying no. It must reach the
         // user unchanged — it is fixed by editing a setting, not by retrying.

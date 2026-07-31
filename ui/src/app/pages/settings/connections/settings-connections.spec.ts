@@ -6,7 +6,7 @@ import { BlueskySession, BskySession } from '../../../providers/bluesky/bluesky-
 import { DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { GitHubSession } from '../../../providers/github/github-session';
 import { CredentialLifetimeStore } from '../../../providers/credential-lifetime';
-import { CentosPasteKey } from '../../../providers/paste/centos-key';
+import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import { CONNECTION_CATALOG } from './connection-catalog';
 import { SettingsConnections } from './settings-connections';
 
@@ -134,14 +134,13 @@ describe('SettingsConnections (catalog)', () => {
     expect(govern).toHaveBeenCalledOnce();
     // Every connector holding a durable credential: all but session-only
     // Dropbox, plus the CORS proxy, whose API key is billable and ages out on
-    // the same policy as the pasted tokens, plus the CentOS pastebin key —
-    // which is pasted on the Pastes page rather than here (a paste service is a
-    // list, not a one-account connector) but must obey the same retention.
+    // the same policy as the pasted tokens, plus the optional Pastepile key
+    // (pasted on the Pastes page, but a stored secret all the same).
     const governed = govern.mock.calls[0][0];
     expect(governed).toHaveLength(6);
     // Asserted by identity, not just by count: a bare length check passes just
     // as happily when a connector is swapped for the wrong one.
-    expect(governed).toContain(TestBed.inject(CentosPasteKey));
+    expect(governed).toContain(TestBed.inject(CorsProxySettings));
     expect(enforceAll).toHaveBeenCalled();
   });
 

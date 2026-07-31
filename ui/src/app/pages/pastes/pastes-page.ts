@@ -6,8 +6,8 @@ import { Compose } from '../../compose/compose';
 import { Drafts } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { toSnapshot } from '../drafts/draft-items';
-import { CentosPasteKey } from '../../providers/paste/centos-key';
 import { PasteFeedFetch } from '../../providers/paste/paste-feed-fetch';
+import { PastepileKey } from '../../providers/paste/pastepile-key';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
 import { PasteHistory, PasteRecord } from '../../providers/paste/paste-history';
 import { FeedPasteProvider } from '../../providers/paste/paste-provider';
@@ -27,7 +27,7 @@ export class PastesPage {
   protected providers = inject(PasteProviderRegistry);
   private feeds = inject(PasteFeedSubscriptions);
   private feedFetch = inject(PasteFeedFetch);
-  protected centosKey = inject(CentosPasteKey);
+  protected pastepileKey = inject(PastepileKey);
   private drafts = inject(Drafts);
   private prefs = inject(ClientPrefs);
   private router = inject(Router);
@@ -37,9 +37,6 @@ export class PastesPage {
 
   /** Active tab; mirrors the Lists page split (My Pastes | Public Paste Feeds). */
   protected tab = signal<PasteTab>('mine');
-
-  /** Bound to the CentOS key field; cleared once the key is stored. */
-  protected centosKeyInput = signal('');
 
   protected editing = signal<string | null>(null);
   protected editTitle = signal('');
@@ -112,34 +109,46 @@ export class PastesPage {
     this.feeds.setUseProxy(provider.id, !this.usesProxy(provider));
   }
 
-  // --- CentOS API key ---
-  // The one provider with no anonymous mode: paste.centos.org answers every
-  // endpoint with "Invalid API key". The key is global (it authorises this
-  // browser to talk to a pastebin, not a persona) while the subscription above
-  // stays per account.
+  // --- Pastepile API key ---
+  // Optional everywhere except the "My pastes" feed, which has nothing to scope
+  // by without one. Keys are free and need no account, so the affordance is a
+  // button rather than a field pointing at a signup page that doesn't exist.
 
-  /** True for a provider that cannot work at all until a key is supplied. */
+  /** True for a feed that cannot work until a key exists. */
   needsKey(provider: FeedPasteProvider): boolean {
-    return provider.id === 'centos' && !this.centosKey.connected();
+    return provider.id === 'pastepile-mine' && !this.pastepileKey.connected();
   }
 
-  saveCentosKey(): void {
-    const value = this.centosKeyInput().trim();
-    if (!value) {
-      return;
-    }
+  /** "public feed" is a lie for the key-scoped one, which is nobody else's. */
+  feedNoun(provider: FeedPasteProvider): string {
+    return provider.id === 'pastepile-mine' ? 'my pastes' : 'public feed';
+  }
+
+  protected keyBusy = signal(false);
+
+  async generateKey(): Promise<void> {
+    this.keyBusy.set(true);
+    this.error.set(null);
     try {
-      this.centosKey.connect(value);
-      this.centosKeyInput.set('');
-      this.notice.set('CentOS API key saved.');
+      await this.pastepileKey.mint();
+      this.notice.set('Pastepile key created. Your new pastes will appear in "My pastes".');
     } catch (error: unknown) {
-      this.error.set(error instanceof Error ? error.message : 'Could not save that key.');
+      this.error.set(
+        error instanceof Error ? error.message : 'Could not get a key from Pastepile.',
+      );
+    } finally {
+      this.keyBusy.set(false);
     }
   }
 
-  clearCentosKey(): void {
-    this.centosKey.disconnect();
-    this.notice.set('CentOS API key removed.');
+  async removeKey(): Promise<void> {
+    this.keyBusy.set(true);
+    try {
+      await this.pastepileKey.disconnect();
+      this.notice.set('Pastepile key revoked and removed.');
+    } finally {
+      this.keyBusy.set(false);
+    }
   }
 
   beginEdit(record: PasteRecord): void {

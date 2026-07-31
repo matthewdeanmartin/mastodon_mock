@@ -6,7 +6,7 @@ import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 import { GitHubSession } from '../../../providers/github/github-session';
 import { OpenRouterSession } from '../../../providers/openrouter/openrouter-session';
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
-import { CentosPasteKey } from '../../../providers/paste/centos-key';
+import { PastepileKey } from '../../../providers/paste/pastepile-key';
 import {
   CREDENTIAL_LIFETIME_OPTIONS,
   CredentialLifetime,
@@ -52,10 +52,9 @@ export class SettingsConnections implements OnInit {
   private openrouter = inject(OpenRouterSession);
   private corsProxy = inject(CorsProxySettings);
   // Not a catalog entry — a paste service is a list, not a one-account
-  // connector, so its key is managed on the Pastes page. It is governed here
-  // anyway, because a stored secret must sit under the same retention policy
-  // wherever it was pasted.
-  private centosPaste = inject(CentosPasteKey);
+  // connector, so the key is managed on the Pastes page. Governed here anyway,
+  // because a stored secret obeys the retention policy wherever it was created.
+  private pastepileKey = inject(PastepileKey);
   protected lifetimes = inject(CredentialLifetimeStore);
 
   protected readonly lifetimeOptions = CREDENTIAL_LIFETIME_OPTIONS;
@@ -114,7 +113,7 @@ export class SettingsConnections implements OnInit {
       this.bsky,
       this.openrouter,
       this.corsProxy,
-      this.centosPaste,
+      this.pastepileKey,
     ]);
     this.lifetimes.enforceAll();
   }

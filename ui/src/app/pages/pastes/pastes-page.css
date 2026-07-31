@@ -136,13 +136,13 @@
   margin: 0 0 0.75rem;
 }
 
-.centos-key {
+.pastepile-key {
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
 
-.centos-key h4 {
+.pastepile-key h4 {
   margin: 0 0 0.25rem;
 }
 

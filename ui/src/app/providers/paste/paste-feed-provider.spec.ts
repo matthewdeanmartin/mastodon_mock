@@ -39,7 +39,7 @@ describe('PasteFeedProvider', () => {
 
     provider.reset();
     provider.fetchPage().subscribe((page) => (statuses = page));
-    http.expectOne('https://pastepile.com/api/public/pastes?limit=50').flush({
+    http.expectOne('https://www.pastepile.com/api/public/pastes?limit=50').flush({
       items: [
         {
           slug: 'abc',

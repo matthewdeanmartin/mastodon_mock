@@ -3,9 +3,32 @@ import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { Account, Status } from '../../models';
 import { externalFetch } from '../external-fetch';
-import { PasteCreateInput, PasteCreated, PasteProvider, PasteRecentItem } from './paste-provider';
+import { PasteFeedFetch } from './paste-feed-fetch';
+import { PasteFeedSubscriptions } from './paste-feed-subscriptions';
+import { PastepileKey } from './pastepile-key';
+import {
+  PasteCreateInput,
+  PasteCreated,
+  PasteExpiry,
+  PasteProvider,
+  PasteRecentItem,
+} from './paste-provider';
 
-const API_URL = 'https://pastepile.com/api/public/pastes';
+/**
+ * The `www` host, deliberately — and this is the whole fix for "Pastepile broke
+ * CORS", which it turns out never did.
+ *
+ * `pastepile.com` 308s to `www.pastepile.com`, and the redirect response itself
+ * carries no `Access-Control-Allow-Origin`. A browser will not follow a
+ * cross-origin redirect that fails CORS, so the request died at the 308 without
+ * ever reaching the real endpoint — which serves a textbook header set
+ * (`Allow-Origin: *`, and `X-Edit-Key` in `Expose-Headers`). The preflight
+ * 308s too, which is why creating and deleting broke as well as reading.
+ *
+ * Naming the post-redirect host skips the problem entirely and needs no proxy.
+ */
+const SITE = 'https://www.pastepile.com';
+const API_URL = `${SITE}/api/public/pastes`;
 
 const PASTEPILE_ACCOUNT: Account = {
   id: 'paste:pastepile',
@@ -13,9 +36,12 @@ const PASTEPILE_ACCOUNT: Account = {
   acct: 'recent@pastepile.com',
   display_name: 'Pastepile public feed',
   note: 'Recent public anonymous pastes from Pastepile.',
-  url: 'https://pastepile.com/archive',
-  avatar: 'https://pastepile.com/favicon.svg',
-  avatar_static: 'https://pastepile.com/favicon.svg',
+  // `www` here too: the avatar is fetched by the browser like any other image,
+  // so the apex host would cost every card an extra redirect hop. `acct` keeps
+  // the bare domain — it is an identity label, not a URL.
+  url: `${SITE}/archive`,
+  avatar: `${SITE}/favicon.svg`,
+  avatar_static: `${SITE}/favicon.svg`,
   header: '',
   followers_count: 0,
   following_count: 0,
@@ -57,6 +83,9 @@ function escapeHtml(value: string): string {
 @Injectable({ providedIn: 'root' })
 export class PastepileProvider implements PasteProvider {
   private http = inject(HttpClient);
+  private feedFetch = inject(PasteFeedFetch);
+  private subscriptions = inject(PasteFeedSubscriptions);
+  private apiKey = inject(PastepileKey);
 
   readonly id = 'pastepile';
   readonly label = 'Pastepile';
@@ -83,16 +112,33 @@ export class PastepileProvider implements PasteProvider {
     { value: 'yaml', label: 'YAML' },
     { value: 'bash', label: 'Bash' },
   ] as const;
-  readonly expiries = [
-    { value: '10m', label: '10 minutes' },
-    { value: '1h', label: '1 hour' },
-    { value: '1d', label: '1 day' },
-    { value: '1w', label: '1 week' },
-    { value: '1mo', label: '1 month' },
-    { value: 'burn', label: 'Burn after reading' },
-  ] as const;
+  /**
+   * Expiry options, which depend on whether a key is attached — the one place
+   * where adding a key *removes* a capability.
+   *
+   * Keyless anonymous requests may create no-expiry pastes; a **free** key
+   * rejects `expiry: "never"` with `expiry_not_allowed` (verified against the
+   * live API, and documented under "Limits (per key plan)"). Recomputing the
+   * list means the composer never offers an option that is about to 400, rather
+   * than letting someone discover it by losing a paste they just wrote.
+   */
+  get expiries(): readonly { value: PasteExpiry; label: string }[] {
+    const timed: { value: PasteExpiry; label: string }[] = [
+      { value: '10m', label: '10 minutes' },
+      { value: '1h', label: '1 hour' },
+      { value: '1d', label: '1 day' },
+      { value: '1w', label: '1 week' },
+      { value: '1mo', label: '1 month' },
+      { value: 'burn', label: 'Burn after reading' },
+    ];
+    // Never-expiring is available keyless, or on a paid key — but not on the
+    // free key this app mints, which is the trap being avoided.
+    const neverAllowed = !this.apiKey.connected() || this.apiKey.allowsNeverExpiry();
+    return neverAllowed ? [...timed, { value: 'never', label: 'Never' }] : timed;
+  }
 
   create(input: PasteCreateInput): Observable<PasteCreated> {
+    const key = this.apiKey.key();
     return this.http
       .post<PastepileCreateResponse>(
         API_URL,
@@ -103,7 +149,12 @@ export class PastepileProvider implements PasteProvider {
           expiry: input.expiry,
           visibility: input.visibility,
         },
-        { context: externalFetch() },
+        {
+          context: externalFetch(),
+          // The key is what makes this paste show up under `scope=mine` later.
+          // Absent it, the create still works — just anonymously.
+          ...(key ? { headers: new HttpHeaders({ 'X-API-Key': key }) } : {}),
+        },
       )
       .pipe(
         map((created) => ({
@@ -143,12 +194,25 @@ export class PastepileProvider implements PasteProvider {
       .pipe(map(() => undefined));
   }
 
+  /**
+   * Recent public pastes.
+   *
+   * Goes through {@link PasteFeedFetch} like the other feed providers, so the
+   * user's per-feed proxy opt-in is honoured here too. Pastepile does not
+   * *need* a proxy now that the host is right — it sends `Allow-Origin: *` —
+   * but the switch exists for the day it breaks again, and for readers behind a
+   * network that blocks the host outright. Off by default, as everywhere else.
+   */
   recent(): Observable<PasteRecentItem[]> {
-    return this.http
-      .get<PastepileRecentResponse>(`${API_URL}?limit=50`, { context: externalFetch() })
+    return this.feedFetch
+      .json<PastepileRecentResponse>(
+        `${API_URL}?limit=50`,
+        this.subscriptions.usesProxy(this.id),
+        this.label,
+      )
       .pipe(
         map((response) =>
-          response.items.map((item) => ({
+          (response?.items ?? []).map((item) => ({
             slug: item.slug,
             title: item.title,
             language: item.language,
@@ -193,7 +257,7 @@ export class PastepileProvider implements PasteProvider {
       quote_approval_policy: null,
       language: item.language,
       media_attachments: [],
-      application: { name: this.label, website: 'https://pastepile.com' },
+      application: { name: this.label, website: SITE },
     };
   }
 }

@@ -71,7 +71,7 @@
           <div class="muted small">{{ provider.feedUrl }}</div>
           @if (needsKey(provider)) {
             <div class="muted small">
-              Needs an API key — this service refuses anonymous requests entirely.
+              Needs a Pastepile key — there's nothing to list until your pastes are tagged with one.
             </div>
           }
         </div>
@@ -87,48 +87,46 @@
             </label>
           }
           <button class="btn btn-outline btn-sm" type="button" (click)="toggleFeed(provider)">
-            {{ isFollowing(provider) ? 'Unfollow public feed' : 'Follow public feed' }}
+            {{ isFollowing(provider) ? 'Unfollow' : 'Follow' }} {{ feedNoun(provider) }}
           </button>
         </div>
       </div>
     }
 
-    <!-- CentOS is the only provider with no anonymous mode at all, so its key
-         lives next to the feed it unlocks rather than on Connections (which is
-         for one-account connectors — see connection-catalog.ts). -->
-    <section class="centos-key" aria-labelledby="centos-key-heading">
-      <h4 id="centos-key-heading">CentOS Pastebin API key</h4>
-      <p class="muted small">
-        paste.centos.org requires a key for everything, including creating pastes. Get one from your
-        account there. Shared by every account in this browser.
-      </p>
-      @if (centosKey.connected()) {
+    <!-- The key is what turns a read-only firehose into "post it, then see your
+         own paste". Free, no account — so this is a button, not a field that
+         sends people looking for a signup page. -->
+    <section class="pastepile-key" aria-labelledby="pastepile-key-heading">
+      <h4 id="pastepile-key-heading">Pastepile API key (optional)</h4>
+      @if (pastepileKey.connected()) {
+        <p class="muted small">
+          Pastes you create are tagged with your key
+          <code>{{ pastepileKey.prefix() }}…</code> ({{ pastepileKey.plan() }} plan), so they show
+          up in “My pastes” — unlisted ones included. Shared by every account in this browser.
+          @if (!pastepileKey.allowsNeverExpiry()) {
+            A free key can't create never-expiring pastes, so that option is hidden while it's in
+            use.
+          }
+        </p>
         <div class="feed-row">
           <span class="muted small">A key is saved.</span>
-          <button class="btn btn-outline btn-sm" type="button" (click)="clearCentosKey()">
-            Remove key
+          <button
+            class="btn btn-outline btn-sm"
+            type="button"
+            [disabled]="keyBusy()"
+            (click)="removeKey()"
+          >
+            {{ keyBusy() ? 'Removing…' : 'Revoke and remove key' }}
           </button>
         </div>
       } @else {
-        <div class="feed-actions">
-          <input
-            type="password"
-            autocomplete="off"
-            placeholder="API key"
-            aria-label="CentOS Pastebin API key"
-            [ngModel]="centosKeyInput()"
-            (ngModelChange)="centosKeyInput.set($event)"
-            (keyup.enter)="saveCentosKey()"
-          />
-          <button
-            class="btn btn-sm"
-            type="button"
-            [disabled]="!centosKeyInput().trim()"
-            (click)="saveCentosKey()"
-          >
-            Save key
-          </button>
-        </div>
+        <p class="muted small">
+          Without a key, pastes are anonymous and you can't pick your own out of the public feed. A
+          key is free, needs no account, and makes your pastes listable under “My pastes”.
+        </p>
+        <button class="btn btn-sm" type="button" [disabled]="keyBusy()" (click)="generateKey()">
+          {{ keyBusy() ? 'Getting a key…' : 'Get a free key' }}
+        </button>
       }
     </section>
   </section>

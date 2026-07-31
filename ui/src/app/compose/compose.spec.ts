@@ -691,7 +691,7 @@ describe('Compose', () => {
 
     internals(f).submit();
 
-    const req = httpMock.expectOne('https://pastepile.com/api/public/pastes');
+    const req = httpMock.expectOne('https://www.pastepile.com/api/public/pastes');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({
       title: 'Example',
