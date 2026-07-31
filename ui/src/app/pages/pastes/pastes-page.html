@@ -41,19 +41,96 @@
   <section class="feed-settings" aria-labelledby="paste-feeds-heading">
     <h3 id="paste-feeds-heading">Public paste feeds</h3>
     <p class="muted">
-      These feeds are optional. Following one adds its recent public pastes to Home.
+      These feeds are optional. Following one adds its recent public pastes to Home. Feeds are per
+      account — following one here doesn't follow it for your other accounts.
     </p>
+
+    <!-- These hosts refuse cross-origin requests, so the proxy isn't a fallback
+         for the unlucky few: it is the only way to read them at all. Still
+         opt-in per feed, and still never switched on automatically. -->
+    <p class="muted small proxy-summary">
+      @if (proxyLabel(); as label) {
+        Paste feeds can be fetched through {{ label }}. Turn it on per feed below — the proxy will
+        see that feed's address and its contents.
+      } @else {
+        No CORS proxy is set up. These services block browser access, so their feeds can't be read
+        without one.
+      }
+      <a [routerLink]="['/settings/connections/cors-proxy']">
+        {{ proxyLabel() ? 'Change' : 'Set one up' }}
+      </a>
+    </p>
+
     @for (provider of providers.feeds; track provider.id) {
       <div class="feed-row">
         <div>
           <strong>{{ provider.label }}</strong>
+          @if (usesProxy(provider)) {
+            <span class="proxy-badge" title="Fetched through your CORS proxy">via proxy</span>
+          }
           <div class="muted small">{{ provider.feedUrl }}</div>
+          @if (needsKey(provider)) {
+            <div class="muted small">
+              Needs an API key — this service refuses anonymous requests entirely.
+            </div>
+          }
         </div>
-        <button class="btn btn-outline btn-sm" type="button" (click)="toggleFeed(provider)">
-          {{ isFollowing(provider) ? 'Unfollow public feed' : 'Follow public feed' }}
-        </button>
+        <div class="feed-actions">
+          @if (proxyLabel()) {
+            <label class="proxy-switch muted small" [title]="'Fetch through ' + proxyLabel()">
+              <input
+                type="checkbox"
+                [checked]="usesProxy(provider)"
+                (change)="toggleProxy(provider)"
+              />
+              via proxy
+            </label>
+          }
+          <button class="btn btn-outline btn-sm" type="button" (click)="toggleFeed(provider)">
+            {{ isFollowing(provider) ? 'Unfollow public feed' : 'Follow public feed' }}
+          </button>
+        </div>
       </div>
     }
+
+    <!-- CentOS is the only provider with no anonymous mode at all, so its key
+         lives next to the feed it unlocks rather than on Connections (which is
+         for one-account connectors — see connection-catalog.ts). -->
+    <section class="centos-key" aria-labelledby="centos-key-heading">
+      <h4 id="centos-key-heading">CentOS Pastebin API key</h4>
+      <p class="muted small">
+        paste.centos.org requires a key for everything, including creating pastes. Get one from your
+        account there. Shared by every account in this browser.
+      </p>
+      @if (centosKey.connected()) {
+        <div class="feed-row">
+          <span class="muted small">A key is saved.</span>
+          <button class="btn btn-outline btn-sm" type="button" (click)="clearCentosKey()">
+            Remove key
+          </button>
+        </div>
+      } @else {
+        <div class="feed-actions">
+          <input
+            type="password"
+            autocomplete="off"
+            placeholder="API key"
+            aria-label="CentOS Pastebin API key"
+            [ngModel]="centosKeyInput()"
+            (ngModelChange)="centosKeyInput.set($event)"
+            (keyup.enter)="saveCentosKey()"
+          />
+          <button
+            class="btn btn-sm"
+            type="button"
+            [disabled]="!centosKeyInput().trim()"
+            (click)="saveCentosKey()"
+          >
+            Save key
+          </button>
+        </div>
+      }
+    </section>
   </section>
 } @else {
   @if (!history.records().length) {

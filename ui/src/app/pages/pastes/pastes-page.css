@@ -105,6 +105,47 @@
   color: var(--accent);
 }
 
+/* Proxy controls mirror Settings → RSS exactly: the same decision, made about a
+   different kind of feed, should not look like a different feature. */
+.feed-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.proxy-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+/* Marks a feed whose traffic goes through a third party. Quiet, but always
+   visible — routing through a proxy should never be invisible. */
+.proxy-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+.proxy-summary {
+  margin: 0 0 0.75rem;
+}
+
+.centos-key {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.centos-key h4 {
+  margin: 0 0 0.25rem;
+}
+
 @media (max-width: 600px) {
   .feed-row,
   .paste-card-head {

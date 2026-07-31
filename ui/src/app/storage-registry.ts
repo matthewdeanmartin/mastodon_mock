@@ -132,11 +132,18 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Per-paste edit codes. A bearer capability: whoever holds one can rewrite or delete that paste. Split out of mockingbird_pastes.',
   },
   {
+    base: 'mockingbird_centos_paste_key',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: 'paste.centos.org API key. That service refuses every endpoint without one, including creating pastes. Unscoped: it authorises this browser to talk to a pastebin, not one persona — which feeds you subscribe to stays per account. Retention-governed like the other pasted tokens.',
+  },
+  {
     base: 'mockingbird_cors_proxy_key',
     storage: 'local',
     suffix: 'none',
     sensitivity: 'secret',
-    note: "CORS proxy API key, plus the header name a custom proxy wants it in. Billable on a paid plan, so it is retention-governed like the other pasted tokens. Unscoped: the subscription belongs to the human, not to one persona. Split out of mockingbird_cors_proxy so the proxy choice itself stays exportable.",
+    note: 'CORS proxy API key, plus the header name a custom proxy wants it in. Billable on a paid plan, so it is retention-governed like the other pasted tokens. Unscoped: the subscription belongs to the human, not to one persona. Split out of mockingbird_cors_proxy so the proxy choice itself stays exportable.',
   },
 
   // ---- private: discloses something about the person ----
@@ -220,9 +227,9 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
   {
     base: 'mockingbird_paste_feeds',
     storage: 'local',
-    suffix: 'none',
+    suffix: 'account',
     sensitivity: 'private',
-    note: 'Subscribed paste feeds — what the user reads.',
+    note: 'Subscribed paste feeds — what the user reads, and whether each goes through the CORS proxy. Scoped per account: following a feed as one persona says nothing about what the others want in their timeline. An unscoped list from before that change is adopted by the first account to read it.',
   },
   {
     base: 'mockingbird_saved_searches',

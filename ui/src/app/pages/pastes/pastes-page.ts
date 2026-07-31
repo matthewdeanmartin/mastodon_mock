@@ -6,6 +6,8 @@ import { Compose } from '../../compose/compose';
 import { Drafts } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { toSnapshot } from '../drafts/draft-items';
+import { CentosPasteKey } from '../../providers/paste/centos-key';
+import { PasteFeedFetch } from '../../providers/paste/paste-feed-fetch';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
 import { PasteHistory, PasteRecord } from '../../providers/paste/paste-history';
 import { FeedPasteProvider } from '../../providers/paste/paste-provider';
@@ -24,6 +26,8 @@ export class PastesPage {
   protected history = inject(PasteHistory);
   protected providers = inject(PasteProviderRegistry);
   private feeds = inject(PasteFeedSubscriptions);
+  private feedFetch = inject(PasteFeedFetch);
+  protected centosKey = inject(CentosPasteKey);
   private drafts = inject(Drafts);
   private prefs = inject(ClientPrefs);
   private router = inject(Router);
@@ -33,6 +37,9 @@ export class PastesPage {
 
   /** Active tab; mirrors the Lists page split (My Pastes | Public Paste Feeds). */
   protected tab = signal<PasteTab>('mine');
+
+  /** Bound to the CentOS key field; cleared once the key is stored. */
+  protected centosKeyInput = signal('');
 
   protected editing = signal<string | null>(null);
   protected editTitle = signal('');
@@ -84,6 +91,55 @@ export class PastesPage {
     } else {
       this.feeds.follow(provider.id, provider.feedUrl, `${provider.label} public pastes`);
     }
+  }
+
+  // --- CORS proxy, per feed ---
+  // None of these hosts send an `access-control-*` header, so their feeds are
+  // unreadable from a browser without a relay. The switch is still per feed and
+  // off by default, exactly as it is for RSS: a proxy operator sees every
+  // address and every byte, so the app never turns one on for the user.
+
+  /** The configured proxy's name, or null when none is set up. */
+  proxyLabel(): string | null {
+    return this.feedFetch.proxyLabel();
+  }
+
+  usesProxy(provider: FeedPasteProvider): boolean {
+    return this.feeds.usesProxy(provider.id);
+  }
+
+  toggleProxy(provider: FeedPasteProvider): void {
+    this.feeds.setUseProxy(provider.id, !this.usesProxy(provider));
+  }
+
+  // --- CentOS API key ---
+  // The one provider with no anonymous mode: paste.centos.org answers every
+  // endpoint with "Invalid API key". The key is global (it authorises this
+  // browser to talk to a pastebin, not a persona) while the subscription above
+  // stays per account.
+
+  /** True for a provider that cannot work at all until a key is supplied. */
+  needsKey(provider: FeedPasteProvider): boolean {
+    return provider.id === 'centos' && !this.centosKey.connected();
+  }
+
+  saveCentosKey(): void {
+    const value = this.centosKeyInput().trim();
+    if (!value) {
+      return;
+    }
+    try {
+      this.centosKey.connect(value);
+      this.centosKeyInput.set('');
+      this.notice.set('CentOS API key saved.');
+    } catch (error: unknown) {
+      this.error.set(error instanceof Error ? error.message : 'Could not save that key.');
+    }
+  }
+
+  clearCentosKey(): void {
+    this.centosKey.disconnect();
+    this.notice.set('CentOS API key removed.');
   }
 
   beginEdit(record: PasteRecord): void {
