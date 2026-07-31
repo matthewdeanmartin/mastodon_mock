@@ -40,6 +40,27 @@ textarea {
   line-height: 1.35;
 }
 
+/* Explains what a pasted link costs against the limit, and offers to tidy it.
+   Reassurance rather than a warning, so it is deliberately not styled as one. */
+.link-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 2px 0;
+  font-size: 0.8em;
+  line-height: 1.35;
+}
+
+.link-note-text {
+  flex: 1 1 220px;
+}
+
+.link-note-setup {
+  white-space: nowrap;
+}
+
 .thread-box {
   display: flex;
   gap: 8px;

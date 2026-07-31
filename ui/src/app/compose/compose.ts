@@ -10,7 +10,8 @@ import {
 } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { switchMap } from 'rxjs';
+import { RouterLink } from '@angular/router';
+import { firstValueFrom, switchMap } from 'rxjs';
 import { Api } from '../api';
 import { PageDiagnostics } from '../page-diagnostics';
 import { Auth } from '../auth';
@@ -30,8 +31,11 @@ import { BskyFacet } from '../providers/bluesky/bluesky-types';
 import { PasteHistory } from '../providers/paste/paste-history';
 import { PasteExpiry } from '../providers/paste/paste-provider';
 import { PasteProviderRegistry } from '../providers/paste/paste-provider-registry';
+import { ShortenerRegistry } from '../providers/shortener/shortener-registry';
+import { ShortenerSettings } from '../providers/shortener/shortener-settings';
 import { applyMinimalMarkdown } from '../markdown';
 import { Terminology } from '../terminology';
+import { longUrls, postLength } from './post-length';
 import { renderStatusText } from './status-text';
 import { FeatureFlags } from '../feature-flags';
 import { KnownLanguages } from '../trend-language-filter';
@@ -234,7 +238,7 @@ function dragHasFiles(event: DragEvent): boolean {
 
 @Component({
   selector: 'app-compose',
-  imports: [FormsModule, EmojiPicker, ConfirmDialog, TagHelperDialog],
+  imports: [FormsModule, RouterLink, EmojiPicker, ConfirmDialog, TagHelperDialog],
   templateUrl: './compose.html',
   styleUrl: './compose.css',
 })
@@ -242,6 +246,8 @@ export class Compose implements OnDestroy {
   private api = inject(Api);
   protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
+  private shorteners = inject(ShortenerRegistry);
+  private shortenerSettings = inject(ShortenerSettings);
   private bskyApi = inject(BlueskyApi);
   protected bskySession = inject(BlueskySession);
   private drafts = inject(Drafts);
@@ -660,12 +666,46 @@ export class Compose implements OnDestroy {
 
   protected readonly maxChars = MAX_POST_CHARS;
 
+  /**
+   * The post's length as the *server* counts it, not as the string measures.
+   *
+   * Mastodon reserves a fixed width for every URL — see {@link postLength}. The
+   * composer used to count raw characters, which meant pasting one ordinary
+   * shopping link (they routinely run to several hundred characters of tracking
+   * parameters) produced an over-limit warning for a post the server would have
+   * accepted without comment.
+   */
+  protected countOf(text: string): number {
+    return postLength(text);
+  }
+
+  /** The visible counter for the main box. */
+  protected charCount = computed(() => postLength(this.text()));
+
   /** Any box over the limit blocks posting (no more silent auto-splitting). */
   protected overLimit = computed(() =>
     this.targetIncludesPaste()
       ? this.pasteBytes() > MAX_PASTE_BYTES
-      : this.segments().some((s) => s.length > MAX_POST_CHARS),
+      : this.segments().some((s) => postLength(s) > MAX_POST_CHARS),
   );
+
+  /**
+   * URLs long enough that shortening would visibly improve the post.
+   *
+   * Only ever about *appearance*: a 700-character URL already costs 23 against
+   * the limit, so this never appears as a way to get back under budget. It
+   * appears because a wall of `dib=eyJ2IjoiMSJ9...` in the middle of a sentence
+   * is unpleasant to read and impossible to check before clicking.
+   */
+  protected longLinks = computed(() => longUrls(this.text()));
+
+  /** Whether a shortener is connected and usable. */
+  protected shortenerReady = computed(() => this.shortenerSettings.usable());
+
+  protected shortenerName = computed(() => this.shortenerSettings.chosen()?.label ?? '');
+
+  protected shortening = signal(false);
+  protected shortenError = signal<string | null>(null);
 
   /** "Saved to drafts" flash after an explicit save. */
   protected draftSaved = signal(false);
@@ -811,6 +851,44 @@ export class Compose implements OnDestroy {
       // then re-clamp in case the provider itself doesn't allow it.
       this.restoreVisibility();
       this.clampVisibilityForPaste(this.pasteVisibilities());
+    }
+  }
+
+  // --- links ---
+
+  /**
+   * Replace every long URL in the main box with a short one.
+   *
+   * Never automatic. Shortening rewrites what the reader sees and spends a link
+   * from the user's monthly quota, and — more to the point — a short link hides
+   * where it goes, which is the user's call to make about their own post and not
+   * something a composer should do behind their back while they type.
+   *
+   * Replacements are applied back-to-front so that each splice does not shift
+   * the offsets of the ones not yet done.
+   */
+  protected async shortenLinks(): Promise<void> {
+    const targets = this.longLinks();
+    if (!targets.length || this.shortening()) {
+      return;
+    }
+    this.shortening.set(true);
+    this.shortenError.set(null);
+    try {
+      let text = this.text();
+      for (const target of [...targets].reverse()) {
+        const link = await firstValueFrom(this.shorteners.create({ destinationUrl: target.url }));
+        text = text.slice(0, target.start) + link.shortUrl + text.slice(target.end);
+      }
+      this.text.set(text);
+    } catch (error: unknown) {
+      this.shortenError.set(
+        error instanceof Error && error.message
+          ? error.message
+          : "Couldn't shorten that link. Your post is unchanged.",
+      );
+    } finally {
+      this.shortening.set(false);
     }
   }
 

@@ -33,10 +33,43 @@
       without sending a mention notification.
     </p>
   }
-  @if (!targetIncludesPaste() && (thread().length || text().length > maxChars - 50)) {
-    <div class="seg-count muted" [class.over-limit]="text().length > maxChars">
-      {{ text().length }}/{{ maxChars }}
+  @if (!targetIncludesPaste() && (thread().length || charCount() > maxChars - 50)) {
+    <div class="seg-count muted" [class.over-limit]="charCount() > maxChars">
+      {{ charCount() }}/{{ maxChars }}
     </div>
+  }
+
+  <!-- Links are counted as 23 characters by the server however long they are, so
+       this never claims shortening will save budget — it says what the link
+       costs, and offers to tidy it up. -->
+  @if (!targetIncludesPaste() && longLinks().length; as linkCount) {
+    <div class="link-note muted">
+      <span class="link-note-text">
+        {{ linkCount === 1 ? 'That link counts' : 'Those links count' }} as
+        {{ linkCount === 1 ? '23 characters' : linkCount * 23 + ' characters' }}, however long
+        {{ linkCount === 1 ? 'it is' : 'they are' }} — you have room.
+        @if (shortenerReady()) {
+          <span>Shortening only makes {{ linkCount === 1 ? 'it' : 'them' }} easier to read.</span>
+        }
+      </span>
+      @if (shortenerReady()) {
+        <button
+          class="btn btn-outline btn-sm"
+          type="button"
+          [disabled]="shortening()"
+          (click)="shortenLinks()"
+        >
+          {{ shortening() ? 'Shortening…' : 'Shorten with ' + shortenerName() }}
+        </button>
+      } @else {
+        <a class="link-note-setup" routerLink="/settings/connections/link-shortener">
+          Set up a shortener
+        </a>
+      }
+    </div>
+    @if (shortenError(); as msg) {
+      <p class="feed-error" role="alert">{{ msg }}</p>
+    }
   }
 
   @for (t of thread(); track $index; let i = $index) {
@@ -53,8 +86,8 @@
           (paste)="onPaste($event)"
         ></textarea>
         <div class="thread-box-meta">
-          <span class="muted" [class.over-limit]="t.length > maxChars"
-            >{{ t.length }}/{{ maxChars }}</span
+          <span class="muted" [class.over-limit]="countOf(t) > maxChars"
+            >{{ countOf(t) }}/{{ maxChars }}</span
           >
           <button
             class="btn btn-outline btn-sm"
