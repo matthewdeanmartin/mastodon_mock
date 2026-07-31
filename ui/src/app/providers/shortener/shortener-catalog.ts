@@ -33,6 +33,22 @@ export interface ShortenerAuth {
   prefix: string;
 }
 
+/**
+ * Whether a service needs an account, and what one buys.
+ *
+ * - `required` — no key, no service. Dub, Short.io, T.LY, Rebrandly.
+ * - `optional` — works anonymously, and a key unlocks more. TinyURL creates
+ *   links with no account at all; a token adds listing, editing and deleting.
+ * - `none` — no accounts exist. is.gd shortens for anyone and offers nothing
+ *   else, ever.
+ *
+ * This drives more than a form field. A key-less provider has no credential to
+ * leak, so the CORS-proxy consent dialog must *not* warn about one — see
+ * {@link ShortenerProxyConsent}. Crying wolf over a request that carries no
+ * secret is how the real warning stops being read.
+ */
+export type ShortenerKeyPolicy = 'required' | 'optional' | 'none';
+
 export interface ShortenerCatalogEntry {
   id: ShortenerId;
   /** Display name, as the service spells it. */
@@ -41,10 +57,14 @@ export interface ShortenerCatalogEntry {
   /** One sentence: what this service is, for someone who has never used it. */
   pitch: string;
   auth: ShortenerAuth;
+  /** Whether an account is needed, optional, or does not exist. */
+  keyPolicy: ShortenerKeyPolicy;
   /** Where the user gets a key. Deep-linked, because "go find it" is hostile. */
   keyUrl: string;
   /** What the key is called on the provider's own site, so the copy matches. */
   keyLabel: string;
+  /** For `optional` keys: what adding one unlocks. Shown next to the field. */
+  keyBenefit?: string;
   /** The service's front page. */
   homepage: string;
   /** The privacy policy, for the credential-consent dialog. */
@@ -66,18 +86,63 @@ export interface ShortenerCatalogEntry {
 /**
  * Every provider, in the order they appear.
  *
- * Ordered as the spec recommends implementing them, which is also the order of
- * how conventional their API is: Dub is ordinary REST, Short.io is REST with
- * quirks, T.LY identifies links by their full short URL and takes a body on
- * DELETE. A new user picking the first one gets the fewest surprises.
+ * The two that need no account are first, because "works immediately" beats
+ * every other property for someone opening this page for the first time. After
+ * them, the account-based services in order of how conventional their API is:
+ * Dub is ordinary REST, Short.io is REST with quirks, T.LY identifies links by
+ * their full short URL and takes a body on DELETE, Rebrandly wants its key in a
+ * bespoke header and scopes everything to a workspace.
+ *
+ * **Self-hosted shorteners are deliberately absent.** YOURLS was specified and
+ * is not here. Its stock API cannot update or delete, so it would ship as the
+ * one provider where half the Links page does nothing; and being self-hosted, it
+ * cannot be tested against a real instance from here. An integration nobody can
+ * verify, serving an audience that would have to run their own shortener to
+ * benefit, is worse than no integration.
  */
 export const SHORTENER_CATALOG: readonly ShortenerCatalogEntry[] = [
+  {
+    id: 'tinyurl',
+    label: 'TinyURL',
+    emoji: '🪄',
+    pitch: 'The classic shortener. Works with no account at all; a token unlocks managing links.',
+    auth: { header: 'Authorization', prefix: 'Bearer ' },
+    // The only `optional` entry, and the reason that policy exists.
+    keyPolicy: 'optional',
+    keyUrl: 'https://tinyurl.com/app/settings/api',
+    keyLabel: 'API token',
+    keyBenefit:
+      'Without a token TinyURL can only create links. Add one to list, edit and delete them.',
+    homepage: 'https://tinyurl.com/',
+    privacyUrl: 'https://tinyurl.com/app/privacy-policy',
+    freeTier: 'Unlimited links with no account. Links are permanent and cannot be deleted.',
+    domainRequired: false,
+    domainHint: 'Optional, and only with a token on a paid plan. Leave blank for tinyurl.com.',
+  },
+  {
+    id: 'isgd',
+    label: 'is.gd',
+    emoji: '🧷',
+    pitch: 'A minimal, ad-free shortener with no accounts and nothing to sign up for.',
+    // Nothing to authenticate with; the header is never sent.
+    auth: { header: '', prefix: '' },
+    keyPolicy: 'none',
+    keyUrl: '',
+    keyLabel: '',
+    homepage: 'https://is.gd/',
+    privacyUrl: 'https://is.gd/privacy.php',
+    freeTier:
+      'Free and unlimited, but anonymous: links cannot be listed, edited or deleted afterwards.',
+    domainRequired: false,
+    domainHint: '',
+  },
   {
     id: 'dub',
     label: 'Dub',
     emoji: '🔗',
     pitch: 'An open-source link platform with analytics. The most conventional API of the three.',
     auth: { header: 'Authorization', prefix: 'Bearer ' },
+    keyPolicy: 'required',
     keyUrl: 'https://app.dub.co/settings/tokens',
     keyLabel: 'API key',
     homepage: 'https://dub.co/',
@@ -92,6 +157,7 @@ export const SHORTENER_CATALOG: readonly ShortenerCatalogEntry[] = [
     emoji: '✂️',
     pitch: 'Branded short links on your own domain, with a long-standing API.',
     auth: { header: 'Authorization', prefix: '' },
+    keyPolicy: 'required',
     keyUrl: 'https://app.short.io/settings/integrations/api-key',
     keyLabel: 'secret API key',
     homepage: 'https://short.io/',
@@ -107,6 +173,7 @@ export const SHORTENER_CATALOG: readonly ShortenerCatalogEntry[] = [
     emoji: '⚡',
     pitch: 'A simple hosted shortener with tags, QR codes and statistics.',
     auth: { header: 'Authorization', prefix: 'Bearer ' },
+    keyPolicy: 'required',
     keyUrl: 'https://t.ly/settings#/api',
     keyLabel: 'API token',
     homepage: 'https://t.ly/',
@@ -114,6 +181,24 @@ export const SHORTENER_CATALOG: readonly ShortenerCatalogEntry[] = [
     freeTier: '10 links a month on the free plan, on the t.ly domain.',
     domainRequired: false,
     domainHint: 'Optional, and only on paid plans. Leave blank for t.ly.',
+  },
+  {
+    id: 'rebrandly',
+    label: 'Rebrandly',
+    emoji: '🏷️',
+    pitch: 'Branded links on your own domain, organised into workspaces.',
+    // Not `Authorization` at all: Rebrandly reads a bespoke `apikey` header.
+    auth: { header: 'apikey', prefix: '' },
+    keyPolicy: 'required',
+    keyUrl: 'https://app.rebrandly.com/account/api-keys',
+    keyLabel: 'API key',
+    homepage: 'https://www.rebrandly.com/',
+    privacyUrl: 'https://www.rebrandly.com/privacy',
+    freeTier: '500 branded links a month, with one custom domain.',
+    // A workspace has no guaranteed default domain, but rebrand.ly is available
+    // to free accounts, so this stays optional rather than blocking setup.
+    domainRequired: false,
+    domainHint: 'Optional. A verified domain on your account; leave blank for rebrand.ly.',
   },
 ];
 
@@ -124,11 +209,23 @@ export function shortenerEntry(
 }
 
 /**
- * The API hosts each provider talks to.
+ * The API hosts of providers this app holds a key for.
  *
  * Exported because `cors-proxy.ts` needs them in its credential-host blocklist:
- * these are now hosts this app holds a key for, so the ordinary proxy path must
- * refuse them exactly as it refuses OpenRouter and GitHub. Only the explicit,
- * consented path may route them.
+ * the ordinary proxy path must refuse them exactly as it refuses OpenRouter and
+ * GitHub, leaving only the explicit, consented path.
+ *
+ * **is.gd is deliberately not here, and TinyURL is.** The blocklist is about
+ * credentials, not about shorteners. is.gd has no accounts, so a proxied request
+ * to it carries nothing worth protecting and there is no reason to make the user
+ * consent to anything. TinyURL is listed because it *may* carry a token — its
+ * key is optional, and the transport only takes the consented path when one is
+ * actually present.
  */
-export const SHORTENER_API_HOSTS: readonly string[] = ['api.dub.co', 'api.short.io', 'api.t.ly'];
+export const SHORTENER_API_HOSTS: readonly string[] = [
+  'api.dub.co',
+  'api.short.io',
+  'api.t.ly',
+  'api.rebrandly.com',
+  'api.tinyurl.com',
+];

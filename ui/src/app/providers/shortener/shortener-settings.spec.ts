@@ -22,7 +22,10 @@ describe('ShortenerSettings', () => {
     settings.activate('dub');
 
     // Dub wants `Bearer `; the prefix comes from the catalog, not the caller.
-    expect(settings.resolve()?.authorization).toBe('Bearer dub-token');
+    expect(settings.resolve()?.auth).toEqual({
+      header: 'Authorization',
+      value: 'Bearer dub-token',
+    });
     expect(settings.usable()).toBe(true);
   });
 
@@ -32,7 +35,7 @@ describe('ShortenerSettings', () => {
     settings.activate('shortio');
 
     // The single most common way to get Short.io wrong.
-    expect(settings.resolve()?.authorization).toBe('sk_live_123');
+    expect(settings.resolve()?.auth).toEqual({ header: 'Authorization', value: 'sk_live_123' });
   });
 
   it('refuses to resolve Short.io without a short domain', () => {
@@ -55,10 +58,13 @@ describe('ShortenerSettings', () => {
     settings.activate('tly');
 
     expect(settings.hasKey('dub')).toBe(true);
-    expect(settings.resolve()?.authorization).toBe('Bearer tly-token');
+    expect(settings.resolve()?.auth?.value).toBe('Bearer tly-token');
 
     settings.activate('dub');
-    expect(settings.resolve()?.authorization).toBe('Bearer dub-token');
+    expect(settings.resolve()?.auth).toEqual({
+      header: 'Authorization',
+      value: 'Bearer dub-token',
+    });
   });
 
   it('stores keys separately from the choice, and never in the config blob', () => {

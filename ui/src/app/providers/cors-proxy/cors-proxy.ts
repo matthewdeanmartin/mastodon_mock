@@ -52,12 +52,20 @@ const CREDENTIAL_HOSTS: readonly string[] = [
   'github.com',
   'dropboxapi.com',
   'dropbox.com',
-  // The link shorteners. Listed here so the ordinary path refuses them like any
-  // other credentialed host; they are reachable only through
-  // `proxyCredentialedRequest`, which demands recorded user consent first.
+  // The link shorteners this app can hold a key for. Listed here so the
+  // ordinary path refuses them like any other credentialed host; they are
+  // reachable only through `proxyCredentialedRequest`, which demands recorded
+  // user consent first.
+  //
+  // is.gd is pointedly absent: it has no accounts, so a proxied request to it
+  // carries no credential and there is nothing to consent to. TinyURL is present
+  // because its token is optional rather than nonexistent — the transport takes
+  // the consented path only when one is actually stored.
   'dub.co',
   'short.io',
   't.ly',
+  'rebrandly.com',
+  'tinyurl.com',
 ];
 
 /** Raised when a request must not be proxied. Never caught into a direct fetch. */

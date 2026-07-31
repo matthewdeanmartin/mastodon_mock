@@ -70,6 +70,59 @@
     server API URLs, no account IDs — is ever put in the message.
   </p>
 
+  <label class="profile-toggle">
+    <input
+      type="checkbox"
+      [checked]="shorten()"
+      [disabled]="!shortenerReady() || shortening()"
+      (change)="toggleShorten($any($event.target).checked)"
+    />
+    <span>
+      Shorten the link with {{ shortenerLabel() }}
+      @if (!shortenerReady()) {
+        <span class="muted small">
+          — no shortener connected.
+          <a routerLink="/settings/connections/link-shortener">Set one up</a> to use this.
+        </span>
+      } @else if (shortening()) {
+        <span class="muted small">— shortening…</span>
+      } @else if (shorten()) {
+        <span class="muted small">— {{ visitUrl() }}</span>
+      } @else {
+        <span class="muted small"
+          >— saves characters against the {{ limits[network()] }} limit.</span
+        >
+      }
+    </span>
+  </label>
+
+  @if (shorten() && shortenerReady()) {
+    <label class="profile-toggle nested-toggle">
+      <input
+        type="checkbox"
+        [checked]="trackCampaign()"
+        [disabled]="shortening()"
+        (change)="toggleTracking($any($event.target).checked)"
+      />
+      <span>
+        Tag the link so you can tell which invitation worked
+        <span class="muted small">
+          — adds <code>utm_source</code>, <code>utm_medium</code> and <code>utm_campaign</code> to
+          the destination. It records which wording was clicked, never who clicked it.
+        </span>
+      </span>
+    </label>
+    <p class="muted small">
+      Off by default on purpose: tracking links in a personal invitation is a choice, not a default.
+      Either way the shortener counts clicks on its own — that is what a shortener does — and those
+      counts are visible to whoever runs it.
+    </p>
+  }
+
+  @if (shortenError(); as msg) {
+    <p class="feed-error" role="alert">{{ msg }}</p>
+  }
+
   <button class="btn btn-outline btn-sm" type="button" (click)="shuffle()">
     Shuffle — show a different one first
   </button>

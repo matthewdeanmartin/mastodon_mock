@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   anonymousEntryUrl,
+  campaignTaggedUrl,
   INVITE_LIMITS,
   InviteContext,
   inviteIntentUrl,
@@ -179,5 +180,41 @@ describe('the invitation inventory', () => {
         );
       }
     }
+  });
+});
+
+describe('campaignTaggedUrl', () => {
+  const base = `${MAWKINGBIRD_URL}/anonymous?example.social`;
+
+  it('adds the three UTM parameters without disturbing the existing query', () => {
+    const tagged = new URL(campaignTaggedUrl(base, { network: 'x', variationId: 'friendly' }));
+
+    expect(tagged.searchParams.get('utm_source')).toBe('x');
+    expect(tagged.searchParams.get('utm_medium')).toBe('invite');
+    expect(tagged.searchParams.get('utm_campaign')).toBe('friendly');
+    // The instance host is carried as a bare query key; tagging must not eat it.
+    expect(tagged.searchParams.has('example.social')).toBe(true);
+  });
+
+  it('names the invitation wording, never the reader', () => {
+    const tagged = campaignTaggedUrl(base, { network: 'bluesky', variationId: 'no-signup' });
+
+    // The only question these tags can answer is "which wording worked".
+    expect(tagged).toContain('utm_campaign=no-signup');
+    expect(tagged).not.toMatch(/user|account|profile|id=/i);
+  });
+
+  it('replaces rather than duplicates tags when applied twice', () => {
+    const once = campaignTaggedUrl(base, { network: 'x', variationId: 'a' });
+    const twice = campaignTaggedUrl(once, { network: 'bluesky', variationId: 'b' });
+
+    const params = new URL(twice).searchParams;
+    expect(params.getAll('utm_campaign')).toEqual(['b']);
+    expect(params.get('utm_source')).toBe('bluesky');
+  });
+
+  it('returns an unparseable URL untouched rather than mangling it', () => {
+    // The invitation still goes out; it just goes out untagged.
+    expect(campaignTaggedUrl('not a url', { network: 'x', variationId: 'a' })).toBe('not a url');
   });
 });

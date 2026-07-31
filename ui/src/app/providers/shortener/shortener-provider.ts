@@ -43,7 +43,33 @@ import { Observable } from 'rxjs';
  */
 
 /** Every provider implemented here. Also the discriminant on {@link ShortLink}. */
-export type ShortenerId = 'dub' | 'shortio' | 'tly';
+export type ShortenerId = 'dub' | 'shortio' | 'tly' | 'tinyurl' | 'rebrandly' | 'isgd';
+
+/**
+ * What a short link is *for* — the distinction this feature keeps getting wrong.
+ *
+ * Two things in this app produce a short link, they use the same services, and
+ * they mean entirely different things:
+ *
+ * - `shortened` — the ordinary case. Someone else's real page is the
+ *   destination, and the short link is a convenience wrapper: shorter to type,
+ *   countable, disposable. Editing it re-points it at a different page. This is
+ *   what the Links page and the Invites toggle create.
+ *
+ * - `message` — the Pastes case, created by {@link TinyurlProvider} (the *paste*
+ *   provider, not the shortener one). Here the redirect target is not a
+ *   destination at all: it is a `mawkingbird.com/message/?m=…` URL carrying the
+ *   post body in its query string. Nobody visits it as a page; the short link
+ *   *is* the message. There is nothing meaningful to "re-point" it at, and
+ *   showing its destination in a UI would show the user a wall of
+ *   percent-encoded text.
+ *
+ * Both end up in the same history because from the user's side both are "a short
+ * link I made". Everything else about them differs, so the kind is recorded
+ * rather than inferred — inferring it from the URL shape worked right up until
+ * someone legitimately shortened a link to the message reader.
+ */
+export type LinkKind = 'shortened' | 'message';
 
 export interface CreateLinkInput {
   destinationUrl: string;
@@ -148,7 +174,18 @@ export interface ShortenerProvider {
   readonly id: ShortenerId;
   /** Display name, as the service spells it. */
   readonly label: string;
-  readonly capabilities: ShortenerCapabilities;
+
+  /**
+   * What this provider can do *right now*.
+   *
+   * A method rather than a property because two providers change shape at
+   * runtime. TinyURL creates links with no account at all, and gains list, edit
+   * and delete only once an API token is present; is.gd never has an account and
+   * never gains them. A fixed property would have to describe one of those
+   * states and lie about the other, and the create form renders straight off
+   * this — so a stale answer means offering a field the service will drop.
+   */
+  capabilities(): ShortenerCapabilities;
 
   createLink(input: CreateLinkInput): Observable<ShortLink>;
   updateLink(id: string, changes: UpdateLinkInput): Observable<ShortLink>;

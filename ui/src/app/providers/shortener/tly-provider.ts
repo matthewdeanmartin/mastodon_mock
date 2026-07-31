@@ -82,23 +82,25 @@ export class TlyProvider implements ShortenerProvider {
   readonly id = 'tly' as const;
   readonly label = 'T.LY';
 
-  readonly capabilities: ShortenerCapabilities = {
-    customSlug: true,
-    // Only on paid plans, but the field is accepted and the provider decides.
-    customDomain: true,
-    // T.LY has a description but no separate title; the UI maps its title field
-    // onto description rather than pretending both exist.
-    title: false,
-    description: true,
-    tags: true,
-    expiry: true,
-    password: true,
-    archive: false,
-    update: true,
-    delete: true,
-    textSearch: true,
-    list: true,
-  };
+  capabilities(): ShortenerCapabilities {
+    return {
+      customSlug: true,
+      // Only on paid plans, but the field is accepted and the provider decides.
+      customDomain: true,
+      // T.LY has a description but no separate title; the UI maps its title field
+      // onto description rather than pretending both exist.
+      title: false,
+      description: true,
+      tags: true,
+      expiry: true,
+      password: true,
+      archive: false,
+      update: true,
+      delete: true,
+      textSearch: true,
+      list: true,
+    };
+  }
 
   createLink(input: CreateLinkInput): Observable<ShortLink> {
     assertValidDestination(input.destinationUrl);

@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { ShortenerId, ShortLink } from './shortener-provider';
+import { LinkKind, ShortenerId, ShortLink } from './shortener-provider';
 
 /**
  * Every short link this browser created, kept locally.
@@ -59,13 +59,28 @@ export type LinkOrigin = ShortenerId | 'tinyurl';
  */
 export interface ShortLinkRecord extends Omit<ShortLink, 'raw' | 'provider'> {
   provider: LinkOrigin;
+  /**
+   * Whether this is an ordinary shortened link or a message-in-a-URL.
+   *
+   * Absent on records written before the distinction existed, which are all
+   * shortened links — the message links came from the Pastes feature and were
+   * never in this store. Read it through {@link linkKind}, which supplies that
+   * default in one place.
+   */
+  kind?: LinkKind;
   /** When this browser created it. ISO. The one consistent sort key. */
   recordedAt: string;
   /**
-   * Whether this app can edit or delete it. False for TinyURL, whose links are
-   * permanent, so the page can render the row without controls that would fail.
+   * Whether this app can edit or delete it. True for anonymous links (is.gd,
+   * token-less TinyURL) and for message links, so the page renders the row
+   * without controls that could only fail.
    */
   readOnly?: boolean;
+}
+
+/** A record's kind, defaulting older records to the ordinary case. */
+export function linkKind(record: ShortLinkRecord): LinkKind {
+  return record.kind ?? 'shortened';
 }
 
 function load(): ShortLinkRecord[] {
@@ -86,10 +101,25 @@ export class ShortenerHistory {
     return this.records().filter((record) => record.provider === provider);
   }
 
-  add(link: ShortLink): ShortLinkRecord {
+  /**
+   * Record a link this app just created.
+   *
+   * `readOnly` is supplied by the caller rather than inferred from the provider,
+   * because it is a fact about *this link* and not about the service. A TinyURL
+   * link made anonymously stays permanent even after the user adds a token
+   * later — the token grants no authority over links it did not create.
+   */
+  add(link: ShortLink, options: { readOnly?: boolean } = {}): ShortLinkRecord {
     const { raw, ...rest } = link;
     void raw;
-    const record: ShortLinkRecord = { ...rest, recordedAt: new Date().toISOString() };
+    const record: ShortLinkRecord = {
+      ...rest,
+      // Everything created through this store is an ordinary shortened link;
+      // message links come from the Pastes feature and are never added here.
+      kind: 'shortened',
+      recordedAt: new Date().toISOString(),
+      ...(options.readOnly ? { readOnly: true } : {}),
+    };
     // Replace rather than duplicate when the same link is created twice — which
     // Short.io does deliberately, handing back the existing link for a repeated
     // destination.

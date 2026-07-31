@@ -93,8 +93,27 @@ export class ConnectionLinkShortener {
     this.error.set(null);
   }
 
+  /**
+   * Whether the form can be submitted.
+   *
+   * A required-key provider needs a key typed in; the other two are always
+   * submittable, because "use this one" is the entire configuration.
+   */
+  protected canSubmit(): boolean {
+    return this.entry().keyPolicy !== 'required' || !!this.keyDraft().trim();
+  }
+
+  /**
+   * Whether this provider is set up enough to be used.
+   *
+   * Not the same as "has a key": is.gd and TinyURL are ready with none, so this
+   * asks whether they are *configured* rather than whether a secret is stored.
+   */
   protected connected(id: ShortenerId): boolean {
-    return this.settings.hasKey(id);
+    const entry = this.catalog.find((item) => item.id === id);
+    return entry?.keyPolicy === 'required'
+      ? this.settings.hasKey(id)
+      : this.settings.hasKey(id) || this.settings.activeId() === id;
   }
 
   protected isActive(id: ShortenerId): boolean {
@@ -110,11 +129,16 @@ export class ConnectionLinkShortener {
 
   /**
    * Save and verify. See the class note for why these are one action.
+   *
+   * The key is optional for TinyURL and meaningless for is.gd, so a blank field
+   * is only an error when the provider actually requires one. For the other two
+   * this is the "just use it" path: activate, verify (which is a no-op without
+   * credentials), done.
    */
   protected async save(): Promise<void> {
     const entry = this.entry();
     const key = this.keyDraft().trim();
-    if (!key) {
+    if (entry.keyPolicy === 'required' && !key) {
       this.error.set(`Paste your ${entry.label} ${entry.keyLabel} first.`);
       return;
     }
@@ -124,11 +148,13 @@ export class ConnectionLinkShortener {
     }
 
     const hadKey = this.settings.hasKey(entry.id);
-    this.settings.setKey(entry.id, key);
+    if (key && entry.keyPolicy !== 'none') {
+      this.settings.setKey(entry.id, key);
+    }
     this.settings.setDomain(entry.id, this.domainDraft());
     this.settings.activate(entry.id);
 
-    await this.verify({ rollbackTo: hadKey ? 'keep' : 'clear' });
+    await this.verify({ rollbackTo: hadKey || !key ? 'keep' : 'clear' });
   }
 
   /**

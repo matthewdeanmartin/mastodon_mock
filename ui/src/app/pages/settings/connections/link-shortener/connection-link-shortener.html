@@ -49,23 +49,43 @@
 <section class="setup">
   <h2 class="section-title">{{ entry().emoji }} {{ entry().label }}</h2>
 
-  <ol class="setup-steps muted small">
-    <li>
-      Sign in to
-      <a [href]="entry().homepage" target="_blank" rel="noopener noreferrer">{{ entry().label }}</a>
-      and open
-      <a [href]="entry().keyUrl" target="_blank" rel="noopener noreferrer">your API settings</a>.
-    </li>
-    <li>Create a {{ entry().keyLabel }} and copy it.</li>
-    @if (entry().domainRequired) {
-      <li>Note the short domain on your account — {{ entry().label }} needs it to make links.</li>
-    }
-    <li>Paste it below. Mawkingbird tests the key before saving the connection.</li>
-  </ol>
+  <!-- is.gd has no account and no API settings page, so the setup steps would
+       point at nothing. Its explanation is the paragraph below instead. -->
+  @if (entry().keyPolicy !== 'none') {
+    <ol class="setup-steps muted small">
+      <li>
+        Sign in to
+        <a [href]="entry().homepage" target="_blank" rel="noopener noreferrer">{{
+          entry().label
+        }}</a>
+        and open
+        <a [href]="entry().keyUrl" target="_blank" rel="noopener noreferrer">your API settings</a>.
+      </li>
+      <li>Create a {{ entry().keyLabel }} and copy it.</li>
+      @if (entry().domainRequired) {
+        <li>Note the short domain on your account — {{ entry().label }} needs it to make links.</li>
+      }
+      <li>Paste it below. Mawkingbird tests the key before saving the connection.</li>
+    </ol>
+  }
+
+  @if (entry().keyPolicy === 'none') {
+    <p class="muted small">
+      {{ entry().label }} has no accounts and needs no setup — choose it and start shortening.
+      Because there is no account, it cannot list, edit or delete links afterwards; Mawkingbird
+      keeps its own record of the ones you make here.
+    </p>
+  } @else if (entry().keyPolicy === 'optional') {
+    <p class="muted small">
+      {{ entry().label }} works with no setup at all. {{ entry().keyBenefit }}
+    </p>
+  }
 
   @if (connected(entry().id)) {
     <div class="conn-actions">
-      <span class="connection-ok">Key saved</span>
+      <span class="connection-ok">
+        {{ settings.hasKey(entry().id) ? 'Key saved' : 'Ready — no account needed' }}
+      </span>
       @if (!isActive(entry().id)) {
         <button class="btn btn-outline" type="button" (click)="activate(entry().id)">
           Make active
@@ -76,7 +96,7 @@
       </button>
       <button class="btn btn-outline" type="button" (click)="forget(entry().id)">Disconnect</button>
     </div>
-    @if (expiryLabel(settings.expiresAt()); as expiry) {
+    @if (settings.hasKey(entry().id) && expiryLabel(settings.expiresAt()); as expiry) {
       <p class="muted small">This key is deleted from this browser on {{ expiry }}.</p>
     }
     @if (hasConsent(entry().id) && proxyEntry(); as proxy) {
@@ -91,38 +111,57 @@
   }
 
   <form class="shortener-form" (ngSubmit)="save()">
-    <label class="field">
-      <span class="field-label">
-        Short domain
-        @if (!entry().domainRequired) {
-          <span class="muted small">(optional)</span>
+    <!-- is.gd has one fixed domain and no workspaces; the field would do nothing. -->
+    @if (entry().domainHint) {
+      <label class="field">
+        <span class="field-label">
+          {{ entry().id === 'rebrandly' ? 'Workspace' : 'Short domain' }}
+          @if (!entry().domainRequired) {
+            <span class="muted small">(optional)</span>
+          }
+        </span>
+        <input
+          type="text"
+          name="shortenerDomain"
+          autocomplete="off"
+          [placeholder]="entry().id === 'rebrandly' ? 'Workspace ID' : 'go.example.com'"
+          [ngModel]="domainDraft()"
+          (ngModelChange)="domainDraft.set($event)"
+        />
+        <span class="muted small">{{ entry().domainHint }}</span>
+      </label>
+    }
+
+    @if (entry().keyPolicy !== 'none') {
+      <label class="field">
+        <span class="field-label">
+          {{ entry().keyLabel }}
+          @if (entry().keyPolicy === 'optional') {
+            <span class="muted small">(optional)</span>
+          }
+        </span>
+        <input
+          type="password"
+          name="shortenerKey"
+          autocomplete="off"
+          [placeholder]="entry().label + ' ' + entry().keyLabel"
+          [ngModel]="keyDraft()"
+          (ngModelChange)="keyDraft.set($event)"
+        />
+        @if (entry().keyBenefit) {
+          <span class="muted small">{{ entry().keyBenefit }}</span>
         }
-      </span>
-      <input
-        type="text"
-        name="shortenerDomain"
-        autocomplete="off"
-        placeholder="go.example.com"
-        [ngModel]="domainDraft()"
-        (ngModelChange)="domainDraft.set($event)"
-      />
-      <span class="muted small">{{ entry().domainHint }}</span>
-    </label>
+      </label>
+    }
 
-    <label class="field">
-      <span class="field-label">{{ entry().keyLabel }}</span>
-      <input
-        type="password"
-        name="shortenerKey"
-        autocomplete="off"
-        [placeholder]="entry().label + ' ' + entry().keyLabel"
-        [ngModel]="keyDraft()"
-        (ngModelChange)="keyDraft.set($event)"
-      />
-    </label>
-
-    <button class="btn" type="submit" [disabled]="busy() || !keyDraft().trim()">
-      {{ busy() ? 'Testing key…' : 'Save and test connection' }}
+    <button class="btn" type="submit" [disabled]="busy() || !canSubmit()">
+      @if (busy()) {
+        Testing…
+      } @else if (entry().keyPolicy === 'required') {
+        Save and test connection
+      } @else {
+        Use {{ entry().label }}
+      }
     </button>
   </form>
 

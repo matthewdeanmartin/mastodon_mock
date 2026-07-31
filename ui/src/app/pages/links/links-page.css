@@ -145,6 +145,17 @@
   letter-spacing: 0.03em;
 }
 
+/* Marks a row as a message-in-a-URL rather than a shortened link. Deliberately
+   visible: the two look identical otherwise and behave completely differently. */
+.kind-tag {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 11px;
+}
+
 .row-actions {
   display: flex;
   flex-wrap: wrap;

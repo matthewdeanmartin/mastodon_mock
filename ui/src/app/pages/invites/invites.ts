@@ -1,10 +1,14 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { Auth } from '../../auth';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { Server } from '../../server';
+import { ShortenerRegistry } from '../../providers/shortener/shortener-registry';
+import { ShortenerSettings } from '../../providers/shortener/shortener-settings';
 import {
   anonymousEntryUrl,
+  campaignTaggedUrl,
   INVITE_LIMITS,
   InviteContext,
   InviteNetwork,
@@ -51,6 +55,8 @@ export class Invites implements OnInit {
   private readonly auth = inject(Auth);
   private readonly server = inject(Server);
   private readonly diagnostics = inject(PageDiagnostics);
+  private readonly shorteners = inject(ShortenerRegistry);
+  private readonly shortenerSettings = inject(ShortenerSettings);
 
   protected readonly network = signal<InviteNetwork>('x');
   protected readonly limits = INVITE_LIMITS;
@@ -121,7 +127,51 @@ export class Invites implements OnInit {
     return this.server.baseUrl().replace(/^https?:\/\//, '');
   });
 
-  protected readonly visitUrl = computed(() => anonymousEntryUrl(this.homeHost()));
+  /**
+   * The plain "try it without signing up" link, before any shortening.
+   *
+   * Kept separate from {@link visitUrl} so turning shortening off restores the
+   * original rather than leaving a short link that can no longer be explained.
+   */
+  private readonly plainVisitUrl = computed(() => anonymousEntryUrl(this.homeHost()));
+
+  /**
+   * Whether to replace the visit link with a short one.
+   *
+   * Off by default. The invitations read perfectly well with the full URL, and
+   * a shortened link in a stranger's timeline is slightly less trustworthy than
+   * a legible `mawkingbird.com` one — so this is worth having (it buys back
+   * characters, and it is how you learn whether invitations work at all) but not
+   * worth doing to people who did not ask.
+   */
+  protected readonly shorten = signal(false);
+
+  /**
+   * Whether to attach UTM campaign tags before shortening.
+   *
+   * A deliberately separate switch, and also off by default. Wanting a shorter
+   * link is not the same as wanting to measure your friends, and tracking links
+   * in personal invitations is contentious enough that it must be an explicit
+   * choice rather than a side effect of the first checkbox. See
+   * {@link campaignTaggedUrl}.
+   */
+  protected readonly trackCampaign = signal(false);
+
+  /** The shortened link once created, or null while off or not yet made. */
+  private readonly shortVisitUrl = signal<string | null>(null);
+  protected readonly shortening = signal(false);
+  protected readonly shortenError = signal<string | null>(null);
+
+  /** Whether a shortener is connected and usable at all. */
+  protected readonly shortenerReady = computed(() => this.shortenerSettings.usable());
+
+  /** The active shortener's display name, for the checkbox label. */
+  protected readonly shortenerLabel = computed(
+    () => this.shortenerSettings.chosen()?.label ?? 'a link shortener',
+  );
+
+  /** What actually goes in the post: the short link when there is one. */
+  protected readonly visitUrl = computed(() => this.shortVisitUrl() ?? this.plainVisitUrl());
 
   /** False when nothing personal can be offered, so the toggle explains itself. */
   protected readonly hasProfile = computed(() => !!this.profileUrl());
@@ -170,6 +220,84 @@ export class Invites implements OnInit {
   protected setNetwork(network: InviteNetwork): void {
     this.network.set(network);
     this.clearCopyState();
+  }
+
+  /**
+   * Turn link shortening on or off.
+   *
+   * Turning it off restores the plain URL immediately; the short link that was
+   * already created is not deleted, because it exists on the service and may
+   * already be in a post someone sent. It simply stops being used here, and it
+   * is listed on the Links page like any other.
+   */
+  protected async toggleShorten(on: boolean): Promise<void> {
+    this.shorten.set(on);
+    this.shortenError.set(null);
+    if (!on) {
+      this.shortVisitUrl.set(null);
+      return;
+    }
+    await this.makeShortLink();
+  }
+
+  /**
+   * Turn campaign tracking on or off.
+   *
+   * Re-shortens when already shortening, because the tags have to be baked into
+   * the destination *before* it is shortened — a short link points wherever it
+   * pointed when it was made. Toggling this therefore creates a second link
+   * rather than editing the first, which is honest: the two links measure
+   * different things.
+   */
+  protected async toggleTracking(on: boolean): Promise<void> {
+    this.trackCampaign.set(on);
+    this.shortenError.set(null);
+    if (this.shorten()) {
+      await this.makeShortLink();
+    }
+  }
+
+  /**
+   * Shorten the visit URL with the active provider.
+   *
+   * One link for the whole page rather than one per card. The invitations differ
+   * in wording, not in where they point, and creating ten links to burn through
+   * a free tier of twenty-five would be a poor trade for per-card attribution
+   * nobody asked for. When tracking is on, `utm_campaign` still distinguishes
+   * the invitation — it is set from whichever card is currently at the top of
+   * the deck, which is the one the user is looking at.
+   */
+  private async makeShortLink(): Promise<void> {
+    if (!this.shortenerReady()) {
+      this.shortenError.set(null);
+      return;
+    }
+    const target = this.trackCampaign()
+      ? campaignTaggedUrl(this.plainVisitUrl(), {
+          network: this.network(),
+          variationId: this.order()[this.network()][0] ?? 'invite',
+        })
+      : this.plainVisitUrl();
+
+    this.shortening.set(true);
+    try {
+      const link = await firstValueFrom(this.shorteners.create({ destinationUrl: target }));
+      this.shortVisitUrl.set(link.shortUrl);
+      this.diagnostics.info('Invites', 'link:shortened', {
+        provider: link.provider,
+        tracked: this.trackCampaign(),
+      });
+    } catch (error: unknown) {
+      this.shortVisitUrl.set(null);
+      this.shorten.set(false);
+      this.shortenError.set(
+        error instanceof Error && error.message
+          ? error.message
+          : "Couldn't shorten the link. The invitations still work with the full URL.",
+      );
+    } finally {
+      this.shortening.set(false);
+    }
   }
 
   protected toggleProfile(include: boolean): void {

@@ -8,7 +8,7 @@ import { CorsProxyEntry } from '../../providers/cors-proxy/cors-proxy-catalog';
 import { ProxyConsentDialog } from '../../providers/shortener/proxy-consent-dialog/proxy-consent-dialog';
 import { ShortenerProxyConsent } from '../../providers/shortener/proxy-consent';
 import { ShortenerCatalogEntry, shortenerEntry } from '../../providers/shortener/shortener-catalog';
-import { ShortLinkRecord } from '../../providers/shortener/shortener-history';
+import { linkKind, ShortLinkRecord } from '../../providers/shortener/shortener-history';
 import { ShortenerRegistry } from '../../providers/shortener/shortener-registry';
 import { ShortenerSettings } from '../../providers/shortener/shortener-settings';
 import { ProxyConsentRequired } from '../../providers/shortener/shortener-transport';
@@ -87,7 +87,7 @@ export class LinksPage implements OnInit {
   private pendingAction: (() => Promise<void>) | null = null;
 
   protected readonly provider = computed(() => this.registry.active());
-  protected readonly capabilities = computed(() => this.provider()?.capabilities ?? null);
+  protected readonly capabilities = computed(() => this.provider()?.capabilities() ?? null);
   protected readonly entry = computed(() => shortenerEntry(this.settings.activeId()) ?? null);
 
   /** Why the page cannot shorten anything yet, or null when it can. */
@@ -101,9 +101,43 @@ export class LinksPage implements OnInit {
     return `${record.provider}:${record.providerId}`;
   }
 
-  /** TinyURL rows, and anything else the app cannot modify. */
+  /**
+   * Whether this row is a message-in-a-URL rather than a shortened link.
+   *
+   * These come from the Pastes feature: the redirect target is a
+   * `mawkingbird.com/message/?m=…` URL holding a post body, so the link *is* the
+   * message. The row shows the message rather than a destination, and offers no
+   * editing — there is no destination to re-point.
+   */
+  protected isMessage(record: ShortLinkRecord): boolean {
+    return linkKind(record) === 'message';
+  }
+
+  /**
+   * Rows this app cannot modify: anonymous links, message links, and anything
+   * belonging to a provider that is not the active one.
+   *
+   * The last case is not a limitation so much as a fact — the credentials for a
+   * different service are not in play, so its Edit button could only ever fail.
+   */
   protected readOnly(record: ShortLinkRecord): boolean {
-    return record.readOnly === true || record.provider !== this.settings.activeId();
+    if (record.readOnly === true || this.isMessage(record)) {
+      return true;
+    }
+    if (record.provider !== this.settings.activeId()) {
+      return true;
+    }
+    const caps = this.capabilities();
+    return !caps?.update && !caps?.delete;
+  }
+
+  /** Whether the active provider can delete, so the row shows the right buttons. */
+  protected canDelete(record: ShortLinkRecord): boolean {
+    return !this.readOnly(record) && this.capabilities()?.delete === true;
+  }
+
+  protected canEdit(record: ShortLinkRecord): boolean {
+    return !this.readOnly(record) && this.capabilities()?.update === true;
   }
 
   protected async reload(): Promise<void> {

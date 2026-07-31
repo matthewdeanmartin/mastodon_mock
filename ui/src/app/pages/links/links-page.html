@@ -13,7 +13,8 @@
       Set up a link shortener
     </a>
     <p class="muted small">
-      Dub, Short.io and T.LY are supported. You will need a free or paid account with one of them.
+      TinyURL and is.gd work straight away with no account at all. Dub, Short.io, T.LY and Rebrandly
+      need a free or paid account, and can list and delete links afterwards.
     </p>
   </section>
 } @else if (entry(); as service) {
@@ -107,7 +108,7 @@
 
 @if (!loading() && !links().length) {
   <p class="muted empty">
-    No links yet. Anything you shorten here — and any TinyURL message links you have made on the
+    No links yet. Anything you shorten here — and any messages you have shared as a link from the
     Pastes page — will show up in this list.
   </p>
 }
@@ -161,15 +162,28 @@
           @if (record.title) {
             <span class="link-title">{{ record.title }}</span>
           }
-          <a
-            class="destination muted small"
-            [href]="record.destinationUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ record.destinationUrl }}</a
-          >
+          @if (isMessage(record)) {
+            <!-- A message link's "destination" is the post body encoded into a
+                 query string. Showing it raw would be a wall of percent-escapes,
+                 so the row says what the link is instead. -->
+            <span class="destination muted small">
+              A message you shared — the text is inside the link itself.
+            </span>
+          } @else {
+            <a
+              class="destination muted small"
+              [href]="record.destinationUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ record.destinationUrl }}</a
+            >
+          }
           <span class="meta muted small">
             <span class="origin">{{ record.provider }}</span>
+            @if (isMessage(record)) {
+              <span aria-hidden="true">·</span>
+              <span class="kind-tag">message</span>
+            }
             <span aria-hidden="true">·</span>
             <span>{{ record.recordedAt | humanTime }}</span>
             @if (record.expiresAt) {
@@ -182,10 +196,14 @@
         <div class="row-actions">
           @if (readOnly(record)) {
             <span class="muted small">
-              @if (record.provider === 'tinyurl') {
-                Permanent — TinyURL links can't be changed
+              @if (isMessage(record)) {
+                Permanent — a shared message can't be edited
+              } @else if (record.readOnly) {
+                Permanent — made without an account
+              } @else if (record.provider !== settings.activeId()) {
+                Switch to {{ record.provider }} to manage this
               } @else {
-                Connect {{ record.provider }} to manage this
+                This service can't edit or delete links
               }
             </span>
           } @else if (confirmingDelete() === key(record)) {
@@ -195,14 +213,20 @@
               Keep
             </button>
           } @else {
-            <button class="btn btn-outline" type="button" (click)="startEdit(record)">Edit</button>
-            <button
-              class="btn btn-outline"
-              type="button"
-              (click)="confirmingDelete.set(key(record))"
-            >
-              Delete
-            </button>
+            @if (canEdit(record)) {
+              <button class="btn btn-outline" type="button" (click)="startEdit(record)">
+                Edit
+              </button>
+            }
+            @if (canDelete(record)) {
+              <button
+                class="btn btn-outline"
+                type="button"
+                (click)="confirmingDelete.set(key(record))"
+              >
+                Delete
+              </button>
+            }
           }
         </div>
       }

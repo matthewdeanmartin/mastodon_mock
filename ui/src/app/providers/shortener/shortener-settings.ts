@@ -65,11 +65,19 @@ interface StoredShortenerKey extends ExpiringCredential {
 
 type StoredKeys = Partial<Record<ShortenerId, StoredShortenerKey>>;
 
-/** Everything an adapter needs to build an authenticated request. */
+/** Everything an adapter needs to build a request. */
 export interface ShortenerConfig {
   entry: ShortenerCatalogEntry;
-  /** The header value, prefix already applied. */
-  authorization: string;
+  /**
+   * The auth header to send, or null when this request carries no credential.
+   *
+   * Null is the normal state for is.gd (no accounts exist) and for TinyURL
+   * before a token is added. It is not an error case, and the difference matters
+   * beyond the header: a request with no credential has nothing to leak, so the
+   * CORS-proxy consent flow skips the warning entirely rather than asking the
+   * user to accept a risk they are not taking.
+   */
+  auth: { header: string; value: string } | null;
   /** The configured short domain, or '' when the provider's default is used. */
   domain: string;
 }
@@ -115,11 +123,16 @@ export class ShortenerSettings implements ExpiringConnection {
    * Everything needed to talk to the active provider, or null when it cannot be
    * used yet.
    *
-   * Null rather than a half-built config when the key is missing, or when the
-   * provider requires a short domain and none is set. Short.io is the case that
-   * matters: its create endpoint rejects a request with no domain, and failing
-   * here produces "finish setting up Short.io" instead of a validation error
-   * from the provider that reads like the destination URL was wrong.
+   * Null rather than a half-built config when a *required* key is missing, or
+   * when the provider requires a short domain and none is set. Short.io is the
+   * case that matters: its create endpoint rejects a request with no domain, and
+   * failing here produces "finish setting up Short.io" instead of a validation
+   * error from the provider that reads like the destination URL was wrong.
+   *
+   * A key-less provider resolves happily with `auth: null`. is.gd has no
+   * accounts to require one from, and TinyURL works anonymously until a token is
+   * added — treating either as unconfigured would make the two zero-setup
+   * options the only ones you have to set up.
    */
   resolve(): ShortenerConfig | null {
     const entry = this.chosen();
@@ -127,14 +140,20 @@ export class ShortenerSettings implements ExpiringConnection {
       return null;
     }
     const key = this.keys()[entry.id]?.key ?? '';
-    if (!key) {
+    if (entry.keyPolicy === 'required' && !key) {
       return null;
     }
     const domain = this.domain(entry.id);
     if (entry.domainRequired && !domain) {
       return null;
     }
-    return { entry, authorization: `${entry.auth.prefix}${key}`, domain };
+    // `none` never authenticates even if a key somehow got stored against it.
+    const usesKey = key && entry.keyPolicy !== 'none' && entry.auth.header;
+    return {
+      entry,
+      auth: usesKey ? { header: entry.auth.header, value: `${entry.auth.prefix}${key}` } : null,
+      domain,
+    };
   }
 
   /** Why {@link resolve} returned null, phrased for the user. Null when it did not. */
@@ -143,7 +162,7 @@ export class ShortenerSettings implements ExpiringConnection {
     if (!entry) {
       return 'No link shortener is connected yet.';
     }
-    if (!this.hasKey(entry.id)) {
+    if (entry.keyPolicy === 'required' && !this.hasKey(entry.id)) {
       return `Add your ${entry.label} ${entry.keyLabel} to start shortening links.`;
     }
     if (entry.domainRequired && !this.domain(entry.id)) {

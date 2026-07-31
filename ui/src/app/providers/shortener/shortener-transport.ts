@@ -107,14 +107,14 @@ export class ShortenerTransport {
     }
 
     const direct = () =>
-      this.send<T>(provider, spec, spec.url, this.authHeaders(config.authorization, spec));
+      this.send<T>(provider, spec, spec.url, this.authHeaders(config.auth, spec));
 
     return direct().pipe(
       catchError((error: unknown) => {
         if (!looksCorsBlocked(error)) {
           return throwError(() => toLinkProviderError(error, provider, spec.hints));
         }
-        return this.viaProxy<T>(provider, spec, config.authorization);
+        return this.viaProxy<T>(provider, spec, config.auth);
       }),
     );
   }
@@ -138,22 +138,36 @@ export class ShortenerTransport {
     };
   }
 
+  /**
+   * The proxy leg, taken only after a direct request came back `status: 0`.
+   *
+   * `auth` being null is the interesting case. A request with no credential —
+   * is.gd, or TinyURL before a token is added — has nothing to disclose to the
+   * proxy operator, so it skips the consent gate entirely and goes through the
+   * *ordinary* proxy path, the same one an RSS feed uses. Asking someone to
+   * accept the risk of leaking a key they do not have would be a lie, and it
+   * would train them to click through the dialog that matters.
+   */
   private viaProxy<T>(
     provider: ShortenerId,
     spec: ShortenerRequest,
-    authorization: string,
+    auth: { header: string; value: string } | null,
   ): Observable<T> {
     const entry = this.proxy.entry();
     if (!entry || !this.proxy.available()) {
       return throwError(() => new ProxyConsentRequired(provider, true));
     }
-    if (!this.consent.granted(provider, entry.id)) {
+
+    const carriesCredential = auth !== null;
+    if (carriesCredential && !this.consent.granted(provider, entry.id)) {
       return throwError(() => new ProxyConsentRequired(provider, false));
     }
 
     let proxied: { url: string; headers: HttpHeaders };
     try {
-      proxied = this.proxy.proxyCredentialedRequest(spec.url, true);
+      proxied = carriesCredential
+        ? this.proxy.proxyCredentialedRequest(spec.url, true)
+        : this.proxy.proxyRequest(spec.url);
     } catch (error: unknown) {
       // A refusal here is a genuine safety stop (mixed content, userinfo), not
       // a missing consent — surface it as the error it is.
@@ -162,9 +176,9 @@ export class ShortenerTransport {
       return throwError(() => new LinkProviderError('CORS_BLOCKED', message, provider));
     }
 
-    // The proxy's own key rides alongside the provider's. Both are needed: one
-    // authenticates us to the proxy, the other to the shortener.
-    let headers = this.authHeaders(authorization, spec);
+    // The proxy's own key rides alongside the provider's, when there is one:
+    // each authenticates us to a different party.
+    let headers = this.authHeaders(auth, spec);
     proxied.headers.keys().forEach((name) => {
       const value = proxied.headers.get(name);
       if (value) {
@@ -179,10 +193,16 @@ export class ShortenerTransport {
     );
   }
 
-  private authHeaders(authorization: string, spec: ShortenerRequest): HttpHeaders {
-    let headers = new HttpHeaders()
-      .set('Authorization', authorization)
-      .set('Accept', 'application/json');
+  private authHeaders(
+    auth: { header: string; value: string } | null,
+    spec: ShortenerRequest,
+  ): HttpHeaders {
+    let headers = new HttpHeaders().set('Accept', 'application/json');
+    if (auth) {
+      // The header name is the provider's, not always `Authorization`:
+      // Rebrandly reads a bespoke `apikey`.
+      headers = headers.set(auth.header, auth.value);
+    }
     for (const [name, value] of Object.entries(spec.headers ?? {})) {
       headers = headers.set(name, value);
     }

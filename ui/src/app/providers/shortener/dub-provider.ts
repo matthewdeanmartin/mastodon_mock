@@ -72,20 +72,22 @@ export class DubProvider implements ShortenerProvider {
   readonly id = 'dub' as const;
   readonly label = 'Dub';
 
-  readonly capabilities: ShortenerCapabilities = {
-    customSlug: true,
-    customDomain: true,
-    title: true,
-    description: true,
-    tags: true,
-    expiry: true,
-    password: true,
-    archive: true,
-    update: true,
-    delete: true,
-    textSearch: true,
-    list: true,
-  };
+  capabilities(): ShortenerCapabilities {
+    return {
+      customSlug: true,
+      customDomain: true,
+      title: true,
+      description: true,
+      tags: true,
+      expiry: true,
+      password: true,
+      archive: true,
+      update: true,
+      delete: true,
+      textSearch: true,
+      list: true,
+    };
+  }
 
   createLink(input: CreateLinkInput): Observable<ShortLink> {
     assertValidDestination(input.destinationUrl);

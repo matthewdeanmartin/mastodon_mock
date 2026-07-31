@@ -79,23 +79,25 @@ export class ShortioProvider implements ShortenerProvider {
   readonly id = 'shortio' as const;
   readonly label = 'Short.io';
 
-  readonly capabilities: ShortenerCapabilities = {
-    customSlug: true,
-    customDomain: true,
-    title: true,
-    // Short.io has no separate description field on a link.
-    description: false,
-    tags: true,
-    expiry: true,
-    password: true,
-    archive: true,
-    update: true,
-    delete: true,
-    // Its list endpoint filters rather than full-text searches; the registry
-    // filters locally within a bounded page instead.
-    textSearch: false,
-    list: true,
-  };
+  capabilities(): ShortenerCapabilities {
+    return {
+      customSlug: true,
+      customDomain: true,
+      title: true,
+      // Short.io has no separate description field on a link.
+      description: false,
+      tags: true,
+      expiry: true,
+      password: true,
+      archive: true,
+      update: true,
+      delete: true,
+      // Its list endpoint filters rather than full-text searches; the registry
+      // filters locally within a bounded page instead.
+      textSearch: false,
+      list: true,
+    };
+  }
 
   createLink(input: CreateLinkInput): Observable<ShortLink> {
     assertValidDestination(input.destinationUrl);

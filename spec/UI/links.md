@@ -1,7 +1,38 @@
-> **Implementation status (2026-07-31).** Sprint one is built: Dub, Short.io and
-> T.LY with full CRUD, the `/links` page behind a `links` feature flag (canary),
-> the `/find-friends` hub, and the Connections entry. Rebrandly and YOURLS are
-> deliberately deferred until these three are proven in real use.
+> **Implementation status (2026-07-31).** Six providers are built: TinyURL,
+> is.gd, Dub, Short.io, T.LY and Rebrandly, plus the `/links` page behind a
+> `links` feature flag (canary), the `/find-friends` hub, the Connections entry,
+> and optional link shortening on the Invites page.
+>
+> **YOURLS is struck, and so is self-hosting generally.** Its stock API cannot
+> update or delete, so it would ship as the one provider where half the Links
+> page does nothing. More decisively, a self-hosted service cannot be tested
+> against a real instance from here, and the audience for it — people who already
+> run their own shortener — is close enough to nobody that an unverifiable
+> integration is a net loss. Treat any future self-hosted shortener request the
+> same way.
+>
+> **Two things that use the same services and are not the same thing.** Worth
+> stating because the codebase now has both, and conflating them was the easiest
+> mistake available:
+>
+> - *Shortening* — the destination is a real page someone wants to visit, and the
+>   short link is a wrapper. This is the Links page and the Invites toggle.
+> - *A message in a URL* — the destination is a `mawkingbird.com/message/?m=…`
+>   URL holding a post body, so the short link **is** the content. This is the
+>   Pastes feature, and it predates all of the above.
+>
+> Both go through TinyURL, so there are deliberately two TinyURL providers:
+> `providers/shortener/tinyurl-shortener-provider.ts` and
+> `providers/paste/tinyurl-provider.ts`. They must not be merged. Stored links
+> carry a `LinkKind` recording which they are, so the Links page can list message
+> links without ever offering to re-point one at a different destination.
+>
+> **Key policy per provider.** is.gd has no accounts at all (create-only, nothing
+> to leak). TinyURL works anonymously and gains list/edit/delete only when a token
+> is added, so its capabilities are computed at call time rather than declared.
+> The other four require a key. A key-less request skips the proxy-consent dialog
+> entirely — warning someone about leaking a credential they do not have is how a
+> real warning stops being read.
 >
 > **Where the research below was overridden.** Section 2 assumes
 > `Angular → your backend → shortener API`, with credentials held server-side.
@@ -46,10 +77,19 @@ Let’s support multiple shortening services, but only 1 is active at a time.
 - Short.io
 - Dub.co
 - Rebrandly
-- Short.io
-- Dub.co
 - T.LY
-- YOURLS
+- TinyURL (key-less by default; a token unlocks list/edit/delete)
+- is.gd (key-less, create-only)
+- ~~YOURLS~~ — struck. Self-hosted, stock API has no update/delete, and cannot be
+  integration tested. Self-hosted shorteners are out of scope generally.
+
+## On the Invites page — optional shortening
+Checkbox to shorten the invite’s visit link with the active shortener.
+Separate, nested checkbox (off by default) to add UTM campaign tags first, so you
+can tell which invitation wording worked. Two switches rather than one because
+shortening and tracking are different asks, and tracking links in a personal
+invitation is contentious enough to require an explicit choice. Copy notes that
+the shortener counts clicks regardless of the tracking toggle.
 
 
 ---This is research from another bot who did the googling---

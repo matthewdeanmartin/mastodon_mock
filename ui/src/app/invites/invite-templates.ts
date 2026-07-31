@@ -72,6 +72,46 @@ export function anonymousEntryUrl(host = 'mastodon.social'): string {
 }
 
 /**
+ * Add UTM campaign parameters to an invite link.
+ *
+ * ## Why this is opt-in, and separate from shortening
+ *
+ * Shortening a link and tracking who clicks it are two different asks, and
+ * conflating them would be the dishonest kind of convenience. Someone who turns
+ * on "make the link shorter" to save characters has not agreed to attach
+ * analytics to a message they are about to send their friends — and tracking
+ * links in personal invitations is genuinely contentious, not a neutral default.
+ *
+ * So the Invites page has two checkboxes, tracking is off unless deliberately
+ * switched on, and the copy says plainly what the tags do. Note also that the
+ * shortener itself records every click regardless: that is what shorteners do,
+ * and the page says so rather than implying that leaving this off means nobody
+ * is counting.
+ *
+ * The parameters are conventional UTM, which the destination — Mawkingbird's own
+ * anonymous entry page — is free to ignore. Nothing here identifies the *reader*;
+ * `utm_campaign` names the invitation text, so the only question it can answer
+ * is "which wording worked", never "who clicked".
+ */
+export function campaignTaggedUrl(
+  url: string,
+  options: { network: InviteNetwork; variationId: string },
+): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // A URL we cannot parse is returned untouched rather than mangled: the
+    // invitation still works, it just goes out untagged.
+    return url;
+  }
+  parsed.searchParams.set('utm_source', options.network);
+  parsed.searchParams.set('utm_medium', 'invite');
+  parsed.searchParams.set('utm_campaign', options.variationId);
+  return parsed.toString();
+}
+
+/**
  * Fill a template in, dropping whole lines whose data we do not have.
  *
  * A missing profile URL must never leave `{profileUrl}` — or a bare "Find me
