@@ -209,6 +209,25 @@ ordinary Mockingbird cards.
 - Full unit coverage per §18.1 with fixtures per §18.2, written by hand from
   the documented shapes since we have no key yet.
 
+**Sprint 3 status: COMPLETE (2026-07-31).** `providers/twitter/twitterapi-io/`
+holds wire types, guards and normalizers, all written against captured live
+responses. 43 unit tests.
+
+Validated against a *fresh* live response from an account not in the fixtures
+(ESA, 20 posts, fetched through the real CORS.SH path) — the adapter was run
+over data nobody had curated:
+
+```
+posts: 20   skipped: 0   undatedPosts: 0   emptyContent: 0
+withMedia: 13   reblogs: 6   badIds: 0   badAccounts: 0
+unrenderedTco: 0   unescaped: 0   cursorPresent: true
+```
+
+Nothing dropped, nothing mis-dated, no leftover `t.co` shorteners in rendered
+text, no unescaped HTML, and pagination available. Field-name corrections the
+capture-first approach caught are listed in `twitter-1-transport.md` §4 and in
+the Sprint 3 commit message.
+
 ### Sprint 4 — Follows and the Twitter feed
 `sprint/twitter-4-follows.md`
 
