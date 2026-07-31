@@ -51,6 +51,14 @@
   }
 
   <div class="section-head">Server feeds</div>
+  @if (hasDirectory()) {
+    <a class="list-row" routerLink="/directory">
+      <span>
+        Server directory
+        <span class="muted small">· accounts here who opted into discovery</span>
+      </span>
+    </a>
+  }
   @for (f of serverFeeds(); track f.feed) {
     <a class="list-row" [routerLink]="['/feeds', f.feed]">
       <span>

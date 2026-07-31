@@ -97,6 +97,15 @@ describe('Lists', () => {
   }
 
   /**
+   * The profile-directory row is probed with one limit=1 GET before it is
+   * offered. Tests don't assert on the row, so settle it as empty (which hides
+   * it, like the probed server feeds above).
+   */
+  function flushDirectoryProbe(): void {
+    httpMock.match((r) => r.url === '/api/v1/directory').forEach((req) => req.flush([]));
+  }
+
+  /**
    * On the default (unfiltered) Feeds view the Tags section loads followed and
    * featured hashtags. Tests don't assert on them, so settle both as empty.
    */
@@ -115,6 +124,7 @@ describe('Lists', () => {
     fixture.detectChanges();
     httpMock.expectOne('/api/v1/accounts/verify_credentials').error(new ProgressEvent('error'));
     flushServerFeedProbes();
+    flushDirectoryProbe();
     flushTagLoads();
     return fixture;
   }
@@ -289,6 +299,7 @@ describe('Lists', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
     flushServerFeedProbes();
+    flushDirectoryProbe();
     flushTagLoads();
 
     httpMock
@@ -315,6 +326,7 @@ describe('Lists', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
     flushServerFeedProbes();
+    flushDirectoryProbe();
     flushTagLoads();
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
@@ -330,6 +342,7 @@ describe('Lists', () => {
     const fixture = TestBed.createComponent(Lists);
     fixture.detectChanges();
     flushServerFeedProbes();
+    flushDirectoryProbe();
     flushTagLoads();
 
     httpMock

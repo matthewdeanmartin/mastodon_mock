@@ -56,6 +56,9 @@ export class Lists implements OnInit {
    */
   protected serverFeeds = signal<ServerFeedDef[]>([]);
 
+  /** True once the profile directory is confirmed to work here (see probeDirectory). */
+  protected hasDirectory = signal(false);
+
   /**
    * Subscribed RSS feeds, shown as list rows.
    *
@@ -98,6 +101,7 @@ export class Lists implements OnInit {
       filter: this.filter,
     });
     if (this.shows('lists')) {
+      this.probeDirectory();
       this.load();
       this.loadCollections();
       this.resolveServerFeeds();
@@ -174,6 +178,22 @@ export class Lists implements OnInit {
         },
       });
     }
+  }
+
+  /**
+   * Offer the profile-directory row only if this instance actually serves one.
+   *
+   * Same reasoning as the probed server feeds: instances can turn the directory
+   * off, and a row that leads to an error page is worse than no row. One cheap
+   * call (limit=1) answers it. The directory is not a `ServerFeedDef` — it
+   * yields accounts rather than posts or links and has its own route — so it
+   * gets its own signal instead of being bent into that registry.
+   */
+  private probeDirectory(): void {
+    this.api.directory({ order: 'active', local: true, limit: 1 }).subscribe({
+      next: (accounts) => this.hasDirectory.set(accounts.length > 0),
+      error: () => this.hasDirectory.set(false),
+    });
   }
 
   /** Insert a probed feed in its catalogue order (keeps rows stable). */

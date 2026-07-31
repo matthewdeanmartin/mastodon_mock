@@ -132,6 +132,32 @@ export class Api {
     return this.http.post<Relationship>(`/api/v1/accounts/${id}/remove_from_followers`, {});
   }
 
+  // --- directory ---
+  /**
+   * The instance's profile directory: accounts that opted in to discovery.
+   *
+   * Offset-paged rather than cursor-paged (it is the one listing endpoint that
+   * is), and capped at 80 per page server-side. `local=false` lets remote
+   * accounts the server knows about appear too. Public — no token required —
+   * though some instances disable the directory entirely, which surfaces as an
+   * error rather than an empty page (see the directory page's probe).
+   */
+  directory(options: {
+    order: 'active' | 'new';
+    local: boolean;
+    limit?: number;
+    offset?: number;
+  }): Observable<Account[]> {
+    let params = new HttpParams()
+      .set('order', options.order)
+      .set('local', String(options.local))
+      .set('limit', String(options.limit ?? 80));
+    if (options.offset) {
+      params = params.set('offset', String(options.offset));
+    }
+    return this.http.get<Account[]>('/api/v1/directory', { params });
+  }
+
   // --- timelines ---
   homeTimeline(maxId?: string): Observable<Status[]> {
     return this.http.get<Status[]>('/api/v1/timelines/home', { params: this.pageParams(maxId) });

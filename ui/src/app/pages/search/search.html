@@ -22,10 +22,22 @@
             : 'Search hashtags'
       "
     />
-    <select [ngModel]="type()" (ngModelChange)="type.set($event)" aria-label="Search for">
+    <!-- The engines are an action, not a fourth type: picking one opens a tab and
+         the select snaps back to the real type (see onTypeSelect). -->
+    <select
+      #typeSelect
+      [ngModel]="type()"
+      (ngModelChange)="onTypeSelect($event, typeSelect)"
+      aria-label="Search for"
+    >
       <option value="accounts">Accounts</option>
       <option value="statuses">Posts</option>
       <option value="hashtags">Hashtags</option>
+      <optgroup label="Search the web ↗">
+        @for (e of webEngines; track e.id) {
+          <option [value]="e.id">{{ e.label }}</option>
+        }
+      </optgroup>
     </select>
     <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
     @if (canUseSearchHelper()) {
@@ -96,6 +108,16 @@
       {{ shareCopied() ? 'Link copied!' : 'Share' }}
     </button>
   </div>
+
+  <!-- A web engine can't express replies/media/dates/language, so the serializer
+       drops them. Say which, rather than let the tab that just opened look like
+       it ran the search on screen. -->
+  @if (webDropped().length) {
+    <p class="muted small web-dropped" role="status">
+      {{ webEngineLabel() }} can't filter by {{ webDropped().join(', ') }} — the web search ignored
+      {{ webDropped().length === 1 ? 'that' : 'those' }}.
+    </p>
+  }
 
   <!-- Search server: a full-width row of its own, directly under the search bar.
        A server combo needs horizontal room and the two-box layout below has none
@@ -759,6 +781,10 @@
           @if (emptyExplanation(); as why) {
             <p class="search-unavailable" role="status">{{ why }}</p>
           }
+          <!-- Searching needs a name to search for; the directory doesn't. -->
+          <p class="muted center small">
+            Or <a routerLink="/directory">browse the server directory</a> instead of searching.
+          </p>
         }
       }
 

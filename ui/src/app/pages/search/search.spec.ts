@@ -40,6 +40,9 @@ interface SearchInternals {
   run(): void;
   onChanged(updated: Status): void;
   onDeleted(removed: Status): void;
+  onTypeSelect(value: string, el?: HTMLSelectElement): void;
+  webDropped: WritableSignal<string[]>;
+  replies: WritableSignal<'include' | 'only' | 'exclude'>;
 }
 
 function makeAccount(over: Partial<Account> = {}): Account {
@@ -656,6 +659,98 @@ describe('Search', () => {
       await vi.waitFor(() => {
         expect(internals(fixture).emptyExplanation()).toContain('recognises the hashtag');
       });
+    });
+  });
+
+  /**
+   * The four engines share the type dropdown but are an action, not a fourth
+   * type — anonymous post search is off on nearly every server, and the posts
+   * are still public HTML that Google indexes.
+   */
+  describe('web search hand-off', () => {
+    let opened: string[];
+
+    beforeEach(() => {
+      opened = [];
+      vi.spyOn(window, 'open').mockImplementation((url) => {
+        opened.push(String(url));
+        return null;
+      });
+    });
+
+    it('opens the engine in a new tab, scoped to the search host', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('rust borrow checker');
+
+      internals(fixture).onTypeSelect('google');
+
+      expect(opened).toHaveLength(1);
+      expect(opened[0]).toContain('https://www.google.com/search?q=');
+      expect(decodeURIComponent(opened[0])).toContain('rust borrow checker');
+      // Scoped, so results are posts rather than the whole web.
+      expect(decodeURIComponent(opened[0])).toContain('site:');
+    });
+
+    it('leaves the search type alone — an engine is not a fourth tab', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('rust');
+      internals(fixture).type.set('accounts');
+
+      internals(fixture).onTypeSelect('kagi');
+
+      // "google" must never reach type(): it would leak into the URL, saved
+      // searches, and every `type() === …` branch on the page.
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('snaps the select element back to the real type', () => {
+      // Regression: `[ngModel]` is bound to type(), which an engine pick does
+      // not change — with no change to write back, the <select> kept displaying
+      // "Google" while the page was still on Accounts.
+      const fixture = setUp();
+      internals(fixture).query.set('rust');
+      internals(fixture).type.set('accounts');
+      const el = { value: 'google' } as HTMLSelectElement;
+
+      internals(fixture).onTypeSelect('google', el);
+
+      expect(el.value).toBe('accounts');
+    });
+
+    it('does nothing when there is no query to hand off', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('   ');
+
+      internals(fixture).onTypeSelect('bing');
+
+      expect(opened).toHaveLength(0);
+    });
+
+    it('reports post criteria the web cannot express', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('statuses');
+      internals(fixture).query.set('angular');
+      internals(fixture).replies.set('exclude');
+
+      internals(fixture).onTypeSelect('duckduckgo');
+
+      expect(internals(fixture).webDropped()).toContain('no replies');
+      // Dropped, not approximated: the operator must not reach the engine.
+      expect(decodeURIComponent(opened[0])).not.toContain('is:reply');
+    });
+
+    it('clears the dropped note when a real search type is chosen', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('statuses');
+      internals(fixture).query.set('angular');
+      internals(fixture).replies.set('exclude');
+      internals(fixture).onTypeSelect('google');
+      expect(internals(fixture).webDropped().length).toBeGreaterThan(0);
+
+      internals(fixture).onTypeSelect('accounts');
+
+      expect(internals(fixture).webDropped()).toEqual([]);
+      expect(internals(fixture).type()).toBe('accounts');
     });
   });
 });

@@ -351,6 +351,12 @@ export const routes: Routes = [
         path: 'find-people',
         loadComponent: () => import('./pages/find-people/find-people').then((m) => m.FindPeople),
       },
+      // The server's opt-in profile directory. Public endpoint, so no auth guard:
+      // browsing strangers is exactly what an anonymous visitor is here to do.
+      {
+        path: 'directory',
+        loadComponent: () => import('./pages/directory/directory').then((m) => m.Directory),
+      },
       {
         path: 'starter-kits',
         loadComponent: () => import('./pages/starter-kits/starter-kits').then((m) => m.StarterKits),

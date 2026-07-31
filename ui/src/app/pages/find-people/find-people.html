@@ -21,6 +21,14 @@
 <section class="card">
   <h2 class="card-title">Browse directories</h2>
   <div class="card-body">
+    <!-- Your own server's directory first: it's the one that needs no new tab and
+         whose accounts you can follow without leaving the page. -->
+    <a class="dir-link" routerLink="/directory">
+      <strong>This server's directory</strong>
+      <span class="muted small">
+        Members who opted into discovery — browse by recently active or recently joined.
+      </span>
+    </a>
     <a class="dir-link" href="https://fedi.directory/" target="_blank" rel="noopener noreferrer">
       <strong>fedi.directory ↗</strong>
       <span class="muted small">Hand-curated, interesting accounts by topic.</span>

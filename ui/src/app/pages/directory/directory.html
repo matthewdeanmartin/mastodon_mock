@@ -1,0 +1,66 @@
+<div class="page-head">Server directory</div>
+<p class="muted small dir-blurb">
+  Accounts on {{ host() }} that chose to appear in the public directory. Opting out is the default
+  on some servers, so this is a slice of the membership, not a roster.
+</p>
+
+<div class="dir-controls">
+  <div class="tabs">
+    <button class="tab" [class.active]="order() === 'active'" (click)="setOrder('active')">
+      Recently active
+    </button>
+    <button class="tab" [class.active]="order() === 'new'" (click)="setOrder('new')">
+      Recently joined
+    </button>
+  </div>
+
+  <label class="dir-local">
+    <input type="checkbox" [checked]="local()" (change)="toggleLocal()" />
+    <span>This server only</span>
+  </label>
+</div>
+
+@if (!local()) {
+  <p class="muted small dir-note">
+    Including remote accounts {{ host() }} has seen — that depends on who its members follow, not on
+    the whole network.
+  </p>
+}
+
+@if (error()) {
+  <p class="muted center" role="status">{{ error() }}</p>
+  <p class="muted center small">
+    You can still <a routerLink="/search">search for accounts</a> by name or handle.
+  </p>
+} @else if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (!accounts().length) {
+  <p class="muted center">
+    No accounts listed{{ local() ? ' on this server' : '' }}.
+    @if (local()) {
+      Try unchecking “This server only”.
+    }
+  </p>
+} @else {
+  @for (item of items(); track item.account.id) {
+    <app-account-result-card
+      [item]="item"
+      [relationship]="relationshipFor(item.account.id)"
+      [profileLink]="accountLink(item.account)"
+      [expanded]="isExpanded(item.account.id)"
+      [followBusy]="isFollowBusy(item.account.id)"
+      [anonymous]="capabilities.active"
+      (follow)="onFollow($event)"
+      (unfollow)="onUnfollow($event)"
+      (toggleExpand)="toggleExpand(item.account.id)"
+    />
+  }
+
+  @if (!exhausted()) {
+    <button class="btn btn-outline dir-more" [disabled]="loadingMore()" (click)="loadMore()">
+      {{ loadingMore() ? 'Loading…' : 'Load more' }}
+    </button>
+  } @else {
+    <p class="muted center small">That's everyone the directory lists.</p>
+  }
+}

@@ -58,6 +58,13 @@ import {
   Tristate,
 } from './mawkingbird-search';
 import {
+  isWebEngine,
+  serializeWebQuery,
+  WEB_ENGINES,
+  WebEngine,
+  webSearchUrl,
+} from './web-query-serializer';
+import {
   AccountSortKey,
   ACCOUNT_SORTS,
   StatusSortKey,
@@ -297,6 +304,71 @@ export class Search implements OnInit, OnDestroy {
   protected results = signal<SearchResults | null>(null);
   protected searching = signal(false);
   protected type = signal<SearchType>('accounts');
+
+  // --- Web search hand-off ---
+  // The four engines sit at the bottom of the type dropdown, but they are *not*
+  // search types: picking one opens a tab and leaves the page exactly as it was.
+  // Keeping them out of `SearchType` keeps "google" out of the URL, out of saved
+  // searches, out of the capability probes, and out of every `type() === …`
+  // branch — the dropdown is a widget we are borrowing, not a state machine we
+  // are extending. `onTypeSelect` reverts the select to the real type after an
+  // engine is chosen, so the control never displays a state the page isn't in.
+  protected readonly webEngines = WEB_ENGINES;
+
+  /** The last web search's dropped criteria, shown as a note under the bar. */
+  protected webDropped = signal<string[]>([]);
+  /** Engine label for the note, so it reads "Google can't filter by…". */
+  protected webEngineLabel = signal('');
+
+  /**
+   * Dropdown change: either a real search type, or an engine hand-off.
+   *
+   * The element has to be put back by hand. `[ngModel]` is bound to `type()`,
+   * which an engine pick deliberately does not change — and with no change to
+   * the bound value there is nothing for Angular to write back, so the `<select>`
+   * would sit there displaying "Google" while the page is still on Accounts.
+   * Restoring `el.value` directly is what makes the option behave as a button.
+   */
+  onTypeSelect(value: string, el?: HTMLSelectElement): void {
+    if (isWebEngine(value)) {
+      this.searchTheWeb(value);
+      if (el) {
+        el.value = this.type();
+      }
+      return;
+    }
+    this.webDropped.set([]);
+    this.type.set(value as SearchType);
+  }
+
+  /**
+   * Hand the current query off to a web search engine in a new tab.
+   *
+   * Scoped to the host the search would have gone to, so results are posts from
+   * that instance's own pages. Criteria the web can't express are dropped by the
+   * serializer and reported under the bar rather than silently ignored.
+   */
+  searchTheWeb(engine: WebEngine): void {
+    const criteria =
+      this.type() === 'statuses'
+        ? this.postCriteria()
+        : // Accounts/hashtags have no post criteria; the raw box is the query.
+          { words: this.query().trim() };
+    // Bail on an empty search rather than opening a tab that lists the whole
+    // instance. Judged on the *unscoped* query: `site:` alone is non-empty but
+    // carries no search terms, so testing the final string would let a blank
+    // box through.
+    if (!serializeWebQuery(criteria).query.trim()) {
+      return;
+    }
+    // `capabilityHost()` is '' when Api points at the app's own origin, and a
+    // bare `site:` would be worse than none — fall back to the actual host.
+    const host = this.capabilityHost() || window.location.host;
+    const { query, dropped } = serializeWebQuery(criteria, host);
+    this.webDropped.set(dropped);
+    this.webEngineLabel.set(WEB_ENGINES.find((e) => e.id === engine)?.label ?? '');
+    window.open(webSearchUrl(engine, query), '_blank', 'noopener');
+  }
 
   // --- API-call budget (sprint 3) ---
   // A ceiling on HTTP requests one search may spend. `callsUsed` counts real
