@@ -7,7 +7,14 @@
       rel="noopener noreferrer"
       (click)="houseAds.recordClick(ad.id)"
     >
-      <span class="spotlight-title">{{ ad.title }}</span>
+      <span class="spotlight-heading">
+        <span class="spotlight-title">{{ ad.title }}</span>
+        <!-- Someone else's client or service, so say so rather than let it read
+             as one of ours. Nothing here is paid placement either way. -->
+        @if (ad.kind === 'endorsement') {
+          <span class="spotlight-kind">endorsement</span>
+        }
+      </span>
       <span class="spotlight-text">{{ ad.text }}</span>
       <span class="spotlight-cta">{{ ad.cta }}</span>
     </a>

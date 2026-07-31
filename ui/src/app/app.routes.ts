@@ -437,6 +437,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/about/about').then((m) => m.About),
       },
       {
+        // "Funding" — who pays for what, also a virtual tweet. Its own route
+        // rather than a tail section of Design, so it can be linked to.
+        path: 'funding',
+        loadComponent: () => import('./pages/funding/funding').then((m) => m.Funding),
+      },
+      {
         path: 'server-rules',
         loadComponent: () => import('./pages/server-rules/server-rules').then((m) => m.ServerRules),
       },

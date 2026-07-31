@@ -33,6 +33,23 @@ describe('HouseAdStore', () => {
     expect(showing()).toHaveLength(HOUSE_ADS_SHOWN);
   });
 
+  it('gives every ad a unique id and a valid kind', () => {
+    // Ids key the click tally and the off switch, so a duplicate would silently
+    // merge two ads' state. `kind` is optional and means 'house' when omitted.
+    const ids = HOUSE_ADS.map((ad) => ad.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const ad of HOUSE_ADS) {
+      expect(ad.kind ?? 'house').toMatch(/^(house|endorsement)$/);
+      expect(ad.url).toMatch(/^https:\/\//);
+    }
+  });
+
+  it('carries ads for other people, badged as such', () => {
+    // Phanpy, Elk, Mastui and friends are endorsements, not our projects.
+    expect(HOUSE_ADS.some((ad) => ad.kind === 'endorsement')).toBe(true);
+    expect(HOUSE_ADS.some((ad) => (ad.kind ?? 'house') === 'house')).toBe(true);
+  });
+
   it('rotates to a different pair after half an hour', () => {
     const first = showing();
 

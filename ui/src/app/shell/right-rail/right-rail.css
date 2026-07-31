@@ -120,9 +120,28 @@
   text-decoration: none;
 }
 
+.spotlight-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .spotlight-title {
   font-weight: 800;
   font-size: 14px;
+}
+
+/* Badge for ads pointing at other people's projects. `white-space: nowrap` keeps
+   the longer "endorsement" label on one line; the title wraps instead. */
+.spotlight-kind {
+  flex: none;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
 }
 
 .spotlight-text {
