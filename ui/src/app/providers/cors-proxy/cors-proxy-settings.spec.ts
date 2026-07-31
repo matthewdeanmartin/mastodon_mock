@@ -1,7 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CorsProxySettings } from './cors-proxy-settings';
-import { availableCorsProxies, isDevelopmentOrigin } from './cors-proxy-catalog';
+import {
+  availableCorsProxies,
+  corsProxyEntry,
+  headerCapableCorsProxies,
+  isDevelopmentOrigin,
+} from './cors-proxy-catalog';
 
 describe('CorsProxySettings', () => {
   let settings: CorsProxySettings;
@@ -108,15 +113,26 @@ describe('CorsProxySettings', () => {
     expect(new CorsProxySettings().currentId()).toBeNull();
   });
 
+  // corsproxy-io, not corsfix: Corsfix stopped being localhost-only once
+  // testing showed its free tier is allowlist-based and works from a registered
+  // production domain. corsproxy-io is now the genuinely dev-only entry.
   it('drops a localhost-only proxy when the app is deployed', () => {
-    settings.select('corsfix');
+    settings.select('corsproxy-io');
     expect(settings.dropUnavailableSelection('mockingbird.example.com')).toBe(true);
     expect(settings.currentId()).toBeNull();
   });
 
   it('keeps a localhost-only proxy while running locally', () => {
-    settings.select('corsfix');
+    settings.select('corsproxy-io');
     expect(settings.dropUnavailableSelection('localhost')).toBe(false);
+    expect(settings.currentId()).toBe('corsproxy-io');
+  });
+
+  it('keeps Corsfix selected on a deployed origin', () => {
+    // The regression this guards: Corsfix was `devOnly`, so a user who picked it
+    // under `ng serve` had the selection silently cleared in production.
+    settings.select('corsfix');
+    expect(settings.dropUnavailableSelection('mockingbird.example.com')).toBe(false);
     expect(settings.currentId()).toBe('corsfix');
   });
 });
@@ -126,8 +142,15 @@ describe('availableCorsProxies', () => {
     const ids = availableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
     expect(ids).toContain('allorigins');
     expect(ids).toContain('custom');
-    expect(ids).not.toContain('corsfix');
     expect(ids).not.toContain('corsproxy-io');
+  });
+
+  it('offers Corsfix in production, because its free tier is allowlisted not localhost-only', () => {
+    // It used to be marked devOnly and hidden here. That was wrong: localhost is
+    // merely allowed *implicitly*, and a registered domain works from anywhere.
+    // Hiding it in production hid the fastest free option there is.
+    const ids = availableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    expect(ids).toContain('corsfix');
   });
 
   it('offers everything under ng serve', () => {
@@ -142,5 +165,51 @@ describe('availableCorsProxies', () => {
 
   it('does not treat a deployed host as development', () => {
     expect(isDevelopmentOrigin('mockingbird.example.com')).toBe(false);
+  });
+});
+
+describe('headerCapableCorsProxies', () => {
+  // The distinction these tests protect is invisible in ordinary RSS use and
+  // only bites when an API key must ride along. Measurements behind the values:
+  // sprint/twitter-1-transport.md.
+  it('excludes a proxy measured to strip custom headers', () => {
+    const ids = headerCapableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    // AllOrigins fetches public feeds fine but drops X-API-Key, so the target
+    // answers "no key supplied" and the user blames their own key.
+    expect(ids).not.toContain('allorigins');
+  });
+
+  it('keeps the proxies verified to forward them', () => {
+    const ids = headerCapableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    expect(ids).toContain('corssh');
+    expect(ids).toContain('corsfix');
+  });
+
+  it('keeps unproven proxies rather than guessing they fail', () => {
+    // `custom` is whatever the user deployed. Excluding it would remove the one
+    // option nobody can rate-limit, on a guess.
+    const ids = headerCapableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    expect(ids).toContain('custom');
+    expect(corsProxyEntry('custom')!.forwardsCustomHeaders).toBeUndefined();
+  });
+
+  it('still honours the development-origin filter', () => {
+    const ids = headerCapableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    expect(ids).not.toContain('corsproxy-io');
+  });
+});
+
+describe('catalog facts measured against live proxies', () => {
+  it('records that AllOrigins cannot carry a key', () => {
+    expect(corsProxyEntry('allorigins')!.forwardsCustomHeaders).toBe(false);
+  });
+
+  it('records Corsfix as allowlist-based rather than localhost-only', () => {
+    const corsfix = corsProxyEntry('corsfix')!;
+    expect(corsfix.devOnly).toBeUndefined();
+    expect(corsfix.forwardsCustomHeaders).toBe(true);
+    // The 403 it returns for an unregistered origin is a setup step, and the UI
+    // needs somewhere to send the user.
+    expect(corsfix.originAllowlist?.dashboardUrl).toBeTruthy();
   });
 });
