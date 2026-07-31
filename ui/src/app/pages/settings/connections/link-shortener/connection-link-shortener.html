@@ -96,6 +96,18 @@
       </button>
       <button class="btn btn-outline" type="button" (click)="forget(entry().id)">Disconnect</button>
     </div>
+    <!-- The reachability verdict. Deliberately says only what was observed: a
+         browser cannot tell CORS from DNS from offline, so no cause is claimed. -->
+    @if (lastProbe(); as probe) {
+      @if (probe.status === 'needs-proxy') {
+        <p class="muted small">
+          {{ probe.message }}
+          <a routerLink="/settings/connections/cors-proxy">Set up a CORS proxy</a>
+        </p>
+      } @else {
+        <p class="muted small">{{ probe.message }}</p>
+      }
+    }
     @if (settings.hasKey(entry().id) && expiryLabel(settings.expiresAt()); as expiry) {
       <p class="muted small">This key is deleted from this browser on {{ expiry }}.</p>
     }

@@ -11,6 +11,10 @@ import {
   ShortenerCatalogEntry,
 } from '../../../../providers/shortener/shortener-catalog';
 import { ShortenerHistory } from '../../../../providers/shortener/shortener-history';
+import {
+  ReachabilityResult,
+  ShortenerReachability,
+} from '../../../../providers/shortener/shortener-reachability';
 import { ShortenerId } from '../../../../providers/shortener/shortener-provider';
 import { ShortenerRegistry } from '../../../../providers/shortener/shortener-registry';
 import { ShortenerSettings } from '../../../../providers/shortener/shortener-settings';
@@ -56,6 +60,7 @@ export class ConnectionLinkShortener {
   protected consent = inject(ShortenerProxyConsent);
   private proxy = inject(CorsProxy);
   private history = inject(ShortenerHistory);
+  private reachability = inject(ShortenerReachability);
 
   protected readonly catalog = SHORTENER_CATALOG;
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.browser.detail;
@@ -85,12 +90,17 @@ export class ConnectionLinkShortener {
   /** The proxy in play, for the "already consented" note on the page. */
   protected readonly proxyEntry = computed(() => this.proxy.entry());
 
+  /** The most recent reachability verdict, shown under the actions row. */
+  protected readonly lastProbe = signal<ReachabilityResult | null>(null);
+
   protected choose(id: ShortenerId): void {
     this.selected.set(id);
     this.keyDraft.set('');
     this.domainDraft.set(this.settings.domain(id));
     this.notice.set(null);
     this.error.set(null);
+    // A verdict belongs to the provider it was measured against.
+    this.lastProbe.set(null);
   }
 
   /**
@@ -239,9 +249,54 @@ export class ConnectionLinkShortener {
     }
   }
 
-  /** Re-test an existing connection without re-pasting the key. */
+  /**
+   * Re-test an existing connection without re-pasting the key.
+   *
+   * For a provider with a credential, `verify()` is the real test: it makes an
+   * authenticated call, so reaching the service and having a working key are
+   * settled together.
+   *
+   * For a keyless provider they are not the same thing at all. is.gd's `verify()`
+   * reports success without touching the network (there is nothing to verify, and
+   * its only endpoint is a create, which would litter a junk link on every press).
+   * So "Test again" used to be able to say everything was fine while shortening
+   * failed on the very next click. {@link reachability} closes that gap by making
+   * the request the feature would actually make.
+   */
   protected async test(): Promise<void> {
+    if (this.entry().keyPolicy === 'none' || !this.settings.hasKey(this.entry().id)) {
+      await this.probeReachability();
+      return;
+    }
     await this.verify({ rollbackTo: 'keep' });
+  }
+
+  /**
+   * Ask whether this service is reachable from this browser right now, and say so
+   * in the plainest terms the evidence supports.
+   *
+   * The verdict never claims a *cause*. A browser reports every cross-origin
+   * failure as an indistinguishable `status: 0` — CORS, DNS, offline and
+   * ad-blockers all look identical — so the copy is limited to what was observed:
+   * direct worked, the proxy worked, or neither did. See
+   * {@link ShortenerReachability}.
+   */
+  private async probeReachability(): Promise<void> {
+    const entry = this.entry();
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const result = await firstValueFrom(this.reachability.probe(entry.id));
+      this.lastProbe.set(result);
+      if (result.status === 'direct' || result.status === 'proxy') {
+        this.notice.set(`${entry.label}: ${result.message}`);
+      } else {
+        this.error.set(`${entry.label}: ${result.message}`);
+      }
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Withdraw a consent, so the next proxied request asks again. */

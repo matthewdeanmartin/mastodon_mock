@@ -118,6 +118,85 @@ describe('ShortenerTransport', () => {
     httpMock.expectNone('https://api.dub.co/links');
   });
 
+  it('sends no Accept header when the caller asks to stay CORS-simple', async () => {
+    // The bug this guards: `Accept: application/json` is not CORS-safelisted, so
+    // it forces a preflight. is.gd answers OPTIONS without
+    // `Access-Control-Allow-Headers`, so the preflight fails and the real request
+    // is never sent — a service that works fine is made to look CORS-blocked.
+    settings.activate('isgd');
+    const promise = firstValueFrom(
+      transport.request('isgd', {
+        method: 'GET',
+        url: 'https://is.gd/create.php?format=json&url=https%3A%2F%2Fexample.com%2F',
+        idempotent: true,
+        simpleRequest: true,
+      }),
+    );
+
+    const req = httpMock.expectOne((r) => r.url.startsWith('https://is.gd/create.php'));
+    expect(req.request.headers.has('Accept')).toBe(false);
+    req.flush({ shorturl: 'https://is.gd/abc' });
+
+    await promise;
+  });
+
+  it('still sends Accept for providers that did not ask to stay simple', async () => {
+    const promise = firstValueFrom(transport.request('dub', spec));
+
+    const req = httpMock.expectOne('https://api.dub.co/links');
+    expect(req.request.headers.get('Accept')).toBe('application/json');
+    req.flush({});
+
+    await promise;
+  });
+
+  it('blames the proxy, not the shortener, when the proxy leg 5xxs', async () => {
+    // AllOrigins returning its own 500 must not read as "your API key is bad".
+    // Non-idempotent so the 500 is final rather than retried with a backoff.
+    proxySettings.select('allorigins');
+    consent.grant('dub', 'allorigins');
+
+    const promise = firstValueFrom(transport.request('dub', { ...spec, idempotent: false }));
+    httpMock.expectOne('https://api.dub.co/links').error(new ProgressEvent('error'), { status: 0 });
+    httpMock
+      .expectOne((r) => r.url.startsWith('https://api.allorigins.win/raw'))
+      .flush('<html>500</html>', { status: 500, statusText: 'Internal Server Error' });
+
+    const error = (await promise.catch((e: unknown) => e)) as LinkProviderError;
+    expect(error).toBeInstanceOf(LinkProviderError);
+    expect(error.message).toContain('AllOrigins');
+    expect(error.message).toContain('never reached the shortener');
+  });
+
+  it('says the proxy answered without CORS headers when its leg also dies', async () => {
+    // An error page served without CORS headers: the browser blocks the proxy's
+    // reply too, so nothing at all can be concluded about the shortener.
+    proxySettings.select('allorigins');
+    consent.grant('dub', 'allorigins');
+
+    const promise = firstValueFrom(transport.request('dub', spec));
+    httpMock.expectOne('https://api.dub.co/links').error(new ProgressEvent('error'), { status: 0 });
+    httpMock
+      .expectOne((r) => r.url.startsWith('https://api.allorigins.win/raw'))
+      .error(new ProgressEvent('error'), { status: 0 });
+
+    const error = (await promise.catch((e: unknown) => e)) as LinkProviderError;
+    expect(error.code).toBe('CORS_BLOCKED');
+    expect(error.message).toContain('AllOrigins');
+  });
+
+  it('records which leg carried the request, for the reachability probe', async () => {
+    proxySettings.select('allorigins');
+    consent.grant('dub', 'allorigins');
+
+    const promise = firstValueFrom(transport.request('dub', spec));
+    httpMock.expectOne('https://api.dub.co/links').error(new ProgressEvent('error'), { status: 0 });
+    httpMock.expectOne((r) => r.url.startsWith('https://api.allorigins.win/raw')).flush({ ok: 1 });
+
+    await promise;
+    expect(transport.lastRouteUsed).toBe('proxy');
+  });
+
   it('never retries a create, even on a transient failure', async () => {
     const promise = firstValueFrom(
       transport.request('dub', {

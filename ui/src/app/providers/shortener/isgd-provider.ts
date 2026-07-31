@@ -24,19 +24,28 @@ import { ShortenerTransport } from './shortener-transport';
  * {@link capabilities} reports the truth so the Links page renders is.gd rows
  * read-only rather than showing buttons that cannot work.
  *
- * ## The CORS caveat
+ * ## The CORS situation
  *
- * is.gd's create endpoint sends no `Access-Control-Allow-Origin`, so a browser
- * cannot call it directly — a fact already recorded in the comment at the top of
- * `providers/paste/tinyurl-provider.ts`, which is why TinyURL was chosen for the
- * message-link feature instead. In practice is.gd here needs the user's CORS
- * proxy.
+ * is.gd *is* browser-callable: its create endpoint answers with
+ * `Access-Control-Allow-Origin: *`. This file previously claimed the opposite,
+ * and the claim was self-inflicted — the transport used to attach
+ * `Accept: application/json` to every request, which forced a preflight, and
+ * is.gd's `OPTIONS` reply carries no `Access-Control-Allow-Headers`. The GET was
+ * therefore never sent, and the browser reported "ACAO missing" with
+ * `Status code: 200`, which reads like a server-side CORS refusal but is really a
+ * failed preflight.
  *
- * That is a much smaller ask than it is for the others: the request carries no
- * credential, so {@link ShortenerTransport} routes it through the *ordinary*
- * proxy path with no consent dialog. There is no key for a proxy operator to
- * steal, and the destination being shortened is a URL the user is about to
- * publish anyway.
+ * Hence `simpleRequest: true` below: no `Accept` header, no preflight, and the
+ * response's `ACAO: *` is all that is needed. `format=json` in the query string
+ * already selects JSON, so the header was buying nothing.
+ *
+ * A proxy is still the fallback if a direct call fails for some other reason
+ * (offline, DNS, an ad-blocker) — the browser reports all of those identically as
+ * `status: 0`, so the app cannot tell them apart and simply tries the proxy next.
+ * That fallback is a small ask here: the request carries no credential, so
+ * {@link ShortenerTransport} uses the *ordinary* proxy path with no consent
+ * dialog. There is no key to steal, and the destination is a URL the user is
+ * about to publish anyway.
  */
 
 const CREATE_URL = 'https://is.gd/create.php';
@@ -109,6 +118,9 @@ export class IsgdProvider implements ShortenerProvider {
         method: 'GET',
         url: `${CREATE_URL}?${params.toString()}`,
         idempotent: false,
+        // No `Accept` header, so the browser skips the preflight is.gd cannot
+        // satisfy. See the CORS note at the top of this file.
+        simpleRequest: true,
       })
       .pipe(
         map((response) => {
