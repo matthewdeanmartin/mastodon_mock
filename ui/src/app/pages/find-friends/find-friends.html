@@ -1,0 +1,50 @@
+<div class="page-head">Find Friends</div>
+
+<p class="intro muted small">
+  Every way this app can help you find people to follow, in one place.
+</p>
+
+<a class="doc-row" routerLink="/search">
+  <span class="doc-title">Search for people</span>
+  <span class="muted small"> Find accounts by name, bio or the things they post about. </span>
+</a>
+
+<a class="doc-row" routerLink="/starter-kits">
+  <span class="doc-title">Starter Kits</span>
+  <span class="muted small">
+    Curated bundles of accounts on a theme — follow the whole set at once.
+  </span>
+</a>
+
+@if (!auth.isAnonymous) {
+  <a class="doc-row" routerLink="/find-people">
+    <span class="doc-title">People to follow</span>
+    <span class="muted small">
+      Suggestions drawn from who you already follow, and who they follow.
+    </span>
+  </a>
+}
+
+<a class="doc-row" routerLink="/directory">
+  <span class="doc-title">Profile directory</span>
+  <span class="muted small">
+    Browse the accounts your instance publishes in its opt-in directory.
+  </span>
+</a>
+
+@if (!auth.isAnonymous) {
+  <!-- Anonymous accounts have no follow list on a server to import into. -->
+  <a class="doc-row" routerLink="/settings/import-export">
+    <span class="doc-title">Import a follow list</span>
+    <span class="muted small">
+      Bring your follows over from another instance, or from a Twitter archive.
+    </span>
+  </a>
+}
+
+<a class="doc-row" routerLink="/invites">
+  <span class="doc-title">Invite people here</span>
+  <span class="muted small">
+    Prewritten posts for inviting the people you already know to join you.
+  </span>
+</a>

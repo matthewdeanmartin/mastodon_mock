@@ -116,11 +116,15 @@
           @if (featureFlags.enabled('pastebin')) {
             <a routerLink="/pastes">Pastes</a>
           }
+          @if (featureFlags.enabled('links')) {
+            <a routerLink="/links">Links</a>
+          }
 
-          <!-- Find people to follow -->
+          <!-- Find people to follow. Starter Kits and "Find my friends" used to
+               sit here as separate rows; both are now on the Find Friends hub,
+               along with search, the directory and the people browser. -->
           <div class="menu-divider"></div>
-          <a routerLink="/starter-kits">Starter Kits</a>
-          <a routerLink="/settings/import-export">Find my friends</a>
+          <a routerLink="/find-friends">Find Friends</a>
           <a routerLink="/invites">Invites</a>
 
           <!-- Analytics (of self + the client) -->

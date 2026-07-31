@@ -165,6 +165,13 @@ export const routes: Routes = [
                     (m) => m.ConnectionCorsProxy,
                   ),
               },
+              {
+                path: 'link-shortener',
+                loadComponent: () =>
+                  import('./pages/settings/connections/link-shortener/connection-link-shortener').then(
+                    (m) => m.ConnectionLinkShortener,
+                  ),
+              },
             ],
           },
           {
@@ -450,6 +457,16 @@ export const routes: Routes = [
         canActivate: [featureFlagGuard],
         data: { featureFlag: 'pastebin' },
         loadComponent: () => import('./pages/pastes/pastes-page').then((m) => m.PastesPage),
+      },
+      {
+        path: 'links',
+        canActivate: [featureFlagGuard],
+        data: { featureFlag: 'links' },
+        loadComponent: () => import('./pages/links/links-page').then((m) => m.LinksPage),
+      },
+      {
+        path: 'find-friends',
+        loadComponent: () => import('./pages/find-friends/find-friends').then((m) => m.FindFriends),
       },
       {
         path: 'lists/:id',

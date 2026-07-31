@@ -21,14 +21,19 @@
  * feeds, paste providers) is not a connection and does not belong in this
  * catalog — it gets its own settings page.
  *
- * **One deliberate exception: `cors-proxy`.** It is a picker over a catalog of
- * services, so by the rule above it belongs on its own page. It lives here
- * anyway, because what the user configures *is* one thing — a single proxy,
- * optionally with a paid API key, that every feature routes through — and
- * because the key it holds is a credential that must sit under the same
- * retention policy as the tokens on this page. Choosing one of several vendors
- * is not the same as maintaining a list; the paste providers, where all three
- * stay live at once, are the case the rule is really aimed at.
+ * **Two deliberate exceptions: `cors-proxy` and `link-shortener`.** Both are
+ * pickers over a catalog of services, so by the rule above they belong on their
+ * own pages. They live here anyway, because what the user configures *is* one
+ * thing — a single proxy, or a single active shortener — that every feature
+ * routes through, and because the keys they hold are credentials that must sit
+ * under the same retention policy as the tokens on this page.
+ *
+ * Choosing one of several vendors is not the same as maintaining a list. The
+ * paste providers, where all three stay live at once and a post goes to
+ * whichever you pick at the time, are the case the rule is really aimed at. The
+ * shortener is the near miss that proves the distinction: it *stores* a key per
+ * service, so that switching back is cheap, but only one is ever active and
+ * "shorten this URL" always has exactly one answer.
  */
 
 /** Route segment under `/settings/connections`, and the entry's identity. */
@@ -38,7 +43,8 @@ export type ConnectionId =
   | 'raindrop'
   | 'bluesky'
   | 'openrouter'
-  | 'cors-proxy';
+  | 'cors-proxy'
+  | 'link-shortener';
 
 /**
  * Who a connection belongs to — which is a question users actually ask, and
@@ -171,6 +177,19 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
     pitch: 'An app-specific folder in your Dropbox.',
     scope: 'session',
     enables: ['Browse those files from Mawkingbird'],
+  },
+  {
+    id: 'link-shortener',
+    label: 'Link shortener',
+    emoji: '🔗',
+    pitch: 'Dub, Short.io or T.LY, for shortening the URLs you post.',
+    // The subscription belongs to whoever pays for it, not to a persona — same
+    // reasoning as OpenRouter and the CORS proxy. See ShortenerSettings.
+    scope: 'browser',
+    enables: [
+      'Shorten a URL as you write a post',
+      'Keep a list of every link you have made, and delete old ones',
+    ],
   },
   {
     id: 'cors-proxy',

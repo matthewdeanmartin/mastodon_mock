@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertProxyable,
+  assertProxyableIgnoringCredentialHosts,
   buildProxiedUrl,
   canProxy,
   CorsProxyRefusal,
@@ -71,8 +72,29 @@ describe('assertProxyable', () => {
     'https://api.raindrop.io/rest/v1/raindrop',
     'https://api.github.com/user',
     'https://api.dropboxapi.com/2/files/list_folder',
+    // The link shorteners. Reachable only through proxyCredentialedRequest,
+    // which demands recorded consent; the ordinary path must refuse them.
+    'https://api.dub.co/links',
+    'https://api.short.io/links',
+    'https://api.t.ly/api/v1/link/shorten',
   ])('refuses %s, where a connected account has a credential', (url) => {
     expect(() => assertProxyable(url, INSTANCE)).toThrow(CorsProxyRefusal);
+  });
+
+  it('lets the credential-host-free variant through for the consented path', () => {
+    // assertProxyableIgnoringCredentialHosts is the half of the checks that are
+    // about the URL rather than about which secrets this app holds. It must
+    // still enforce those, but must not block a shortener host — that is the
+    // one thing the consented path exists to allow.
+    expect(() =>
+      assertProxyableIgnoringCredentialHosts('https://api.dub.co/links', INSTANCE),
+    ).not.toThrow();
+    expect(() =>
+      assertProxyableIgnoringCredentialHosts(`${INSTANCE}/api/v1/timelines/home`, INSTANCE),
+    ).toThrow(CorsProxyRefusal);
+    expect(() =>
+      assertProxyableIgnoringCredentialHosts('https://user:pw@api.dub.co/links', INSTANCE),
+    ).toThrow(CorsProxyRefusal);
   });
 
   it('does not mistake a lookalike host for a credential host', () => {

@@ -145,6 +145,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     sensitivity: 'secret',
     note: 'CORS proxy API key, plus the header name a custom proxy wants it in. Billable on a paid plan, so it is retention-governed like the other pasted tokens. Unscoped: the subscription belongs to the human, not to one persona. Split out of mockingbird_cors_proxy so the proxy choice itself stays exportable.',
   },
+  {
+    base: 'mockingbird_shortener_keys',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: 'API keys for the link shorteners (Dub, Short.io, T.LY), one per service, each with its own retention stamp. A key here can create, re-point and delete links on a domain the user publishes under, so it is treated exactly like the other pasted tokens. Unscoped: the subscription belongs to the human, not to one persona. Split out of mockingbird_shortener so the service choice stays exportable.',
+  },
 
   // ---- private: discloses something about the person ----
   {
@@ -223,6 +230,20 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'none',
     sensitivity: 'private',
     note: "Which CORS proxy is selected, and a self-hosted proxy's URL template. Not secret — the key half lives in mockingbird_cors_proxy_key — but a custom template names a host the user runs.",
+  },
+  {
+    base: 'mockingbird_shortener',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'Which link shortener is active, and the short domain configured for each. Not secret — the keys live in mockingbird_shortener_keys — but a branded domain names the user, which is rather the point of one.',
+  },
+  {
+    base: 'mockingbird_shortener_proxy_consent',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'Which (shortener, CORS proxy) pairings the user agreed to send an API key through, and when. Holds no credential itself, but it records a security decision: exporting it and re-importing elsewhere would carry consent the person never gave in that browser.',
   },
   {
     base: 'mockingbird_paste_feeds',
@@ -321,6 +342,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'none',
     sensitivity: 'content',
     note: 'Paste history including bodies. Edit codes are NOT here — see mockingbird_paste_edit_keys.',
+  },
+  {
+    base: 'mockingbird_short_links',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'content',
+    note: 'Short links this browser created: destination, short URL and the provider id needed to edit or delete them. Content rather than private because the destinations are things the user chose to publish. Link passwords are deliberately never stored here.',
   },
   {
     base: 'mockingbird_eliza_dm',

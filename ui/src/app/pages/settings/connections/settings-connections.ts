@@ -7,6 +7,7 @@ import { GitHubSession } from '../../../providers/github/github-session';
 import { OpenRouterSession } from '../../../providers/openrouter/openrouter-session';
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import { PastepileKey } from '../../../providers/paste/pastepile-key';
+import { ShortenerSettings } from '../../../providers/shortener/shortener-settings';
 import {
   CREDENTIAL_LIFETIME_OPTIONS,
   CredentialLifetime,
@@ -51,6 +52,7 @@ export class SettingsConnections implements OnInit {
   private github = inject(GitHubSession);
   private openrouter = inject(OpenRouterSession);
   private corsProxy = inject(CorsProxySettings);
+  private shortener = inject(ShortenerSettings);
   // Not a catalog entry — a paste service is a list, not a one-account
   // connector, so the key is managed on the Pastes page. Governed here anyway,
   // because a stored secret obeys the retention policy wherever it was created.
@@ -94,6 +96,11 @@ export class SettingsConnections implements OnInit {
           // working, and saying otherwise would explain nothing when a feed
           // still fails.
           return { entry, connected: this.corsProxy.usable(), unavailableReason: null };
+        case 'link-shortener':
+          // Same standard as the proxy: a stored key with no short domain (which
+          // Short.io requires) is configured but not usable, and the card should
+          // not claim otherwise.
+          return { entry, connected: this.shortener.usable(), unavailableReason: null };
       }
     }),
   );
@@ -113,6 +120,7 @@ export class SettingsConnections implements OnInit {
       this.bsky,
       this.openrouter,
       this.corsProxy,
+      this.shortener,
       this.pastepileKey,
     ]);
     this.lifetimes.enforceAll();

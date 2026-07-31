@@ -1,0 +1,220 @@
+<div class="spage-head">
+  <h1>🔗 Links</h1>
+  <p>
+    Short links you have made. Create new ones with your connected shortener, and delete the ones
+    you no longer want redirecting.
+  </p>
+</div>
+
+@if (blocked(); as reason) {
+  <section class="setup-callout">
+    <p>{{ reason }}</p>
+    <a class="btn" [routerLink]="['/settings/connections/link-shortener']">
+      Set up a link shortener
+    </a>
+    <p class="muted small">
+      Dub, Short.io and T.LY are supported. You will need a free or paid account with one of them.
+    </p>
+  </section>
+} @else if (entry(); as service) {
+  <form class="create-form" (ngSubmit)="create()">
+    <h2 class="section-title">New short link with {{ service.label }}</h2>
+
+    <label class="field">
+      <span class="field-label">Destination URL</span>
+      <input
+        type="url"
+        name="destination"
+        autocomplete="off"
+        placeholder="https://example.com/the-long-url"
+        [ngModel]="destination()"
+        (ngModelChange)="destination.set($event)"
+      />
+    </label>
+
+    @if (capabilities(); as caps) {
+      <div class="field-row">
+        @if (caps.customSlug) {
+          <label class="field">
+            <span class="field-label"
+              >Custom back-half <span class="muted small">(optional)</span></span
+            >
+            <input
+              type="text"
+              name="slug"
+              autocomplete="off"
+              placeholder="my-link"
+              [ngModel]="slug()"
+              (ngModelChange)="slug.set($event)"
+            />
+          </label>
+        }
+        @if (caps.title) {
+          <label class="field">
+            <span class="field-label">Title <span class="muted small">(optional)</span></span>
+            <input
+              type="text"
+              name="title"
+              autocomplete="off"
+              [ngModel]="title()"
+              (ngModelChange)="title.set($event)"
+            />
+          </label>
+        }
+        @if (caps.description) {
+          <label class="field">
+            <span class="field-label">Description <span class="muted small">(optional)</span></span>
+            <input
+              type="text"
+              name="description"
+              autocomplete="off"
+              [ngModel]="description()"
+              (ngModelChange)="description.set($event)"
+            />
+          </label>
+        }
+      </div>
+    }
+
+    <button class="btn" type="submit" [disabled]="creating() || !destination().trim()">
+      {{ creating() ? 'Shortening…' : 'Shorten' }}
+    </button>
+  </form>
+}
+
+<section class="list-head">
+  <h2 class="section-title">Your links</h2>
+  <form class="search-form" (ngSubmit)="reload()">
+    <input
+      type="search"
+      name="linkSearch"
+      placeholder="Search links"
+      [ngModel]="search()"
+      (ngModelChange)="search.set($event)"
+    />
+    <button class="btn btn-outline" type="submit" [disabled]="loading()">
+      {{ loading() ? 'Loading…' : 'Search' }}
+    </button>
+  </form>
+</section>
+
+@if (notice(); as msg) {
+  <p class="connection-ok" role="status">{{ msg }}</p>
+}
+@if (error(); as msg) {
+  <p class="feed-error" role="alert">{{ msg }}</p>
+}
+
+@if (!loading() && !links().length) {
+  <p class="muted empty">
+    No links yet. Anything you shorten here — and any TinyURL message links you have made on the
+    Pastes page — will show up in this list.
+  </p>
+}
+
+<ul class="link-list">
+  @for (record of links(); track key(record)) {
+    <li class="link-row" [class.busy]="busyRow() === key(record)">
+      @if (editing() === key(record)) {
+        <form class="edit-form" (ngSubmit)="saveEdit(record)">
+          <label class="field">
+            <span class="field-label">Destination URL</span>
+            <input
+              type="url"
+              name="editDestination"
+              [ngModel]="editDestination()"
+              (ngModelChange)="editDestination.set($event)"
+            />
+          </label>
+          @if (capabilities()?.title) {
+            <label class="field">
+              <span class="field-label">Title</span>
+              <input
+                type="text"
+                name="editTitle"
+                [ngModel]="editTitle()"
+                (ngModelChange)="editTitle.set($event)"
+              />
+            </label>
+          }
+          @if (capabilities()?.customSlug) {
+            <label class="field">
+              <span class="field-label">Back-half</span>
+              <input
+                type="text"
+                name="editSlug"
+                [ngModel]="editSlug()"
+                (ngModelChange)="editSlug.set($event)"
+              />
+            </label>
+          }
+          <div class="row-actions">
+            <button class="btn" type="submit" [disabled]="busyRow() === key(record)">Save</button>
+            <button class="btn btn-outline" type="button" (click)="cancelEdit()">Cancel</button>
+          </div>
+        </form>
+      } @else {
+        <div class="link-main">
+          <a class="short-url" [href]="record.shortUrl" target="_blank" rel="noopener noreferrer">
+            {{ record.shortUrl }}
+          </a>
+          @if (record.title) {
+            <span class="link-title">{{ record.title }}</span>
+          }
+          <a
+            class="destination muted small"
+            [href]="record.destinationUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ record.destinationUrl }}</a
+          >
+          <span class="meta muted small">
+            <span class="origin">{{ record.provider }}</span>
+            <span aria-hidden="true">·</span>
+            <span>{{ record.recordedAt | humanTime }}</span>
+            @if (record.expiresAt) {
+              <span aria-hidden="true">·</span>
+              <span>expires {{ record.expiresAt | humanTime }}</span>
+            }
+          </span>
+        </div>
+
+        <div class="row-actions">
+          @if (readOnly(record)) {
+            <span class="muted small">
+              @if (record.provider === 'tinyurl') {
+                Permanent — TinyURL links can't be changed
+              } @else {
+                Connect {{ record.provider }} to manage this
+              }
+            </span>
+          } @else if (confirmingDelete() === key(record)) {
+            <span class="muted small">Delete this link?</span>
+            <button class="btn btn-danger" type="button" (click)="remove(record)">Delete</button>
+            <button class="btn btn-outline" type="button" (click)="confirmingDelete.set(null)">
+              Keep
+            </button>
+          } @else {
+            <button class="btn btn-outline" type="button" (click)="startEdit(record)">Edit</button>
+            <button
+              class="btn btn-outline"
+              type="button"
+              (click)="confirmingDelete.set(key(record))"
+            >
+              Delete
+            </button>
+          }
+        </div>
+      }
+    </li>
+  }
+</ul>
+
+@if (consentPrompt(); as prompt) {
+  <app-proxy-consent-dialog
+    [shortener]="prompt.shortener"
+    [proxy]="prompt.proxy"
+    (accepted)="acceptConsent()"
+    (cancelled)="declineConsent()"
+  />
+}

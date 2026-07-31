@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpHeaders } from '@angular/common/http';
 import { Server } from '../../server';
+import { CorsProxyEntry } from './cors-proxy-catalog';
 import { CorsProxyConfig, CorsProxySettings } from './cors-proxy-settings';
 
 /**
@@ -51,6 +52,12 @@ const CREDENTIAL_HOSTS: readonly string[] = [
   'github.com',
   'dropboxapi.com',
   'dropbox.com',
+  // The link shorteners. Listed here so the ordinary path refuses them like any
+  // other credentialed host; they are reachable only through
+  // `proxyCredentialedRequest`, which demands recorded user consent first.
+  'dub.co',
+  'short.io',
+  't.ly',
 ];
 
 /** Raised when a request must not be proxied. Never caught into a direct fetch. */
@@ -99,6 +106,70 @@ export class CorsProxy {
       headers: proxyHeaders(config),
     };
   }
+
+  /**
+   * Build a proxied request that is *allowed* to carry a credential, because the
+   * user was told exactly what that means and agreed to it.
+   *
+   * ## Why this exists at all
+   *
+   * {@link proxyRequest} refuses credentialed traffic, and that refusal is the
+   * right default — it is the reason a stray feature cannot quietly leak a token
+   * to AllOrigins. But the link shorteners' APIs are built for server-to-server
+   * use and largely do not answer browsers, and this app has no server. For many
+   * users the honest choice is "route the key through a proxy, or the feature
+   * does not exist". Removing the guard to allow that would remove it for
+   * everything; so instead there is this second door, and it is deliberately
+   * hard to open by accident:
+   *
+   * - The caller must pass `consented: true`, which the shortener transport only
+   *   does after {@link ShortenerProxyConsent} confirms a recorded grant for this
+   *   exact `(shortener, proxy)` pair.
+   * - That grant can only be created by the dialog that names the proxy
+   *   operator, links its homepage and privacy policy, and states the concrete
+   *   risk — that whoever runs the proxy can read the key and use it to create
+   *   or delete links in the user's account.
+   * - Every other guard still applies. The Mastodon instance, the connected
+   *   services, userinfo URLs, and mixed content are refused here too; consent
+   *   covers the shortener's own key and nothing else.
+   *
+   * The `Authorization` header is attached by the caller, not here, because the
+   * value is the provider's business — Short.io wants a bare key where the
+   * others want `Bearer`.
+   *
+   * @throws CorsProxyRefusal when no proxy is configured, when consent was not
+   * given, or when the target is refused for any of the ordinary reasons.
+   */
+  proxyCredentialedRequest(targetUrl: string, consented: boolean): ProxiedRequest {
+    if (!consented) {
+      throw new CorsProxyRefusal(
+        'Refusing to send an API key through a CORS proxy without your explicit consent.',
+      );
+    }
+    const config = this.settings.resolve();
+    if (!config) {
+      throw new CorsProxyRefusal('No CORS proxy is configured.');
+    }
+    // The credential-host blocklist is skipped — that is the whole point of this
+    // method — but nothing else is. A consented shortener request still must not
+    // be a plain-http target from an https page, or carry userinfo, or point at
+    // the user's own instance.
+    assertProxyableIgnoringCredentialHosts(targetUrl, this.server.baseUrl());
+    return {
+      url: buildProxiedUrl(config, targetUrl),
+      headers: proxyHeaders(config),
+    };
+  }
+
+  /** Whether the configured proxy is one the user runs themselves. */
+  isSelfHosted(): boolean {
+    return this.settings.currentId() === 'custom';
+  }
+
+  /** The configured proxy's catalog entry, for the consent dialog to describe it. */
+  entry(): CorsProxyEntry | null {
+    return this.settings.chosen();
+  }
 }
 
 /**
@@ -129,6 +200,30 @@ export function proxyHeaders(config: CorsProxyConfig): HttpHeaders {
  * {@link canProxy} without triggering a request.
  */
 export function assertProxyable(targetUrl: string, mastodonBaseUrl: string): void {
+  assertProxyableIgnoringCredentialHosts(targetUrl, mastodonBaseUrl);
+
+  const host = new URL(targetUrl).hostname.toLowerCase();
+  for (const credentialHost of CREDENTIAL_HOSTS) {
+    if (hostMatches(host, credentialHost)) {
+      throw new CorsProxyRefusal(
+        `Refusing to send a request for ${credentialHost} through a CORS proxy — you have a connected account there.`,
+      );
+    }
+  }
+}
+
+/**
+ * Every proxyability check except the connected-services blocklist.
+ *
+ * Split out for {@link CorsProxy.proxyCredentialedRequest}, which exists
+ * precisely to reach one of those hosts with consent. Nothing else should use
+ * this: it is not "assertProxyable but lenient", it is the half of the checks
+ * that are about the *URL* rather than about which secrets this app holds.
+ */
+export function assertProxyableIgnoringCredentialHosts(
+  targetUrl: string,
+  mastodonBaseUrl: string,
+): void {
   let url: URL;
   try {
     url = new URL(targetUrl);
@@ -166,14 +261,6 @@ export function assertProxyable(targetUrl: string, mastodonBaseUrl: string): voi
     throw new CorsProxyRefusal(
       "Refusing to proxy this app's own origin. Same-origin requests never need a proxy.",
     );
-  }
-
-  for (const credentialHost of CREDENTIAL_HOSTS) {
-    if (hostMatches(host, credentialHost)) {
-      throw new CorsProxyRefusal(
-        `Refusing to send a request for ${credentialHost} through a CORS proxy — you have a connected account there.`,
-      );
-    }
   }
 }
 

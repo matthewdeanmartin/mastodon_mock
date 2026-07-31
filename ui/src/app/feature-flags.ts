@@ -5,7 +5,7 @@ import { isCanaryBuild } from './build-flavor';
 const STORAGE_KEY = 'mockingbird_feature_flags';
 const DEV_BUILD_HASH = 'development';
 
-export type FeatureFlagId = 'pastebin';
+export type FeatureFlagId = 'pastebin' | 'links';
 export type FeatureFlagState = 'production' | 'canary' | 'off';
 
 export interface FeatureFlagDefinition {
@@ -26,6 +26,17 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     label: 'Pastebin',
     description: 'Create, manage, and follow posts published through external paste services.',
     defaultState: 'production',
+  },
+  {
+    id: 'links',
+    label: 'Links',
+    description:
+      'Shorten URLs through Dub, Short.io or T.LY, and manage the links you have created.',
+    // Canary first. Every provider needs a paid-or-free account and, for most
+    // people, a CORS proxy as well, so the feature cannot be verified for a
+    // general audience the way a read-only page can — it wants real use on the
+    // canary build before it reaches everyone.
+    defaultState: 'canary',
   },
 ];
 

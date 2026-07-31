@@ -166,10 +166,10 @@ describe('Shell account switching', () => {
       expect(fixture.nativeElement.querySelector('.login-nav')).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('+ Add an account');
       expect(fixture.nativeElement.textContent).toContain('Observability');
-      const starterKits = fixture.nativeElement.querySelector(
-        'a[href="/starter-kits"]',
+      const findFriends = fixture.nativeElement.querySelector(
+        'a[href="/find-friends"]',
       ) as HTMLAnchorElement;
-      expect(starterKits.textContent).toContain('Starter Kits');
+      expect(findFriends.textContent).toContain('Find Friends');
       expect(fixture.nativeElement.querySelector('.anonymous-post-login')).toBeNull();
       expect(fixture.nativeElement.querySelector('.profile-stats')?.textContent).toContain('Posts');
     },
@@ -186,12 +186,14 @@ describe('Shell account switching', () => {
     expect(links.some((link) => link.textContent?.includes('Canary'))).toBe(false);
   });
 
-  it('always includes Starter Kits in the More menu for signed-in users', () => {
+  // Starter Kits and "Find my friends" were separate rows here until they were
+  // collapsed into the Find Friends hub; this asserts the surviving entry point.
+  it('always includes Find Friends in the More menu for signed-in users', () => {
     const fixture = createShell();
     const link = fixture.nativeElement.querySelector(
-      'a[href="/starter-kits"]',
+      'a[href="/find-friends"]',
     ) as HTMLAnchorElement;
 
-    expect(link.textContent).toContain('Starter Kits');
+    expect(link.textContent).toContain('Find Friends');
   });
 });

@@ -1,0 +1,150 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>🔗 Link shortener</h1>
+  <p>
+    Shorten the URLs you post, and keep track of the links you have made. Connect one or more
+    services; the active one is used whenever you shorten something.
+  </p>
+  <p class="muted small">{{ scopeDetail }}</p>
+</div>
+
+<p class="credential-warning small">
+  These API keys are stored in this browser's localStorage, because Mawkingbird has no server to
+  keep them on. A key here can create and delete links in your account, so use a key scoped to link
+  management if the service offers one, and only on a device you trust. You can revoke it on the
+  provider's own site at any time.
+</p>
+
+<section class="picker">
+  <h2 class="section-title">Services</h2>
+  <ul class="provider-list">
+    @for (item of catalog; track item.id) {
+      <li>
+        <button
+          class="provider"
+          type="button"
+          [class.chosen]="selected() === item.id"
+          (click)="choose(item.id)"
+        >
+          <span class="provider-emoji" aria-hidden="true">{{ item.emoji }}</span>
+          <span class="provider-text">
+            <span class="provider-name">
+              {{ item.label }}
+              @if (isActive(item.id)) {
+                <span class="pill pill-active">Active</span>
+              } @else if (connected(item.id)) {
+                <span class="pill">Connected</span>
+              }
+            </span>
+            <span class="provider-pitch muted small">{{ item.pitch }}</span>
+            <span class="provider-tier muted small">{{ item.freeTier }}</span>
+          </span>
+        </button>
+      </li>
+    }
+  </ul>
+</section>
+
+<section class="setup">
+  <h2 class="section-title">{{ entry().emoji }} {{ entry().label }}</h2>
+
+  <ol class="setup-steps muted small">
+    <li>
+      Sign in to
+      <a [href]="entry().homepage" target="_blank" rel="noopener noreferrer">{{ entry().label }}</a>
+      and open
+      <a [href]="entry().keyUrl" target="_blank" rel="noopener noreferrer">your API settings</a>.
+    </li>
+    <li>Create a {{ entry().keyLabel }} and copy it.</li>
+    @if (entry().domainRequired) {
+      <li>Note the short domain on your account — {{ entry().label }} needs it to make links.</li>
+    }
+    <li>Paste it below. Mawkingbird tests the key before saving the connection.</li>
+  </ol>
+
+  @if (connected(entry().id)) {
+    <div class="conn-actions">
+      <span class="connection-ok">Key saved</span>
+      @if (!isActive(entry().id)) {
+        <button class="btn btn-outline" type="button" (click)="activate(entry().id)">
+          Make active
+        </button>
+      }
+      <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="test()">
+        {{ busy() ? 'Testing…' : 'Test again' }}
+      </button>
+      <button class="btn btn-outline" type="button" (click)="forget(entry().id)">Disconnect</button>
+    </div>
+    @if (expiryLabel(settings.expiresAt()); as expiry) {
+      <p class="muted small">This key is deleted from this browser on {{ expiry }}.</p>
+    }
+    @if (hasConsent(entry().id) && proxyEntry(); as proxy) {
+      <p class="muted small consent-note">
+        You have allowed this key to be sent through <strong>{{ proxy.label }}</strong> when a
+        direct request fails.
+        <button class="linkish" type="button" (click)="revokeConsent(entry().id)">
+          Withdraw that
+        </button>
+      </p>
+    }
+  }
+
+  <form class="shortener-form" (ngSubmit)="save()">
+    <label class="field">
+      <span class="field-label">
+        Short domain
+        @if (!entry().domainRequired) {
+          <span class="muted small">(optional)</span>
+        }
+      </span>
+      <input
+        type="text"
+        name="shortenerDomain"
+        autocomplete="off"
+        placeholder="go.example.com"
+        [ngModel]="domainDraft()"
+        (ngModelChange)="domainDraft.set($event)"
+      />
+      <span class="muted small">{{ entry().domainHint }}</span>
+    </label>
+
+    <label class="field">
+      <span class="field-label">{{ entry().keyLabel }}</span>
+      <input
+        type="password"
+        name="shortenerKey"
+        autocomplete="off"
+        [placeholder]="entry().label + ' ' + entry().keyLabel"
+        [ngModel]="keyDraft()"
+        (ngModelChange)="keyDraft.set($event)"
+      />
+    </label>
+
+    <button class="btn" type="submit" [disabled]="busy() || !keyDraft().trim()">
+      {{ busy() ? 'Testing key…' : 'Save and test connection' }}
+    </button>
+  </form>
+
+  <p class="muted small">
+    Read {{ entry().label }}'s
+    <a [href]="entry().privacyUrl" target="_blank" rel="noopener noreferrer">privacy policy</a>
+    to see what they record about the links you create and the people who click them.
+  </p>
+</section>
+
+@if (notice(); as msg) {
+  <p class="connection-ok" role="status">{{ msg }}</p>
+}
+@if (error(); as msg) {
+  <p class="feed-error" role="alert">{{ msg }}</p>
+}
+
+@if (consentPrompt(); as prompt) {
+  <app-proxy-consent-dialog
+    [shortener]="prompt.shortener"
+    [proxy]="prompt.proxy"
+    (accepted)="acceptConsent()"
+    (cancelled)="declineConsent()"
+  />
+}
