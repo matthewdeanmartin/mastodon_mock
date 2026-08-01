@@ -62,14 +62,19 @@ else
   # GitHub Pages serves /<subpath>.html for the extensionless path /<subpath>
   # before falling back to the production SPA 404.html at root. Production's
   # root-clear preserves this file by name.
+  public_base="${PUBLISH_PUBLIC_BASE:-/$subpath/}"
+  case "$public_base" in
+    /*/) ;;
+    *) echo "PUBLISH_PUBLIC_BASE must start and end with '/': $public_base" >&2; exit 2 ;;
+  esac
   cat > "$work/$subpath.html" <<HTML
 <!doctype html>
 <meta charset="utf-8">
-<title>Redirecting to /$subpath/</title>
-<meta http-equiv="refresh" content="0; url=/$subpath/">
-<link rel="canonical" href="/$subpath/">
-<script>location.replace("/$subpath/" + location.search + location.hash);</script>
-<a href="/$subpath/">Continue to /$subpath/</a>
+<title>Redirecting to $public_base</title>
+<meta http-equiv="refresh" content="0; url=$public_base">
+<link rel="canonical" href="$public_base">
+<script>location.replace("$public_base" + location.search + location.hash);</script>
+<a href="$public_base">Continue to $public_base</a>
 HTML
 fi
 

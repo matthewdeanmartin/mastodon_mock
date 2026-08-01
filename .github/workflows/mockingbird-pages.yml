@@ -107,16 +107,20 @@ jobs:
         run: node ui/scripts/gen-build-info.mjs
       - name: Build github.io mirror
         run: make mockingbird MOCKINGBIRD_BASE_HREF="$MIRROR_BASE_HREF"
-      - name: Add standalone SPA fallback
-        # This Pages repository hosts only one SPA, so its generated index is
-        # also the correct fallback for every deep link under /mawkingbird/.
-        run: cp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
+      - name: Add mirror SPA fallback
+        # The mirror has production at its project root and canary below it.
+        # Rewrite the shared fallback's site base so deep links boot the owner.
+        run: |
+          cp ui/dist-mockingbird/browser/404-subpath-redirect.html ui/dist-mockingbird/browser/404.html
+          sed -i "s|var SITE_BASE = '/';|var SITE_BASE = '$MIRROR_BASE_HREF';|" \
+            ui/dist-mockingbird/browser/404.html
       - name: Verify mirror layout
         run: |
           grep --fixed-strings '<base href="/mawkingbird/"/>' ui/dist-mockingbird/browser/index.html
-          cmp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
+          grep --fixed-strings "var SITE_BASE = '/mawkingbird/';" ui/dist-mockingbird/browser/404.html
           test ! -e ui/dist-mockingbird/browser/CNAME
       - name: Publish github.io mirror
         env:
           PUBLISH_REMOTE: git@github.com:${{ env.MIRROR_REPOSITORY }}.git
-        run: bash .github/scripts/publish-gh-pages.sh standalone ui/dist-mockingbird/browser
+        # Preserve the mirror's /canary/ subtree during production promotions.
+        run: bash .github/scripts/publish-gh-pages.sh root ui/dist-mockingbird/browser

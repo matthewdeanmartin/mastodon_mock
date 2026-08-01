@@ -6,6 +6,8 @@ name: Deploy Mawkingbird Canary
 # The published site lives on the gh-pages branch of THIS repository:
 #   /         -> production (updated manually by mockingbird-pages.yml)
 #   /canary/  -> canary     (updated by this workflow on every commit)
+# The same commit is also published to the mirror repository at:
+#   https://matthewdeanmartin.github.io/mawkingbird/canary/
 #
 # Each workflow updates only its own subtree of gh-pages, so canary deploys
 # never disturb production and vice versa. No cross-repo PAT is needed: the
@@ -19,14 +21,13 @@ concurrency:
   group: gh-pages-branch
   cancel-in-progress: false
 
-permissions:
-  contents: write
-
 jobs:
   deploy:
     name: Build and deploy Canary
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -52,4 +53,53 @@ jobs:
       - name: Publish /canary/ to gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/publish-gh-pages.sh canary ui/dist-mockingbird/browser
+
+  mirror:
+    name: Build and deploy github.io Canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      MIRROR_BASE_HREF: /mawkingbird/canary/
+      MIRROR_REPOSITORY: matthewdeanmartin/mawkingbird
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Configure mirror deploy key
+        env:
+          MIRROR_DEPLOY_KEY: ${{ secrets.MAWKINGBIRD_DEPLOY_KEY }}
+        run: |
+          test -n "$MIRROR_DEPLOY_KEY"
+          key="$RUNNER_TEMP/mawkingbird-deploy-key"
+          known_hosts="$RUNNER_TEMP/github-known-hosts"
+          printf '%s\n' "$MIRROR_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          curl --fail --silent --show-error https://api.github.com/meta \
+            | jq --raw-output '.ssh_keys[] | "github.com " + .' > "$known_hosts"
+          echo "GIT_SSH_COMMAND=ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts" \
+            >> "$GITHUB_ENV"
+      - name: Stamp build info
+        run: node ui/scripts/gen-build-info.mjs
+      - name: Build github.io Canary
+        run: make mockingbird MOCKINGBIRD_BASE_HREF="$MIRROR_BASE_HREF"
+      - name: Add canary marker
+        run: printf '%s\n' "$GITHUB_SHA" > ui/dist-mockingbird/browser/canary-commit.txt
+      - name: Verify mirror Canary layout
+        run: |
+          grep --fixed-strings '<base href="/mawkingbird/canary/"/>' ui/dist-mockingbird/browser/index.html
+          test ! -e ui/dist-mockingbird/browser/CNAME
+      - name: Publish github.io /canary/
+        env:
+          PUBLISH_PUBLIC_BASE: /mawkingbird/canary/
+          PUBLISH_REMOTE: git@github.com:${{ env.MIRROR_REPOSITORY }}.git
         run: bash .github/scripts/publish-gh-pages.sh canary ui/dist-mockingbird/browser
