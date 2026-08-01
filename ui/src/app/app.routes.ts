@@ -540,17 +540,26 @@ export const routes: Routes = [
         pathMatch: 'full',
       },
       {
-        // Eliza's browser-local chat — reachable once you follow her (the
-        // component redirects to her profile if you don't). Deliberately NOT
-        // behind the anonymous guard: this is the one chat anon users can have.
-        path: 'eliza/chat',
-        loadComponent: () => import('./eliza/eliza-chat').then((m) => m.ElizaChat),
+        // The same for OpenRouter's (id `openrouter:self`). The profile itself
+        // reports "not found" unless a key is connected and AI is on.
+        path: 'openrouter',
+        redirectTo: 'accounts/openrouter:self',
+        pathMatch: 'full',
       },
       {
-        // Eliza's browser-local inbox — her replies, DMs, and welcome. Also
-        // follow-gated and outside the anonymous guard.
+        // Eliza's chat and inbox used to live on their own routes, outside the
+        // ordinary chat surface. Both are gone: she is now one correspondent in
+        // Conversations like any other, and her notification inbox has been
+        // removed entirely. Redirected rather than deleted so old bookmarks and
+        // any link still pointing here land somewhere sensible.
+        path: 'eliza/chat',
+        redirectTo: 'conversations',
+        pathMatch: 'full',
+      },
+      {
         path: 'eliza/inbox',
-        loadComponent: () => import('./eliza/eliza-inbox').then((m) => m.ElizaInbox),
+        redirectTo: 'conversations',
+        pathMatch: 'full',
       },
       {
         path: 'accounts/:id',

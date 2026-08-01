@@ -43,17 +43,11 @@
           <span>Chat</span>
         </a>
       }
-      @if (auth.isAnonymous && eliza.following()) {
-        <a routerLink="/eliza/inbox" routerLinkActive="active">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5" />
-          </svg>
-          <span>Inbox</span>
-          @if (elizaNotifs.unread(); as count) {
-            <span class="nav-badge" aria-label="{{ count }} unread">{{ count }}</span>
-          }
-        </a>
-        <a routerLink="/eliza/chat" routerLinkActive="active">
+      <!-- Anonymous visitors get Chat too, and it is the same page signed-in
+           users see. There is no notification badge any more: Eliza no longer
+           generates notifications, which is the point of removing her inbox. -->
+      @if (auth.isAnonymous && hasLocalChat()) {
+        <a routerLink="/conversations" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 5h16v12H8l-4 4z" />
           </svg>
@@ -94,7 +88,7 @@
           <span>More</span>
         </summary>
         <div class="menu-panel">
-          @if (auth.isAnonymous) {
+          @if (auth.isAnonymous && aiEnabled()) {
             <a routerLink="/eliza">Meet Eliza</a>
             <div class="menu-divider"></div>
           }

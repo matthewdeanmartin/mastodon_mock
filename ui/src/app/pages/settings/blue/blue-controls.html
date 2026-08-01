@@ -1,4 +1,38 @@
 <div class="ssection">
+  <!-- Radios rather than a checkbox: a third option is planned (the generated
+       imagery swapped for hand-drawn illustrations), and this is a question with
+       several answers rather than a thing that is on or off. -->
+  <div class="srow">
+    <span class="slabel">AI features</span>
+    <div class="scontrol">
+      <label class="radioline">
+        <input
+          type="radio"
+          value="on"
+          [ngModel]="prefs.aiMode()"
+          (ngModelChange)="prefs.setAiMode($event)"
+          name="aiMode"
+        />
+        Show them
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="off"
+          [ngModel]="prefs.aiMode()"
+          (ngModelChange)="prefs.setAiMode($event)"
+          name="aiMode"
+        />
+        Hide them all
+      </label>
+      <span class="hint">
+        Hides Eliza, the OpenRouter chat, AI translation and the search and hashtag suggestions.
+        Nothing is deleted — your OpenRouter key and your conversations stay where they are, and
+        turning this back on restores them.
+      </span>
+    </div>
+  </div>
+
   <div class="srow">
     <span class="slabel">Theme</span>
     <div class="scontrol">

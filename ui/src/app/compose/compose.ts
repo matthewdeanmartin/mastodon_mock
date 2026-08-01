@@ -19,6 +19,7 @@ import { ClientPrefs } from '../client-prefs';
 import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import { TagHelperDialog } from './tag-helper-dialog/tag-helper-dialog';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
+import { AiAvailability } from '../ai-availability';
 import { CustomEmojis } from '../custom-emojis';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
@@ -336,6 +337,7 @@ export class Compose implements OnDestroy {
 
   // --- LLM tag helper (sprint openrouter-5) ---
   private openrouter = inject(OpenRouterSession);
+  private ai = inject(AiAvailability);
   protected tagHelperOpen = signal(false);
 
   /**
@@ -343,7 +345,7 @@ export class Compose implements OnDestroy {
    * a power-user surface, and a button that only explains why it doesn't work is
    * worse than no button (decision 9 in sprint/openrouter-0-overview.md).
    */
-  protected canUseTagHelper = computed(() => this.openrouter.connected());
+  protected canUseTagHelper = computed(() => this.ai.enabled() && this.openrouter.connected());
 
   /**
    * Append suggested tags to the post, skipping any already present.

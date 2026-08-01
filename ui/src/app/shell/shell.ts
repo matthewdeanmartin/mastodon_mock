@@ -7,7 +7,8 @@ import { Api } from '../api';
 import { AccountChoice, Auth, Session } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { ElizaService } from '../eliza/eliza.service';
-import { LocalNotificationStore } from '../eliza/local-notification-store';
+import { AiAvailability } from '../ai-availability';
+import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { environment } from '../../environments/environment';
 import { brandLogoSrc, isCanaryBuild } from '../build-flavor';
 import { Hotkeys } from '../hotkeys';
@@ -43,7 +44,23 @@ function isWideUrl(url: string): boolean {
 export class Shell implements OnInit {
   protected auth = inject(Auth);
   protected eliza = inject(ElizaService);
-  protected elizaNotifs = inject(LocalNotificationStore);
+  private ai = inject(AiAvailability);
+  private openRouter = inject(OpenRouterSession);
+
+  /** Whether AI surfaces are shown at all. See {@link AiAvailability}. */
+  protected aiEnabled = this.ai.enabled;
+
+  /**
+   * Whether an anonymous visitor has anyone to chat with.
+   *
+   * Anonymous accounts cannot reach the real chat API, so the page is worth
+   * showing only when a browser-local correspondent exists: Eliza, once
+   * followed, or OpenRouter, once connected. Both are AI, so the whole entry
+   * disappears when AI features are off.
+   */
+  protected hasLocalChat = computed(
+    () => this.ai.enabled() && (this.eliza.following() || this.openRouter.connected()),
+  );
   private api = inject(Api);
   private router = inject(Router);
   /** Mastodon-compatible keyboard shortcuts (and the "?" help dialog). */

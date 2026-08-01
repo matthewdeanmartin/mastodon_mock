@@ -1,11 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ElizaService } from './eliza.service';
-import { LocalNotificationStore } from './local-notification-store';
 import { LocalPostStore } from './local-post-store';
-import { LocalDmStore } from './local-dm-store';
+import { ConversationStore } from '../chat/conversation-store';
 import { Auth } from '../auth';
-import { ELIZA_ID } from './eliza-identity';
+import { ELIZA_ID, ELIZA_PEER } from './eliza-identity';
 import { ELIZA_POSTS } from './eliza-content';
 
 describe('ElizaService', () => {
@@ -50,33 +49,31 @@ describe('ElizaService', () => {
     expect(eliza.replyWithSeed('i need a break', 3)).toBe(eliza.replyWithSeed('i need a break', 3));
   });
 
-  it('following her posts a one-time welcome notification', () => {
-    const notifs = TestBed.inject(LocalNotificationStore);
+  it('following her is idempotent and notifies nothing', () => {
+    // She used to push a welcome into a local notification inbox. Both the
+    // inbox and every notification she generated are gone: she talks in chat,
+    // and nowhere else.
     eliza.follow();
-    eliza.follow(); // idempotent
-    const welcomes = notifs.items().filter((n) => n.kind === 'welcome');
-    expect(welcomes.length).toBe(1);
-    expect(welcomes[0].link).toBe('/eliza/chat');
+    eliza.follow();
+
+    expect(eliza.following()).toBe(true);
   });
 
-  it('unfollowing wipes local posts, the DM thread, and notifications', () => {
+  it('unfollowing wipes local posts and her conversations', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
     const posts = TestBed.inject(LocalPostStore);
-    const dm = TestBed.inject(LocalDmStore);
-    const notifs = TestBed.inject(LocalNotificationStore);
+    const conversations = TestBed.inject(ConversationStore);
 
     eliza.follow();
     posts.compose('practice post');
-    dm.ensureSeeded();
-    dm.send('hello');
+    const conversation = conversations.currentFor(ELIZA_PEER);
+    conversations.append(conversation.id, { from: 'me', text: 'hello' });
     expect(posts.posts().length).toBeGreaterThan(0);
-    expect(dm.messages().length).toBeGreaterThan(0);
-    expect(notifs.items().length).toBeGreaterThan(0);
+    expect(conversations.forPeer(ELIZA_PEER).length).toBeGreaterThan(0);
 
     eliza.unfollow();
 
     expect(posts.posts()).toEqual([]);
-    expect(dm.messages()).toEqual([]);
-    expect(notifs.items()).toEqual([]);
+    expect(conversations.forPeer(ELIZA_PEER)).toEqual([]);
   });
 });

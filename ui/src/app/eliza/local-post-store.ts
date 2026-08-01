@@ -18,10 +18,6 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { Account, Status } from '../models';
 import { scopedKey } from '../account-scope';
 import { Auth } from '../auth';
-import { ElizaService } from './eliza.service';
-import { LocalNotificationStore } from './local-notification-store';
-import { elizaAccount } from './eliza-identity';
-import { LOCAL_POST_DISCLAIMER } from './eliza-content';
 
 const BASE_KEY = 'mockingbird_local_posts';
 const STATE_VERSION = 1;
@@ -121,8 +117,6 @@ function buildStatus(
 @Injectable({ providedIn: 'root' })
 export class LocalPostStore {
   private readonly auth = inject(Auth);
-  private readonly eliza = inject(ElizaService);
-  private readonly notifications = inject(LocalNotificationStore);
 
   private readonly state = signal<LocalPostState>(loadState());
 
@@ -179,13 +173,18 @@ export class LocalPostStore {
       return null;
     }
     const mine = buildStatus(freshId('local:'), account, trimmed, new Date().toISOString(), null);
-    const reply = this.elizaReplyTo(mine, trimmed);
-    this.append([mine, reply]);
+    this.append([mine]);
     return mine;
   }
 
-  /** Reply to an existing post (Eliza's or one of your own). Eliza answers back.
-   *  Returns the viewer's reply status. */
+  /**
+   * Reply to an existing post (Eliza's or one of your own).
+   *
+   * Eliza used to answer every one of these automatically. She no longer does:
+   * an ELIZA reflection on a practice post was noise attached to something the
+   * user wrote for their own sake, and it made the practice feed feel like a
+   * conversation nobody had asked to have. Her chat is where she talks.
+   */
   reply(inReplyToId: string, text: string): Status | null {
     const trimmed = text.trim();
     if (!trimmed) {
@@ -202,8 +201,7 @@ export class LocalPostStore {
       new Date().toISOString(),
       inReplyToId,
     );
-    const reply = this.elizaReplyTo(mine, trimmed);
-    this.append([mine, reply]);
+    this.append([mine]);
     return mine;
   }
 
@@ -222,17 +220,6 @@ export class LocalPostStore {
     const next: LocalPostState = { version: STATE_VERSION, posts: [] };
     this.persist(next);
     this.state.set(next);
-  }
-
-  /** Build Eliza's reply to `mine`: the disclaimer plus an ELIZA-style line. */
-  private elizaReplyTo(mine: Status, userText: string): Status {
-    const line = this.eliza.reply(userText);
-    const body = `${LOCAL_POST_DISCLAIMER}\n\n${line}`;
-    // A moment after the user's post, so it sorts just below theirs.
-    const createdAt = new Date(Date.parse(mine.created_at) + 1000).toISOString();
-    // Surface it in the Eliza inbox — the plain reflection line is the preview.
-    this.notifications.push('reply', line, '/home');
-    return buildStatus(freshId('eliza:reply:'), elizaAccount(), body, createdAt, mine.id);
   }
 
   private append(newPosts: Status[]): void {

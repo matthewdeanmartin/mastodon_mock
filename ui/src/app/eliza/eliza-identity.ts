@@ -22,6 +22,14 @@ export const ELIZA_ID = 'eliza:self';
 export const ELIZA_ACCT = 'eliza';
 
 /**
+ * Her conversation-store peer key.
+ *
+ * Also the key {@link ConversationStore} treats as ephemeral: starting a new
+ * conversation with Eliza clears the old one instead of archiving it.
+ */
+export const ELIZA_PEER = 'eliza';
+
+/**
  * Her fully-qualified handle. Deliberately on `mockingbird.com` — which is not a
  * Mastodon instance and never will be — so that anything qualifying her handle
  * (list membership, mentions) can't resolve to a real `eliza@mastodon.social`.

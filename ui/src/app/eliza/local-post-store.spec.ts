@@ -1,9 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { LocalPostStore } from './local-post-store';
-import { LocalNotificationStore } from './local-notification-store';
 import { Auth } from '../auth';
-import { LOCAL_POST_DISCLAIMER } from './eliza-content';
 import { ELIZA_ID } from './eliza-identity';
 
 describe('LocalPostStore', () => {
@@ -21,34 +19,30 @@ describe('LocalPostStore', () => {
     expect(store.posts()).toEqual([]);
   });
 
-  it('compose stores the post and an Eliza reply with the disclaimer', () => {
+  it('compose stores only the viewer’s post', () => {
+    // Eliza used to answer every practice post automatically. She does not any
+    // more: an ELIZA reflection attached to something you wrote for your own
+    // sake was noise, and it made the practice feed read as a conversation
+    // nobody asked to have. She talks in chat instead.
     const mine = store.compose('hello world');
     expect(mine).not.toBeNull();
 
     const posts = store.posts();
-    expect(posts.length).toBe(2);
-
-    const reply = posts.find((p) => p.account.id === ELIZA_ID);
-    expect(reply).toBeDefined();
-    expect(reply!.in_reply_to_id).toBe(mine!.id);
-    // The disclaimer is present, though rendered as HTML (apostrophe escaped).
-    expect(reply!.content).toContain('Remember, this doesn');
-    expect(LOCAL_POST_DISCLAIMER).toContain('doesn');
+    expect(posts.length).toBe(1);
+    expect(posts[0].id).toBe(mine!.id);
+    expect(posts.some((p) => p.account.id === ELIZA_ID)).toBe(false);
   });
 
-  it("the viewer's post uses a local: id, the reply uses an eliza: id", () => {
+  it("the viewer's post uses a local: id", () => {
     const mine = store.compose('practice');
-    const reply = store.posts().find((p) => p.id !== mine!.id);
     expect(mine!.id.startsWith('local:')).toBe(true);
-    expect(reply!.id.startsWith('eliza:')).toBe(true);
   });
 
-  it('reply threads under the target and also draws an Eliza answer', () => {
+  it('reply threads under the target without drawing an answer', () => {
     const mine = store.reply('eliza:post:welcome', 'nice to meet you');
     expect(mine!.in_reply_to_id).toBe('eliza:post:welcome');
 
-    const answer = store.posts().find((p) => p.in_reply_to_id === mine!.id);
-    expect(answer?.account.id).toBe(ELIZA_ID);
+    expect(store.posts().some((p) => p.in_reply_to_id === mine!.id)).toBe(false);
   });
 
   it('ignores blank input', () => {
@@ -56,23 +50,16 @@ describe('LocalPostStore', () => {
     expect(store.posts()).toEqual([]);
   });
 
-  it("Eliza's reply to a local post posts a reply notification", () => {
-    const notifs = TestBed.inject(LocalNotificationStore);
-    store.compose('hello');
-    const replies = notifs.items().filter((n) => n.kind === 'reply');
-    expect(replies.length).toBe(1);
-    expect(replies[0].link).toBe('/home');
-  });
-
   it('persists across a refresh (localStorage)', () => {
     store.compose('remember me');
     const fresh = TestBed.inject(LocalPostStore);
     fresh.refresh();
-    expect(fresh.posts().length).toBe(2);
+    expect(fresh.posts().length).toBe(1);
   });
 
   it('delete removes a post and its replies', () => {
     const mine = store.compose('delete me');
+    store.reply(mine!.id, 'a follow-up');
     expect(store.posts().length).toBe(2);
     store.delete(mine!.id);
     expect(store.posts().length).toBe(0);
@@ -88,11 +75,11 @@ describe('LocalPostStore', () => {
 
   it('assembles a thread with the post and its descendants', () => {
     const mine = store.compose('a practice post')!;
+    const follow = store.reply(mine.id, 'and another thing')!;
     const built = store.thread(mine.id, []);
     expect(built).not.toBeNull();
     expect(built!.status.id).toBe(mine.id);
-    // Eliza's reply is a descendant.
-    expect(built!.descendants.some((d) => d.account.id === ELIZA_ID)).toBe(true);
+    expect(built!.descendants.map((d) => d.id)).toContain(follow.id);
   });
 
   it('includes an Eliza timeline post in the thread corpus', () => {

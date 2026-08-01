@@ -661,7 +661,7 @@ describe('Conversations', () => {
     expect(visible).toHaveLength(1);
     expect(visible[0].accounts[0].acct).toBe('alice');
 
-    prefs.setChatAudience('everyone');
+    prefs.setChatAudience('all');
     expect(internals(fixture).visibleChats()).toHaveLength(2);
   });
 });

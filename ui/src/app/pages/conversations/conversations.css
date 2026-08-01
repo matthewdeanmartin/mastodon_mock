@@ -459,3 +459,67 @@
     max-height: 40vh;
   }
 }
+
+/* --- Bot conversations (Eliza, OpenRouter) --- */
+
+.kind-bot {
+  background: #2a7d8c;
+  color: #fff;
+}
+
+/* The conversation picker and "new" button. Above the transcript because this
+   row changes which transcript you are looking at. */
+.bot-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bot-picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.bot-picker select {
+  width: 100%;
+  max-width: 380px;
+}
+
+.bot-note {
+  margin: 0;
+  padding: 6px 12px;
+}
+
+.bot-compose {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.bot-compose textarea {
+  flex: 1;
+  resize: vertical;
+}
+
+.bubble-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A partial answer is worth keeping and worth labelling. Quiet enough not to
+   shout, distinct enough that nobody mistakes it for the whole reply. */
+.bubble-incomplete {
+  margin-top: 4px;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.chat-error {
+  margin: 8px 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgb(209 66 92 / 40%);
+  background: rgb(209 66 92 / 10%);
+}

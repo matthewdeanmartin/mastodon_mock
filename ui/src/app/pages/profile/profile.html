@@ -54,6 +54,19 @@
             {{ twitterFollowed() ? '𝕏 Following locally' : '𝕏 Follow locally' }}
           </button>
         </div>
+      } @else if (isOpenRouter()) {
+        <!-- No follow, no lists, no moderation: this is a service you have
+             connected, not an account you have a relationship with. -->
+        <div class="profile-buttons">
+          <a
+            class="btn"
+            [routerLink]="['/conversations']"
+            [queryParams]="{ open: 'bot:openrouter' }"
+          >
+            💬 Message
+          </a>
+          <a class="btn btn-outline" routerLink="/settings/connections/openrouter">Settings</a>
+        </div>
       } @else if (isSelf() && auth.isAnonymous) {
         <div class="profile-buttons">
           <a class="btn btn-outline" routerLink="/settings/profile">Edit local profile</a>
@@ -145,7 +158,9 @@
             </button>
           }
           @if (isEliza() && relationship()?.following) {
-            <a class="btn" routerLink="/eliza/chat">💬 Message</a>
+            <a class="btn" [routerLink]="['/conversations']" [queryParams]="{ open: 'bot:eliza' }">
+              💬 Message
+            </a>
           }
         </div>
       }

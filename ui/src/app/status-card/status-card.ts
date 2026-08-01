@@ -23,6 +23,7 @@ import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, MediaAttachment, Poll, Status, Translation } from '../models';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
+import { AiAvailability } from '../ai-availability';
 import { AiTranslate, AiTranslation } from '../ai-translate';
 import { TranslationPreference } from '../translation-preference';
 import { MutedPosts } from '../muted-posts';
@@ -1105,6 +1106,7 @@ export class StatusCard {
 
   // --- AI translation (anonymous-great sprint 3) ---
   private openrouter = inject(OpenRouterSession);
+  private ai = inject(AiAvailability);
   private aiTranslate = inject(AiTranslate);
   protected translatePref = inject(TranslationPreference);
 
@@ -1150,7 +1152,9 @@ export class StatusCard {
   }
 
   /** Drives the dialog's two faces: chooser when connected, upsell when not. */
-  protected openrouterConnected = computed(() => this.openrouter.connected());
+  // AI translation is an AI surface, so it answers to the AI switch as well as
+  // to whether a key exists. See AiAvailability.
+  protected openrouterConnected = computed(() => this.ai.enabled() && this.openrouter.connected());
 
   /** The 🌐 click for a signed-in user, routed by preference. */
   translateByPreference(event: Event): void {

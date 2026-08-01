@@ -30,8 +30,8 @@ describe('LocalCompose', () => {
 
     expect(emitted.length).toBe(1);
     expect(emitted[0].in_reply_to_id).toBeNull();
-    // Store holds the post + Eliza's reply.
-    expect(TestBed.inject(LocalPostStore).posts().length).toBe(2);
+    // Just the viewer's post: Eliza no longer answers practice posts.
+    expect(TestBed.inject(LocalPostStore).posts().length).toBe(1);
     // Input cleared after submit.
     expect(cmp.text).toBe('');
   });

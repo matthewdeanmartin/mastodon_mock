@@ -16,15 +16,20 @@ import { inject, Injectable, Injector } from '@angular/core';
 import { Account, Relationship, Status } from '../models';
 import { elizaReply } from './eliza-engine';
 import { ElizaFollow } from './eliza-follow';
-import { LocalNotificationStore } from './local-notification-store';
+import { ConversationStore } from '../chat/conversation-store';
 import { LocalPostStore } from './local-post-store';
-import { LocalDmStore } from './local-dm-store';
-import { ELIZA_ACCT, ELIZA_ID, elizaAccount, elizaTimeline, isElizaId } from './eliza-identity';
+import {
+  ELIZA_ACCT,
+  ELIZA_ID,
+  ELIZA_PEER,
+  elizaAccount,
+  elizaTimeline,
+  isElizaId,
+} from './eliza-identity';
 
 @Injectable({ providedIn: 'root' })
 export class ElizaService {
   private readonly followState = inject(ElizaFollow);
-  private readonly notifications = inject(LocalNotificationStore);
   // Resolved lazily to break the cycle: the post/DM stores inject ElizaService.
   private readonly injector = inject(Injector);
 
@@ -70,18 +75,15 @@ export class ElizaService {
   /** Follow Eliza (browser-local; never touches a real following list). */
   follow(): void {
     this.followState.follow();
-    // Greet the new follower in her inbox (one-time).
-    this.notifications.ensureWelcome();
   }
 
-  /** Unfollow Eliza, wiping the whole practice relationship: her feed replies,
-   *  your local practice posts, the DM thread, and her notifications. Ending the
-   *  follow ends the simulation cleanly rather than leaving orphaned content. */
+  /** Unfollow Eliza, wiping the whole practice relationship: your local practice
+   *  posts and the chat. Ending the follow ends the simulation cleanly rather
+   *  than leaving orphaned content. */
   unfollow(): void {
     this.followState.unfollow();
     this.injector.get(LocalPostStore).clear();
-    this.injector.get(LocalDmStore).clear();
-    this.notifications.clear();
+    this.injector.get(ConversationStore).clearPeer(ELIZA_PEER);
   }
 
   /** Re-read follow state after an account switch changes the storage scope. */

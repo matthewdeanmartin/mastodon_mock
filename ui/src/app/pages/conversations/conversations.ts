@@ -20,6 +20,15 @@ import { HumanTimePipe } from '../../human-time.pipe';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { Streaming } from '../../streaming';
 import { Account, Conversation, MastodonNotification, Relationship, Status } from '../../models';
+import { AiAvailability } from '../../ai-availability';
+import { BotPeers } from '../../chat/bot-peers';
+import {
+  Conversation as StoredConversation,
+  ConversationMessage,
+  ConversationStore,
+} from '../../chat/conversation-store';
+import { LlmConversation } from '../../chat/llm-conversation';
+import { ElizaService } from '../../eliza/eliza.service';
 import { BlueskyChatApi, isChatScopeError } from '../../providers/bluesky/bluesky-chat-api';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import {
@@ -40,7 +49,12 @@ const READ_KEY = 'mockingbird_chat_read';
  */
 export interface Chat {
   key: string;
-  kind: 'private' | 'public' | 'bsky';
+  /**
+   * `bot` is a browser-local correspondent — Eliza or a language model through
+   * OpenRouter. Unlike the other three it involves no Mastodon or Bluesky API
+   * at all, which is what lets an anonymous visitor use this page.
+   */
+  kind: 'private' | 'public' | 'bsky' | 'bot';
   /** Ids of the merged conversations (private chats only; used for mark-read). */
   convIds: string[];
   /** Participants we hold full Account records for (avatars, moderation menu). */
@@ -120,6 +134,18 @@ export class Conversations implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   protected bsky = inject(BlueskySession);
   protected prefs = inject(ClientPrefs);
+  protected bots = inject(BotPeers);
+  protected conversations = inject(ConversationStore);
+  protected llm = inject(LlmConversation);
+  protected ai = inject(AiAvailability);
+  private eliza = inject(ElizaService);
+
+  /** The conversation shown for the selected bot, when one is selected. */
+  protected currentConversationId = signal<string | null>(null);
+  /** True when the dropdown is set to "All conversations" (flattened view). */
+  protected flattened = signal(false);
+  /** What the user is typing to a bot. Separate from the Mastodon composer. */
+  protected botDraft = signal('');
 
   /** A chat key requested via `?open=…` (e.g. from a notification) to auto-select. */
   private pendingOpen = signal<string | null>(null);
@@ -190,6 +216,12 @@ export class Conversations implements OnInit, OnDestroy {
       if (chat) {
         this.openHandled = true;
         this.prefs.setChatKind(chat.kind);
+        // The audience filter can hide the row we were sent to open — 'mutuals'
+        // excludes bots by definition. Widen it rather than selecting something
+        // the list refuses to show.
+        if (this.prefs.chatAudience() === 'mutuals' && chat.kind === 'bot') {
+          this.prefs.setChatAudience('all');
+        }
         this.select(chat);
         return;
       }
@@ -295,6 +327,26 @@ export class Conversations implements OnInit, OnDestroy {
         lastAt: convo.lastMessage?.sentAt,
       });
     }
+    // Bot correspondents. Always present when available, with or without a
+    // conversation behind them — unlike every other row here, an empty one is
+    // not a stale artifact but an invitation to start talking.
+    for (const bot of this.bots.peers()) {
+      const latest = this.conversations.forPeer(bot.peer)[0];
+      const lastMessage = latest?.messages.at(-1);
+      rows.push({
+        key: `bot:${bot.peer}`,
+        kind: 'bot',
+        convIds: [],
+        accounts: [bot.account],
+        handles: [bot.account.acct],
+        lastStatus: null,
+        // Nothing to be unread about: these never arrive while you are away,
+        // because nothing here speaks until it is spoken to.
+        unread: false,
+        previewText: lastMessage?.text ?? '',
+        lastAt: latest?.updatedAt,
+      });
+    }
     // A drafted 1:1 chat surfaces only until a real message exists under its key.
     // The moment the conversations/mentions data grows a row with the same key,
     // that real row wins and the stub drops out (no duplicate, no stale empty).
@@ -314,13 +366,24 @@ export class Conversations implements OnInit, OnDestroy {
       if (kind !== 'all' && c.kind !== kind) {
         return false;
       }
-      if (audience === 'mutuals' && c.accounts.length) {
-        const mutual = c.accounts.every((a) => {
-          const r = rels.get(a.id);
-          return !!r && r.following && r.followed_by;
-        });
-        if (!mutual) {
+      if (audience === 'bots') {
+        return c.kind === 'bot';
+      }
+      // Bots are never mutuals — there is no relationship to be mutual about,
+      // and a synthetic correspondent showing up under a filter about who
+      // follows you back would be answering a question nobody asked.
+      if (audience === 'mutuals') {
+        if (c.kind === 'bot') {
           return false;
+        }
+        if (c.accounts.length) {
+          const mutual = c.accounts.every((a) => {
+            const r = rels.get(a.id);
+            return !!r && r.following && r.followed_by;
+          });
+          if (!mutual) {
+            return false;
+          }
         }
       }
       return true;
@@ -330,6 +393,104 @@ export class Conversations implements OnInit, OnDestroy {
   protected selected = computed(
     () => this.chats().find((c) => c.key === this.selectedKey()) ?? null,
   );
+
+  // --- Bot conversations ---
+
+  /** The selected bot peer key, or null when the selection is not a bot. */
+  protected selectedPeer = computed(() => {
+    const chat = this.selected();
+    return chat?.kind === 'bot' ? chat.key.slice('bot:'.length) : null;
+  });
+
+  /** Every conversation with the selected bot, for the dropdown. */
+  protected peerConversations = computed<StoredConversation[]>(() => {
+    const peer = this.selectedPeer();
+    return peer ? this.conversations.forPeer(peer) : [];
+  });
+
+  /**
+   * The messages on screen.
+   *
+   * "All conversations" concatenates every conversation with this peer in
+   * chronological order — the flattening the dropdown offers. It is a reading
+   * view only: sending while flattened would have no conversation to append to,
+   * so the composer targets the most recent one.
+   */
+  protected botMessages = computed<ConversationMessage[]>(() => {
+    if (this.flattened()) {
+      return [...this.peerConversations()]
+        .reverse()
+        .flatMap((conversation) => conversation.messages);
+    }
+    const id = this.currentConversationId();
+    return id ? (this.conversations.get(id)?.messages ?? []) : [];
+  });
+
+  /** True while a model reply is streaming into the shown conversation. */
+  protected botStreaming = computed(() => {
+    const id = this.currentConversationId();
+    return !!id && this.llm.streaming(id);
+  });
+
+  /** Select a conversation from the dropdown. `all` flattens instead. */
+  protected pickConversation(value: string): void {
+    if (value === 'all') {
+      this.flattened.set(true);
+      return;
+    }
+    this.flattened.set(false);
+    this.currentConversationId.set(value);
+  }
+
+  /**
+   * Start a fresh conversation with the selected bot.
+   *
+   * For Eliza this discards the previous one — see {@link ConversationStore}.
+   * For a model it is kept and stays in the dropdown.
+   */
+  protected newConversation(): void {
+    const peer = this.selectedPeer();
+    if (!peer) {
+      return;
+    }
+    this.flattened.set(false);
+    this.currentConversationId.set(this.conversations.startNew(peer).id);
+  }
+
+  /** Send the drafted line to the selected bot. */
+  protected sendToBot(): void {
+    const peer = this.selectedPeer();
+    const text = this.botDraft().trim();
+    if (!peer || !text) {
+      return;
+    }
+    // Flattened is a reading view; sending targets the live conversation.
+    const id = this.flattened()
+      ? this.conversations.currentFor(peer).id
+      : this.ensureConversation(peer);
+    this.flattened.set(false);
+    this.currentConversationId.set(id);
+    this.botDraft.set('');
+
+    if (this.bots.find(peer)?.streams) {
+      // Deliberately not awaited: the reply streams into the store, so this
+      // page can be left and the answer still arrives.
+      void this.llm.send(id, text);
+      return;
+    }
+    // Eliza answers instantly and locally.
+    this.conversations.append(id, { from: 'me', text });
+    this.conversations.append(id, { from: 'them', text: this.eliza.reply(text) });
+  }
+
+  /** The shown conversation, creating one if this peer has none yet. */
+  private ensureConversation(peer: string): string {
+    const current = this.currentConversationId();
+    if (current && this.conversations.get(current)?.peer === peer) {
+      return current;
+    }
+    return this.conversations.currentFor(peer).id;
+  }
 
   /**
    * Pre-seed the composer with @mentions of the reply's recipients.
@@ -520,6 +681,14 @@ export class Conversations implements OnInit, OnDestroy {
 
   select(chat: Chat): void {
     this.selectedKey.set(chat.key);
+    if (chat.kind === 'bot') {
+      // Open the most recent conversation, or an empty new one. Nothing is
+      // fetched and nothing is marked read: this correspondent lives here.
+      const peer = chat.key.slice('bot:'.length);
+      this.flattened.set(false);
+      this.currentConversationId.set(this.conversations.currentFor(peer).id);
+      return;
+    }
     if (chat.kind === 'bsky') {
       this.loadBskyThread(chat);
       return;

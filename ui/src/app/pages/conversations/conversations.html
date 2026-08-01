@@ -4,10 +4,10 @@
     <div class="chat-filters">
       <div class="seg" role="group" aria-label="Who">
         <button
-          [class.active]="prefs.chatAudience() === 'everyone'"
-          (click)="prefs.setChatAudience('everyone')"
+          [class.active]="prefs.chatAudience() === 'all'"
+          (click)="prefs.setChatAudience('all')"
         >
-          Everyone
+          All
         </button>
         <button
           [class.active]="prefs.chatAudience() === 'mutuals'"
@@ -15,6 +15,17 @@
         >
           Mutuals
         </button>
+        <!-- Only with somewhere to lead: without a bot correspondent this
+             filter can only ever produce an empty list. -->
+        @if (bots.peers().length) {
+          <button
+            [class.active]="prefs.chatAudience() === 'bots'"
+            (click)="prefs.setChatAudience('bots')"
+            title="Eliza and your language model"
+          >
+            Bots
+          </button>
+        }
       </div>
       <div class="seg" role="group" aria-label="Kind">
         <button [class.active]="prefs.chatKind() === 'all'" (click)="prefs.setChatKind('all')">
@@ -99,6 +110,10 @@
               <span class="kind-badge kind-public">📢 PUBLIC</span>
             } @else if (c.kind === 'bsky') {
               <span class="kind-badge kind-bsky">🦋 Bluesky</span>
+            } @else if (c.kind === 'bot') {
+              <!-- "This browser" rather than "Private": both are true, but the
+                   surprising one is that nothing here leaves the machine. -->
+              <span class="kind-badge kind-bot">🤖 This browser</span>
             } @else {
               <span class="kind-badge kind-private">🔒 Private</span>
             }
@@ -165,10 +180,14 @@
           <span class="kind-badge kind-public">📢 PUBLIC</span>
         } @else if (chat.kind === 'bsky') {
           <span class="kind-badge kind-bsky">🦋 Bluesky</span>
+        } @else if (chat.kind === 'bot') {
+          <span class="kind-badge kind-bot">🤖 This browser</span>
         } @else {
           <span class="kind-badge kind-private">🔒 Private</span>
         }
-        @if (chat.accounts.length) {
+        <!-- No moderation menu for bots: there is nobody to mute, block or
+             report, and offering it would imply otherwise. -->
+        @if (chat.accounts.length && chat.kind !== 'bot') {
           <details class="danger-menu">
             <summary aria-label="Conversation actions">•••</summary>
             <div class="danger-menu-panel">
@@ -200,9 +219,80 @@
         </div>
       }
 
+      <!-- Bot conversation picker. Sits above the transcript because it changes
+           what the transcript *is*, unlike anything else in this header. -->
+      @if (chat.kind === 'bot') {
+        <div class="bot-bar">
+          <div class="bot-picker">
+            <select
+              [ngModel]="flattened() ? 'all' : currentConversationId()"
+              (ngModelChange)="pickConversation($event)"
+              name="conversation"
+              aria-label="Conversation"
+            >
+              @for (conversation of peerConversations(); track conversation.id) {
+                <option [value]="conversation.id">{{ conversation.title }}</option>
+              }
+              @if (peerConversations().length > 1) {
+                <option value="all">All conversations</option>
+              }
+            </select>
+          </div>
+          <button class="btn btn-outline btn-sm" type="button" (click)="newConversation()">
+            + New conversation
+          </button>
+        </div>
+        @if (flattened()) {
+          <p class="muted small bot-note">
+            Every conversation with {{ chat.accounts[0].display_name }}, oldest first. Sending a
+            message continues the most recent one.
+          </p>
+        }
+        <!-- Eliza's history is not kept, and that should be said before someone
+             starts a conversation they assume they can come back to. -->
+        @if (selectedPeer() === 'eliza') {
+          <p class="muted small bot-note">
+            Eliza remembers nothing between messages, so starting a new conversation clears this one
+            rather than saving it.
+          </p>
+        }
+      }
+
       <div class="chat-scroll" #scroller>
         @if (threadLoading()) {
           <p class="muted center small">Loading thread…</p>
+        }
+        @if (chat.kind === 'bot') {
+          @for (m of botMessages(); track m.id) {
+            <div class="bubble-row" [class.mine]="m.from === 'me'">
+              <div class="bubble" [class.bubble-mine]="m.from === 'me'">
+                <div class="bubble-text">{{ m.text }}</div>
+                @if (m.incomplete) {
+                  <!-- Kept rather than hidden: these tokens were paid for, and a
+                       truncated answer presented as whole would be worse. -->
+                  <div class="bubble-incomplete small">
+                    ⚠ Cut off — the reply was still arriving.
+                  </div>
+                }
+              </div>
+            </div>
+          }
+          @if (botStreaming()) {
+            <p class="muted center small">
+              Answering… you can leave this page; the reply keeps arriving.
+              <button class="btn btn-outline btn-sm" type="button" (click)="llm.stop()">
+                Stop
+              </button>
+            </p>
+          }
+          @if (!botMessages().length && !botStreaming()) {
+            <p class="muted center small">
+              Nothing here yet. Say something to {{ chat.accounts[0].display_name }}.
+            </p>
+          }
+          @if (llm.error(); as message) {
+            <p class="chat-error" role="alert">{{ message }}</p>
+          }
         }
         @if (chat.kind === 'bsky') {
           @for (m of bskyMessages(); track m.id) {
@@ -312,7 +402,24 @@
         </div>
       }
 
-      @if (chat.kind === 'bsky') {
+      @if (chat.kind === 'bot') {
+        <div class="chat-compose bot-compose">
+          <textarea
+            rows="2"
+            [ngModel]="botDraft()"
+            (ngModelChange)="botDraft.set($event)"
+            (keydown.enter)="$event.preventDefault(); sendToBot()"
+            [placeholder]="'Message ' + chat.accounts[0].display_name + '…'"
+          ></textarea>
+          <button
+            class="btn"
+            (click)="sendToBot()"
+            [disabled]="botStreaming() || !botDraft().trim()"
+          >
+            Send
+          </button>
+        </div>
+      } @else if (chat.kind === 'bsky') {
         <div class="chat-compose bsky-compose">
           <textarea
             rows="2"

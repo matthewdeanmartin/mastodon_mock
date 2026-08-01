@@ -26,6 +26,7 @@ import { SearchHelperDialog } from './search-helper-dialog/search-helper-dialog'
 import { SearchContext } from './search-helper';
 import { SearchSyntaxHelp } from './search-syntax-help/search-syntax-help';
 import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
+import { AiAvailability } from '../../ai-availability';
 import { AccountSearchStore } from './account-search-store';
 import {
   AccountFacet,
@@ -141,6 +142,7 @@ export class Search implements OnInit, OnDestroy {
 
   // --- LLM search helper (sprint openrouter-4) ---
   private openrouter = inject(OpenRouterSession);
+  private ai = inject(AiAvailability);
   protected searchHelperOpen = signal(false);
 
   /**
@@ -245,7 +247,7 @@ export class Search implements OnInit, OnDestroy {
    * queries the user cannot run would be worse than offering nothing.
    */
   protected canUseSearchHelper = computed(
-    () => this.openrouter.connected() && !this.capabilities.active,
+    () => this.ai.enabled() && this.openrouter.connected() && !this.capabilities.active,
   );
 
   /**

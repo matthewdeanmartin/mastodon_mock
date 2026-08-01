@@ -34,6 +34,10 @@ import { AccountStatusesOptions } from '../../api';
 import { Observable } from 'rxjs';
 import { ElizaService } from '../../eliza/eliza.service';
 import { isElizaId } from '../../eliza/eliza-identity';
+import { AiAvailability } from '../../ai-availability';
+import { OpenRouterModelChoice } from '../../providers/openrouter/openrouter-model-choice';
+import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
+import { isOpenRouterId, openRouterAccount } from '../../providers/openrouter/openrouter-identity';
 import { CloneFriendsDialog } from './clone-friends-dialog/clone-friends-dialog';
 import { PageDiagnostics } from '../../page-diagnostics';
 
@@ -69,6 +73,9 @@ export class Profile implements OnInit, OnDestroy {
   private anonymousPublic = inject(AnonymousPublicApi);
   protected anonymousFollows = inject(AnonymousFollows);
   protected eliza = inject(ElizaService);
+  private ai = inject(AiAvailability);
+  private openRouter = inject(OpenRouterSession);
+  private modelChoice = inject(OpenRouterModelChoice);
   private location = inject(Location);
   private rss = inject(RssProvider);
   private twitterFollows = inject(TwitterFollows);
@@ -181,6 +188,7 @@ export class Profile implements OnInit, OnDestroy {
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
   /** True when this profile is Eliza's — unlocks her local "Message" button. */
   protected isEliza = computed(() => isElizaId(this.account()?.id));
+  protected isOpenRouter = computed(() => isOpenRouterId(this.account()?.id));
 
   // --- clone friends list (anonymous-great sprint 2) ---
 
@@ -295,6 +303,10 @@ export class Profile implements OnInit, OnDestroy {
     }
     if (isElizaId(id)) {
       this.loadEliza();
+      return;
+    }
+    if (isOpenRouterId(id)) {
+      this.loadOpenRouter();
       return;
     }
     if (this.auth.isAnonymous && id === 'anonymous') {
@@ -570,6 +582,36 @@ export class Profile implements OnInit, OnDestroy {
     this.statuses.set(timeline);
     this.featured.set([]);
     this.relationship.set(this.eliza.relationship());
+    this.loading.set(false);
+    this.statusesLoading.set(false);
+    this.exhausted.set(true);
+    this.tab.set('posts');
+  }
+
+  /**
+   * OpenRouter's synthetic profile — the model you have configured, as a
+   * correspondent.
+   *
+   * Deliberately empty of posts, and that is not a gap to fill later: a
+   * language model has nothing to say until asked, so a feed of model-authored
+   * posts would be words put in its mouth. The profile is the door to a
+   * conversation, and the template's empty state says so.
+   *
+   * Left as "account not found" when AI is off or no key is connected. There is
+   * genuinely nothing to show, and a profile for a service you cannot reach
+   * would only raise a question the page cannot answer.
+   */
+  private loadOpenRouter(): void {
+    if (!this.ai.enabled() || !this.openRouter.connected()) {
+      this.loading.set(false);
+      this.statusesLoading.set(false);
+      return;
+    }
+    this.account.set(openRouterAccount(this.modelChoice.modelId()));
+    this.statuses.set([]);
+    this.pinnedStatuses.set([]);
+    this.featured.set([]);
+    this.relationship.set(null);
     this.loading.set(false);
     this.statusesLoading.set(false);
     this.exhausted.set(true);

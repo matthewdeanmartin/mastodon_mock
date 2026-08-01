@@ -81,7 +81,31 @@ export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
 export type ReaderTextAlign = 'left' | 'justify';
 
 // Chat-list filters (the toggles above the conversation list).
-export type ChatAudience = 'everyone' | 'mutuals';
+/**
+ * Who the chat list shows.
+ *
+ * `bots` is the synthetic correspondents — Eliza and OpenRouter — and is only
+ * offered while AI features are on. There is nothing behind it otherwise.
+ */
+export type ChatAudience = 'all' | 'mutuals' | 'bots';
+
+const CHAT_AUDIENCES: readonly ChatAudience[] = ['all', 'mutuals', 'bots'];
+
+/**
+ * How much of the AI machinery is present in the UI.
+ *
+ * Deliberately a named mode rather than a boolean. A third state is planned —
+ * the generated header art swapped for hand-drawn illustrations — and it is not
+ * "AI on" or "AI off", so a boolean would have to be renamed and migrated the
+ * day it lands. Modes cost nothing now and make that a one-line addition.
+ *
+ * `off` hides every AI surface: Eliza, OpenRouter chat, AI translation, and the
+ * query/hashtag suggestions. It does not delete anything — a stored OpenRouter
+ * key survives, and turning AI back on restores the conversations intact.
+ */
+export type AiMode = 'on' | 'off';
+
+const AI_MODES: readonly AiMode[] = ['on', 'off'];
 
 /**
  * How long a fetched RSS feed may be reused. `0` refetches every time.
@@ -96,7 +120,9 @@ export const RSS_CACHE_TTL_OPTIONS: readonly { hours: number; label: string }[] 
   { hours: 24, label: '24 hours' },
   { hours: 24 * 7, label: '7 days' },
 ];
-export type ChatKindFilter = 'all' | 'private' | 'public' | 'bsky';
+export type ChatKindFilter = 'all' | 'private' | 'public' | 'bsky' | 'bot';
+
+const CHAT_KINDS: readonly ChatKindFilter[] = ['all', 'private', 'public', 'bsky', 'bot'];
 
 /** Algo-feed audience chip: everything, or only posts authored by follows. */
 export type AlgoAudience = 'all' | 'friends';
@@ -175,6 +201,7 @@ interface StoredPrefs {
   showImages?: boolean;
   hiddenProviders?: ProviderId[];
   chatAudience?: ChatAudience;
+  aiMode?: AiMode;
   rssCacheTtlHours?: number;
   chatKind?: ChatKindFilter;
   feedMin?: number;
@@ -287,7 +314,17 @@ export class ClientPrefs {
   readonly defaultVisibility = signal<Visibility>('public');
 
   // Chat-list filters.
-  readonly chatAudience = signal<ChatAudience>('everyone');
+  readonly chatAudience = signal<ChatAudience>('all');
+
+  /**
+   * Whether the AI features are present at all. See {@link AiMode}.
+   *
+   * This is the *user's* switch, and it is not the whole answer — the
+   * `connector-openrouter` rollout flag is the operator's, for when the API is
+   * down. Anything gating an AI surface must consult both; nothing should read
+   * this signal directly except that combined check.
+   */
+  readonly aiMode = signal<AiMode>('on');
 
   /**
    * How long a fetched RSS feed is reused before going back to the network.
@@ -473,8 +510,14 @@ export class ClientPrefs {
   }
 
   setChatAudience(who: ChatAudience): void {
-    if (who === 'everyone' || who === 'mutuals') {
+    if (CHAT_AUDIENCES.includes(who)) {
       this.chatAudience.set(who);
+    }
+  }
+
+  setAiMode(mode: AiMode): void {
+    if (AI_MODES.includes(mode)) {
+      this.aiMode.set(mode);
     }
   }
 
@@ -485,7 +528,7 @@ export class ClientPrefs {
   }
 
   setChatKind(kind: ChatKindFilter): void {
-    if (kind === 'all' || kind === 'private' || kind === 'public' || kind === 'bsky') {
+    if (CHAT_KINDS.includes(kind)) {
       this.chatKind.set(kind);
     }
   }
@@ -670,8 +713,16 @@ export class ClientPrefs {
     }
     this.loadHiddenProviders(stored);
     this.loadDefaultVisibility();
-    if (stored.chatAudience === 'everyone' || stored.chatAudience === 'mutuals') {
+    // 'everyone' was this setting's name for 'all' before the Bots filter
+    // arrived. Migrated rather than dropped: silently resetting someone's chat
+    // filter is the kind of small betrayal nobody reports but everybody notices.
+    if ((stored.chatAudience as string) === 'everyone') {
+      this.chatAudience.set('all');
+    } else if (stored.chatAudience && CHAT_AUDIENCES.includes(stored.chatAudience)) {
       this.chatAudience.set(stored.chatAudience);
+    }
+    if (stored.aiMode && AI_MODES.includes(stored.aiMode)) {
+      this.aiMode.set(stored.aiMode);
     }
     if (
       typeof stored.rssCacheTtlHours === 'number' &&
@@ -679,12 +730,7 @@ export class ClientPrefs {
     ) {
       this.rssCacheTtlHours.set(stored.rssCacheTtlHours);
     }
-    if (
-      stored.chatKind === 'all' ||
-      stored.chatKind === 'private' ||
-      stored.chatKind === 'public' ||
-      stored.chatKind === 'bsky'
-    ) {
+    if (stored.chatKind && CHAT_KINDS.includes(stored.chatKind)) {
       this.chatKind.set(stored.chatKind);
     }
     // A legacy stored 'platform' value simply falls back to the 'all' default.
@@ -742,6 +788,7 @@ export class ClientPrefs {
       homeWindow: this.homeWindow(),
       showImages: this.showImages(),
       chatAudience: this.chatAudience(),
+      aiMode: this.aiMode(),
       rssCacheTtlHours: this.rssCacheTtlHours(),
       chatKind: this.chatKind(),
       feedMin: this.feedMin(),
