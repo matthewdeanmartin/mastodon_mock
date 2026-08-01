@@ -128,8 +128,9 @@ export class Invites implements OnInit {
     const available = new Map(
       invitesFor(network, this.mode() === 'simple').map((invite) => [invite.id, invite]),
     );
-    return this.order()
-      [network].map((id) => available.get(id))
+    const orderedIds = this.order()[network];
+    return orderedIds
+      .map((id) => available.get(id))
       .filter((variation): variation is InviteVariation => !!variation)
       .map((variation) => {
         const edit = edits[variation.id];
