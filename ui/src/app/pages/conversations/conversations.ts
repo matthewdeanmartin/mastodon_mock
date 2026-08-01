@@ -239,6 +239,13 @@ export class Conversations implements OnInit, OnDestroy {
       }
       const missing = new Set<string>();
       for (const chat of this.chats()) {
+        // Bots are skipped, and not merely as an optimisation: their ids are
+        // synthetic (`eliza:self`), so asking the server about a relationship
+        // with one is a request that can only 404. They are also excluded from
+        // the Mutuals filter by definition — see visibleChats.
+        if (chat.kind === 'bot') {
+          continue;
+        }
         for (const a of chat.accounts) {
           if (!this.requestedRels.has(a.id)) {
             missing.add(a.id);
@@ -393,6 +400,9 @@ export class Conversations implements OnInit, OnDestroy {
   protected selected = computed(
     () => this.chats().find((c) => c.key === this.selectedKey()) ?? null,
   );
+
+  /** Any chat that came from a server, so paging older history is meaningful. */
+  protected hasServerChats = computed(() => this.chats().some((c) => c.kind !== 'bot'));
 
   // --- Bot conversations ---
 

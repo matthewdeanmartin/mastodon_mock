@@ -126,7 +126,10 @@
         </div>
       </button>
     }
-    @if (!loading() && chats().length) {
+    <!-- Only when there is Mastodon history to page through. A bot row is not
+         that: "Load more" fetches older mentions, and an anonymous visitor whose
+         only chat is Eliza has none to fetch. -->
+    @if (!loading() && hasServerChats()) {
       <div class="chat-load-more">
         @if (chatsExhausted()) {
           <span class="muted small">No older messages.</span>
@@ -223,21 +226,23 @@
            what the transcript *is*, unlike anything else in this header. -->
       @if (chat.kind === 'bot') {
         <div class="bot-bar">
-          <div class="bot-picker">
-            <select
-              [ngModel]="flattened() ? 'all' : currentConversationId()"
-              (ngModelChange)="pickConversation($event)"
-              name="conversation"
-              aria-label="Conversation"
-            >
-              @for (conversation of peerConversations(); track conversation.id) {
-                <option [value]="conversation.id">{{ conversation.title }}</option>
-              }
-              @if (peerConversations().length > 1) {
+          <!-- A picker over one option is a control that cannot do anything;
+               it appears once there is a second conversation to switch to. -->
+          @if (peerConversations().length > 1) {
+            <div class="bot-picker">
+              <select
+                [ngModel]="flattened() ? 'all' : currentConversationId()"
+                (ngModelChange)="pickConversation($event)"
+                name="conversation"
+                aria-label="Conversation"
+              >
+                @for (conversation of peerConversations(); track conversation.id) {
+                  <option [value]="conversation.id">{{ conversation.title }}</option>
+                }
                 <option value="all">All conversations</option>
-              }
-            </select>
-          </div>
+              </select>
+            </div>
+          }
           <button class="btn btn-outline btn-sm" type="button" (click)="newConversation()">
             + New conversation
           </button>

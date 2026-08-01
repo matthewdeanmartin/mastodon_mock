@@ -33,6 +33,34 @@ function internals(fixture: ComponentFixture<Conversations>): ConversationsInter
   return fixture.componentInstance as unknown as ConversationsInternals;
 }
 
+/**
+ * The Mastodon and Bluesky chat rows — everything except the bots.
+ *
+ * Eliza is an unconditional correspondent, so `chats()` always carries at least
+ * one row that has nothing to do with the plumbing most of these tests are
+ * about. Filtering here keeps their assertions stating what they mean: "one
+ * private chat", not "one private chat plus whatever bots exist today".
+ */
+function realChats(fixture: ComponentFixture<Conversations>): Chat[] {
+  return internals(fixture)
+    .chats()
+    .filter((c) => c.kind !== 'bot');
+}
+
+/** Only the bot rows — the complement of {@link realChats}. */
+function botRows(fixture: ComponentFixture<Conversations>): Chat[] {
+  return internals(fixture)
+    .chats()
+    .filter((c) => c.kind === 'bot');
+}
+
+/** {@link realChats}, but after the audience and kind filters. */
+function visibleReal(fixture: ComponentFixture<Conversations>): Chat[] {
+  return internals(fixture)
+    .visibleChats()
+    .filter((c) => c.kind !== 'bot');
+}
+
 /** The component opens two streams (direct + user); track subscribers per kind. */
 class MultiFakeStreaming {
   private subscribers = new Map<string, (ev: StreamEvent) => void>();
@@ -162,8 +190,8 @@ describe('Conversations', () => {
     httpMock.expectOne((r) => r.url === '/api/v1/notifications').flush([]);
 
     expect(internals(fixture).loading()).toBe(false);
-    expect(internals(fixture).chats()).toHaveLength(1);
-    expect(internals(fixture).chats()[0].kind).toBe('private');
+    expect(realChats(fixture)).toHaveLength(1);
+    expect(realChats(fixture)[0].kind).toBe('private');
   });
 
   it('clears loading even when both requests fail', () => {
@@ -198,7 +226,7 @@ describe('Conversations', () => {
     });
     const fixture = setUp([], [makeMention('n1', s1), makeMention('n2', s2)]);
 
-    const chats = internals(fixture).chats();
+    const chats = realChats(fixture);
     expect(chats).toHaveLength(1);
     expect(chats[0].kind).toBe('public');
     expect(chats[0].lastStatus?.id).toBe('s2');
@@ -237,11 +265,7 @@ describe('Conversations', () => {
     expect(draft?.kind).toBe('public');
     expect(draft?.accounts[0].id).toBe('2');
     // It appears in the list and is auto-selected with an empty history.
-    expect(
-      internals(fixture)
-        .chats()
-        .some((c) => c.key === 'pub:alice'),
-    ).toBe(true);
+    expect(realChats(fixture).some((c) => c.key === 'pub:alice')).toBe(true);
     expect(internals(fixture).selected()?.key).toBe('pub:alice');
     expect(internals(fixture).messages()).toEqual([]);
   });
@@ -272,11 +296,7 @@ describe('Conversations', () => {
     httpMock.expectOne('/api/v1/accounts/2').flush('', { status: 404, statusText: 'Not Found' });
 
     expect(internals(fixture).draftChat()).toBeNull();
-    expect(
-      internals(fixture)
-        .chats()
-        .some((c) => c.key === 'pub:alice'),
-    ).toBe(false);
+    expect(realChats(fixture).some((c) => c.key === 'pub:alice')).toBe(false);
   });
 
   it('retires the draft once a real reply is posted under its key', () => {
@@ -295,9 +315,7 @@ describe('Conversations', () => {
 
     expect(internals(fixture).draftChat()).toBeNull();
     // A real public row for the same key now carries the conversation.
-    const row = internals(fixture)
-      .chats()
-      .find((c) => c.key === 'pub:alice');
+    const row = realChats(fixture).find((c) => c.key === 'pub:alice');
     expect(row).toBeDefined();
     expect(row?.lastStatus?.id).toBe('r1');
     expect(internals(fixture).selected()?.key).toBe('pub:alice');
@@ -318,21 +336,9 @@ describe('Conversations', () => {
       convo('valid', 'alice.bsky.social'),
     ]);
 
-    expect(
-      internals(fixture)
-        .chats()
-        .filter((chat) => chat.kind === 'bsky'),
-    ).toHaveLength(1);
-    expect(
-      internals(fixture)
-        .chats()
-        .some((chat) => chat.key === 'bsky:valid'),
-    ).toBe(true);
-    expect(
-      internals(fixture)
-        .chats()
-        .some((chat) => chat.key === 'bsky:broken'),
-    ).toBe(false);
+    expect(realChats(fixture).filter((chat) => chat.kind === 'bsky')).toHaveLength(1);
+    expect(realChats(fixture).some((chat) => chat.key === 'bsky:valid')).toBe(true);
+    expect(realChats(fixture).some((chat) => chat.key === 'bsky:broken')).toBe(false);
   });
 
   it('different authors produce different public chats', () => {
@@ -340,7 +346,7 @@ describe('Conversations', () => {
     const s2 = makeStatus('s2', { visibility: 'public', account: makeAccount('3', 'bob') });
     const fixture = setUp([], [makeMention('n1', s1), makeMention('n2', s2)]);
 
-    expect(internals(fixture).chats()).toHaveLength(2);
+    expect(realChats(fixture)).toHaveLength(2);
   });
 
   it('same author groups together even when replies mention different third parties', () => {
@@ -361,7 +367,7 @@ describe('Conversations', () => {
     });
     const fixture = setUp([], [makeMention('n1', s1), makeMention('n2', s2)]);
 
-    const chats = internals(fixture).chats();
+    const chats = realChats(fixture);
     expect(chats).toHaveLength(1);
     expect(chats[0].handles).toEqual(['alice']);
   });
@@ -370,7 +376,45 @@ describe('Conversations', () => {
     const s1 = makeStatus('s1', { visibility: 'direct', account: makeAccount('2', 'alice') });
     const fixture = setUp([], [makeMention('n1', s1)]);
 
-    expect(internals(fixture).chats()).toHaveLength(0);
+    expect(realChats(fixture)).toHaveLength(0);
+  });
+
+  it('always offers Eliza, even with no Mastodon conversations at all', () => {
+    const fixture = setUp([], []);
+
+    const bots = botRows(fixture);
+    expect(bots.map((c) => c.key)).toContain('bot:eliza');
+    // Nothing arrives from a bot while you are away, so nothing is ever unread.
+    expect(bots.every((c) => !c.unread)).toBe(true);
+  });
+
+  it('keeps bots out of Mutuals, and never asks the server about their ids', () => {
+    const prefs = TestBed.inject(ClientPrefs);
+    const fixture = setUp([], []);
+
+    prefs.setChatAudience('mutuals');
+    fixture.detectChanges();
+
+    expect(
+      internals(fixture)
+        .visibleChats()
+        .some((c) => c.kind === 'bot'),
+    ).toBe(false);
+    // A bot's id is synthetic ('eliza:self'), so a relationship lookup for one
+    // could only 404. httpMock.verify() in afterEach is what enforces this.
+  });
+
+  it('shows only bots under the Bots filter', () => {
+    const prefs = TestBed.inject(ClientPrefs);
+    const s1 = makeStatus('s1', { visibility: 'public', account: makeAccount('2', 'alice') });
+    const fixture = setUp([], [makeMention('n1', s1)]);
+
+    prefs.setChatAudience('bots');
+    fixture.detectChanges();
+
+    const visible = internals(fixture).visibleChats();
+    expect(visible.length).toBeGreaterThan(0);
+    expect(visible.every((c) => c.kind === 'bot')).toBe(true);
   });
 
   // ---------------------------------------------------------------- select / threads
@@ -380,7 +424,7 @@ describe('Conversations', () => {
     const conv = makeConversation('c1', { unread: true, last_status: status });
     const fixture = setUp([conv]);
 
-    fixture.componentInstance.select(internals(fixture).chats()[0]);
+    fixture.componentInstance.select(realChats(fixture)[0]);
 
     const read = httpMock.expectOne('/api/v1/conversations/c1/read');
     expect(read.request.method).toBe('POST');
@@ -403,13 +447,13 @@ describe('Conversations', () => {
     const s1 = makeStatus('s1', { visibility: 'public', account: makeAccount('2', 'alice') });
     const fixture = setUp([], [makeMention('n1', s1)]);
 
-    const chat = internals(fixture).chats()[0];
+    const chat = realChats(fixture)[0];
     expect(chat.unread).toBe(true);
 
     fixture.componentInstance.select(chat);
     httpMock.expectOne('/api/v1/statuses/s1/context').flush({ ancestors: [], descendants: [] });
 
-    expect(internals(fixture).chats()[0].unread).toBe(false);
+    expect(realChats(fixture)[0].unread).toBe(false);
     httpMock.expectNone((r) => r.url.includes('/read'));
   });
 
@@ -431,7 +475,7 @@ describe('Conversations', () => {
   it("replyVisibility: public chats reply with the thread's own visibility", () => {
     const s1 = makeStatus('s1', { visibility: 'unlisted', account: makeAccount('2', 'alice') });
     const fixture = setUp([], [makeMention('n1', s1)]);
-    internals(fixture).selectedKey.set(internals(fixture).chats()[0].key);
+    internals(fixture).selectedKey.set(realChats(fixture)[0].key);
 
     expect(internals(fixture).replyVisibility()).toBe('unlisted');
   });
@@ -450,7 +494,7 @@ describe('Conversations', () => {
       ],
     });
     const fixture = setUp([], [makeMention('n1', s1)]);
-    internals(fixture).selectedKey.set(internals(fixture).chats()[0].key);
+    internals(fixture).selectedKey.set(realChats(fixture)[0].key);
 
     expect(internals(fixture).replyMentions()).toBe('@alice @bob ');
   });
@@ -491,14 +535,14 @@ describe('Conversations', () => {
     });
     const fixture = setUp([], [makeMention('n1', s1)]);
 
-    const chat = internals(fixture).chats()[0];
+    const chat = realChats(fixture)[0];
     expect(fixture.componentInstance.title(chat)).toBe('Alice A');
   });
 
   it('title: returns "Me" for a self-conversation with no participants', () => {
     const conv = makeConversation('c1');
     const fixture = setUp([conv]);
-    expect(fixture.componentInstance.title(internals(fixture).chats()[0])).toBe('Me');
+    expect(fixture.componentInstance.title(realChats(fixture)[0])).toBe('Me');
   });
 
   // ---------------------------------------------------------------- streaming
@@ -509,7 +553,7 @@ describe('Conversations', () => {
 
     streaming.emit('direct', { event: 'conversation', payload: conv });
 
-    const chats = internals(fixture).chats();
+    const chats = realChats(fixture);
     expect(chats).toHaveLength(1);
     expect(chats[0].key).toBe('priv:');
   });
@@ -521,7 +565,7 @@ describe('Conversations', () => {
 
     streaming.emit('user', { event: 'notification', payload: makeMention('n1', s1, alice) });
 
-    const chats = internals(fixture).chats();
+    const chats = realChats(fixture);
     expect(chats).toHaveLength(1);
     expect(chats[0].kind).toBe('public');
     expect(chats[0].accounts[0].acct).toBe('alice');
@@ -530,7 +574,7 @@ describe('Conversations', () => {
   it('a streamed reply to the open thread is appended', () => {
     const s1 = makeStatus('s1', { visibility: 'public', account: makeAccount('2', 'alice') });
     const fixture = setUp([], [makeMention('n1', s1)]);
-    fixture.componentInstance.select(internals(fixture).chats()[0]);
+    fixture.componentInstance.select(realChats(fixture)[0]);
     httpMock.expectOne('/api/v1/statuses/s1/context').flush({ ancestors: [], descendants: [] });
 
     const reply = makeStatus('s2', {
@@ -584,7 +628,7 @@ describe('Conversations', () => {
   it('onReplyPosted (public): appends without refetching conversations', () => {
     const s1 = makeStatus('s1', { visibility: 'public', account: makeAccount('2', 'alice') });
     const fixture = setUp([], [makeMention('n1', s1)]);
-    internals(fixture).selectedKey.set(internals(fixture).chats()[0].key);
+    internals(fixture).selectedKey.set(realChats(fixture)[0].key);
 
     const posted = makeStatus('s2', {
       visibility: 'public',
@@ -601,7 +645,7 @@ describe('Conversations', () => {
     ).toBe(true);
     httpMock.expectNone((r) => r.url === '/api/v1/conversations');
     // The posted status also advances the public chat row.
-    expect(internals(fixture).chats()[0].lastStatus?.id).toBe('s2');
+    expect(realChats(fixture)[0].lastStatus?.id).toBe('s2');
   });
 
   // ---------------------------------------------------------------- list filters
@@ -612,23 +656,15 @@ describe('Conversations', () => {
     const fixture = setUp([conv], [makeMention('n1', s1)]);
     const prefs = TestBed.inject(ClientPrefs);
 
-    expect(internals(fixture).visibleChats()).toHaveLength(2);
+    expect(visibleReal(fixture)).toHaveLength(2);
 
     prefs.setChatKind('private');
-    expect(
-      internals(fixture)
-        .visibleChats()
-        .map((c) => c.kind),
-    ).toEqual(['private']);
+    expect(visibleReal(fixture).map((c) => c.kind)).toEqual(['private']);
 
     prefs.setChatKind('public');
-    expect(
-      internals(fixture)
-        .visibleChats()
-        .map((c) => c.kind),
-    ).toEqual(['public']);
+    expect(visibleReal(fixture).map((c) => c.kind)).toEqual(['public']);
 
-    expect(internals(fixture).chats()).toHaveLength(2);
+    expect(realChats(fixture)).toHaveLength(2);
   });
 
   it('the mutuals toggle fetches relationships lazily and hides non-mutual chats', () => {
@@ -657,12 +693,12 @@ describe('Conversations', () => {
       .expectOne((r) => r.url === '/api/v1/accounts/relationships')
       .flush([rel('2', true), rel('3', false)]);
 
-    const visible = internals(fixture).visibleChats();
+    const visible = visibleReal(fixture);
     expect(visible).toHaveLength(1);
     expect(visible[0].accounts[0].acct).toBe('alice');
 
     prefs.setChatAudience('all');
-    expect(internals(fixture).visibleChats()).toHaveLength(2);
+    expect(visibleReal(fixture)).toHaveLength(2);
   });
 });
 

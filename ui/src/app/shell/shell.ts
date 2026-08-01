@@ -6,9 +6,7 @@ import { filter, map } from 'rxjs';
 import { Api } from '../api';
 import { AccountChoice, Auth, Session } from '../auth';
 import { ClientPrefs } from '../client-prefs';
-import { ElizaService } from '../eliza/eliza.service';
-import { AiAvailability } from '../ai-availability';
-import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
+import { BotPeers } from '../chat/bot-peers';
 import { environment } from '../../environments/environment';
 import { brandLogoSrc, isCanaryBuild } from '../build-flavor';
 import { Hotkeys } from '../hotkeys';
@@ -43,24 +41,19 @@ function isWideUrl(url: string): boolean {
 })
 export class Shell implements OnInit {
   protected auth = inject(Auth);
-  protected eliza = inject(ElizaService);
-  private ai = inject(AiAvailability);
-  private openRouter = inject(OpenRouterSession);
-
-  /** Whether AI surfaces are shown at all. See {@link AiAvailability}. */
-  protected aiEnabled = this.ai.enabled;
+  private bots = inject(BotPeers);
 
   /**
    * Whether an anonymous visitor has anyone to chat with.
    *
-   * Anonymous accounts cannot reach the real chat API, so the page is worth
-   * showing only when a browser-local correspondent exists: Eliza, once
-   * followed, or OpenRouter, once connected. Both are AI, so the whole entry
-   * disappears when AI features are off.
+   * Anonymous accounts cannot reach the real chat API, so the entry is worth
+   * showing only when a browser-local correspondent exists. In practice that
+   * is always true while AI is on, because Eliza is unconditional — but the
+   * check is against the peer list rather than assuming so, since that list is
+   * the thing the page actually renders. It is also what a future bot (a docs
+   * search bot, say) would add itself to.
    */
-  protected hasLocalChat = computed(
-    () => this.ai.enabled() && (this.eliza.following() || this.openRouter.connected()),
-  );
+  protected hasLocalChat = computed(() => this.bots.peers().length > 0);
   private api = inject(Api);
   private router = inject(Router);
   /** Mastodon-compatible keyboard shortcuts (and the "?" help dialog). */

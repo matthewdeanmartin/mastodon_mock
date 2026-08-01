@@ -1,7 +1,10 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { adminGuard } from './admin/admin.guard';
-import { anonymousUnavailableGuard } from './providers/anonymous/anonymous-route.guard';
+import {
+  anonymousChatGuard,
+  anonymousUnavailableGuard,
+} from './providers/anonymous/anonymous-route.guard';
 import { anonymousOnlyGuard } from './providers/anonymous/anonymous-only.guard';
 import { featureFlagGuard } from './feature-flag.guard';
 import { inviteAccessGuard } from './invites/invite-access.guard';
@@ -87,7 +90,7 @@ export const routes: Routes = [
       },
       {
         path: 'conversations',
-        canActivate: [anonymousUnavailableGuard],
+        canActivate: [anonymousChatGuard],
         data: { anonymousFeature: 'Chat' },
         loadComponent: () =>
           import('./pages/conversations/conversations').then((m) => m.Conversations),

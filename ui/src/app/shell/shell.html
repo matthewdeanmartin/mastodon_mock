@@ -88,10 +88,9 @@
           <span>More</span>
         </summary>
         <div class="menu-panel">
-          @if (auth.isAnonymous && aiEnabled()) {
-            <a routerLink="/eliza">Meet Eliza</a>
-            <div class="menu-divider"></div>
-          }
+          <!-- "Meet Eliza" used to sit here. She is an easter egg, not a
+               headline feature, and this menu is short on room — she is found
+               in Chat, or at /eliza by anyone who goes looking. -->
 
           <a routerLink="/settings">Settings</a>
 

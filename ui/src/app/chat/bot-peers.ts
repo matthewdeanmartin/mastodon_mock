@@ -49,9 +49,12 @@ export class BotPeers {
         streams: true,
       });
     }
-    if (this.eliza.following()) {
-      peers.push({ peer: ELIZA_PEER, account: this.eliza.account(), streams: false });
-    }
+    // Eliza is unconditional. Following her governs whether her posts appear in
+    // your *timeline* — a real opt-in — but it was never a sensible gate on
+    // whether you can talk to her, and once "Meet Eliza" left the menu it
+    // became a gate with no way to open it. She costs nothing, runs no model,
+    // and is the one correspondent every visitor has.
+    peers.push({ peer: ELIZA_PEER, account: this.eliza.account(), streams: false });
     return peers;
   });
 
