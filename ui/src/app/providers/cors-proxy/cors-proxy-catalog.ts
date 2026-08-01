@@ -198,13 +198,15 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
     // whose domain is registered works fine, so hiding this in production was
     // hiding the best free option there is.
     originAllowlist: {
-      dashboardUrl: 'https://corsfix.com/dashboard',
+      dashboardUrl: 'https://app.corsfix.com',
       note: 'Corsfix answers localhost automatically. For a deployed site, add your domain in the Corsfix dashboard first — until you do it replies "domain_not_registered" (HTTP 403), which is a setup step, not a fault.',
     },
     keyHeader: 'x-corsfix-key',
     keyNote:
       'Optional. Domain registration is the usual route; a key is only needed if you would rather not allowlist an origin.',
-    limits: '60 requests per minute on the free tier. 5 MB payload cap, 20s upstream timeout.',
+    limits:
+      '60 requests per minute on the free/trial tier — the binding constraint for bulk work, ' +
+      'since it is far tighter than the data services behind it. 5 MB payload cap, 20s upstream timeout.',
     homepage: 'https://corsfix.com/',
   },
   {

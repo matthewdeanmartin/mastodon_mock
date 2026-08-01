@@ -140,7 +140,7 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
   {
     id: 'twitter',
     label: 'Twitter',
-    emoji: '𝕏',
+    emoji: '🐦',
     pitch: 'Read public tweets, so the friends who never left stay in your reading.',
     // The key belongs to whoever pays for the API credits, not to a persona —
     // same reasoning as OpenRouter and the CORS proxy. See TwitterSettings. The
