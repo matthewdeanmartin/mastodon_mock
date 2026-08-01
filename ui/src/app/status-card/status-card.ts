@@ -28,7 +28,7 @@ import { TranslationPreference } from '../translation-preference';
 import { MutedPosts } from '../muted-posts';
 import { LocalModeration } from '../local-moderation';
 import { StatusVisibility } from '../status-visibility';
-import { ProviderCapabilities } from '../providers/provider';
+import { serverKnowsStatus, ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
 import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
@@ -691,6 +691,7 @@ export class StatusCard {
     return (this.display.provider ?? 'mastodon') !== 'mastodon';
   }
 
+
   /**
    * A provider that reports real engagement counts the viewer cannot act on.
    *
@@ -1037,9 +1038,23 @@ export class StatusCard {
       });
   }
 
+  /**
+   * Bookmark locally or on the server, depending on where the post lives.
+   *
+   * The test is "does the home server know this post", not "am I signed in".
+   * Those coincide for Mastodon posts and come apart for every foreign
+   * provider: a signed-in reader bookmarking an X post used to send
+   * `twitter:2083…` to `/api/v1/statuses/{id}/bookmark`, which 404s and loses
+   * the bookmark silently. Anonymous readers got a working local bookmark for
+   * the same post, so signing in made the feature worse — parity inverted.
+   *
+   * Local storage is the right home for these regardless of session: the home
+   * server cannot bookmark a post it has never seen, and {@link
+   * AnonymousBookmarks} already keys off the status rather than a Mastodon id.
+   */
   private toggleNativeBookmark(): void {
     const s = this.display;
-    if (this.auth.isAnonymous) {
+    if (this.auth.isAnonymous || !serverKnowsStatus(s.provider)) {
       this.changed.emit(this.anonymousBookmarks.toggle(s));
       return;
     }
@@ -1115,8 +1130,25 @@ export class StatusCard {
    * button appears only once OpenRouter is connected.
    */
   protected showAiTranslate = computed(
-    () => this.capabilities.active || this.openrouter.connected(),
+    () => this.capabilities.active || this.openrouter.connected() || this.serverCannotTranslate,
   );
+
+  /**
+   * True when the home server could not translate this post even if asked.
+   *
+   * Translation for a read-only provider means "ask the autorouter": the server
+   * has never seen an X, RSS or paste post, so `/api/v1/statuses/{id}/translate`
+   * can only fail on an id it cannot resolve. The AI path works from the post
+   * text already in hand, so it is the only one that can succeed.
+   *
+   * Without this the 🌐 button was hidden (it needs `canUseServerActions`) and
+   * the 🤖🌐 button was hidden too (it needed anonymous mode), so a signed-in
+   * reader looking at an X post got no translate control at all — the
+   * capability vanished rather than being merely unavailable.
+   */
+  protected get serverCannotTranslate(): boolean {
+    return !serverKnowsStatus(this.display.provider);
+  }
 
   /** Drives the dialog's two faces: chooser when connected, upsell when not. */
   protected openrouterConnected = computed(() => this.openrouter.connected());

@@ -1,6 +1,6 @@
 # X/Twitter provider — remaining roadmap
 
-**Status:** §1 (caching) and §2 (clicking) shipped; §4–§6 remain
+**Status:** §1 (caching), §2 (clicking) and §4 (parity) shipped; §5–§6 remain
 **Date:** 2026-08-01
 **Context:** Sprints 1–5 are merged (PR #13 + follow-ups). This document covers
 what is left, with the cost arithmetic measured rather than estimated.
@@ -141,10 +141,11 @@ for X *because the actions are impossible* — so the capability flag was doing
 two jobs ("can you press this" and "is there a number worth showing") and got
 the second one wrong. A new `readOnlyStats` concept separates them, and the
 bookmark/translate/••• block now includes X for signed-in readers, not just
-anonymous ones. Real result on a live @AnthropicAI post:
+anonymous ones. Real result on a live @AnthropicAI post (the translate button
+became 🤖🌐 in §4, once it turned out the server one could only 404):
 
 ```
-💬 1751 | 🔁 2115 | ⭐ 12504 | ↗ Nitter | 🔖 | 🌐 | •••
+💬 1751 | 🔁 2115 | ⭐ 12504 | ↗ Nitter | 🔖 | 🤖🌐 | •••
 ```
 
 **"Open original" is now "↗ Nitter"** for X posts, so a click goes to a
@@ -233,37 +234,64 @@ into the card) rather than bolted onto `Status`, so nothing outside
 
 ---
 
-## 4. Parity with the anonymous read-only experience
+## 4. Parity with the anonymous read-only experience — **DONE (2026-08-01)**
 
-**Mostly free already, because those features were built provider-agnostic.**
-Worth auditing rather than assuming, but the mechanism is right:
+**The prediction below was wrong on three of five rows.** "Built
+provider-agnostic, so it should just work" held for the mechanisms that operate
+on a `Status`; it failed everywhere a *gate* decided whether to show a control,
+because every one of those gates was a denylist written before X existed.
 
-| Feature | Status for X posts |
-|---|---|
-| Local block/mute | **Works.** `LocalModeration` keys on the account, and `StatusCard.mutedLocally` filters regardless of provider. |
-| Third-party translate | **Works.** `AiTranslate` operates on `status.content`, which X posts have. |
-| Bookmark | **Needs a decision** — see below. |
-| Reader mode | Should work; `content` is Mastodon-shaped HTML. Verify. |
-| Filters | Should work; they match on text. Verify. |
+| Feature | Predicted | Measured |
+|---|---|---|
+| Local block/mute | Works | **Works.** Mute, Block and Report all offered; muting genuinely hides the post. |
+| Reader mode | Should work | **Was broken.** Offered Reply/Boost/Favourite and a live composer. |
+| Bookmark | Needs a decision | **Was broken.** Signed in, it POSTed a `twitter:` id to Mastodon. |
+| Third-party translate | Works | **Was missing entirely** for a signed-in reader. |
+| Filters | Should work | **Works.** They match on text, which X posts have. |
 
-### The bookmark question
+### What was actually wrong
+
+**Reader mode offered impossible actions.** It chose its action row with
+`isRss() || isAnonymousPublic()` — a denylist — so X posts landed in the
+*writable* branch. A signed-in reader saw live 💬/🔁/⭐ buttons and, on clicking
+reply, a composer armed with `inReplyToId="twitter:2083…"`. Now gated on
+`readOnlyPost()`, derived from `capabilitiesFor()`, so the next read-only
+provider is handled before it is written.
+
+**Bookmarking an X post was broken by signing in.** The code asked "am I
+anonymous" when the real question is "does the home server know this post".
+Measured in a browser:
+
+```
+POST /api/v1/statuses/twitter:2083317461269598348/bookmark   → 404, bookmark lost
+```
+
+An anonymous reader bookmarking the same post got a working local bookmark, so
+signing in made the feature *worse*. Both callers now use
+`serverKnowsStatus()`, and this also settles "the bookmark question" below in
+favour of option (1) — the local store — which is where an X bookmark was always
+going to have to live.
+
+**Translate disappeared entirely.** The server 🌐 button needs
+`canUseServerActions`; the AI 🤖🌐 button needed anonymous mode. A signed-in
+reader looking at an X post therefore got *neither* — the capability vanished
+rather than being unavailable. For a read-only provider **translate means "ask
+the autorouter"**: the server has never seen the post, so only the client-side
+AI path can work. The 🌐 button is now hidden for these providers and 🤖🌐 shown
+regardless of session. Final toolbar on a live X card: `🔖 | 🤖🌐`.
+
+**"Open in chat" was offered** for an account that exists only on X. Same
+denylist, same fix.
+
+All four are covered by regression tests that were confirmed to fail against
+the old code — a test that passes either way proves nothing.
+
+### The bookmark question — settled
 
 Mastodon bookmarks are server-side; anonymous mode has `AnonymousBookmarks` in
-localStorage. An X post can only use the local kind — there is no X account to
-bookmark against, and reading public data cannot create one.
-
-The honest options:
-
-1. **Reuse the local bookmark store** for X posts. Simple, and consistent with
-   anonymous mode. Risk: a bookmarked X post is a *reference*, and re-rendering
-   it later costs a request unless the cache (§1) persists it.
-2. **Bookmark to Raindrop** via the existing connector, which is already the
-   "second place to save bookmarks". Arguably the better home for a link to
-   something outside the fediverse.
-
-Recommendation: (1) for consistency, with the persisted cache from §1 making it
-actually work offline. (2) is already reachable through the existing
-"save the post's first external link" path.
+localStorage. An X post can only use the local kind, and the 404 above shows
+what happens otherwise. Raindrop remains reachable through the existing "save
+the post's first external link" path for anyone who wants it.
 
 ---
 
@@ -372,10 +400,12 @@ about what refreshing that many accounts implies.
 3. ~~Persist the cache (§1)~~ — **done**, IndexedDB, verified zero requests on
    reload. It also made the thread view's cold-load fetch unnecessary in most
    cases, as predicted.
-4. **Read-only parity audit (§4)** — now the top item. Bookmark, translate and
-   local moderation render on X posts; what remains is verifying reader mode and
-   filters actually behave. Cheap, and the smallest remaining unknown.
-5. **Home feed mix (§5)** — §1 is settled, so this is now affordable. The main
+4. ~~Read-only parity audit (§4)~~ — **done**, and it found four real bugs
+   rather than confirming the happy path: reader mode offered impossible
+   actions, bookmarking an X post 404'd once signed in, translate vanished
+   entirely, and "open in chat" was offered for an X-only account.
+5. **Home feed mix (§5)** — now the top item. §1 is settled, so this is
+   affordable. The main
    open question is ordering a merged feed when X posts arrive in bulk on a
    refresh rather than continuously.
 6. **Followings bulk import + rotation (§6)** — the big one, and it wants §5

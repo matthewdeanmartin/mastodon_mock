@@ -15,6 +15,7 @@ import { adaptPost } from '../../providers/bluesky/bluesky-adapter';
 import { BskyThreadNode } from '../../providers/bluesky/bluesky-types';
 import { BskyReply } from '../../providers/bluesky/bluesky-reply';
 import { StatusActions } from '../../providers/status-actions';
+import { serverKnowsStatus, capabilitiesFor } from '../../providers/provider';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { TwitterApi } from '../../providers/twitter/twitter-api';
 import { TwitterFeed } from '../../providers/twitter/twitter-feed';
@@ -104,6 +105,29 @@ export class Thread implements OnInit {
   /** The author chain reader mode renders (root post + same-author self-replies). */
   protected chain = computed<Status[]>(() => readerChain(this.thread()));
 
+  /**
+   * Whether the focused post can be written to at all.
+   *
+   * Derived from {@link capabilitiesFor} rather than from a list of provider
+   * flags. Reader mode previously chose its action row with
+   * `isRss() || isAnonymousPublic()`, which is a denylist — so X posts, added
+   * long afterwards, fell into the writable branch and offered Reply, Boost and
+   * Favourite buttons for actions that cannot exist, plus a composer that would
+   * have POSTed a `twitter:` id to the Mastodon API. Asking the capability
+   * table means the next read-only provider is handled before it is written.
+   */
+  protected readOnlyPost = computed(() => {
+    const post = this.status();
+    if (!post) {
+      return false;
+    }
+    if (this.isMessageStatus()) {
+      return true;
+    }
+    const caps = capabilitiesFor(post.provider, !this.auth.isAnonymous);
+    return !caps.reply && !caps.favourite && !caps.reblog;
+  });
+
   /** Everything in the thread that is not part of the author chain: the comments. */
   protected comments = computed<Status[]>(() => {
     const chainIds = new Set(this.chain().map((s) => s.id));
@@ -121,7 +145,11 @@ export class Thread implements OnInit {
    * anonymous threads don't participate: those don't have a Mastodon DM to open.
    */
   protected chatPartner = computed(() => {
-    if (this.isRss() || this.isAnonymousPublic() || this.isMessageStatus()) {
+    // Read-only posts have no Mastodon DM to open: there is no account on this
+    // server to message. Asking readOnlyPost() rather than listing providers
+    // means X was covered the moment it was added, instead of offering "Open in
+    // chat" for an account that exists only on X.
+    if (this.isAnonymousPublic() || this.readOnlyPost()) {
       return null;
     }
     const me = this.auth.account();
@@ -193,8 +221,16 @@ export class Thread implements OnInit {
     this.actions.toggleReblog(post).subscribe((updated) => this.patch(updated.reblog ?? updated));
   }
 
+  /**
+   * Bookmark locally or on the server, depending on where the post lives.
+   *
+   * See `StatusCard.toggleNativeBookmark` for the reasoning. The provider list
+   * here is the same one: an X, RSS or paste id names nothing the home server
+   * has ever seen, so a bookmark call could only 404 and lose the bookmark.
+   */
   toggleBookmark(post: Status): void {
-    if (post.provider === 'anonymous-mastodon') {
+    const provider = post.provider ?? 'mastodon';
+    if (provider === 'anonymous-mastodon' || !serverKnowsStatus(provider)) {
       this.patch(this.anonymousBookmarks.toggle(post));
       return;
     }
@@ -479,6 +515,22 @@ export class Thread implements OnInit {
         error: () => this.rssCommentsUnavailable.set(true),
       }),
     );
+  }
+
+  /**
+   * The "read it at the source" link for a read-only post in reader mode.
+   *
+   * X posts go to Nitter rather than x.com, matching the card toolbar — sending
+   * a reader to a login wall is the thing this app exists to avoid. Everything
+   * else keeps its own URL, because an RSS item's original site is the whole
+   * point of the link.
+   */
+  protected readerOriginalLink(post: Status): { url: string; label: string } | null {
+    if (post.provider === 'twitter') {
+      const url = toNitterUrl(post.url);
+      return url ? { url, label: 'Read on Nitter' } : null;
+    }
+    return post.url ? { url: post.url, label: 'Read on the original site' } : null;
   }
 
   toggleReader(): void {

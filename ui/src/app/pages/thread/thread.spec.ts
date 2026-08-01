@@ -11,6 +11,8 @@ import { Account, Context, Status } from '../../models';
 import { Thread } from './thread';
 import { anonymousStatusRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 import { settleRssCache } from '../../testing/settle-rss-cache';
+import { TwitterApi } from '../../providers/twitter/twitter-api';
+import { TwitterFeed } from '../../providers/twitter/twitter-feed';
 
 interface ThreadInternals {
   status: WritableSignal<Status | null>;
@@ -315,6 +317,85 @@ describe('Thread', () => {
     expect(readerInternals(fixture).readerMode()).toBe(true);
     expect((fixture.nativeElement as HTMLElement).querySelector('article.reader')).not.toBeNull();
   });
+
+  describe('reader mode on a read-only X post', () => {
+    /**
+     * A thread page showing one X post, with the provider stubbed.
+     *
+     * The focus post is served from the feed cache exactly as it is in the app,
+     * so no request is made — which is also the behaviour worth protecting.
+     */
+    function setUpTwitter(): ComponentFixture<Thread> {
+      const post: Status = {
+        ...makeStatus('twitter:2083317461269598348'),
+        provider: 'twitter',
+        url: 'https://x.com/NASA/status/2083317461269598348',
+        replies_count: 2,
+        reblogs_count: 5,
+        favourites_count: 99,
+      };
+      TestBed.overrideProvider(TwitterFeed, {
+        useValue: { hydrated: Promise.resolve(), findCached: () => post },
+      });
+      TestBed.overrideProvider(TwitterApi, {
+        useValue: {
+          getReplies: () => of({ statuses: [], cursor: null, hasMore: false, skipped: 0 }),
+        },
+      });
+      return setUpWithId('twitter:2083317461269598348', { reader: '1' });
+    }
+
+    it('offers no reply, boost or favourite buttons', async () => {
+      // Reader mode chose its action row with `isRss() || isAnonymousPublic()`
+      // — a denylist — so X posts, added long afterwards, landed in the
+      // *writable* branch. Verified in a browser: a signed-in reader saw live
+      // 💬/🔁/⭐ buttons and a composer for actions that cannot exist.
+      const fixture = setUpTwitter();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.reader-actions')).toBeNull();
+      expect(el.querySelector('app-compose')).toBeNull();
+    });
+
+    it('sends the reader to Nitter rather than x.com', async () => {
+      const fixture = setUpTwitter();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+        'a.reader-original',
+      );
+      expect(link?.href).toContain('nitter');
+      expect(link?.href).not.toContain('x.com');
+    });
+
+    it('still offers a bookmark, which is local and therefore possible', async () => {
+      // Parity with the anonymous reader: bookmarking touches no server.
+      const fixture = setUpTwitter();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const labels = [...el.querySelectorAll('button')].map((b) => b.textContent ?? '');
+      expect(labels.some((text) => text.includes('Bookmark'))).toBe(true);
+    });
+
+    it('does not offer "open in chat" for an account that exists only on X', async () => {
+      const fixture = setUpTwitter();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(internalsWithChat(fixture).chatPartner()).toBeNull();
+    });
+  });
+
+  function internalsWithChat(
+    fixture: ComponentFixture<Thread>,
+  ): { chatPartner: () => unknown } {
+    return fixture.componentInstance as unknown as { chatPartner: () => unknown };
+  }
 
   it('A+/A− buttons adjust the persisted reader font size', () => {
     const fixture = setUpWithId('1');

@@ -429,7 +429,10 @@
               🔖
             </button>
           }
-          @if (capabilities.canUseServerActions) {
+          <!-- Server translation needs a status the server actually has. For a
+               read-only provider it could only 404 on an id it cannot resolve,
+               so those posts get the AI button below instead. -->
+          @if (capabilities.canUseServerActions && !serverCannotTranslate) {
             <button
               class="action"
               [class.on]="!!translation()"
@@ -443,7 +446,7 @@
           <!-- Always present for anonymous readers, connected or not: they have no
                other translate button, so hiding this one would make the capability
                invisible rather than merely unavailable. See sprint 3 decision 8. -->
-          @if (showAiTranslate() && (capabilities.active || translatePref.choice() === 'ai')) {
+          @if (showAiTranslate() && (capabilities.active || serverCannotTranslate || translatePref.choice() === 'ai')) {
             <button
               class="action"
               [class.on]="!!aiTranslation()"

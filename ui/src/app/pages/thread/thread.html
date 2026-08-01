@@ -81,18 +81,20 @@
             decoding="async"
           />
         }
-        @if (isRss() || isAnonymousPublic()) {
-          @if (post.url) {
+        @if (readOnlyPost()) {
+          @if (readerOriginalLink(post); as original) {
             <a
               class="btn btn-outline btn-sm reader-original"
-              [href]="post.url"
+              [href]="original.url"
               target="_blank"
               rel="noopener noreferrer"
             >
-              ↗ Read on the original site
+              ↗ {{ original.label }}
             </a>
           }
-          @if (isAnonymousPublic()) {
+          <!-- Bookmarking is local for these posts, so it works regardless of
+               session — including for X, where it previously did not appear. -->
+          @if (!isMessageStatus()) {
             <button
               class="btn btn-outline btn-sm reader-original"
               [class.active]="post.bookmarked"

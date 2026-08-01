@@ -47,6 +47,37 @@ export const PROVIDER_CAPS: Record<ProviderId, ProviderCapabilities> = {
 const NO_WRITES: ProviderCapabilities = { reply: false, favourite: false, reblog: false };
 
 /**
+ * Providers whose status ids name nothing the home server has ever seen.
+ *
+ * Deliberately not "everything that isn't Mastodon". `anonymous-mastodon`
+ * statuses are real posts on a Mastodon-compatible server, reachable once the
+ * namespace prefix is stripped, and Bluesky ones federate. An X, RSS or paste
+ * id, by contrast, is a client-side construction — sending one to
+ * `/api/v1/statuses/{id}/…` can only 404.
+ */
+const CLIENT_SIDE_ONLY: ReadonlySet<ProviderId> = new Set<ProviderId>(['twitter', 'rss', 'paste']);
+
+/**
+ * Whether the home server could act on this post's id at all.
+ *
+ * The question behind several UI decisions — where a bookmark goes, which
+ * translate button to show — and the one the code kept getting wrong by asking
+ * "am I signed in" instead. Those coincide for Mastodon posts and diverge for
+ * every provider listed above:
+ *
+ * - Bookmarking an X post while signed in POSTed `twitter:2083…` to
+ *   `/api/v1/statuses/{id}/bookmark`, which 404s and loses the bookmark, while
+ *   an anonymous reader bookmarking the same post got a working local one.
+ * - Translation is worse: the server button needs `canUseServerActions` and the
+ *   AI button needed anonymous mode, so a signed-in reader got *neither* and
+ *   translate disappeared. For these providers translate means "ask the
+ *   autorouter", which works from the post text already in hand.
+ */
+export function serverKnowsStatus(provider: ProviderId | undefined): boolean {
+  return !CLIENT_SIDE_ONLY.has(provider ?? 'mastodon');
+}
+
+/**
  * Capabilities for one status, given whether this browser holds a token.
  *
  * The token is what makes the difference, not the provider. With one, an

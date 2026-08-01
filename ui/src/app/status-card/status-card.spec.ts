@@ -15,6 +15,7 @@ import {
 import { AiTranslate } from '../ai-translate';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { TranslationPreference } from '../translation-preference';
+import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
 
 /** Expose protected signals/methods for white-box testing. */
 interface StatusCardInternals {
@@ -496,6 +497,33 @@ describe('StatusCard', () => {
     const req = httpMock.expectOne('/api/v1/statuses/8/unbookmark');
     expect(req.request.method).toBe('POST');
     req.flush(makeStatus({ id: '8' }));
+  });
+
+  it('offers AI translation on an X post, since the server cannot translate it', () => {
+    // Translation for a read-only provider means "ask the autorouter". The
+    // server button needs canUseServerActions and the AI button needed
+    // anonymous mode, so a signed-in reader looking at an X post got *neither*
+    // — translate vanished rather than being merely unavailable.
+    const f = setUp(makeStatus({ id: 'twitter:1', provider: 'twitter' }));
+    f.detectChanges();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector("button[aria-label='Translate with AI']")).not.toBeNull();
+    // And never the server one: /api/v1/statuses/twitter:1/translate can only 404.
+    expect(el.querySelector("button[title='Translate']")).toBeNull();
+  });
+
+  it('toggleBookmark: keeps an X post local instead of 404ing the home server', () => {
+    // Signing in used to *break* this. `twitter:2083…` names nothing the home
+    // server has ever seen, so the call 404s and the bookmark is lost silently
+    // — while an anonymous reader bookmarking the same post got a working local
+    // one. Observed in a browser as
+    // `POST /api/v1/statuses/twitter:2083317461269598348/bookmark`.
+    const f = setUp(
+      makeStatus({ id: 'twitter:2083317461269598348', provider: 'twitter', bookmarked: false }),
+    );
+    f.componentInstance.toggleBookmark(fakeEvent());
+    httpMock.expectNone('/api/v1/statuses/twitter:2083317461269598348/bookmark');
+    expect(TestBed.inject(AnonymousBookmarks).bookmarks().length).toBe(1);
   });
 
   it('offers Mastodon and Raindrop choices when the second provider is connected', () => {
