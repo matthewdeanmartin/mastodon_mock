@@ -227,6 +227,31 @@
   }
 }
 
+<!-- X accounts, like RSS, live entirely in this browser. Shown only once the
+     connector is set up: an empty section advertising a connector that needs an
+     API key and a CORS proxy would be noise on everyone else's Feeds page. -->
+@if (twitterFollows().length) {
+  <div class="section-head">X accounts</div>
+  @for (f of twitterFollows(); track f.username) {
+    <a class="list-row" [routerLink]="['/accounts', 'twitter:@' + f.username]">
+      <span>
+        {{ f.displayName || f.username }}
+        <span class="muted small">
+          · &#64;{{ f.username }}
+          @if (!f.enabled) {
+            · off
+          }
+        </span>
+      </span>
+    </a>
+  }
+  <p class="muted center small">
+    Follow or unfollow accounts in
+    <a routerLink="/settings/connections/twitter">settings</a>. Opening one costs a request
+    unless it was loaded in the last few minutes.
+  </p>
+}
+
 @if (listToDelete(); as l) {
   <app-confirm-dialog
     title="Delete this list?"

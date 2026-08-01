@@ -184,6 +184,116 @@
   }
 </section>
 
+<section class="follows">
+  <h2 class="section-title">Accounts you follow</h2>
+
+  @if (!canFollow()) {
+    <p class="muted">
+      Finish the setup above first. Once the connection works you can follow X accounts here.
+    </p>
+  } @else {
+    <p class="muted small">
+      Following stores the handle in this browser so their posts show up on your Feeds page. It is
+      not a follow on X — nobody is notified. Up to {{ followLimit }} accounts, because each one
+      costs a request every time its posts refresh.
+    </p>
+
+    @if (!lookupResult()) {
+      <label class="field">
+        <span class="field-label">X handle</span>
+        <input
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="@NASA"
+          [ngModel]="handleDraft()"
+          (ngModelChange)="handleDraft.set($event)"
+          (keyup.enter)="lookup()"
+        />
+      </label>
+      <div class="actions">
+        <button
+          class="btn"
+          type="button"
+          [disabled]="lookingUp() || !handleDraft().trim() || follows.atLimit()"
+          (click)="lookup()"
+        >
+          {{ lookingUp() ? 'Looking up…' : 'Look up (1 request)' }}
+        </button>
+      </div>
+      @if (follows.atLimit()) {
+        <p class="muted small">
+          You are following {{ followLimit }} accounts, the maximum. Remove one to add another.
+        </p>
+      }
+    } @else {
+      <div class="lookup-preview">
+        <p class="muted small">Is this the right account?</p>
+        <div class="preview-card">
+          @if (lookupResult()!.avatar) {
+            <img class="preview-avatar" [src]="lookupResult()!.avatar" alt="" width="48" height="48" />
+          }
+          <div class="preview-text">
+            <strong>{{ lookupResult()!.display_name }}</strong>
+            <span class="muted">&#64;{{ lookupResult()!.username }}</span>
+            <span class="muted small">
+              {{ lookupResult()!.followers_count | number }} followers ·
+              {{ lookupResult()!.statuses_count | number }} posts
+            </span>
+            <a [href]="lookupResult()!.url" target="_blank" rel="noopener noreferrer" class="small">
+              View on X ↗
+            </a>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn" type="button" (click)="confirmFollow()">
+            Follow &#64;{{ lookupResult()!.username }}
+          </button>
+          <button class="btn btn-outline" type="button" (click)="cancelLookup()">Cancel</button>
+        </div>
+      </div>
+    }
+
+    @if (followError()) {
+      <p class="feed-error">{{ followError() }}</p>
+    }
+    @if (followNotice()) {
+      <p class="connection-ok">{{ followNotice() }}</p>
+    }
+
+    @if (follows.follows().length) {
+      <ul class="follow-list">
+        @for (f of follows.follows(); track f.username) {
+          <li class="follow-row">
+            @if (f.avatar) {
+              <img class="follow-avatar" [src]="f.avatar" alt="" width="32" height="32" />
+            }
+            <span class="follow-text">
+              <strong>{{ f.displayName }}</strong>
+              <span class="muted small">&#64;{{ f.username }}</span>
+            </span>
+            <label class="follow-toggle small">
+              <input
+                type="checkbox"
+                [checked]="f.enabled"
+                (change)="toggleFollowEnabled(f.username, !f.enabled)"
+              />
+              Show
+            </label>
+            <button class="btn btn-outline btn-small" type="button" (click)="unfollow(f.username)">
+              Unfollow
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="muted small">
+        No accounts yet. Add the people you would miss if you stopped opening X.
+      </p>
+    }
+  }
+</section>
+
 @if (consentPrompt(); as prompt) {
   <app-twitter-consent-dialog
     [source]="prompt.source"

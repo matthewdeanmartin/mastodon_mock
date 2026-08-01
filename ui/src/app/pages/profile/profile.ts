@@ -2,7 +2,7 @@ import { Component, computed, DestroyRef, inject, OnDestroy, OnInit, signal } fr
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Location, NgOptimizedImage } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { firstValueFrom, Subscription } from 'rxjs';
+import { firstValueFrom, map, of, Subscription, switchMap, tap } from 'rxjs';
 import { Api } from '../../api';
 import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
@@ -17,6 +17,9 @@ import { PeopleBrowser } from '../../people-browser/people-browser';
 import { AccountAnalytics } from '../../account-analytics/account-analytics';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
+import { TwitterApi } from '../../providers/twitter/twitter-api';
+import { TwitterFeed } from '../../providers/twitter/twitter-feed';
+import { TwitterFollow, TwitterFollows } from '../../providers/twitter/twitter-follows';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
@@ -67,6 +70,9 @@ export class Profile implements OnInit, OnDestroy {
   protected eliza = inject(ElizaService);
   private location = inject(Location);
   private rss = inject(RssProvider);
+  private twitterFollows = inject(TwitterFollows);
+  private twitterFeed = inject(TwitterFeed);
+  private twitterApi = inject(TwitterApi);
   private rssSubs = inject(RssSubscriptions);
   private destroyRef = inject(DestroyRef);
   private routeLoadSub = new Subscription();
@@ -75,6 +81,17 @@ export class Profile implements OnInit, OnDestroy {
 
   /** True when this "profile" is a synthetic RSS feed (id `rss:<feedUrl>`). */
   protected isRss = signal(false);
+  /** True when this profile is an X account (id `twitter:@<handle>`). */
+  protected isTwitter = signal(false);
+  /** The handle behind an X profile, for the follow toggle. */
+  private twitterHandle = signal<string | null>(null);
+  /** Why this X profile's posts could not be loaded, if they could not. */
+  protected twitterError = signal<string | null>(null);
+  /** Whether the viewer follows this X account locally. */
+  protected twitterFollowed = computed(() => {
+    const handle = this.twitterHandle();
+    return !!handle && this.twitterFollows.has(handle);
+  });
   /** The feed URL behind an RSS profile, for the subscribe toggle. */
   private rssFeedUrl = signal<string | null>(null);
   /** Whether the viewer is currently subscribed to this feed. */
@@ -251,9 +268,16 @@ export class Profile implements OnInit, OnDestroy {
     this.showCloneFriends.set(false);
     this.collections.set([]);
     this.rssFeedUrl.set(null);
+    this.isTwitter.set(false);
+    this.twitterHandle.set(null);
+    this.twitterError.set(null);
     this.tab.set('posts');
     if (id.startsWith('rss:')) {
       this.loadRss(id);
+      return;
+    }
+    if (id.startsWith('twitter:@')) {
+      this.loadTwitter(id);
       return;
     }
     if (isElizaId(id)) {
@@ -322,6 +346,124 @@ export class Profile implements OnInit, OnDestroy {
    * timeline. No relationships, pinned, or featured — those are Mastodon-only.
    * Feeds have no pagination, so the whole feed loads at once (exhausted).
    */
+  /**
+   * An X account as a profile: their posts, read through the configured data
+   * service.
+   *
+   * Reuses this page rather than adding a screen of its own, exactly like the
+   * RSS branch above — the whole architecture rests on foreign content becoming
+   * ordinary `Status` objects, so an X profile should need no special rendering.
+   *
+   * Two differences from every other profile here, both from the same cause
+   * (there is no signed-in X user):
+   *
+   * - No relationships, pinned posts or featured tags. Those need an account.
+   * - Loading costs money, so it is capped at one page and marked exhausted.
+   *   Infinite scroll on a billed API is a way to spend a balance by accident.
+   *
+   * The profile itself is not fetched: the follow record already holds the
+   * display name and avatar, and the posts carry the author. That saves one
+   * billable request per visit for an account you already follow. Only an
+   * *unfollowed* handle needs the lookup.
+   */
+  private loadTwitter(id: string): void {
+    this.isTwitter.set(true);
+    const handle = id.slice('twitter:@'.length);
+    this.twitterHandle.set(handle);
+    this.statuses.set([]);
+    this.pinnedStatuses.set([]);
+    this.featured.set([]);
+    this.statusesLoading.set(true);
+    // One page only; see the note above.
+    this.exhausted.set(true);
+    const seq = ++this.loadSeq;
+
+    const follow = this.twitterFollows.find(handle);
+    const known: Observable<TwitterFollow> = follow
+      ? of(follow)
+      : this.twitterApi.getProfile(handle).pipe(
+          map(
+            (account): TwitterFollow => ({
+              username: account.username,
+              displayName: account.display_name,
+              avatar: account.avatar,
+              addedAt: Date.now(),
+              enabled: true,
+            }),
+          ),
+          tap((resolved: TwitterFollow) => {
+            if (seq === this.loadSeq) {
+              this.account.set(twitterPlaceholderAccount(resolved));
+            }
+          }),
+        );
+
+    this.statusLoadSub = known
+      .pipe(switchMap((resolved) => this.twitterFeed.timeline(resolved)))
+      .subscribe({
+        next: (statuses) => {
+          if (seq !== this.loadSeq) {
+            return;
+          }
+          // The author object off a real post beats anything synthesized: it
+          // carries the live follower counts and bio.
+          const authored = statuses.find(
+            (status) => status.account.username.toLowerCase() === handle.toLowerCase(),
+          );
+          this.account.set(
+            authored?.account ??
+              this.account() ??
+              twitterPlaceholderAccount(follow ?? fallbackFollow(handle)),
+          );
+          this.statuses.set(statuses);
+          this.loading.set(false);
+          this.statusesLoading.set(false);
+          this.diagnostics.info('Profile', 'twitter:loaded', {
+            handle,
+            posts: statuses.length,
+          });
+        },
+        error: (error: unknown) => {
+          if (seq !== this.loadSeq) {
+            return;
+          }
+          this.diagnostics.error('Profile', 'twitter:load-failed', error, { handle });
+          // Show the account with its posts missing, and say why — rather than
+          // letting the page fall through to "Account not found", which is a
+          // different and wrong claim. A rate limit, an expired key or a dead
+          // proxy all mean "we could not fetch the posts"; none of them mean the
+          // account does not exist, and sending someone to check the handle they
+          // typed is the least useful thing the page could do.
+          this.account.set(
+            this.account() ?? twitterPlaceholderAccount(follow ?? fallbackFollow(handle)),
+          );
+          this.twitterError.set(
+            error instanceof Error ? error.message : `Could not load posts for @${handle}.`,
+          );
+          this.loading.set(false);
+          this.statusesLoading.set(false);
+        },
+      });
+  }
+
+  /** Follow or unfollow this X account locally. Costs nothing either way. */
+  protected toggleTwitterFollow(): void {
+    const handle = this.twitterHandle();
+    const account = this.account();
+    if (!handle) {
+      return;
+    }
+    if (this.twitterFollows.has(handle)) {
+      this.twitterFollows.remove(handle);
+      return;
+    }
+    this.twitterFollows.add({
+      username: handle,
+      displayName: account?.display_name ?? handle,
+      avatar: account?.avatar,
+    });
+  }
+
   private loadRss(id: string): void {
     this.isRss.set(true);
     const feedUrl = id.slice('rss:'.length);
@@ -797,4 +939,43 @@ export class Profile implements OnInit, OnDestroy {
     this.showReport.set(false);
     this.reportDone.set(true);
   }
+}
+
+/**
+ * A minimal `Account` for an X profile we know the handle of but have not yet
+ * seen a post from.
+ *
+ * Used only as a placeholder while the timeline loads, and replaced by the real
+ * author object as soon as one post arrives — that one carries live follower
+ * counts and the bio, which this cannot. It exists so the page has a name and
+ * avatar to render immediately instead of flashing "Account not found".
+ */
+function twitterPlaceholderAccount(follow: {
+  username: string;
+  displayName: string;
+  avatar?: string;
+}): Account {
+  return {
+    id: `twitter:@${follow.username}`,
+    username: follow.username,
+    acct: `${follow.username}@x.com`,
+    display_name: follow.displayName || follow.username,
+    note: '',
+    url: `https://x.com/${follow.username}`,
+    avatar: follow.avatar ?? '',
+    avatar_static: follow.avatar ?? '',
+    header: '',
+    header_static: '',
+    followers_count: 0,
+    following_count: 0,
+    statuses_count: 0,
+    bot: false,
+    locked: false,
+    fields: [],
+  };
+}
+
+/** The bare minimum needed to fetch a handle nobody follows yet. */
+function fallbackFollow(handle: string) {
+  return { username: handle, displayName: handle, addedAt: Date.now(), enabled: true };
 }

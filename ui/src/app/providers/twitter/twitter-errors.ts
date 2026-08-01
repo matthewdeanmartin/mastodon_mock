@@ -264,7 +264,13 @@ export function toTwitterApiError(
     case 429:
       return new TwitterApiError(
         'RATE_LIMITED',
-        'The X data service is rate-limiting you.',
+        // Names both parties, because the user cannot tell them apart and the
+        // fix differs: a free CORS proxy's limit is hit far sooner than the
+        // data service's, and waiting is the answer to one while upgrading is
+        // the answer to the other.
+        context.viaProxy
+          ? `Rate-limited — either by ${proxy} or by the X data service. Wait a minute and try again; free proxy tiers throttle quickly.`
+          : 'The X data service is rate-limiting you. Wait a minute and try again.',
         source,
         429,
         retryAfterMs(error),

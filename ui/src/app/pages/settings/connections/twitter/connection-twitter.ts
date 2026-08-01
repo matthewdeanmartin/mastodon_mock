@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -6,6 +7,12 @@ import { CorsProxy } from '../../../../providers/cors-proxy/cors-proxy';
 import { CorsProxyEntry } from '../../../../providers/cors-proxy/cors-proxy-catalog';
 import { ProxyConsent } from '../../../../providers/proxy-consent-store';
 import { TwitterConsentDialog } from '../../../../providers/twitter/twitter-consent-dialog/twitter-consent-dialog';
+import { Account } from '../../../../models';
+import { TwitterApi, stripAt } from '../../../../providers/twitter/twitter-api';
+import {
+  TwitterFollows,
+  TWITTER_FOLLOW_LIMIT,
+} from '../../../../providers/twitter/twitter-follows';
 import {
   TwitterReachability,
   TwitterReachabilityResult,
@@ -48,15 +55,19 @@ import { expiryLabel } from '../expiry-label';
  */
 @Component({
   selector: 'app-connection-twitter',
-  imports: [FormsModule, RouterLink, TwitterConsentDialog],
+  imports: [DecimalPipe, FormsModule, RouterLink, TwitterConsentDialog],
   templateUrl: './connection-twitter.html',
   styleUrls: ['../connection-page.css', './connection-twitter.css'],
 })
 export class ConnectionTwitter implements OnInit {
   protected settings = inject(TwitterSettings);
   protected consent = inject(ProxyConsent);
+  protected follows = inject(TwitterFollows);
   private proxy = inject(CorsProxy);
   private reachability = inject(TwitterReachability);
+  private twitterApi = inject(TwitterApi);
+
+  protected readonly followLimit = TWITTER_FOLLOW_LIMIT;
 
   protected readonly sources = availableTwitterSources();
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.browser.detail;
@@ -259,6 +270,110 @@ export class ConnectionTwitter implements OnInit {
       this.lastProbe.set(null);
       this.notice.set('Consent withdrawn. You will be asked again next time.');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Following accounts
+  //
+  // The point of the whole connector: keeping the handful of people who never
+  // left X in your reading. Deliberately a *two-step* flow — look up, then
+  // confirm — rather than one button that follows whatever was typed.
+  //
+  // A single button would be worse for two reasons. It bills a request for a
+  // typo, and it gives no chance to notice that @nasa is not the account you
+  // meant before it lands in your feed. Showing the profile first makes the
+  // request buy something the user can actually check.
+  // ---------------------------------------------------------------------------
+
+  protected readonly handleDraft = signal('');
+  /** The profile found by a lookup, awaiting confirmation. */
+  protected readonly lookupResult = signal<Account | null>(null);
+  protected readonly lookingUp = signal(false);
+  protected readonly followError = signal<string | null>(null);
+  protected readonly followNotice = signal<string | null>(null);
+
+  /** Whether following is possible at all yet. */
+  protected readonly canFollow = computed(
+    () => this.settings.usable() && this.hasConsent() && !this.proxyStripsHeaders(),
+  );
+
+  /**
+   * Look up a handle. Costs one request, which the button says.
+   *
+   * Failures are reported without storing anything: a handle that could not be
+   * resolved is not followed, because a follow that cannot be fetched is a row
+   * that will fail on every refresh.
+   */
+  protected async lookup(): Promise<void> {
+    const handle = stripAt(this.handleDraft());
+    if (!handle) {
+      this.followError.set('Type an X handle first, for example @NASA.');
+      return;
+    }
+    if (this.follows.has(handle)) {
+      this.followError.set(`You already follow @${handle}.`);
+      return;
+    }
+    if (this.follows.atLimit()) {
+      this.followError.set(
+        `You can follow up to ${this.followLimit} X accounts. Remove one to add another.`,
+      );
+      return;
+    }
+
+    this.lookingUp.set(true);
+    this.followError.set(null);
+    this.followNotice.set(null);
+    this.lookupResult.set(null);
+    try {
+      this.lookupResult.set(await firstValueFrom(this.twitterApi.getProfile(handle)));
+    } catch (error: unknown) {
+      this.followError.set(
+        error instanceof Error ? error.message : `Could not find @${handle} on X.`,
+      );
+    } finally {
+      this.lookingUp.set(false);
+    }
+  }
+
+  /** Confirm the previewed profile. Costs nothing — the lookup already paid. */
+  protected confirmFollow(): void {
+    const account = this.lookupResult();
+    if (!account) {
+      return;
+    }
+    const error = this.follows.add({
+      username: account.username,
+      displayName: account.display_name,
+      avatar: account.avatar,
+      // providerRef carries the raw numeric id the adapter recorded; storing it
+      // now means the first timeline fetch can use the faster by-id endpoint
+      // and survives the account being renamed.
+      userId: undefined,
+    });
+    if (error) {
+      this.followError.set(error);
+      return;
+    }
+    this.followNotice.set(
+      `Following @${account.username}. Their posts are on the Feeds page.`,
+    );
+    this.lookupResult.set(null);
+    this.handleDraft.set('');
+  }
+
+  protected cancelLookup(): void {
+    this.lookupResult.set(null);
+    this.followError.set(null);
+  }
+
+  protected unfollow(username: string): void {
+    this.follows.remove(username);
+    this.followNotice.set(`Unfollowed @${username}.`);
+  }
+
+  protected toggleFollowEnabled(username: string, enabled: boolean): void {
+    this.follows.setEnabled(username, enabled);
   }
 
   /** Forget this source entirely: key, probe verdict, and proxy consents. */

@@ -82,3 +82,84 @@
   gap: 0.5rem;
   margin-block: 0.75rem 0.35rem;
 }
+
+.follows {
+  margin-block: 1.5rem;
+}
+
+/*
+ * The confirm-before-following card.
+ *
+ * Bordered and set apart because it is a decision point, not a result: the
+ * lookup has been paid for and the user is being asked whether this is the
+ * person they meant. A plain line of text here would get skimmed past, which
+ * defeats the entire reason the flow has two steps.
+ */
+.lookup-preview {
+  margin-block: 0.75rem;
+}
+
+.preview-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  max-width: 32rem;
+}
+
+.preview-avatar,
+.follow-avatar {
+  border-radius: 50%;
+  flex: none;
+  object-fit: cover;
+}
+
+.preview-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.follow-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  max-width: 32rem;
+}
+
+.follow-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-block-start: 1px solid var(--border);
+}
+
+.follow-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.follow-text strong,
+.preview-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.follow-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+}
+
+.btn-small {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85em;
+}

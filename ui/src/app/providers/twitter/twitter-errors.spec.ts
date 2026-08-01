@@ -111,6 +111,16 @@ describe('toTwitterApiError', () => {
     expect(error.message).toMatch(/credit/i);
   });
 
+  it('names both possible throttlers on a proxied 429', () => {
+    // Observed live: a free CORS proxy throttles long before the data service
+    // does, and the fixes differ (wait vs. upgrade). Blaming only the service
+    // sends the user to the wrong dashboard.
+    const error = toTwitterApiError(http(429), SOURCE, { viaProxy: true, proxyLabel: 'CORS.SH' });
+    expect(error.message).toContain('CORS.SH');
+    expect(error.message).toMatch(/X data service/);
+    expect(error.message).toMatch(/wait a minute/i);
+  });
+
   it('honours Retry-After on a 429', () => {
     const headers = new HttpHeaders({ 'Retry-After': '30' });
     expect(toTwitterApiError(http(429, undefined, headers), SOURCE).retryAfterMs).toBe(30_000);
