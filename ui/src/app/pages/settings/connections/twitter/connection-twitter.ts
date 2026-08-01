@@ -15,6 +15,7 @@ import {
   timelinePagesRemaining,
 } from '../../../../providers/twitter/twitter-api';
 import {
+  TwitterFollow,
   TwitterFollows,
   TWITTER_FOLLOW_COMFORTABLE,
   TWITTER_FOLLOW_LIMIT,
@@ -26,8 +27,10 @@ import {
 import { TwitterFeed } from '../../../../providers/twitter/twitter-feed';
 import {
   DEFAULT_INACTIVE_DAYS,
+  parseHandles,
   TwitterImport,
 } from '../../../../providers/twitter/twitter-import';
+import { TwitterPacer } from '../../../../providers/twitter/twitter-pacer';
 import { TwitterSettings } from '../../../../providers/twitter/twitter-settings';
 import { TwitterUsage } from '../../../../providers/twitter/twitter-usage';
 import {
@@ -80,6 +83,7 @@ export class ConnectionTwitter implements OnInit {
   private proxy = inject(CorsProxy);
   private reachability = inject(TwitterReachability);
   private twitterApi = inject(TwitterApi);
+  private pacer = inject(TwitterPacer);
 
   protected readonly followLimit = TWITTER_FOLLOW_LIMIT;
   protected readonly comfortableLimit = TWITTER_FOLLOW_COMFORTABLE;
@@ -398,7 +402,18 @@ export class ConnectionTwitter implements OnInit {
 
   protected readonly softDraft = signal(this.usage.softLimit());
   protected readonly hardDraft = signal(this.usage.hardLimit());
-  protected readonly refreshing = signal(false);
+  /** Which refresh is running, or null. Two buttons, one at a time. */
+  protected readonly refreshing = signal<'all' | 'rotation' | null>(null);
+
+  /**
+   * How many accounts one rotation press refreshes.
+   *
+   * Twenty is a batch someone will actually wait for: roughly twenty seconds
+   * through a proxy allowing 60 requests a minute, against three and a half
+   * minutes for a full 200. Small enough to press casually, large enough to
+   * move the feed on.
+   */
+  protected readonly rotationBatch = 20;
   protected readonly refreshResult = signal<{ message: string; stopped: boolean } | null>(null);
 
   /**
@@ -411,6 +426,36 @@ export class ConnectionTwitter implements OnInit {
   protected readonly refreshCost = computed(() =>
     this.feed.estimateCost(this.follows.enabled().map((f) => f.username)),
   );
+
+  /**
+   * What a rotation press would cost — the batch size, or fewer if the list is
+   * short. Zero when rotation would just be "refresh all", so the button hides
+   * rather than offering the same thing twice.
+   */
+  protected readonly rotationCost = computed<number>(() => {
+    const enabled = this.follows.enabled();
+    // Only offered when it would do *less* than "Refresh all". Once few enough
+    // accounts are stale, rotation and a full refresh are the same act, and
+    // showing both would price the same work two different ways — which is
+    // exactly what happened after one rotation press: "oldest 20" sat next to
+    // "all 5" and looked like the more expensive option.
+    const stale = this.feed.estimateCost(enabled.map((follow) => follow.username));
+    return stale > this.rotationBatch ? this.rotationBatch : 0;
+  });
+
+  /**
+   * Wall clock for a refresh, from the pacer's live interval.
+   *
+   * The honest number: with a paid data plan and a free proxy tier, the proxy
+   * is the binding constraint, and the pacer discovers that by being refused.
+   */
+  private durationFor(requests: number): string {
+    const seconds = Math.round((requests * this.pacer.delayMs()) / 1000);
+    return seconds < 60 ? `${Math.max(1, seconds)} sec` : `${Math.round(seconds / 60)} min`;
+  }
+
+  protected readonly rotationDuration = computed(() => this.durationFor(this.rotationCost()));
+  protected readonly refreshDuration = computed(() => this.durationFor(this.refreshCost()));
 
   /**
    * How many handles have posts saved on this device.
@@ -463,6 +508,41 @@ export class ConnectionTwitter implements OnInit {
     } finally {
       this.balanceLoading.set(false);
     }
+  }
+
+  // ------------------------------------------------------------- paste a list
+
+  protected readonly pasteDraft = signal('');
+  protected readonly pasteResult = signal<string | null>(null);
+
+  /** Live preview of what the paste would follow, so it is checkable first. */
+  protected readonly pastePreview = computed(() => parseHandles(this.pasteDraft()));
+
+  /** First few handles, for a preview line that stays one line. */
+  protected readonly pastePreviewLabel = computed(() => {
+    const handles = this.pastePreview();
+    const shown = handles.slice(0, 6).map((h) => '@' + h);
+    return handles.length > shown.length
+      ? `${shown.join(', ')} and ${handles.length - shown.length} more`
+      : shown.join(', ');
+  });
+
+  protected followPasted(): void {
+    const result = this.importer.followPasted(this.pasteDraft());
+    const parts = [`Followed ${result.added}.`];
+    if (result.already) {
+      parts.push(`${result.already} already followed.`);
+    }
+    if (result.invalid) {
+      // Say so rather than silently dropping: a line that did not look like a
+      // handle is usually a paste that brought along a name or a stray word.
+      parts.push(`${result.invalid} did not look like handles and were ignored.`);
+    }
+    if (result.capped) {
+      parts.push(`${result.capped} did not fit under the ${TWITTER_FOLLOW_LIMIT} limit.`);
+    }
+    this.pasteResult.set(parts.join(' '));
+    this.pasteDraft.set('');
   }
 
   // ------------------------------------------------------------- bulk import
@@ -557,9 +637,41 @@ export class ConnectionTwitter implements OnInit {
    * a fan-out that stops halfway has spent money for a partial answer nobody
    * can interpret.
    */
-  protected async refreshAll(): Promise<void> {
-    const targets = this.follows.enabled();
-    const cost = this.refreshCost();
+  protected refreshAll(): Promise<void> {
+    return this.runRefresh('all', this.follows.enabled(), this.refreshCost());
+  }
+
+  /**
+   * Refresh only the accounts that have gone longest without one.
+   *
+   * Rotation, and the answer to a large follow list. Refreshing everything is
+   * mostly re-fetching accounts that were current a moment ago; refreshing the
+   * stalest {@link rotationBatch} gets the feed most of the way fresh for a
+   * fraction of the cost and the wait.
+   *
+   * Forced, unlike "Refresh all": these were chosen *because* they are the
+   * oldest, so honouring the freshness TTL would be picking accounts and then
+   * declining to fetch most of them.
+   */
+  protected refreshStalest(): Promise<void> {
+    const targets = this.feed.stalest(this.follows.enabled(), this.rotationBatch);
+    return this.runRefresh('rotation', targets, targets.length, true);
+  }
+
+  /**
+   * Shared by both refresh buttons: check the daily limit, run sequentially,
+   * report honestly.
+   *
+   * One path rather than two so the limit check and the "stopped early" message
+   * cannot drift apart — the rotation button is the one people will press
+   * often, and it is the one that must not quietly overspend.
+   */
+  private async runRefresh(
+    mode: 'all' | 'rotation',
+    targets: TwitterFollow[],
+    cost: number,
+    force = false,
+  ): Promise<void> {
     if (!targets.length || this.refreshing()) {
       return;
     }
@@ -567,27 +679,36 @@ export class ConnectionTwitter implements OnInit {
       this.refreshResult.set({
         stopped: true,
         message:
-          `Refreshing all ${targets.length} accounts needs ${cost} requests, and only ` +
-          `${this.usage.remainingToday()} remain before today's limit. Raise the limit, or wait for midnight.`,
+          `Refreshing ${targets.length} ${targets.length === 1 ? 'account' : 'accounts'} needs ` +
+          `${cost} requests, and only ${this.usage.remainingToday()} remain before today's limit. ` +
+          'Raise the limit, or wait for midnight.',
       });
       return;
     }
 
-    this.refreshing.set(true);
+    this.refreshing.set(mode);
     this.refreshResult.set(null);
     try {
-      const result = await firstValueFrom(this.feed.refreshMany(targets));
+      const result = await firstValueFrom(this.feed.refreshMany(targets, force));
       const parts = [`Loaded ${result.loaded} of ${targets.length}.`];
       if (result.failed.length) {
         parts.push(`Could not load: ${result.failed.map((u) => '@' + u).join(', ')}.`);
       }
       if (result.stopped) {
-        parts.push('Stopped early after a rate limit, rather than spending on requests that would also fail.');
+        parts.push(
+          'Stopped early after a rate limit, rather than spending on requests that would also fail.',
+        );
+      }
+      if (mode === 'rotation') {
+        const left = Math.max(0, this.follows.enabled().length - targets.length);
+        if (left) {
+          parts.push(`${left} older ${left === 1 ? 'account' : 'accounts'} not refreshed yet.`);
+        }
       }
       this.refreshResult.set({ stopped: result.stopped, message: parts.join(' ') });
       await this.syncStoredCount();
     } finally {
-      this.refreshing.set(false);
+      this.refreshing.set(null);
     }
   }
 

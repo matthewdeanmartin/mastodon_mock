@@ -51,6 +51,46 @@ import { WireFollowing } from './twitterapi-io/wire-types';
 /** Default cutoff for "dead": no post in this many days. */
 export const DEFAULT_INACTIVE_DAYS = 365;
 
+/**
+ * Pull handles out of pasted text.
+ *
+ * Accepts commas, newlines, spaces, and any mix — because the list is going to
+ * be pasted from somewhere else (a note, a spreadsheet column, a thread) and
+ * insisting on one separator would just make people edit it first. `@` is
+ * optional, and a full profile URL works too, since that is what you get from
+ * copying a link.
+ *
+ * Deliberately no network calls: this is free, instant, and reversible. It is
+ * the path for someone who knows exactly which twenty accounts they want and
+ * does not want to import four thousand to get them.
+ */
+export function parseHandles(text: string): string[] {
+  const seen = new Set<string>();
+  const handles: string[] = [];
+  for (const raw of text.split(/[\s,;]+/)) {
+    if (!raw) {
+      continue;
+    }
+    // A pasted profile URL — x.com/NASA, twitter.com/NASA/, with or without
+    // query junk — yields the handle rather than being rejected as malformed.
+    const fromUrl = /(?:^|\/\/)(?:www\.|mobile\.)?(?:x|twitter|nitter\.\w+)\.com\/([^/?#]+)/i.exec(
+      raw,
+    );
+    const candidate = (fromUrl ? fromUrl[1] : raw).replace(/^@+/, '').trim();
+    // Twitter handles are 1-15 of [A-Za-z0-9_]. Anything else is a stray word
+    // from the paste, not a handle someone meant to type.
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(candidate)) {
+      continue;
+    }
+    const key = candidate.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      handles.push(candidate);
+    }
+  }
+  return handles;
+}
+
 /** One account under consideration, with whatever we know so far. */
 export interface ImportCandidate {
   userId: string;
@@ -320,6 +360,51 @@ export class TwitterImport {
       }
     }
     return { added, skipped: this.excluded().length, capped, already };
+  }
+
+  /**
+   * Follow a pasted list of handles directly, without verifying them.
+   *
+   * Costs **nothing**. A follow here is a local subscription, so an entry that
+   * turns out to be a typo simply produces one failed timeline fetch later,
+   * visible on the follow list, and is one click to remove. Spending a request
+   * per handle to check spelling would make the cheap path expensive to protect
+   * against a mistake the user can already see and fix.
+   *
+   * This is the path for someone who knows which accounts they want. Importing
+   * a whole following list is the other one, and they are different jobs: a
+   * following list from years ago may be thousands of accounts you no longer
+   * care about, and wanting twenty of them is not a reason to import all four
+   * thousand.
+   */
+  followPasted(text: string): {
+    added: number;
+    already: number;
+    capped: number;
+    invalid: number;
+  } {
+    const handles = parseHandles(text);
+    // Count only tokens that were genuinely *unusable*, not ones parseHandles
+    // merged as duplicates. Comparing raw token count to handle count blamed a
+    // repeated @handle on bad input and reported "2 ignored" for one typo.
+    const invalid = text
+      .split(/[\s,;]+/)
+      .filter(Boolean)
+      .filter((token) => parseHandles(token).length === 0).length;
+    let added = 0;
+    let already = 0;
+    let capped = 0;
+    for (const username of handles) {
+      const refusal = this.follows.add({ username, displayName: username });
+      if (!refusal) {
+        added++;
+      } else if (/already follow/i.test(refusal)) {
+        already++;
+      } else {
+        capped++;
+      }
+    }
+    return { added, already, capped, invalid };
   }
 
   private patch(userId: string, changes: Partial<ImportCandidate>): void {

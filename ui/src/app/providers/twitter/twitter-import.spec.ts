@@ -3,7 +3,12 @@ import { of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TwitterApi } from './twitter-api';
 import { TwitterFollows } from './twitter-follows';
-import { DEFAULT_INACTIVE_DAYS, toCandidate, TwitterImport } from './twitter-import';
+import {
+  DEFAULT_INACTIVE_DAYS,
+  parseHandles,
+  toCandidate,
+  TwitterImport,
+} from './twitter-import';
 import { TwitterApiError } from './twitter-errors';
 import { FAST_DELAY_MS, TwitterPacer } from './twitter-pacer';
 import { WireFollowing } from './twitterapi-io/wire-types';
@@ -254,5 +259,83 @@ describe('TwitterImport', () => {
 
     importer.toggle('1');
     expect(importer.keeping()).toHaveLength(1);
+  });
+});
+
+describe('parseHandles', () => {
+  it('accepts whatever separator the paste happened to use', () => {
+    // The list comes from somewhere else - a note, a spreadsheet column, a
+    // thread - so insisting on one separator would just make people edit it
+    // before pasting.
+    expect(parseHandles('@a, @b')).toEqual(['a', 'b']);
+    expect(parseHandles(['a', 'b', 'c'].join('\n'))).toEqual(['a', 'b', 'c']);
+    expect(parseHandles('a b;c,  d')).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('takes the handle out of a pasted profile link', () => {
+    // Copying a link is the most likely way someone collects these.
+    expect(parseHandles('https://x.com/NASA')).toEqual(['NASA']);
+    expect(parseHandles('https://twitter.com/NASA/status/123')).toEqual(['NASA']);
+    expect(parseHandles('https://mobile.twitter.com/NASA?s=20')).toEqual(['NASA']);
+  });
+
+  it('drops duplicates case-insensitively, keeping the first spelling', () => {
+    expect(parseHandles('@NASA nasa NASA')).toEqual(['NASA']);
+  });
+
+  it('ignores words that cannot be handles', () => {
+    // A paste usually brings along display names and stray punctuation.
+    // Twitter handles are 1-15 of [A-Za-z0-9_].
+    // Parenthesised display names are dropped because of the brackets, which
+    // is the common shape of a paste like "@NASA (National Aeronautics)".
+    expect(parseHandles('@NASA (National Aeronautics) @ESA')).toEqual(['NASA', 'ESA']);
+    // A bare word that *could* be a handle is kept — there is no way to tell
+    // "Aeronautics" from a real handle, and following a wrong one is free and
+    // one click to undo.
+    expect(parseHandles('@NASA Aeronautics @ESA')).toEqual(['NASA', 'Aeronautics', 'ESA']);
+    expect(parseHandles('waaaaaaytoolongforahandle')).toEqual([]);
+    expect(parseHandles('bad-chars!')).toEqual([]);
+  });
+
+  it('returns nothing for empty or whitespace input', () => {
+    expect(parseHandles('')).toEqual([]);
+    expect(parseHandles([' ', '\t', ' '].join('\n'))).toEqual([]);
+  });
+});
+
+describe('followPasted', () => {
+  let importer: TwitterImport;
+  let follows: TwitterFollows;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [{ provide: TwitterApi, useValue: {} }],
+    });
+    importer = TestBed.inject(TwitterImport);
+    follows = TestBed.inject(TwitterFollows);
+  });
+
+  it('follows everything valid without spending a request', () => {
+    // A follow is a local subscription, so verifying spelling would make the
+    // cheap path expensive to guard against a mistake the user can already see.
+    const result = importer.followPasted(['@NASA', '@ESA'].join('\n'));
+    expect(result.added).toBe(2);
+    expect(follows.has('NASA')).toBe(true);
+    expect(follows.has('ESA')).toBe(true);
+  });
+
+  it('does not blame a repeated handle on bad input', () => {
+    // Comparing raw token count to parsed handle count counted a duplicate as
+    // unusable, so one typo plus one repeat reported "2 ignored".
+    const result = importer.followPasted('@NASA @NASA (nope!)');
+    expect(result).toMatchObject({ added: 1, invalid: 1 });
+  });
+
+  it('counts duplicates and junk separately from successes', () => {
+    follows.add({ username: 'NASA', displayName: 'NASA' });
+    const result = importer.followPasted('@NASA, @ESA, (nope!)');
+    expect(result).toMatchObject({ added: 1, already: 1, invalid: 1 });
   });
 });

@@ -104,9 +104,9 @@ and paging behaviour, which the default window would mask.
   it renders as a single chip with a dropdown rather than three chips.
 - Changing the window calls `load()`, which is the existing refresh path.
 
-## Rotation (Twitter, §6 of the Twitter roadmap)
+## Rotation (Twitter, §6 of the Twitter roadmap) — **BUILT (2026-08-01)**
 
-Decided at the same time: **manual only, but smarter.**
+**Manual only, but smarter.** Shipped, with a companion feature below.
 
 Rotation is about *which* accounts get refreshed, never about *when*. Nothing
 spends on its own — the rule the rest of the connector follows.
@@ -124,4 +124,31 @@ the plan actually in force.
 Note the binding constraint is now the **CORS proxy**, not the data service:
 Corsfix's trial allows 60 requests/minute, while a paid TwitterAPI.io balance
 answered 20 back-to-back requests without throttling. A 200-account refresh is
-therefore proxy-bound at ~3.5 minutes.
+therefore proxy-bound.
+
+`TwitterFeed.stalest()` sorts by `fetchedAt`, with never-fetched accounts first
+— an account with nothing cached contributes nothing to Home at all, so it is
+the one case where a request definitely buys something new. The button hides
+once fewer than a batch is stale, so rotation and "Refresh all" never price the
+same work two different ways.
+
+Verified with 25 follows: `Refresh oldest 20 (20 requests, ~5 sec)` made
+**exactly 20 requests to 20 unique accounts** and reported *"Loaded 20 of 20.
+5 older accounts not refreshed yet."*
+
+## Paste a list of accounts — **BUILT (2026-08-01)**
+
+Importing someone's whole following list is the wrong tool for the common case.
+As the user put it: *"twitter has changed so much since I left, my home feed is
+crap. I just want to follow the AI accounts and don't want to unfollow 4000
+accounts and follow 20 accounts just so I can import my old follow list."*
+
+So the connector also takes a pasted list. Commas, newlines, spaces, any mix;
+`@` optional; profile URLs work, since copying a link is how people collect
+these. Costs **nothing** — a follow here is a local subscription, so verifying
+spelling would make the cheap path expensive to guard against a mistake that is
+already visible and one click to undo.
+
+Verified: `@AnthropicAI, @OpenAI / https://x.com/NASA / @AnthropicAI / (nope!)`
+→ *"Followed 3. 1 did not look like handles and were ignored."* — deduped the
+repeat, pulled the handle out of the URL, rejected the junk.

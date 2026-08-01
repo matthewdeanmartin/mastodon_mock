@@ -184,6 +184,28 @@ export class TwitterFeed {
   }
 
   /**
+   * The accounts most worth spending a request on, stalest first.
+   *
+   * The whole of "rotation": with 200 follows and a proxy that allows 60
+   * requests a minute, refreshing everything is minutes of waiting, and most of
+   * it is re-fetching accounts that were current a moment ago. Refreshing the
+   * *oldest* N gets the feed most of the way fresh for a fraction of the cost.
+   *
+   * Never-fetched accounts sort first (treated as infinitely stale), because an
+   * account with nothing cached contributes nothing to Home at all — it is the
+   * one case where a request definitely buys something new.
+   *
+   * Deliberately a pure selector rather than a scheduler. Nothing here decides
+   * *when* to refresh; that stays an explicit press, as everywhere else in this
+   * connector.
+   */
+  stalest(follows: TwitterFollow[], count: number): TwitterFollow[] {
+    return [...follows]
+      .sort((a, b) => (this.fetchedAt(a.username) ?? 0) - (this.fetchedAt(b.username) ?? 0))
+      .slice(0, Math.max(0, count));
+  }
+
+  /**
    * How many requests loading these accounts would cost right now.
    *
    * Drives the "Refresh all (7 requests)" label. Counts only what would

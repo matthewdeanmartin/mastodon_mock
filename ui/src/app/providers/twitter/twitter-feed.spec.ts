@@ -361,4 +361,82 @@ describe('TwitterFeed', () => {
       expect(fresh.findCached('twitter:42')?.id).toBe('twitter:42');
     });
   });
+  describe('rotation picks the accounts most worth paying for', () => {
+    const follow = (username: string): TwitterFollow => ({
+      username,
+      displayName: username,
+      addedAt: 0,
+      enabled: true,
+    });
+
+    /** A feed hydrated with known fetch times. */
+    async function withCache(
+      stored: { handle: string; statuses: Status[]; fetchedAt: number }[],
+    ): Promise<TwitterFeed> {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: TwitterApi, useValue: { getUserPosts } },
+          {
+            provide: TwitterCache,
+            useValue: {
+              load: () => Promise.resolve(stored),
+              put: () => Promise.resolve(),
+              evict: () => Promise.resolve(),
+              clear: () => Promise.resolve(),
+              entries: () => Promise.resolve(stored),
+            },
+          },
+        ],
+      });
+      const fresh = TestBed.inject(TwitterFeed);
+      await fresh.hydrated;
+      return fresh;
+    }
+
+    it('returns the stalest first', async () => {
+      // The whole point of rotation: with 200 follows and a proxy allowing 60
+      // requests a minute, refreshing everything is minutes of waiting, most of
+      // it re-fetching accounts that were current a moment ago.
+      const now = Date.now();
+      const fresh = await withCache([
+        { handle: 'recent', statuses: [], fetchedAt: now - 1000 },
+        { handle: 'ancient', statuses: [], fetchedAt: now - 900_000 },
+        { handle: 'middling', statuses: [], fetchedAt: now - 60_000 },
+      ]);
+
+      const picked = fresh.stalest(
+        [follow('recent'), follow('ancient'), follow('middling')],
+        2,
+      );
+      expect(picked.map((f) => f.username)).toEqual(['ancient', 'middling']);
+    });
+
+    it('puts never-fetched accounts first', async () => {
+      // An account with nothing cached contributes nothing to Home at all, so
+      // it is the one case where a request definitely buys something new.
+      const fresh = await withCache([
+        { handle: 'known', statuses: [], fetchedAt: Date.now() - 500_000 },
+      ]);
+      const picked = fresh.stalest([follow('known'), follow('brandnew')], 1);
+      expect(picked.map((f) => f.username)).toEqual(['brandnew']);
+    });
+
+    it('never returns more than asked for, or more than exist', async () => {
+      const fresh = await withCache([]);
+      expect(fresh.stalest([follow('a'), follow('b')], 5)).toHaveLength(2);
+      expect(fresh.stalest([follow('a'), follow('b')], 0)).toHaveLength(0);
+      expect(fresh.stalest([follow('a')], -3)).toHaveLength(0);
+    });
+
+    it('does not reorder the array it was given', async () => {
+      const fresh = await withCache([
+        { handle: 'b', statuses: [], fetchedAt: 1 },
+        { handle: 'a', statuses: [], fetchedAt: 2 },
+      ]);
+      const input = [follow('a'), follow('b')];
+      fresh.stalest(input, 2);
+      expect(input.map((f) => f.username)).toEqual(['a', 'b']);
+    });
+  });
 });

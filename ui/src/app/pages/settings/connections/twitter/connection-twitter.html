@@ -367,19 +367,38 @@
 
     @if (follows.follows().length) {
       <div class="actions">
+        <!-- Rotation: refresh the accounts that have gone longest without,
+             rather than everything. At 200 follows through a proxy that allows
+             60 requests a minute, "everything" is minutes of waiting, most of
+             it spent re-fetching accounts that were current a moment ago. -->
+        @if (rotationCost() > 0) {
+          <button
+            class="btn btn-outline btn-small"
+            type="button"
+            [disabled]="refreshing() || usage.atHardLimit()"
+            (click)="refreshStalest()"
+          >
+            @if (refreshing() === 'rotation') {
+              Refreshing {{ rotationBatch }} oldest…
+            } @else {
+              Refresh oldest {{ rotationCost() }} ({{ rotationCost() }}
+              {{ rotationCost() === 1 ? 'request' : 'requests' }}, ~{{ rotationDuration() }})
+            }
+          </button>
+        }
         <button
           class="btn btn-outline btn-small"
           type="button"
           [disabled]="refreshing() || usage.atHardLimit()"
           (click)="refreshAll()"
         >
-          @if (refreshing()) {
+          @if (refreshing() === 'all') {
             Refreshing…
           } @else if (refreshCost() === 0) {
             Everything is up to date
           } @else {
             Refresh all ({{ refreshCost() }}
-            {{ refreshCost() === 1 ? 'request' : 'requests' }})
+            {{ refreshCost() === 1 ? 'request' : 'requests' }}, ~{{ refreshDuration() }})
           }
         </button>
         <!-- Costs nothing and spends nothing: for someone who wants the stored
@@ -437,6 +456,46 @@
 </section>
 
 @if (canFollow()) {
+  <!-- The cheap path, and for most people the right one: you already know who
+       you want. Costs nothing and needs no lookups. -->
+  <section class="import">
+    <h2 class="section-title">Paste a list of accounts</h2>
+    <p class="muted small">
+      One per line, or separated by commas. The <code>&#64;</code> is optional, and profile links
+      work too. Nothing is fetched — following is local and free, so a typo just shows up as an
+      account that fails to load, and you can remove it.
+    </p>
+    <label class="field">
+      <span class="field-label">Handles</span>
+      <textarea
+        rows="4"
+        placeholder="&#64;AnthropicAI, &#64;OpenAI&#10;https://x.com/NASA"
+        [ngModel]="pasteDraft()"
+        (ngModelChange)="pasteDraft.set($event)"
+      ></textarea>
+    </label>
+    @if (pastePreview().length) {
+      <p class="muted small">
+        Ready to follow {{ pastePreview().length }}:
+        {{ pastePreviewLabel() }}
+      </p>
+    }
+    <div class="actions">
+      <button
+        class="btn"
+        type="button"
+        [disabled]="!pastePreview().length"
+        (click)="followPasted()"
+      >
+        Follow {{ pastePreview().length || '' }}
+        {{ pastePreview().length === 1 ? 'account' : 'accounts' }}
+      </button>
+    </div>
+    @if (pasteResult(); as message) {
+      <p class="connection-ok">{{ message }}</p>
+    }
+  </section>
+
   <section class="import">
     <h2 class="section-title">Import someone's following list</h2>
     <p class="muted small">
