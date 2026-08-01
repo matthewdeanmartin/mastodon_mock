@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { TIMELINE_ENVELOPE, TIMELINE_FIXTURE, USER_FIXTURE } from '../fixtures/twitterapi-io.fixtures';
 import { TwitterApiError } from '../twitter-errors';
-import { isWireTweet, isWireUser, parseTimelineResponse, parseUserResponse } from './guards';
+import {
+  isWireTweet,
+  isWireUser,
+  parsePostsResponse,
+  parseTimelineResponse,
+  parseUserResponse,
+} from './guards';
 
 /** A response envelope shaped like the real one. */
 const envelope = (data: unknown, extra: Record<string, unknown> = {}) => ({
@@ -96,6 +102,33 @@ describe('parseTimelineResponse', () => {
     }
   });
 
+  it('accepts tweets at the top level, as tweet/replies sends them', () => {
+    // Measured 2026-08-01: this API uses at least four envelope shapes. The
+    // timeline endpoints nest under `data`; `tweet/replies` puts `tweets` at
+    // the top level with pagination beside it. Assuming the nested shape threw
+    // PROVIDER_CHANGED on a perfectly good replies response.
+    const page = parseTimelineResponse({
+      tweets: TIMELINE_FIXTURE,
+      has_next_page: false,
+      next_cursor: '',
+      status: 'success',
+      msg: 'success',
+    });
+    expect(page.tweets).toHaveLength(TIMELINE_FIXTURE.length);
+    expect(page.hasMore).toBe(false);
+  });
+
+  it('handles an empty replies list', () => {
+    // The real shape when a post has no replies — observed on a live post.
+    const page = parseTimelineResponse({
+      tweets: [],
+      has_next_page: false,
+      next_cursor: '',
+      status: 'success',
+    });
+    expect(page.tweets).toEqual([]);
+  });
+
   it('handles an empty timeline as an empty page, not an error', () => {
     const page = parseTimelineResponse(envelope({ tweets: [] }, { has_next_page: false }));
     expect(page.tweets).toEqual([]);
@@ -125,5 +158,24 @@ describe('identity guards are permissive about everything but identity', () => {
   it('rejects a numeric id, which would mean it had been through a JS number', () => {
     // 2083317461269598348 does not survive a round-trip through a double.
     expect(isWireTweet({ id: 2083317461269598348, author: { userName: 'a' } })).toBe(false);
+  });
+});
+
+describe('parsePostsResponse', () => {
+  it('reads the batch endpoint shape, which nests differently again', () => {
+    // /twitter/tweets returns `tweets` at the top level with NO data wrapper
+    // and no pagination — a third shape from the same API.
+    expect(parsePostsResponse({ tweets: TIMELINE_FIXTURE, status: 'success' })).toHaveLength(
+      TIMELINE_FIXTURE.length,
+    );
+  });
+
+  it('returns an empty list for a post that no longer exists', () => {
+    // A deleted or withheld post comes back as an empty array, not an error.
+    expect(parsePostsResponse({ tweets: [], status: 'success' })).toEqual([]);
+  });
+
+  it('raises PROVIDER_CHANGED when tweets is missing', () => {
+    expect(() => parsePostsResponse({ status: 'success' })).toThrow(TwitterApiError);
   });
 });

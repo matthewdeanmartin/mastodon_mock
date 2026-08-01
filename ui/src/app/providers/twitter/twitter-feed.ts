@@ -188,6 +188,35 @@ export class TwitterFeed {
     );
   }
 
+  /**
+   * A post already held in the cache, by its namespaced id.
+   *
+   * Lets the thread page render the post someone just clicked without paying to
+   * fetch it again — they were looking at it a moment ago, so the app already
+   * has it. Returns null when the cache has been dropped (a reload, a new tab),
+   * and the caller falls back to a real lookup.
+   *
+   * Searches nested reblogs and quotes too, since those are clickable in their
+   * own right.
+   */
+  findCached(statusId: string): Status | null {
+    for (const entry of this.cache.values()) {
+      for (const status of entry.page.statuses) {
+        if (status.id === statusId) {
+          return status;
+        }
+        if (status.reblog?.id === statusId) {
+          return status.reblog;
+        }
+        const quoted = status.quote?.quoted_status;
+        if (quoted?.id === statusId) {
+          return quoted;
+        }
+      }
+    }
+    return null;
+  }
+
   /** Drop everything cached for one account, so the next read refetches. */
   evict(username: string): void {
     this.cache.delete(key(username));

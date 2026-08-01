@@ -6,15 +6,40 @@ const FOLLOWS_KEY_BASE = 'mockingbird_twitter_follows';
 /**
  * How many X accounts one Mastodon account may follow here.
  *
- * Ten, matching the RSS subscription cap — but for a different reason worth
- * stating, because someone will want to raise it. RSS is capped to keep a
- * timeline refresh from taking forever. This is capped because **every account
- * costs money on every refresh**: at one request each, ten follows is ten
- * billable requests per "refresh all", and the arithmetic gets uncomfortable
- * fast. The cap is the cheapest possible protection against a user discovering
- * that in their billing dashboard rather than here.
+ * Two hundred, which is deliberately the page size of the provider's
+ * `user/followings` endpoint — so a bulk import of someone's real X following
+ * list maps onto exactly one request per cap's worth.
+ *
+ * ## Why this was 10, and why 10 was wrong
+ *
+ * The original cap was set when nothing else limited spend, so it had to do all
+ * the protecting by itself. That is no longer true: {@link TwitterUsage}
+ * enforces a daily request limit, the timeline cache suppresses repeat fetches,
+ * and `refreshMany` runs sequentially and stops on a rate limit. With those in
+ * place, a low follow cap protects nothing the daily limit does not already
+ * protect, while making the feature useless to the people it is aimed at —
+ * someone keeping up with the friends who never left X plausibly has dozens.
+ *
+ * ## What the real constraint turned out to be
+ *
+ * Measured: a timeline page is ~6 credits, roughly $0.0001. Two hundred follows
+ * refreshed once a day is about $0.36 a month — not the binding constraint.
+ * The binding constraint is the CORS proxy's rate limit (Corsfix's free tier is
+ * 60/min), which is a *pacing* problem, not a budget one. That is why the cap
+ * can rise now and why the answer beyond a few hundred is rotation rather than
+ * a bigger number — see `spec/ui/twitter_remaining_roadmap.md` §6.
  */
-export const TWITTER_FOLLOW_LIMIT = 10;
+export const TWITTER_FOLLOW_LIMIT = 200;
+
+/**
+ * Above this many follows, refreshing everything stops being quick.
+ *
+ * Not a limit — a threshold for telling the truth. At 60 requests a minute
+ * through a free proxy, fifty accounts is about a minute of solid requesting,
+ * so past this point the UI should say what a full refresh actually involves
+ * rather than letting someone discover it by watching a spinner.
+ */
+export const TWITTER_FOLLOW_COMFORTABLE = 50;
 
 /**
  * One locally-followed X account.
@@ -114,8 +139,8 @@ export class TwitterFollows {
     }
     if (this.atLimit()) {
       return (
-        `You can follow up to ${TWITTER_FOLLOW_LIMIT} X accounts. ` +
-        'Each one costs a request every time its posts are refreshed, so the limit keeps the bill predictable.'
+        `You can follow up to ${TWITTER_FOLLOW_LIMIT} X accounts here. ` +
+        'Unfollow someone to make room.'
       );
     }
     this.persist([...this.follows(), { ...follow, addedAt: Date.now(), enabled: true }]);

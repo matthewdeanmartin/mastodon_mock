@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TwitterFollows, TWITTER_FOLLOW_LIMIT } from './twitter-follows';
+import {
+  TwitterFollows,
+  TWITTER_FOLLOW_COMFORTABLE,
+  TWITTER_FOLLOW_LIMIT,
+} from './twitter-follows';
 
 describe('TwitterFollows', () => {
   let follows: TwitterFollows;
@@ -27,14 +31,22 @@ describe('TwitterFollows', () => {
     expect(follows.follows()).toHaveLength(1);
   });
 
-  it('caps the list, explaining that each account costs requests', () => {
+  it('caps the list and says how to make room', () => {
     for (let i = 0; i < TWITTER_FOLLOW_LIMIT; i++) {
       expect(add(`user${i}`)).toBeNull();
     }
     const error = add('one-too-many');
     expect(error).toMatch(new RegExp(`${TWITTER_FOLLOW_LIMIT}`));
-    expect(error).toMatch(/costs a request/i);
+    expect(error).toMatch(/unfollow/i);
     expect(follows.follows()).toHaveLength(TWITTER_FOLLOW_LIMIT);
+  });
+
+  it('caps at the provider followings page size, so a bulk import maps cleanly', () => {
+    // 200 is `user/followings`' page size. The cap was 10 when nothing else
+    // limited spend; TwitterUsage's daily limit does that job now, so the cap
+    // exists to bound the follow *list*, not the bill.
+    expect(TWITTER_FOLLOW_LIMIT).toBe(200);
+    expect(TWITTER_FOLLOW_COMFORTABLE).toBeLessThan(TWITTER_FOLLOW_LIMIT);
   });
 
   it('unfollows regardless of the case typed', () => {
@@ -103,7 +115,7 @@ describe('TwitterFollows', () => {
     });
 
     it('truncates a list longer than the cap', () => {
-      const many = Array.from({ length: 50 }, (_, i) => ({
+      const many = Array.from({ length: TWITTER_FOLLOW_LIMIT + 20 }, (_, i) => ({
         username: `u${i}`,
         displayName: `U${i}`,
         addedAt: 1,

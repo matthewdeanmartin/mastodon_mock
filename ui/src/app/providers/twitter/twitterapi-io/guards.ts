@@ -85,6 +85,29 @@ export function isWireTweet(value: unknown): value is WireTweet {
   return typeof value['id'] === 'string' && isWireUser(value['author']);
 }
 
+/**
+ * Validate a `/twitter/tweets` (batch post lookup) response.
+ *
+ * A *third* envelope shape from the same API, measured 2026-08-01: `tweets`
+ * sits at the top level here, with no `data` wrapper at all — unlike the
+ * timeline endpoints, which nest it under `data`, and unlike `user/info`, which
+ * puts a single object there. Reusing the timeline parser threw
+ * `PROVIDER_CHANGED` on a perfectly good response.
+ *
+ * Exactly the reason each endpoint gets its own guard rather than one shared
+ * "unwrap and hope".
+ */
+export function parsePostsResponse(body: unknown): WireTweet[] {
+  if (!isObject(body)) {
+    throw changed('/twitter/tweets', ['a JSON object body']);
+  }
+  const raw: unknown = body['tweets'];
+  if (!Array.isArray(raw)) {
+    throw changed('/twitter/tweets', ['tweets']);
+  }
+  return raw.filter(isWireTweet);
+}
+
 /** Validate a `/twitter/user/info` response. */
 export function parseUserResponse(body: unknown): WireUser {
   const { data } = unwrap<unknown>(body, '/twitter/user/info');
@@ -110,16 +133,28 @@ export function parseTimelineResponse(body: unknown): {
   hasMore: boolean;
   skipped: number;
 } {
-  const { data, envelope } = unwrap<WireTimelineData>(body, 'user timeline');
-  // `data` is typed but not trusted — it came off the wire, so the array check
-  // is a runtime one regardless of what the type claims.
-  const rawTweets: unknown = (data as WireTimelineData)?.tweets;
+  if (!isObject(body)) {
+    throw changed('user timeline', ['a JSON object body']);
+  }
+  const envelope = body as WireEnvelope<WireTimelineData>;
+
+  // Two nestings in the wild, both measured 2026-08-01:
+  //
+  //   user/last_tweets, user/tweet_timeline  ->  { data: { tweets: [...] } }
+  //   tweet/replies                          ->  { tweets: [...] }
+  //
+  // Same conceptual payload, different envelope, from one API. Accepting either
+  // here is not laxity — it is the only way one function can serve both without
+  // the caller having to know which endpoint nests and which does not.
+  const nested: unknown = (envelope.data as WireTimelineData | undefined)?.tweets;
+  const flat: unknown = (body as Record<string, unknown>)['tweets'];
+  const rawTweets: unknown = Array.isArray(nested) ? nested : flat;
   if (!Array.isArray(rawTweets)) {
-    throw changed('user timeline', ['data.tweets']);
+    throw changed('user timeline', ['tweets or data.tweets']);
   }
 
   const tweets = rawTweets.filter(isWireTweet);
-  const pinnedCandidate = (data as WireTimelineData)?.pin_tweet;
+  const pinnedCandidate = (envelope.data as WireTimelineData | undefined)?.pin_tweet;
   const cursor = typeof envelope.next_cursor === 'string' ? envelope.next_cursor : null;
 
   return {

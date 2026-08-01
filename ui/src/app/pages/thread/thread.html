@@ -225,6 +225,22 @@
       <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
     } @else if (isLocal(s)) {
       <app-local-compose [inReplyTo]="s.id" (posted)="onReply($event)" />
+    } @else if (isTwitter()) {
+      <!-- No composer: replying on X needs an authenticated X account, which
+           this app never asks for. Ancestors are not fetched either (one
+           request per level, unknown depth), so Nitter is how a reader reaches
+           the rest of the conversation — and it costs nothing. -->
+      @if (twitterError(); as error) {
+        <p class="muted center">{{ error }}</p>
+      }
+      @if (nitterThreadUrl(); as url) {
+        <p class="muted center">
+          Replies only — Mawkingbird cannot post to X.
+          <a [href]="url" target="_blank" rel="noopener noreferrer">
+            Read the full conversation on Nitter ↗
+          </a>
+        </p>
+      }
     } @else if (!isRss() && !isAnonymousPublic() && !isMessageStatus()) {
       <app-compose
         [inReplyToId]="s.id"

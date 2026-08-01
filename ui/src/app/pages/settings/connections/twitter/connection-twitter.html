@@ -266,8 +266,7 @@
   } @else {
     <p class="muted small">
       Following stores the handle in this browser so their posts show up on your Feeds page. It is
-      not a follow on X — nobody is notified. Up to {{ followLimit }} accounts, because each one
-      costs a request every time its posts refresh.
+      not a follow on X — nobody is notified. Up to {{ followLimit }} accounts.
     </p>
 
     @if (!lookupResult()) {
@@ -296,6 +295,13 @@
       @if (follows.atLimit()) {
         <p class="muted small">
           You are following {{ followLimit }} accounts, the maximum. Remove one to add another.
+        </p>
+      }
+      @if (follows.follows().length >= comfortableLimit && !follows.atLimit()) {
+        <p class="muted small">
+          You follow {{ follows.follows().length }} accounts. Refreshing them all takes a while —
+          requests go one at a time to stay under your CORS proxy's rate limit — so expect a full
+          refresh to run for a minute or more.
         </p>
       }
     } @else {

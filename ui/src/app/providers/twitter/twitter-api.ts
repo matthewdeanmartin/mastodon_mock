@@ -1,7 +1,11 @@
 import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { Account, Status } from '../../models';
-import { parseTimelineResponse, parseUserResponse } from './twitterapi-io/guards';
+import {
+  parsePostsResponse,
+  parseTimelineResponse,
+  parseUserResponse,
+} from './twitterapi-io/guards';
 import { toAccount, toStatus } from './twitterapi-io/normalizers';
 import { TwitterTransport } from './twitter-transport';
 
@@ -73,6 +77,59 @@ export class TwitterApi {
           const page = parseTimelineResponse(body);
           return {
             statuses: page.tweets.map((tweet) => toStatus(tweet)),
+            cursor: page.cursor,
+            hasMore: page.hasMore,
+            skipped: page.skipped,
+          };
+        }),
+      );
+  }
+
+  /**
+   * One post by id.
+   *
+   * Used only on a *cold* thread load — a reload, or a link someone shared —
+   * where the feed cache has nothing. Navigating from a card never calls this,
+   * because the post is already in hand.
+   *
+   * The endpoint is the batch one (`tweet_ids` takes a comma-separated list);
+   * asking for a single id is the documented way to fetch one post.
+   */
+  getPost(tweetId: string): Observable<Status | null> {
+    return this.transport
+      .request<unknown>({ path: '/twitter/tweets', params: { tweet_ids: tweetId } })
+      .pipe(
+        map((body) => {
+          const tweets = parsePostsResponse(body);
+          return tweets[0] ? toStatus(tweets[0]) : null;
+        }),
+      );
+  }
+
+  /**
+   * Direct replies to a post, oldest first.
+   *
+   * One request, 6 credits. Deliberately *only* the replies: walking up to the
+   * conversation root would cost one request per ancestor level with no way to
+   * know the depth in advance, which is exactly the unbounded chain §6.10 warns
+   * about. The thread page instead offers a link to the full conversation on
+   * Nitter, which costs nothing.
+   */
+  getReplies(tweetId: string, cursor?: string): Observable<TwitterPage> {
+    return this.transport
+      .request<unknown>({
+        path: '/twitter/tweet/replies',
+        params: { tweetId, cursor },
+      })
+      .pipe(
+        map((body) => {
+          const page = parseTimelineResponse(body);
+          return {
+            statuses: page.tweets
+              .map((tweet) => toStatus(tweet))
+              // Oldest first, so a thread reads top to bottom like every other
+              // conversation view in this app.
+              .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
             cursor: page.cursor,
             hasMore: page.hasMore,
             skipped: page.skipped,

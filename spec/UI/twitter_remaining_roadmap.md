@@ -91,12 +91,46 @@ serializable.
 
 ---
 
-## 2. Clicking a post / clicking a profile
+## 2. Clicking a post / clicking a profile — **DONE (2026-08-01)**
 
-**Expected, and by construction rather than oversight** — but only half of it is
-intentional.
+Both shipped, along with the toolbar. Kept here for the reasoning.
 
-### Threads: genuinely not implemented
+Also fixed while doing it: the per-post toolbar was almost entirely invisible on
+X posts. Counts render under `caps.favourite`/`caps.reblog`, which are `false`
+for X *because the actions are impossible* — so the capability flag was doing
+two jobs ("can you press this" and "is there a number worth showing") and got
+the second one wrong. A new `readOnlyStats` concept separates them, and the
+bookmark/translate/••• block now includes X for signed-in readers, not just
+anonymous ones. Real result on a live @AnthropicAI post:
+
+```
+💬 1751 | 🔁 2115 | ⭐ 12504 | ↗ Nitter | 🔖 | 🌐 | •••
+```
+
+**"Open original" is now "↗ Nitter"** for X posts, so a click goes to a
+tracker-free front-end instead of x.com's login wall. The instance is
+configurable (`providers/twitter/nitter.ts`) because the public Nitter
+ecosystem is unstable — a hardcoded host turns a dead instance into a dead
+feature.
+
+Thread view fetches replies only, one request, with a free "full conversation on
+Nitter" link instead of walking ancestors. A cold load (reload, shared link)
+costs one extra request for the focus post; navigating from a card costs none,
+because the post comes out of the feed cache.
+
+**Two more envelope shapes found doing this.** The API now has four:
+
+```
+user/info                              -> { data: {...} }
+user/last_tweets, user/tweet_timeline  -> { data: { tweets: [...] }, has_next_page, next_cursor }
+tweet/replies                          -> { tweets: [...], has_next_page, next_cursor }
+twitter/tweets                         -> { tweets: [...] }
+```
+
+`parseTimelineResponse` now accepts either nesting, and `parsePostsResponse`
+handles the batch shape. Both are regression-tested.
+
+### Threads: how it was built
 
 `StatusCard.threadable` holds an explicit allowlist:
 
@@ -277,8 +311,9 @@ The current cap of 10 is a blunt instrument chosen when nothing else limited
 spend. With rotation and a daily cap, the follow cap can rise substantially —
 several hundred — because the *daily* limit is doing the real protecting.
 
-Suggested: cap at 200 (one `followings` page, conveniently), warn above ~50 that
-full freshness is no longer possible, and show the computed cycle time.
+**DONE (2026-08-01):** the cap is now 200 — one `followings` page — and the
+connector page warns past 50 that a full refresh takes a while. The computed
+cycle time waits on rotation.
 
 ### The import path
 
@@ -292,13 +327,16 @@ about what refreshing that many accounts implies.
 
 ## Suggested order
 
-1. **Persist the cache (§1)** — biggest cost saving, smallest change, and it
-   makes everything below cheaper.
-2. **Profile links + thread view (§2)** — what makes the content feel native.
-3. **Read-only parity audit (§4)** — mostly verification; catches anything that
-   silently assumes Mastodon.
-4. **Home feed mix (§5)** — needs §1 to be affordable.
-5. **Rotation, raised cap, followings import (§6)** — the big one, and it wants
-   §1 and §5 settled first.
+1. ~~Profile links + thread view (§2)~~ — **done**, with the toolbar and Nitter.
+2. ~~Raise the follow cap (§6)~~ — **done**, 200.
+3. **Persist the cache (§1)** — now the top item. Biggest cost saving, smallest
+   change, and it makes everything below cheaper. It also makes the thread
+   view's cold-load fetch unnecessary in most cases.
+4. **Read-only parity audit (§4)** — bookmark/translate/moderation now render on
+   X posts; what remains is verifying reader mode and filters actually behave.
+5. **Home feed mix (§5)** — needs §1 to be affordable.
+6. **Followings bulk import + rotation (§6)** — the big one, and it wants §1 and
+   §5 settled first. Import is ~25 requests for 5,000 accounts; rotation is what
+   makes keeping them fresh tractable.
 
 `viewCount` (§3) is a nice-to-have that can ride along with any of these.

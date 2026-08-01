@@ -275,7 +275,7 @@
           >
             💬 <span>{{ display.replies_count }}</span>
           </button>
-        } @else if (auth.isAnonymous) {
+        } @else if (auth.isAnonymous || readOnlyStats) {
           <span class="action" title="Replies"
             >💬 <span>{{ display.replies_count }}</span></span
           >
@@ -347,8 +347,8 @@
           } @else {
             <span class="action">{{ display.reblogs_count }}</span>
           }
-        } @else if (caps.reblog) {
-          <span class="action" title="Reposts">{{ display.reblogs_count }}</span>
+        } @else if (caps.reblog || readOnlyStats) {
+          <span class="action" title="Reposts">🔁 {{ display.reblogs_count }}</span>
         }
         @if (caps.favourite) {
           <button
@@ -381,21 +381,42 @@
           } @else {
             <span class="action">{{ display.favourites_count }}</span>
           }
-        } @else if (caps.favourite) {
-          <span class="action" title="Likes">{{ display.favourites_count }}</span>
+        } @else if (caps.favourite || readOnlyStats) {
+          <span class="action" title="Likes">⭐ {{ display.favourites_count }}</span>
         }
         @if (foreign) {
-          <a
-            class="action open-original"
-            [href]="display.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open on the original site"
-          >
-            ↗ Open original
-          </a>
+          @if (nitterLink; as nitter) {
+            <!-- X posts point at Nitter rather than x.com: no trackers, no
+                 login wall, and clicking through to X is the habit this
+                 connector exists to avoid. The instance is configurable
+                 because the public Nitter ecosystem is unstable. -->
+            <a
+              class="action open-original"
+              [href]="nitter"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open on Nitter, a tracker-free front-end for X"
+            >
+              ↗ Nitter
+            </a>
+          } @else {
+            <a
+              class="action open-original"
+              [href]="display.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open on the original site"
+            >
+              ↗ Open original
+            </a>
+          }
         }
-        @if (!foreign || auth.isAnonymous) {
+        <!-- `readOnlyStats` joins the anonymous case here so a signed-in reader
+             gets the same client-side tools on an X post that an anonymous one
+             already got: bookmark, translate, and the ••• menu with local
+             block/mute. None of these touch the origin server, so "this post is
+             foreign" was never the right reason to withhold them. -->
+        @if (!foreign || auth.isAnonymous || readOnlyStats) {
           @if (capabilities.canBookmark) {
             <button
               class="action"

@@ -11,6 +11,7 @@ import { Account } from '../../../../models';
 import { TwitterApi, stripAt } from '../../../../providers/twitter/twitter-api';
 import {
   TwitterFollows,
+  TWITTER_FOLLOW_COMFORTABLE,
   TWITTER_FOLLOW_LIMIT,
 } from '../../../../providers/twitter/twitter-follows';
 import {
@@ -72,6 +73,7 @@ export class ConnectionTwitter implements OnInit {
   private twitterApi = inject(TwitterApi);
 
   protected readonly followLimit = TWITTER_FOLLOW_LIMIT;
+  protected readonly comfortableLimit = TWITTER_FOLLOW_COMFORTABLE;
 
   protected readonly sources = availableTwitterSources();
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.browser.detail;

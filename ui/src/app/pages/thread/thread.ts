@@ -16,6 +16,9 @@ import { BskyThreadNode } from '../../providers/bluesky/bluesky-types';
 import { BskyReply } from '../../providers/bluesky/bluesky-reply';
 import { StatusActions } from '../../providers/status-actions';
 import { RssProvider } from '../../providers/rss/rss-provider';
+import { TwitterApi } from '../../providers/twitter/twitter-api';
+import { TwitterFeed } from '../../providers/twitter/twitter-feed';
+import { toNitterUrl } from '../../providers/twitter/nitter';
 import { Subscription } from 'rxjs';
 import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import {
@@ -40,6 +43,8 @@ export class Thread implements OnInit {
   private auth = inject(Auth);
   private bsky = inject(BlueskyApi);
   private rss = inject(RssProvider);
+  private twitterApi = inject(TwitterApi);
+  private twitterFeed = inject(TwitterFeed);
   private anonymousPublic = inject(AnonymousPublicApi);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   private eliza = inject(ElizaService);
@@ -69,10 +74,26 @@ export class Thread implements OnInit {
 
   /** True while viewing an RSS article: interactions are read-only, comments come from a feed. */
   protected isRss = signal(false);
+  /** True when this thread is an X post and its replies. */
+  protected isTwitter = signal(false);
+  /** Why the X replies could not be loaded, if they could not. */
+  protected twitterError = signal<string | null>(null);
   /** Whether the RSS item declared a comment feed we could load (informs the empty state). */
   protected rssHasCommentFeed = signal(false);
   /** True once a declared RSS comment feed came back empty or failed to load. */
   protected rssCommentsUnavailable = signal(false);
+
+  /**
+   * The conversation on Nitter, when this is an X thread.
+   *
+   * Ancestors are deliberately not fetched (one request per level, unknown
+   * depth), so this is how a reader reaches the rest of the conversation — and
+   * it is free, because it leaves the app.
+   */
+  protected nitterThreadUrl = computed(() => {
+    const status = this.status();
+    return this.isTwitter() && status ? toNitterUrl(status.url) : null;
+  });
 
   /** The whole thread in display order. */
   private thread = computed<Status[]>(() => {
@@ -216,6 +237,8 @@ export class Thread implements OnInit {
     this.ancestors.set([]);
     this.descendants.set([]);
     this.isRss.set(false);
+    this.isTwitter.set(false);
+    this.twitterError.set(null);
     this.isAnonymousPublic.set(false);
     this.isMessageStatus.set(false);
     this.publicContextUnavailable.set(false);
@@ -228,6 +251,10 @@ export class Thread implements OnInit {
     }
     if (id.startsWith('rss:')) {
       this.loadRss(id);
+      return;
+    }
+    if (id.startsWith('twitter:')) {
+      this.loadTwitter(id.slice('twitter:'.length));
       return;
     }
     if (isElizaId(id) || id.startsWith('local:')) {
@@ -337,6 +364,68 @@ export class Thread implements OnInit {
           this.loading.set(false);
         },
         error: () => this.loading.set(false),
+      }),
+    );
+  }
+
+  /**
+   * An X post and its direct replies.
+   *
+   * Costs **one** request, for the replies. The focus post itself comes out of
+   * the feed cache — the reader was looking at it a moment ago — so clicking
+   * into a thread does not pay twice for something already on screen.
+   *
+   * Deliberately no ancestors. Walking to the conversation root costs one
+   * request per level with the depth unknowable in advance, which is the
+   * unbounded chain the spec warns about (§6.10). A reply's parent is instead
+   * reachable through the "full conversation" link the template offers, which
+   * costs nothing because it leaves the app.
+   */
+  private loadTwitter(tweetId: string): void {
+    this.isTwitter.set(true);
+    this.ancestors.set([]);
+    this.descendants.set([]);
+
+    const cached = this.twitterFeed.findCached(`twitter:${tweetId}`);
+    if (cached) {
+      this.status.set(cached);
+      this.loading.set(false);
+    } else {
+      // Cold load: a reload, or a link someone shared. The cache is in-memory,
+      // so it is empty here and the post has to be fetched — one extra request,
+      // paid only on this path. Navigating from a card never reaches it.
+      this.loadSub.add(
+        this.twitterApi.getPost(tweetId).subscribe({
+          next: (status) => {
+            this.status.set(status);
+            this.loading.set(false);
+          },
+          error: (error: unknown) => {
+            this.twitterError.set(
+              error instanceof Error ? error.message : 'Could not load this post.',
+            );
+            this.loading.set(false);
+          },
+        }),
+      );
+    }
+
+    this.loadSub.add(
+      this.twitterApi.getReplies(tweetId).subscribe({
+        next: (page) => {
+          this.descendants.set(page.statuses);
+          // A cold load (reload, shared link) has no cached focus post. The
+          // replies carry `inReplyToId` but not the parent itself, so rather
+          // than spend a second request the page shows the replies under a
+          // note — see `twitterFocusMissing` in the template.
+          this.loading.set(false);
+        },
+        error: (error: unknown) => {
+          this.twitterError.set(
+            error instanceof Error ? error.message : 'Could not load replies.',
+          );
+          this.loading.set(false);
+        },
       }),
     );
   }

@@ -32,6 +32,7 @@ import { ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
 import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
+import { toNitterUrl } from '../providers/twitter/nitter';
 import { StatusActions } from '../providers/status-actions';
 import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
@@ -691,6 +692,35 @@ export class StatusCard {
   }
 
   /**
+   * A provider that reports real engagement counts the viewer cannot act on.
+   *
+   * X is the first of these and the reason this exists. Its posts carry genuine
+   * reply, repost and like counts — 244 likes, 77k views on a real NASA post —
+   * but no viewer of this app can add to them, because every write on X needs an
+   * authenticated X account this app deliberately never asks for.
+   *
+   * Before this, those numbers were invisible: the counts render under
+   * `caps.favourite`/`caps.reblog`, which are `false` for X precisely *because*
+   * the actions are impossible. So the capability flag was doing two jobs —
+   * "can you press this" and "is there a number worth showing" — and the second
+   * answer was wrong. RSS and paste genuinely have nothing to show; X has a lot.
+   */
+  protected get readOnlyStats(): boolean {
+    return this.display.provider === 'twitter';
+  }
+
+  /**
+   * This post on Nitter, or null when it is not an X post.
+   *
+   * Null rather than a fallback so the template can keep "↗ Open original" for
+   * every other foreign provider — an RSS item's original site is the whole
+   * point of the link, and there is nothing to rewrite it to.
+   */
+  protected get nitterLink(): string | null {
+    return this.display.provider === 'twitter' ? toNitterUrl(this.display.url) : null;
+  }
+
+  /**
    * True when the thread page can render this post in a conversation view.
    * Bluesky threads load via `getPostThread`; RSS items open a reader view of
    * the article (plus a comment feed when the publisher declares one).
@@ -704,7 +734,15 @@ export class StatusCard {
       const ref = this.anonymousRef;
       return !!ref && !ref.statusId.startsWith('rss:');
     }
-    return provider === 'mastodon' || provider === 'bluesky' || provider === 'rss';
+    return (
+      provider === 'mastodon' ||
+      provider === 'bluesky' ||
+      provider === 'rss' ||
+      // X posts open a thread view backed by `tweet/replies`. Costs one request
+      // per open, which is why the thread page shows the price and does not
+      // walk ancestors — see spec/ui/twitter_remaining_roadmap.md §2.
+      provider === 'twitter'
+    );
   }
 
   protected get threadLink(): (string | number)[] | null {
@@ -756,6 +794,11 @@ export class StatusCard {
       ];
     }
     if (this.display.provider === 'rss' && id.startsWith('rss:') && !id.includes('::')) {
+      return ['/accounts', id];
+    }
+    // X accounts already have a working profile page (the Sprint 4 screen);
+    // nothing linked to it, which made avatars and display names dead text.
+    if (this.display.provider === 'twitter' && id.startsWith('twitter:@')) {
       return ['/accounts', id];
     }
     return null;
