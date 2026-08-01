@@ -22,6 +22,11 @@
   max-height: 50vh;
   aspect-ratio: 4 / 3;
   object-fit: contain;
+  /* This is a flex *column*, so the main axis is vertical and the default
+     flex-shrink:1 lets the box compress the image's height whenever the
+     content is taller than the viewport — squashing a wide whale into a tall
+     one. aspect-ratio does not save it, because the flex height wins. */
+  flex-shrink: 0;
 }
 
 /* Short viewports: drive the size off height instead so the ratio is preserved

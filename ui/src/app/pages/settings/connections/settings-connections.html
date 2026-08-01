@@ -11,85 +11,88 @@
   </p>
 </div>
 
-<ul class="catalog" aria-label="Available connections">
-  @for (row of rows(); track row.entry.id) {
-    <li>
-      <a
-        class="catalog-card"
-        [class.unavailable]="row.unavailableReason"
-        [routerLink]="['/settings/connections', row.entry.id]"
-      >
-        <span class="catalog-emoji" aria-hidden="true">{{ row.entry.emoji }}</span>
-        <span class="catalog-body">
-          <span class="catalog-title">
-            <span class="catalog-label">{{ row.entry.label }}</span>
-            @if (row.flagged) {
-              <span class="pill pill-off">Turned off</span>
-            } @else if (row.unavailableReason) {
-              <span class="pill pill-off">Unavailable</span>
-            } @else if (row.connected) {
-              <span class="pill pill-on">Connected</span>
-            } @else {
-              <span class="pill">Not connected</span>
-            }
-            <span class="pill pill-scope" [title]="scopeCopy[row.entry.scope].detail">
-              {{ scopeCopy[row.entry.scope].label }}
-            </span>
-          </span>
-          <span class="muted catalog-pitch">{{ row.entry.pitch }}</span>
-          @if (row.unavailableReason; as reason) {
-            <span class="muted small catalog-reason">{{ reason }}</span>
-          } @else {
-            <span class="catalog-enables">
-              @for (feature of row.entry.enables; track feature) {
-                <span class="enable">{{ feature }}</span>
+<div class="spage-body">
+  <ul class="catalog" aria-label="Available connections">
+    @for (row of rows(); track row.entry.id) {
+      <li>
+        <a
+          class="catalog-card"
+          [class.unavailable]="row.unavailableReason"
+          [routerLink]="['/settings/connections', row.entry.id]"
+        >
+          <span class="catalog-emoji" aria-hidden="true">{{ row.entry.emoji }}</span>
+          <span class="catalog-body">
+            <span class="catalog-title">
+              <span class="catalog-label">{{ row.entry.label }}</span>
+              @if (row.flagged) {
+                <span class="pill pill-off">Turned off</span>
+              } @else if (row.unavailableReason) {
+                <span class="pill pill-off">Unavailable</span>
+              } @else if (row.connected) {
+                <span class="pill pill-on">Connected</span>
+              } @else {
+                <span class="pill">Not connected</span>
               }
+              <span class="pill pill-scope" [title]="scopeCopy[row.entry.scope].detail">
+                {{ scopeCopy[row.entry.scope].label }}
+              </span>
             </span>
-          }
-        </span>
-        <span class="chev" aria-hidden="true">›</span>
-      </a>
-      <!-- Outside the card: a link inside a link is invalid, and the card is
+            <span class="muted catalog-pitch">{{ row.entry.pitch }}</span>
+            @if (row.unavailableReason; as reason) {
+              <span class="muted small catalog-reason">{{ reason }}</span>
+            } @else {
+              <span class="catalog-enables">
+                @for (feature of row.entry.enables; track feature) {
+                  <span class="enable">{{ feature }}</span>
+                }
+              </span>
+            }
+          </span>
+          <span class="chev" aria-hidden="true">›</span>
+        </a>
+        <!-- Outside the card: a link inside a link is invalid, and the card is
            still worth opening — its page explains what the connector does. -->
-      @if (row.flagged) {
-        <p class="muted small catalog-flag-link">
-          <a [routerLink]="['/settings/feature-flags']">Turn it back on in feature flags</a>
-        </p>
-      }
-    </li>
-  }
-</ul>
-
-<section class="conn-section">
-  <h2>🔑 How long to keep credentials</h2>
-  <p class="muted">
-    GitHub, Raindrop.io and Bluesky are connected by pasting a long-lived secret. There is no server
-    here to hold those, so they sit in this browser until something removes them. Pick how long that
-    should be — when a connection reaches its limit it is disconnected and the credential is deleted
-    from this browser. Reconnecting takes a few seconds and restarts the clock.
-  </p>
-  <p class="muted">
-    This does not apply to Dropbox, which uses a proper OAuth flow with short-lived tokens that
-    expire on their own.
-  </p>
-  <div class="lifetime-options" role="group" aria-label="Credential retention">
-    @for (option of lifetimeOptions; track option.value) {
-      <label class="lifetime-option">
-        <input
-          type="radio"
-          name="credentialLifetime"
-          [value]="option.value"
-          [checked]="lifetimes.lifetime() === option.value"
-          (change)="setLifetime(option.value)"
-        />
-        <span>{{ option.label }}</span>
-      </label>
+        @if (row.flagged) {
+          <p class="muted small catalog-flag-link">
+            <a [routerLink]="['/settings/feature-flags']">Turn it back on in feature flags</a>
+          </p>
+        }
+      </li>
     }
-  </div>
-  @if (lifetimes.lifetime() === 'never') {
-    <p class="muted lifetime-warning">
-      Nothing will expire on its own. Revoke tokens at the provider when you stop using a
-      connection.
+  </ul>
+
+  <section class="conn-section">
+    <h2>🔑 How long to keep credentials</h2>
+    <p class="muted">
+      GitHub, Raindrop.io and Bluesky are connected by pasting a long-lived secret. There is no
+      server here to hold those, so they sit in this browser until something removes them. Pick how
+      long that should be — when a connection reaches its limit it is disconnected and the
+      credential is deleted from this browser. Reconnecting takes a few seconds and restarts the
+      clock.
     </p>
-  }
-</section>
+    <p class="muted">
+      This does not apply to Dropbox, which uses a proper OAuth flow with short-lived tokens that
+      expire on their own.
+    </p>
+    <div class="lifetime-options" role="group" aria-label="Credential retention">
+      @for (option of lifetimeOptions; track option.value) {
+        <label class="lifetime-option">
+          <input
+            type="radio"
+            name="credentialLifetime"
+            [value]="option.value"
+            [checked]="lifetimes.lifetime() === option.value"
+            (change)="setLifetime(option.value)"
+          />
+          <span>{{ option.label }}</span>
+        </label>
+      }
+    </div>
+    @if (lifetimes.lifetime() === 'never') {
+      <p class="muted lifetime-warning">
+        Nothing will expire on its own. Revoke tokens at the provider when you stop using a
+        connection.
+      </p>
+    }
+  </section>
+</div>

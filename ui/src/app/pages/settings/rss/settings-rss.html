@@ -13,225 +13,229 @@
   </p>
 </div>
 
-<p class="proxy-summary muted small">
-  @if (proxyLabel(); as label) {
-    Feeds that block browser access can be routed through <strong>{{ label }}</strong
-    >, per feed, below.
-  } @else if (proxyIncomplete()) {
-    Your CORS proxy is selected but not finished — it still needs a key or a valid address.
-  } @else {
-    No CORS proxy is set up. Without one, feeds that block browser access can't be read at all.
-  }
-  <a [routerLink]="['/settings/connections/cors-proxy']">
-    {{ proxyLabel() ? 'Change' : 'Set one up' }}
-  </a>
-</p>
+<div class="spage-body">
+  <p class="proxy-summary muted small">
+    @if (proxyLabel(); as label) {
+      Feeds that block browser access can be routed through <strong>{{ label }}</strong
+      >, per feed, below.
+    } @else if (proxyIncomplete()) {
+      Your CORS proxy is selected but not finished — it still needs a key or a valid address.
+    } @else {
+      No CORS proxy is set up. Without one, feeds that block browser access can't be read at all.
+    }
+    <a [routerLink]="['/settings/connections/cors-proxy']">
+      {{ proxyLabel() ? 'Change' : 'Set one up' }}
+    </a>
+  </p>
 
-<div class="cache-controls">
-  <label class="cache-ttl">
-    <span>Reuse a fetched feed for</span>
-    <!-- Plain string values rather than [ngValue]: the stored preference is a
+  <div class="cache-controls">
+    <label class="cache-ttl">
+      <span>Reuse a fetched feed for</span>
+      <!-- Plain string values rather than [ngValue]: the stored preference is a
          number, but a string-valued <option> is what both the DOM and anyone
          scripting this page expect. setTtl coerces. -->
-    <select
-      [ngModel]="prefs.rssCacheTtlHours().toString()"
-      (ngModelChange)="setTtl($event)"
-      name="rssCacheTtl"
-    >
-      @for (option of ttlOptions; track option.hours) {
-        <option [value]="option.hours.toString()">{{ option.label }}</option>
-      }
-    </select>
-  </label>
-  <p class="muted small">
-    Feeds are re-read by every view that shows them. Without a cache that is a request per visit —
-    enough to exhaust a free CORS proxy's rate limit just by reading. Cached feeds are kept in this
-    browser's IndexedDB, which has room for feeds far too large for ordinary settings storage.
-  </p>
-  @if (cacheSummary(); as summary) {
-    <p class="cache-summary muted small">
-      {{ summary }}
-      <button class="btn btn-outline btn-sm" type="button" (click)="clearCache()">
-        Clear cache
-      </button>
-    </p>
-  }
-</div>
-
-<form class="add-feed" (ngSubmit)="addFeed()">
-  <input
-    type="url"
-    name="feedUrl"
-    placeholder="https://example.com/feed.xml"
-    [ngModel]="feedUrl()"
-    (ngModelChange)="feedUrl.set($event)"
-    [disabled]="adding()"
-  />
-  <button class="btn" type="submit" [disabled]="!feedUrl().trim() || adding()">
-    {{ adding() ? 'Checking…' : 'Add feed' }}
-  </button>
-</form>
-@if (error(); as msg) {
-  <p class="feed-error">{{ msg }}</p>
-}
-@if (retryable()) {
-  <p class="retry-line">
-    <button class="btn btn-outline btn-sm" type="button" (click)="retryViaProxy()">
-      Try again via {{ proxyLabel() }}
-    </button>
-    <span class="muted small"> The proxy will see this feed's address and its contents. </span>
-  </p>
-}
-
-<section class="opml">
-  <h2>📄 Import &amp; export (OPML)</h2>
-  <p class="muted small">
-    OPML is the subscription-list format every feed reader speaks. Export yours to move it somewhere
-    else, or import a file from a reader you are leaving. Folders in an imported file are flattened
-    — Mawkingbird has no folders yet.
-  </p>
-
-  <label class="feed-limit">
-    <span>Maximum feeds</span>
-    <input
-      type="number"
-      name="feedLimit"
-      min="1"
-      [max]="maxLimit"
-      [ngModel]="limitDraft()"
-      (ngModelChange)="limitDraft.set($event)"
-      (blur)="setLimit()"
-    />
-    <button class="btn btn-outline btn-sm" type="button" (click)="setLimit()">Save</button>
-  </label>
-  <p class="muted small">
-    We suggest no more than {{ recommendedLimit }}. Every feed is re-read by every view that shows
-    them, so a long list opens slower and uses more of a free CORS proxy's quota — but it is your
-    reading list, so set it where you want it. Lowering this never deletes a feed you already have.
-  </p>
-
-  <div class="opml-actions">
-    <button
-      class="btn btn-outline"
-      type="button"
-      (click)="exportOpml()"
-      [disabled]="!subs.feeds().length"
-    >
-      Export OPML
-    </button>
-    <label class="btn btn-outline opml-import" [class.disabled]="importProgress()">
-      {{ importProgress() ? 'Importing…' : 'Import OPML' }}
-      <input
-        type="file"
-        accept=".opml,.xml,text/xml,application/xml"
-        (change)="importOpml($event)"
-        [disabled]="!!importProgress()"
-      />
+      <select
+        [ngModel]="prefs.rssCacheTtlHours().toString()"
+        (ngModelChange)="setTtl($event)"
+        name="rssCacheTtl"
+      >
+        @for (option of ttlOptions; track option.hours) {
+          <option [value]="option.hours.toString()">{{ option.label }}</option>
+        }
+      </select>
     </label>
+    <p class="muted small">
+      Feeds are re-read by every view that shows them. Without a cache that is a request per visit —
+      enough to exhaust a free CORS proxy's rate limit just by reading. Cached feeds are kept in
+      this browser's IndexedDB, which has room for feeds far too large for ordinary settings
+      storage.
+    </p>
+    @if (cacheSummary(); as summary) {
+      <p class="cache-summary muted small">
+        {{ summary }}
+        <button class="btn btn-outline btn-sm" type="button" (click)="clearCache()">
+          Clear cache
+        </button>
+      </p>
+    }
   </div>
 
-  @if (importProgress(); as progress) {
-    <p class="muted small">
-      Checking feed {{ progress.done + 1 }} of {{ progress.total }} — each one is fetched to prove
-      this browser can actually read it.
+  <form class="add-feed" (ngSubmit)="addFeed()">
+    <input
+      type="url"
+      name="feedUrl"
+      placeholder="https://example.com/feed.xml"
+      [ngModel]="feedUrl()"
+      (ngModelChange)="feedUrl.set($event)"
+      [disabled]="adding()"
+    />
+    <button class="btn" type="submit" [disabled]="!feedUrl().trim() || adding()">
+      {{ adding() ? 'Checking…' : 'Add feed' }}
+    </button>
+  </form>
+  @if (error(); as msg) {
+    <p class="feed-error">{{ msg }}</p>
+  }
+  @if (retryable()) {
+    <p class="retry-line">
+      <button class="btn btn-outline btn-sm" type="button" (click)="retryViaProxy()">
+        Try again via {{ proxyLabel() }}
+      </button>
+      <span class="muted small"> The proxy will see this feed's address and its contents. </span>
     </p>
   }
 
-  @if (importError(); as msg) {
-    <p class="feed-error">{{ msg }}</p>
-  }
+  <section class="opml">
+    <h2>📄 Import &amp; export (OPML)</h2>
+    <p class="muted small">
+      OPML is the subscription-list format every feed reader speaks. Export yours to move it
+      somewhere else, or import a file from a reader you are leaving. Folders in an imported file
+      are flattened — Mawkingbird has no folders yet.
+    </p>
 
-  <!-- Every bucket named separately: each one has a different fix. -->
-  @if (importReport(); as report) {
-    <div class="import-report">
-      <p>
-        <strong>Added {{ report.added }} of {{ report.total }} feeds.</strong>
-      </p>
-      <ul class="muted small">
-        @if (report.alreadySubscribed) {
-          <li>{{ report.alreadySubscribed }} were already in your list.</li>
-        }
-        @if (report.skippedForLimit) {
-          <li>
-            {{ report.skippedForLimit }} went past your limit of {{ subs.limit() }}. Raise it above
-            and import the same file again to pick up the rest.
-          </li>
-        }
-        @if (report.failed.length) {
-          <li>
-            {{ report.failed.length }} could not be read
-            @if (!proxyLabel()) {
-              — usually this is CORS, which a
-              <a [routerLink]="['/settings/connections/cors-proxy']">CORS proxy</a> can fix.
-            }
-          </li>
-        }
-      </ul>
-      @if (report.failed.length) {
-        <details class="failed-feeds">
-          <summary class="muted small">Which ones failed</summary>
-          <ul class="muted small">
-            @for (failure of report.failed; track failure.url) {
-              <li>
-                <span class="failed-url">{{ failure.url }}</span>
-                <span class="failed-reason">{{ failure.reason }}</span>
-              </li>
-            }
-          </ul>
-        </details>
-      }
+    <label class="feed-limit">
+      <span>Maximum feeds</span>
+      <input
+        type="number"
+        name="feedLimit"
+        min="1"
+        [max]="maxLimit"
+        [ngModel]="limitDraft()"
+        (ngModelChange)="limitDraft.set($event)"
+        (blur)="setLimit()"
+      />
+      <button class="btn btn-outline btn-sm" type="button" (click)="setLimit()">Save</button>
+    </label>
+    <p class="muted small">
+      We suggest no more than {{ recommendedLimit }}. Every feed is re-read by every view that shows
+      them, so a long list opens slower and uses more of a free CORS proxy's quota — but it is your
+      reading list, so set it where you want it. Lowering this never deletes a feed you already
+      have.
+    </p>
+
+    <div class="opml-actions">
+      <button
+        class="btn btn-outline"
+        type="button"
+        (click)="exportOpml()"
+        [disabled]="!subs.feeds().length"
+      >
+        Export OPML
+      </button>
+      <label class="btn btn-outline opml-import" [class.disabled]="importProgress()">
+        {{ importProgress() ? 'Importing…' : 'Import OPML' }}
+        <input
+          type="file"
+          accept=".opml,.xml,text/xml,application/xml"
+          (change)="importOpml($event)"
+          [disabled]="!!importProgress()"
+        />
+      </label>
     </div>
-  }
-</section>
 
-@if (subs.feeds().length) {
-  <ul class="feed-list">
-    @for (f of subs.feeds(); track f.url) {
-      <li class="feed-row">
-        <label class="feed-toggle">
-          <input type="checkbox" [checked]="f.enabled" (change)="toggle(f)" />
-          <span class="names">
-            <span class="name">
-              {{ f.title || f.url }}
-              @if (f.useProxy) {
-                <span class="proxy-badge" title="Fetched through your CORS proxy">via proxy</span>
-              }
-            </span>
-            <span class="muted small">{{ f.url }}</span>
-          </span>
-        </label>
-        <span class="feed-actions">
-          @if (proxyLabel()) {
-            <label class="proxy-switch muted small" [title]="'Fetch through ' + proxyLabel()">
-              <input type="checkbox" [checked]="f.useProxy === true" (change)="toggleProxy(f)" />
-              <span>Proxy</span>
-            </label>
+    @if (importProgress(); as progress) {
+      <p class="muted small">
+        Checking feed {{ progress.done + 1 }} of {{ progress.total }} — each one is fetched to prove
+        this browser can actually read it.
+      </p>
+    }
+
+    @if (importError(); as msg) {
+      <p class="feed-error">{{ msg }}</p>
+    }
+
+    <!-- Every bucket named separately: each one has a different fix. -->
+    @if (importReport(); as report) {
+      <div class="import-report">
+        <p>
+          <strong>Added {{ report.added }} of {{ report.total }} feeds.</strong>
+        </p>
+        <ul class="muted small">
+          @if (report.alreadySubscribed) {
+            <li>{{ report.alreadySubscribed }} were already in your list.</li>
           }
-          <!-- The way into the feed's profile page. Without this, a subscribed
+          @if (report.skippedForLimit) {
+            <li>
+              {{ report.skippedForLimit }} went past your limit of {{ subs.limit() }}. Raise it
+              above and import the same file again to pick up the rest.
+            </li>
+          }
+          @if (report.failed.length) {
+            <li>
+              {{ report.failed.length }} could not be read
+              @if (!proxyLabel()) {
+                — usually this is CORS, which a
+                <a [routerLink]="['/settings/connections/cors-proxy']">CORS proxy</a> can fix.
+              }
+            </li>
+          }
+        </ul>
+        @if (report.failed.length) {
+          <details class="failed-feeds">
+            <summary class="muted small">Which ones failed</summary>
+            <ul class="muted small">
+              @for (failure of report.failed; track failure.url) {
+                <li>
+                  <span class="failed-url">{{ failure.url }}</span>
+                  <span class="failed-reason">{{ failure.reason }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+      </div>
+    }
+  </section>
+
+  @if (subs.feeds().length) {
+    <ul class="feed-list">
+      @for (f of subs.feeds(); track f.url) {
+        <li class="feed-row">
+          <label class="feed-toggle">
+            <input type="checkbox" [checked]="f.enabled" (change)="toggle(f)" />
+            <span class="names">
+              <span class="name">
+                {{ f.title || f.url }}
+                @if (f.useProxy) {
+                  <span class="proxy-badge" title="Fetched through your CORS proxy">via proxy</span>
+                }
+              </span>
+              <span class="muted small">{{ f.url }}</span>
+            </span>
+          </label>
+          <span class="feed-actions">
+            @if (proxyLabel()) {
+              <label class="proxy-switch muted small" [title]="'Fetch through ' + proxyLabel()">
+                <input type="checkbox" [checked]="f.useProxy === true" (change)="toggleProxy(f)" />
+                <span>Proxy</span>
+              </label>
+            }
+            <!-- The way into the feed's profile page. Without this, a subscribed
                feed can only be reached by finding one of its posts in the home
                timeline, which makes the whole feature hard to discover. -->
-          <a
-            class="btn btn-outline btn-sm"
-            [routerLink]="['/accounts', 'rss:' + f.url]"
-            title="Open this feed's page"
-            >Open</a
-          >
-          <!-- Bypasses the cache for this one feed. Without it a cached feed
+            <a
+              class="btn btn-outline btn-sm"
+              [routerLink]="['/accounts', 'rss:' + f.url]"
+              title="Open this feed's page"
+              >Open</a
+            >
+            <!-- Bypasses the cache for this one feed. Without it a cached feed
                cannot be updated before its TTL expires, which matters when you
                have just published something and want to see it. -->
-          <button
-            class="btn btn-outline btn-sm"
-            [disabled]="refreshing() === f.url"
-            (click)="refresh(f)"
-            title="Fetch this feed again now"
-          >
-            {{ refreshing() === f.url ? 'Refreshing…' : 'Refresh' }}
-          </button>
-          <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
-        </span>
-      </li>
-    }
-  </ul>
-} @else {
-  <p class="muted">No feeds yet.</p>
-}
+            <button
+              class="btn btn-outline btn-sm"
+              [disabled]="refreshing() === f.url"
+              (click)="refresh(f)"
+              title="Fetch this feed again now"
+            >
+              {{ refreshing() === f.url ? 'Refreshing…' : 'Refresh' }}
+            </button>
+            <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
+          </span>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="muted">No feeds yet.</p>
+  }
+</div>

@@ -483,15 +483,31 @@ input {
 
 /* Analytics opt-out at the foot of the login page. */
 .login-privacy {
+  /* The parent is a centred flex column, so `align-items: center` sizes this
+     to its content rather than to max-width — which collapsed the box to the
+     checkbox and wrapped "Count my page views" onto its own lines on a screen
+     with room to spare. width:100% claims the line back, max-width still caps
+     it, and `margin: auto` keeps it centred. */
+  width: 100%;
   max-width: 640px;
   margin: 26px auto 0;
   padding: 0 16px;
+  box-sizing: border-box;
   text-align: center;
 }
 
+/* The label's text is an anonymous flex item, so it shrinks to whatever the
+   checkbox leaves it and breaks "Count my page views" over three lines even on
+   a wide screen. nowrap keeps it on one line; the checkbox is the thing that
+   must not shrink around it. */
 .login-privacy .checkline {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.login-privacy .checkline input {
+  flex: none;
 }

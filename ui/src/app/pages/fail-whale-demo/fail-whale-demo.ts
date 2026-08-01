@@ -46,9 +46,14 @@ import { InstanceStatus } from '../../instance-status';
     .whale-page {
       padding: 48px 24px;
     }
+    /* height:auto is not optional here. The <img> carries width="640"
+       height="480" attributes, so constraining only the width leaves the
+       height pinned at 480 and stretches a landscape whale into a portrait
+       one. */
     .whale-img {
       max-width: 320px;
       width: 100%;
+      height: auto;
       margin-bottom: 16px;
     }
     h1 {
