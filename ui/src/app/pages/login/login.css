@@ -510,4 +510,5 @@ input {
 
 .login-privacy .checkline input {
   flex: none;
+  margin: 0;
 }
