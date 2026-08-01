@@ -47,17 +47,26 @@ describe('ShortenerProxyConsent', () => {
     expect(consent.granted('tly', 'allorigins')).toBe(true);
   });
 
+  // A reload is simulated by resetting the injector rather than by calling the
+  // constructor: this service now delegates to the shared ProxyConsent store via
+  // `inject()`, so a hand-built instance has no store to read from.
+  function reload(): ShortenerProxyConsent {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    return TestBed.inject(ShortenerProxyConsent);
+  }
+
   it('persists across a reload, so the user is not re-asked every request', () => {
     consent.grant('dub', 'allorigins');
 
-    expect(new ShortenerProxyConsent().granted('dub', 'allorigins')).toBe(true);
+    expect(reload().granted('dub', 'allorigins')).toBe(true);
   });
 
   it('treats a corrupt store as no consent rather than throwing', () => {
     localStorage.setItem('mockingbird_shortener_proxy_consent', 'not json');
 
     // Failing closed is the only safe direction here.
-    expect(new ShortenerProxyConsent().granted('dub', 'allorigins')).toBe(false);
+    expect(reload().granted('dub', 'allorigins')).toBe(false);
   });
 
   it('records when consent was given, for the connector page to show', () => {

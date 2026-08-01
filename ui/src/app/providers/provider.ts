@@ -37,6 +37,11 @@ export const PROVIDER_CAPS: Record<ProviderId, ProviderCapabilities> = {
   bluesky: { reply: true, favourite: true, reblog: true },
   rss: { reply: false, favourite: false, reblog: false },
   paste: { reply: false, favourite: false, reblog: false },
+  // Read-only by construction, not by omission. Every write on X needs an
+  // authenticated X account, which this app deliberately never asks for — no
+  // password, no session cookie, no `auth_token`. Cards show "Open on X ↗"
+  // where reply/boost/favourite would be, exactly like RSS.
+  twitter: { reply: false, favourite: false, reblog: false },
 };
 
 const NO_WRITES: ProviderCapabilities = { reply: false, favourite: false, reblog: false };

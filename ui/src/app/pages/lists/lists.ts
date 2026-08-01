@@ -11,6 +11,7 @@ import { SavedSearches } from '../search/saved-searches';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 import { RssCache } from '../../providers/rss/rss-cache';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
+import { TwitterFollows } from '../../providers/twitter/twitter-follows';
 import { PageDiagnostics } from '../../page-diagnostics';
 
 /**
@@ -33,6 +34,7 @@ export class Lists implements OnInit {
   private anonymousTags = inject(AnonymousTags);
   protected saved = inject(SavedSearches);
   private rssSubs = inject(RssSubscriptions);
+  private twitterFollowStore = inject(TwitterFollows);
   private rssCache = inject(RssCache);
   private diagnostics = inject(PageDiagnostics);
   private route = inject(ActivatedRoute);
@@ -69,6 +71,8 @@ export class Lists implements OnInit {
    * unsubscribing anywhere updates this list with no reload.
    */
   protected rssFeeds = this.rssSubs.feeds;
+  /** Locally-followed X accounts. Empty (and the section hidden) unless set up. */
+  protected twitterFollows = this.twitterFollowStore.follows;
 
   protected lists = signal<UserList[]>([]);
   protected loading = signal(true);

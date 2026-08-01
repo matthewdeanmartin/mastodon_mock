@@ -31,6 +31,29 @@
             {{ rssSubscribed() ? '📡 Subscribed' : '📡 Subscribe' }}
           </button>
         </div>
+      } @else if (isTwitter()) {
+        <!-- Follow is local storage only. There is deliberately no like, repost
+             or reply: those are X mutations needing an X login this app never
+             asks for. "Open on X" is the honest alternative. -->
+        <div class="profile-buttons">
+          @if (a.url) {
+            <a class="btn btn-outline" [href]="a.url" target="_blank" rel="noopener noreferrer">
+              ↗ Open on X
+            </a>
+          }
+          <button
+            class="btn"
+            [class.btn-outline]="twitterFollowed()"
+            (click)="toggleTwitterFollow()"
+            [title]="
+              twitterFollowed()
+                ? 'Stop showing this account on your Feeds page'
+                : 'Show this account on your Feeds page. Not a follow on X — nobody is notified.'
+            "
+          >
+            {{ twitterFollowed() ? '𝕏 Following locally' : '𝕏 Follow locally' }}
+          </button>
+        </div>
       } @else if (isSelf() && auth.isAnonymous) {
         <div class="profile-buttons">
           <a class="btn btn-outline" routerLink="/settings/profile">Edit local profile</a>
@@ -124,6 +147,12 @@
     @if (followError(); as error) {
       <div class="action-error" role="alert">{{ error }}</div>
     }
+    @if (twitterError(); as error) {
+      <!-- The account is real; only the fetch failed. Saying so beats the
+           page's "Account not found" fallback, which would send the reader to
+           check a handle that was never the problem. -->
+      <div class="action-error" role="alert">{{ error }}</div>
+    }
     @if (reportDone()) {
       <div class="report-done">
         Report submitted. A moderator will review it; reports cannot be undone.
@@ -150,7 +179,7 @@
         ><strong>{{ a.statuses_count | humanCount }}</strong>
         {{ isRss() ? 'items' : words().posts }}</span
       >
-      @if (!isRss()) {
+      @if (!isRss() && !isTwitter()) {
         <button type="button" class="count-btn" (click)="setTab('following')">
           <strong>{{
             auth.isAnonymous && isSelf()
@@ -225,7 +254,7 @@
     </section>
   }
 
-  @if (!isRss()) {
+  @if (!isRss() && !isTwitter()) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
       <button
         type="button"
@@ -274,7 +303,7 @@
     </div>
   }
 
-  @if (!isRss() && (tab() === 'following' || tab() === 'followers')) {
+  @if (!isRss() && !isTwitter() && (tab() === 'following' || tab() === 'followers')) {
     <app-people-browser
       [accountId]="a.id"
       [mode]="tab() === 'followers' ? 'followers' : 'following'"
@@ -323,12 +352,12 @@
     </section>
   }
 
-  @if (!isRss() && tab() === 'analytics') {
+  @if (!isRss() && !isTwitter() && tab() === 'analytics') {
     <app-account-analytics [account]="a" [publicRef]="publicRef" />
   }
 
   @if (tab() === 'posts') {
-    @if (!isRss() && auth.shouldOfferLogin && isSelf()) {
+    @if (!isRss() && !isTwitter() && auth.shouldOfferLogin && isSelf()) {
       <a class="profile-login-post" routerLink="/login" (click)="auth.exitAnonymous()">
         <div class="profile-login-post-label muted">📌 Pinned</div>
         <div class="profile-login-post-body">
@@ -343,7 +372,7 @@
         </div>
       </a>
     }
-    @if (!isRss() && (!auth.isAnonymous || !isSelf())) {
+    @if (!isRss() && !isTwitter() && (!auth.isAnonymous || !isSelf())) {
       <div class="profile-filters" role="group" aria-label="Timeline filters">
         <button
           type="button"

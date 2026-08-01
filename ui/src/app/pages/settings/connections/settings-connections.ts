@@ -8,6 +8,7 @@ import { OpenRouterSession } from '../../../providers/openrouter/openrouter-sess
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import { PastepileKey } from '../../../providers/paste/pastepile-key';
 import { ShortenerSettings } from '../../../providers/shortener/shortener-settings';
+import { TwitterSettings } from '../../../providers/twitter/twitter-settings';
 import {
   CREDENTIAL_LIFETIME_OPTIONS,
   CredentialLifetime,
@@ -53,6 +54,7 @@ export class SettingsConnections implements OnInit {
   private openrouter = inject(OpenRouterSession);
   private corsProxy = inject(CorsProxySettings);
   private shortener = inject(ShortenerSettings);
+  private twitter = inject(TwitterSettings);
   // Not a catalog entry — a paste service is a list, not a one-account
   // connector, so the key is managed on the Pastes page. Governed here anyway,
   // because a stored secret obeys the retention policy wherever it was created.
@@ -101,6 +103,15 @@ export class SettingsConnections implements OnInit {
           // Short.io requires) is configured but not usable, and the card should
           // not claim otherwise.
           return { entry, connected: this.shortener.usable(), unavailableReason: null };
+        case 'twitter':
+          // Deliberately the weakest claim on this page: a key is stored and a
+          // source is chosen. Unlike the others, that is genuinely not enough to
+          // work — these services need a header-forwarding CORS proxy and a
+          // consent on top — but the card is a directory entry, not a health
+          // check, and the connector's own page owns the five-stage setup state.
+          // Reporting "not connected" to someone who has pasted a valid key
+          // would send them looking for a key problem that does not exist.
+          return { entry, connected: this.twitter.usable(), unavailableReason: null };
       }
     }),
   );
@@ -121,6 +132,7 @@ export class SettingsConnections implements OnInit {
       this.openrouter,
       this.corsProxy,
       this.shortener,
+      this.twitter,
       this.pastepileKey,
     ]);
     this.lifetimes.enforceAll();

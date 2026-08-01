@@ -44,7 +44,8 @@ export type ConnectionId =
   | 'bluesky'
   | 'openrouter'
   | 'cors-proxy'
-  | 'link-shortener';
+  | 'link-shortener'
+  | 'twitter';
 
 /**
  * Who a connection belongs to — which is a question users actually ask, and
@@ -134,6 +135,21 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
       'Bluesky posts merged into your home timeline',
       'Reply, like and repost without leaving Mawkingbird',
       'Bluesky DMs in Chat',
+    ],
+  },
+  {
+    id: 'twitter',
+    label: 'X (Twitter)',
+    emoji: '𝕏',
+    pitch: 'Read public X posts, so the friends who never left stay in your reading.',
+    // The key belongs to whoever pays for the API credits, not to a persona —
+    // same reasoning as OpenRouter and the CORS proxy. See TwitterSettings. The
+    // *follows* built on top of it are account-scoped; the key is not.
+    scope: 'browser',
+    enables: [
+      'Follow public X accounts and read their posts here',
+      'Read-only: no X login, and nothing you do is sent to X',
+      'Needs your own API key and a CORS proxy',
     ],
   },
   {

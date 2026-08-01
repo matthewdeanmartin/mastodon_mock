@@ -66,6 +66,16 @@ const CREDENTIAL_HOSTS: readonly string[] = [
   't.ly',
   'rebrandly.com',
   'tinyurl.com',
+  // The X data services. Their keys spend a credit balance, so they belong here
+  // like any other credentialed host — and, like the shorteners, they are
+  // reachable only through `proxyCredentialedRequest` after recorded consent.
+  //
+  // Unlike the shorteners there is no direct route at all: these services refuse
+  // browser requests outright (their CORS preflight demands the API-key header a
+  // preflight cannot carry), so the consented path is the *only* path. See
+  // `twitter-transport.ts`.
+  'twitterapi.io',
+  'getxapi.com',
 ];
 
 /** Raised when a request must not be proxied. Never caught into a direct fetch. */

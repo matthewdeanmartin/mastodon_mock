@@ -1,0 +1,304 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>𝕏 X / Twitter</h1>
+  <p>
+    Read public posts from X, so the people who never left don't drop out of your reading. Follow
+    accounts by handle and their posts show up here — no X account needed, and nothing you do here
+    touches X itself.
+  </p>
+  <p class="muted small">{{ scopeDetail }}</p>
+</div>
+
+<section class="honesty">
+  <h2 class="section-title">Read this first</h2>
+  <p>
+    This connector is more work to set up than the others, and it is fair to know why before you
+    start.
+  </p>
+  <ul>
+    <li>
+      <strong>X has no free API</strong>, so Mawkingbird reads through a third-party service that
+      resells public X data. You bring your own key and pay them per request.
+    </li>
+    <li>
+      <strong>Those services refuse web browsers</strong>, so every request also has to go through
+      a CORS proxy. You will see this happen when you press Test.
+    </li>
+    <li>
+      <strong>It is read-only.</strong> You can read posts and follow accounts locally. You cannot
+      like, repost or reply — those need a real X login, which this app never asks for.
+    </li>
+  </ul>
+  <p class="muted small">
+    "Follow" here means a subscription stored in this browser. It is not a follow on X, and nobody
+    on X is notified.
+  </p>
+</section>
+
+@if (nextStep(); as step) {
+  <p class="next-step">
+    <strong>Next:</strong>
+    {{ step }}
+  </p>
+} @else {
+  <p class="connection-ok">Set up and working. Add accounts to follow from the Feeds page.</p>
+}
+
+<p class="credential-warning small">
+  This API key is stored in this browser's localStorage, because Mawkingbird has no server to keep
+  it on. The key spends credits you have paid for, so use one you can rotate, and only on a device
+  you trust. You can revoke it on the provider's own site at any time.
+</p>
+
+@if (sources.length > 1) {
+  <section class="picker">
+    <h2 class="section-title">Services</h2>
+    <ul class="provider-list">
+      @for (item of sources; track item.id) {
+        <li>
+          <button
+            class="provider"
+            type="button"
+            [class.chosen]="selected() === item.id"
+            (click)="choose(item.id)"
+          >
+            <span class="provider-text">
+              <span class="provider-name">
+                {{ item.label }}
+                @if (isActive(item.id)) {
+                  <span class="pill pill-active">Active</span>
+                } @else if (hasKey(item.id)) {
+                  <span class="pill">Key saved</span>
+                }
+              </span>
+              <span class="provider-pitch muted small">{{ item.pitch }}</span>
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+<section class="setup">
+  <h2 class="section-title">{{ entry().label }}</h2>
+  <p class="muted small">{{ entry().pricingNote }}</p>
+  <p class="small">
+    <a [href]="entry().keyUrl" target="_blank" rel="noopener noreferrer">
+      Get an API key from {{ entry().label }} ↗
+    </a>
+  </p>
+
+  <label class="field">
+    <span class="field-label">API key</span>
+    <input
+      type="password"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="Paste your {{ entry().label }} key"
+      [ngModel]="keyDraft()"
+      (ngModelChange)="keyDraft.set($event)"
+    />
+    @if (hasKey(entry().id)) {
+      <span class="muted small">
+        A key is saved. Paste a new one to replace it.
+        @if (expiryLabel(settings.expiresAt()); as expiry) {
+          It is removed from this browser on {{ expiry }}.
+        }
+      </span>
+    }
+  </label>
+
+  <div class="actions">
+    <button class="btn" type="button" [disabled]="busy() || !keyDraft().trim()" (click)="save()">
+      Save and test
+    </button>
+    @if (hasKey(entry().id)) {
+      <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="test()">
+        Test connection
+      </button>
+      <button class="btn btn-outline" type="button" (click)="forget(entry().id)">Disconnect</button>
+    }
+  </div>
+  <p class="muted small">
+    Testing costs up to two requests against your {{ entry().label }} credits — one direct attempt
+    (which usually fails before it reaches them, costing nothing) and one through your proxy.
+  </p>
+
+  @if (busy()) {
+    <p class="muted small">Testing…</p>
+  }
+  @if (notice()) {
+    <p class="connection-ok">{{ notice() }}</p>
+  }
+  @if (error()) {
+    <p class="feed-error">{{ error() }}</p>
+  }
+</section>
+
+<section class="proxy-status">
+  <h2 class="section-title">CORS proxy</h2>
+  @if (proxyEntry(); as proxy) {
+    <p>
+      Using <strong>{{ proxy.label }}</strong
+      >.
+      @if (hasConsent()) {
+        You have agreed to send your {{ entry().label }} key through it.
+      } @else {
+        You have not yet agreed to send your API key through it.
+      }
+    </p>
+
+    @if (proxyStripsHeaders()) {
+      <p class="feed-error">
+        {{ proxy.label }} does not forward custom headers, so it cannot carry an API key — requests
+        through it arrive at {{ entry().label }} with no key, which looks exactly like a rejected
+        key. Pick a different proxy under
+        <a [routerLink]="['/settings/connections/cors-proxy']">CORS proxy</a>.
+      </p>
+    }
+
+    @if (proxyNeedsRegistration(); as allowlist) {
+      <p class="muted small">
+        {{ allowlist.note }}
+        <a [href]="allowlist.dashboardUrl" target="_blank" rel="noopener noreferrer">
+          Open the {{ proxy.label }} dashboard ↗
+        </a>
+      </p>
+    }
+
+    @if (hasConsent()) {
+      <button class="btn btn-outline" type="button" (click)="revokeConsent()">
+        Withdraw consent
+      </button>
+    }
+  } @else {
+    <p>
+      No CORS proxy is configured. {{ entry().label }} cannot be reached from a browser without
+      one, so this connector will not work until you set one up.
+    </p>
+    <p class="small">
+      <a [routerLink]="['/settings/connections/cors-proxy']">Set up a CORS proxy →</a>
+    </p>
+  }
+</section>
+
+<section class="follows">
+  <h2 class="section-title">Accounts you follow</h2>
+
+  @if (!canFollow()) {
+    <p class="muted">
+      Finish the setup above first. Once the connection works you can follow X accounts here.
+    </p>
+  } @else {
+    <p class="muted small">
+      Following stores the handle in this browser so their posts show up on your Feeds page. It is
+      not a follow on X — nobody is notified. Up to {{ followLimit }} accounts, because each one
+      costs a request every time its posts refresh.
+    </p>
+
+    @if (!lookupResult()) {
+      <label class="field">
+        <span class="field-label">X handle</span>
+        <input
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="@NASA"
+          [ngModel]="handleDraft()"
+          (ngModelChange)="handleDraft.set($event)"
+          (keyup.enter)="lookup()"
+        />
+      </label>
+      <div class="actions">
+        <button
+          class="btn"
+          type="button"
+          [disabled]="lookingUp() || !handleDraft().trim() || follows.atLimit()"
+          (click)="lookup()"
+        >
+          {{ lookingUp() ? 'Looking up…' : 'Look up (1 request)' }}
+        </button>
+      </div>
+      @if (follows.atLimit()) {
+        <p class="muted small">
+          You are following {{ followLimit }} accounts, the maximum. Remove one to add another.
+        </p>
+      }
+    } @else {
+      <div class="lookup-preview">
+        <p class="muted small">Is this the right account?</p>
+        <div class="preview-card">
+          @if (lookupResult()!.avatar) {
+            <img class="preview-avatar" [src]="lookupResult()!.avatar" alt="" width="48" height="48" />
+          }
+          <div class="preview-text">
+            <strong>{{ lookupResult()!.display_name }}</strong>
+            <span class="muted">&#64;{{ lookupResult()!.username }}</span>
+            <span class="muted small">
+              {{ lookupResult()!.followers_count | number }} followers ·
+              {{ lookupResult()!.statuses_count | number }} posts
+            </span>
+            <a [href]="lookupResult()!.url" target="_blank" rel="noopener noreferrer" class="small">
+              View on X ↗
+            </a>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn" type="button" (click)="confirmFollow()">
+            Follow &#64;{{ lookupResult()!.username }}
+          </button>
+          <button class="btn btn-outline" type="button" (click)="cancelLookup()">Cancel</button>
+        </div>
+      </div>
+    }
+
+    @if (followError()) {
+      <p class="feed-error">{{ followError() }}</p>
+    }
+    @if (followNotice()) {
+      <p class="connection-ok">{{ followNotice() }}</p>
+    }
+
+    @if (follows.follows().length) {
+      <ul class="follow-list">
+        @for (f of follows.follows(); track f.username) {
+          <li class="follow-row">
+            @if (f.avatar) {
+              <img class="follow-avatar" [src]="f.avatar" alt="" width="32" height="32" />
+            }
+            <span class="follow-text">
+              <strong>{{ f.displayName }}</strong>
+              <span class="muted small">&#64;{{ f.username }}</span>
+            </span>
+            <label class="follow-toggle small">
+              <input
+                type="checkbox"
+                [checked]="f.enabled"
+                (change)="toggleFollowEnabled(f.username, !f.enabled)"
+              />
+              Show
+            </label>
+            <button class="btn btn-outline btn-small" type="button" (click)="unfollow(f.username)">
+              Unfollow
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="muted small">
+        No accounts yet. Add the people you would miss if you stopped opening X.
+      </p>
+    }
+  }
+</section>
+
+@if (consentPrompt(); as prompt) {
+  <app-twitter-consent-dialog
+    [source]="prompt.source"
+    [proxy]="prompt.proxy"
+    (accepted)="acceptConsent()"
+    (cancelled)="declineConsent()"
+  />
+}

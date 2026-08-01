@@ -1,0 +1,118 @@
+<div
+  class="overlay"
+  role="presentation"
+  tabindex="-1"
+  (click)="cancelled.emit()"
+  (keyup.escape)="cancelled.emit()"
+>
+  <div
+    class="dialog"
+    role="alertdialog"
+    aria-labelledby="consent-title"
+    aria-describedby="consent-body"
+    (click)="$event.stopPropagation()"
+    (keyup)="$event.stopPropagation()"
+  >
+    @if (selfHosted()) {
+      <h3 id="consent-title">Send your {{ source().label }} key through your own proxy?</h3>
+    } @else {
+      <h3 id="consent-title" class="warn">
+        {{ proxy().label }} will be able to read your {{ source().label }} key
+      </h3>
+    }
+
+    <div id="consent-body">
+      <p>
+        {{ source().label }} refuses to answer web browsers at all&nbsp;— you just saw that test
+        fail. Mawkingbird has no server of its own, so the only way to read X posts here is to
+        route every request through the CORS proxy you configured, and those requests carry your
+        API key.
+      </p>
+
+      @if (selfHosted()) {
+        <p>
+          Your proxy is <strong>your own server</strong>. Your key and your reading go to a machine
+          you run, so nothing is being disclosed to anyone else. Just make sure the template you
+          configured points where you think it does.
+        </p>
+      } @else {
+        <section class="who">
+          <h4>Who you would be trusting</h4>
+          <p class="operator">{{ proxy().label }}</p>
+          <p class="pitch">{{ proxy().pitch }}</p>
+          <p class="links">
+            <a [href]="proxy().homepage" target="_blank" rel="noopener noreferrer">
+              Their website
+            </a>
+            <span aria-hidden="true">·</span>
+            <a [href]="source().homepage" target="_blank" rel="noopener noreferrer">
+              About {{ source().label }}
+            </a>
+          </p>
+          <p class="hint">
+            Read their terms before you decide. A CORS proxy is a machine-in-the-middle by design:
+            it sees every request it relays, including the headers.
+          </p>
+        </section>
+
+        <section class="risk">
+          <h4>What could go wrong</h4>
+          <p>
+            If {{ proxy().label }} logged or misused what passes through it, whoever holds your key
+            could:
+          </p>
+          <ul>
+            <li>
+              <strong>Spend your credits.</strong> {{ source().label }} bills per request, so a
+              stolen key draws down the balance you paid for until you notice and rotate it.
+            </li>
+            <li>Look up any public X account, post or search using your account's quota</li>
+          </ul>
+          <p>
+            And separately from the key itself: because <em>every</em> X request goes through the
+            proxy, its operator can see <strong>which accounts you read and what you search
+            for</strong>. That is your reading history, not something you published.
+          </p>
+        </section>
+
+        <section class="scope">
+          <h4>What this does not cover</h4>
+          <p>
+            Only your {{ source().label }} key and the X content you look up. Mawkingbird still
+            refuses to send your Mastodon session, your Bluesky account, or any other connected
+            service through a proxy. No X account password or session cookie is involved&nbsp;—
+            this app never asks for one, and reading public X data does not require it.
+          </p>
+          <p>
+            If you would rather not take this risk, you can run
+            <a
+              href="https://developers.cloudflare.com/workers/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >your own proxy</a
+            >
+            and select it under CORS proxy instead.
+          </p>
+        </section>
+      }
+    </div>
+
+    <div class="consent-actions">
+      <button class="btn btn-outline" type="button" (click)="cancelled.emit()">
+        No, don't send it
+      </button>
+      <button
+        class="btn"
+        [class.btn-danger]="!selfHosted()"
+        type="button"
+        (click)="accepted.emit()"
+      >
+        @if (selfHosted()) {
+          Use my proxy
+        } @else {
+          I accept the risk
+        }
+      </button>
+    </div>
+  </div>
+</div>
