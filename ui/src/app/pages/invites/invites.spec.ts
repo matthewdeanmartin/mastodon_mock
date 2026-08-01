@@ -82,11 +82,22 @@ describe('Invites', () => {
     expect(boxes(fixture).some((box) => box.value.includes(ACCOUNT.url))).toBe(true);
   });
 
-  it('restores ten Twitter choices in advanced mode', () => {
+  it('restores the original Twitter choices and keeps touch grass in advanced mode', () => {
     const fixture = setUp();
     clickButton(fixture, 'Advanced');
-    expect(cards(fixture)).toHaveLength(10);
+    expect(cards(fixture)).toHaveLength(11);
     expect(root(fixture).textContent).toContain('Real talk: touch grass');
+  });
+
+  it('rotates a new visible invitation to the top when shuffled', () => {
+    const fixture = setUp();
+    const first = cards(fixture)[0].querySelector('h2')!.textContent;
+    const second = cards(fixture)[1].querySelector('h2')!.textContent;
+
+    clickButton(fixture, 'Shuffle');
+
+    expect(cards(fixture)[0].querySelector('h2')!.textContent).toBe(second);
+    expect(cards(fixture).map((card) => card.querySelector('h2')!.textContent)).toContain(first);
   });
 
   it('uses a distinct Bluesky deck', () => {

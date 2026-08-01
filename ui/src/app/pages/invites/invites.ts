@@ -54,6 +54,12 @@ export class Invites implements OnInit {
   protected readonly includeLink = signal(true);
   protected readonly limits = INVITE_LIMITS;
   private readonly edits = signal<Record<string, string>>({});
+  /** Display order per platform; Shuffle rotates the visible deck instead of randomizing it. */
+  private readonly order = signal<Record<InviteNetwork, readonly string[]>>({
+    x: invitesFor('x', false).map((invite) => invite.id),
+    bluesky: invitesFor('bluesky', false).map((invite) => invite.id),
+    mastodon: invitesFor('mastodon', false).map((invite) => invite.id),
+  });
 
   protected readonly copied = signal<string | null>(null);
   protected readonly copyFailed = signal<string | null>(null);
@@ -119,19 +125,25 @@ export class Invites implements OnInit {
     const network = this.network();
     const context = this.context();
     const edits = this.edits();
-    return invitesFor(network, this.mode() === 'simple').map((variation) => {
-      const edit = edits[variation.id];
-      const text = edit ?? renderInvite(variation.template, context);
-      const length = Array.from(text).length;
-      return {
-        variation,
-        text,
-        length,
-        overLimit: length > INVITE_LIMITS[network],
-        edited: edit !== undefined,
-        intentUrl: inviteIntentUrl(network, text, this.homeHost()),
-      };
-    });
+    const available = new Map(
+      invitesFor(network, this.mode() === 'simple').map((invite) => [invite.id, invite]),
+    );
+    return this.order()
+      [network].map((id) => available.get(id))
+      .filter((variation): variation is InviteVariation => !!variation)
+      .map((variation) => {
+        const edit = edits[variation.id];
+        const text = edit ?? renderInvite(variation.template, context);
+        const length = Array.from(text).length;
+        return {
+          variation,
+          text,
+          length,
+          overLimit: length > INVITE_LIMITS[network],
+          edited: edit !== undefined,
+          intentUrl: inviteIntentUrl(network, text, this.homeHost()),
+        };
+      });
   });
 
   ngOnInit(): void {
@@ -248,6 +260,22 @@ export class Invites implements OnInit {
       delete next[id];
       return next;
     });
+    this.clearCopyState();
+  }
+
+  /** Show the next visible message first while keeping every message reachable. */
+  protected shuffle(): void {
+    const network = this.network();
+    const visibleIds = this.cards().map((card) => card.variation.id);
+    if (visibleIds.length < 2) {
+      return;
+    }
+    const rotated = [...visibleIds.slice(1), visibleIds[0]];
+    const visible = new Set(visibleIds);
+    this.order.update((order) => ({
+      ...order,
+      [network]: [...rotated, ...order[network].filter((id) => !visible.has(id))],
+    }));
     this.clearCopyState();
   }
 

@@ -193,9 +193,14 @@
   </details>
 }
 
-<div class="message-count muted small">
-  {{ cards().length }} {{ networkLabel() }} {{ cards().length === 1 ? 'message' : 'messages' }} —
-  edit any one before opening the composer.
+<div class="message-toolbar">
+  <span class="muted small">
+    {{ cards().length }} {{ networkLabel() }} {{ cards().length === 1 ? 'message' : 'messages' }}
+    — edit any one before opening the composer.
+  </span>
+  <button class="btn btn-outline btn-sm" type="button" (click)="shuffle()">
+    Shuffle — show a new one first
+  </button>
 </div>
 
 <ul class="invite-list">

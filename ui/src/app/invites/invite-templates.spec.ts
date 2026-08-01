@@ -20,10 +20,40 @@ const CONTEXT: InviteContext = {
 };
 
 describe('invitation inventory', () => {
-  it('keeps ten advanced choices for every platform', () => {
-    expect(invitesFor('x', false)).toHaveLength(10);
+  it('keeps the ten original Twitter choices plus the new advanced-only joke', () => {
+    expect(invitesFor('x', false)).toHaveLength(11);
     expect(invitesFor('bluesky', false)).toHaveLength(10);
     expect(invitesFor('mastodon', false)).toHaveLength(10);
+    expect(invitesFor('x', false).map((invite) => invite.id)).toEqual([
+      'x-straightforward',
+      'x-try-first',
+      'x-follow-me',
+      'x-no-algorithm',
+      'x-community',
+      'x-friendly-migration',
+      'x-open-web',
+      'x-low-pressure',
+      'x-mawkingbird',
+      'x-bring-friends',
+      'x-touch-grass',
+    ]);
+  });
+
+  it('keeps the eight original Bluesky choices before the two new additions', () => {
+    expect(
+      invitesFor('bluesky', false)
+        .slice(0, 8)
+        .map((invite) => invite.id),
+    ).toEqual([
+      'bsky-both-at-once',
+      'bsky-no-signup',
+      'bsky-one-timeline',
+      'bsky-your-people',
+      'bsky-window-shop',
+      'bsky-say-hello',
+      'bsky-same-web',
+      'bsky-guest-pass',
+    ]);
   });
 
   it('reduces direct invitations to two and Mastodon rally posts to four in simple mode', () => {

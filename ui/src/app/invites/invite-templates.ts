@@ -104,21 +104,19 @@ const X_INVITES: readonly InviteVariation[] = [
 
 Find me here: {profileUrl}
 
-Start here: {visitUrl}
+Try it with {visitUrl}
 
 #Mastodon #Fediverse`,
   },
   {
-    id: 'x-leave-twitter',
+    id: 'x-try-first',
     network: 'x',
-    title: 'Leave Twitter behind',
-    template: `Still on Twitter? Upgrade your experience by leaving it behind. Come find your people on Mastodon instead.
+    title: 'Try before committing',
+    template: `Curious about Mastodon but haven’t tried it yet? Mawkingbird makes it easy to explore and use Mastodon from the web.
 
-I’m here: {profileUrl}
+{visitUrl}
 
-Start here: {visitUrl}
-
-#JoinMastodon #Fediverse`,
+#Mastodon #Fediverse #SocialMedia`,
   },
   {
     id: 'x-follow-me',
@@ -128,14 +126,14 @@ Start here: {visitUrl}
 
 Follow me at {profileUrl}
 
-Get started: {visitUrl}
+Start here: {visitUrl}
 
 #Mastodon #JoinMastodon`,
   },
   {
     id: 'x-no-algorithm',
     network: 'x',
-    title: 'Choose your own feed',
+    title: 'No algorithm',
     template: `Want a social feed you control instead of one chosen entirely by an algorithm? Give Mastodon a try.
 
 Start here: {visitUrl}
@@ -145,7 +143,7 @@ Start here: {visitUrl}
   {
     id: 'x-community',
     network: 'x',
-    title: 'Lots of communities',
+    title: 'Lots of small communities',
     template: `Mastodon is made of independent communities that can still talk to one another. It’s a different and surprisingly human way to use social media.
 
 Come try it: {visitUrl}
@@ -155,8 +153,8 @@ Come try it: {visitUrl}
   {
     id: 'x-friendly-migration',
     network: 'x',
-    title: 'Low-pressure migration',
-    template: `You don’t have to quit Twitter today to try Mastodon. Make an account, follow a few people, and see whether you like it.
+    title: 'Friendly migration',
+    template: `You don’t have to quit Twitter to try Mastodon. Make an account, follow a few people, and see whether you like it.
 
 {visitUrl}
 
@@ -170,31 +168,42 @@ Come try it: {visitUrl}
 
 Join me: {profileUrl}
 
-Start here: {visitUrl}
+Or just start here: {visitUrl}
 
 #Mastodon #OpenWeb`,
   },
   {
-    id: 'x-human-internet',
+    id: 'x-low-pressure',
     network: 'x',
-    title: 'A more human internet',
-    template: `Friendly invitation: come say hello on Mastodon sometime. Smaller communities and conversations feel refreshingly human.
+    title: 'Low pressure',
+    template: `Friendly invitation: come say hello to me on Mastodon sometime.
 
 My profile: {profileUrl}
 
-Try it: {visitUrl}
+You can try Mastodon through {visitUrl}
 
 #Mastodon #Fediverse`,
   },
   {
     id: 'x-mawkingbird',
     network: 'x',
-    title: 'Try it in a browser',
-    template: `Want to see what Mastodon is like? Pick a community, follow your interests, and try the open social web from your browser.
+    title: 'About Mawkingbird',
+    template: `Want to see what Mastodon is like? Try Mawkingbird, a web client for exploring and using the Fediverse.
 
 {visitUrl}
 
-#Mastodon #Fediverse`,
+#Mawkingbird #Mastodon #Fediverse`,
+  },
+  {
+    id: 'x-bring-friends',
+    network: 'x',
+    title: 'Bring your friends',
+    template: `Social networks get better when your friends are there. I’m inviting mine to join me on Mastodon.
+
+Find me at {handle}
+Get started at {visitUrl}
+
+#JoinMastodon #Fediverse`,
   },
   {
     id: 'x-touch-grass',
@@ -211,29 +220,37 @@ const BLUESKY_INVITES: readonly InviteVariation[] = [
     id: 'bsky-both-at-once',
     network: 'bluesky',
     title: 'Both at once',
-    template: `Some of your friends are over on Mastodon. You don’t need to pick one open network forever — come see what the other side is talking about.
+    template: `Hey — some of your friends are over on Mastodon. You can hang out with both crowds in one timeline with Mawkingbird, and you don’t even have to sign up for an account.
 
 {visitUrl}
 
 #Mastodon #Fediverse`,
   },
   {
-    id: 'bsky-open-web',
+    id: 'bsky-no-signup',
     network: 'bluesky',
-    title: 'More of the open web',
-    template: `Bluesky is one part of the open social web. Mastodon is another, full of communities and people worth meeting.
+    title: 'No signup needed',
+    template: `You can read Mastodon right now without making an account anywhere. Open this, look around, and leave if it’s not for you:
 
-Find me here: {profileUrl}
+{visitUrl}
 
-Start here: {visitUrl}
+#Fediverse #Mastodon`,
+  },
+  {
+    id: 'bsky-one-timeline',
+    network: 'bluesky',
+    title: 'One timeline',
+    template: `I got tired of checking two apps, so now I read Bluesky and Mastodon in the same timeline. Mawkingbird does both, and Mastodon works without an account:
 
-#Mastodon #OpenWeb`,
+{visitUrl}
+
+#Bluesky #Mastodon`,
   },
   {
     id: 'bsky-your-people',
     network: 'bluesky',
     title: 'Your people are there',
-    template: `A surprising number of people you used to follow are posting on Mastodon these days. Come look around and see who you recognize.
+    template: `A surprising number of the people you used to follow are posting on Mastodon these days. No account needed to go see:
 
 {visitUrl}
 
@@ -242,20 +259,10 @@ You’ll find me at {handle}
 #Mastodon #Fediverse`,
   },
   {
-    id: 'bsky-no-switch',
+    id: 'bsky-window-shop',
     network: 'bluesky',
-    title: 'No switching required',
-    template: `This is not a demand to leave Bluesky. Social networks are better when you can visit more than one neighborhood.
-
-Come explore Mastodon: {visitUrl}
-
-#Bluesky #Mastodon`,
-  },
-  {
-    id: 'bsky-community',
-    network: 'bluesky',
-    title: 'Choose a community',
-    template: `If you like the open social web, try the version where you choose a community first and can still follow people everywhere.
+    title: 'Just window shopping',
+    template: `Not asking you to switch to anything. Mawkingbird will show you Mastodon with no account, no email, no signup — just have a look and see whether your people are there.
 
 {visitUrl}
 
@@ -265,13 +272,31 @@ Come explore Mastodon: {visitUrl}
     id: 'bsky-say-hello',
     network: 'bluesky',
     title: 'Come say hello',
-    template: `Come say hello to me on the Mastodon side sometime.
+    template: `Come say hello to me on the Mastodon side sometime — {profileUrl}
 
-My profile: {profileUrl}
-
-Choose where to start: {visitUrl}
+You can read it without signing up for anything: {visitUrl}
 
 #Mastodon #Fediverse`,
+  },
+  {
+    id: 'bsky-same-web',
+    network: 'bluesky',
+    title: 'Same open web',
+    template: `Bluesky and Mastodon are both the open social web, and there’s no reason to pick just one. Mawkingbird reads both, and the Mastodon half needs no account at all:
+
+{visitUrl}
+
+#Bluesky #Mastodon #OpenWeb`,
+  },
+  {
+    id: 'bsky-guest-pass',
+    network: 'bluesky',
+    title: 'Guest pass',
+    template: `Consider this a guest pass to Mastodon: no account, no signup, just a public timeline you can read today. If you like it, then make an account.
+
+{visitUrl}
+
+#Mastodon #TryMastodon`,
   },
   {
     id: 'bsky-small-communities',
@@ -290,26 +315,6 @@ Choose where to start: {visitUrl}
     template: `On Mastodon, choosing a home server does not trap you there. You can follow people across the Fediverse from one account.
 
 Try it: {visitUrl}
-
-#Mastodon #Fediverse`,
-  },
-  {
-    id: 'bsky-curious',
-    network: 'bluesky',
-    title: 'For the curious',
-    template: `Curious what the Mastodon half of the open social web feels like? Bring your interests, find a few people, and give it an honest look.
-
-{visitUrl}
-
-#Mastodon #OpenWeb`,
-  },
-  {
-    id: 'bsky-bring-friends',
-    network: 'bluesky',
-    title: 'Bring a friend',
-    template: `The hardest part of trying another social network is arriving alone. Come to Mastodon with one friend and build your corner together.
-
-Start here: {visitUrl}
 
 #Mastodon #Fediverse`,
   },

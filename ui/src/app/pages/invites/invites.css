@@ -14,6 +14,12 @@
   margin: 0;
 }
 
+.invite-page-head p {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
 .anonymous-note {
   display: flex;
   flex-direction: column;
@@ -152,7 +158,12 @@ select {
   margin-left: 24px;
 }
 
-.message-count {
+.message-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
 }
