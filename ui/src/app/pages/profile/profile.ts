@@ -81,11 +81,11 @@ export class Profile implements OnInit, OnDestroy {
 
   /** True when this "profile" is a synthetic RSS feed (id `rss:<feedUrl>`). */
   protected isRss = signal(false);
-  /** True when this profile is an X account (id `twitter:@<handle>`). */
+  /** True when this profile is a Twitter account (id `twitter:@<handle>`). */
   protected isTwitter = signal(false);
-  /** The handle behind an X profile, for the follow toggle. */
+  /** The handle behind a Twitter profile, for the follow toggle. */
   private twitterHandle = signal<string | null>(null);
-  /** Why this X profile's posts could not be loaded, if they could not. */
+  /** Why this Twitter profile's posts could not be loaded, if they could not. */
   protected twitterError = signal<string | null>(null);
   /**
    * Whether the posts on screen came off disk rather than the network.
@@ -95,7 +95,7 @@ export class Profile implements OnInit, OnDestroy {
    * posts immediately plus a Refresh button, and decides for themselves.
    */
   protected twitterStale = signal(false);
-  /** Whether the viewer follows this X account locally. */
+  /** Whether the viewer follows this Twitter account locally. */
   protected twitterFollowed = computed(() => {
     const handle = this.twitterHandle();
     return !!handle && this.twitterFollows.has(handle);
@@ -355,12 +355,12 @@ export class Profile implements OnInit, OnDestroy {
    * Feeds have no pagination, so the whole feed loads at once (exhausted).
    */
   /**
-   * An X account as a profile: their posts, read through the configured data
+   * A Twitter account as a profile: their posts, read through the configured data
    * service.
    *
    * Reuses this page rather than adding a screen of its own, exactly like the
    * RSS branch above — the whole architecture rests on foreign content becoming
-   * ordinary `Status` objects, so an X profile should need no special rendering.
+   * ordinary `Status` objects, so a Twitter profile should need no special rendering.
    *
    * Two differences from every other profile here, both from the same cause
    * (there is no signed-in X user):
@@ -457,7 +457,7 @@ export class Profile implements OnInit, OnDestroy {
   }
 
   /**
-   * Fetch this X account's posts again, at the cost of one request.
+   * Fetch this Twitter account's posts again, at the cost of one request.
    *
    * The only path that spends money on this page. Deliberately a button rather
    * than anything automatic — see {@link twitterStale}.
@@ -495,7 +495,7 @@ export class Profile implements OnInit, OnDestroy {
     });
   }
 
-  /** Follow or unfollow this X account locally. Costs nothing either way. */
+  /** Follow or unfollow this Twitter account locally. Costs nothing either way. */
   protected toggleTwitterFollow(): void {
     const handle = this.twitterHandle();
     const account = this.account();
@@ -991,7 +991,7 @@ export class Profile implements OnInit, OnDestroy {
 }
 
 /**
- * A minimal `Account` for an X profile we know the handle of but have not yet
+ * A minimal `Account` for a Twitter profile we know the handle of but have not yet
  * seen a post from.
  *
  * Used only as a placeholder while the timeline loads, and replaced by the real

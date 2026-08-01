@@ -112,7 +112,7 @@ guaranteed failure each time. Instead:
    direct.
 3. With no consented proxy, `TwitterTransport` throws
    `TwitterProxyConsentRequired` immediately — no time, no money spent.
-4. The disclosure names the stake: **the proxy operator can read your X API key
+4. The disclosure names the stake: **the proxy operator can read your Twitter API key
    and spend your credits, and can see every profile and search you look up.**
 5. Only after a recorded `(provider, proxy)` consent does anything go through
    `proxyCredentialedRequest`.
@@ -251,7 +251,7 @@ accounts show up as feeds.
   across N followed accounts is exactly the cost blowout Sprint 5 exists to
   prevent, and it should not ship before those controls do.
 - Capability gating: `PROVIDER_CAPS.twitter = { reply: false, favourite: false,
-  reblog: false }` — cards show "Open on X ↗", exactly like RSS.
+  reblog: false }` — cards show "Open on Twitter ↗", exactly like RSS.
 - Provider badge (🐦 or 𝕏) on cards; filter chip when merging lands.
 
 ### Sprint 5 — Cost controls and honesty

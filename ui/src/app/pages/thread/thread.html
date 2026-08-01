@@ -93,7 +93,7 @@
             </a>
           }
           <!-- Bookmarking is local for these posts, so it works regardless of
-               session — including for X, where it previously did not appear. -->
+               session — including for Twitter, where it previously did not appear. -->
           @if (!isMessageStatus()) {
             <button
               class="btn btn-outline btn-sm reader-original"
@@ -228,7 +228,7 @@
     } @else if (isLocal(s)) {
       <app-local-compose [inReplyTo]="s.id" (posted)="onReply($event)" />
     } @else if (isTwitter()) {
-      <!-- No composer: replying on X needs an authenticated X account, which
+      <!-- No composer: replying on Twitter needs an authenticated Twitter account, which
            this app never asks for. Ancestors are not fetched either (one
            request per level, unknown depth), so Nitter is how a reader reaches
            the rest of the conversation — and it costs nothing. -->
@@ -237,7 +237,7 @@
       }
       @if (nitterThreadUrl(); as url) {
         <p class="muted center">
-          Replies only — Mawkingbird cannot post to X.
+          Replies only — Mawkingbird cannot post to Twitter.
           <a [href]="url" target="_blank" rel="noopener noreferrer">
             Read the full conversation on Nitter ↗
           </a>

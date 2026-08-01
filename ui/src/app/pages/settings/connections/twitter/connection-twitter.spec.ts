@@ -90,10 +90,10 @@ describe('ConnectionTwitter', () => {
       expect(body).toMatch(/no free API/i);
     });
 
-    it('explains that following here is local and not a follow on X', () => {
+    it('explains that following here is local and not a follow on Twitter', () => {
       // The single most likely misunderstanding: someone believing they have
-      // followed a person on X, and that the person was notified.
-      expect(text()).toMatch(/not a follow on X/i);
+      // followed a person on Twitter, and that the person was notified.
+      expect(text()).toMatch(/not a follow on Twitter/i);
     });
 
     it('states the cost of pressing Test before it is pressed', () => {

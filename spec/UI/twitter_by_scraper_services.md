@@ -35,7 +35,7 @@ The rest of the Angular application must not depend directly on either provider'
 
 ### 2.1 Included
 
-This specification includes only operations that can be performed using the application's provider API key and public X data.
+This specification includes only operations that can be performed using the application's provider API key and public Twitter data.
 
 Included operations are:
 
@@ -63,7 +63,7 @@ Included operations are:
 
 ### 2.2 Excluded
 
-The following are mutations or require an authenticated X account and are excluded:
+The following are mutations or require an authenticated Twitter account and are excluded:
 
 * Follow or unfollow an account
 * Like or unlike a post
@@ -668,7 +668,7 @@ Fallback search:
 conversation_id:<post-id>
 ```
 
-The fallback may include non-reply conversation posts and may not reproduce X's ranking. Mark it as best-effort.
+The fallback may include non-reply conversation posts and may not reproduce Twitter's ranking. Mark it as best-effort.
 
 ---
 
@@ -845,7 +845,7 @@ Fallback options:
 
 The merge fallback has significant limitations:
 
-* It is not X's list-feed ranking.
+* It is not Twitter's list-feed ranking.
 * It requires many calls.
 * It can miss posts between refreshes.
 * It may produce incorrect ordering if calls complete at different times.
@@ -940,9 +940,9 @@ GetXAPI lists:
 POST /twitter/user/home_timeline
 ```
 
-but places it among authenticated-user operations. Its documentation distinguishes API-key-only reads from operations that additionally require X account authentication.
+but places it among authenticated-user operations. Its documentation distinguishes API-key-only reads from operations that additionally require Twitter account authentication.
 
-Do not request an X session token merely to reproduce a home feed.
+Do not request a Twitter session token merely to reproduce a home feed.
 
 ## 7.2 Local following feed
 
@@ -977,7 +977,7 @@ Limitations:
 * No social-context ranking
 * Potential omissions due to provider pagination
 * Cost grows approximately with the number of followed accounts
-* Reposts and replies may differ from X's native feed
+* Reposts and replies may differ from Twitter's native feed
 
 Recommended default concurrency:
 
@@ -1737,7 +1737,7 @@ Never send:
 
 * X password
 * X 2FA seed
-* X session cookie
+* Twitter session cookie
 * X `auth_token`
 * X `ct0`
 * Direct-message content
@@ -1780,7 +1780,7 @@ Optional privacy mode:
 | Reposters                     |                      Yes |                   Yes | Optional UI                            |
 | Trends                        |                      Yes |                   Yes | Validate location support              |
 | Local constructed feed        |                      Yes |                   Yes | App-generated                          |
-| True personalized X home feed |                       No |                    No | Requires X session                     |
+| True personalized X home feed |                       No |                    No | Requires Twitter session                     |
 | Follow/unfollow               |             Out of scope |          Out of scope | Mutation                               |
 | Like/repost/bookmark          |             Out of scope |          Out of scope | Mutation                               |
 | Private/protected data        |                       No |                    No | Not supported                          |
@@ -1849,7 +1849,7 @@ The integration is complete when:
 6. Followers and following lists paginate safely.
 7. Repeated or empty cursors cannot cause infinite pagination.
 8. Provider API keys never appear in URLs or logs.
-9. No X account credential or session token is requested.
+9. No Twitter account credential or session token is requested.
 10. The UI does not claim to provide a native X home timeline.
 11. Unsupported provider capabilities are reported explicitly.
 12. Provider HTTP 200 responses containing error status are treated as errors.
@@ -1871,7 +1871,7 @@ The integration is complete when:
 * Do not assume HTTP 200 means success.
 * Do not assume cursor pagination is internally consistent.
 * Do not expose a shared API key in an Angular environment file; production Angular environment values are bundled into downloadable JavaScript.
-* Do not represent a locally merged timeline as X's official “Following” feed.
+* Do not represent a locally merged timeline as Twitter's official “Following” feed.
 * Do not treat `isBlueVerified` as proof of legacy identity verification.
 * Do not rely on TypeScript compile-time interfaces to validate untrusted JSON.
 * Keep provider wire objects out of components.

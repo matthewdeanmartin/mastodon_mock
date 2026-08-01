@@ -1,7 +1,7 @@
 /**
  * The X/Twitter data services this app can read through, as inert catalog data.
  *
- * Neither is X. Both are third-party scrapers that resell public X data, and
+ * Neither is X. Both are third-party scrapers that resell public Twitter data, and
  * both must be treated as replaceable: endpoints change without notice, fields
  * appear and vanish, and a provider can lose access to an X feature overnight.
  * That is why the catalog exists at all — so switching costs one entry and one
@@ -13,7 +13,7 @@
  * account, which this app deliberately never asks for. It never accepts an X
  * password, 2FA seed, session cookie, `auth_token`, or `ct0` — see the spec's
  * §2.2 and §19. "Follow" in Mawkingbird means a local subscription stored in
- * this browser, not a follow on X.
+ * this browser, not a follow on Twitter.
  *
  * ## Why per-request cost is modelled here
  *
@@ -64,7 +64,7 @@ export const TWITTER_SOURCE_CATALOG: readonly TwitterSourceEntry[] = [
   {
     id: 'twitterapi-io',
     label: 'TwitterAPI.io',
-    pitch: 'Public X data — profiles, posts, search — billed per record returned.',
+    pitch: 'Public Twitter data — profiles, posts, search — billed per record returned.',
     baseUrl: 'https://api.twitterapi.io',
     // Measured: this header is what forces the preflight that makes direct
     // browser access impossible. See sprint/twitter-1-transport.md.
@@ -79,7 +79,7 @@ export const TWITTER_SOURCE_CATALOG: readonly TwitterSourceEntry[] = [
   {
     id: 'getxapi',
     label: 'GetXAPI',
-    pitch: 'Public X data with a flat per-call price and dedicated thread and media endpoints.',
+    pitch: 'Public Twitter data with a flat per-call price and dedicated thread and media endpoints.',
     baseUrl: 'https://api.getxapi.com',
     authHeader: 'Authorization',
     authPrefix: 'Bearer ',

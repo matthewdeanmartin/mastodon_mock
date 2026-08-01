@@ -3,7 +3,7 @@ import { CorsProxyEntry } from '../../cors-proxy/cors-proxy-catalog';
 import { TwitterSourceEntry } from '../twitter-source';
 
 /**
- * Asks permission to send an X data-service API key through a CORS proxy.
+ * Asks permission to send a Twitter data-service API key through a CORS proxy.
  *
  * ## Why this is not the shortener's consent dialog
  *
@@ -18,7 +18,7 @@ import { TwitterSourceEntry } from '../twitter-source';
  *
  * 2. **Every read goes through the proxy, so the proxy sees the user's reading
  *    history.** The shortener case disclosed the destination URLs someone chose
- *    to publish. This one discloses which X accounts a person follows, reads,
+ *    to publish. This one discloses which Twitter accounts a person follows, reads,
  *    and searches for — private behaviour they never intended to publish, and
  *    exactly the sort of thing §19 of the spec requires be disclosed.
  *

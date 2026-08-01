@@ -6,7 +6,7 @@ import { TwitterSettings } from './twitter-settings';
 import { TwitterProxyRequired, TwitterTransport } from './twitter-transport';
 
 /**
- * "Can I reach this X data service, and how?"
+ * "Can I reach this Twitter data service, and how?"
  *
  * ## Why this exists rather than a claim in the copy
  *
@@ -156,7 +156,7 @@ const MESSAGES: Record<TwitterReachabilityStatus, (proxy: string) => string> = {
   proxy: (proxy) =>
     `Confirmed: your browser cannot reach this service directly, but it works through ${proxy}. Requests will use the proxy.`,
   'needs-proxy': () =>
-    'Confirmed: your browser cannot reach this service directly. It does not answer browsers, so Mawkingbird needs a CORS proxy to read X data at all. Set one up under Settings → Connections → CORS proxy.',
+    'Confirmed: your browser cannot reach this service directly. It does not answer browsers, so Mawkingbird needs a CORS proxy to read Twitter data at all. Set one up under Settings → Connections → CORS proxy.',
   'needs-consent': (proxy) =>
     `Confirmed: your browser cannot reach this service directly. It can be reached through ${proxy}, but Mawkingbird will not send your API key to that proxy until you say so.`,
   unreachable: (proxy) =>

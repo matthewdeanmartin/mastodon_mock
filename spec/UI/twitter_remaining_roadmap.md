@@ -90,7 +90,7 @@ survived the reload and made the refresh cheaper than the original lookup.
 
 Also fixed while here: `toStatus` returned `url: null` when a response carried
 neither `url` nor `twitterUrl`, which silently cost the post its "↗ Nitter"
-link — the only way out of the app for an X post. It now builds the permalink
+link — the only way out of the app for a tweet. It now builds the permalink
 from the handle and post id, both of which the guards already require.
 
 ### The original analysis
@@ -136,8 +136,8 @@ serializable.
 Both shipped, along with the toolbar. Kept here for the reasoning.
 
 Also fixed while doing it: the per-post toolbar was almost entirely invisible on
-X posts. Counts render under `caps.favourite`/`caps.reblog`, which are `false`
-for X *because the actions are impossible* — so the capability flag was doing
+tweets. Counts render under `caps.favourite`/`caps.reblog`, which are `false`
+for Twitter *because the actions are impossible* — so the capability flag was doing
 two jobs ("can you press this" and "is there a number worth showing") and got
 the second one wrong. A new `readOnlyStats` concept separates them, and the
 bookmark/translate/••• block now includes X for signed-in readers, not just
@@ -148,7 +148,7 @@ became 🤖🌐 in §4, once it turned out the server one could only 404):
 💬 1751 | 🔁 2115 | ⭐ 12504 | ↗ Nitter | 🔖 | 🤖🌐 | •••
 ```
 
-**"Open original" is now "↗ Nitter"** for X posts, so a click goes to a
+**"Open original" is now "↗ Nitter"** for tweets, so a click goes to a
 tracker-free front-end instead of x.com's login wall. The instance is
 configurable (`providers/twitter/nitter.ts`) because the public Nitter
 ecosystem is unstable — a hardcoded host turns a dead instance into a dead
@@ -190,7 +190,7 @@ existing `bsky:` and `rss:` ones, backed by one of:
 
 Cost: one request per thread open, 6 credits. Ancestors would cost one *more*
 per level, which is why §6.10's recursion cap matters. Proposal: fetch the focus
-post's replies only, show ancestors as "↑ Open the full thread on X" rather than
+post's replies only, show ancestors as "↑ Open the full thread on Twitter" rather than
 walking the chain. One click, one price, no surprises.
 
 ### Profiles: already work, but nothing links to them
@@ -247,18 +247,18 @@ because every one of those gates was a denylist written before X existed.
 | Reader mode | Should work | **Was broken.** Offered Reply/Boost/Favourite and a live composer. |
 | Bookmark | Needs a decision | **Was broken.** Signed in, it POSTed a `twitter:` id to Mastodon. |
 | Third-party translate | Works | **Was missing entirely** for a signed-in reader. |
-| Filters | Should work | **Works.** They match on text, which X posts have. |
+| Filters | Should work | **Works.** They match on text, which tweets have. |
 
 ### What was actually wrong
 
 **Reader mode offered impossible actions.** It chose its action row with
-`isRss() || isAnonymousPublic()` — a denylist — so X posts landed in the
+`isRss() || isAnonymousPublic()` — a denylist — so tweets landed in the
 *writable* branch. A signed-in reader saw live 💬/🔁/⭐ buttons and, on clicking
 reply, a composer armed with `inReplyToId="twitter:2083…"`. Now gated on
 `readOnlyPost()`, derived from `capabilitiesFor()`, so the next read-only
 provider is handled before it is written.
 
-**Bookmarking an X post was broken by signing in.** The code asked "am I
+**Bookmarking a tweet was broken by signing in.** The code asked "am I
 anonymous" when the real question is "does the home server know this post".
 Measured in a browser:
 
@@ -274,13 +274,13 @@ going to have to live.
 
 **Translate disappeared entirely.** The server 🌐 button needs
 `canUseServerActions`; the AI 🤖🌐 button needed anonymous mode. A signed-in
-reader looking at an X post therefore got *neither* — the capability vanished
+reader looking at a tweet therefore got *neither* — the capability vanished
 rather than being unavailable. For a read-only provider **translate means "ask
 the autorouter"**: the server has never seen the post, so only the client-side
 AI path can work. The 🌐 button is now hidden for these providers and 🤖🌐 shown
 regardless of session. Final toolbar on a live X card: `🔖 | 🤖🌐`.
 
-**"Open in chat" was offered** for an account that exists only on X. Same
+**"Open in chat" was offered** for an account that exists only on Twitter. Same
 denylist, same fix.
 
 All four are covered by regression tests that were confirmed to fail against
@@ -289,7 +289,7 @@ the old code — a test that passes either way proves nothing.
 ### The bookmark question — settled
 
 Mastodon bookmarks are server-side; anonymous mode has `AnonymousBookmarks` in
-localStorage. An X post can only use the local kind, and the 404 above shows
+localStorage. A tweet can only use the local kind, and the 404 above shows
 what happens otherwise. Raindrop remains reachable through the existing "save
 the post's first external link" path for anyone who wants it.
 
@@ -402,11 +402,11 @@ about what refreshing that many accounts implies.
    cases, as predicted.
 4. ~~Read-only parity audit (§4)~~ — **done**, and it found four real bugs
    rather than confirming the happy path: reader mode offered impossible
-   actions, bookmarking an X post 404'd once signed in, translate vanished
+   actions, bookmarking a tweet 404'd once signed in, translate vanished
    entirely, and "open in chat" was offered for an X-only account.
 5. **Home feed mix (§5)** — now the top item. §1 is settled, so this is
    affordable. The main
-   open question is ordering a merged feed when X posts arrive in bulk on a
+   open question is ordering a merged feed when tweets arrive in bulk on a
    refresh rather than continuously.
 6. **Followings bulk import + rotation (§6)** — the big one, and it wants §5
    settled first. Import is ~25 requests for 5,000 accounts; rotation is what

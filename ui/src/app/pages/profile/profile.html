@@ -33,12 +33,12 @@
         </div>
       } @else if (isTwitter()) {
         <!-- Follow is local storage only. There is deliberately no like, repost
-             or reply: those are X mutations needing an X login this app never
-             asks for. "Open on X" is the honest alternative. -->
+             or reply: those are Twitter mutations needing a Twitter login this app never
+             asks for. "Open on Twitter" is the honest alternative. -->
         <div class="profile-buttons">
           @if (a.url) {
             <a class="btn btn-outline" [href]="a.url" target="_blank" rel="noopener noreferrer">
-              ↗ Open on X
+              ↗ Open on Twitter
             </a>
           }
           <button
@@ -48,7 +48,7 @@
             [title]="
               twitterFollowed()
                 ? 'Stop showing this account on your Feeds page'
-                : 'Show this account on your Feeds page. Not a follow on X — nobody is notified.'
+                : 'Show this account on your Feeds page. Not a follow on Twitter — nobody is notified.'
             "
           >
             {{ twitterFollowed() ? '𝕏 Following locally' : '𝕏 Follow locally' }}

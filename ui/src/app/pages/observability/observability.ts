@@ -71,7 +71,7 @@ export class Observability {
   private metrics = inject(ApiMetrics);
   private routeLog = inject(RouteLog);
   private proxyUsageStore = inject(CorsProxyUsageStore);
-  /** X spend, for the section that exists because these requests cost money. */
+  /** Twitter spend, for the section that exists because these requests cost money. */
   protected twitterUsage = inject(TwitterUsage);
   private proxySettings = inject(CorsProxySettings);
   private rssSubs = inject(RssSubscriptions);

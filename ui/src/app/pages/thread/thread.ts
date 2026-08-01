@@ -75,7 +75,7 @@ export class Thread implements OnInit {
 
   /** True while viewing an RSS article: interactions are read-only, comments come from a feed. */
   protected isRss = signal(false);
-  /** True when this thread is an X post and its replies. */
+  /** True when this thread is a tweet and its replies. */
   protected isTwitter = signal(false);
   /** Why the X replies could not be loaded, if they could not. */
   protected twitterError = signal<string | null>(null);
@@ -85,7 +85,7 @@ export class Thread implements OnInit {
   protected rssCommentsUnavailable = signal(false);
 
   /**
-   * The conversation on Nitter, when this is an X thread.
+   * The conversation on Nitter, when this is a Twitter thread.
    *
    * Ancestors are deliberately not fetched (one request per level, unknown
    * depth), so this is how a reader reaches the rest of the conversation — and
@@ -110,7 +110,7 @@ export class Thread implements OnInit {
    *
    * Derived from {@link capabilitiesFor} rather than from a list of provider
    * flags. Reader mode previously chose its action row with
-   * `isRss() || isAnonymousPublic()`, which is a denylist — so X posts, added
+   * `isRss() || isAnonymousPublic()`, which is a denylist — so tweets, added
    * long afterwards, fell into the writable branch and offered Reply, Boost and
    * Favourite buttons for actions that cannot exist, plus a composer that would
    * have POSTed a `twitter:` id to the Mastodon API. Asking the capability
@@ -148,7 +148,7 @@ export class Thread implements OnInit {
     // Read-only posts have no Mastodon DM to open: there is no account on this
     // server to message. Asking readOnlyPost() rather than listing providers
     // means X was covered the moment it was added, instead of offering "Open in
-    // chat" for an account that exists only on X.
+    // chat" for an account that exists only on Twitter.
     if (this.isAnonymousPublic() || this.readOnlyPost()) {
       return null;
     }
@@ -405,7 +405,7 @@ export class Thread implements OnInit {
   }
 
   /**
-   * An X post and its direct replies.
+   * A tweet and its direct replies.
    *
    * Costs **one** request, for the replies. The focus post itself comes out of
    * the feed cache — the reader was looking at it a moment ago — so clicking
@@ -520,7 +520,7 @@ export class Thread implements OnInit {
   /**
    * The "read it at the source" link for a read-only post in reader mode.
    *
-   * X posts go to Nitter rather than x.com, matching the card toolbar — sending
+   * tweets go to Nitter rather than x.com, matching the card toolbar — sending
    * a reader to a login wall is the thing this app exists to avoid. Everything
    * else keeps its own URL, because an RSS item's original site is the whole
    * point of the link.

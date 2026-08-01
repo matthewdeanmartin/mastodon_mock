@@ -9,7 +9,7 @@
  * connector is trying to break. Mawkingbird cannot host the content itself, but
  * it can point at a front-end that does not do those things.
  *
- * Nitter is a privacy-respecting front-end for X: no JavaScript required, no
+ * Nitter is a privacy-respecting front-end for Twitter: no JavaScript required, no
  * tracking, no account. `https://x.com/NASA` becomes
  * `https://<instance>/NASA`, and the path shape is otherwise identical —
  * `/user/status/123` works unchanged.
@@ -94,7 +94,7 @@ export function toNitterUrl(url: string | null | undefined, host = nitterHost())
   if (!X_HOSTS.has(parsed.hostname.toLowerCase())) {
     return url;
   }
-  // Path, query and fragment carry over: Nitter mirrors X's URL shape, so
+  // Path, query and fragment carry over: Nitter mirrors Twitter's URL shape, so
   // `/NASA/status/123` needs no translation.
   return `https://${host}${parsed.pathname}${parsed.search}${parsed.hash}`;
 }

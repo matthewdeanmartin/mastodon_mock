@@ -32,10 +32,10 @@ interface InviteCard {
 }
 
 /**
- * "Invite people": ten prewritten posts for X and eight for Bluesky, each of
+ * "Invite people": ten prewritten posts for Twitter and eight for Bluesky, each of
  * which opens a prefilled composer on that network.
  *
- * There is no X or Bluesky API here, no OAuth, and no posting. Every card ends
+ * There is no Twitter or Bluesky API here, no OAuth, and no posting. Every card ends
  * at a web intent — a normal link to a composer the user still has to read and
  * submit. Which means this page works from the static GitHub Pages build, and
  * also means we can never know whether a post was actually made. The
@@ -392,8 +392,8 @@ export class Invites implements OnInit {
     return (!!url && text.includes(url)) || (!!handle && text.includes(handle));
   }
 
-  /** Accessible label, e.g. `Post “Friendly migration” on X`. */
+  /** Accessible label, e.g. `Post “Friendly migration” on Twitter`. */
   protected postLabel(card: InviteCard): string {
-    return `Post “${card.variation.title}” on ${card.variation.network === 'x' ? 'X' : 'Bluesky'}`;
+    return `Post “${card.variation.title}” on ${card.variation.network === 'x' ? 'Twitter' : 'Bluesky'}`;
   }
 }

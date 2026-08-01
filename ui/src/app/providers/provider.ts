@@ -37,9 +37,9 @@ export const PROVIDER_CAPS: Record<ProviderId, ProviderCapabilities> = {
   bluesky: { reply: true, favourite: true, reblog: true },
   rss: { reply: false, favourite: false, reblog: false },
   paste: { reply: false, favourite: false, reblog: false },
-  // Read-only by construction, not by omission. Every write on X needs an
-  // authenticated X account, which this app deliberately never asks for — no
-  // password, no session cookie, no `auth_token`. Cards show "Open on X ↗"
+  // Read-only by construction, not by omission. Every write on Twitter needs an
+  // authenticated Twitter account, which this app deliberately never asks for — no
+  // password, no session cookie, no `auth_token`. Cards show "Open on Twitter ↗"
   // where reply/boost/favourite would be, exactly like RSS.
   twitter: { reply: false, favourite: false, reblog: false },
 };
@@ -65,7 +65,7 @@ const CLIENT_SIDE_ONLY: ReadonlySet<ProviderId> = new Set<ProviderId>(['twitter'
  * "am I signed in" instead. Those coincide for Mastodon posts and diverge for
  * every provider listed above:
  *
- * - Bookmarking an X post while signed in POSTed `twitter:2083…` to
+ * - Bookmarking a tweet while signed in POSTed `twitter:2083…` to
  *   `/api/v1/statuses/{id}/bookmark`, which 404s and loses the bookmark, while
  *   an anonymous reader bookmarking the same post got a working local one.
  * - Translation is worse: the server button needs `canUseServerActions` and the

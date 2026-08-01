@@ -499,10 +499,10 @@ describe('StatusCard', () => {
     req.flush(makeStatus({ id: '8' }));
   });
 
-  it('offers AI translation on an X post, since the server cannot translate it', () => {
+  it('offers AI translation on a tweet, since the server cannot translate it', () => {
     // Translation for a read-only provider means "ask the autorouter". The
     // server button needs canUseServerActions and the AI button needed
-    // anonymous mode, so a signed-in reader looking at an X post got *neither*
+    // anonymous mode, so a signed-in reader looking at a tweet got *neither*
     // — translate vanished rather than being merely unavailable.
     const f = setUp(makeStatus({ id: 'twitter:1', provider: 'twitter' }));
     f.detectChanges();
@@ -512,7 +512,7 @@ describe('StatusCard', () => {
     expect(el.querySelector("button[title='Translate']")).toBeNull();
   });
 
-  it('toggleBookmark: keeps an X post local instead of 404ing the home server', () => {
+  it('toggleBookmark: keeps a tweet local instead of 404ing the home server', () => {
     // Signing in used to *break* this. `twitter:2083…` names nothing the home
     // server has ever seen, so the call 404s and the bookmark is lost silently
     // — while an anonymous reader bookmarking the same post got a working local

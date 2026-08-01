@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TwitterSourceId } from './twitter-source';
 
 /**
- * Normalized failures from an X data service.
+ * Normalized failures from a Twitter data service.
  *
  * Follows the spec's §10 error model, with one addition it does not have:
  * `PROXY_REQUIRED` and `PROXY_CONSENT_REQUIRED`, because in this app a request
@@ -121,7 +121,7 @@ export function providerErrorInBody(
   if (text.includes('api key') || text.includes('unauthorized') || text.includes('forbidden')) {
     return new TwitterApiError(
       'INVALID_API_KEY',
-      'The X data service rejected the API key. If the request went through a CORS proxy, the proxy may have stripped the key header rather than the key being wrong.',
+      'The Twitter data service rejected the API key. If the request went through a CORS proxy, the proxy may have stripped the key header rather than the key being wrong.',
       source,
       undefined,
       undefined,
@@ -131,7 +131,7 @@ export function providerErrorInBody(
   if (text.includes('credit') || text.includes('balance') || text.includes('quota')) {
     return new TwitterApiError(
       'INSUFFICIENT_CREDITS',
-      'Your account with the X data service is out of credits.',
+      'Your account with the Twitter data service is out of credits.',
       source,
       undefined,
       undefined,
@@ -141,7 +141,7 @@ export function providerErrorInBody(
   if (text.includes('not found')) {
     return new TwitterApiError(
       'USER_NOT_FOUND',
-      'The X data service could not find that account or post.',
+      'The Twitter data service could not find that account or post.',
       source,
       undefined,
       undefined,
@@ -151,13 +151,47 @@ export function providerErrorInBody(
   return new TwitterApiError(
     'UNKNOWN',
     providerMessage
-      ? `The X data service reported: ${providerMessage}`
-      : 'The X data service reported an error without explaining it.',
+      ? `The Twitter data service reported: ${providerMessage}`
+      : 'The Twitter data service reported an error without explaining it.',
     source,
     undefined,
     undefined,
     providerMessage,
   );
+}
+
+/**
+ * Say who is throttling, rather than naming both and shrugging.
+ *
+ * A proxy refusing on its own behalf answers with its own error page and no
+ * provider body. The data service's refusal carries a provider message. So an
+ * embedded provider error means the service is the culprit; its absence, with a
+ * proxy in the path, means the proxy is.
+ *
+ * Worth distinguishing because the fixes are opposites: waiting a minute clears
+ * a free proxy tier, while the data service throttling means slowing down or
+ * upgrading the plan — and telling someone to wait when they should upgrade
+ * (or vice versa) wastes their time either way.
+ */
+export function rateLimitMessage(
+  viaProxy: boolean,
+  proxy: string,
+  providerMessage?: string,
+): string {
+  if (providerMessage) {
+    return (
+      'The Twitter data service is rate-limiting you. Wait a minute and try again, ' +
+      'or slow down how often you refresh. Your credit balance is unaffected.'
+    );
+  }
+  if (viaProxy) {
+    return (
+      `${proxy} is rate-limiting you — the request never reached the Twitter data service, ` +
+      'so nothing was spent. Free proxy tiers throttle quickly; wait a minute, or use a ' +
+      'different proxy on the CORS proxy settings page.'
+    );
+  }
+  return 'The Twitter data service is rate-limiting you. Wait a minute and try again.';
 }
 
 /** Map a transport-level failure to the normalized model (spec §10.1). */
@@ -173,7 +207,7 @@ export function toTwitterApiError(
   if (!(error instanceof HttpErrorResponse)) {
     return new TwitterApiError(
       'UNKNOWN',
-      error instanceof Error ? error.message : 'Unknown error reading X data.',
+      error instanceof Error ? error.message : 'Unknown error reading Twitter data.',
       source,
     );
   }
@@ -187,8 +221,8 @@ export function toTwitterApiError(
     return new TwitterApiError(
       'CORS_UNAVAILABLE',
       context.viaProxy
-        ? `Could not reach the X data service through ${proxy}. The proxy may be down, rate-limiting you, or answering without the CORS headers a browser needs.`
-        : 'Your browser could not reach the X data service directly. These services do not answer browsers, so this request needs a CORS proxy.',
+        ? `Could not reach the Twitter data service through ${proxy}. The proxy may be down, rate-limiting you, or answering without the CORS headers a browser needs.`
+        : 'Your browser could not reach the Twitter data service directly. These services do not answer browsers, so this request needs a CORS proxy.',
       source,
       0,
     );
@@ -199,7 +233,7 @@ export function toTwitterApiError(
   if (context.viaProxy && error.status >= 500) {
     return new TwitterApiError(
       'PROVIDER_UNAVAILABLE',
-      `${proxy} failed with a ${error.status}, so the request never reached the X data service.`,
+      `${proxy} failed with a ${error.status}, so the request never reached the Twitter data service.`,
       source,
       error.status,
     );
@@ -210,8 +244,8 @@ export function toTwitterApiError(
       return new TwitterApiError(
         'BAD_REQUEST',
         embedded?.providerMessage
-          ? `The X data service rejected the request: ${embedded.providerMessage}`
-          : 'The X data service rejected the request.',
+          ? `The Twitter data service rejected the request: ${embedded.providerMessage}`
+          : 'The Twitter data service rejected the request.',
         source,
         400,
         undefined,
@@ -221,8 +255,8 @@ export function toTwitterApiError(
       return new TwitterApiError(
         'INVALID_API_KEY',
         context.viaProxy
-          ? `The X data service rejected the API key. ${proxy} may have stripped the key header — not every proxy forwards custom headers.`
-          : 'The X data service rejected the API key.',
+          ? `The Twitter data service rejected the API key. ${proxy} may have stripped the key header — not every proxy forwards custom headers.`
+          : 'The Twitter data service rejected the API key.',
         source,
         401,
         undefined,
@@ -231,21 +265,41 @@ export function toTwitterApiError(
     case 402:
       return new TwitterApiError(
         'INSUFFICIENT_CREDITS',
-        'Your account with the X data service is out of credits.',
+        'Your account with the Twitter data service is out of credits.',
         source,
         402,
         undefined,
         embedded?.providerMessage,
       );
     case 403:
-      // 403 is overloaded across these services: out of credits, a protected
-      // account, or a plan restriction. The body is the only way to tell, and
-      // when it is silent the honest answer names all three.
+      // 403 is overloaded across these services: throttling, out of credits, a
+      // protected account, or a plan restriction. The body is the only way to
+      // tell, and when it is silent the honest answer names the rest.
+      //
+      // Throttling first, because it is the one that lies. Measured 2026-08-01:
+      // TwitterAPI.io throttles by returning
+      //   403 {"error":"Forbidden","message":"API key required..."}
+      // on a key that *is* being sent and *does* have credits — the same key
+      // answered `/oapi/my/info` moments earlier, and a direct curl with no
+      // proxy in the path failed identically. Passing that message through
+      // sends someone to re-paste a key that was never the problem.
+      if (embedded && /api key required|invalid api key/i.test(embedded.providerMessage ?? '')) {
+        return new TwitterApiError(
+          'RATE_LIMITED',
+          'The Twitter data service is refusing requests for this key right now. It reports ' +
+            'the key as missing even when it is being sent correctly, which is how it throttles. ' +
+            'Your credit balance is unaffected — wait a few minutes and try again.',
+          source,
+          403,
+          undefined,
+          embedded.providerMessage,
+        );
+      }
       return (
         embedded ??
         new TwitterApiError(
           'PROTECTED_CONTENT',
-          'The X data service refused the request. The content may be protected, or your plan or credit balance may not cover it.',
+          'The Twitter data service refused the request. The content may be protected, or your plan or credit balance may not cover it.',
           source,
           403,
         )
@@ -253,24 +307,28 @@ export function toTwitterApiError(
     case 404:
       return new TwitterApiError(
         'USER_NOT_FOUND',
-        'The X data service could not find that account or post.',
+        'The Twitter data service could not find that account or post.',
         source,
         404,
         undefined,
         embedded?.providerMessage,
       );
     case 408:
-      return new TwitterApiError('TIMEOUT', 'The X data service timed out.', source, 408);
+      return new TwitterApiError('TIMEOUT', 'The Twitter data service timed out.', source, 408);
     case 429:
+      // Which side threw the 429 is answerable, and the earlier "either by the
+      // proxy or by the service" wording gave up too early. A proxy refusing on
+      // its own behalf returns its own error page; the data service's refusal
+      // carries a provider message in the body. So when there is an embedded
+      // provider error, the service is the one throttling — otherwise, with a
+      // proxy in the path, it is the proxy.
+      //
+      // The distinction matters because the fixes are opposites: waiting fixes a
+      // free proxy tier, while the data service's limit means slowing down or
+      // upgrading the plan.
       return new TwitterApiError(
         'RATE_LIMITED',
-        // Names both parties, because the user cannot tell them apart and the
-        // fix differs: a free CORS proxy's limit is hit far sooner than the
-        // data service's, and waiting is the answer to one while upgrading is
-        // the answer to the other.
-        context.viaProxy
-          ? `Rate-limited — either by ${proxy} or by the X data service. Wait a minute and try again; free proxy tiers throttle quickly.`
-          : 'The X data service is rate-limiting you. Wait a minute and try again.',
+        rateLimitMessage(context.viaProxy, proxy, embedded?.providerMessage),
         source,
         429,
         retryAfterMs(error),
@@ -281,16 +339,16 @@ export function toTwitterApiError(
     case 503:
       return new TwitterApiError(
         'PROVIDER_UNAVAILABLE',
-        'The X data service is unavailable right now.',
+        'The Twitter data service is unavailable right now.',
         source,
         error.status,
       );
     case 504:
-      return new TwitterApiError('TIMEOUT', 'The X data service timed out.', source, 504);
+      return new TwitterApiError('TIMEOUT', 'The Twitter data service timed out.', source, 504);
     default:
       return new TwitterApiError(
         'UNKNOWN',
-        `The X data service answered ${error.status}.`,
+        `The Twitter data service answered ${error.status}.`,
         source,
         error.status,
         undefined,

@@ -297,17 +297,17 @@
     }
   </section>
 
-  <!-- ============================ X spend ================================= -->
+  <!-- ============================ Twitter spend ================================= -->
   <!-- The only connector in this app whose requests cost money, so it is the
        only one whose request count is worth a section of its own. -->
   @if (twitterUsage.total()) {
     <section class="obs-section">
       <div class="section-head">
-        <h2>X data requests</h2>
+        <h2>Twitter data requests</h2>
         <span class="muted small">billed per request</span>
       </div>
       <p class="muted small section-note">
-        Every request to the X data service draws on credits you have paid for. Counts only —
+        Every request to the Twitter data service draws on credits you have paid for. Counts only —
         which accounts you looked up is deliberately not recorded here.
       </p>
       <div class="tiles">
@@ -328,7 +328,7 @@
         <p class="muted small">
           Today's limit of {{ twitterUsage.hardLimit() }} has been reached. It resets at midnight;
           the limit itself is on the
-          <a routerLink="/settings/connections/twitter">X connector page</a>.
+          <a routerLink="/settings/connections/twitter">Twitter connector page</a>.
         </p>
       }
     </section>

@@ -8,13 +8,13 @@
  *
  * Two networks, two pitches, and the difference matters:
  *
- * - **X** invites ask people to *join Mastodon*. The reader has no fediverse
+ * - **Twitter** invites ask people to *join Mastodon*. The reader has no fediverse
  *   account, so the call to action is "make one, and here is a client".
  * - **Bluesky** invites ask people to *come hang out with the Mastodon half of
  *   their friends*, which needs no signup at all: Mawkingbird's anonymous mode
  *   reads a public instance with no account, so the link does the whole job.
  *
- * We never use an X or Bluesky API, never ask for authorization, and never post
+ * We never use a Twitter or Bluesky API, never ask for authorization, and never post
  * anything. Every invitation ends at a prefilled composer the user has to read,
  * possibly edit, and submit themselves.
  */
@@ -46,10 +46,10 @@ export interface InviteContext {
 export const MAWKINGBIRD_URL = 'https://mawkingbird.com';
 
 /**
- * X and Bluesky composer limits, for the local estimate shown on each card.
+ * Twitter and Bluesky composer limits, for the local estimate shown on each card.
  *
  * An estimate is all it can be: both networks count links as a fixed weight
- * rather than by length (and X's is neither published nor stable), so the
+ * rather than by length (and Twitter's is neither published nor stable), so the
  * composer is always the final authority. We warn rather than block.
  */
 export const INVITE_LIMITS: Record<InviteNetwork, number> = { x: 280, bluesky: 300 };
@@ -146,7 +146,7 @@ export function renderInvite(template: string, context: InviteContext): string {
  * The prefilled-composer URL for a rendered invitation.
  *
  * The whole post goes in `text`, and nothing else does. Both networks accept a
- * separate `url` (and X a separate `hashtags`), but every link and tag is
+ * separate `url` (and Twitter a separate `hashtags`), but every link and tag is
  * already in the body — supplying them twice is how you end up with a duplicated
  * URL in the composer, and it would make the preview on the card a lie.
  */
@@ -159,7 +159,7 @@ export function inviteIntentUrl(network: InviteNetwork, text: string): string {
 }
 
 /**
- * Ten ways to ask your X followers to come over, in rough order of how safe
+ * Ten ways to ask your Twitter followers to come over, in rough order of how safe
  * they are to post: plainest first, novelty last.
  *
  * The hashtag sets are deliberately uneven. Ten posts carrying an identical
@@ -193,7 +193,7 @@ ${MAWKINGBIRD_URL}
     id: 'x-follow-me',
     network: 'x',
     title: 'Follow me',
-    template: `I’d love to see more of my X friends on Mastodon. It takes a couple of minutes to try.
+    template: `I’d love to see more of my Twitter friends on Mastodon. It takes a couple of minutes to try.
 
 Follow me at {profileUrl}
 
@@ -225,7 +225,7 @@ Come try it: ${MAWKINGBIRD_URL}
     id: 'x-friendly-migration',
     network: 'x',
     title: 'Friendly migration',
-    template: `You don’t have to quit X to try Mastodon. Make an account, follow a few people, and see whether you like it.
+    template: `You don’t have to quit Twitter to try Mastodon. Make an account, follow a few people, and see whether you like it.
 
 ${MAWKINGBIRD_URL}
 

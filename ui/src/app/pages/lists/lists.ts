@@ -71,7 +71,7 @@ export class Lists implements OnInit {
    * unsubscribing anywhere updates this list with no reload.
    */
   protected rssFeeds = this.rssSubs.feeds;
-  /** Locally-followed X accounts. Empty (and the section hidden) unless set up. */
+  /** Locally-followed Twitter accounts. Empty (and the section hidden) unless set up. */
   protected twitterFollows = this.twitterFollowStore.follows;
 
   protected lists = signal<UserList[]>([]);

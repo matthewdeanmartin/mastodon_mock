@@ -139,16 +139,16 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
   },
   {
     id: 'twitter',
-    label: 'X (Twitter)',
+    label: 'Twitter',
     emoji: '𝕏',
-    pitch: 'Read public X posts, so the friends who never left stay in your reading.',
+    pitch: 'Read public tweets, so the friends who never left stay in your reading.',
     // The key belongs to whoever pays for the API credits, not to a persona —
     // same reasoning as OpenRouter and the CORS proxy. See TwitterSettings. The
     // *follows* built on top of it are account-scoped; the key is not.
     scope: 'browser',
     enables: [
-      'Follow public X accounts and read their posts here',
-      'Read-only: no X login, and nothing you do is sent to X',
+      'Follow public Twitter accounts and read their posts here',
+      'Read-only: no Twitter login, and nothing you do is sent to Twitter',
       'Needs your own API key and a CORS proxy',
     ],
   },

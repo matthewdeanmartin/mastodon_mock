@@ -39,6 +39,28 @@ export class TwitterApi {
   private transport = inject(TwitterTransport);
 
   /**
+   * What is left on the prepaid balance.
+   *
+   * The one call here that is *about* the account rather than about X, and the
+   * only honest answer to "how much have I got left". {@link TwitterUsage}
+   * counts requests this browser made, which is a different number: it cannot
+   * see spending from another device, and it counts requests rather than the
+   * credits each one actually cost.
+   *
+   * Costs nothing measurable — it is an account endpoint, not a data one — but
+   * it still goes through the proxy like everything else, because the service
+   * sends no `Access-Control-Allow-Origin` on it either.
+   *
+   * Returns null rather than throwing when the shape is unrecognisable: a
+   * missing balance should blank a display, never break the page it sits on.
+   */
+  getBalance(): Observable<TwitterBalance | null> {
+    return this.transport
+      .request<unknown>({ path: '/oapi/my/info' })
+      .pipe(map((body) => parseBalance(body)));
+  }
+
+  /**
    * Look up a profile by handle.
    *
    * Costs one request. The caller should cache the resulting numeric id: every
@@ -142,4 +164,55 @@ export class TwitterApi {
 /** Handles are stored and sent without the `@`, however the user typed them. */
 export function stripAt(username: string): string {
   return username.trim().replace(/^@+/, '');
+}
+
+/** What is left on the account, as the service reports it. */
+export interface TwitterBalance {
+  /** Credits bought with money. */
+  recharge: number;
+  /** Free/promotional credits, spent first in practice. */
+  bonus: number;
+  /** What either kind buys, combined — the number worth showing. */
+  total: number;
+}
+
+/**
+ * Read a balance out of `/oapi/my/info`.
+ *
+ * Measured shape, 2026-08-01: `{"recharge_credits":0,"total_bonus_credits":4680}`
+ * — a *fifth* envelope from this API, with no `status` wrapper and no `data`.
+ * Both fields are treated as optional because a plan change could plausibly
+ * rename or drop either, and a missing balance must blank the display rather
+ * than break the connector page.
+ */
+export function parseBalance(body: unknown): TwitterBalance | null {
+  if (typeof body !== 'object' || body === null) {
+    return null;
+  }
+  const record = body as Record<string, unknown>;
+  const recharge = record['recharge_credits'];
+  const bonus = record['total_bonus_credits'];
+  if (typeof recharge !== 'number' && typeof bonus !== 'number') {
+    return null;
+  }
+  const rechargeCredits = typeof recharge === 'number' ? recharge : 0;
+  const bonusCredits = typeof bonus === 'number' ? bonus : 0;
+  return {
+    recharge: rechargeCredits,
+    bonus: bonusCredits,
+    total: rechargeCredits + bonusCredits,
+  };
+}
+
+/**
+ * Timeline pages a credit balance buys.
+ *
+ * One page measured at 6 credits (roadmap §0). Expressed in pages rather than
+ * credits because "4,680 credits" means nothing to a reader, while "about 780
+ * refreshes" is a decision they can act on.
+ */
+export const CREDITS_PER_TIMELINE_PAGE = 6;
+
+export function timelinePagesRemaining(total: number): number {
+  return Math.floor(total / CREDITS_PER_TIMELINE_PAGE);
 }

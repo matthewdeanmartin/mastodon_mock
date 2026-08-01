@@ -73,7 +73,7 @@ describe('Invites', () => {
     isAnonymous = false;
   });
 
-  it('shows ten X invitations, each with the text visible and a composer link', () => {
+  it('shows ten Twitter invitations, each with the text visible and a composer link', () => {
     const fixture = setUp();
     expect(cards(fixture)).toHaveLength(10);
     expect(boxes(fixture)).toHaveLength(10);
@@ -202,7 +202,7 @@ describe('Invites', () => {
 
     const card = cards(fixture)[0];
     expect(card.querySelector('.count')!.textContent).toContain('281/280');
-    expect(card.querySelector('.warn')!.textContent).toContain('Longer than X');
+    expect(card.querySelector('.warn')!.textContent).toContain('Longer than Twitter');
     // Still openable — the composer is the final authority on length.
     expect(card.querySelector('a.btn')!.getAttribute('href')).toContain('x.com/intent/post');
   });
@@ -223,7 +223,7 @@ describe('Invites', () => {
     const fixture = setUp();
     const label = cards(fixture)[0].querySelector('a.btn')!.getAttribute('aria-label');
     const title = cards(fixture)[0].querySelector('h2')!.textContent;
-    expect(label).toBe(`Post “${title}” on X`);
+    expect(label).toBe(`Post “${title}” on Twitter`);
   });
 
   it('copies exactly what the card shows', async () => {

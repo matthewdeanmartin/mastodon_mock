@@ -1,7 +1,7 @@
 <h1 class="page-title">Invite people to Mastodon</h1>
 <p class="muted page-intro">
   Invite your friends elsewhere to come find you on Mastodon. Pick a message, edit it here if you
-  like, then post it on X or Bluesky. Mawkingbird doesn’t connect to either account — the button
+  like, then post it on Twitter or Bluesky. Mawkingbird doesn’t connect to either account — the button
   just opens their composer with the text filled in, and you send it.
 </p>
 
@@ -15,7 +15,7 @@
     [class.active]="network() === 'x'"
     (click)="setNetwork('x')"
   >
-    Twitter (X)
+    Twitter
   </button>
   <button
     class="tab"
@@ -33,7 +33,7 @@
 <div class="invite-intro" role="tabpanel" [attr.aria-labelledby]="'invite-tab-' + network()">
   @if (network() === 'x') {
     <p class="muted small">
-      These ask people to join Mastodon and come find you. Your X followers probably don’t have a
+      These ask people to join Mastodon and come find you. Your Twitter followers probably don’t have a
       fediverse account yet, so each one links somewhere they can start.
     </p>
   } @else {
@@ -164,7 +164,7 @@
 
       @if (card.overLimit) {
         <p class="warn small">
-          Longer than {{ card.variation.network === 'x' ? 'X' : 'Bluesky' }} normally allows. Both
+          Longer than {{ card.variation.network === 'x' ? 'Twitter' : 'Bluesky' }} normally allows. Both
           networks count links their own way, so this is an estimate — but consider dropping a
           sentence. Keep the profile link if you can; it’s the part that helps people find you.
         </p>
@@ -179,7 +179,7 @@
           [attr.aria-label]="postLabel(card)"
           (click)="onIntentOpen(card)"
         >
-          {{ card.variation.network === 'x' ? 'Post on X' : 'Post on Bluesky' }} ↗
+          {{ card.variation.network === 'x' ? 'Post on Twitter' : 'Post on Bluesky' }} ↗
         </a>
         <button class="btn btn-outline" type="button" (click)="copy(card)">Copy text</button>
         @if (card.edited) {

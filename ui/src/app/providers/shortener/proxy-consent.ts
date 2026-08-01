@@ -9,7 +9,7 @@ import { ShortenerId } from './shortener-provider';
  * ## Why this still exists
  *
  * The consent machinery was originally written here, keyed to `ShortenerId`.
- * The X data services need exactly the same thing — a recorded, revocable,
+ * The Twitter data services need exactly the same thing — a recorded, revocable,
  * per-`(connector, proxy)` grant — so the implementation moved to
  * `providers/proxy-consent-store.ts` and widened its key type.
  *
@@ -71,7 +71,7 @@ export class ShortenerProxyConsent {
    * Withdraw shortener consents — one provider's, or all of them.
    *
    * Scoped to shorteners even in the "all" case. Disconnecting the link
-   * shortener is not a statement about the user's X data connection.
+   * shortener is not a statement about the user's Twitter data connection.
    */
   revokeAll(shortener?: ShortenerId): void {
     if (shortener) {

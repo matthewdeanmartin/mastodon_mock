@@ -55,7 +55,7 @@ describe('toAccount', () => {
 
   it('namespaces the id and marks the domain in acct', () => {
     expect(account.id).toBe('twitter:@jack');
-    // So nothing mistakes an X account for a local one.
+    // So nothing mistakes a Twitter account for a local one.
     expect(account.acct).toBe('jack@x.com');
     expect(account.url).toBe('https://x.com/jack');
   });
@@ -116,7 +116,7 @@ describe('toStatus', () => {
 
   it('builds a permalink when the provider sends neither url field', () => {
     // A null url silently costs the post its "↗ Nitter" button, which is the
-    // only way out of the app for an X post — and the id and handle needed to
+    // only way out of the app for a tweet — and the id and handle needed to
     // construct the link are required fields we already have.
     const status = toStatus({
       id: '123',

@@ -379,7 +379,7 @@ export const routes: Routes = [
         path: 'starter-kits',
         loadComponent: () => import('./pages/starter-kits/starter-kits').then((m) => m.StarterKits),
       },
-      // Outbound recruiting: prewritten posts for X and Bluesky. Available to
+      // Outbound recruiting: prewritten posts for Twitter and Bluesky. Available to
       // Anonymous too — the Bluesky pitch ("no account needed") is exactly what
       // someone browsing anonymously is living proof of.
       {

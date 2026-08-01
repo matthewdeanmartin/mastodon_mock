@@ -192,7 +192,7 @@ describe('TwitterFeed', () => {
       getUserPosts.mockImplementation(() => {
         call++;
         return call === 2
-          ? throwError(() => new Error('Rate-limited — either by CORS.SH or by the X data service.'))
+          ? throwError(() => new Error('Rate-limited — either by CORS.SH or by the Twitter data service.'))
           : of(page([status('1')]));
       });
       const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c', 'd'])));
@@ -203,7 +203,7 @@ describe('TwitterFeed', () => {
 
     it('stops when the daily limit is hit mid-batch', async () => {
       getUserPosts.mockReturnValue(
-        throwError(() => new Error('You have reached your daily limit of 200 X data requests.')),
+        throwError(() => new Error('You have reached your daily limit of 200 Twitter data requests.')),
       );
       const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c'])));
       expect(result.stopped).toBe(true);

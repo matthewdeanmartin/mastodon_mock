@@ -697,11 +697,11 @@ export class StatusCard {
    *
    * X is the first of these and the reason this exists. Its posts carry genuine
    * reply, repost and like counts — 244 likes, 77k views on a real NASA post —
-   * but no viewer of this app can add to them, because every write on X needs an
-   * authenticated X account this app deliberately never asks for.
+   * but no viewer of this app can add to them, because every write on Twitter needs an
+   * authenticated Twitter account this app deliberately never asks for.
    *
    * Before this, those numbers were invisible: the counts render under
-   * `caps.favourite`/`caps.reblog`, which are `false` for X precisely *because*
+   * `caps.favourite`/`caps.reblog`, which are `false` for Twitter precisely *because*
    * the actions are impossible. So the capability flag was doing two jobs —
    * "can you press this" and "is there a number worth showing" — and the second
    * answer was wrong. RSS and paste genuinely have nothing to show; X has a lot.
@@ -711,7 +711,7 @@ export class StatusCard {
   }
 
   /**
-   * This post on Nitter, or null when it is not an X post.
+   * This post on Nitter, or null when it is not a tweet.
    *
    * Null rather than a fallback so the template can keep "↗ Open original" for
    * every other foreign provider — an RSS item's original site is the whole
@@ -739,7 +739,7 @@ export class StatusCard {
       provider === 'mastodon' ||
       provider === 'bluesky' ||
       provider === 'rss' ||
-      // X posts open a thread view backed by `tweet/replies`. Costs one request
+      // tweets open a thread view backed by `tweet/replies`. Costs one request
       // per open, which is why the thread page shows the price and does not
       // walk ancestors — see spec/ui/twitter_remaining_roadmap.md §2.
       provider === 'twitter'
@@ -797,7 +797,7 @@ export class StatusCard {
     if (this.display.provider === 'rss' && id.startsWith('rss:') && !id.includes('::')) {
       return ['/accounts', id];
     }
-    // X accounts already have a working profile page (the Sprint 4 screen);
+    // Twitter accounts already have a working profile page (the Sprint 4 screen);
     // nothing linked to it, which made avatars and display names dead text.
     if (this.display.provider === 'twitter' && id.startsWith('twitter:@')) {
       return ['/accounts', id];
@@ -1043,7 +1043,7 @@ export class StatusCard {
    *
    * The test is "does the home server know this post", not "am I signed in".
    * Those coincide for Mastodon posts and come apart for every foreign
-   * provider: a signed-in reader bookmarking an X post used to send
+   * provider: a signed-in reader bookmarking a tweet used to send
    * `twitter:2083…` to `/api/v1/statuses/{id}/bookmark`, which 404s and loses
    * the bookmark silently. Anonymous readers got a working local bookmark for
    * the same post, so signing in made the feature worse — parity inverted.
@@ -1143,7 +1143,7 @@ export class StatusCard {
    *
    * Without this the 🌐 button was hidden (it needs `canUseServerActions`) and
    * the 🤖🌐 button was hidden too (it needed anonymous mode), so a signed-in
-   * reader looking at an X post got no translate control at all — the
+   * reader looking at a tweet got no translate control at all — the
    * capability vanished rather than being merely unavailable.
    */
   protected get serverCannotTranslate(): boolean {

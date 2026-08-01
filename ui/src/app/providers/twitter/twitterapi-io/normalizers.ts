@@ -23,7 +23,7 @@ import {
  * and delete in the timeline from colliding with real Mastodon ids, and it lets
  * `StatusCard` route an interaction back to the right provider.
  *
- * X ids exceed `Number.MAX_SAFE_INTEGER` (spec §8.1), so they are never parsed
+ * Twitter ids exceed `Number.MAX_SAFE_INTEGER` (spec §8.1), so they are never parsed
  * as numbers anywhere in this file — not even transiently.
  */
 
@@ -91,7 +91,7 @@ function link(href: string, text: string, className?: string): string {
  * splice by the `indices` X provides, this rewrites by token. The offsets are
  * UTF-16-hostile — they are code *point* indices into a string containing
  * emoji and astral characters, so slicing a JavaScript string with them
- * misaligns the moment a post contains an emoji, which for X posts is most of
+ * misaligns the moment a post contains an emoji, which for tweets is most of
  * them. Matching `@handle`, `#tag` and `t.co` links textually is immune to that
  * entire class of bug, and produces the same result.
  *
@@ -200,7 +200,7 @@ export function toAccount(user: WireUser): Account {
     id: accountId(username),
     username,
     // `acct` carries the domain so the UI renders `@handle@x.com` and nobody
-    // mistakes an X account for a local one.
+    // mistakes a Twitter account for a local one.
     acct: `${username}@x.com`,
     display_name: user.name ?? username,
     note: renderNote(user),
@@ -280,7 +280,7 @@ export function toStatus(tweet: WireTweet, depth = 0): Status {
   const media = tweet.extendedEntities?.media ?? [];
 
   // A retweet is Mastodon's `reblog`: the outer status is the boost, the inner
-  // one is the post. X's "RT @user: …" text is a rendering of the same thing,
+  // one is the post. Twitter's "RT @user: …" text is a rendering of the same thing,
   // so it is replaced by the real nested post rather than shown twice.
   const reblog =
     depth < 2 && tweet.retweeted_tweet ? toStatus(tweet.retweeted_tweet, depth + 1) : null;
@@ -303,7 +303,7 @@ export function toStatus(tweet: WireTweet, depth = 0): Status {
     // Both are required fields the guards already enforce, so the canonical
     // permalink is always derivable — and returning null here silently costs
     // the post its "↗ Nitter" link, which is the only way out of the app for an
-    // X post. Observed with a response that carried neither `url` nor
+    // tweet. Observed with a response that carried neither `url` nor
     // `twitterUrl`.
     url: tweet.url ?? tweet.twitterUrl ?? permalink(author.username, tweet.id),
     account: author,

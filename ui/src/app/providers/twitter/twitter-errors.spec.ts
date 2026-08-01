@@ -111,14 +111,42 @@ describe('toTwitterApiError', () => {
     expect(error.message).toMatch(/credit/i);
   });
 
-  it('names both possible throttlers on a proxied 429', () => {
-    // Observed live: a free CORS proxy throttles long before the data service
-    // does, and the fixes differ (wait vs. upgrade). Blaming only the service
-    // sends the user to the wrong dashboard.
+  it('blames the proxy on a bare proxied 429, and says nothing was spent', () => {
+    // Which side threw the 429 is answerable rather than a coin flip: a proxy
+    // refusing on its own behalf sends its own error page with no provider
+    // body. Saying so matters because the request never reached the service, so
+    // no credits were used — and the earlier "either X or Y" wording left the
+    // user unable to tell whether they had just paid for a failure.
     const error = toTwitterApiError(http(429), SOURCE, { viaProxy: true, proxyLabel: 'CORS.SH' });
     expect(error.message).toContain('CORS.SH');
-    expect(error.message).toMatch(/X data service/);
-    expect(error.message).toMatch(/wait a minute/i);
+    expect(error.message).toMatch(/nothing was spent/i);
+  });
+
+  it('blames the data service when the 429 carries a provider message', () => {
+    // The service's own refusal comes with a body. That is the discriminator.
+    const error = toTwitterApiError(
+      http(429, { status: 'error', message: 'Too many requests' }),
+      SOURCE,
+      { viaProxy: true, proxyLabel: 'CORS.SH' },
+    );
+    expect(error.message).toMatch(/Twitter data service is rate-limiting/i);
+    expect(error.message).not.toContain('CORS.SH');
+  });
+
+  it('reads a throttling 403 as throttling, not as a missing key', () => {
+    // Measured 2026-08-01: TwitterAPI.io throttles by answering
+    //   403 {"error":"Forbidden","message":"API key required..."}
+    // on a key that IS being sent and DOES have credits — the same key answered
+    // /oapi/my/info moments earlier, and a direct curl with no proxy failed
+    // identically. Passing that message through sends someone to re-paste a key
+    // that was never the problem.
+    const error = toTwitterApiError(
+      http(403, { error: 'Forbidden', message: 'API key required. Please include x-api-key' }),
+      SOURCE,
+    );
+    expect(error.code).toBe('RATE_LIMITED');
+    expect(error.message).toMatch(/throttles/i);
+    expect(error.message).toMatch(/balance is unaffected/i);
   });
 
   it('honours Retry-After on a 429', () => {

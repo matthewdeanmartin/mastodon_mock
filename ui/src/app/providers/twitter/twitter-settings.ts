@@ -9,7 +9,7 @@ import {
 import { TwitterSourceEntry, TwitterSourceId, twitterSourceEntry } from './twitter-source';
 
 /**
- * Which X data service this browser uses, and the key for it.
+ * Which Twitter data service this browser uses, and the key for it.
  *
  * Modelled directly on {@link ShortenerSettings}, including the split storage:
  *
@@ -151,10 +151,10 @@ export class TwitterSettings implements ExpiringConnection {
   blockedReason(): string | null {
     const entry = this.chosen();
     if (!entry) {
-      return 'No X data service is connected yet.';
+      return 'No Twitter data service is connected yet.';
     }
     if (!this.hasKey(entry.id)) {
-      return `Add your ${entry.label} API key to start reading X data.`;
+      return `Add your ${entry.label} API key to start reading Twitter data.`;
     }
     return null;
   }

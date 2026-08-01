@@ -1,7 +1,7 @@
 import { computed, Injectable, signal } from '@angular/core';
 
 /**
- * What the X data connector has spent, and the limits it spends against.
+ * What the Twitter data connector has spent, and the limits it spends against.
  *
  * ## Why this exists when nothing else in the app has it
  *

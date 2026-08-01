@@ -8,7 +8,12 @@ import { CorsProxyEntry } from '../../../../providers/cors-proxy/cors-proxy-cata
 import { ProxyConsent } from '../../../../providers/proxy-consent-store';
 import { TwitterConsentDialog } from '../../../../providers/twitter/twitter-consent-dialog/twitter-consent-dialog';
 import { Account } from '../../../../models';
-import { TwitterApi, stripAt } from '../../../../providers/twitter/twitter-api';
+import {
+  TwitterApi,
+  TwitterBalance,
+  stripAt,
+  timelinePagesRemaining,
+} from '../../../../providers/twitter/twitter-api';
 import {
   TwitterFollows,
   TWITTER_FOLLOW_COMFORTABLE,
@@ -30,7 +35,7 @@ import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
 
 /**
- * Settings → Connections → X (Twitter).
+ * Settings → Connections → Twitter.
  *
  * ## The flow this page has to walk someone through
  *
@@ -255,7 +260,7 @@ export class ConnectionTwitter implements OnInit {
     this.consentPrompt.set(null);
     if (prompt) {
       this.error.set(
-        `Nothing was sent through ${prompt.proxy.label}. Without a proxy, X data cannot be read ` +
+        `Nothing was sent through ${prompt.proxy.label}. Without a proxy, Twitter data cannot be read ` +
           `from a browser at all — so this connection stays off until you either consent or ` +
           `configure a proxy you trust.`,
       );
@@ -314,7 +319,7 @@ export class ConnectionTwitter implements OnInit {
   protected async lookup(): Promise<void> {
     const handle = stripAt(this.handleDraft());
     if (!handle) {
-      this.followError.set('Type an X handle first, for example @NASA.');
+      this.followError.set('Type a Twitter handle first, for example @NASA.');
       return;
     }
     if (this.follows.has(handle)) {
@@ -323,7 +328,7 @@ export class ConnectionTwitter implements OnInit {
     }
     if (this.follows.atLimit()) {
       this.followError.set(
-        `You can follow up to ${this.followLimit} X accounts. Remove one to add another.`,
+        `You can follow up to ${this.followLimit} Twitter accounts. Remove one to add another.`,
       );
       return;
     }
@@ -336,7 +341,7 @@ export class ConnectionTwitter implements OnInit {
       this.lookupResult.set(await firstValueFrom(this.twitterApi.getProfile(handle)));
     } catch (error: unknown) {
       this.followError.set(
-        error instanceof Error ? error.message : `Could not find @${handle} on X.`,
+        error instanceof Error ? error.message : `Could not find @${handle} on Twitter.`,
       );
     } finally {
       this.lookingUp.set(false);
@@ -411,6 +416,50 @@ export class ConnectionTwitter implements OnInit {
    * two actions below.
    */
   protected readonly storedCount = signal(0);
+
+  /**
+   * Credits left on the account, as the *service* reports them.
+   *
+   * Deliberately not derived from {@link TwitterUsage}, which counts requests
+   * this browser made. That number cannot see spending from another device and
+   * counts calls rather than the credits each one cost, so it answers a
+   * different question. This is the one a reader means by "how much have I got
+   * left".
+   *
+   * Fetched on demand rather than on load: it is free, but it still needs the
+   * proxy, and a connector page that fires a request just by being opened is
+   * the pattern this connector avoids everywhere else.
+   */
+  protected readonly balance = signal<TwitterBalance | null>(null);
+  protected readonly balanceLoading = signal(false);
+  protected readonly balanceError = signal<string | null>(null);
+
+  /** Credits expressed as something actionable — see CREDITS_PER_TIMELINE_PAGE. */
+  protected readonly pagesRemaining = computed(() =>
+    timelinePagesRemaining(this.balance()?.total ?? 0),
+  );
+
+  protected async checkBalance(): Promise<void> {
+    if (this.balanceLoading()) {
+      return;
+    }
+    this.balanceLoading.set(true);
+    this.balanceError.set(null);
+    try {
+      this.balance.set(await firstValueFrom(this.twitterApi.getBalance()));
+      if (!this.balance()) {
+        this.balanceError.set(
+          'The service answered but did not report a balance. It may have changed its account API.',
+        );
+      }
+    } catch (error: unknown) {
+      this.balanceError.set(
+        error instanceof Error ? error.message : 'Could not read the balance.',
+      );
+    } finally {
+      this.balanceLoading.set(false);
+    }
+  }
 
   /** Forget every saved timeline. Costs nothing; spends nothing. */
   protected async clearCache(): Promise<void> {

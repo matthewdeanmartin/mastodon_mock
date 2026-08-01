@@ -12,7 +12,7 @@ import { TwitterSourceId } from './twitter-source';
 import { TwitterUsage } from './twitter-usage';
 
 /**
- * The one place an X data request is actually sent.
+ * The one place a Twitter data request is actually sent.
  *
  * ## Why this is proxy-*first*, unlike every other transport here
  *
@@ -53,8 +53,8 @@ export class TwitterProxyRequired extends Error {
   ) {
     super(
       noProxyConfigured
-        ? 'X data services refuse direct browser requests, and no CORS proxy is configured.'
-        : 'Sending your X API key through the CORS proxy needs your consent.',
+        ? 'Twitter data services refuse direct browser requests, and no CORS proxy is configured.'
+        : 'Sending your Twitter API key through the CORS proxy needs your consent.',
     );
     this.name = 'TwitterProxyRequired';
   }
@@ -91,7 +91,7 @@ export class TwitterTransport {
         () =>
           new TwitterApiError(
             'INVALID_CONFIGURATION',
-            this.settings.blockedReason() ?? 'No X data service is configured.',
+            this.settings.blockedReason() ?? 'No Twitter data service is configured.',
             this.settings.activeId() ?? 'twitterapi-io',
           ),
       );
@@ -104,8 +104,8 @@ export class TwitterTransport {
         () =>
           new TwitterApiError(
             'INVALID_CONFIGURATION',
-            `You have reached your daily limit of ${this.usage.hardLimit()} X data requests. ` +
-              'It resets at midnight, or you can raise it on the X connector page.',
+            `You have reached your daily limit of ${this.usage.hardLimit()} Twitter data requests. ` +
+              'It resets at midnight, or you can raise it on the Twitter connector page.',
             config.entry.id,
           ),
       );
@@ -207,7 +207,7 @@ export class TwitterTransport {
         () =>
           new TwitterApiError(
             'INVALID_CONFIGURATION',
-            this.settings.blockedReason() ?? 'No X data service is configured.',
+            this.settings.blockedReason() ?? 'No Twitter data service is configured.',
             this.settings.activeId() ?? 'twitterapi-io',
           ),
       );

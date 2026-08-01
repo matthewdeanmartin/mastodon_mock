@@ -1,11 +1,11 @@
 <a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
 
 <div class="spage-head">
-  <h1>𝕏 X / Twitter</h1>
+  <h1>🐦 Twitter</h1>
   <p>
-    Read public posts from X, so the people who never left don't drop out of your reading. Follow
-    accounts by handle and their posts show up here — no X account needed, and nothing you do here
-    touches X itself.
+    Read public posts from Twitter, so the people who never left don't drop out of your reading. Follow
+    accounts by handle and their posts show up here — no Twitter account needed, and nothing you do here
+    touches Twitter itself.
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
@@ -18,8 +18,8 @@
   </p>
   <ul>
     <li>
-      <strong>X has no free API</strong>, so Mawkingbird reads through a third-party service that
-      resells public X data. You bring your own key and pay them per request.
+      <strong>Twitter has no free API</strong>, so Mawkingbird reads through a third-party service that
+      resells public Twitter data. You bring your own key and pay them per request.
     </li>
     <li>
       <strong>Those services refuse web browsers</strong>, so every request also has to go through
@@ -27,12 +27,12 @@
     </li>
     <li>
       <strong>It is read-only.</strong> You can read posts and follow accounts locally. You cannot
-      like, repost or reply — those need a real X login, which this app never asks for.
+      like, repost or reply — those need a real Twitter login, which this app never asks for.
     </li>
   </ul>
   <p class="muted small">
-    "Follow" here means a subscription stored in this browser. It is not a follow on X, and nobody
-    on X is notified.
+    "Follow" here means a subscription stored in this browser. It is not a follow on Twitter, and nobody
+    on Twitter is notified.
   </p>
 </section>
 
@@ -200,7 +200,33 @@
         <strong>{{ usage.remainingToday() }}</strong>
         <span class="muted small">left before today's limit</span>
       </span>
+      <!-- The only figure here that is not this browser's own bookkeeping: it
+           comes from the service, so it also counts spending from other devices
+           and prices each request in credits rather than in calls. -->
+      @if (balance(); as credits) {
+        <span class="spend-stat">
+          <strong>{{ credits.total | number }}</strong>
+          <span class="muted small">
+            credits left · about {{ pagesRemaining() | number }} refreshes
+          </span>
+        </span>
+      }
     </div>
+
+    <div class="actions">
+      <button
+        class="btn btn-outline btn-small"
+        type="button"
+        [disabled]="balanceLoading()"
+        (click)="checkBalance()"
+      >
+        {{ balanceLoading() ? 'Checking…' : 'Check balance' }}
+      </button>
+      <span class="muted small">Free — this is an account call, not a data one.</span>
+    </div>
+    @if (balanceError(); as message) {
+      <p class="feed-error">{{ message }}</p>
+    }
 
     @if (usage.atHardLimit()) {
       <p class="feed-error">
@@ -261,17 +287,17 @@
 
   @if (!canFollow()) {
     <p class="muted">
-      Finish the setup above first. Once the connection works you can follow X accounts here.
+      Finish the setup above first. Once the connection works you can follow Twitter accounts here.
     </p>
   } @else {
     <p class="muted small">
       Following stores the handle in this browser so their posts show up on your Feeds page. It is
-      not a follow on X — nobody is notified. Up to {{ followLimit }} accounts.
+      not a follow on Twitter — nobody is notified. Up to {{ followLimit }} accounts.
     </p>
 
     @if (!lookupResult()) {
       <label class="field">
-        <span class="field-label">X handle</span>
+        <span class="field-label">Twitter handle</span>
         <input
           type="text"
           autocomplete="off"
@@ -319,7 +345,7 @@
               {{ lookupResult()!.statuses_count | number }} posts
             </span>
             <a [href]="lookupResult()!.url" target="_blank" rel="noopener noreferrer" class="small">
-              View on X ↗
+              View on Twitter ↗
             </a>
           </div>
         </div>
@@ -404,7 +430,7 @@
       </ul>
     } @else {
       <p class="muted small">
-        No accounts yet. Add the people you would miss if you stopped opening X.
+        No accounts yet. Add the people you would miss if you stopped opening Twitter.
       </p>
     }
   }

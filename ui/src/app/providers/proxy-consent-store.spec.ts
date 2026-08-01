@@ -101,7 +101,7 @@ describe('ShortenerProxyConsent facade', () => {
     expect(shortener.all().map((r) => r.subject)).toEqual(['dub']);
   });
 
-  it('revokeAll leaves the X data consent alone', () => {
+  it('revokeAll leaves the Twitter data consent alone', () => {
     // Disconnecting the link shortener says nothing about the user's X
     // connection, and silently revoking it would be a surprise.
     shortener.grant('dub', 'corssh');

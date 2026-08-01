@@ -139,7 +139,7 @@ describe('SettingsConnections (catalog)', () => {
     // the same policy as the pasted tokens, plus the link-shortener keys (which
     // can create and delete links on a domain the user publishes under), plus
     // the optional Pastepile key (pasted on the Pastes page, but a stored
-    // secret all the same), plus the X data-service key (which spends a prepaid
+    // secret all the same), plus the Twitter data-service key (which spends a prepaid
     // credit balance).
     const governed = govern.mock.calls[0][0];
     expect(governed).toHaveLength(8);

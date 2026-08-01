@@ -29,9 +29,9 @@ import { TwitterSourceId } from './twitter/twitter-source';
  *   Someone may accept the risk for a throwaway T.LY token and refuse it for a
  *   key that spends money.
  *
- * ## Why the X data services raised the stakes
+ * ## Why the Twitter data services raised the stakes
  *
- * The shortener case disclosed a key that creates and deletes links. An X data
+ * The shortener case disclosed a key that creates and deletes links. A Twitter data
  * service key **spends the user's credit balance**, and — because every lookup
  * goes through the proxy — the proxy operator also learns *every profile,
  * search and post the user reads*. That is a reading-history disclosure the

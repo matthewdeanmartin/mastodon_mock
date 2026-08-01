@@ -318,9 +318,9 @@ describe('Thread', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('article.reader')).not.toBeNull();
   });
 
-  describe('reader mode on a read-only X post', () => {
+  describe('reader mode on a read-only tweet', () => {
     /**
-     * A thread page showing one X post, with the provider stubbed.
+     * A thread page showing one tweet, with the provider stubbed.
      *
      * The focus post is served from the feed cache exactly as it is in the app,
      * so no request is made — which is also the behaviour worth protecting.
@@ -347,7 +347,7 @@ describe('Thread', () => {
 
     it('offers no reply, boost or favourite buttons', async () => {
       // Reader mode chose its action row with `isRss() || isAnonymousPublic()`
-      // — a denylist — so X posts, added long afterwards, landed in the
+      // — a denylist — so tweets, added long afterwards, landed in the
       // *writable* branch. Verified in a browser: a signed-in reader saw live
       // 💬/🔁/⭐ buttons and a composer for actions that cannot exist.
       const fixture = setUpTwitter();
@@ -382,7 +382,7 @@ describe('Thread', () => {
       expect(labels.some((text) => text.includes('Bookmark'))).toBe(true);
     });
 
-    it('does not offer "open in chat" for an account that exists only on X', async () => {
+    it('does not offer "open in chat" for an account that exists only on Twitter', async () => {
       const fixture = setUpTwitter();
       await fixture.whenStable();
       fixture.detectChanges();

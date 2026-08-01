@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Status } from '../../models';
 
 /**
- * A durable cache of fetched X timelines, in IndexedDB.
+ * A durable cache of fetched Twitter timelines, in IndexedDB.
  *
  * ## Why this exists
  *
@@ -41,7 +41,7 @@ import { Status } from '../../models';
  * Every failure path here resolves rather than rejecting. IndexedDB is
  * unavailable in Firefox private windows and can be blocked outright by storage
  * settings; in all such cases the correct behaviour is to degrade to the old
- * in-memory behaviour, not to break X support.
+ * in-memory behaviour, not to break Twitter support.
  */
 
 const DB_NAME = 'mockingbird_twitter';

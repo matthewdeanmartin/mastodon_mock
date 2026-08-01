@@ -74,7 +74,7 @@ describe('anonymousEntryUrl', () => {
 });
 
 describe('inviteIntentUrl', () => {
-  it('uses the X post intent with the whole post in text', () => {
+  it('uses the tweet intent with the whole post in text', () => {
     const url = new URL(inviteIntentUrl('x', 'hello #Mastodon'));
     expect(url.origin + url.pathname).toBe('https://x.com/intent/post');
     expect(url.searchParams.get('text')).toBe('hello #Mastodon');
@@ -93,7 +93,7 @@ describe('inviteIntentUrl', () => {
 });
 
 describe('the invitation inventory', () => {
-  it('offers ten X variations and at least six for Bluesky', () => {
+  it('offers ten Twitter variations and at least six for Bluesky', () => {
     expect(invitesFor('x')).toHaveLength(10);
     expect(invitesFor('bluesky').length).toBeGreaterThanOrEqual(6);
   });
@@ -156,7 +156,7 @@ describe('the invitation inventory', () => {
     }
   });
 
-  it('still gives every X invitation somewhere to go with no profile to show', () => {
+  it('still gives every Twitter invitation somewhere to go with no profile to show', () => {
     for (const invite of invitesFor('x')) {
       expect(renderInvite(invite.template, ANONYMOUS), invite.id).toContain(MAWKINGBIRD_URL);
     }

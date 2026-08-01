@@ -4,7 +4,7 @@ import { scopedKey } from '../../account-scope';
 const FOLLOWS_KEY_BASE = 'mockingbird_twitter_follows';
 
 /**
- * How many X accounts one Mastodon account may follow here.
+ * How many Twitter accounts one Mastodon account may follow here.
  *
  * Two hundred, which is deliberately the page size of the provider's
  * `user/followings` endpoint — so a bulk import of someone's real X following
@@ -42,12 +42,12 @@ export const TWITTER_FOLLOW_LIMIT = 200;
 export const TWITTER_FOLLOW_COMFORTABLE = 50;
 
 /**
- * One locally-followed X account.
+ * One locally-followed Twitter account.
  *
  * "Follow" here is a subscription stored in this browser. It is emphatically
- * *not* a follow on X: no request is made to X, nobody is notified, and the
+ * *not* a follow on Twitter: no request is made to Twitter, nobody is notified, and the
  * followed account cannot tell. The spec is explicit that following is a
- * mutation requiring an authenticated X session (§2.2), which this app never
+ * mutation requiring an authenticated Twitter session (§2.2), which this app never
  * asks for — so this is the honest thing the app can actually do.
  */
 export interface TwitterFollow {
@@ -91,7 +91,7 @@ function load(key: string): TwitterFollow[] {
 }
 
 /**
- * The X accounts this Mastodon account follows locally.
+ * The Twitter accounts this Mastodon account follows locally.
  *
  * ## Why this is account-scoped when the API key is not
  *
@@ -139,7 +139,7 @@ export class TwitterFollows {
     }
     if (this.atLimit()) {
       return (
-        `You can follow up to ${TWITTER_FOLLOW_LIMIT} X accounts here. ` +
+        `You can follow up to ${TWITTER_FOLLOW_LIMIT} Twitter accounts here. ` +
         'Unfollow someone to make room.'
       );
     }

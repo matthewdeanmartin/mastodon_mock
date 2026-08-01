@@ -386,8 +386,8 @@
         }
         @if (foreign) {
           @if (nitterLink; as nitter) {
-            <!-- X posts point at Nitter rather than x.com: no trackers, no
-                 login wall, and clicking through to X is the habit this
+            <!-- tweets point at Nitter rather than x.com: no trackers, no
+                 login wall, and clicking through to Twitter is the habit this
                  connector exists to avoid. The instance is configurable
                  because the public Nitter ecosystem is unstable. -->
             <a
@@ -395,7 +395,7 @@
               [href]="nitter"
               target="_blank"
               rel="noopener noreferrer"
-              title="Open on Nitter, a tracker-free front-end for X"
+              title="Open on Nitter, a tracker-free front-end for Twitter"
             >
               ↗ Nitter
             </a>
@@ -412,7 +412,7 @@
           }
         }
         <!-- `readOnlyStats` joins the anonymous case here so a signed-in reader
-             gets the same client-side tools on an X post that an anonymous one
+             gets the same client-side tools on a tweet that an anonymous one
              already got: bookmark, translate, and the ••• menu with local
              block/mute. None of these touch the origin server, so "this post is
              foreign" was never the right reason to withhold them. -->
