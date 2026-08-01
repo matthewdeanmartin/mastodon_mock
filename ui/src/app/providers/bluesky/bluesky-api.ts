@@ -6,6 +6,8 @@ import { BlueskySession } from './bluesky-session';
 import {
   BskyAuthorFeedFilter,
   BskyFacet,
+  BskyNotificationPage,
+  BskyPostView,
   BskyProfile,
   BskyThreadNode,
   BskyTimeline,
@@ -65,6 +67,47 @@ export class BlueskyApi {
       params = params.set('cursor', cursor);
     }
     return this.get<BskyTimeline>('app.bsky.feed.getAuthorFeed', params);
+  }
+
+  /**
+   * One page of notifications.
+   *
+   * Verified 2026-08-01 to answer at the `bsky.social` entryway, so no PDS
+   * resolution is needed — unlike chat, which is service-proxied and must hit
+   * the account's real PDS.
+   */
+  listNotifications(cursor: string | null): Observable<BskyNotificationPage> {
+    let params = new HttpParams().set('limit', '30');
+    if (cursor) {
+      params = params.set('cursor', cursor);
+    }
+    return this.get<BskyNotificationPage>('app.bsky.notification.listNotifications', params);
+  }
+
+  /** How many notifications have arrived since `updateSeen`. */
+  getUnreadCount(): Observable<{ count: number }> {
+    return this.get<{ count: number }>('app.bsky.notification.getUnreadCount', new HttpParams());
+  }
+
+  /** Mark everything up to now as seen, clearing the unread badge. */
+  updateSeen(seenAt = new Date().toISOString()): Observable<unknown> {
+    return this.request('app.bsky.notification.updateSeen', { seenAt });
+  }
+
+  /**
+   * Hydrate posts by at-uri, up to 25 per call.
+   *
+   * **Returns only what it finds, in its own order.** Nine uris yielded eight
+   * posts in live testing: one was a repost record rather than a post, and it
+   * was dropped with no error and no placeholder. Callers must key the result
+   * by uri, never by index.
+   */
+  getPosts(uris: string[]): Observable<{ posts: BskyPostView[] }> {
+    let params = new HttpParams();
+    for (const uri of uris) {
+      params = params.append('uris', uri);
+    }
+    return this.get<{ posts: BskyPostView[] }>('app.bsky.feed.getPosts', params);
   }
 
   /**

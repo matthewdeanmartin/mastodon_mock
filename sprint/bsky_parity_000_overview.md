@@ -1,7 +1,6 @@
 # Bluesky parity — roadmap
 
-Status: SPRINT 1 DONE (2026-08-01). Sprints 2–5 READY, awaiting the open
-questions at the bottom.
+Status: SPRINTS 1–2 DONE (2026-08-01). Sprints 3–5 READY.
 
 Goal: **the Bluesky experience in Mockingbird is the same experience as
 Mastodon** — same pages, same cards, same gestures — for everything a reader
@@ -34,21 +33,25 @@ rejected below.
    Established by `sprint/roadmap-providers.md`, upheld by the RSS, Twitter and
    anonymous providers.
 3. **Ids are namespaced.** `bsky:<did>` for accounts, `bsky:<at-uri>` for posts.
-4. **The entryway is not the PDS.** `bsky.social` answers AppView reads
-   (`getTimeline`, `getProfile`, search). Service-proxied and repo-write calls
-   need the account's real PDS — this already bit us on chat (see
+4. **The entryway is not the PDS.** `bsky.social` answers AppView reads.
+   Service-proxied calls need the account's real PDS — this bit us on chat (see
    `bsky-chat-pds` memory and the note on `BlueskyApi.get`). **Verify per
    endpoint as each sprint lands rather than assuming either way.**
+
+   Measured so far, all at the entryway with an app-password session:
+   `getTimeline`, `getProfile`, `getAuthorFeed`, `createRecord`/`deleteRecord`,
+   `listNotifications`, `getPosts` — **all fine**. Only `chat.bsky.convo.*` has
+   needed the real PDS. The rule is "verify", not "assume the worst".
 
 ## Sprint list
 
 | # | Theme | Demo at the end | Status |
 |---|---|---|---|
 | 1 | [Profile + follow](bsky_parity_001_profile_and_follow.md) | Click any bsky avatar → real profile, with a working Follow button | **DONE** |
-| 2 | [Notifications](bsky_parity_002_notifications.md) | A Bluesky tab on /notifications: likes, reposts, follows, replies, mentions, quotes | READY |
+| 2 | [Notifications](bsky_parity_002_notifications.md) | A Bluesky tab on /notifications: likes, reposts, follows, replies, mentions, quotes | **DONE** |
 | 3 | [Search](bsky_parity_003_search.md) | Search page finds bsky posts and accounts, with Bluesky's own filters | READY |
 | 4 | [People browser](bsky_parity_004_people_browser.md) | Followers/following tabs work on a bsky profile; follow from search results | READY |
-| 5 | [Feeds](bsky_parity_005_feeds.md) | Bluesky's custom feeds as first-class feeds in the Lists tab | READY — **has open questions** |
+| 5 | [Feeds + lists](bsky_parity_005_feeds.md) | Bluesky's custom feeds *and* curated lists, as two new sections on the Feeds tab | READY |
 
 Each sprint ends with something demoable on its own. They are ordered so that
 each one makes the previous more useful: profiles make search results clickable,
@@ -96,8 +99,15 @@ these corrected assumptions made in the initial assessment:
 - `searchPosts` warns its cursor "may not enable complete result set
   traversal", so paging must degrade gracefully rather than assert.
 
-## Open questions for the user
+## Product decisions (user, 2026-08-01)
 
-Sprint 5 (Feeds) is the one where Bluesky has something Mastodon does not, so it
-is the one where the plan needs a decision rather than a derivation. Questions
-are recorded at the top of that document.
+- **Bluesky feeds live on the Feeds tab, in their own section** — "as far as my
+  app is concerned they're yet another sort of feed". That is the existing
+  sectioned structure at `/feeds/lists`, not a new page.
+- **Feeds and lists are separate kinds**, because they genuinely are different
+  things: a feed is a third-party algorithm with no membership, a list is a
+  curated set of accounts. They differ in `memberOrigin`, so they render
+  differently. Two `ListSource` kinds, two sections.
+- **Deferred:** whether a *pinned* Bluesky feed should be able to feed the
+  merged home timeline. Sprint 5 reads `pinned` and sorts by it, and touches
+  nothing on /home, which keeps the option open either way.

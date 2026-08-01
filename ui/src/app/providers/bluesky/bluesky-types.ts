@@ -125,6 +125,45 @@ export interface BskyThreadNode {
   replies?: BskyThreadNode[];
 }
 
+// -------------------------------------------------------------- notifications
+
+/**
+ * One row of `app.bsky.notification.listNotifications`.
+ *
+ * `record` is the *notifying* record and varies with `reason`: a like record for
+ * `like`, the reply post itself for `reply`, a follow record for `follow`. For
+ * the reasons whose record is not the interesting post, `reasonSubject` names
+ * the post that is — see {@link BskyNotification.reasonSubject}.
+ */
+export interface BskyNotification {
+  uri: string;
+  cid: string;
+  author: BskyAuthor;
+  /**
+   * Why this arrived. `knownValues` in the lexicon, which in AT Protocol means
+   * "these are known, others are legal" — so this stays a plain string and the
+   * adapter has a default arm. A `repost-via-repost` turned up in the first 20
+   * notifications of a test account, so the long tail is not theoretical.
+   */
+  reason: string;
+  /**
+   * The post that was liked/reposted/replied to, when the reason implies one.
+   * Absent for `follow`. **Not always a post**: a `repost-via-repost` names a
+   * repost record, which `getPosts` will not return.
+   */
+  reasonSubject?: string;
+  record?: { $type?: string } & Partial<BskyPostRecord>;
+  isRead: boolean;
+  indexedAt: string;
+}
+
+export interface BskyNotificationPage {
+  notifications: BskyNotification[];
+  cursor?: string;
+  seenAt?: string;
+  priority?: boolean;
+}
+
 // ---------------------------------------------------------------- chat (DMs)
 
 export interface BskyChatMember {

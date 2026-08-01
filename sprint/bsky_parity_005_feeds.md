@@ -23,34 +23,58 @@ decision rather than a derivation.
 creator, a display name, a description, an avatar, a like count — and it emits
 posts. It is not a member list: there is no "who is in this feed" to enumerate.
 
-## Open questions for the user
+## Answered (user, 2026-08-01)
 
-**Q1. Where do feeds live in the UI?**
-- (a) **In the Lists tab**, as a new `ListSource` kind. Matches the existing
-  "Lists tab = hub for every custom feed" model (`best-list-tab` memory) and
-  Twitter's followed accounts, which went the same way. *Recommended.*
-- (b) A separate "Feeds" page, closer to how the Bluesky app presents them.
-- (c) As selectable home-timeline modes — a dropdown on /home swapping which
-  algorithm feeds the page.
+**A1. The Feeds tab, in their own section.**
+
+> live feeds are going to be on the feeds tab, as far as my app is concerned
+> they're yet another sort of feed. They'd get their own section.
+
+That is the existing structure, not a new one: `pages/lists/lists.html` is
+already a sectioned page (`showsSection('lists' | 'searches' | 'server' |
+'collections' | 'tags' | 'featured-tags')`) behind `/feeds/*`. Bluesky feeds
+become one more section beside "Server feeds" and "Saved searches", via a new
+`ListSource` kind. No new page, no new navigation.
+
+**A4. Both feeds and lists, as separate kinds** — if they really are different
+things. They are:
+
+| | Bluesky **feed** (`app.bsky.feed.generator`) | Bluesky **list** (`app.bsky.graph.list`) |
+|---|---|---|
+| what it is | an algorithm hosted by a third party | a curated set of accounts |
+| members | none — only authors who happen to appear | real, enumerable members |
+| posts from | `getFeed(uri)` | `getListFeed(uri)` |
+| `memberOrigin` | `synthetic` | `real` |
+| Mastodon analogue | none | a Mastodon list, near-exactly |
+
+So: two `ListSource` kinds, `bluesky-feed` and `bluesky-list`, and **two
+sections** on the Feeds page. Lumping them would be the "apples into round
+holes" mistake — the members column alone means they render differently.
+
+Lists are the better parity story (they map onto a Mastodon list), feeds are the
+better novelty story. Both come from the same preference read, so the
+incremental cost of the second is small.
+
+## Still open
 
 **Q2. Should a pinned Bluesky feed be able to feed the merged home timeline?**
-Right now `BlueskyProvider` contributes `getTimeline` (the follows feed) to the
-merged home feed. Should a reader be able to say "merge Discover instead of / as
-well as my follows"? That is a genuinely new capability with no Mastodon
-analogue, and it changes `FeedProvider` from one-provider-one-feed to
-one-provider-many-feeds.
+User: *"uh... I'll have to read about pinned feeds."*
 
-**Q3. Feed discovery — how far?** Minimum is "show the feeds I've already
-saved/pinned". Beyond that: browse a creator's feeds (`getActorFeeds`), search
-feeds (`getPopularFeedGenerators`, unspecified in the core lexicons), or
-save/unsave from inside Mockingbird (a `putPreferences` write). Writing
-preferences is the risky one — it mutates state the official app owns.
+Deferred, and nothing in this sprint depends on it. For context when you get to
+it: `savedFeed.pinned` is a boolean on each saved feed. In the official app,
+pinned feeds become the tabs across the top of the home screen — so "pinned"
+means "promoted to a top-level tab", not "merged into one stream". Bluesky
+itself never merges them; you swipe between them.
 
-**Q4. Lists.** `savedFeed.type` is `feed | list | timeline`, so Bluesky *lists*
-(`app.bsky.graph.list` — curated member lists, the real analogue of a Mastodon
-list) come back through the same preference. They are arguably a better parity
-target than algorithmic feeds, since they map exactly onto what a Mastodon list
-is. Do we do lists in this sprint, feeds in this sprint, or both?
+Mockingbird's home feed *does* merge providers, so we could do something the
+official app doesn't. That is the actual question, and it is a product call
+rather than a technical one. **This sprint reads `pinned` and sorts pinned feeds
+first within the section; it does not touch the home timeline.** That keeps the
+option open in both directions.
+
+**Q3. Feed discovery — how far?** Not asked again; the sprint takes the
+conservative answer (read-only, saved/pinned only) and lists the rest under
+"Deliberately out". Revisit after reads are proven.
 
 ## What the lexicons say
 
@@ -80,37 +104,75 @@ Key facts:
 - `UnknownFeed` is a real error: third-party generators go down. A dead feed
   must degrade to a message, not an empty timeline that looks like "no posts".
 
-## Recommended shape (assuming Q1 = a)
+Also needed for lists (A4):
+
+```
+app.bsky.feed.getListFeed  { list(at-uri), limit(1..100, d50), cursor }
+                           → { feed[], cursor? }   error: UnknownList
+                           "Does not require auth."
+app.bsky.graph.getList     { list(at-uri), limit, cursor }
+                           → { list: listView, items: listItemView[], cursor? }
+#listView       uri, cid, creator, name(1..64), purpose, description?,
+                descriptionFacets?, avatar?, listItemCount?, viewer?, indexedAt
+#listItemView   uri, subject(profileView)
+#listPurpose    modlist | curatelist | referencelist
+```
+
+`purpose` has **three** known values, not two:
+
+- `curatelist` — "used for curation purposes such as list feeds". The only one
+  that belongs in the Feeds tab.
+- `modlist` — "apply an aggregate moderation action (mute/block)". Showing one
+  as a readable feed would be actively misleading — it is a blocklist.
+- `referencelist` — "for reference purposes such as within a starter pack".
+  Not a feed either.
+
+So filter to `curatelist` specifically, rather than filtering *out* `modlist` —
+the allowlist is right when the enum can grow.
+
+`getListFeed` **does not require auth**, like `searchActors`. Its error is
+`UnknownList`, not `UnknownFeed`.
+
+## Shape
 
 `ListSource` (`lists/list-source.ts`) is a discriminated union of feed kinds
 that each resolve to `ResolvedFeed { statuses, members, memberOrigin, hasMore,
-warnings }`. Add:
+warnings }`. Add two:
 
 ```ts
-| { kind: 'bluesky-feed'; uri: string }
+| { kind: 'bluesky-feed'; uri: string }   // algorithm — memberOrigin 'synthetic'
+| { kind: 'bluesky-list'; uri: string }   // curated   — memberOrigin 'real'
 ```
 
-`memberOrigin: 'synthetic'` — members are `authorsOf(statuses)`, which is
-already a helper and is exactly right here: an algorithmic feed genuinely has no
-membership, only authors who happened to appear. That the existing model has a
-word for this is a good sign the fit is real.
+The `memberOrigin` split is the whole reason these are two kinds rather than
+one. For a feed, members are `authorsOf(statuses)` — an algorithmic feed
+genuinely has no membership, only authors who happened to appear, and the
+existing model already has a word for that. For a list, members are real and
+come from `getList`, so the members panel enumerates them the way a Mastodon
+list does.
 
 Warnings carry the honest caveats: "This feed is run by @creator, not by
 Bluesky" and, on `UnknownFeed`, "This feed's server is not responding."
 
-## Work (assuming a = Lists tab, minimum viable Q3)
+## Work
 
 1. `getPreferences()` on `BlueskyApi`; a `savedFeedsPrefV2` reader that tolerates
    unknown pref types in the union (there are 16 and the list grows).
-2. `getFeedGenerators(uris)` — one call hydrates every saved feed.
-3. `BlueskyFeeds` service: saved + pinned feeds as `{uri, displayName, avatar,
-   creator, pinned}`, cached for the session.
-4. `getFeed(uri, cursor)` on `BlueskyApi`; adapt with the existing
-   `adaptFeedItem`.
-5. `ListSource` gains `bluesky-feed`; `ListFeedResolver` gains its arm.
-6. Lists tab lists the reader's Bluesky feeds, pinned ones first, badged 🦋 and
-   attributed to their creator.
-7. `UnknownFeed` → a warning row, not an empty state.
+   Partition `items[]` by `type`: `feed` → generators, `list` → lists,
+   `timeline` → the follows feed, which we already have as `BlueskyProvider` and
+   which must **not** be shown again as a saved feed.
+2. `getFeedGenerators(uris)` and `getList(uri)` — hydrate names and avatars.
+   Generators hydrate in one batched call; lists are one call each, so fetch
+   them lazily (on section expand) if the reader has many.
+3. `BlueskyFeeds` service: saved feeds and saved lists as
+   `{uri, kind, displayName, avatar, creator, pinned}`, cached for the session.
+4. `getFeed(uri, cursor)` and `getListFeed(uri, cursor)` on `BlueskyApi`; both
+   adapt with the existing `adaptFeedItem` — both return `feedViewPost[]`.
+5. `ListSource` gains both kinds; `ListFeedResolver` gains both arms.
+6. **Two sections** on `/feeds/lists`: "Bluesky feeds" and "Bluesky lists",
+   each badged 🦋, pinned entries first, feeds attributed to their creator.
+   Keep only `purpose: curatelist`.
+7. `UnknownFeed` / `UnknownList` → a warning row, not an empty state.
 
 ## Deliberately out of this sprint
 

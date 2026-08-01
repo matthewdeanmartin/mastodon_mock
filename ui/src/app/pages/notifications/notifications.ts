@@ -12,9 +12,23 @@ import { AccountResultCard } from '../search/account-result-card';
 import { AccountWithMatches } from '../search/account-refine';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { Auth } from '../../auth';
+import { BlueskyNotifications } from '../../providers/bluesky/bluesky-notifications';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 
 type NotifAudience = 'all' | 'friends' | 'followers';
 type NotificationView = 'notifications' | 'new-accounts';
+
+/**
+ * Which network's notifications are showing.
+ *
+ * Deliberately a switch rather than one merged stream. Half this page's
+ * controls cannot cross the boundary: the audience filter batches
+ * `api.relationships()` over account ids the Mastodon server issued, the
+ * account actions are Mastodon writes, and the live toggle is a Mastodon
+ * WebSocket. Bluesky has no notification stream at all — it is polled. Showing
+ * those controls over Bluesky rows would mean four features that silently fail.
+ */
+export type NotificationSource = 'mastodon' | 'bluesky';
 
 export interface NewAccountCandidate {
   account: Account;
@@ -192,9 +206,17 @@ export class Notifications implements OnInit, OnDestroy {
   private prefs = inject(ClientPrefs);
   private diagnostics = inject(PageDiagnostics);
   private auth = inject(Auth);
+  private bskyNotifications = inject(BlueskyNotifications);
+  protected bskySession = inject(BlueskySession);
 
   /** Media thumbnails respect the feed-wide images on/off preference. */
   protected showImages = this.prefs.showImages;
+
+  protected source = signal<NotificationSource>('mastodon');
+  /** Bluesky's opaque paging cursor; null before the first page or once done. */
+  private bskyCursor: string | null = null;
+  /** Why the Bluesky list is empty, when it is empty for a reason. */
+  protected bskyError = signal<string | null>(null);
 
   protected items = signal<MastodonNotification[]>([]);
   protected loading = signal(true);
@@ -249,6 +271,13 @@ export class Notifications implements OnInit, OnDestroy {
 
   constructor() {
     effect(() => {
+      // `bsky:` ids name nothing this server issued, so batching them into
+      // /api/v1/accounts/relationships can only 400. The controls that need
+      // relationships are hidden for Bluesky anyway; this stops the effect
+      // firing at all.
+      if (this.source() === 'bluesky') {
+        return;
+      }
       if (this.audience() === 'all' && this.view() !== 'new-accounts') {
         return;
       }
@@ -297,6 +326,20 @@ export class Notifications implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.diagnostics.info('Notifications', 'page:open');
+    this.load();
+  }
+
+  /** Load the first page of whichever source is selected. */
+  private load(): void {
+    this.loading.set(true);
+    this.items.set([]);
+    this.exhausted.set(false);
+    this.bskyError.set(null);
+    this.bskyCursor = null;
+    if (this.source() === 'bluesky') {
+      this.loadBluesky();
+      return;
+    }
     this.api.notifications().subscribe({
       next: (n) => {
         this.items.set(n);
@@ -310,11 +353,87 @@ export class Notifications implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Switch which network's notifications are showing. The list is reloaded from
+   * scratch rather than kept per-source: notifications go stale fast, and a
+   * cached page from five minutes ago is worse than a spinner.
+   */
+  setSource(source: NotificationSource): void {
+    if (this.source() === source) {
+      return;
+    }
+    this.source.set(source);
+    // Mastodon-only controls do not survive the switch; reset them so coming
+    // back does not land on a filter the other list could not honour.
+    this.audience.set('all');
+    this.typeFilter.set('all');
+    this.view.set('notifications');
+    this.stopLive();
+    this.diagnostics.info('Notifications', 'user:set-source', { source });
+    this.load();
+  }
+
+  /** Re-read the current source from the top. */
+  refresh(): void {
+    this.load();
+  }
+
+  /** One page of Bluesky notifications, appended to whatever is already shown. */
+  private loadBluesky(): void {
+    if (!this.bskySession.linked()) {
+      this.loading.set(false);
+      this.exhausted.set(true);
+      this.bskyError.set(
+        'Link a Bluesky account in Settings → Connections to see its notifications.',
+      );
+      return;
+    }
+    const cursor = this.bskyCursor;
+    this.bskyNotifications.page(cursor).subscribe({
+      next: (page) => {
+        this.bskyCursor = page.cursor;
+        const seen = new Set(this.items().map((n) => n.id));
+        this.items.update((list) => [
+          ...list,
+          ...page.notifications.filter((n) => !seen.has(n.id)),
+        ]);
+        this.exhausted.set(!page.cursor || page.notifications.length === 0);
+        this.loading.set(false);
+        this.loadingMore.set(false);
+        this.diagnostics.info('Notifications', 'load:bsky-success', {
+          notifications: page.notifications.length,
+        });
+        // Clearing the badge is best-effort: failing to mark seen must not make
+        // the page look broken when the notifications themselves arrived.
+        if (!cursor) {
+          this.bskyNotifications.markSeen().subscribe({ error: () => undefined });
+        }
+      },
+      error: (error: unknown) => {
+        this.loading.set(false);
+        this.loadingMore.set(false);
+        this.exhausted.set(true);
+        this.diagnostics.error('Notifications', 'load:bsky-error', error);
+        this.bskyError.set(
+          error instanceof Error ? error.message : 'Could not load Bluesky notifications.',
+        );
+      },
+    });
+  }
+
   ngOnDestroy(): void {
     this.liveSub?.unsubscribe();
   }
 
   loadMore(): void {
+    if (this.source() === 'bluesky') {
+      if (this.loadingMore() || this.exhausted() || !this.bskyCursor) {
+        return;
+      }
+      this.loadingMore.set(true);
+      this.loadBluesky();
+      return;
+    }
     const last = this.items().at(-1);
     if (!last || this.loadingMore() || this.exhausted()) {
       return;
@@ -334,11 +453,15 @@ export class Notifications implements OnInit, OnDestroy {
     });
   }
 
+  private stopLive(): void {
+    this.liveSub?.unsubscribe();
+    this.liveSub = null;
+    this.live.set(false);
+  }
+
   toggleLive(): void {
     if (this.live()) {
-      this.liveSub?.unsubscribe();
-      this.liveSub = null;
-      this.live.set(false);
+      this.stopLive();
       return;
     }
     this.live.set(true);
@@ -461,7 +584,18 @@ export class Notifications implements OnInit, OnDestroy {
   }
 
   /** Dialog mode for a grouped type; null when the API has no "who did it" list. */
+  /**
+   * Whether a group row's "and N others" opens the who-liked/who-boosted dialog.
+   *
+   * Null for Bluesky: the dialog fetches `/api/v1/statuses/{id}/favourited_by`,
+   * and a `bsky:` id names nothing this server has seen. Bluesky's equivalents
+   * (`getLikes` / `getRepostedBy`) exist and could back this later; until then
+   * the count renders as plain text rather than a button that 404s.
+   */
   listMode(type: string): AccountListMode | null {
+    if (this.source() === 'bluesky') {
+      return null;
+    }
     return type === 'favourite' ? 'favourited_by' : type === 'reblog' ? 'reblogged_by' : null;
   }
 

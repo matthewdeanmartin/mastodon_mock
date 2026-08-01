@@ -1,23 +1,47 @@
 <div class="live-toggle">
   <div class="notif-filters">
-    <div class="seg view-seg" role="group" aria-label="Notification view">
-      <button [class.active]="view() === 'notifications'" (click)="setView('notifications')">
-        Notifications
-      </button>
-      <button [class.active]="view() === 'new-accounts'" (click)="setView('new-accounts')">
-        Accounts New to Me
-      </button>
-    </div>
-    @if (view() === 'notifications') {
-      <div class="seg" role="group" aria-label="From">
-        <button [class.active]="audience() === 'all'" (click)="audience.set('all')">All</button>
-        <button [class.active]="audience() === 'friends'" (click)="audience.set('friends')">
-          Friends
+    <!-- Which network. Shown only when there is a choice to make: with no
+         Bluesky account linked this is a switch between one thing and an error
+         message. -->
+    @if (bskySession.linked()) {
+      <div class="seg source-seg" role="group" aria-label="Notification source">
+        <button [class.active]="source() === 'mastodon'" (click)="setSource('mastodon')">
+          🐘 Mastodon
         </button>
-        <button [class.active]="audience() === 'followers'" (click)="audience.set('followers')">
-          Followers
+        <button [class.active]="source() === 'bluesky'" (click)="setSource('bluesky')">
+          🦋 Bluesky
         </button>
       </div>
+    }
+    <!-- Accounts New to Me reads relationships from the Mastodon server, so it
+         has nothing to say about Bluesky actors. -->
+    @if (source() === 'mastodon') {
+      <div class="seg view-seg" role="group" aria-label="Notification view">
+        <button [class.active]="view() === 'notifications'" (click)="setView('notifications')">
+          Notifications
+        </button>
+        <button [class.active]="view() === 'new-accounts'" (click)="setView('new-accounts')">
+          Accounts New to Me
+        </button>
+      </div>
+    }
+    @if (view() === 'notifications') {
+      <!-- Friends/Followers batches api.relationships() over account ids this
+           server issued. A `bsky:` id can only 400 there, so the filter is
+           hidden rather than shown and broken. -->
+      @if (source() === 'mastodon') {
+        <div class="seg" role="group" aria-label="From">
+          <button [class.active]="audience() === 'all'" (click)="audience.set('all')">All</button>
+          <button [class.active]="audience() === 'friends'" (click)="audience.set('friends')">
+            Friends
+          </button>
+          <button [class.active]="audience() === 'followers'" (click)="audience.set('followers')">
+            Followers
+          </button>
+        </div>
+      }
+      <!-- The type dropdown is built from whatever arrived, so it works for
+           either source with no changes. -->
       <select
         class="type-select"
         [ngModel]="typeFilter()"
@@ -31,22 +55,40 @@
       </select>
     }
   </div>
-  <button
-    class="btn btn-outline"
-    [class.active]="live()"
-    (click)="toggleLive()"
-    [title]="
-      live()
-        ? 'Live: new notifications stream in as they arrive — click to stop'
-        : 'Stream new notifications live as they arrive'
-    "
-  >
-    {{ live() ? '● Live' : 'Go live' }}
-  </button>
+  <!-- Live is a Mastodon WebSocket. Bluesky has no notification stream — it is
+       polled — so rather than a "live" button that quietly means something
+       weaker, the Bluesky side gets an honest Refresh. -->
+  @if (source() === 'mastodon') {
+    <button
+      class="btn btn-outline"
+      [class.active]="live()"
+      (click)="toggleLive()"
+      [title]="
+        live()
+          ? 'Live: new notifications stream in as they arrive — click to stop'
+          : 'Stream new notifications live as they arrive'
+      "
+    >
+      {{ live() ? '● Live' : 'Go live' }}
+    </button>
+  } @else {
+    <button
+      class="btn btn-outline"
+      [disabled]="loading()"
+      (click)="refresh()"
+      title="Check Bluesky for new notifications"
+    >
+      ↻ Refresh
+    </button>
+  }
 </div>
 
 @if (loading()) {
   <p class="muted center">Loading…</p>
+} @else if (bskyError(); as error) {
+  <!-- A reason beats "No notifications yet", which would be a different and
+       wrong claim when the fetch is what failed. -->
+  <p class="muted center">{{ error }}</p>
 } @else if (!items().length) {
   <p class="muted center">No notifications yet.</p>
 } @else if (view() === 'new-accounts') {
@@ -152,7 +194,11 @@
           }}</a>
           <span class="what muted">{{ label(n.type) }}</span>
           @if (n.status) {
-            @if (n.type === 'mention') {
+            <!-- Bluesky replies and mentions also arrive as type 'mention', but
+                 "open in chat" means the Mastodon DM tab and `chatKey` builds a
+                 key from a Mastodon acct. A bsky reply goes to its thread, which
+                 is where the reply actually is. -->
+            @if (n.type === 'mention' && source() === 'mastodon') {
               <!-- Mentions open as a chat: click the body to jump into the DM
                    tab's public chat with this person (we nudge chat over thread). -->
               <a

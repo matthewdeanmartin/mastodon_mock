@@ -1,9 +1,28 @@
 # Sprint 2 — Notifications
 
-Status: READY. Grounded in the `app.bsky.notification.listNotifications`
-lexicon read 2026-08-01, not from memory.
+Status: **DONE** (2026-08-01). 2699 tests pass, lint clean, production build
+green. Grounded in the `app.bsky.notification.listNotifications` lexicon and
+then verified against the live API — see "Measured" below.
 
-Demo at the end: `/notifications` gets a source switch. Picking Bluesky shows
+## What shipped
+
+- `bluesky-types.ts`: `BskyNotification`, `BskyNotificationPage`.
+- `bluesky-api.ts`: `listNotifications`, `getUnreadCount`, `updateSeen`,
+  `getPosts`.
+- `bluesky-notification-adapter.ts`: reason→type mapping, `subjectUris`,
+  `chunkUris`, `postsByUri`, `adaptNotification`.
+- `bluesky-notifications.ts`: `BlueskyNotifications` — one page plus at most one
+  batched hydration call.
+- `notifications.ts` / `.html`: a `source` switch, shown only when a Bluesky
+  account is linked. Audience filter, Accounts-New-to-Me, live toggle,
+  open-in-chat and the who-liked dialog are all hidden on the Bluesky side
+  rather than shown and broken; the type dropdown works for both unchanged.
+
+26 new tests. Live end-to-end check against @mistersql: all 20 notifications in
+a real page rendered, including a `repost-via-repost` whose subject is not a
+post (renders without an excerpt, by design).
+
+Demo: `/notifications` gets a source switch. Picking Bluesky shows
 likes, reposts, follows, replies, mentions and quotes from Bluesky, in the same
 rows the Mastodon list uses, with the same grouping, and clicking through lands
 on the right thread or profile (both of which Sprint 1 made real).
@@ -123,16 +142,65 @@ keys on status id.
    push stream. Simplest honest option for this sprint: no live toggle, just a
    Refresh button.
 
-## Verify before building
+## Measured against the live API (2026-08-01)
 
-- **Does `listNotifications` work against the `bsky.social` entryway, or does it
-  need the account's real PDS?** Chat needed the PDS (`bsky-chat-pds`). This is
-  an AppView read like `getTimeline`, so the entryway *should* answer — but
-  confirm with one live call before writing the page, because getting this wrong
-  is a silent 400 on the whole feature.
-- Actual max `uris` for `getPosts` (25 is the documented figure; confirm).
-- Whether `priority: true` is worth exposing — it is Bluesky's "only from people
-  you follow", which is close to the audience filter we are hiding.
+Run as @mistersql against `bsky.social` with a real app password. These replace
+the "verify before building" list; all four questions are now answered.
+
+**1. The entryway answers `listNotifications`. No PDS resolution needed.**
+
+```
+GET https://bsky.social/xrpc/app.bsky.notification.listNotifications?limit=20
+→ HTTP 200, 20 notifications, cursor present
+GET https://shiitake.us-east.host.bsky.network/xrpc/…   (the real PDS)
+→ HTTP 200, byte-identical first record
+```
+
+So this is unlike chat (`bsky-chat-pds`), which is service-proxied and *must*
+hit the PDS. Notifications are an AppView read like `getTimeline`. Use the
+existing `BlueskyApi.get()` with no `serviceUrl` override.
+
+**2. Live reason mix included one from outside the "big six":**
+`{like: 8, reply: 9, follow: 2, repost-via-repost: 1}`. The 13-value table
+below is not theoretical — a `-via-repost` variant showed up in the first 20
+notifications of a low-traffic account.
+
+**3. `record` is inline and is exactly what the table predicts:**
+
+| reason | `record.$type` | `reasonSubject` |
+|---|---|---|
+| `like` | `app.bsky.feed.like` (keys: subject, createdAt) | the liked **post** |
+| `reply` | `app.bsky.feed.post` (keys: text, langs, reply, createdAt) | the parent post |
+| `follow` | `app.bsky.graph.follow` | **absent** |
+| `repost-via-repost` | `app.bsky.feed.repost` (has an extra `via`) | see below |
+
+So `reply` / `mention` / `quote` render from `record` with **no** extra call,
+confirmed.
+
+**4. ⚠️ `getPosts` silently drops non-post uris. Nine in, eight out.**
+
+The `repost-via-repost` notification's `reasonSubject` was
+`at://…/app.bsky.feed.repost/3mrsppjucxh24` — a *repost* record, not a post.
+`getPosts` returned 8 posts for 9 requested uris, with no error and no
+placeholder.
+
+Two hard consequences for the adapter:
+
+- **Never index-align** `posts[i]` with `uris[i]`. Build a `Map<uri, Status>`
+  from the response and look up by uri.
+- **A missing subject is normal, not an error.** The notification still renders;
+  it just has no `status`. Do not blank the row or log noise.
+
+Filtering the request to uris containing `/app.bsky.feed.post/` would also work
+and saves a wasted slot, but the Map is needed regardless — a deleted post
+disappears the same way.
+
+**5. Batching:** 9 uris in one call was accepted. The documented cap is 25;
+chunk at 25 and the cap is never hit in practice for a 50-item page.
+
+**6. `priority` and `seenAt` are both returned** (`priority: false`,
+`seenAt: 2026-08-01T22:09:54.756Z`), so `updateSeen` and the unread badge have
+what they need.
 
 ## Tests
 
