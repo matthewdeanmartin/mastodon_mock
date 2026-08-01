@@ -35,7 +35,11 @@ describe('StarterKitPost', () => {
     const el = fixture.nativeElement as HTMLElement;
     const kit = SHIPPED_STARTER_KITS[0];
 
-    expect(el.querySelectorAll('.kit-member[href]')).toHaveLength(kit.itemCount);
+    // Members open in-app for anonymous viewers too. They used to be off-site
+    // anchors, which dropped a first-time visitor onto someone else's web UI at
+    // the moment they were deciding whether to stay here.
+    expect(el.querySelectorAll('button.kit-member')).toHaveLength(kit.itemCount);
+    expect(el.querySelectorAll('.kit-member[href]')).toHaveLength(0);
     expect(el.querySelectorAll('app-account-hover-card')).toHaveLength(kit.itemCount);
     expect(el.querySelector('app-account-hover-card button')).toBeNull();
     expect((el.querySelector('.kit-link') as HTMLAnchorElement).getAttribute('href')).toBe(

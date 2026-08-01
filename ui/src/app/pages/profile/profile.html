@@ -203,7 +203,7 @@
       </div>
     }
     @if (a.note) {
-      <div class="note" [innerHTML]="a.note"></div>
+      <div class="note" appRenderedHtmlLinks [innerHTML]="a.note"></div>
     }
     @if (a.fields.length) {
       <div class="profile-fields">

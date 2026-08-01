@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { catchError, forkJoin, of } from 'rxjs';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -10,11 +11,31 @@ import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { ListCollectionConverter } from '../../list-collection-converter';
 import { ListFeedResolver } from '../../lists/list-feed-resolver';
+import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
+import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import {
   shippedStarterKit,
   shippedStarterKitCollection,
   ShippedStarterKit,
 } from '../../starter-kits';
+
+/**
+ * Where to read a shipped member's posts from, or null for a local account.
+ *
+ * Their `url` is the only thing that says which instance they are on — the id is
+ * meaningless anywhere else, which is precisely why asking the home server for
+ * it 404s.
+ */
+function publicRefFor(account: Account): { server: string; id: string } | null {
+  if (!account.url) {
+    return null;
+  }
+  try {
+    return { server: new URL(account.url).origin, id: account.id };
+  } catch {
+    return null;
+  }
+}
 
 /** A member of the collection paired with its item id (needed for removal). */
 interface Member {
@@ -42,6 +63,7 @@ export class CollectionPage implements OnInit {
   private router = inject(Router);
   private converter = inject(ListCollectionConverter);
   private feedResolver = inject(ListFeedResolver);
+  private anonymousApi = inject(AnonymousPublicApi);
 
   protected data = signal<CollectionWithAccounts | null>(null);
   protected shipped = signal<ShippedStarterKit | null>(null);
@@ -80,6 +102,33 @@ export class CollectionPage implements OnInit {
     }
     return out;
   });
+
+  /**
+   * Route to a member's profile, keeping them inside Mawkingbird.
+   *
+   * A shipped collection's members are accounts on other instances, so their
+   * ids mean nothing to the home server. An anonymous route ref carries the
+   * origin alongside the id, which is what lets the profile page fetch them —
+   * the same resolution the collection widget on Home already used. Members of
+   * a real server-side collection are local and route by plain id.
+   */
+  protected memberLink(account: Account): (string | number)[] {
+    if (!this.shipped() || !account.url) {
+      return ['/accounts', account.id];
+    }
+    try {
+      return [
+        '/accounts',
+        anonymousAccountRouteRef({
+          server: new URL(account.url).origin,
+          id: account.id,
+          originalUrl: account.url,
+        }),
+      ];
+    } catch {
+      return ['/accounts', account.id];
+    }
+  }
 
   protected curator = computed<Account | null>(() => {
     const d = this.data();
@@ -166,6 +215,73 @@ export class CollectionPage implements OnInit {
     this.feedResolver.mergeMemberTimelines(ids).subscribe({
       next: (merged) => {
         this.feed.set(merged.statuses);
+        this.feedLoading.set(false);
+      },
+      error: () => this.feedLoading.set(false),
+    });
+  }
+
+  // ------------------------------------------------------------- preview
+
+  /** Sample sizes offered on a preview. Each member costs one request. */
+  protected readonly sampleSizes = [5, 10, 25] as const;
+
+  /** How many members to sample posts from. Small by default: this costs N calls. */
+  protected sampleSize = signal(5);
+
+  /** True once a preview sample has been asked for, so the empty state can differ. */
+  protected sampled = signal(false);
+
+  protected setSampleSize(value: string): void {
+    this.sampleSize.set(Number(value) || 5);
+  }
+
+  /**
+   * Load a sample of posts from a shipped collection's members.
+   *
+   * A preview of a curated list is nearly useless without seeing what these
+   * people actually post — but the members live on other instances, so there is
+   * no single timeline to fetch and it costs one request per member. Hence the
+   * explicit size and an explicit button: the reader decides how much this is
+   * worth, rather than the page spending 24 requests on their behalf.
+   *
+   * Members are shuffled before sampling, so pressing it again on a large
+   * collection surfaces different people rather than the same first five.
+   */
+  protected loadSample(): void {
+    const accepted = this.members().filter((m) => m.state === 'accepted');
+    if (!accepted.length || this.feedLoading()) {
+      return;
+    }
+    const shuffled = [...accepted];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const picked = shuffled.slice(0, this.sampleSize()).map((m) => m.account);
+    this.sampled.set(true);
+    this.feedLoading.set(true);
+
+    // Shipped members live on *their* instances, so their ids mean nothing to the
+    // home server — asking it produces a 404 per member and an empty sample. Each
+    // one is fetched from its own origin instead, the same public read the
+    // profile page makes.
+    forkJoin(
+      picked.map((account) => {
+        const ref = this.shipped() ? publicRefFor(account) : null;
+        const request = ref
+          ? this.anonymousApi.getAccountStatuses(ref, { excludeReplies: true, limit: 20 })
+          : this.api.getAccountStatuses(account.id, { excludeReplies: true, limit: 20 });
+        return request.pipe(catchError(() => of([] as Status[])));
+      }),
+    ).subscribe({
+      next: (lists) => {
+        this.feed.set(
+          lists
+            .flat()
+            .sort((a, b) => b.created_at.localeCompare(a.created_at))
+            .slice(0, 60),
+        );
         this.feedLoading.set(false);
       },
       error: () => this.feedLoading.set(false),

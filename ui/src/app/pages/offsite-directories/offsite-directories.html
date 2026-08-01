@@ -1,22 +1,12 @@
 @if (!embedded()) {
-  <h1 class="page-title">Find people to follow</h1>
+  <h1 class="page-title">Offsite directories</h1>
 }
 <p class="muted">
-  Your home timeline is built from the people you follow — with too few, Mastodon feels empty.
-  Browse a directory to find interesting accounts, or
+  Other people have built good ways to find fediverse accounts. These all live on other sites and
+  open in a new tab — bring handles back here and paste them into
+  <a routerLink="/search">search</a> to follow, or
   <a routerLink="/settings/import-export">import a follow list</a> in Settings.
 </p>
-
-@if (embedded() && hasNoFollows()) {
-  <a class="starter-pack-card" routerLink="/collections/starter">
-    <span class="starter-pack-avatar" aria-hidden="true">M</span>
-    <span>
-      <strong>Universal starter pack</strong>
-      <span class="muted small">Start your timeline with a curated collection of accounts.</span>
-    </span>
-    <span class="starter-pack-arrow" aria-hidden="true">→</span>
-  </a>
-}
 
 <section class="card">
   <h2 class="card-title">Browse directories</h2>
@@ -41,6 +31,44 @@
     >
       <strong>fediverse.info ↗</strong>
       <span class="muted small">Opt-in people directory, browsable by hashtag.</span>
+    </a>
+    <a
+      class="dir-link"
+      href="https://followgraph.vercel.app/"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <strong>Followgraph ↗</strong>
+      <span class="muted small">
+        Finds people your friends follow but you don't — the highest-yield source once you already
+        follow a few of the right people.
+      </span>
+    </a>
+    <a class="dir-link" href="https://fedidevs.com/" target="_blank" rel="noopener noreferrer">
+      <strong>FediDevs ↗</strong>
+      <span class="muted small">
+        Developer-centric: people who build things, by language and topic.
+      </span>
+    </a>
+    <a
+      class="dir-link"
+      href="https://matthewdeanmartin.github.io/youtuberfinder/"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <strong>YouTuber Finder ↗</strong>
+      <span class="muted small">YouTubers who also post on the fediverse.</span>
+    </a>
+    <!-- Trunk last: it is the oldest of these and the most uneven, so it is the
+         one to try after the others have not turned anything up. -->
+    <a
+      class="dir-link"
+      href="https://communitywiki.org/trunk"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <strong>Trunk ↗</strong>
+      <span class="muted small">Opt-in lists by interest, maintained by volunteers.</span>
     </a>
     @if (embedded()) {
       <a class="invite-people-link" routerLink="/invites">

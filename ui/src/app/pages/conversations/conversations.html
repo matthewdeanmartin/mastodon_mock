@@ -2,25 +2,24 @@
   <aside class="chat-list">
     <div class="chat-list-head">Chat</div>
     <div class="chat-filters">
-      <!-- "All" used to head this row while quietly excluding the bots, so the
-           one label that promised everything delivered less than it said. It is
-           "Ppl" now: honest about being people-only, and short enough for the
-           phone widths where most of this row is read. Full words live in the
-           tooltips. -->
+      <!-- "All" means all *people*. Bots are the odd one out — a chat with Eliza
+           or a language model is a different kind of thing from a chat with a
+           person, and someone who wants one goes looking for it. Leaving this
+           "All" costs a little precision and keeps the row readable. -->
       <div class="seg" role="group" aria-label="Who">
         <button
           [class.active]="prefs.chatAudience() === 'all'"
           (click)="prefs.setChatAudience('all')"
-          title="People — everyone you talk to on Bluesky and the fediverse (no bots)"
+          title="Everyone you talk to on Bluesky and the fediverse (bots have their own tab)"
         >
-          Ppl
+          All
         </button>
         <button
           [class.active]="prefs.chatAudience() === 'mutuals'"
           (click)="prefs.setChatAudience('mutuals')"
-          title="Mutuals — people you follow who follow you back"
+          title="People you follow who follow you back"
         >
-          Mut
+          Mutuals
         </button>
         <!-- Only with somewhere to lead: without a bot correspondent this
              filter can only ever produce an empty list. -->
@@ -28,7 +27,7 @@
           <button
             [class.active]="prefs.chatAudience() === 'bots'"
             (click)="prefs.setChatAudience('bots')"
-            title="Bots — Eliza and your language model"
+            title="Eliza and your language model"
           >
             Bot
           </button>

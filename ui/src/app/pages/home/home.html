@@ -11,7 +11,7 @@
         import a follow list or browse directories to fill your feed.
       </span>
     </div>
-    <a class="btn nudge-cta" routerLink="/find-people">Find people</a>
+    <a class="btn nudge-cta" routerLink="/find-friends">Find people</a>
     <button class="nudge-dismiss" type="button" aria-label="Dismiss" (click)="dismissNudge()">
       ✕
     </button>
@@ -157,50 +157,16 @@
     </aside>
   }
 
-  @if (!loading() && showOnboarding()) {
-    @if (!eliza.following()) {
-      <a class="starter-pack-post eliza-invite" routerLink="/eliza">
-        <img class="starter-pack-avatar" src="eliza-avatar.svg" width="40" height="40" alt="" />
-        <div class="starter-pack-content">
-          <div class="starter-pack-author">
-            <strong>Eliza</strong>
-            <span class="muted">&#64;eliza</span>
-          </div>
-          <p class="eliza-invite-copy">
-            New here, or no one to follow yet? I'm your practice friend — follow me and you can
-            post, reply, and chat, all safely in your browser.
-          </p>
-        </div>
-      </a>
-    }
-    <article class="starter-pack-post starter-pack-universal">
-      <div class="starter-pack-avatar" aria-hidden="true">M</div>
-      <div class="starter-pack-content">
-        <div class="starter-pack-author">
-          <strong>Mawkingbird</strong>
-          <span class="muted">&#64;mawkingbird</span>
-        </div>
-        <a routerLink="/collections/starter">
-          Get your account started with the universal starter kit
-        </a>
-      </div>
-    </article>
-    @for (kit of shippedStarterKits; track kit.id) {
-      <app-starter-kit-post [kit]="kit" />
-    }
-  }
-
+  <!-- The feed used to seed itself with an Eliza invite, the universal starter
+       kit, and every shipped starter-kit post whenever the timeline was thin.
+       Well meant, but it put the same handful of collections in front of the
+       same person on every fresh browser, forever. One link to the hub is the
+       better trade: ten ways to jump-start a feed, chosen rather than served. -->
   @if (loading()) {
     <p class="muted center">Loading…</p>
   } @else if (!visible().length) {
     <p class="muted center">
-      @if (auth.isAnonymous) {
-        Follow a public Mastodon account from Search or its profile to build this feed. Posts are
-        fetched only when you load or refresh this page.
-      } @else {
-        Your home timeline is empty.
-        <a routerLink="/find-people">Find people to follow</a>, or post something.
-      }
+      <a routerLink="/find-friends">Find friends to follow →</a>
     </p>
   } @else {
     @for (s of visible(); track s.id) {

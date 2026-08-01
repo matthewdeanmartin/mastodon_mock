@@ -40,6 +40,7 @@ import { OpenRouterSession } from '../../providers/openrouter/openrouter-session
 import { isOpenRouterId, openRouterAccount } from '../../providers/openrouter/openrouter-identity';
 import { CloneFriendsDialog } from './clone-friends-dialog/clone-friends-dialog';
 import { PageDiagnostics } from '../../page-diagnostics';
+import { RenderedHtmlLinks } from '../../rendered-html-links';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analytics';
@@ -57,6 +58,7 @@ type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analyti
     AccountAnalytics,
     NgOptimizedImage,
     CloneFriendsDialog,
+    RenderedHtmlLinks,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.css',

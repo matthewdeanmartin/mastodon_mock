@@ -75,6 +75,9 @@ export class SettingsAccountList implements OnInit {
    */
   private otherCache = new Map<number, ReadonlySet<string>>();
 
+  /** Follow state per cached page, kept beside {@link otherCache}. */
+  private followingCache = new Map<number, ReadonlySet<string>>();
+
   /** True once a page comes back with no `rel="next"`: the walk has an end. */
   protected lastPageKnown = signal(false);
 
@@ -107,6 +110,16 @@ export class SettingsAccountList implements OnInit {
    * whether the block already exists, and the row gave no clue either way.
    */
   protected alsoOther = signal<ReadonlySet<string>>(new Set());
+
+  /**
+   * Ids on this page that the viewer still follows.
+   *
+   * Muting does not unfollow, so "muted but still followed" is an ordinary
+   * state rather than an edge case — and this page is where you notice it.
+   * Blocking *does* force an unfollow server-side, which is why the Blocked
+   * list never shows this and only the Muted one offers Unfollow.
+   */
+  protected following = signal<ReadonlySet<string>>(new Set());
 
   /** Rows whose convert/add button is mid-flight, so it can disable itself. */
   protected busy = signal<ReadonlySet<string>>(new Set());
@@ -178,6 +191,11 @@ export class SettingsAccountList implements OnInit {
     return this.kind() === 'mutes' ? 'Block' : 'Mute';
   }
 
+  /** Past tense for the badge. Spelled out because "mute" + "ed" is "muteed". */
+  protected get otherPastTense(): string {
+    return this.kind() === 'mutes' ? 'blocked' : 'muted';
+  }
+
   // ------------------------------------------------------------ fetching
 
   /** Throw away every cached page and cursor, then load page 1. */
@@ -185,6 +203,7 @@ export class SettingsAccountList implements OnInit {
     this.cursors = [undefined];
     this.pageCache.clear();
     this.otherCache.clear();
+    this.followingCache.clear();
     this.lastPageKnown.set(false);
     this.lastPage.set(null);
     this.page.set(0);
@@ -204,6 +223,7 @@ export class SettingsAccountList implements OnInit {
       this.accounts.set(cached);
       // Flags come from the cache too — a revisited page costs no requests at all.
       this.alsoOther.set(this.otherCache.get(index) ?? new Set());
+      this.following.set(this.followingCache.get(index) ?? new Set());
       return;
     }
 
@@ -317,6 +337,7 @@ export class SettingsAccountList implements OnInit {
   private markOtherList(index: number, accounts: Account[]): void {
     if (!accounts.length) {
       this.alsoOther.set(new Set());
+      this.following.set(new Set());
       return;
     }
     this.api.relationships(accounts.map((a) => a.id)).subscribe({
@@ -325,16 +346,23 @@ export class SettingsAccountList implements OnInit {
         const flagged = new Set(
           rels.filter((r) => (muting ? r.blocking : r.muting)).map((r) => r.id),
         );
+        // The same response already says whether you follow them — muting does
+        // not unfollow, so this is a common state and worth reading off here
+        // rather than spending a second call on it.
+        const followed = new Set(rels.filter((r) => r.following).map((r) => r.id));
         this.otherCache.set(index, flagged);
+        this.followingCache.set(index, followed);
         // Only paint if this is still the page on screen: a fast Next while the
         // lookup was in flight would otherwise flag the wrong rows.
         if (this.page() === index) {
           this.alsoOther.set(flagged);
+          this.following.set(followed);
         }
       },
       error: () => {
         if (this.page() === index) {
           this.alsoOther.set(new Set());
+          this.following.set(new Set());
         }
       },
     });
@@ -345,6 +373,41 @@ export class SettingsAccountList implements OnInit {
   /** True when this account is on the opposite list as well as this one. */
   protected isAlsoOther(id: string): boolean {
     return this.alsoOther().has(id);
+  }
+
+  /**
+   * Whether to offer Unfollow for this row.
+   *
+   * Muted lists only. A block already forces the unfollow server-side, so the
+   * button could never do anything there — and there is deliberately no Follow
+   * counterpart: nobody arrives at their mute list to start following someone,
+   * and the profile is one click away for the rare case that they do.
+   */
+  protected canUnfollow(id: string): boolean {
+    return this.kind() === 'mutes' && this.following().has(id);
+  }
+
+  /** Stop following without touching the mute — the two are independent. */
+  protected unfollow(acc: Account): void {
+    if (this.isBusy(acc.id)) {
+      return;
+    }
+    this.setBusy(acc.id, true);
+    this.api.unfollow(acc.id).subscribe({
+      next: () => {
+        this.clearFollow(acc.id);
+        this.setBusy(acc.id, false);
+      },
+      error: () => this.setBusy(acc.id, false),
+    });
+  }
+
+  /** Forget that this account is followed, on screen and in the page cache. */
+  private clearFollow(id: string): void {
+    const left = new Set(this.following());
+    left.delete(id);
+    this.following.set(left);
+    this.followingCache.set(this.page(), left);
   }
 
   protected isBusy(id: string): boolean {
@@ -398,6 +461,12 @@ export class SettingsAccountList implements OnInit {
         const flagged = new Set(this.alsoOther()).add(acc.id);
         this.alsoOther.set(flagged);
         this.otherCache.set(this.page(), flagged);
+        // Blocking forces an unfollow server-side, so the Unfollow button on
+        // this row has just become a no-op. Drop it rather than leave a control
+        // that would fire a request the server has already made moot.
+        if (this.kind() === 'mutes') {
+          this.clearFollow(acc.id);
+        }
         this.setBusy(acc.id, false);
       },
       error: () => this.setBusy(acc.id, false),

@@ -25,6 +25,8 @@ interface SettingsAccountListInternals {
   last(): void;
   first(): void;
   isAlsoOther(id: string): boolean;
+  canUnfollow(id: string): boolean;
+  unfollow(acc: Account): void;
   alsoApply(acc: Account): void;
   convert(acc: Account): void;
 }
@@ -83,7 +85,7 @@ describe('SettingsAccountList', () => {
     accounts: Account[],
     nextMaxId?: string,
     alsoOther: string[] = [],
-    options: { expectRelationships?: boolean } = {},
+    options: { expectRelationships?: boolean; following?: string[] } = {},
   ): void {
     const req = httpMock.expectOne((r) => r.url === '/api/v1/mutes' || r.url === '/api/v1/blocks');
     req.flush(
@@ -104,6 +106,7 @@ describe('SettingsAccountList', () => {
           id: a.id,
           muting: alsoOther.includes(a.id),
           blocking: alsoOther.includes(a.id),
+          following: (options.following ?? []).includes(a.id),
         })),
       );
   }
@@ -262,6 +265,63 @@ describe('SettingsAccountList', () => {
 
     httpMock.expectOne('/api/v1/accounts/7/unmute').flush({});
     expect(internals(fixture).accounts()).toEqual([]);
+  });
+
+  // -------------------------------------------------------------- unfollow
+  // Muting does not unfollow, so "muted but still followed" is ordinary — and
+  // this page is where you notice it.
+
+  it('offers Unfollow only for muted accounts you actually follow', () => {
+    configure('mutes');
+    const fixture = TestBed.createComponent(SettingsAccountList);
+    fixture.detectChanges();
+    flushPage([makeAccount('1'), makeAccount('2')], undefined, [], { following: ['2'] });
+
+    expect(internals(fixture).canUnfollow('1')).toBe(false);
+    expect(internals(fixture).canUnfollow('2')).toBe(true);
+  });
+
+  it('never offers Unfollow on the block list, where the server already did it', () => {
+    configure('blocks');
+    const fixture = TestBed.createComponent(SettingsAccountList);
+    fixture.detectChanges();
+    // Even if the relationship still claims a follow, blocking forces an
+    // unfollow server-side, so the button would be a no-op.
+    flushPage([makeAccount('1')], undefined, [], { following: ['1'] });
+
+    expect(internals(fixture).canUnfollow('1')).toBe(false);
+  });
+
+  it('unfollow leaves the mute alone and keeps the row', () => {
+    configure('mutes');
+    const fixture = TestBed.createComponent(SettingsAccountList);
+    fixture.detectChanges();
+    const acc = makeAccount('5');
+    flushPage([acc], undefined, [], { following: ['5'] });
+
+    internals(fixture).unfollow(acc);
+    const req = httpMock.expectOne('/api/v1/accounts/5/unfollow');
+    expect(req.request.method).toBe('POST');
+    req.flush({});
+
+    // Still muted, still listed — only the follow went away.
+    expect(internals(fixture).accounts().map((a) => a.id)).toEqual(['5']);
+    expect(internals(fixture).canUnfollow('5')).toBe(false);
+  });
+
+  it('drops the Unfollow button once a block makes it moot', () => {
+    configure('mutes');
+    const fixture = TestBed.createComponent(SettingsAccountList);
+    fixture.detectChanges();
+    const acc = makeAccount('5');
+    flushPage([acc], undefined, [], { following: ['5'] });
+    expect(internals(fixture).canUnfollow('5')).toBe(true);
+
+    internals(fixture).alsoApply(acc);
+    httpMock.expectOne('/api/v1/accounts/5/block').flush({});
+
+    // The block already unfollowed them server-side.
+    expect(internals(fixture).canUnfollow('5')).toBe(false);
   });
 
   it('convert skips the block when they are already blocked', () => {

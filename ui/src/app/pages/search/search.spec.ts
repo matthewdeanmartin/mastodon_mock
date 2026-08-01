@@ -160,28 +160,21 @@ describe('Search', () => {
     expect(internals(fixture).query()).toBe('');
   });
 
-  it('places the universal starter pack above follow-list import for an account with no follows', () => {
+  // The empty account tab used to push the universal starter pack at anyone with
+  // no follows. Bundled collections live on their own page now, reached on
+  // purpose from Find Friends, so this offers directories instead.
+  it('offers offsite directories on the empty account tab, without a page title of its own', () => {
     const auth = TestBed.inject(Auth);
     auth.setToken('zero-follow-token');
     auth.setAccount({ id: 'me', username: 'me', following_count: 0 } as Account);
     const fixture = setUp();
-    const starter = fixture.nativeElement.querySelector('.starter-pack-card') as HTMLAnchorElement;
-    const importer = fixture.nativeElement.querySelector('.card') as HTMLElement;
+    const el = fixture.nativeElement as HTMLElement;
 
-    expect(starter.textContent).toContain('Universal starter pack');
-    expect(starter.getAttribute('href')).toBe('/collections/starter');
-    expect(
-      starter.compareDocumentPosition(importer) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it('hides the universal starter pack when the account already follows someone', () => {
-    const auth = TestBed.inject(Auth);
-    auth.setToken('following-token');
-    auth.setAccount({ id: 'me', username: 'me', following_count: 1 } as Account);
-    const fixture = setUp();
-
-    expect(fixture.nativeElement.querySelector('.starter-pack-card')).toBeNull();
+    expect(el.querySelector('app-offsite-directories')).not.toBeNull();
+    expect(el.textContent).toContain('Followgraph');
+    // Embedded: the host page already has a heading.
+    expect(el.querySelector('app-offsite-directories .page-title')).toBeNull();
+    expect(el.querySelector('.starter-pack-card')).toBeNull();
   });
 
   it('keeps optional idle trends empty when the trends request fails', () => {

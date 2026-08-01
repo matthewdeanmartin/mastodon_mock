@@ -39,14 +39,9 @@ import { isElizaId } from '../../eliza/eliza-identity';
 import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
-import { StarterKitPost } from '../../starter-kit-post/starter-kit-post';
-import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 
-/** Below this many follows, nudge toward /find-people (few follows = empty-feeling feed). */
+/** Below this many follows, nudge toward /find-friends (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
-/** Keep the onboarding cards (Eliza invite, starter pack) around until the user
- *  has this many real friends — a follow of Eliza alone shouldn't retire them. */
-const ONBOARDING_FRIEND_THRESHOLD = 10;
 const NUDGE_DISMISSED_KEY = 'mockingbird_follow_nudge_dismissed';
 /** How many saved bookmarks get tacked onto the feed when the cap hits. */
 const BOOKMARK_TAIL_SIZE = 40;
@@ -61,7 +56,6 @@ const BOOKMARK_TAIL_SIZE = 40;
     Announcements,
     RouterLink,
     LocalCompose,
-    StarterKitPost,
     FeedAnalytics,
     FeedMembers,
   ],
@@ -69,7 +63,6 @@ const BOOKMARK_TAIL_SIZE = 40;
   styleUrl: './home.css',
 })
 export class Home implements OnInit, OnDestroy {
-  protected readonly shippedStarterKits = SHIPPED_STARTER_KITS;
   private api = inject(Api);
   protected auth = inject(Auth);
   protected prefs = inject(ClientPrefs);
@@ -259,19 +252,6 @@ export class Home implements OnInit, OnDestroy {
   private nudgeDismissed = signal(localStorage.getItem(NUDGE_DISMISSED_KEY) === 'true');
 
   protected followingCount = computed(() => this.auth.account()?.following_count ?? 0);
-
-  /** Real friends the viewer has, across both modes — anonymous follows live in
-   *  browser storage, authed follows in the account's `following_count`. Eliza
-   *  is deliberately excluded: following her doesn't count as having friends. */
-  protected friendCount = computed(() =>
-    this.auth.isAnonymous ? this.anonymousFollows.count() : this.followingCount(),
-  );
-
-  /** Show the onboarding cards (Eliza invite + starter pack) until the viewer
-   *  builds up a handful of real friends — regardless of whether the feed now
-   *  has content (following Eliza fills the feed but you still need a starter
-   *  pack). */
-  protected showOnboarding = computed(() => this.friendCount() < ONBOARDING_FRIEND_THRESHOLD);
 
   protected showFollowNudge = computed(
     () =>

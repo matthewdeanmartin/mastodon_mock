@@ -5,6 +5,7 @@ import { HumanCountPipe } from '../../human-count.pipe';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
 import { StatusCard } from '../../status-card/status-card';
 import { AccountWithMatches } from './account-refine';
+import { RenderedHtmlLinks } from '../../rendered-html-links';
 
 /**
  * One account in the search results, built for discovery rather than lookup: the
@@ -22,7 +23,7 @@ import { AccountWithMatches } from './account-refine';
  */
 @Component({
   selector: 'app-account-result-card',
-  imports: [RouterLink, HumanCountPipe, VerifiedBadge, StatusCard],
+  imports: [RouterLink, HumanCountPipe, VerifiedBadge, StatusCard, RenderedHtmlLinks],
   templateUrl: './account-result-card.html',
   styleUrl: './account-result-card.css',
 })

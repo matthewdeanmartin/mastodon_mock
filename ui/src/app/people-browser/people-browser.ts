@@ -9,6 +9,7 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
 import { anonymousAccountRouteRef } from '../providers/anonymous/anonymous-route-ref';
 import { Observable } from 'rxjs';
+import { RenderedHtmlLinks } from '../rendered-html-links';
 
 /** Which list this widget pages through. */
 export type PeopleMode = 'followers' | 'following';
@@ -25,7 +26,7 @@ type FollowState = 'idle' | 'busy';
  */
 @Component({
   selector: 'app-people-browser',
-  imports: [RouterLink, VerifiedBadge],
+  imports: [RouterLink, VerifiedBadge, RenderedHtmlLinks],
   templateUrl: './people-browser.html',
   styleUrl: './people-browser.css',
 })

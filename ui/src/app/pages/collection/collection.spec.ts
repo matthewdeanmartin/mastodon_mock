@@ -29,6 +29,9 @@ interface CollectionInternals {
   revokeSelf(): void;
   remove(): void;
   search(): void;
+  sampled: WritableSignal<boolean>;
+  setSampleSize(value: string): void;
+  loadSample(): void;
 }
 
 function internals(fixture: ComponentFixture<CollectionPage>): CollectionInternals {
@@ -187,6 +190,72 @@ describe('CollectionPage', () => {
     expect(internals(fixture).tab()).toBe('members');
     expect(internals(fixture).members()).toHaveLength(kit.itemCount);
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(kit.title);
+  });
+
+  // A preview used to link its members straight to the origin instance, which
+  // dropped the reader out of Mawkingbird. They resolve in-app now, the way the
+  // collection widget on Home already did.
+  it('keeps shipped-collection member links inside the app', () => {
+    const kit = SHIPPED_STARTER_KITS[0];
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { paramMap: of(convertToParamMap({ id: kit.id })) },
+    });
+
+    const fixture = setUp();
+    const links = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('a.member-link'),
+    ] as HTMLAnchorElement[];
+
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      const href = link.getAttribute('href') ?? '';
+      expect(href.startsWith('/accounts')).toBe(true);
+      expect(href).not.toContain('https://');
+    }
+  });
+
+  // Names alone say little about whether you want these people. Sampling costs
+  // one request per member, so nothing loads until it is asked for.
+  it('fetches nothing for a preview until a sample is requested', () => {
+    const kit = SHIPPED_STARTER_KITS[0];
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { paramMap: of(convertToParamMap({ id: kit.id })) },
+    });
+
+    const fixture = setUp();
+
+    expect(internals(fixture).sampled()).toBe(false);
+    httpMock.expectNone((r) => r.url.includes('/statuses'));
+
+    internals(fixture).loadSample();
+
+    // Default size is 5, so at most five member timelines get asked for.
+    const requests = httpMock.match((r) => r.url.includes('/statuses'));
+    expect(requests.length).toBeGreaterThan(0);
+    expect(requests.length).toBeLessThanOrEqual(5);
+    // Each goes to the member's *own* instance. Asking the home server for an
+    // id it has never seen is a guaranteed 404 and an empty sample.
+    for (const request of requests) {
+      expect(request.request.url).toMatch(/^https:\/\//);
+    }
+    requests.forEach((r) => r.flush([]));
+    expect(internals(fixture).sampled()).toBe(true);
+  });
+
+  it('honours a larger chosen sample size', () => {
+    const kit = SHIPPED_STARTER_KITS[0];
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { paramMap: of(convertToParamMap({ id: kit.id })) },
+    });
+
+    const fixture = setUp();
+    internals(fixture).setSampleSize('10');
+    internals(fixture).loadSample();
+
+    const requests = httpMock.match((r) => r.url.includes('/statuses'));
+    expect(requests.length).toBeGreaterThan(5);
+    expect(requests.length).toBeLessThanOrEqual(10);
+    requests.forEach((r) => r.flush([]));
   });
 
   // ---------------------------------------------------------------- feed synthesis

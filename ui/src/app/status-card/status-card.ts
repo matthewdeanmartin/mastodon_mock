@@ -15,6 +15,7 @@ import { AccountHoverCard } from '../account-hover-card/account-hover-card';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
 import { Api } from '../api';
 import { Auth } from '../auth';
+import { hashtagNameFrom } from '../rendered-html-links';
 import { ClientPrefs } from '../client-prefs';
 import { Terminology } from '../terminology';
 import { Compose } from '../compose/compose';
@@ -627,20 +628,9 @@ export class StatusCard {
     }
   }
 
-  /**
-   * Extract a hashtag name from a content anchor, or null if it isn't one.
-   * Mastodon marks these with `class="… hashtag"` and an href ending in
-   * `/tags/<name>`; we fall back to the anchor's visible `#text`.
-   */
+  /** Shared with bios and other rendered HTML — see {@link hashtagNameFrom}. */
   private hashtagName(anchor: HTMLAnchorElement, href: string): string | null {
-    const isHashtag = anchor.classList.contains('hashtag') || /\/tags?\/[^/?#]+\/?$/i.test(href);
-    if (!isHashtag) {
-      return null;
-    }
-    const fromHref = href.match(/\/tags?\/([^/?#]+)\/?$/i)?.[1];
-    const raw = fromHref ?? anchor.textContent ?? '';
-    const name = decodeURIComponent(raw).replace(/^#/, '').trim();
-    return name || null;
+    return hashtagNameFrom(anchor, href);
   }
 
   /** Route resolved Mastodon mentions to Mawkingbird's profile page. */

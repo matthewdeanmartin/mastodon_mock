@@ -51,6 +51,7 @@
   flex: none;
 }
 
+.badge.following-badge,
 .badge.also {
   font-size: 0.75em;
   padding: 2px 7px;

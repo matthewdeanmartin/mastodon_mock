@@ -56,9 +56,25 @@
         </a>
         <div class="row-actions">
           @if (isAlsoOther(a.id)) {
-            <span class="badge also" [title]="'Also ' + otherWord + 'ed'">
-              also {{ otherWord }}ed
+            <span class="badge also" [title]="'Also ' + otherPastTense">
+              also {{ otherPastTense }}
             </span>
+          }
+          <!-- Muting doesn't unfollow, so plenty of these are people you still
+               follow. Unfollow only — following someone from your mute list is
+               not a thing anyone comes here to do. -->
+          @if (canUnfollow(a.id)) {
+            <span class="badge following-badge" title="You still follow this account">
+              following
+            </span>
+            <button
+              class="btn btn-outline btn-sm"
+              [disabled]="isBusy(a.id)"
+              (click)="unfollow(a)"
+              title="Stop following — the mute stays as it is"
+            >
+              Unfollow
+            </button>
           }
           <button class="btn btn-outline btn-sm" (click)="undo(a)">
             {{ kind() === 'mutes' ? 'Unmute' : 'Unblock' }}

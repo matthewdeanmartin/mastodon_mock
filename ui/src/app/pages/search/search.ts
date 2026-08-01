@@ -15,7 +15,7 @@ import { catchError, EMPTY, Observable, of, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Account, Relationship, SearchResults, Status, Tag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
-import { FindPeople } from '../find-people/find-people';
+import { OffsiteDirectories } from '../offsite-directories/offsite-directories';
 import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
@@ -107,7 +107,7 @@ const LOAD_MORE_HARD_CAP = 30;
     FormsModule,
     RouterLink,
     StatusCard,
-    FindPeople,
+    OffsiteDirectories,
     AccountResultCard,
     SearchHelperDialog,
     SearchSyntaxHelp,

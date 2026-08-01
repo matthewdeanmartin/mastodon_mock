@@ -23,7 +23,7 @@
           </a>
           <div class="person-acct muted">&#64;{{ a.acct }}</div>
           @if (a.note) {
-            <div class="person-note" [innerHTML]="a.note"></div>
+            <div class="person-note" appRenderedHtmlLinks [innerHTML]="a.note"></div>
           }
           <div class="person-stats muted small">
             <span>{{ a.followers_count.toLocaleString() }} followers</span>

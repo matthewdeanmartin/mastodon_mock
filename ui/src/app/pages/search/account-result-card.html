@@ -47,7 +47,7 @@
       }
 
       @if (a.note) {
-        <div class="acct-bio" [innerHTML]="a.note"></div>
+        <div class="acct-bio" appRenderedHtmlLinks [innerHTML]="a.note"></div>
       }
 
       <div class="acct-stats muted small">

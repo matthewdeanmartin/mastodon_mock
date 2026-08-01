@@ -16,6 +16,7 @@ import { HumanCountPipe } from '../human-count.pipe';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
 import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
 import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
+import { RenderedHtmlLinks } from '../rendered-html-links';
 
 /**
  * Small card shown when hovering an account's avatar or name: bio,
@@ -26,7 +27,7 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
  */
 @Component({
   selector: 'app-account-hover-card',
-  imports: [VerifiedBadge, HumanCountPipe],
+  imports: [VerifiedBadge, HumanCountPipe, RenderedHtmlLinks],
   template: `
     <div class="hover-card" (mouseenter)="loadRelationship()">
       <img
@@ -50,7 +51,7 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
         }
       </div>
       @if (account().note) {
-        <div class="hc-note" [innerHTML]="account().note"></div>
+        <div class="hc-note" appRenderedHtmlLinks [innerHTML]="account().note"></div>
       }
       @if (showStats() && hasStats) {
         <div class="hc-stats muted">

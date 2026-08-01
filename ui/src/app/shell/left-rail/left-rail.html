@@ -34,11 +34,10 @@
     }
     <p class="card-hint muted">{{ words().Boosted }} by people across the network</p>
   }
-  @if (auth.isAnonymous) {
-    <a class="find-people-link" routerLink="/search">Search for people →</a>
-  } @else {
-    <a class="find-people-link" routerLink="/find-people">Find people to follow →</a>
-  }
+  <!-- The hub, not one of the things on it: this is the most prominent
+       who-to-follow link in the app, and the reader almost never knows yet which
+       of the eight routes they want. -->
+  <a class="find-people-link" routerLink="/find-friends">Find people to follow →</a>
 </section>
 
 @if (trends().length) {

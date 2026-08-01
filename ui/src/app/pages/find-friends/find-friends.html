@@ -9,21 +9,28 @@
   <span class="muted small"> Find accounts by name, bio or the things they post about. </span>
 </a>
 
-<a class="doc-row" routerLink="/starter-kits">
-  <span class="doc-title">Starter Kits</span>
+<a class="doc-row" routerLink="/bundled-starter-kits">
+  <span class="doc-title">Bundled starter kits</span>
   <span class="muted small">
-    Curated bundles of accounts on a theme — follow the whole set at once.
+    Curated sets of accounts assembled by the developer of Mawkingbird — follow a whole set at
+    once.
   </span>
 </a>
 
-@if (!auth.isAnonymous) {
-  <a class="doc-row" routerLink="/find-people">
-    <span class="doc-title">People to follow</span>
-    <span class="muted small">
-      Suggestions drawn from who you already follow, and who they follow.
-    </span>
-  </a>
-}
+<a class="doc-row" routerLink="/bundled-collections">
+  <span class="doc-title">Bundled collections</span>
+  <span class="muted small">
+    Real collections curated by other people, shipped with the app because Mastodon can't search
+    for collections yet.
+  </span>
+</a>
+
+<a class="doc-row" routerLink="/offsite-directories">
+  <span class="doc-title">Offsite directories</span>
+  <span class="muted small">
+    Directories other people run — follow graphs, topic lists, and hand-curated picks.
+  </span>
+</a>
 
 <a class="doc-row" routerLink="/directory">
   <span class="doc-title">Profile directory</span>

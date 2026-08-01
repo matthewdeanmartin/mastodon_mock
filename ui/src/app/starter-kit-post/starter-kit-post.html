@@ -19,43 +19,28 @@
     <div class="kit-members" aria-label="All accounts in {{ kit().title }}">
       @for (account of kit().accounts; track account.url) {
         <span class="kit-member-shell" (mouseenter)="prepareAccount(account)">
-          @if (auth.isAnonymous) {
-            <a
-              class="kit-member"
-              [href]="account.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              [attr.aria-label]="'Open ' + (account.display_name || account.acct) + ' profile'"
-            >
-              <img
-                [src]="account.avatar_static || account.avatar"
-                [alt]="account.display_name || account.acct"
-                width="38"
-                height="38"
-                loading="lazy"
-                decoding="async"
-              />
-              <span>{{ account.display_name || account.username }}</span>
-            </a>
-          } @else {
-            <button
-              type="button"
-              class="kit-member"
-              [disabled]="opening() !== null"
-              (click)="openAccount(account)"
-              [attr.aria-label]="'Open ' + (account.display_name || account.acct) + ' in app'"
-            >
-              <img
-                [src]="accountFor(account).avatar_static || accountFor(account).avatar"
-                [alt]="accountFor(account).display_name || accountFor(account).acct"
-                width="38"
-                height="38"
-                loading="lazy"
-                decoding="async"
-              />
-              <span>{{ accountFor(account).display_name || accountFor(account).username }}</span>
-            </button>
-          }
+          <!-- Anonymous visitors used to get an off-site link here while signed-in
+               ones got an in-app resolve. But reading a profile needs no account —
+               it is the thing an anonymous visitor is most likely to want — and
+               sending them to the origin instance drops them out of Mawkingbird
+               at exactly the moment they are deciding whether to stay. -->
+          <button
+            type="button"
+            class="kit-member"
+            [disabled]="opening() !== null"
+            (click)="openAccount(account)"
+            [attr.aria-label]="'Open ' + (account.display_name || account.acct) + ' in app'"
+          >
+            <img
+              [src]="accountFor(account).avatar_static || accountFor(account).avatar"
+              [alt]="accountFor(account).display_name || accountFor(account).acct"
+              width="38"
+              height="38"
+              loading="lazy"
+              decoding="async"
+            />
+            <span>{{ accountFor(account).display_name || accountFor(account).username }}</span>
+          </button>
           <app-account-hover-card
             [account]="accountFor(account)"
             [allowFollow]="!auth.isAnonymous && isResolved(account)"

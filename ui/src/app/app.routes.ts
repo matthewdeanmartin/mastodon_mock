@@ -383,9 +383,16 @@ export const routes: Routes = [
       },
       ...mockOnlyChildren,
       {
-        path: 'find-people',
-        loadComponent: () => import('./pages/find-people/find-people').then((m) => m.FindPeople),
+        path: 'offsite-directories',
+        loadComponent: () =>
+          import('./pages/offsite-directories/offsite-directories').then(
+            (m) => m.OffsiteDirectories,
+          ),
       },
+      // Was `/find-people`, which promised the same thing as the Find Friends hub
+      // and split the "who to follow" links between them. Redirected rather than
+      // dropped: the old path is linked from released builds and bookmarks.
+      { path: 'find-people', redirectTo: 'offsite-directories', pathMatch: 'full' },
       // The server's opt-in profile directory. Public endpoint, so no auth guard:
       // browsing strangers is exactly what an anonymous visitor is here to do.
       {
@@ -393,9 +400,23 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/directory/directory').then((m) => m.Directory),
       },
       {
-        path: 'starter-kits',
-        loadComponent: () => import('./pages/starter-kits/starter-kits').then((m) => m.StarterKits),
+        path: 'bundled-collections',
+        loadComponent: () =>
+          import('./pages/bundled-collections/bundled-collections').then(
+            (m) => m.BundledCollections,
+          ),
       },
+      {
+        path: 'bundled-starter-kits',
+        loadComponent: () =>
+          import('./pages/bundled-starter-kits/bundled-starter-kits').then(
+            (m) => m.BundledStarterKits,
+          ),
+      },
+      // `/starter-kits` used to hold both kinds at once. They are two different
+      // things — other people's real collections, and ours — so they are two
+      // pages now, and the old path lands on the hub that offers both.
+      { path: 'starter-kits', redirectTo: 'find-friends', pathMatch: 'full' },
       // Feeds hub: lists, saved searches, server feeds, collections and tags in
       // one page. `/feeds/lists` and `/feeds/tags` are filtered views of the same
       // component (see Feeds.only). These literal segments MUST precede the

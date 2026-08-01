@@ -183,76 +183,52 @@ describe('Home', () => {
     expect(internals(fixture).statuses()).toEqual([]);
   });
 
-  it('offers the universal starter pack in an empty zero-follow Anonymous feed', () => {
+  // Home used to inject onboarding into a thin feed: an Eliza invite, the
+  // universal starter kit, and every shipped starter-kit post. It put the same
+  // collections in front of the same person on every fresh browser, so it is
+  // gone — one link to the hub, and only when there is nothing else to show.
+
+  it('offers one link to the Find Friends hub when the feed is empty', () => {
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const link = el.querySelector('a[href="/find-friends"]');
+    expect(link?.textContent).toContain('Find friends');
+    // Nothing else fills the empty feed on its own any more.
+    expect(el.querySelectorAll('app-starter-kit-post')).toHaveLength(0);
+    expect(el.querySelector('.starter-pack-universal')).toBeNull();
+    expect(el.querySelector('.eliza-invite')).toBeNull();
+  });
+
+  it('keeps the pinned login post for Anonymous, which is not onboarding filler', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
 
     const fixture = TestBed.createComponent(Home);
     fixture.detectChanges();
 
-    const link = fixture.nativeElement.querySelector(
-      '.starter-pack-universal a',
-    ) as HTMLAnchorElement;
-    expect(link.textContent).toContain('Get your account started with the universal starter kit');
-    expect(link.getAttribute('href')).toBe('/collections/starter');
     const loginPost = fixture.nativeElement.querySelector(
       '.anonymous-login-post',
     ) as HTMLAnchorElement;
     expect(loginPost.textContent).toContain(
       'Login or create an account to post content, reply and more',
     );
-    expect(loginPost.textContent).toContain('Pinned');
     expect(loginPost.getAttribute('href')).toBe('/login');
-
-    const universal = fixture.nativeElement.querySelector('.starter-pack-universal');
-    const shipped = [
-      ...(fixture.nativeElement as HTMLElement).querySelectorAll('app-starter-kit-post'),
-    ];
-    expect(shipped).toHaveLength(11);
-    expect(
-      universal.compareDocumentPosition(shipped[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(shipped[0].textContent).toContain('Artists of Mastodon');
   });
 
-  it('gives a new signed-in account actionable starter-kit widgets', () => {
-    const auth = TestBed.inject(Auth);
-    auth.setToken('starter-token');
-    auth.setAccount({
-      id: 'me',
-      username: 'new-user',
-      acct: 'new-user',
-      display_name: 'New User',
-      following_count: 0,
-    } as Status['account']);
-
-    const fixture = setUp();
-    fixture.detectChanges();
-    const el = fixture.nativeElement as HTMLElement;
-
-    expect(el.querySelectorAll('app-starter-kit-post')).toHaveLength(11);
-    expect(el.querySelector('app-starter-kit-post')?.textContent).toContain('Follow all');
-    expect(el.querySelector('.starter-pack-universal a')?.getAttribute('href')).toBe(
-      '/collections/starter',
-    );
-  });
-
-  it('keeps the starter pack after following Eliza (still few real friends)', () => {
+  it('drops the hub link as soon as the feed has anything in it', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
     const fixture = TestBed.createComponent(Home);
     fixture.detectChanges();
 
-    // Follow Eliza — her posts now fill the feed, but the onboarding cards must stay.
-    (fixture.componentInstance as unknown as { eliza: { follow(): void } }).eliza.follow();
+    // Following Eliza fills the feed with her posts.
+    internals(fixture).eliza.follow();
     fixture.detectChanges();
 
-    const starter = fixture.nativeElement.querySelector('.starter-pack-universal a');
-    expect(starter).not.toBeNull();
-    // The Eliza invite, however, retires once she's followed.
-    expect(fixture.nativeElement.querySelector('.eliza-invite')).toBeNull();
-    // And the feed is no longer empty.
-    expect(
-      (fixture.componentInstance as unknown as { visible: () => unknown[] }).visible().length,
-    ).toBeGreaterThan(0);
+    expect(internals(fixture).visible().length).toBeGreaterThan(0);
+    expect(fixture.nativeElement.querySelector('a[href="/find-friends"]')).toBeNull();
   });
 
   it('shows the Anonymous practice composer only after Eliza is followed', () => {
