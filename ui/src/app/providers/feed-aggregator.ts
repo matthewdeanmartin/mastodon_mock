@@ -1,8 +1,8 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 import { Api } from '../api';
 import { Auth } from '../auth';
-import { ClientPrefs } from '../client-prefs';
+import { ClientPrefs, homeWindowMs } from '../client-prefs';
 import { HomeDiagnostics } from '../home-diagnostics';
 import { Status } from '../models';
 import { FeedProvider } from './provider';
@@ -40,9 +40,38 @@ export class FeedAggregator {
   private mastodonMaxId: string | undefined;
   private mastodonExhausted = false;
   private foreign: ForeignSource[] = [];
+  /** Epoch ms before which posts are not loaded, or null for no limit. */
+  private cutoff: number | null = null;
+
+  /**
+   * How many posts the current window dropped, so Home can offer to widen it.
+   *
+   * Counted rather than inferred: "you are only seeing today" is useful, but
+   * only if the app can say there is actually something older to see.
+   */
+  readonly droppedByWindow = signal(0);
+
+  /**
+   * Whether a post is inside the loading window.
+   *
+   * An unparseable date counts as *inside*. `normalizeTimestamp` already yields
+   * null rather than now() for a bad date, and those statuses carry epoch 0 —
+   * dropping them would silently hide a post because its provider sent a date
+   * we could not read, which is a worse failure than showing it.
+   */
+  private withinWindow(status: Status): boolean {
+    if (this.cutoff === null) {
+      return true;
+    }
+    const ms = Date.parse(status.created_at);
+    return Number.isNaN(ms) || ms === 0 || ms >= this.cutoff;
+  }
 
   /** Start over from the top using the providers currently visible to the user. */
   reset(): void {
+    const windowMs = homeWindowMs(this.prefs.homeWindow());
+    this.cutoff = windowMs === null ? null : Date.now() - windowMs;
+    this.droppedByWindow.set(0);
     this.mastodonMaxId = undefined;
     this.mastodonExhausted = this.auth.isAnonymous || !this.prefs.isProviderVisible('mastodon');
     this.foreign = this.registry
@@ -92,7 +121,15 @@ export class FeedAggregator {
             if (items.length < SOURCE_PAGE_SIZE) {
               this.mastodonExhausted = true;
             }
-            return items;
+            // A page is newest-first, so once it crosses the cutoff everything
+            // beyond it is older still — stop rather than paging into the
+            // archive. This is what keeps "Today" from loading a year.
+            const fresh = items.filter((item) => this.withinWindow(item));
+            if (fresh.length < items.length) {
+              this.droppedByWindow.update((n) => n + (items.length - fresh.length));
+              this.mastodonExhausted = true;
+            }
+            return fresh;
           }),
           tap({
             next: (items) =>
@@ -147,7 +184,17 @@ export class FeedAggregator {
           source.exhausted = true;
           return of(collected);
         }
-        return this.fetchForeignPage(source, [...collected, ...items]);
+        // Same rule as Mastodon: a source that has gone past the cutoff has
+        // nothing newer left to give, so stop paging it. Without this, a
+        // provider that merges many low-rate sources (RSS, and Anonymous
+        // client-side follows worst of all) keeps paging until it has loaded
+        // every post it has ever seen.
+        const fresh = items.filter((item) => this.withinWindow(item));
+        if (fresh.length < items.length) {
+          this.droppedByWindow.update((n) => n + (items.length - fresh.length));
+          source.exhausted = true;
+        }
+        return this.fetchForeignPage(source, [...collected, ...fresh]);
       }),
     );
   }

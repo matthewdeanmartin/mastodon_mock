@@ -1,6 +1,6 @@
 # Home feed freshness — merging many providers without a stale tail
 
-**Status:** decided, not yet built
+**Status:** built and verified (2026-08-01)
 **Date:** 2026-08-01
 
 ## The problem, as reported
@@ -68,15 +68,38 @@ boundary. A rolling 24h window matches how someone actually reads a feed.
 is empty if you check twice in an hour, and behaves oddly across devices or
 after a week away.
 
-## Implementation sketch
+## Built
+
+Verified in a browser with three tweets — now, three days old, and from 2019:
+
+| Window | Cards | now | 3 days | 2019 | "older hidden" note |
+|---|---:|---|---|---|---|
+| Today | 6 | shown | — | — | shown |
+| This week | 7 | shown | shown | — | shown |
+| Everything | 8 | shown | shown | shown | hidden |
+
+The card count *growing* with the window is the proof it bounds loading rather
+than hiding: a display-only filter would show 8 cards' worth of DOM in every
+row. The choice survives a reload.
+
+One design detail worth keeping: an **unparseable date counts as inside** the
+window. `normalizeTimestamp` yields null rather than `now()` for a bad date and
+those statuses carry epoch 0, so dropping them would silently hide a post
+because its provider sent a date we could not read — a worse failure than
+showing it out of order.
+
+Existing specs in `feed-aggregator.spec.ts` and `home.spec.ts` opt out with
+`setHomeWindow('all')`: they use fixed 2026-01-01/07-14 dates and assert merge
+and paging behaviour, which the default window would mask.
+
+### How it is wired
 
 - `ClientPrefs.homeWindow: 'today' | 'week' | 'all'`, default `'today'`.
 - `FeedAggregator` gains a cutoff. A source is marked exhausted as soon as its
   newest unconsumed post is older than the cutoff, so paging stops naturally
   rather than being filtered afterwards.
-- `TwitterProvider` already returns one page and reports exhausted; it just
-  filters that page by the cutoff. Its `COLD_START_BUDGET` should skip accounts
-  whose cached newest post is already outside the window.
+- `TwitterProvider` needed no change: it already returns one page and reports
+  exhausted, so the aggregator's cutoff filters it like any other source.
 - The chip goes in `home.html` next to Retweets/Replies. The bar is crowded, so
   it renders as a single chip with a dropdown rather than three chips.
 - Changing the window calls `load()`, which is the existing refresh path.

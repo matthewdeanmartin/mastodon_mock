@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ACCENT_PRESETS, ClientPrefs } from './client-prefs';
+import { ACCENT_PRESETS, ClientPrefs, homeWindowMs } from './client-prefs';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
 const TOKEN_KEY = 'mastodon_mock_token';
@@ -240,5 +240,25 @@ describe('ClientPrefs', () => {
 
     localStorage.setItem(TOKEN_KEY, 'token-two');
     expect(recreate().defaultVisibility()).toBe('public');
+  });
+
+  it('defaults the home window to the last 24 hours', () => {
+    // Merging providers that publish at very different rates sorts badly by
+    // date alone, so Home reaches back one rolling day unless asked otherwise.
+    // Rolling rather than since-midnight: "Today" at 00:05 would be empty.
+    expect(TestBed.inject(ClientPrefs).homeWindow()).toBe('today');
+    expect(homeWindowMs('today')).toBe(24 * 60 * 60 * 1000);
+    expect(homeWindowMs('week')).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(homeWindowMs('all')).toBeNull();
+  });
+
+  it('remembers a chosen home window across a reload', () => {
+    TestBed.inject(ClientPrefs).setHomeWindow('all');
+    // Persistence runs in an effect, so it needs a flush before the value is
+    // in localStorage for the next instance to read.
+    TestBed.tick();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(ClientPrefs).homeWindow()).toBe('all');
   });
 });

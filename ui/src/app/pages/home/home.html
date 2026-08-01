@@ -101,7 +101,32 @@
     >
       💬 Replies
     </button>
+    <!-- How far back the feed reaches. A select rather than three chips: the
+         bar is already crowded, and these are mutually exclusive. -->
+    <label class="home-window">
+      📅
+      <select
+        [ngModel]="prefs.homeWindow()"
+        (ngModelChange)="setHomeWindow($event)"
+        aria-label="How far back to load"
+      >
+        <option value="today">Today</option>
+        <option value="week">This week</option>
+        <option value="all">Everything</option>
+      </select>
+    </label>
   </div>
+
+  <!-- Only shown when something was actually left out, so it is an offer
+       rather than a permanent disclaimer. -->
+  @if (olderAvailable()) {
+    <p class="muted small older-note">
+      Older posts are hidden.
+      <button type="button" class="link-button" (click)="widenWindow()">
+        {{ prefs.homeWindow() === 'today' ? 'Show this week' : 'Show everything' }}
+      </button>
+    </p>
+  }
 
   @if (auth.isAnonymous && anonymousProvider.errors().length) {
     <aside class="muted" role="status">

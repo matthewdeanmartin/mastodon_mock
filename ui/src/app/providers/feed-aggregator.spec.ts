@@ -111,6 +111,10 @@ describe('FeedAggregator', () => {
         },
       ],
     });
+    // These specs assert *merge* behaviour with fixed 2026-07-14 dates, which
+    // sit outside the default 24h loading window. The window has its own
+    // describe block below; here it would only mask what is being tested.
+    TestBed.inject(ClientPrefs).setHomeWindow('all');
   });
 
   it('with no providers linked, passes the Mastodon timeline through page by page', async () => {
@@ -281,6 +285,85 @@ describe('FeedAggregator', () => {
     expect(aggregator.hasMore()).toBe(false);
     expect(diagnostics.error).toHaveBeenCalledWith('foreign:page-error', expect.any(Error), {
       provider: 'rss',
+    });
+  });
+  // ------------------------------------------------------- loading window
+
+  describe('the loading window bounds what is fetched, not just what is shown', () => {
+    const hoursAgo = (n: number) => new Date(Date.now() - n * 3600_000).toISOString();
+
+    /** Build the aggregator with a chosen window. */
+    function withWindow(window: 'today' | 'week' | 'all'): FeedAggregator {
+      TestBed.inject(ClientPrefs).setHomeWindow(window);
+      const aggregator = TestBed.inject(FeedAggregator);
+      aggregator.reset();
+      return aggregator;
+    }
+
+    it('drops posts older than the window', async () => {
+      homeTimeline.mockReturnValue(
+        of([makeStatus('fresh', hoursAgo(1)), makeStatus('ancient', hoursAgo(48))]),
+      );
+      const page = await firstValueFrom(withWindow('today').nextPage());
+      expect(page.map((s) => s.id)).toEqual(['fresh']);
+    });
+
+    it('stops paging a source that has crossed the cutoff', async () => {
+      // The point of the whole feature: an RSS feed or a dormant Twitter
+      // account should not keep being paged into its 2019 archive just because
+      // the busy sources ran out. Without this the page grows without bound —
+      // worst of all for Anonymous client-side follows, which merge 20-40
+      // accounts.
+      fakeRss.linked.set(true);
+      fakeRss.pages = [
+        [rssStatus('r1', hoursAgo(2)), rssStatus('r2', hoursAgo(100))],
+        [rssStatus('r3', hoursAgo(200))],
+      ];
+      homeTimeline.mockReturnValue(of([]));
+
+      const page = await firstValueFrom(withWindow('today').nextPage());
+      expect(page.map((s) => s.id)).toEqual(['r1']);
+      // One call only: the source was retired the moment it went past the
+      // cutoff, rather than being paged again and filtered afterwards.
+      expect(fakeRss.fetchPage).toHaveBeenCalledTimes(1);
+    });
+
+    it('loads everything when the window is off', async () => {
+      fakeRss.linked.set(true);
+      fakeRss.pages = [[rssStatus('r1', hoursAgo(2)), rssStatus('r2', hoursAgo(9000))], []];
+      homeTimeline.mockReturnValue(of([]));
+
+      const page = await firstValueFrom(withWindow('all').nextPage());
+      expect(page.map((s) => s.id)).toEqual(['r1', 'r2']);
+    });
+
+    it('honours a week-long window', async () => {
+      homeTimeline.mockReturnValue(
+        of([makeStatus('recent', hoursAgo(48)), makeStatus('old', hoursAgo(24 * 9))]),
+      );
+      const page = await firstValueFrom(withWindow('week').nextPage());
+      expect(page.map((s) => s.id)).toEqual(['recent']);
+    });
+
+    it('reports how much was hidden, so Home can offer to widen', async () => {
+      homeTimeline.mockReturnValue(
+        of([makeStatus('fresh', hoursAgo(1)), makeStatus('a', hoursAgo(48)), makeStatus('b', hoursAgo(72))]),
+      );
+      const aggregator = withWindow('today');
+      await firstValueFrom(aggregator.nextPage());
+      expect(aggregator.droppedByWindow()).toBe(2);
+    });
+
+    it('keeps a post whose date cannot be parsed', async () => {
+      // normalizeTimestamp yields null rather than now() for an unreadable
+      // date, and those statuses land at epoch 0. Dropping them would hide a
+      // post because its provider sent a date we could not read, which is a
+      // worse failure than showing it out of order.
+      homeTimeline.mockReturnValue(
+        of([makeStatus('fresh', hoursAgo(1)), makeStatus('undated', 'not-a-date')]),
+      );
+      const page = await firstValueFrom(withWindow('today').nextPage());
+      expect(page.map((s) => s.id)).toContain('undated');
     });
   });
 });

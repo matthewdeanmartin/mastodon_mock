@@ -30,6 +30,38 @@ const PROVIDER_IDS: ProviderId[] = [
   'paste',
 ];
 
+/**
+ * How far back the home feed reaches.
+ *
+ * Merging providers that publish at wildly different rates sorts badly by date
+ * alone: Mastodon and Bluesky produce posts continuously, while a followed
+ * Twitter account or an RSS feed may produce one a month. The high-rate sources
+ * fill the top, and once they run out the low-rate ones dump their entire back
+ * catalogue — so scrolling down reaches posts from years ago that the reader has
+ * already seen.
+ *
+ * This bounds what is *loaded*, not just what is shown. A window that only hid
+ * old posts would leave the page just as large (the Anonymous client-side
+ * follows feed is the worst case) and would still spend Twitter's cold-start
+ * budget on accounts dormant since 2019.
+ *
+ * `today` is a rolling 24 hours rather than "since local midnight", which would
+ * be nearly empty at 00:05 and jump at the day boundary.
+ */
+export type HomeWindow = 'today' | 'week' | 'all';
+
+/** Cutoff in ms for each window, or null for "no limit". */
+export function homeWindowMs(window: HomeWindow): number | null {
+  switch (window) {
+    case 'today':
+      return 24 * 60 * 60 * 1000;
+    case 'week':
+      return 7 * 24 * 60 * 60 * 1000;
+    default:
+      return null;
+  }
+}
+
 export type ThemeMode = 'light' | 'dark' | 'auto';
 
 /** Mastodon's four post visibilities, in descending reach. */
@@ -139,6 +171,7 @@ interface StoredPrefs {
   readerWordSpacing?: number;
   readerTextAlign?: ReaderTextAlign;
   feedReader?: boolean;
+  homeWindow?: HomeWindow;
   showImages?: boolean;
   hiddenProviders?: ProviderId[];
   chatAudience?: ChatAudience;
@@ -231,6 +264,13 @@ export class ClientPrefs {
 
   // Feed-wide toggles (command bar).
   readonly feedReader = signal<boolean>(false);
+
+  /**
+   * How far back Home reaches. Defaults to the last 24 hours — see
+   * {@link HomeWindow} for why this bounds loading rather than only display.
+   */
+  readonly homeWindow = signal<HomeWindow>('today');
+
   readonly showImages = signal<boolean>(true);
 
   /** Providers filtered OUT of the home feed via the command-bar chips. */
@@ -420,6 +460,10 @@ export class ClientPrefs {
     this.feedReader.set(on);
   }
 
+  setHomeWindow(window: HomeWindow): void {
+    this.homeWindow.set(window);
+  }
+
   setShowImages(on: boolean): void {
     this.showImages.set(on);
   }
@@ -595,6 +639,13 @@ export class ClientPrefs {
       this.verifiedMode.set(stored.verifiedMode);
     }
     this.loadBool(stored.feedReader, this.feedReader);
+    if (
+      stored.homeWindow === 'today' ||
+      stored.homeWindow === 'week' ||
+      stored.homeWindow === 'all'
+    ) {
+      this.homeWindow.set(stored.homeWindow);
+    }
     this.loadBool(stored.showImages, this.showImages);
     if (typeof stored.readerFontSize === 'number') {
       this.setReaderFontSize(stored.readerFontSize);
@@ -688,6 +739,7 @@ export class ClientPrefs {
       readerWordSpacing: this.readerWordSpacing(),
       readerTextAlign: this.readerTextAlign(),
       feedReader: this.feedReader(),
+      homeWindow: this.homeWindow(),
       showImages: this.showImages(),
       chatAudience: this.chatAudience(),
       rssCacheTtlHours: this.rssCacheTtlHours(),

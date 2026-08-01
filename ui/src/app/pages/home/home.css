@@ -208,3 +208,27 @@ a.eliza-invite:hover {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* How far back the feed reaches. Sits with the Retweets/Replies chips. */
+.home-window {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.home-window select {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+
+.older-note {
+  margin: 6px 0 0;
+}

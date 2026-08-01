@@ -5,7 +5,7 @@ import { map, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Drafts } from '../../drafts';
-import { ClientPrefs, FEED_MAX_COOLDOWN_MS } from '../../client-prefs';
+import { ClientPrefs, FEED_MAX_COOLDOWN_MS, HomeWindow } from '../../client-prefs';
 import { Status } from '../../models';
 import { isCalmHidden } from '../../sentiment';
 import { FeedLanguageFilter } from '../../trend-language-filter';
@@ -20,6 +20,7 @@ import { Announcements } from '../../announcements/announcements';
 import { Streaming } from '../../streaming';
 import { HomeTimelineFeed } from '../../home-timeline-feed';
 import { HomeDiagnostics } from '../../home-diagnostics';
+import { FormsModule } from '@angular/forms';
 import { FeedAggregator } from '../../providers/feed-aggregator';
 import { ProviderRegistry } from '../../providers/provider-registry';
 import { Server } from '../../server';
@@ -53,6 +54,7 @@ const BOOKMARK_TAIL_SIZE = 40;
 @Component({
   selector: 'app-home',
   imports: [
+    FormsModule,
     CommandBar,
     Compose,
     StatusCard,
@@ -77,6 +79,31 @@ export class Home implements OnInit, OnDestroy {
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private diagnostics = inject(HomeDiagnostics);
   private aggregator = inject(FeedAggregator);
+
+  /**
+   * Whether the window actually hid something, so the offer to widen it only
+   * appears when there is more to see. A permanent "older posts are hidden"
+   * note would be furniture; this is an answer to a question the reader is
+   * about to ask when the feed ends sooner than expected.
+   */
+  protected readonly olderAvailable = computed(
+    () => this.aggregator.droppedByWindow() > 0 && this.prefs.homeWindow() !== 'all',
+  );
+
+  /** Change how far back Home reaches. Reloads, because the window bounds
+   *  what is *fetched* rather than only what is shown. */
+  protected setHomeWindow(window: HomeWindow): void {
+    if (window === this.prefs.homeWindow()) {
+      return;
+    }
+    this.prefs.setHomeWindow(window);
+    this.load(true);
+  }
+
+  /** One step wider, from the note under the filter bar. */
+  protected widenWindow(): void {
+    this.setHomeWindow(this.prefs.homeWindow() === 'today' ? 'week' : 'all');
+  }
   private registry = inject(ProviderRegistry);
   private server = inject(Server);
   private anonymousCorpus = inject(AnonymousFeedCorpus);

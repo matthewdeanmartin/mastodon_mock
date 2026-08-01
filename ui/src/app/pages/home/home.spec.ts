@@ -90,6 +90,14 @@ describe('Home', () => {
     localStorage.clear();
   });
 
+  beforeEach(() => {
+    // These specs use fixed 2026-01-01 dates and assert paging, filtering and
+    // views — not recency. The default 24h loading window would drop every
+    // fixture and stop paging on the first page. The window has its own
+    // coverage in feed-aggregator.spec.ts.
+    TestBed.inject(ClientPrefs).setHomeWindow('all');
+  });
+
   function setUp(): ComponentFixture<Home> {
     const fixture = TestBed.createComponent(Home);
     fixture.detectChanges();
