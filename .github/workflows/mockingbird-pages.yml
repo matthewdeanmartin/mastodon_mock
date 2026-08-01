@@ -6,6 +6,8 @@ name: Deploy Mawkingbird production
 # branch:
 #   /         -> production (this workflow, run on demand)
 #   /canary/  -> canary     (mockingbird-canary.yml, every main commit)
+# The same promoted commit is also built for the separate mirror repository:
+#   https://matthewdeanmartin.github.io/mawkingbird/
 #
 # This workflow rewrites the branch root but preserves the /canary/ subtree, so
 # promoting prod never clobbers canary.
@@ -22,13 +24,13 @@ on:
 concurrency:
   group: gh-pages-branch
   cancel-in-progress: false
-permissions:
-  contents: write
 jobs:
   build:
     name: Build and deploy production
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
     env:
       CUSTOM_DOMAIN: mawkingbird.com
     steps:
@@ -66,3 +68,55 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/publish-gh-pages.sh root ui/dist-mockingbird/browser
+
+  mirror:
+    name: Build and deploy github.io mirror
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      MIRROR_BASE_HREF: /mawkingbird/
+      MIRROR_REPOSITORY: matthewdeanmartin/mawkingbird
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Configure mirror deploy key
+        env:
+          MIRROR_DEPLOY_KEY: ${{ secrets.MAWKINGBIRD_DEPLOY_KEY }}
+        run: |
+          test -n "$MIRROR_DEPLOY_KEY"
+          key="$RUNNER_TEMP/mawkingbird-deploy-key"
+          known_hosts="$RUNNER_TEMP/github-known-hosts"
+          printf '%s\n' "$MIRROR_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          curl --fail --silent --show-error https://api.github.com/meta \
+            | jq --raw-output '.ssh_keys[] | "github.com " + .' > "$known_hosts"
+          echo "GIT_SSH_COMMAND=ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts" \
+            >> "$GITHUB_ENV"
+      - name: Stamp build info
+        run: node ui/scripts/gen-build-info.mjs
+      - name: Build github.io mirror
+        run: make mockingbird MOCKINGBIRD_BASE_HREF="$MIRROR_BASE_HREF"
+      - name: Add standalone SPA fallback
+        # This Pages repository hosts only one SPA, so its generated index is
+        # also the correct fallback for every deep link under /mawkingbird/.
+        run: cp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
+      - name: Verify mirror layout
+        run: |
+          grep --fixed-strings '<base href="/mawkingbird/"/>' ui/dist-mockingbird/browser/index.html
+          cmp ui/dist-mockingbird/browser/index.html ui/dist-mockingbird/browser/404.html
+          test ! -e ui/dist-mockingbird/browser/CNAME
+      - name: Publish github.io mirror
+        env:
+          PUBLISH_REMOTE: git@github.com:${{ env.MIRROR_REPOSITORY }}.git
+        run: bash .github/scripts/publish-gh-pages.sh standalone ui/dist-mockingbird/browser
