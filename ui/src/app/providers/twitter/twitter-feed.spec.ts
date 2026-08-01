@@ -3,6 +3,7 @@ import { firstValueFrom, Observable, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../../models';
 import { TwitterApi, TwitterPage } from './twitter-api';
+import { CachedTimelineRecord, TwitterCache } from './twitter-cache';
 import { TwitterFeed, TIMELINE_TTL_MS } from './twitter-feed';
 import { TwitterFollow, TwitterFollows } from './twitter-follows';
 
@@ -222,5 +223,142 @@ describe('TwitterFeed', () => {
     feed.evict('NASA');
     await firstValueFrom(feed.timeline(FOLLOW));
     expect(getUserPosts).toHaveBeenCalledTimes(2);
+  });
+
+  describe('persistence across reloads', () => {
+    /** Rebuild the injector so a fresh TwitterFeed hydrates from `stored`. */
+    async function reload(stored: CachedTimelineRecord[]): Promise<TwitterFeed> {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: TwitterApi, useValue: { getUserPosts } },
+          {
+            provide: TwitterCache,
+            useValue: {
+              load: () => Promise.resolve(stored),
+              put: () => Promise.resolve(),
+              evict: () => Promise.resolve(),
+              clear: () => Promise.resolve(),
+              entries: () => Promise.resolve(stored),
+            },
+          },
+        ],
+      });
+      const fresh = TestBed.inject(TwitterFeed);
+      await fresh.hydrated;
+      return fresh;
+    }
+
+    it('serves restored posts without a request', async () => {
+      // The whole point: a reload used to cost one request per followed
+      // account, which at any real follow count is the largest avoidable spend
+      // in the product.
+      const fresh = await reload([
+        { handle: 'nasa', statuses: [status('1')], fetchedAt: Date.now() - 60_000 },
+      ]);
+      getUserPosts.mockClear();
+      await expect(firstValueFrom(fresh.timeline(FOLLOW))).resolves.toHaveLength(1);
+      expect(getUserPosts).not.toHaveBeenCalled();
+    });
+
+    it('does not refetch a restored entry just because it is older than the TTL', async () => {
+      // A naive age test would make every cold start bill a request per account
+      // — the exact cost this persistence exists to remove. Restored entries are
+      // shown and left alone until the reader asks for new posts.
+      const fresh = await reload([
+        { handle: 'nasa', statuses: [status('1')], fetchedAt: Date.now() - TIMELINE_TTL_MS * 10 },
+      ]);
+      getUserPosts.mockClear();
+      await firstValueFrom(fresh.timeline(FOLLOW));
+      expect(getUserPosts).not.toHaveBeenCalled();
+    });
+
+    it('says a restored copy is a saved one rather than passing it off as current', async () => {
+      const fresh = await reload([
+        { handle: 'nasa', statuses: [status('1')], fetchedAt: Date.now() - TIMELINE_TTL_MS * 10 },
+      ]);
+      expect(fresh.isStale('NASA')).toBe(true);
+      // A fetch this session replaces it, and it stops being flagged.
+      await firstValueFrom(fresh.timeline(FOLLOW, true));
+      expect(fresh.isStale('NASA')).toBe(false);
+    });
+
+    it('lets an explicit refresh replace a restored entry', async () => {
+      const fresh = await reload([
+        { handle: 'nasa', statuses: [status('1')], fetchedAt: Date.now() },
+      ]);
+      getUserPosts.mockClear();
+      await firstValueFrom(fresh.timeline(FOLLOW, true));
+      expect(getUserPosts).toHaveBeenCalledTimes(1);
+    });
+
+    it('writes a successful fetch to the store', async () => {
+      const put = vi.fn().mockResolvedValue(undefined);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: TwitterApi, useValue: { getUserPosts } },
+          {
+            provide: TwitterCache,
+            useValue: {
+              load: () => Promise.resolve([]),
+              put,
+              evict: () => Promise.resolve(),
+              clear: () => Promise.resolve(),
+              entries: () => Promise.resolve([]),
+            },
+          },
+        ],
+      });
+      const fresh = TestBed.inject(TwitterFeed);
+      await fresh.hydrated;
+      await firstValueFrom(fresh.timeline(FOLLOW));
+      expect(put).toHaveBeenCalledWith(
+        expect.objectContaining({ handle: 'nasa', userId: '11348282' }),
+      );
+    });
+
+    it('waits for the disk read before deciding to spend anything', async () => {
+      // The cold page load is the exact navigation this feature exists to make
+      // free. If the read raced hydration it would miss, bill a request, and
+      // then have the saved copy land moments later — paying for it twice.
+      const slowLoad = new Promise<CachedTimelineRecord[]>((resolve) =>
+        setTimeout(
+          () => resolve([{ handle: 'nasa', statuses: [status('7')], fetchedAt: Date.now() }]),
+          5,
+        ),
+      );
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: TwitterApi, useValue: { getUserPosts } },
+          {
+            provide: TwitterCache,
+            useValue: {
+              load: () => slowLoad,
+              put: () => Promise.resolve(),
+              evict: () => Promise.resolve(),
+              clear: () => Promise.resolve(),
+              entries: () => Promise.resolve([]),
+            },
+          },
+        ],
+      });
+      const fresh = TestBed.inject(TwitterFeed);
+      getUserPosts.mockClear();
+      // Subscribed immediately, before the store has answered.
+      const statuses = await firstValueFrom(fresh.timeline(FOLLOW));
+      expect(statuses[0].id).toBe('twitter:7');
+      expect(getUserPosts).not.toHaveBeenCalled();
+    });
+
+    it('finds a restored post for the thread page', async () => {
+      // A shared link opened in a new tab now resolves from disk instead of
+      // paying for a lookup.
+      const fresh = await reload([
+        { handle: 'nasa', statuses: [status('42')], fetchedAt: Date.now() },
+      ]);
+      expect(fresh.findCached('twitter:42')?.id).toBe('twitter:42');
+    });
   });
 });

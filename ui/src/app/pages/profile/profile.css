@@ -478,3 +478,33 @@ h2 {
   font-size: 16px;
   line-height: 1.45;
 }
+
+/* Saved-copy notice for X profiles. Informational rather than an error: the
+   posts below it are real, just not freshly fetched. */
+.stale-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle, transparent);
+  font-size: 14px;
+}
+
+.stale-notice button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.stale-notice button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

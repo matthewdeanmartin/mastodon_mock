@@ -6,12 +6,14 @@ import {
   map,
   Observable,
   of,
+  switchMap,
   takeWhile,
   tap,
   toArray,
 } from 'rxjs';
 import { Account, Status } from '../../models';
 import { TwitterApi, TwitterPage } from './twitter-api';
+import { TwitterCache } from './twitter-cache';
 import { TwitterFollow, TwitterFollows } from './twitter-follows';
 import { TwitterUsage } from './twitter-usage';
 
@@ -29,6 +31,13 @@ export const TIMELINE_TTL_MS = 5 * 60 * 1000;
 interface CacheEntry {
   page: TwitterPage;
   fetchedAt: number;
+  /**
+   * True when this came off disk rather than the network this session.
+   *
+   * Distinguishes "old but shown deliberately" from "fresh", which is what lets
+   * a reload render instantly without also making the app refetch on open.
+   */
+  persisted?: boolean;
 }
 
 /**
@@ -47,20 +56,56 @@ interface CacheEntry {
  * - Refresh is always an explicit act. Nothing here polls, and nothing
  *   refetches on focus or reconnect.
  *
- * In-memory rather than IndexedDB (unlike {@link RssCache}): these URLs and
- * media links expire, the data is someone's live timeline, and persisting a
- * stranger's posts across sessions buys little. A page reload costs one
- * request, which is the honest price of asking for current data.
+ * ## Two layers, and why
+ *
+ * The `Map` below is the synchronous source of truth; {@link TwitterCache}
+ * backs it with IndexedDB. That split is deliberate rather than incidental:
+ * `isCached()`, `estimateCost()` and `findCached()` are called from templates
+ * and from cost labels that must answer *now*, so making them async would push
+ * `await` into the render path for no benefit. Instead the persisted entries are
+ * hydrated into the map once at startup, and writes go to both.
+ *
+ * This class previously kept the cache in memory only, on the reasoning that
+ * media URLs expire and persisting a stranger's posts "buys little". That was
+ * wrong about the trade-off: a reload cost one request *per followed account*,
+ * which at any real follow count is the largest avoidable spend in the product.
+ * Expiring media URLs argue for refetching an image that fails to load, not for
+ * discarding the text.
  */
 @Injectable({ providedIn: 'root' })
 export class TwitterFeed {
   private api = inject(TwitterApi);
   private follows = inject(TwitterFollows);
   private usage = inject(TwitterUsage);
+  private store = inject(TwitterCache);
 
   private cache = new Map<string, CacheEntry>();
   /** Handles whose last fetch failed, so a broken one is not billed repeatedly. */
   private failed = new Map<string, { message: string; at: number }>();
+
+  /**
+   * Resolves once persisted entries have been read into {@link cache}.
+   *
+   * Callers do not await this — a timeline read that arrives before hydration
+   * finishes simply misses and fetches, which is the old behaviour and is
+   * correct, just not free. Exposed so specs can settle it deterministically.
+   */
+  readonly hydrated: Promise<void> = this.hydrate();
+
+  private async hydrate(): Promise<void> {
+    for (const record of await this.store.load()) {
+      // Never overwrite a fetch that already happened this session: it is newer
+      // than anything on disk by definition.
+      if (this.cache.has(record.handle)) {
+        continue;
+      }
+      this.cache.set(record.handle, {
+        page: { statuses: record.statuses, cursor: null, hasMore: false, skipped: 0 },
+        fetchedAt: record.fetchedAt,
+        persisted: true,
+      });
+    }
+  }
 
   /**
    * Requests spent, delegated to {@link TwitterUsage}.
@@ -71,10 +116,38 @@ export class TwitterFeed {
    */
   readonly requestCount = computed(() => this.usage.total());
 
+  /**
+   * Whether a held entry is worth spending a request to replace.
+   *
+   * A restored entry is *never* refetched automatically, however old it is. This
+   * is the rule that keeps opening the app free: hydrated posts are minutes or
+   * hours old, so a plain age test would make every cold start bill one request
+   * per followed account — precisely the cost the persistence was added to
+   * avoid. Restored entries are shown, flagged {@link isStale}, and replaced
+   * only when the reader asks.
+   */
+  private shouldRefetch(entry: CacheEntry, now: number = Date.now()): boolean {
+    if (entry.persisted) {
+      return false;
+    }
+    return now - entry.fetchedAt >= TIMELINE_TTL_MS;
+  }
+
   /** Whether this account's posts can be served without a request. */
   isCached(username: string): boolean {
     const entry = this.cache.get(key(username));
-    return !!entry && Date.now() - entry.fetchedAt < TIMELINE_TTL_MS;
+    return !!entry && !this.shouldRefetch(entry);
+  }
+
+  /**
+   * Whether what we would show came off disk rather than the network.
+   *
+   * Drives the "Saved copy — Refresh for new posts" note. Saying so matters: the
+   * alternative is silently presenting yesterday's timeline as though it were
+   * current, which is worse than either refetching or showing nothing.
+   */
+  isStale(username: string): boolean {
+    return this.cache.get(key(username))?.persisted === true;
   }
 
   /** When this account was last fetched, or null. */
@@ -100,9 +173,17 @@ export class TwitterFeed {
    * never from a navigation, a focus event, or a retry.
    */
   timeline(follow: TwitterFollow, force = false): Observable<Status[]> {
+    // Wait for the disk read before deciding whether to spend anything. Without
+    // this the very navigation that persistence exists to make free — a cold
+    // page load — would race hydration, miss the cache and bill a request, and
+    // the saved copy would land moments later having been paid for twice.
+    return from(this.hydrated).pipe(switchMap(() => this.read(follow, force)));
+  }
+
+  private read(follow: TwitterFollow, force: boolean): Observable<Status[]> {
     const cacheKey = key(follow.username);
     const cached = this.cache.get(cacheKey);
-    if (!force && cached && Date.now() - cached.fetchedAt < TIMELINE_TTL_MS) {
+    if (!force && cached && !this.shouldRefetch(cached)) {
       return of(cached.page.statuses);
     }
     // A handle that just failed is not re-billed on the next navigation. An
@@ -114,15 +195,25 @@ export class TwitterFeed {
 
     return this.api.getUserPosts({ userId: follow.userId, username: follow.username }).pipe(
       tap((page) => {
-        this.cache.set(cacheKey, { page, fetchedAt: Date.now() });
+        const fetchedAt = Date.now();
+        this.cache.set(cacheKey, { page, fetchedAt });
         this.failed.delete(cacheKey);
         // Bank the stable id and current profile details for free, from a fetch
         // that was happening anyway.
         const author = page.statuses[0]?.reblog?.account ?? page.statuses[0]?.account;
+        const userId = authorIdOf(page, follow.username);
         this.follows.recordProfile(follow.username, {
-          userId: authorIdOf(page, follow.username),
+          userId,
           displayName: author?.display_name,
           avatar: author?.avatar,
+        });
+        // Fire-and-forget: a storage failure must not fail a fetch whose posts
+        // are already in hand and about to render.
+        void this.store.put({
+          handle: cacheKey,
+          statuses: page.statuses,
+          fetchedAt,
+          userId,
         });
       }),
       map((page) => page.statuses),
@@ -221,6 +312,25 @@ export class TwitterFeed {
   evict(username: string): void {
     this.cache.delete(key(username));
     this.failed.delete(key(username));
+    void this.store.evict(key(username));
+  }
+
+  /**
+   * Forget every cached timeline, on disk and in memory.
+   *
+   * Offered on the connector page next to the follow list. Unlike Refresh this
+   * costs nothing and spends nothing — it is for someone who wants the stored
+   * posts gone, not someone who wants newer ones.
+   */
+  async clear(): Promise<void> {
+    this.cache.clear();
+    this.failed.clear();
+    await this.store.clear();
+  }
+
+  /** How many handles have posts held on disk, for the connector page to report. */
+  async storedCount(): Promise<number> {
+    return (await this.store.entries()).length;
   }
 }
 

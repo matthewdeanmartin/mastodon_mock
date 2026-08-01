@@ -156,8 +156,16 @@ describe('identity guards are permissive about everything but identity', () => {
   });
 
   it('rejects a numeric id, which would mean it had been through a JS number', () => {
-    // 2083317461269598348 does not survive a round-trip through a double.
-    expect(isWireTweet({ id: 2083317461269598348, author: { userName: 'a' } })).toBe(false);
+    // A snowflake id does not survive a round-trip through a double: parsing
+    // "2083317461269598348" as a number yields 2083317461269598200. Any id
+    // arriving as a number has therefore already been corrupted, so the guard
+    // rejects it rather than rendering a post that links to the wrong place.
+    //
+    // Built with Number() rather than written as a literal so the source itself
+    // does not contain a value the language cannot represent.
+    const corrupted = Number('2083317461269598348');
+    expect(String(corrupted)).not.toBe('2083317461269598348');
+    expect(isWireTweet({ id: corrupted, author: { userName: 'a' } })).toBe(false);
   });
 });
 

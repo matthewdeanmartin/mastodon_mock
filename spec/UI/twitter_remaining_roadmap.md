@@ -1,6 +1,6 @@
 # X/Twitter provider — remaining roadmap
 
-**Status:** open questions answered, work not yet scheduled
+**Status:** §1 (caching) and §2 (clicking) shipped; §4–§6 remain
 **Date:** 2026-08-01
 **Context:** Sprints 1–5 are merged (PR #13 + follow-ups). This document covers
 what is left, with the cost arithmetic measured rather than estimated.
@@ -41,19 +41,59 @@ solution.
 
 ---
 
-## 1. Caching — are we as aggressive as RSS?
+## 1. Caching — are we as aggressive as RSS? — **DONE (2026-08-01)**
 
-**No, and deliberately less so in one dimension while being stricter in
-another.** Worth stating precisely because the two providers optimise for
-different things.
+**Now yes.** Timelines persist to IndexedDB (`providers/twitter/twitter-cache.ts`),
+so a reload no longer costs a request per followed account. Kept below for the
+reasoning; the original analysis follows the summary.
 
-| | RSS | X |
+| | RSS | X (now) |
 |---|---|---|
-| Store | IndexedDB, survives reload | In-memory, dies with the tab |
-| TTL | 24 h (`ClientPrefs.rssCacheTtlHours`) | 5 min (`TIMELINE_TTL_MS`) |
+| Store | IndexedDB, survives reload | IndexedDB, survives reload |
+| Freshness TTL | 24 h (`ClientPrefs.rssCacheTtlHours`) | 5 min (`TIMELINE_TTL_MS`) |
+| Retention | 24 h | 24 h (`CACHE_RETENTION_MS`) |
 | Failure cooldown | Yes (`FAILURE_COOLDOWN_MS`) | Yes, 5 min, per handle |
 | Stale-on-error | Serves stale rather than failing | Same |
 | Refetch on navigation | No | No |
+
+### How it was built
+
+Two ages rather than one, because a single TTL cannot express what this needs:
+5 minutes answers *"may I serve this without asking whether to refetch"*, and 24
+hours answers *"is this still worth showing at all"*. Between the two an entry
+is **stale**: rendered immediately, labelled "Saved posts from an earlier visit"
+with a `Refresh (1 request)` button, and never refetched on its own.
+
+The rule that makes it work: **a restored entry is never refetched
+automatically, however old it is.** A plain age test would have made every cold
+start bill one request per followed account — exactly the cost the persistence
+was added to remove. `shouldRefetch()` returns false for anything hydrated from
+disk.
+
+Two ordering traps, both real and both fixed:
+
+- `timeline()` now waits on hydration before deciding to spend. Without it the
+  very navigation this exists to make free — a cold page load — raced the disk
+  read, missed, billed, and *then* had the saved copy arrive.
+- The thread page does the same before its cold-load `getPost()`. A shared link
+  opened after a reload used to always pay; now it resolves from disk when the
+  post is in a saved timeline.
+
+The in-memory `Map` stays the synchronous source of truth so `isCached()`,
+`estimateCost()` and `findCached()` can still answer during render; IndexedDB
+hydrates it once at startup and every successful fetch writes through.
+
+**Verified in a browser**, counting every outbound request: first load makes one
+`user/last_tweets` call, reload makes **zero**, and pressing Refresh makes
+exactly one — via `user/tweet_timeline?userId=…`, proving the banked numeric id
+survived the reload and made the refresh cheaper than the original lookup.
+
+Also fixed while here: `toStatus` returned `url: null` when a response carried
+neither `url` nor `twitterUrl`, which silently cost the post its "↗ Nitter"
+link — the only way out of the app for an X post. It now builds the permalink
+from the handle and post id, both of which the guards already require.
+
+### The original analysis
 
 ### What is already right
 
@@ -329,14 +369,18 @@ about what refreshing that many accounts implies.
 
 1. ~~Profile links + thread view (§2)~~ — **done**, with the toolbar and Nitter.
 2. ~~Raise the follow cap (§6)~~ — **done**, 200.
-3. **Persist the cache (§1)** — now the top item. Biggest cost saving, smallest
-   change, and it makes everything below cheaper. It also makes the thread
-   view's cold-load fetch unnecessary in most cases.
-4. **Read-only parity audit (§4)** — bookmark/translate/moderation now render on
-   X posts; what remains is verifying reader mode and filters actually behave.
-5. **Home feed mix (§5)** — needs §1 to be affordable.
-6. **Followings bulk import + rotation (§6)** — the big one, and it wants §1 and
-   §5 settled first. Import is ~25 requests for 5,000 accounts; rotation is what
-   makes keeping them fresh tractable.
+3. ~~Persist the cache (§1)~~ — **done**, IndexedDB, verified zero requests on
+   reload. It also made the thread view's cold-load fetch unnecessary in most
+   cases, as predicted.
+4. **Read-only parity audit (§4)** — now the top item. Bookmark, translate and
+   local moderation render on X posts; what remains is verifying reader mode and
+   filters actually behave. Cheap, and the smallest remaining unknown.
+5. **Home feed mix (§5)** — §1 is settled, so this is now affordable. The main
+   open question is ordering a merged feed when X posts arrive in bulk on a
+   refresh rather than continuously.
+6. **Followings bulk import + rotation (§6)** — the big one, and it wants §5
+   settled first. Import is ~25 requests for 5,000 accounts; rotation is what
+   makes keeping them fresh tractable. §1 makes the rotation far cheaper, since
+   only the accounts due for a refresh cost anything.
 
 `viewCount` (§3) is a nice-to-have that can ride along with any of these.

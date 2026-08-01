@@ -153,6 +153,17 @@
            check a handle that was never the problem. -->
       <div class="action-error" role="alert">{{ error }}</div>
     }
+    @if (twitterStale()) {
+      <!-- Saved posts are shown immediately and never refreshed on their own:
+           a fetch costs a billable request, and arriving on a page is not a
+           request for one. Say the copy is saved, and let the reader choose. -->
+      <div class="stale-notice">
+        <span>Saved posts from an earlier visit.</span>
+        <button type="button" (click)="refreshTwitter()" [disabled]="statusesLoading()">
+          {{ statusesLoading() ? 'Refreshing…' : 'Refresh (1 request)' }}
+        </button>
+      </div>
+    }
     @if (reportDone()) {
       <div class="report-done">
         Report submitted. A moderator will review it; reports cannot be undone.

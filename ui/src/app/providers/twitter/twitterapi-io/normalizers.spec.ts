@@ -114,6 +114,28 @@ describe('toStatus', () => {
     expect(toStatus(tweets[0]).provider).toBe('twitter');
   });
 
+  it('builds a permalink when the provider sends neither url field', () => {
+    // A null url silently costs the post its "↗ Nitter" button, which is the
+    // only way out of the app for an X post — and the id and handle needed to
+    // construct the link are required fields we already have.
+    const status = toStatus({
+      id: '123',
+      text: 'hi',
+      author: { userName: 'NASA', id: '11348282' },
+    });
+    expect(status.url).toBe('https://x.com/NASA/status/123');
+  });
+
+  it('prefers the provider url when it sends one', () => {
+    const status = toStatus({
+      id: '123',
+      text: 'hi',
+      url: 'https://x.com/NASA/status/123?s=20',
+      author: { userName: 'NASA', id: '11348282' },
+    });
+    expect(status.url).toBe('https://x.com/NASA/status/123?s=20');
+  });
+
   it('reports no interaction state, because there is no signed-in X user', () => {
     const status = toStatus(tweets[0]);
     expect(status.favourited).toBe(false);

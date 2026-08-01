@@ -356,7 +356,25 @@
             {{ refreshCost() === 1 ? 'request' : 'requests' }})
           }
         </button>
+        <!-- Costs nothing and spends nothing: for someone who wants the stored
+             posts gone, not someone who wants newer ones. -->
+        <button
+          class="btn btn-outline btn-small"
+          type="button"
+          [disabled]="refreshing() || storedCount() === 0"
+          (click)="clearCache()"
+        >
+          @if (storedCount() === 0) {
+            No saved posts
+          } @else {
+            Clear saved posts ({{ storedCount() }})
+          }
+        </button>
       </div>
+      <p class="muted small">
+        Posts are saved on this device for a day so reopening Mawkingbird costs nothing.
+        Refreshing is the only thing here that spends a request.
+      </p>
       @if (refreshResult(); as result) {
         <p [class]="result.stopped ? 'feed-error' : 'connection-ok'">{{ result.message }}</p>
       }

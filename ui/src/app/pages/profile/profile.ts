@@ -87,6 +87,14 @@ export class Profile implements OnInit, OnDestroy {
   private twitterHandle = signal<string | null>(null);
   /** Why this X profile's posts could not be loaded, if they could not. */
   protected twitterError = signal<string | null>(null);
+  /**
+   * Whether the posts on screen came off disk rather than the network.
+   *
+   * Shown rather than silently refetched: a refetch costs a billable request,
+   * and nobody asked for one by navigating here. The reader gets the saved
+   * posts immediately plus a Refresh button, and decides for themselves.
+   */
+  protected twitterStale = signal(false);
   /** Whether the viewer follows this X account locally. */
   protected twitterFollowed = computed(() => {
     const handle = this.twitterHandle();
@@ -416,11 +424,13 @@ export class Profile implements OnInit, OnDestroy {
               twitterPlaceholderAccount(follow ?? fallbackFollow(handle)),
           );
           this.statuses.set(statuses);
+          this.twitterStale.set(this.twitterFeed.isStale(handle));
           this.loading.set(false);
           this.statusesLoading.set(false);
           this.diagnostics.info('Profile', 'twitter:loaded', {
             handle,
             posts: statuses.length,
+            stale: this.twitterStale(),
           });
         },
         error: (error: unknown) => {
@@ -444,6 +454,45 @@ export class Profile implements OnInit, OnDestroy {
           this.statusesLoading.set(false);
         },
       });
+  }
+
+  /**
+   * Fetch this X account's posts again, at the cost of one request.
+   *
+   * The only path that spends money on this page. Deliberately a button rather
+   * than anything automatic — see {@link twitterStale}.
+   */
+  protected refreshTwitter(): void {
+    const handle = this.twitterHandle();
+    if (!handle || this.statusesLoading()) {
+      return;
+    }
+    this.twitterError.set(null);
+    this.statusesLoading.set(true);
+    const follow = this.twitterFollows.find(handle) ?? fallbackFollow(handle);
+    const seq = ++this.loadSeq;
+    this.statusLoadSub?.unsubscribe();
+    this.statusLoadSub = this.twitterFeed.timeline(follow, true).subscribe({
+      next: (statuses) => {
+        if (seq !== this.loadSeq) {
+          return;
+        }
+        this.statuses.set(statuses);
+        this.twitterStale.set(false);
+        this.statusesLoading.set(false);
+      },
+      error: (error: unknown) => {
+        if (seq !== this.loadSeq) {
+          return;
+        }
+        // The saved posts stay on screen. A failed refresh should cost the
+        // reader the update, not the copy they were already reading.
+        this.twitterError.set(
+          error instanceof Error ? error.message : `Could not refresh @${handle}.`,
+        );
+        this.statusesLoading.set(false);
+      },
+    });
   }
 
   /** Follow or unfollow this X account locally. Costs nothing either way. */

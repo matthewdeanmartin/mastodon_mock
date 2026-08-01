@@ -38,6 +38,17 @@ export function accountId(username: string): string {
 }
 
 /**
+ * The canonical permalink for a post, built from parts we always have.
+ *
+ * Used when the provider omits `url` and `twitterUrl`. Returns null only when
+ * the pieces genuinely are not there, which the guards should already have
+ * prevented.
+ */
+export function permalink(username: string, tweetId: string | undefined): string | null {
+  return username && tweetId ? `https://x.com/${username}/status/${tweetId}` : null;
+}
+
+/**
  * Convert a provider timestamp to ISO-8601, or null.
  *
  * Two formats appear in one API, which is exactly the trap §9 warns about:
@@ -288,7 +299,13 @@ export function toStatus(tweet: WireTweet, depth = 0): Status {
     content: reblog ? '' : renderContent(tweet),
     spoiler_text: '',
     visibility: 'public',
-    url: tweet.url ?? tweet.twitterUrl ?? null,
+    // Falls back to a URL built from the handle and post id rather than null.
+    // Both are required fields the guards already enforce, so the canonical
+    // permalink is always derivable — and returning null here silently costs
+    // the post its "↗ Nitter" link, which is the only way out of the app for an
+    // X post. Observed with a response that carried neither `url` nor
+    // `twitterUrl`.
+    url: tweet.url ?? tweet.twitterUrl ?? permalink(author.username, tweet.id),
     account: author,
     reblog,
     quote: quoted ? { state: 'accepted', quoted_status: quoted } : null,

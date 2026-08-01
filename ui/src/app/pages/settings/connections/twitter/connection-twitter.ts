@@ -174,6 +174,7 @@ export class ConnectionTwitter implements OnInit {
    */
   ngOnInit(): void {
     this.settings.enforceLifetime();
+    void this.syncStoredCount();
   }
 
   protected choose(id: TwitterSourceId): void {
@@ -402,6 +403,28 @@ export class ConnectionTwitter implements OnInit {
     this.feed.estimateCost(this.follows.enabled().map((f) => f.username)),
   );
 
+  /**
+   * How many handles have posts saved on this device.
+   *
+   * A signal refreshed by hand rather than a computed: the count lives in
+   * IndexedDB, which cannot be read synchronously, and it only changes on the
+   * two actions below.
+   */
+  protected readonly storedCount = signal(0);
+
+  /** Forget every saved timeline. Costs nothing; spends nothing. */
+  protected async clearCache(): Promise<void> {
+    await this.feed.clear();
+    await this.syncStoredCount();
+    this.notice.set(
+      'Saved posts cleared. The next visit to a followed account will spend one request.',
+    );
+  }
+
+  private async syncStoredCount(): Promise<void> {
+    this.storedCount.set(await this.feed.storedCount());
+  }
+
   protected saveLimits(): void {
     this.usage.setLimits(Number(this.softDraft()), Number(this.hardDraft()));
     // Read back: setLimits clamps a soft limit above the hard one, and the form
@@ -452,6 +475,7 @@ export class ConnectionTwitter implements OnInit {
         parts.push('Stopped early after a rate limit, rather than spending on requests that would also fail.');
       }
       this.refreshResult.set({ stopped: result.stopped, message: parts.join(' ') });
+      await this.syncStoredCount();
     } finally {
       this.refreshing.set(false);
     }

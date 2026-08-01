@@ -386,14 +386,21 @@ export class Thread implements OnInit {
     this.ancestors.set([]);
     this.descendants.set([]);
 
+    // Wait for the saved timelines to load before deciding to pay. On a reload
+    // this is the difference between the post being already in hand and buying
+    // it again — the cache used to die with the tab, so this path always spent
+    // a request.
+    void this.twitterFeed.hydrated.then(() => this.showTwitterPost(tweetId));
+  }
+
+  private showTwitterPost(tweetId: string): void {
     const cached = this.twitterFeed.findCached(`twitter:${tweetId}`);
     if (cached) {
       this.status.set(cached);
       this.loading.set(false);
     } else {
-      // Cold load: a reload, or a link someone shared. The cache is in-memory,
-      // so it is empty here and the post has to be fetched — one extra request,
-      // paid only on this path. Navigating from a card never reaches it.
+      // Genuinely not held: a link to a post from an account nobody here
+      // follows. One request, paid only on this path.
       this.loadSub.add(
         this.twitterApi.getPost(tweetId).subscribe({
           next: (status) => {
