@@ -141,6 +141,16 @@
               }
             </div>
           </details>
+          <!-- Which way the relationship runs. "Following" only says what *you*
+               did; without this there is no way to tell a mutual from someone who
+               has never heard of you. -->
+          @if (!isSelf() && relationship()?.followed_by) {
+            <span class="badge follows-you" [title]="relationship()?.following
+                ? 'You follow each other'
+                : 'This account follows you'">
+              {{ relationship()?.following ? 'Mutuals' : 'Follows you' }}
+            </span>
+          }
           @if (capabilities.canFollow) {
             <button
               class="btn"

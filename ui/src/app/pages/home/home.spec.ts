@@ -25,7 +25,6 @@ interface HomeInternals {
   showBoosts: WritableSignal<boolean>;
   showReplies: WritableSignal<boolean>;
   eliza: { follow(): void; unfollow(): void };
-  toggleLive(): void;
   loadMore(): void;
   toggleBoosts(): void;
   toggleReplies(): void;
@@ -106,10 +105,23 @@ describe('Home', () => {
     return fixture;
   }
 
-  /** Toggle live on and flush the fresh-snapshot refetch that going live triggers. */
+  /**
+   * Turn streaming on and flush the fresh-snapshot refetch it triggers.
+   *
+   * Driven by the Blue preference now that "Go live" has left the toolbar —
+   * Home follows `autoRefreshTimeline` through an effect, so the switch has to
+   * be flipped there and the effect flushed with `detectChanges`.
+   */
   function goLive(fixture: ComponentFixture<Home>): void {
-    internals(fixture).toggleLive();
+    TestBed.inject(ClientPrefs).setAutoRefreshTimeline(true);
+    fixture.detectChanges();
     httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([]);
+  }
+
+  /** The inverse of {@link goLive}: no refetch happens on the way down. */
+  function stopLive(fixture: ComponentFixture<Home>): void {
+    TestBed.inject(ClientPrefs).setAutoRefreshTimeline(false);
+    fixture.detectChanges();
   }
 
   it('reports an empty first page with enough context to diagnose filtering', () => {
@@ -256,7 +268,7 @@ describe('Home', () => {
     expect(fixture.nativeElement.querySelector('app-local-compose')).not.toBeNull();
   });
 
-  it('toggleLive() opens a user stream and flips the live flag', () => {
+  it('opens a user stream and flips the live flag when the Blue pref goes on', () => {
     const fixture = setUp();
     goLive(fixture);
 
@@ -292,21 +304,21 @@ describe('Home', () => {
     ).toEqual(['2']);
   });
 
-  it('toggling live off closes the stream subscription', () => {
+  it('turning the pref off closes the stream subscription', () => {
     const fixture = setUp();
     goLive(fixture);
     expect(fakeStreaming.closed).toBe(false);
 
-    internals(fixture).toggleLive();
+    stopLive(fixture);
 
     expect(internals(fixture).live()).toBe(false);
     expect(fakeStreaming.closed).toBe(true);
   });
 
-  it('ignores events once live is toggled off', () => {
+  it('ignores events once the pref is turned off', () => {
     const fixture = setUp();
     goLive(fixture);
-    internals(fixture).toggleLive();
+    stopLive(fixture);
 
     fakeStreaming.emit({ event: 'update', payload: makeStatus('99') });
 

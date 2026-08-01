@@ -297,6 +297,28 @@
 
 <div class="ssection">
   <div class="srow">
+    <span class="slabel">Timeline</span>
+    <div class="scontrol">
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.autoRefreshTimeline()"
+          (ngModelChange)="prefs.setAutoRefreshTimeline($event)"
+          name="auto_refresh_timeline"
+        />
+        Auto-refresh timeline — new posts arrive continually, without you asking
+      </label>
+      <p class="muted small">
+        Off by default, and worth leaving off: a feed that rewrites itself moves the post you were
+        halfway through reading. Mastodon only — Twitter, Bluesky and RSS are polled and are not
+        affected.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="ssection">
+  <div class="srow">
     <span class="slabel">Reader typography</span>
     <div class="scontrol">
       <label class="inline-field">

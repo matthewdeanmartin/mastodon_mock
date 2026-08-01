@@ -1,6 +1,7 @@
-import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { Api } from '../../api';
+import { ClientPrefs } from '../../client-prefs';
 import { CommandBar } from '../../command-bar/command-bar';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
@@ -14,6 +15,7 @@ import { Streaming } from '../../streaming';
 export class PublicTimeline implements OnInit, OnDestroy {
   private api = inject(Api);
   private streaming = inject(Streaming);
+  private prefs = inject(ClientPrefs);
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
@@ -22,6 +24,9 @@ export class PublicTimeline implements OnInit, OnDestroy {
 
   private liveSub: Subscription | null = null;
   private loadSub: Subscription | null = null;
+
+  /** Follow Blue → "Auto-refresh timeline" for as long as this page is open. */
+  private readonly liveEffect = effect(() => this.syncLive());
 
   ngOnInit(): void {
     this.load();
@@ -43,8 +48,16 @@ export class PublicTimeline implements OnInit, OnDestroy {
     }
   }
 
-  toggleLive(): void {
-    if (this.live()) {
+  /**
+   * Open or close the stream to match Blue → "Auto-refresh timeline", the same
+   * preference Home follows now that the toolbar button is gone.
+   */
+  private syncLive(): void {
+    const wanted = this.prefs.autoRefreshTimeline();
+    if (wanted === this.live()) {
+      return;
+    }
+    if (!wanted) {
       this.liveSub?.unsubscribe();
       this.liveSub = null;
       this.live.set(false);

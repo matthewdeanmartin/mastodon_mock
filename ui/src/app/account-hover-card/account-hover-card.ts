@@ -40,7 +40,15 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
         {{ account().display_name || account().username }}
         <app-verified-badge [account]="account()" />
       </div>
-      <div class="hc-acct muted">&#64;{{ account().acct }}</div>
+      <div class="hc-acct muted">
+        &#64;{{ account().acct }}
+        <!-- The follow button says what you did; this says what they did. A card
+             that shows "Following" and nothing else cannot distinguish a mutual
+             from a stranger, which is usually the thing you hovered to find out. -->
+        @if (inboundLabel(); as inbound) {
+          <span class="hc-inbound">{{ inbound }}</span>
+        }
+      </div>
       @if (account().note) {
         <div class="hc-note" [innerHTML]="account().note"></div>
       }
@@ -144,6 +152,15 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
     .hc-acct {
       font-size: 13px;
     }
+    .hc-inbound {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
     .hc-note {
       margin-top: 6px;
       color: var(--text);
@@ -212,6 +229,19 @@ export class AccountHoverCard {
   protected isFollowingState = computed(
     () => !!this.relationship()?.following || !!this.relationship()?.requested,
   );
+  /**
+   * "Mutuals" / "Follows you", or null when they do not follow the viewer.
+   *
+   * Null while the relationship is still unloaded too — the card fetches it
+   * lazily on hover, and asserting "not a mutual" before the answer arrives
+   * would be a worse lie than saying nothing.
+   */
+  protected inboundLabel = computed<string | null>(() => {
+    const relationship = this.relationship();
+    if (!relationship?.followed_by) return null;
+    return relationship.following ? 'Mutuals' : 'Follows you';
+  });
+
   protected followLabel = computed(() => {
     const relationship = this.relationship();
     if (relationship?.requested) return 'Requested';

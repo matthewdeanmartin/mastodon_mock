@@ -54,10 +54,58 @@
             <span class="acct muted">&#64;{{ a.acct }}</span>
           </span>
         </a>
-        <button class="btn btn-outline btn-sm" (click)="undo(a)">
-          {{ kind() === 'mutes' ? 'Unmute' : 'Unblock' }}
-        </button>
+        <div class="row-actions">
+          @if (isAlsoOther(a.id)) {
+            <span class="badge also" [title]="'Also ' + otherWord + 'ed'">
+              also {{ otherWord }}ed
+            </span>
+          }
+          <button class="btn btn-outline btn-sm" (click)="undo(a)">
+            {{ kind() === 'mutes' ? 'Unmute' : 'Unblock' }}
+          </button>
+          <!-- Two separate escalations: keep this restriction and add the other,
+               or trade this one for the other. -->
+          @if (!isAlsoOther(a.id)) {
+            <button
+              class="btn btn-outline btn-sm"
+              [disabled]="isBusy(a.id)"
+              (click)="alsoApply(a)"
+              [title]="'Also ' + otherWord + ' this account, keeping the current restriction'"
+            >
+              {{ otherVerb }}
+            </button>
+          }
+          <button
+            class="btn btn-outline btn-sm"
+            [disabled]="isBusy(a.id)"
+            (click)="convert(a)"
+            [title]="'Replace this with a ' + otherWord"
+          >
+            Convert to {{ otherWord }}
+          </button>
+        </div>
       </li>
     }
   </ul>
+
+  <!-- Link-header pagination: no random access, so "Last" walks forward and
+       caches what it passes. Pages already seen come back without a request. -->
+  <nav class="pager" aria-label="Pages">
+    <button class="btn btn-outline btn-sm" [disabled]="!canPrev()" (click)="first()">
+      « First
+    </button>
+    <button class="btn btn-outline btn-sm" [disabled]="!canPrev()" (click)="prev()">
+      ‹ Previous
+    </button>
+    <span class="pager-status muted small">
+      Page {{ page() + 1 }}@if (lastPage() !== null) {
+        of {{ lastPage()! + 1 }}
+      }
+      @if (rangeLabel()) {
+        <span class="range">({{ rangeLabel() }})</span>
+      }
+    </span>
+    <button class="btn btn-outline btn-sm" [disabled]="!canNext()" (click)="next()">Next ›</button>
+    <button class="btn btn-outline btn-sm" [disabled]="!canNext()" (click)="last()">Last »</button>
+  </nav>
 }

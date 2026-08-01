@@ -61,8 +61,6 @@
 }
 
 <app-command-bar
-  [live]="live()"
-  [showLive]="!auth.isAnonymous"
   [providerChips]="true"
   [showLangFilter]="true"
   [showCalm]="true"
@@ -70,7 +68,6 @@
   [showFeedViews]="true"
   [view]="view()"
   (refresh)="load(true)"
-  (toggleLive)="toggleLive()"
   (providerVisibilityChanged)="load()"
   (viewChange)="setView($event)"
 />

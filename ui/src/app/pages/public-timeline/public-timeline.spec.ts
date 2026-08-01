@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ClientPrefs } from '../../client-prefs';
 import { Status } from '../../models';
 import { Streaming } from '../../streaming';
 import { FakeStreaming } from '../../testing/fake-streaming';
@@ -13,7 +14,6 @@ interface PublicTimelineInternals {
   local: WritableSignal<boolean>;
   live: WritableSignal<boolean>;
   setLocal(local: boolean): void;
-  toggleLive(): void;
 }
 
 function internals(fixture: ComponentFixture<PublicTimeline>): PublicTimelineInternals {
@@ -75,13 +75,26 @@ describe('PublicTimeline', () => {
     return fixture;
   }
 
-  /** Toggle live on and flush the fresh-snapshot refetch that going live triggers. */
+  /**
+   * Turn streaming on and flush the fresh-snapshot refetch it triggers.
+   *
+   * Driven by the Blue preference now that "Go live" has left the toolbar — the
+   * page follows `autoRefreshTimeline` through an effect, so the switch is
+   * flipped there and the effect flushed with `detectChanges`.
+   */
   function goLive(fixture: ComponentFixture<PublicTimeline>): void {
-    internals(fixture).toggleLive();
+    TestBed.inject(ClientPrefs).setAutoRefreshTimeline(true);
+    fixture.detectChanges();
     httpMock.expectOne('/api/v1/timelines/public?limit=20').flush([]);
   }
 
-  it('toggleLive() opens a non-local public stream by default', () => {
+  /** The inverse of {@link goLive}: no refetch happens on the way down. */
+  function stopLive(fixture: ComponentFixture<PublicTimeline>): void {
+    TestBed.inject(ClientPrefs).setAutoRefreshTimeline(false);
+    fixture.detectChanges();
+  }
+
+  it('opens a non-local public stream by default when the Blue pref goes on', () => {
     const fixture = setUp();
     goLive(fixture);
 
@@ -130,10 +143,10 @@ describe('PublicTimeline', () => {
     ).toEqual(['2']);
   });
 
-  it('toggling live off closes the stream', () => {
+  it('turning the pref off closes the stream', () => {
     const fixture = setUp();
     goLive(fixture);
-    internals(fixture).toggleLive();
+    stopLive(fixture);
 
     expect(internals(fixture).live()).toBe(false);
     expect(fakeStreaming.closed).toBe(true);

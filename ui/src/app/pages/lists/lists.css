@@ -1,3 +1,16 @@
+/* Sits inside .page-head, which is 18px/800 — a control that inherited those
+   would read as a second title. Reset both explicitly. */
+.section-picker {
+  float: right;
+  font-size: 13px;
+  font-weight: 400;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--col-bg);
+  color: var(--text);
+}
+
 .new-list {
   display: flex;
   gap: 8px;

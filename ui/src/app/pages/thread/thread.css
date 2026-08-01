@@ -10,12 +10,26 @@
 .reader-font {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-right: auto;
 }
 
+.reader-select {
+  font-size: 0.85em;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: inherit;
+}
+
 .reader {
   padding: 24px 32px 48px;
+  /* Article-only paper colour: --reader-bg/--reader-fg are set by ClientPrefs
+     and absent on the "Match app" default, so the app theme shows through. */
+  background: var(--reader-bg, transparent);
+  color: var(--reader-fg, inherit);
   font-family: var(--reader-font-family, Georgia, serif);
   font-size: var(--reader-font-size, 18px);
   font-weight: var(--reader-font-weight, 400);
@@ -23,6 +37,19 @@
   letter-spacing: var(--reader-letter-spacing, 0);
   word-spacing: var(--reader-word-spacing, 0);
   text-align: var(--reader-text-align, left);
+}
+
+/* When a paper colour is in force, the article's own muted text and rules must
+   be derived from the article's foreground — the app's --muted/--border are
+   tuned for the app background and disappear against sepia or solarized. */
+.reader:not([data-paper='app']) .muted,
+.reader:not([data-paper='app']) .reader-comments-note {
+  color: color-mix(in srgb, var(--reader-fg, currentColor) 62%, transparent);
+}
+
+.reader:not([data-paper='app']) .reader-head,
+.reader:not([data-paper='app']) .reader-comments {
+  border-color: color-mix(in srgb, var(--reader-fg, currentColor) 22%, transparent);
 }
 
 .reader-head {

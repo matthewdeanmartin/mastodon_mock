@@ -80,6 +80,25 @@ export type VerifiedMode = 'fixed' | 'famous' | 'everyone';
 export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
 export type ReaderTextAlign = 'left' | 'justify';
 
+/**
+ * Paper colour for reader mode.
+ *
+ * `app` means "whatever the app theme is" and stays the default, so nothing
+ * changes for people who never open the picker. The other four repaint *only*
+ * the article — a sepia page inside an otherwise dark app is the point, not a
+ * bug: reading a long article is a different activity from scanning a feed, and
+ * people have strong per-activity preferences.
+ */
+export type ReaderTheme = 'app' | 'light' | 'sepia' | 'dark' | 'solarized';
+
+/** Article foreground/background per {@link ReaderTheme}. `app` inherits. */
+export const READER_THEMES: Record<Exclude<ReaderTheme, 'app'>, { bg: string; fg: string }> = {
+  light: { bg: '#ffffff', fg: '#16181c' },
+  sepia: { bg: '#f4ecd8', fg: '#3b2f1e' },
+  dark: { bg: '#16181c', fg: '#e7e9ea' },
+  solarized: { bg: '#fdf6e3', fg: '#586e75' },
+};
+
 // Chat-list filters (the toggles above the conversation list).
 /**
  * Who the chat list shows.
@@ -196,7 +215,9 @@ interface StoredPrefs {
   readerLetterSpacing?: number;
   readerWordSpacing?: number;
   readerTextAlign?: ReaderTextAlign;
+  readerTheme?: ReaderTheme;
   feedReader?: boolean;
+  autoRefreshTimeline?: boolean;
   homeWindow?: HomeWindow;
   showImages?: boolean;
   hiddenProviders?: ProviderId[];
@@ -288,9 +309,26 @@ export class ClientPrefs {
   readonly readerLetterSpacing = signal<number>(0);
   readonly readerWordSpacing = signal<number>(0);
   readonly readerTextAlign = signal<ReaderTextAlign>('left');
+  /** Paper colour for the article body only — see {@link ReaderTheme}. */
+  readonly readerTheme = signal<ReaderTheme>('app');
 
   // Feed-wide toggles (command bar).
   readonly feedReader = signal<boolean>(false);
+
+  /**
+   * Whether the timeline may hold a streaming connection open and append posts
+   * as they arrive.
+   *
+   * Off by default and deliberately opt-in. A feed that rewrites itself while
+   * you are reading it is an antipattern — it moves the thing you were halfway
+   * through and turns a timeline into a slot machine — so it lives in Blue where
+   * someone has to go looking for it, rather than one click away on a toolbar
+   * whose space is better spent on controls people actually want.
+   *
+   * Only Mastodon has a streaming API here; every other provider is polled, so
+   * the toggle has no effect on Twitter, Bluesky, or RSS content.
+   */
+  readonly autoRefreshTimeline = signal<boolean>(false);
 
   /**
    * How far back Home reaches. Defaults to the last 24 hours — see
@@ -471,6 +509,12 @@ export class ClientPrefs {
     }
   }
 
+  setReaderTheme(theme: ReaderTheme): void {
+    if (theme === 'app' || theme in READER_THEMES) {
+      this.readerTheme.set(theme);
+    }
+  }
+
   setReaderFontWeight(weight: number): void {
     this.readerFontWeight.set(clamp(Math.round(weight / 100) * 100, 300, 700));
   }
@@ -495,6 +539,10 @@ export class ClientPrefs {
 
   setFeedReader(on: boolean): void {
     this.feedReader.set(on);
+  }
+
+  setAutoRefreshTimeline(on: boolean): void {
+    this.autoRefreshTimeline.set(on);
   }
 
   setHomeWindow(window: HomeWindow): void {
@@ -682,6 +730,7 @@ export class ClientPrefs {
       this.verifiedMode.set(stored.verifiedMode);
     }
     this.loadBool(stored.feedReader, this.feedReader);
+    this.loadBool(stored.autoRefreshTimeline, this.autoRefreshTimeline);
     if (
       stored.homeWindow === 'today' ||
       stored.homeWindow === 'week' ||
@@ -698,6 +747,9 @@ export class ClientPrefs {
     }
     if (typeof stored.readerFontWeight === 'number') {
       this.setReaderFontWeight(stored.readerFontWeight);
+    }
+    if (typeof stored.readerTheme === 'string') {
+      this.setReaderTheme(stored.readerTheme);
     }
     if (typeof stored.readerLineHeight === 'number') {
       this.setReaderLineHeight(stored.readerLineHeight);
@@ -779,12 +831,14 @@ export class ClientPrefs {
       verifiedMode: this.verifiedMode(),
       readerFontSize: this.readerFontSize(),
       readerFontFamily: this.readerFontFamily(),
+      readerTheme: this.readerTheme(),
       readerFontWeight: this.readerFontWeight(),
       readerLineHeight: this.readerLineHeight(),
       readerLetterSpacing: this.readerLetterSpacing(),
       readerWordSpacing: this.readerWordSpacing(),
       readerTextAlign: this.readerTextAlign(),
       feedReader: this.feedReader(),
+      autoRefreshTimeline: this.autoRefreshTimeline(),
       homeWindow: this.homeWindow(),
       showImages: this.showImages(),
       chatAudience: this.chatAudience(),
@@ -883,6 +937,12 @@ export class ClientPrefs {
     root.style.setProperty('--reader-letter-spacing', `${this.readerLetterSpacing()}px`);
     root.style.setProperty('--reader-word-spacing', `${this.readerWordSpacing()}px`);
     root.style.setProperty('--reader-text-align', this.readerTextAlign());
+    // Article-only paper colour. `app` removes the variables so `.reader` falls
+    // through to the page's own --bg/--fg rather than pinning either one.
+    const paper = this.readerTheme();
+    const colors = paper === 'app' ? null : READER_THEMES[paper];
+    setOrRemove(root, '--reader-bg', colors?.bg ?? null);
+    setOrRemove(root, '--reader-fg', colors?.fg ?? null);
     // Custom colors ride on top of the theme/accent as inline overrides;
     // clearing one falls back to whatever the palette defines.
     setOrRemove(root, '--bg', this.customBg());

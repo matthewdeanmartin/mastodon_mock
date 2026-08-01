@@ -347,7 +347,11 @@
           } @else {
             <span class="action">{{ display.reblogs_count }}</span>
           }
-        } @else if (caps.reblog || readOnlyStats) {
+        } @else if (!caps.reblog && readOnlyStats) {
+          <!-- Read-only providers (Twitter) report real counts with no button to
+               attach them to. When `caps.reblog` already rendered a button above,
+               this fallback would be a second 🔁 on the same row — the case a
+               signed-in viewer hits on every Bluesky post. -->
           <span class="action" title="Reposts">🔁 {{ display.reblogs_count }}</span>
         }
         @if (caps.favourite) {
@@ -381,7 +385,9 @@
           } @else {
             <span class="action">{{ display.favourites_count }}</span>
           }
-        } @else if (caps.favourite || readOnlyStats) {
+        } @else if (!caps.favourite && readOnlyStats) {
+          <!-- Same pairing as the boost fallback above: only stand in for the
+               button when there is no button. -->
           <span class="action" title="Likes">⭐ {{ display.favourites_count }}</span>
         }
         @if (foreign) {

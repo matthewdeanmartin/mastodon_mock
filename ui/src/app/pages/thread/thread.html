@@ -11,6 +11,35 @@
         <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(1)" title="Larger text">
           A+
         </button>
+
+        <!-- Typeface and paper, at hand while reading rather than buried in
+             Settings — these are the two things people change mid-article. Both
+             persist through ClientPrefs. -->
+        <select
+          class="reader-select"
+          aria-label="Font family"
+          title="Font family"
+          [value]="prefs.readerFontFamily()"
+          (change)="setReaderFont($event)"
+        >
+          <option value="serif">Serif</option>
+          <option value="sans">Sans-serif</option>
+          <option value="mono">Monospace</option>
+        </select>
+
+        <select
+          class="reader-select"
+          aria-label="Article theme"
+          title="Article theme — colours this article only"
+          [value]="prefs.readerTheme()"
+          (change)="setReaderTheme($event)"
+        >
+          <option value="app">Match app</option>
+          <option value="light">Light</option>
+          <option value="sepia">Sepia</option>
+          <option value="dark">Dark</option>
+          <option value="solarized">Solarized</option>
+        </select>
       </div>
     }
     <button class="btn btn-outline" [class.active]="readerMode()" (click)="toggleReader()">
@@ -49,7 +78,7 @@
   </div>
 
   @if (readerMode()) {
-    <article class="reader">
+    <article class="reader" [attr.data-paper]="prefs.readerTheme()">
       @if (chain()[0].account; as author) {
         <header class="reader-head">
           <img

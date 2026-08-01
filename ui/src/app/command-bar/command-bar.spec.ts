@@ -121,16 +121,16 @@ describe('CommandBar', () => {
     expect(changed).toHaveBeenCalledTimes(2);
   });
 
-  it('emits toggleLive without owning the live state', () => {
+  // "Go live" moved to Blue → "Auto-refresh timeline", opt-in and off by
+  // default. The toolbar must not offer it: this row's space is the whole
+  // reason it moved.
+  it('offers no live toggle — that setting lives in Blue now', () => {
     const fixture = setUp();
-    const spy = vi.fn();
-    fixture.componentInstance.toggleLive.subscribe(spy);
 
-    const liveBtn = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
-      (b) => b.textContent?.includes('Go live'),
-    )!;
-    liveBtn.click();
+    const labels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].map(
+      (b) => b.textContent ?? '',
+    );
 
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(labels.some((text) => text.includes('Go live') || text.includes('● Live'))).toBe(false);
   });
 });

@@ -17,11 +17,10 @@ export type FeedView = 'feed' | 'members' | 'analytics';
   selector: 'app-command-bar',
   template: `
     <div class="command-bar">
-      @if (showLive()) {
-        <button class="btn btn-outline" [class.active]="live()" (click)="toggleLive.emit()">
-          {{ live() ? '● Live' : 'Go live' }}
-        </button>
-      }
+      <!-- "Go live" used to sit here. It is now Blue → "Auto-refresh timeline",
+           opt-in and off by default: a feed that rewrites itself under you is an
+           antipattern, and this row's space is worth more than a toggle most
+           people never want. Home reads the pref directly. -->
       @if (showRefresh()) {
         <button
           class="btn btn-outline"
@@ -156,9 +155,6 @@ export class CommandBar {
   protected readonly prefs = inject(ClientPrefs);
   protected readonly registry = inject(ProviderRegistry);
 
-  /** Whether the host page has a live stream to offer. */
-  readonly showLive = input(true);
-  readonly live = input(false);
   /**
    * Whether to show a manual refresh button — for pages where live streaming
    * is off by default and re-clicking the nav link is the only other way to
@@ -175,7 +171,6 @@ export class CommandBar {
   readonly showFeedViews = input(false);
   /** Which view the host page is currently showing. */
   readonly view = input<FeedView>('feed');
-  readonly toggleLive = output<void>();
   readonly refresh = output<void>();
   /** A source filter changed; merged feeds need to refetch their active sources. */
   readonly providerVisibilityChanged = output<void>();

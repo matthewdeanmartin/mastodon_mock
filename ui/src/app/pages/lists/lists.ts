@@ -21,6 +21,44 @@ import { PageDiagnostics } from '../../page-diagnostics';
  */
 type FeedFilter = 'all' | 'lists' | 'tags';
 
+/**
+ * One kind of feed on this page.
+ *
+ * The page grew from "your lists" into a hub for a dozen unrelated kinds —
+ * lists, saved searches, server feeds, hashtags, collections, endorsements, RSS,
+ * Twitter — stacked in one scroll. The picker above the page narrows to one kind
+ * at a time; `all` keeps the full stack and stays the default.
+ *
+ * Distinct from {@link FeedFilter}, which is the coarse route-level split behind
+ * `/feeds/lists` and `/feeds/tags`. The route still wins: on `/feeds/tags` there
+ * is nothing but tags to narrow, so the picker is not offered.
+ */
+export type FeedSection =
+  | 'all'
+  | 'lists'
+  | 'searches'
+  | 'server'
+  | 'tags'
+  | 'featured-tags'
+  | 'collections'
+  | 'endorsements'
+  | 'rss'
+  | 'twitter';
+
+/** Picker options, in the order the sections appear down the page. */
+export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'lists', label: 'Lists' },
+  { id: 'searches', label: 'Saved searches' },
+  { id: 'server', label: 'Server feeds' },
+  { id: 'tags', label: 'Followed hashtags' },
+  { id: 'featured-tags', label: 'Featured hashtags' },
+  { id: 'collections', label: 'Collections' },
+  { id: 'endorsements', label: 'Endorsed accounts' },
+  { id: 'rss', label: 'RSS feeds' },
+  { id: 'twitter', label: 'Twitter accounts' },
+];
+
 @Component({
   selector: 'app-lists',
   imports: [RouterLink, FormsModule, ConfirmDialog],
@@ -44,6 +82,23 @@ export class Lists implements OnInit {
   /** A given section is shown when we're on the "all" view or it owns the filter. */
   protected shows(section: FeedFilter): boolean {
     return this.filter === 'all' || this.filter === section;
+  }
+
+  protected readonly sectionOptions = FEED_SECTIONS;
+
+  /** Which single kind of feed to show, or `all`. Only offered on `/feeds`. */
+  protected section = signal<FeedSection>('all');
+
+  /** The picker is pointless on a route that already shows one kind. */
+  protected readonly showSectionPicker = this.filter === 'all';
+
+  /** True when `section` renders this kind — the template's per-section guard. */
+  protected showsSection(section: FeedSection): boolean {
+    return this.section() === 'all' || this.section() === section;
+  }
+
+  protected setSection(value: string): void {
+    this.section.set(value as FeedSection);
   }
 
   // Followed / featured hashtags, surfaced here as feed rows (the old /tags page).

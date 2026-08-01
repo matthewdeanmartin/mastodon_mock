@@ -4,7 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Terminology } from '../../terminology';
-import { ClientPrefs } from '../../client-prefs';
+import { ClientPrefs, ReaderFontFamily, ReaderTheme } from '../../client-prefs';
 import { Account, Status } from '../../models';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
@@ -537,6 +537,14 @@ export class Thread implements OnInit {
 
   bumpReaderFont(delta: number): void {
     this.prefs.setReaderFontSize(this.prefs.readerFontSize() + delta);
+  }
+
+  setReaderFont(event: Event): void {
+    this.prefs.setReaderFontFamily((event.target as HTMLSelectElement).value as ReaderFontFamily);
+  }
+
+  setReaderTheme(event: Event): void {
+    this.prefs.setReaderTheme((event.target as HTMLSelectElement).value as ReaderTheme);
   }
 
   onReply(status: Status): void {

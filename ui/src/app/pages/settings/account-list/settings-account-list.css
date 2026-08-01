@@ -41,6 +41,44 @@
   font-size: 0.85em;
 }
 
+/* Four buttons per row on a phone need to wrap rather than squeeze the name. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: none;
+}
+
+.badge.also {
+  font-size: 0.75em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------- pager */
+.pager {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 22px 4px;
+}
+
+.pager-status {
+  min-width: 9ch;
+  text-align: center;
+}
+
+.pager-status .range {
+  margin-left: 4px;
+}
+
 /* --------------------------------------------------------------- amnesty */
 .amnesty-bar {
   padding: 0 22px;

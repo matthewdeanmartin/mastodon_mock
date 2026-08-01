@@ -831,6 +831,8 @@ export class StatusCard {
         return '🦋 Bluesky';
       case 'anonymous-mastodon':
         return '🐘 Mastodon';
+      case 'twitter':
+        return '🐦 Twitter';
       default:
         return null;
     }

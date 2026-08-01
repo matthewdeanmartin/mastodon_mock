@@ -6,9 +6,25 @@
   } @else {
     Feeds
   }
+
+  <!-- A dozen kinds of feed stack up on this page. Narrow to one rather than
+       scrolling past the other eleven. Not offered on /feeds/lists or
+       /feeds/tags, where the route has already narrowed it. -->
+  @if (showSectionPicker) {
+    <select
+      class="section-picker"
+      aria-label="Show which kind of feed"
+      [value]="section()"
+      (change)="setSection($any($event.target).value)"
+    >
+      @for (opt of sectionOptions; track opt.id) {
+        <option [value]="opt.id">{{ opt.label }}</option>
+      }
+    </select>
+  }
 </div>
 
-@if (shows('lists')) {
+@if (shows('lists') && showsSection('lists')) {
   <div class="new-list">
     <input
       type="text"
@@ -33,6 +49,9 @@
     }
   }
 
+}
+
+@if (shows('lists') && showsSection('searches')) {
   <div class="section-head">Saved searches</div>
   @if (!saved.count()) {
     <p class="muted center small">None yet — save one from <a routerLink="/search">search</a>.</p>
@@ -50,6 +69,9 @@
     }
   }
 
+}
+
+@if (shows('lists') && showsSection('server')) {
   <div class="section-head">Server feeds</div>
   @if (hasDirectory()) {
     <a class="list-row" routerLink="/directory">
@@ -69,7 +91,7 @@
   }
 }
 
-@if (shows('tags')) {
+@if (shows('tags') && showsSection('tags')) {
   <div class="section-head">Followed hashtags</div>
   @if (!followedTags().length) {
     <p class="muted center small">You don't follow any hashtags yet.</p>
@@ -82,6 +104,9 @@
     }
   }
 
+}
+
+@if (shows('tags') && showsSection('featured-tags')) {
   @if (!auth.isAnonymous) {
     <div class="section-head">Featured on your profile</div>
     @if (!featuredTags().length) {
@@ -99,7 +124,7 @@
   }
 }
 
-@if (shows('lists')) {
+@if (shows('lists') && showsSection('collections')) {
   @if (auth.isAnonymous) {
     @if (showStarterCollection()) {
       <div class="section-head">Collections</div>
@@ -171,6 +196,9 @@
     }
   }
 
+}
+
+@if (shows('lists') && showsSection('endorsements')) {
   @if (!auth.isAnonymous) {
     <div class="section-head">Endorsed accounts</div>
     @if (myEndorsedCount()) {
@@ -189,9 +217,12 @@
     }
   }
 
-  <!-- Last section on the page. RSS feeds are the one kind of feed here that
-       lives entirely in this browser rather than on the server, so they sit
-       after everything the instance provides. -->
+}
+
+<!-- Last section on the page. RSS feeds are the one kind of feed here that
+     lives entirely in this browser rather than on the server, so they sit
+     after everything the instance provides. -->
+@if (shows('lists') && showsSection('rss')) {
   <div class="section-head">RSS feeds</div>
   @if (!rssFeeds().length) {
     <p class="muted center small">
@@ -230,7 +261,7 @@
 <!-- Twitter accounts, like RSS, live entirely in this browser. Shown only once the
      connector is set up: an empty section advertising a connector that needs an
      API key and a CORS proxy would be noise on everyone else's Feeds page. -->
-@if (twitterFollows().length) {
+@if (twitterFollows().length && showsSection('twitter')) {
   <div class="section-head">Twitter accounts</div>
   @for (f of twitterFollows(); track f.username) {
     <a class="list-row" [routerLink]="['/accounts', 'twitter:@' + f.username]">

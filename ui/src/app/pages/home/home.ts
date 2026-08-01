@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map, Subscription } from 'rxjs';
@@ -291,6 +291,9 @@ export class Home implements OnInit, OnDestroy {
   private bookmarkSub: Subscription | null = null;
   private anonymousCacheGeneration = 0;
 
+  /** Follow Blue → "Auto-refresh timeline" for as long as this page is open. */
+  private readonly liveEffect = effect(() => this.syncLive());
+
   ngOnInit(): void {
     this.diagnostics.info('page:open', {
       mode: this.auth.mode() ?? 'unauthenticated',
@@ -310,8 +313,19 @@ export class Home implements OnInit, OnDestroy {
     }
   }
 
-  toggleLive(): void {
-    if (this.live()) {
+  /**
+   * Open or close the stream to match Blue → "Auto-refresh timeline".
+   *
+   * Driven by the preference rather than a toolbar button: the control moved to
+   * Blue, is off by default, and has to be opted into. Anonymous sessions hold no
+   * token and have no stream to open, so they stay off whatever the pref says.
+   */
+  private syncLive(): void {
+    const wanted = this.prefs.autoRefreshTimeline() && !this.auth.isAnonymous;
+    if (wanted === this.live()) {
+      return;
+    }
+    if (!wanted) {
       this.diagnostics.info('user:live-off', { stored: this.statuses().length });
       this.liveSub?.unsubscribe();
       this.liveSub = null;
