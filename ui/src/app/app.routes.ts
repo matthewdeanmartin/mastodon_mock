@@ -4,6 +4,7 @@ import { adminGuard } from './admin/admin.guard';
 import { anonymousUnavailableGuard } from './providers/anonymous/anonymous-route.guard';
 import { anonymousOnlyGuard } from './providers/anonymous/anonymous-only.guard';
 import { featureFlagGuard } from './feature-flag.guard';
+import { inviteAccessGuard } from './invites/invite-access.guard';
 // Mock-only routes; file-replaced with an empty list in the Mocking Bird build.
 import { mockOnlyChildren } from './mock-routes';
 
@@ -23,11 +24,18 @@ export const routes: Routes = [
     path: 'explore',
     loadComponent: () => import('./pages/explore/explore').then((m) => m.Explore),
   },
-  // Public recruiting tool. This must live above the guarded shell: signed-out
-  // visitors are the people house ads and shared links send here.
+  // Public recruiting tool in the normal three-column shell. Fresh visitors
+  // enter Anonymous against ?server.example (mastodon.social by default).
   {
     path: 'invites',
-    loadComponent: () => import('./pages/invites/invites').then((m) => m.Invites),
+    canActivate: [inviteAccessGuard],
+    loadComponent: () => import('./shell/shell').then((m) => m.Shell),
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./pages/invites/invites').then((m) => m.Invites),
+      },
+    ],
   },
   // A message shared as a TinyURL short link. Un-guarded so a shared link opens
   // for anyone, signed in or not.

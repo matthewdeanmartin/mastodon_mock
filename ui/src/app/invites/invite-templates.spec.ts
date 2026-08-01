@@ -1,87 +1,101 @@
 import { describe, expect, it } from 'vitest';
 import {
   campaignTaggedUrl,
+  INVITE_LIMITS,
   INVITE_VARIATIONS,
+  InviteContext,
   inviteIntentUrl,
   invitesFor,
   invitesPageUrl,
   JOIN_MASTODON_URL,
-  mastodonRallyText,
   publicServerUrl,
   renderInvite,
 } from './invite-templates';
 
-describe('renderInvite', () => {
-  it('fills available values and drops whole lines for unavailable optional values', () => {
-    const text = renderInvite('Hello\nFind me: {profileUrl}\nStart: {visitUrl}\nHandle: {handle}', {
-      profileUrl: '',
-      handle: '',
-      visitUrl: JOIN_MASTODON_URL,
-    });
-
-    expect(text).toBe(`Hello\nStart: ${JOIN_MASTODON_URL}`);
-    expect(text).not.toContain('{');
-  });
-});
+const CONTEXT: InviteContext = {
+  profileUrl: 'https://example.social/@person',
+  handle: '@person@example.social',
+  visitUrl: JOIN_MASTODON_URL,
+  inviteUrl: invitesPageUrl('example.social'),
+};
 
 describe('invitation inventory', () => {
-  it('offers exactly two sensible choices in simple mode', () => {
-    expect(invitesFor(true)).toHaveLength(2);
-    expect(invitesFor(true).every((invite) => invite.simple)).toBe(true);
+  it('keeps ten advanced choices for every platform', () => {
+    expect(invitesFor('x', false)).toHaveLength(10);
+    expect(invitesFor('bluesky', false)).toHaveLength(10);
+    expect(invitesFor('mastodon', false)).toHaveLength(10);
   });
 
-  it('keeps the touch-grass joke in advanced mode only', () => {
-    expect(invitesFor(true).some((invite) => invite.id === 'touch-grass')).toBe(false);
-    expect(invitesFor(false).some((invite) => invite.id === 'touch-grass')).toBe(true);
+  it('reduces direct invitations to two and Mastodon rally posts to four in simple mode', () => {
+    expect(invitesFor('x', true)).toHaveLength(2);
+    expect(invitesFor('bluesky', true)).toHaveLength(2);
+    expect(invitesFor('mastodon', true)).toHaveLength(4);
   });
 
-  it('keeps every default direct invitation within Twitter’s limit', () => {
+  it('uses distinct copy for each platform', () => {
+    const x = new Set(invitesFor('x', false).map((invite) => invite.template));
+    const bluesky = new Set(invitesFor('bluesky', false).map((invite) => invite.template));
+    const mastodon = new Set(invitesFor('mastodon', false).map((invite) => invite.template));
+
+    expect([...x].some((template) => bluesky.has(template) || mastodon.has(template))).toBe(false);
+    expect([...bluesky].some((template) => mastodon.has(template))).toBe(false);
+  });
+
+  it('keeps direct and rally calls to action separate', () => {
+    for (const invite of invitesFor('mastodon', false)) {
+      expect(invite.template, invite.id).toContain('{inviteUrl}');
+      expect(invite.template, invite.id).not.toContain('{visitUrl}');
+    }
+    for (const invite of [...invitesFor('x', false), ...invitesFor('bluesky', false)]) {
+      expect(invite.template, invite.id).not.toContain('{inviteUrl}');
+    }
+  });
+
+  it('keeps every default rendering inside its platform limit', () => {
     for (const invite of INVITE_VARIATIONS) {
-      const text = renderInvite(invite.template, {
-        profileUrl: 'https://example.social/@person',
-        handle: '@person@example.social',
-        visitUrl: JOIN_MASTODON_URL,
-      });
-      expect(Array.from(text).length, invite.id).toBeLessThanOrEqual(280);
+      const text = renderInvite(invite.template, CONTEXT);
+      expect(Array.from(text).length, invite.id).toBeLessThanOrEqual(INVITE_LIMITS[invite.network]);
     }
   });
 });
 
-describe('share destinations', () => {
-  it('opens Twitter and Bluesky composers with the supplied invitation', () => {
+describe('renderInvite', () => {
+  it('drops whole lines for unavailable optional values', () => {
+    const text = renderInvite('Hello\nMe: {profileUrl}\nStart: {visitUrl}', {
+      ...CONTEXT,
+      profileUrl: '',
+    });
+    expect(text).toBe(`Hello\nStart: ${JOIN_MASTODON_URL}`);
+  });
+});
+
+describe('URLs and share intents', () => {
+  it('carries the selected Anonymous server in a bare query key', () => {
+    expect(invitesPageUrl('https://hachyderm.io/')).toBe(
+      'https://mawkingbird.com/invites?hachyderm.io',
+    );
+  });
+
+  it('normalizes a server to its public homepage', () => {
+    expect(publicServerUrl('https://mstdn.social/')).toBe('https://mstdn.social');
+  });
+
+  it('opens the correct composer for all three platforms', () => {
     expect(inviteIntentUrl('x', 'hello')).toContain('https://x.com/intent/post?text=hello');
     expect(inviteIntentUrl('bluesky', 'hello')).toContain(
       'https://bsky.app/intent/compose?text=hello',
     );
-  });
-
-  it('opens the selected Mastodon server composer', () => {
-    expect(inviteIntentUrl('mastodon', 'go invite friends', 'mstdn.social')).toContain(
-      'https://mstdn.social/share?text=go+invite+friends',
+    expect(inviteIntentUrl('mastodon', 'hello', 'mstdn.social')).toContain(
+      'https://mstdn.social/share?text=hello',
     );
   });
 
-  it('uses Mastodon only for a rally invitation back to the public invite page', () => {
-    const text = mastodonRallyText();
-    expect(text).toContain('got friends still on Twitter');
-    expect(text).toContain(invitesPageUrl());
-    expect(text).not.toContain('join foobar');
-  });
-
-  it('normalizes the current API server to its public homepage', () => {
-    expect(publicServerUrl('https://mstdn.social/')).toBe('https://mstdn.social');
-    expect(publicServerUrl('')).toBe('https://mastodon.social');
-  });
-});
-
-describe('campaignTaggedUrl', () => {
-  it('adds anonymous campaign metadata without changing the destination', () => {
+  it('tags links for the chosen platform and wording', () => {
     const tagged = new URL(
-      campaignTaggedUrl(JOIN_MASTODON_URL, { source: 'mawkingbird', variationId: 'friendly' }),
+      campaignTaggedUrl(JOIN_MASTODON_URL, { source: 'bluesky', variationId: 'open-web' }),
     );
-    expect(`${tagged.origin}${tagged.pathname}`).toBe(JOIN_MASTODON_URL);
-    expect(tagged.searchParams.get('utm_source')).toBe('mawkingbird');
+    expect(tagged.searchParams.get('utm_source')).toBe('bluesky');
     expect(tagged.searchParams.get('utm_medium')).toBe('invite');
-    expect(tagged.searchParams.get('utm_campaign')).toBe('friendly');
+    expect(tagged.searchParams.get('utm_campaign')).toBe('open-web');
   });
 });

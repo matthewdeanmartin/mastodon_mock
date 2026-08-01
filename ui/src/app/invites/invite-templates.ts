@@ -1,26 +1,21 @@
-/** Pure invitation copy and share-intent helpers for the public Invites page. */
+/** Platform-specific invitation copy and pure share-intent helpers. */
 
-/** A site whose composer can be opened with prefilled text. */
 export type InviteNetwork = 'x' | 'bluesky' | 'mastodon';
 
-/** A direct invitation intended for friends on any other social platform. */
 export interface InviteVariation {
-  /** Stable identity, also used as the campaign name when tracking is enabled. */
   id: string;
+  network: InviteNetwork;
   title: string;
-  description: string;
-  /** Simple mode intentionally exposes exactly two low-friction choices. */
-  simple: boolean;
-  /** The post, with optional `{placeholder}` tokens. */
   template: string;
 }
 
-/** Everything a template can interpolate. An empty value removes its whole line. */
 export interface InviteContext {
   profileUrl: string;
   handle: string;
-  /** The selected place where the recipient can start with Mastodon. */
+  /** Where a friend can start with Mastodon. Used by direct invitations. */
   visitUrl: string;
+  /** This page, carrying the current server. Used only by Mastodon rally posts. */
+  inviteUrl: string;
 }
 
 export const MAWKINGBIRD_URL = 'https://mawkingbird.com';
@@ -31,21 +26,25 @@ export const INVITE_LIMITS: Record<InviteNetwork, number> = {
   mastodon: 500,
 };
 
-/** Normalize a chosen API/home server into the public homepage we can promote. */
+const SIMPLE_COUNTS: Record<InviteNetwork, number> = {
+  x: 2,
+  bluesky: 2,
+  mastodon: 4,
+};
+
 export function publicServerUrl(host = 'mastodon.social'): string {
   const clean = host.replace(/^https?:\/\//, '').replace(/\/+$/, '') || 'mastodon.social';
   return `https://${clean}`;
 }
 
-/** The public Invites route, suitable for putting in a Mastodon rally post. */
-export function invitesPageUrl(): string {
-  return `${MAWKINGBIRD_URL}/invites`;
+export function invitesPageUrl(host = 'mastodon.social'): string {
+  const clean = host.replace(/^https?:\/\//, '').replace(/\/+$/, '') || 'mastodon.social';
+  return `${MAWKINGBIRD_URL}/invites?${encodeURIComponent(clean)}`;
 }
 
-/** Add campaign tags before a destination is handed to a link shortener. */
 export function campaignTaggedUrl(
   url: string,
-  options: { source: string; variationId: string },
+  options: { source: InviteNetwork; variationId: string },
 ): string {
   let parsed: URL;
   try {
@@ -59,12 +58,13 @@ export function campaignTaggedUrl(
   return parsed.toString();
 }
 
-/** Fill a template, removing whole lines whose optional value is unavailable. */
+/** Fill tokens, dropping the whole line when an optional value is unavailable. */
 export function renderInvite(template: string, context: InviteContext): string {
   const values: Record<string, string> = {
     profileUrl: context.profileUrl,
     handle: context.handle,
     visitUrl: context.visitUrl,
+    inviteUrl: context.inviteUrl,
     mawkingbird: MAWKINGBIRD_URL,
   };
   return template
@@ -79,7 +79,6 @@ export function renderInvite(template: string, context: InviteContext): string {
     .trim();
 }
 
-/** Build a normal, user-controlled web share intent. Nothing is posted automatically. */
 export function inviteIntentUrl(
   network: InviteNetwork,
   text: string,
@@ -96,25 +95,23 @@ export function inviteIntentUrl(
   return url.toString();
 }
 
-export const INVITE_VARIATIONS: readonly InviteVariation[] = [
+const X_INVITES: readonly InviteVariation[] = [
   {
-    id: 'friendly',
-    title: 'A friendly invitation',
-    description: 'A warm, low-pressure invitation that works on any social platform.',
-    simple: true,
-    template: `Come join me on Mastodon — social media made of independent communities that can still talk to one another.
+    id: 'x-straightforward',
+    network: 'x',
+    title: 'Straightforward',
+    template: `I’m on Mastodon! Come join me for social media built around communities instead of one central platform.
 
 Find me here: {profileUrl}
 
-Pick a server and get started: {visitUrl}
+Start here: {visitUrl}
 
 #Mastodon #Fediverse`,
   },
   {
-    id: 'leave-twitter',
+    id: 'x-leave-twitter',
+    network: 'x',
     title: 'Leave Twitter behind',
-    description: 'A direct invitation for friends who are ready for somewhere else.',
-    simple: true,
     template: `Still on Twitter? Upgrade your experience by leaving it behind. Come find your people on Mastodon instead.
 
 I’m here: {profileUrl}
@@ -124,34 +121,310 @@ Start here: {visitUrl}
 #JoinMastodon #Fediverse`,
   },
   {
-    id: 'open-web',
-    title: 'Try the open social web',
-    description: 'For friends on Bluesky, Threads, Twitter, or anywhere else.',
-    simple: false,
-    template: `Wherever you post now, you can also be part of the open social web. Mastodon lets you choose a community and still follow people across the Fediverse.
+    id: 'x-follow-me',
+    network: 'x',
+    title: 'Follow me',
+    template: `I’d love to see more of my Twitter friends on Mastodon. It takes a couple of minutes to try.
 
-Come say hello: {profileUrl}
+Follow me at {profileUrl}
 
-See where to start: {visitUrl}
+Get started: {visitUrl}
+
+#Mastodon #JoinMastodon`,
+  },
+  {
+    id: 'x-no-algorithm',
+    network: 'x',
+    title: 'Choose your own feed',
+    template: `Want a social feed you control instead of one chosen entirely by an algorithm? Give Mastodon a try.
+
+Start here: {visitUrl}
+
+#Mastodon #Fediverse #OpenSocial`,
+  },
+  {
+    id: 'x-community',
+    network: 'x',
+    title: 'Lots of communities',
+    template: `Mastodon is made of independent communities that can still talk to one another. It’s a different and surprisingly human way to use social media.
+
+Come try it: {visitUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'x-friendly-migration',
+    network: 'x',
+    title: 'Low-pressure migration',
+    template: `You don’t have to quit Twitter today to try Mastodon. Make an account, follow a few people, and see whether you like it.
+
+{visitUrl}
+
+#TryMastodon #Fediverse`,
+  },
+  {
+    id: 'x-open-web',
+    network: 'x',
+    title: 'The open web',
+    template: `I’m spending more time on the open social web. Mastodon lets people pick their own community and still follow people everywhere else.
+
+Join me: {profileUrl}
+
+Start here: {visitUrl}
 
 #Mastodon #OpenWeb`,
   },
   {
-    id: 'touch-grass',
+    id: 'x-human-internet',
+    network: 'x',
+    title: 'A more human internet',
+    template: `Friendly invitation: come say hello on Mastodon sometime. Smaller communities and conversations feel refreshingly human.
+
+My profile: {profileUrl}
+
+Try it: {visitUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'x-mawkingbird',
+    network: 'x',
+    title: 'Try it in a browser',
+    template: `Want to see what Mastodon is like? Pick a community, follow your interests, and try the open social web from your browser.
+
+{visitUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'x-touch-grass',
+    network: 'x',
     title: 'Real talk: touch grass',
-    description: 'The deliberately unserious option.',
-    simple: false,
     template: `Hey, I’ve invited you to Mastodon, to Bluesky, and that didn’t work. I’m now inviting you to go touch grass. Log out and upgrade your experience by leaving Twitter.
 
-If you come back online, try this: {visitUrl}`,
+If you come back online: {visitUrl}`,
   },
 ];
 
-export function invitesFor(simple: boolean): readonly InviteVariation[] {
-  return simple ? INVITE_VARIATIONS.filter((invite) => invite.simple) : INVITE_VARIATIONS;
-}
+const BLUESKY_INVITES: readonly InviteVariation[] = [
+  {
+    id: 'bsky-both-at-once',
+    network: 'bluesky',
+    title: 'Both at once',
+    template: `Some of your friends are over on Mastodon. You don’t need to pick one open network forever — come see what the other side is talking about.
 
-/** Mastodon shares are meta-invitations: they ask existing users to recruit elsewhere. */
-export function mastodonRallyText(): string {
-  return `Hey Mastodon users: got friends still on Twitter? Go save them. Pick an invitation, make it your own, and send it from wherever they still post.\n\n${invitesPageUrl()}\n\n#Mastodon #Fediverse`;
+{visitUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'bsky-open-web',
+    network: 'bluesky',
+    title: 'More of the open web',
+    template: `Bluesky is one part of the open social web. Mastodon is another, full of communities and people worth meeting.
+
+Find me here: {profileUrl}
+
+Start here: {visitUrl}
+
+#Mastodon #OpenWeb`,
+  },
+  {
+    id: 'bsky-your-people',
+    network: 'bluesky',
+    title: 'Your people are there',
+    template: `A surprising number of people you used to follow are posting on Mastodon these days. Come look around and see who you recognize.
+
+{visitUrl}
+
+You’ll find me at {handle}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'bsky-no-switch',
+    network: 'bluesky',
+    title: 'No switching required',
+    template: `This is not a demand to leave Bluesky. Social networks are better when you can visit more than one neighborhood.
+
+Come explore Mastodon: {visitUrl}
+
+#Bluesky #Mastodon`,
+  },
+  {
+    id: 'bsky-community',
+    network: 'bluesky',
+    title: 'Choose a community',
+    template: `If you like the open social web, try the version where you choose a community first and can still follow people everywhere.
+
+{visitUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'bsky-say-hello',
+    network: 'bluesky',
+    title: 'Come say hello',
+    template: `Come say hello to me on the Mastodon side sometime.
+
+My profile: {profileUrl}
+
+Choose where to start: {visitUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'bsky-small-communities',
+    network: 'bluesky',
+    title: 'Small communities',
+    template: `Mastodon’s small communities each have their own character, but they can all talk to one another. That is worth experiencing firsthand.
+
+{visitUrl}
+
+#Mastodon #OpenSocial`,
+  },
+  {
+    id: 'bsky-follow-across',
+    network: 'bluesky',
+    title: 'Follow across servers',
+    template: `On Mastodon, choosing a home server does not trap you there. You can follow people across the Fediverse from one account.
+
+Try it: {visitUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'bsky-curious',
+    network: 'bluesky',
+    title: 'For the curious',
+    template: `Curious what the Mastodon half of the open social web feels like? Bring your interests, find a few people, and give it an honest look.
+
+{visitUrl}
+
+#Mastodon #OpenWeb`,
+  },
+  {
+    id: 'bsky-bring-friends',
+    network: 'bluesky',
+    title: 'Bring a friend',
+    template: `The hardest part of trying another social network is arriving alone. Come to Mastodon with one friend and build your corner together.
+
+Start here: {visitUrl}
+
+#Mastodon #Fediverse`,
+  },
+];
+
+const MASTODON_RALLIES: readonly InviteVariation[] = [
+  {
+    id: 'mastodon-save-a-friend',
+    network: 'mastodon',
+    title: 'Save a friend',
+    template: `Hey Mastodon users: got friends still on Twitter? Go save one. Pick an invitation, make it yours, and send it where they still post.
+
+{inviteUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'mastodon-one-today',
+    network: 'mastodon',
+    title: 'Invite one today',
+    template: `Mastodon gets better when our people are here. Invite one friend from another platform today — one thoughtful message beats a migration campaign.
+
+{inviteUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'mastodon-personal-note',
+    network: 'mastodon',
+    title: 'Make it personal',
+    template: `Know somebody who would like Mastodon? Send them a personal invitation where they already are. We made a few starting points you can edit.
+
+{inviteUrl}
+
+#JoinMastodon #Fediverse`,
+  },
+  {
+    id: 'mastodon-network-effect',
+    network: 'mastodon',
+    title: 'The good network effect',
+    template: `The best way to improve Mastodon is to bring good people into it. Think of one person you miss and invite them from whichever platform they use.
+
+{inviteUrl}
+
+#Mastodon #OpenSocial`,
+  },
+  {
+    id: 'mastodon-twitter-friends',
+    network: 'mastodon',
+    title: 'Friends still on Twitter',
+    template: `Some of our friends are still on Twitter because nobody asked them personally. This is your reminder to ask — kindly, directly, and without a lecture.
+
+{inviteUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'mastodon-any-platform',
+    network: 'mastodon',
+    title: 'Invite from anywhere',
+    template: `Your future Mastodon friends might be on Twitter, Bluesky, Threads, a group chat, or somewhere else. Meet them there and invite them in.
+
+{inviteUrl}
+
+#Mastodon #OpenWeb`,
+  },
+  {
+    id: 'mastodon-house-party',
+    network: 'mastodon',
+    title: 'The house-party rule',
+    template: `A social network is like a house party: if you want interesting people there, invite interesting people. Who are you bringing to Mastodon?
+
+{inviteUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'mastodon-no-evangelism',
+    network: 'mastodon',
+    title: 'No evangelism required',
+    template: `You do not need a manifesto to invite someone to Mastodon. “I think you’d like it here” plus a useful starting link is enough.
+
+{inviteUrl}
+
+#Mastodon #Fediverse`,
+  },
+  {
+    id: 'mastodon-community-builder',
+    network: 'mastodon',
+    title: 'Community builder',
+    template: `Communities do not grow by accident. If you value this one, invite somebody whose voice would make the wider Fediverse better.
+
+{inviteUrl}
+
+#Mastodon #Community`,
+  },
+  {
+    id: 'mastodon-pass-it-on',
+    network: 'mastodon',
+    title: 'Pass it on',
+    template: `Someone helped you find your way to Mastodon. Pass that favor on: reach outside the Fediverse and invite the next person in.
+
+{inviteUrl}
+
+#Mastodon #OpenSocial`,
+  },
+];
+
+export const INVITE_VARIATIONS: readonly InviteVariation[] = [
+  ...X_INVITES,
+  ...BLUESKY_INVITES,
+  ...MASTODON_RALLIES,
+];
+
+export function invitesFor(network: InviteNetwork, simple: boolean): readonly InviteVariation[] {
+  const matches = INVITE_VARIATIONS.filter((invite) => invite.network === network);
+  return simple ? matches.slice(0, SIMPLE_COUNTS[network]) : matches;
 }

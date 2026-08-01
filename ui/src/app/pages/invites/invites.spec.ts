@@ -58,6 +58,15 @@ describe('Invites', () => {
     return Array.from(root(fixture).querySelectorAll<HTMLTextAreaElement>('textarea.invite-text'));
   }
 
+  function clickButton(fixture: ComponentFixture<Invites>, text: string): void {
+    const button = Array.from(root(fixture).querySelectorAll<HTMLButtonElement>('button')).find(
+      (candidate) => candidate.textContent?.includes(text),
+    );
+    expect(button).toBeTruthy();
+    button!.click();
+    fixture.detectChanges();
+  }
+
   beforeEach(() => {
     localStorage.clear();
     account = signal<Account | null>(ACCOUNT);
@@ -66,60 +75,69 @@ describe('Invites', () => {
     isAnonymous = false;
   });
 
-  it('shows exactly two invitation choices with reasonable defaults in simple mode', () => {
+  it('starts with two Twitter-specific choices and simple defaults', () => {
     const fixture = setUp();
-
     expect(cards(fixture)).toHaveLength(2);
     expect(boxes(fixture).every((box) => box.value.includes(JOIN_MASTODON_URL))).toBe(true);
     expect(boxes(fixture).some((box) => box.value.includes(ACCOUNT.url))).toBe(true);
-    expect(root(fixture).textContent).not.toContain('touch grass');
   });
 
-  it('works signed out and explains the optional sign-in benefits', () => {
-    isAuthenticated = false;
-    account.set(null);
-    baseUrl.set('');
+  it('restores ten Twitter choices in advanced mode', () => {
     const fixture = setUp();
+    clickButton(fixture, 'Advanced');
+    expect(cards(fixture)).toHaveLength(10);
+    expect(root(fixture).textContent).toContain('Real talk: touch grass');
+  });
+
+  it('uses a distinct Bluesky deck', () => {
+    const fixture = setUp();
+    const twitterText = boxes(fixture)
+      .map((box) => box.value)
+      .join('\n');
+    clickButton(fixture, 'Bluesky');
+    const blueskyText = boxes(fixture)
+      .map((box) => box.value)
+      .join('\n');
 
     expect(cards(fixture)).toHaveLength(2);
-    expect(root(fixture).textContent).toContain('No account required.');
-    expect(boxes(fixture).every((box) => !box.value.includes('{'))).toBe(true);
+    expect(blueskyText).not.toBe(twitterText);
+    expect(root(fixture).textContent).toContain('already understand why open networks matter');
   });
 
-  it('offers sign-in to the browser-local Anonymous account while using its API server', () => {
+  it('shows four Mastodon rally choices in simple mode and ten in advanced', () => {
+    const fixture = setUp();
+    clickButton(fixture, 'Mastodon rally');
+
+    expect(cards(fixture)).toHaveLength(4);
+    expect(boxes(fixture).every((box) => box.value.includes('/invites?example.social'))).toBe(true);
+    expect(boxes(fixture).every((box) => !box.value.includes(JOIN_MASTODON_URL))).toBe(true);
+    for (const link of root(fixture).querySelectorAll<HTMLAnchorElement>('.invite-card a.btn')) {
+      expect(link.href).toContain('https://example.social/share?text=');
+    }
+
+    clickButton(fixture, 'Advanced');
+    expect(cards(fixture)).toHaveLength(10);
+  });
+
+  it('uses the Anonymous API server and offers login without requiring it', () => {
     isAuthenticated = true;
     isAnonymous = true;
     account.set(null);
-    baseUrl.set('https://mastodon.social');
+    baseUrl.set('https://hachyderm.io');
     const fixture = setUp();
 
-    expect(root(fixture).textContent).toContain('No account required.');
-    expect(root(fixture).textContent).toContain('Sign in');
-    expect(root(fixture).textContent).toContain('mastodon.social');
+    expect(root(fixture).textContent).toContain('Anonymous on hachyderm.io');
+    expect(root(fixture).textContent).toContain('/invites?hachyderm.io');
+    expect(cards(fixture)).toHaveLength(2);
   });
 
-  it('reveals the humorous option and link controls only in advanced mode', () => {
-    const fixture = setUp();
-    const advanced = Array.from(
-      root(fixture).querySelectorAll<HTMLButtonElement>('.mode-switch button'),
-    ).find((button) => button.textContent?.includes('Advanced'))!;
-
-    advanced.click();
-    fixture.detectChanges();
-
-    expect(cards(fixture)).toHaveLength(4);
-    expect(root(fixture).textContent).toContain('Real talk: touch grass');
-    expect(root(fixture).querySelector('#promotion-target')).toBeTruthy();
-  });
-
-  it('can promote the anonymous API server public homepage', () => {
-    isAuthenticated = false;
+  it('can promote the Anonymous server public homepage in advanced mode', () => {
+    isAuthenticated = true;
+    isAnonymous = true;
     account.set(null);
     baseUrl.set('https://mstdn.social');
     const fixture = setUp();
-    const advanced = root(fixture).querySelectorAll<HTMLButtonElement>('.mode-switch button')[1];
-    advanced.click();
-    fixture.detectChanges();
+    clickButton(fixture, 'Advanced');
 
     const select = root(fixture).querySelector<HTMLSelectElement>('#promotion-target')!;
     select.value = 'home-server';
@@ -129,31 +147,20 @@ describe('Invites', () => {
     expect(boxes(fixture).every((box) => box.value.includes('https://mstdn.social'))).toBe(true);
   });
 
-  it('uses Mastodon sharing only for the rally message', () => {
+  it('sends an edit to only the selected platform composer', () => {
     const fixture = setUp();
-    const directLinks = Array.from(
-      root(fixture).querySelectorAll<HTMLAnchorElement>('.invite-card a.btn'),
-    );
-    expect(directLinks.every((link) => !link.href.includes('/share?'))).toBe(true);
-
-    const rally = root(fixture).querySelector<HTMLAnchorElement>('.rally-card a.btn')!;
-    expect(rally.href).toContain('https://example.social/share?text=');
-    expect(decodeURIComponent(rally.href)).toContain('got+friends+still+on+Twitter');
-  });
-
-  it('sends hand-edited text to both external composers', () => {
-    const fixture = setUp();
+    clickButton(fixture, 'Bluesky');
     const box = boxes(fixture)[0];
-    box.value = 'my own invitation';
+    box.value = 'my Bluesky-specific invitation';
     box.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    const links = cards(fixture)[0].querySelectorAll<HTMLAnchorElement>('a.btn');
-    expect(links[0].href).toContain('text=my+own+invitation');
-    expect(links[1].href).toContain('text=my+own+invitation');
+    const link = cards(fixture)[0].querySelector<HTMLAnchorElement>('a.btn')!;
+    expect(link.href).toContain('https://bsky.app/intent/compose');
+    expect(link.href).toContain('text=my+Bluesky-specific+invitation');
   });
 
-  it('copies exactly what the card shows', async () => {
+  it('copies exactly what the selected card shows', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     const fixture = setUp();
@@ -164,6 +171,6 @@ describe('Invites', () => {
     fixture.detectChanges();
 
     expect(writeText).toHaveBeenCalledWith(shown);
-    expect(cards(fixture)[0].textContent).toContain('Invitation copied');
+    expect(cards(fixture)[0].textContent).toContain('✓ Copied');
   });
 });

@@ -57,7 +57,7 @@ export const HOUSE_ADS: HouseAd[] = [
     id: 'invite-people-off-twitter',
     title: '📣 Invite people to leave Twitter',
     text: 'Pick an invitation, make it yours, and send it wherever your friends still post.',
-    url: 'https://mawkingbird.com/invites',
+    url: 'https://mawkingbird.com/invites?mastodon.social',
     cta: 'Build an invitation ↗',
   },
   {

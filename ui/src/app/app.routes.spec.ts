@@ -11,11 +11,12 @@ describe('application routes', () => {
     expect(routes.find((route) => route.path === 'anonymous')?.loadComponent).toBeDefined();
   });
 
-  it('keeps the invitation builder outside the authenticated shell', () => {
+  it('gives the public invitation builder its own guarded instance of the standard shell', () => {
     const inviteRoute = routes.find((route) => route.path === 'invites');
 
     expect(inviteRoute?.loadComponent).toBeDefined();
-    expect(inviteRoute?.canActivate).toBeUndefined();
+    expect(inviteRoute?.canActivate).toHaveLength(1);
+    expect(inviteRoute?.children?.find((child) => child.path === '')?.loadComponent).toBeDefined();
     expect(shellChild('invites')).toBeUndefined();
   });
 

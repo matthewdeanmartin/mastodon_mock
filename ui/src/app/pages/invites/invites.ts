@@ -4,12 +4,14 @@ import { firstValueFrom } from 'rxjs';
 import { Auth } from '../../auth';
 import {
   campaignTaggedUrl,
+  INVITE_LIMITS,
   InviteContext,
+  InviteNetwork,
   InviteVariation,
   inviteIntentUrl,
   invitesFor,
+  invitesPageUrl,
   JOIN_MASTODON_URL,
-  mastodonRallyText,
   publicServerUrl,
   renderInvite,
 } from '../../invites/invite-templates';
@@ -27,11 +29,10 @@ interface InviteCard {
   length: number;
   overLimit: boolean;
   edited: boolean;
-  xIntentUrl: string;
-  blueskyIntentUrl: string;
+  intentUrl: string;
 }
 
-/** Public invitation builder. Share intents open composers but never post automatically. */
+/** Invitation builder rendered inside Mawkingbird's standard three-column shell. */
 @Component({
   selector: 'app-invites',
   imports: [RouterLink],
@@ -45,12 +46,13 @@ export class Invites implements OnInit {
   private readonly shorteners = inject(ShortenerRegistry);
   private readonly shortenerSettings = inject(ShortenerSettings);
 
-  /** Anonymous mode is usable here, but only a real Mastodon account can add a profile. */
   protected readonly signedIn = this.auth.isAuthenticated && !this.auth.isAnonymous;
   protected readonly mode = signal<InviteMode>('simple');
+  protected readonly network = signal<InviteNetwork>('x');
   protected readonly promotion = signal<PromotionTarget>('join-mastodon');
   protected readonly includeProfile = signal(true);
-  protected readonly includeDestination = signal(true);
+  protected readonly includeLink = signal(true);
+  protected readonly limits = INVITE_LIMITS;
   private readonly edits = signal<Record<string, string>>({});
 
   protected readonly copied = signal<string | null>(null);
@@ -86,33 +88,38 @@ export class Invites implements OnInit {
       : `@${account.username}@${this.homeHost()}`;
   });
 
-  private readonly plainDestinationUrl = computed(() =>
-    this.promotion() === 'home-server' ? publicServerUrl(this.homeHost()) : JOIN_MASTODON_URL,
-  );
+  private readonly plainLinkUrl = computed(() => {
+    if (this.network() === 'mastodon') {
+      return invitesPageUrl(this.homeHost());
+    }
+    return this.promotion() === 'home-server'
+      ? publicServerUrl(this.homeHost())
+      : JOIN_MASTODON_URL;
+  });
 
   protected readonly shorten = signal(false);
   protected readonly trackCampaign = signal(false);
-  private readonly shortDestinationUrl = signal<string | null>(null);
+  private readonly shortLinkUrl = signal<string | null>(null);
   protected readonly shortening = signal(false);
   protected readonly shortenError = signal<string | null>(null);
   protected readonly shortenerReady = computed(() => this.shortenerSettings.usable());
   protected readonly shortenerLabel = computed(
     () => this.shortenerSettings.chosen()?.label ?? 'a link shortener',
   );
-  protected readonly destinationUrl = computed(
-    () => this.shortDestinationUrl() ?? this.plainDestinationUrl(),
-  );
+  protected readonly linkUrl = computed(() => this.shortLinkUrl() ?? this.plainLinkUrl());
 
   private readonly context = computed<InviteContext>(() => ({
     profileUrl: this.naming() ? this.profileUrl() : '',
     handle: this.naming() ? this.handle() : '',
-    visitUrl: this.includeDestination() ? this.destinationUrl() : '',
+    visitUrl: this.network() !== 'mastodon' && this.includeLink() ? this.linkUrl() : '',
+    inviteUrl: this.network() === 'mastodon' && this.includeLink() ? this.linkUrl() : '',
   }));
 
   protected readonly cards = computed<InviteCard[]>(() => {
+    const network = this.network();
     const context = this.context();
     const edits = this.edits();
-    return invitesFor(this.mode() === 'simple').map((variation) => {
+    return invitesFor(network, this.mode() === 'simple').map((variation) => {
       const edit = edits[variation.id];
       const text = edit ?? renderInvite(variation.template, context);
       const length = Array.from(text).length;
@@ -120,22 +127,16 @@ export class Invites implements OnInit {
         variation,
         text,
         length,
-        overLimit: length > 280,
+        overLimit: length > INVITE_LIMITS[network],
         edited: edit !== undefined,
-        xIntentUrl: inviteIntentUrl('x', text),
-        blueskyIntentUrl: inviteIntentUrl('bluesky', text),
+        intentUrl: inviteIntentUrl(network, text, this.homeHost()),
       };
     });
   });
 
-  protected readonly rallyText = mastodonRallyText();
-  protected readonly mastodonRallyIntent = computed(() =>
-    inviteIntentUrl('mastodon', this.rallyText, this.homeHost()),
-  );
-
   ngOnInit(): void {
     this.diagnostics.info('Invites', 'page:open', {
-      signedIn: this.signedIn,
+      anonymous: this.auth.isAnonymous,
       hasProfile: this.hasProfile(),
       server: this.homeHost(),
     });
@@ -146,17 +147,25 @@ export class Invites implements OnInit {
     this.clearCopyState();
     if (mode === 'simple') {
       this.promotion.set('join-mastodon');
-      this.includeDestination.set(true);
+      this.includeLink.set(true);
       this.includeProfile.set(true);
       this.shorten.set(false);
       this.trackCampaign.set(false);
-      this.shortDestinationUrl.set(null);
+      this.shortLinkUrl.set(null);
     }
+  }
+
+  protected setNetwork(network: InviteNetwork): void {
+    this.network.set(network);
+    this.shorten.set(false);
+    this.trackCampaign.set(false);
+    this.shortLinkUrl.set(null);
+    this.clearCopyState();
   }
 
   protected setPromotion(target: PromotionTarget): void {
     this.promotion.set(target);
-    this.shortDestinationUrl.set(null);
+    this.shortLinkUrl.set(null);
     if (this.shorten()) {
       void this.makeShortLink();
     }
@@ -167,8 +176,12 @@ export class Invites implements OnInit {
     this.clearCopyState();
   }
 
-  protected toggleDestination(include: boolean): void {
-    this.includeDestination.set(include);
+  protected toggleLink(include: boolean): void {
+    this.includeLink.set(include);
+    if (!include) {
+      this.shorten.set(false);
+      this.shortLinkUrl.set(null);
+    }
     this.clearCopyState();
   }
 
@@ -176,7 +189,7 @@ export class Invites implements OnInit {
     this.shorten.set(on);
     this.shortenError.set(null);
     if (!on) {
-      this.shortDestinationUrl.set(null);
+      this.shortLinkUrl.set(null);
       return;
     }
     await this.makeShortLink();
@@ -197,27 +210,27 @@ export class Invites implements OnInit {
     }
     const firstId = this.cards()[0]?.variation.id ?? 'invite';
     const target = this.trackCampaign()
-      ? campaignTaggedUrl(this.plainDestinationUrl(), {
-          source: 'mawkingbird',
+      ? campaignTaggedUrl(this.plainLinkUrl(), {
+          source: this.network(),
           variationId: firstId,
         })
-      : this.plainDestinationUrl();
+      : this.plainLinkUrl();
 
     this.shortening.set(true);
     try {
       const link = await firstValueFrom(this.shorteners.create({ destinationUrl: target }));
-      this.shortDestinationUrl.set(link.shortUrl);
+      this.shortLinkUrl.set(link.shortUrl);
       this.diagnostics.info('Invites', 'link:shortened', {
         provider: link.provider,
         tracked: this.trackCampaign(),
       });
     } catch (error: unknown) {
-      this.shortDestinationUrl.set(null);
+      this.shortLinkUrl.set(null);
       this.shorten.set(false);
       this.shortenError.set(
         error instanceof Error && error.message
           ? error.message
-          : "Couldn't shorten the link. The invitations still work with the full URL.",
+          : "Couldn't shorten the link. The invitation still works with the full URL.",
       );
     } finally {
       this.shortening.set(false);
@@ -238,18 +251,13 @@ export class Invites implements OnInit {
     this.clearCopyState();
   }
 
-  protected onIntentOpen(card: InviteCard, network: 'x' | 'bluesky'): void {
+  protected onIntentOpen(card: InviteCard): void {
     this.diagnostics.info('Invites', 'user:intent-open', {
-      network,
+      network: this.network(),
       variationId: card.variation.id,
-      includedMastodonProfile: this.mentionsProfile(card.text),
       edited: card.edited,
       overLimit: card.overLimit,
     });
-  }
-
-  protected onRallyOpen(): void {
-    this.diagnostics.info('Invites', 'user:rally-intent-open', { server: this.homeHost() });
   }
 
   protected async copy(card: InviteCard): Promise<void> {
@@ -268,19 +276,22 @@ export class Invites implements OnInit {
     this.fallbackText.set(null);
   }
 
-  protected postLabel(card: InviteCard, network: 'Twitter' | 'Bluesky'): string {
-    return `Post “${card.variation.title}” on ${network}`;
+  protected networkLabel(): string {
+    return this.network() === 'x'
+      ? 'Twitter'
+      : this.network() === 'bluesky'
+        ? 'Bluesky'
+        : 'Mastodon';
+  }
+
+  protected actionLabel(card: InviteCard): string {
+    const verb =
+      this.network() === 'mastodon' ? 'Rally Mastodon with' : `Post on ${this.networkLabel()}:`;
+    return `${verb} “${card.variation.title}”`;
   }
 
   private clearCopyState(): void {
     this.copied.set(null);
     this.copyFailed.set(null);
-  }
-
-  private mentionsProfile(text: string): boolean {
-    return (
-      (!!this.profileUrl() && text.includes(this.profileUrl())) ||
-      (!!this.handle() && text.includes(this.handle()))
-    );
   }
 }
