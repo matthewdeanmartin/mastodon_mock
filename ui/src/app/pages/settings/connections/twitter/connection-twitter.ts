@@ -473,10 +473,22 @@ export class ConnectionTwitter implements OnInit {
   protected readonly importInactiveDays = signal(DEFAULT_INACTIVE_DAYS);
   protected readonly importResult = signal<string | null>(null);
 
-  /** Wall clock for the liveness pass, in whole minutes — see QPS_DELAY_MS. */
-  protected readonly importMinutes = computed(() =>
-    Math.max(1, Math.round(this.importer.checkSeconds() / 60)),
-  );
+  /**
+   * Wall clock for the liveness pass, in whatever unit reads honestly.
+   *
+   * Minutes were hardcoded when the pace was: the free tier's one-request-per-
+   * five-seconds made everything minutes. A paid plan finishes the same work in
+   * seconds, and "~1 min" for a six-second job is a worse estimate than no
+   * estimate. The pacer's live interval drives this, so it also updates if the
+   * service starts throttling mid-run.
+   */
+  protected readonly importDuration = computed(() => {
+    const seconds = this.importer.checkSeconds();
+    if (seconds < 60) {
+      return `${Math.max(1, seconds)} sec`;
+    }
+    return `${Math.round(seconds / 60)} min`;
+  });
 
   protected async startImport(): Promise<void> {
     this.importResult.set(null);

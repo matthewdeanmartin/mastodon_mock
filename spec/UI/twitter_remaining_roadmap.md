@@ -1,6 +1,6 @@
 # Twitter provider — remaining roadmap
 
-**Status:** §1–§5 shipped; §6 (bulk import + rotation) remains
+**Status:** §1–§5 shipped; §6 bulk import shipped, rotation remains
 **Date:** 2026-08-01
 **Context:** Sprints 1–5 are merged (PR #13 + follow-ups). This document covers
 what is left, with the cost arithmetic measured rather than estimated.
@@ -355,6 +355,49 @@ merged by timestamp, not appended as a block.
 
 ## 6. The 5,000-friends problem
 
+### Bulk import — **DONE (2026-08-01)**
+
+On the Twitter connector: enter a handle, pull in who they follow, review, import.
+Nothing is followed until Import is pressed.
+
+**Two costs, nothing alike.** `user/followings` returns 200 accounts per request
+and moved the credit balance by less than its resolution — 5,000 follows is ~25
+requests and no meaningful money. Liveness is one request *per account*, and
+there is no bulk alternative: **no endpoint on this service reports a last-tweet
+timestamp**, and `created_at` everywhere is when the account was created. So
+"skip dead accounts" is the expensive half and is opt-in.
+
+**Free exclusions run first**, straight off the list: `statuses_count === 0`
+(never posted) and `protected` (unreadable). Both remove real accounts from the
+candidate set before any per-account request is spent.
+
+**The pace is discovered, not assumed.** The first cut hardcoded 5.2s from the
+free tier's stated limit:
+
+```
+{"error":"Too Many Requests","message":"For free-tier users, the QPS limit
+ is one request every 5 seconds."}
+```
+
+Note *"for free-tier users"*. On a paid balance, twenty back-to-back requests all
+returned 200. `TwitterPacer` therefore starts fast and backs off only on
+evidence: obey `Retry-After` when sent, otherwise double up to a ceiling, then
+ease back after a clean streak. Measured effect on the same 3-account check:
+**~1 sec and 0.9s actual**, where the constant predicted "~1 min" and took ~16s.
+
+There are **no rate-limit headers to read** — none on success, none on a 429,
+only an occasional `Retry-After`. The pacer accepts a remaining-quota reading
+for the day they appear, without depending on them.
+
+A rate-limited account is **retried, not skipped** (measured: 4 requests for 3
+accounts under a 429, same final result), because a refused request did no work
+and moving on would silently drop someone from the import.
+
+Archive-zip import is deferred; `ui/src/app/twitter-archive.ts` already parses
+the format if it is picked up later.
+
+### Rotation — still open
+
 The most interesting question here, and the measurements change the answer.
 
 ### It is not primarily a cost problem
@@ -412,13 +455,12 @@ several hundred — because the *daily* limit is doing the real protecting.
 connector page warns past 50 that a full refresh takes a while. The computed
 cycle time waits on rotation.
 
-### The import path
+### The import path — **built**, see above
 
-If someone has 5,000 friends they will not type them in. `GET
-/twitter/user/followings` returns **200 per page**, so importing a 5,000-account
-list is ~25 requests — trivially cheap, and a much better experience than the
-follow form. Worth building alongside the rotation work, with a clear warning
-about what refreshing that many accounts implies.
+The prediction held exactly: `user/followings` returns 200 per page, so a
+5,000-account list is ~25 requests. What the plan missed is that *importing* is
+cheap while *vetting* is not — liveness has no bulk endpoint — which is why the
+shipped feature separates the free filters from the opt-in per-account check.
 
 ---
 
@@ -437,8 +479,11 @@ about what refreshing that many accounts implies.
    rather than fetching, so Home never spends. The main
    open question is ordering a merged feed when tweets arrive in bulk on a
    refresh rather than continuously.
-6. **Followings bulk import + rotation (§6)** — the last one, and now the top
-   item. Import is ~25 requests for 5,000 accounts; rotation is what
+6. ~~Followings bulk import (§6)~~ — **done**, with adaptive pacing and
+   dead-account skipping.
+7. **Rotation (§6)** — the last item. Now that Home reads the cache and never
+   spends, rotation is purely about *when* to refresh a large follow list, not
+   about protecting Home from it. Import is ~25 requests for 5,000 accounts; rotation is what
    makes keeping them fresh tractable. §1 makes the rotation far cheaper, since
    only the accounts due for a refresh cost anything.
 

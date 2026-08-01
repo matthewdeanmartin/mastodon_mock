@@ -526,14 +526,19 @@
             All checked
           } @else {
             Skip dead accounts ({{ importer.unchecked().length }} requests, ~{{
-              importMinutes()
-            }} min)
+              importDuration()
+            }})
           }
         </button>
       </div>
       <p class="muted small">
-        Checking costs one request per account and the free tier allows one every five seconds, so
-        it takes a while. You can stop at any point and keep what has been checked so far.
+        Checking costs one request per account. How long that takes depends on your plan — the
+        free tier allows one request every five seconds, paid plans are far quicker — so the
+        estimate above adjusts as it runs. You can stop at any point and keep what has been
+        checked so far.
+        @if (importer.throttled()) {
+          <strong>The service is currently throttling, so this has slowed down.</strong>
+        }
       </p>
 
       <ul class="import-list">

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TwitterApi } from './twitter-api';
 import { TwitterFollows } from './twitter-follows';
 import { DEFAULT_INACTIVE_DAYS, toCandidate, TwitterImport } from './twitter-import';
+import { TwitterApiError } from './twitter-errors';
+import { FAST_DELAY_MS, TwitterPacer } from './twitter-pacer';
 import { WireFollowing } from './twitterapi-io/wire-types';
 
 /** A followings entry in the measured snake_case shape. */
@@ -138,9 +140,9 @@ describe('TwitterImport', () => {
     expect(importer.keeping()).toHaveLength(1);
   });
 
-  it('paces liveness checks to the free tier limit', async () => {
-    // The service states it outright: one request every five seconds. Firing
-    // them back to back earns a 403 that claims the key is missing.
+  it('checks one account at a time rather than firing them together', async () => {
+    // Sequential regardless of pace: parallel requests are what trip a limit,
+    // and a refused request has already been billed.
     getFollowings.mockReturnValue(
       of({
         users: [wire({ id: '1', screen_name: 'a' }), wire({ id: '2', screen_name: 'b' })],
@@ -152,11 +154,37 @@ describe('TwitterImport', () => {
     getLastPostedAt.mockReturnValue(of(daysAgo(1)));
 
     const promise = importer.checkLiveness();
-    await vi.advanceTimersByTimeAsync(100);
-    // Only the first has gone out; the second is waiting on the gap.
+    await Promise.resolve();
     expect(getLastPostedAt).toHaveBeenCalledTimes(1);
     await run(promise);
     expect(getLastPostedAt).toHaveBeenCalledTimes(2);
+  });
+
+  it('slows down when the service says so, instead of assuming a fixed pace', async () => {
+    // The pace used to be hardcoded to the free tier's five seconds. A paid
+    // plan is far quicker, so it is discovered: fast until refused.
+    const pacer = TestBed.inject(TwitterPacer);
+    getFollowings.mockReturnValue(
+      of({ users: [wire({ id: '1', screen_name: 'a' })], cursor: null, hasMore: false }),
+    );
+    await run(importer.list('mistersql', 10));
+    expect(pacer.delayMs()).toBe(FAST_DELAY_MS);
+
+    let call = 0;
+    getLastPostedAt.mockImplementation(() => {
+      call++;
+      return call === 1
+        ? throwError(() => new TwitterApiError('RATE_LIMITED', 'slow', 'twitterapi-io', 429))
+        : of(daysAgo(1));
+    });
+    await run(importer.checkLiveness());
+
+    expect(pacer.delayMs()).toBeGreaterThan(FAST_DELAY_MS);
+    expect(importer.throttled()).toBe(true);
+    // Retried rather than skipped: a refused request did no work, so moving on
+    // would silently drop the account from the import.
+    expect(importer.keeping()).toHaveLength(1);
+    expect(importer.candidates()[0].lastPostedAt).toBeTruthy();
   });
 
   it('stops between accounts and keeps what was already decided', async () => {

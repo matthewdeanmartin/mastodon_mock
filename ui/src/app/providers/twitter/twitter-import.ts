@@ -2,6 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { TwitterApi } from './twitter-api';
 import { TwitterFollows } from './twitter-follows';
+import { TwitterPacer } from './twitter-pacer';
 import { WireFollowing } from './twitterapi-io/wire-types';
 
 /**
@@ -19,9 +20,14 @@ import { WireFollowing } from './twitterapi-io/wire-types';
  *   last-tweet timestamp. `created_at` on both the profile and the followings
  *   entry is when the *account* was created, which says nothing about activity.
  *
- * The free tier allows **one request every five seconds**, which the service
- * states outright when you exceed it. So liveness for 200 candidates is about
- * 17 minutes of wall clock. That single fact shapes everything here: the check
+ * How long that takes depends entirely on the plan. The *free* tier allows one
+ * request every five seconds — the service says so in its own error body — so
+ * 200 candidates is about seventeen minutes. On a paid balance, twenty
+ * back-to-back requests all succeeded (measured 2026-08-01), and the same work
+ * finishes in under a minute.
+ *
+ * The pace is therefore discovered at runtime by {@link TwitterPacer} rather
+ * than hardcoded. But the *worst* case still shapes this design: the check
  * cannot be a modal spinner, it has to be interruptible, and partial results
  * have to be worth keeping.
  *
@@ -64,13 +70,20 @@ export interface ImportCandidate {
 
 export type ImportPhase = 'idle' | 'listing' | 'checking' | 'done' | 'stopped' | 'failed';
 
-/** How long to wait between liveness requests, from the service's own limit. */
-export const QPS_DELAY_MS = 5_200;
+/**
+ * How many times one account's check is retried when the service refuses it.
+ *
+ * A rate-limited request did no work, so retrying is not extra spend on a
+ * result we already have — it is the only way to avoid silently dropping the
+ * account from the import.
+ */
+export const RATE_LIMIT_RETRIES = 3;
 
 @Injectable({ providedIn: 'root' })
 export class TwitterImport {
   private api = inject(TwitterApi);
   private follows = inject(TwitterFollows);
+  private pacer = inject(TwitterPacer);
 
   readonly phase = signal<ImportPhase>('idle');
   readonly candidates = signal<ImportCandidate[]>([]);
@@ -91,14 +104,30 @@ export class TwitterImport {
     this.candidates().filter((c) => !c.excluded && !c.checked),
   );
 
-  /** Wall-clock estimate for checking the rest, in seconds. */
+  /**
+   * Wall-clock estimate for checking the rest, in seconds.
+   *
+   * Reads the pacer's *current* interval rather than a constant, so the figure
+   * reflects the plan actually in force: a paid account sees seconds where a
+   * throttled free one sees minutes. It also moves during a run, which is the
+   * honest behaviour — the estimate was wrong the moment the pace changed.
+   */
   readonly checkSeconds = computed(() =>
-    Math.round((this.unchecked().length * QPS_DELAY_MS) / 1000),
+    Math.round((this.unchecked().length * this.pacer.delayMs()) / 1000),
   );
 
   readonly running = computed(
     () => this.phase() === 'listing' || this.phase() === 'checking',
   );
+
+  /**
+   * Whether the service has refused us at least once this run.
+   *
+   * Surfaced so a slowdown is explained rather than merely experienced: a run
+   * that suddenly takes ten times longer looks broken unless the page says the
+   * service is throttling.
+   */
+  readonly throttled = this.pacer.throttled;
 
   stop(): void {
     this.stopRequested = true;
@@ -122,6 +151,7 @@ export class TwitterImport {
    */
   async list(username: string, stopAfter: number): Promise<void> {
     this.reset();
+    this.pacer.reset();
     this.phase.set('listing');
     const collected: ImportCandidate[] = [];
     let cursor: string | undefined;
@@ -149,7 +179,8 @@ export class TwitterImport {
         }
         cursor = page.cursor;
         // Paging is a request too, so it is paced like everything else.
-        await delay(QPS_DELAY_MS);
+        this.pacer.noteSuccess();
+        await this.pacer.wait();
       }
       this.applyFreeFilters();
       this.phase.set('done');
@@ -194,6 +225,7 @@ export class TwitterImport {
    */
   async checkLiveness(inactiveDays = DEFAULT_INACTIVE_DAYS): Promise<void> {
     this.stopRequested = false;
+    this.pacer.reset();
     this.phase.set('checking');
     const cutoff = Date.now() - inactiveDays * 24 * 60 * 60 * 1000;
 
@@ -202,27 +234,46 @@ export class TwitterImport {
         this.phase.set('stopped');
         return;
       }
-      try {
-        const lastPostedAt = await firstValueFrom(this.api.getLastPostedAt(candidate.userId));
-        this.requests.update((n) => n + 1);
-        const dead = !lastPostedAt || Date.parse(lastPostedAt) < cutoff;
-        this.patch(candidate.userId, {
-          lastPostedAt,
-          checked: true,
-          excluded: dead
-            ? lastPostedAt
-              ? `No posts since ${lastPostedAt.slice(0, 10)}.`
-              : 'No readable posts.'
-            : null,
-        });
-      } catch {
-        // An account we cannot check is kept rather than dropped: excluding
-        // someone because of a transient failure is the worse mistake, and the
-        // user can still untick them by hand.
-        this.patch(candidate.userId, { checked: true });
+      // A rate-limited request did no work, so it is retried rather than
+      // skipped — moving on would silently drop an account from the import.
+      let attempts = 0;
+      for (;;) {
+        attempts++;
+        try {
+          const lastPostedAt = await firstValueFrom(this.api.getLastPostedAt(candidate.userId));
+          this.requests.update((n) => n + 1);
+          this.pacer.noteSuccess();
+          const dead = !lastPostedAt || Date.parse(lastPostedAt) < cutoff;
+          this.patch(candidate.userId, {
+            lastPostedAt,
+            checked: true,
+            excluded: dead
+              ? lastPostedAt
+                ? `No posts since ${lastPostedAt.slice(0, 10)}.`
+                : 'No readable posts.'
+              : null,
+          });
+          break;
+        } catch (error: unknown) {
+          this.requests.update((n) => n + 1);
+          const retry = this.pacer.noteFailure(error) && attempts < RATE_LIMIT_RETRIES;
+          if (retry) {
+            await this.pacer.wait();
+            if (this.stopRequested) {
+              this.phase.set('stopped');
+              return;
+            }
+            continue;
+          }
+          // An account we cannot check is kept rather than dropped: excluding
+          // someone because of a transient failure is the worse mistake, and
+          // the user can still untick them by hand.
+          this.patch(candidate.userId, { checked: true });
+          break;
+        }
       }
       this.checked.update((n) => n + 1);
-      await delay(QPS_DELAY_MS);
+      await this.pacer.wait();
     }
     this.phase.set('done');
   }
@@ -302,8 +353,4 @@ export function toCandidate(user: WireFollowing): ImportCandidate | null {
     excluded: null,
     checked: false,
   };
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
