@@ -92,6 +92,41 @@ describe('BlueskyApi', () => {
     req.flush({ feed: [], cursor: undefined });
   });
 
+  it('pages one actor feed and applies the filter server-side', () => {
+    const api = TestBed.inject(BlueskyApi);
+    api.getAuthorFeed('did:plc:alice', 'cur-2', 'posts_with_replies').subscribe();
+
+    const req = httpMock.expectOne((r) => r.url === `${SERVICE}/xrpc/app.bsky.feed.getAuthorFeed`);
+    expect(req.request.params.get('actor')).toBe('did:plc:alice');
+    expect(req.request.params.get('cursor')).toBe('cur-2');
+    expect(req.request.params.get('filter')).toBe('posts_with_replies');
+    req.flush({ feed: [] });
+  });
+
+  it('omits the cursor on a first author-feed page', () => {
+    const api = TestBed.inject(BlueskyApi);
+    api.getAuthorFeed('did:plc:alice', null).subscribe();
+
+    const req = httpMock.expectOne((r) => r.url === `${SERVICE}/xrpc/app.bsky.feed.getAuthorFeed`);
+    expect(req.request.params.has('cursor')).toBe(false);
+    // Threads by the author read as one post, matching how the profile shows them.
+    expect(req.request.params.get('filter')).toBe('posts_and_author_threads');
+    req.flush({ feed: [] });
+  });
+
+  it('follow writes a graph.follow record into the viewer own repo', () => {
+    const api = TestBed.inject(BlueskyApi);
+    api.follow('did:plc:them').subscribe();
+
+    const req = httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.repo.createRecord`);
+    expect(req.request.body).toMatchObject({
+      repo: 'did:plc:me',
+      collection: 'app.bsky.graph.follow',
+      record: { $type: 'app.bsky.graph.follow', subject: 'did:plc:them' },
+    });
+    req.flush({ uri: 'at://did:plc:me/app.bsky.graph.follow/1', cid: 'c' });
+  });
+
   it('refreshes an expired token once and retries the call', () => {
     const api = TestBed.inject(BlueskyApi);
     let result: unknown;

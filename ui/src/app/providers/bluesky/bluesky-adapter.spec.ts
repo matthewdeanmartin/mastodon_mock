@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { adaptFeedItem, adaptPost, renderRichText } from './bluesky-adapter';
-import { BskyFeedItem, BskyPostView, BskyRef } from './bluesky-types';
+import {
+  adaptFeedItem,
+  adaptPost,
+  adaptProfile,
+  adaptRelationship,
+  renderRichText,
+} from './bluesky-adapter';
+import { BskyFeedItem, BskyPostView, BskyProfile, BskyRef } from './bluesky-types';
 
 function makePost(overrides: Partial<BskyPostView> = {}): BskyPostView {
   return {
@@ -198,5 +204,75 @@ describe('adaptFeedItem', () => {
   it('passes plain posts through', () => {
     const status = adaptFeedItem({ post: makePost() });
     expect(status.reblog).toBeNull();
+  });
+});
+
+describe('adaptProfile', () => {
+  const detailed: BskyProfile = {
+    did: 'did:plc:alice',
+    handle: 'alice.bsky.social',
+    displayName: 'Alice',
+    description: 'Line one\nstill one\n\nParagraph two',
+    avatar: 'https://cdn.example/avatar.jpg',
+    banner: 'https://cdn.example/banner.jpg',
+    followersCount: 120,
+    followsCount: 45,
+    postsCount: 900,
+  };
+
+  it('carries the bio, banner and all three counts', () => {
+    const account = adaptProfile(detailed);
+    expect(account.id).toBe('bsky:did:plc:alice');
+    expect(account.acct).toBe('alice.bsky.social');
+    expect(account.header).toBe('https://cdn.example/banner.jpg');
+    expect(account.followers_count).toBe(120);
+    expect(account.following_count).toBe(45);
+    expect(account.statuses_count).toBe(900);
+  });
+
+  it('renders the plain-text bio as paragraphs, escaping markup', () => {
+    const account = adaptProfile({ ...detailed, description: 'a <b>bold</b> claim' });
+    expect(account.note).toBe('<p>a &lt;b&gt;bold&lt;/b&gt; claim</p>');
+  });
+
+  it('turns blank lines into paragraphs and single newlines into breaks', () => {
+    expect(adaptProfile(detailed).note).toBe('<p>Line one<br>still one</p><p>Paragraph two</p>');
+  });
+
+  it('leaves the note empty when there is no bio', () => {
+    expect(adaptProfile({ ...detailed, description: '   ' }).note).toBe('');
+  });
+
+  it('falls back to the placeholder avatar and zero counts', () => {
+    const account = adaptProfile({ did: 'did:plc:bob', handle: 'bob.bsky.social' });
+    expect(account.display_name).toBe('bob.bsky.social');
+    expect(account.avatar).toContain('data:image/svg+xml');
+    expect(account.followers_count).toBe(0);
+  });
+});
+
+describe('adaptRelationship', () => {
+  it('reads presence of the follow records, not their values', () => {
+    const rel = adaptRelationship({
+      did: 'did:plc:alice',
+      handle: 'alice.bsky.social',
+      viewer: { following: 'at://a/b/c', followedBy: 'at://d/e/f', muted: true },
+    });
+    expect(rel).toEqual({
+      id: 'bsky:did:plc:alice',
+      following: true,
+      followed_by: true,
+      requested: false,
+      blocking: false,
+      muting: true,
+    });
+  });
+
+  it('reports no relationship when the viewer state is absent', () => {
+    const rel = adaptRelationship({ did: 'did:plc:alice', handle: 'alice.bsky.social' });
+    expect(rel.following).toBe(false);
+    expect(rel.followed_by).toBe(false);
+    // Bluesky has no locked accounts, so a follow is never merely requested.
+    expect(rel.requested).toBe(false);
   });
 });

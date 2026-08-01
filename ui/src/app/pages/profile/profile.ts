@@ -21,6 +21,15 @@ import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { TwitterApi } from '../../providers/twitter/twitter-api';
 import { TwitterFeed } from '../../providers/twitter/twitter-feed';
 import { TwitterFollow, TwitterFollows } from '../../providers/twitter/twitter-follows';
+import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
+import { BlueskyGraph } from '../../providers/bluesky/bluesky-graph';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
+import {
+  adaptFeedItem,
+  adaptProfile,
+  adaptRelationship,
+} from '../../providers/bluesky/bluesky-adapter';
+import { BskyAuthorFeedFilter } from '../../providers/bluesky/bluesky-types';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
@@ -84,6 +93,9 @@ export class Profile implements OnInit, OnDestroy {
   private twitterFeed = inject(TwitterFeed);
   private twitterApi = inject(TwitterApi);
   private rssSubs = inject(RssSubscriptions);
+  private bskyApi = inject(BlueskyApi);
+  private bskyGraph = inject(BlueskyGraph);
+  protected bskySession = inject(BlueskySession);
   private destroyRef = inject(DestroyRef);
   private routeLoadSub = new Subscription();
   private statusLoadSub = new Subscription();
@@ -110,6 +122,73 @@ export class Profile implements OnInit, OnDestroy {
     const handle = this.twitterHandle();
     return !!handle && this.twitterFollows.has(handle);
   });
+  /** True when this profile is a Bluesky account (id `bsky:<did>`). */
+  protected isBluesky = signal(false);
+  /** The DID behind a Bluesky profile, for the follow toggle and paging. */
+  private bskyDid = signal<string | null>(null);
+  /** Why this Bluesky profile's posts (or its follow toggle) failed, if they did. */
+  protected bskyError = signal<string | null>(null);
+  /** True while a follow/unfollow round-trip is in flight. */
+  protected bskyFollowBusy = signal(false);
+  /** Paging cursor for `getAuthorFeed`; null once exhausted or before the first page. */
+  private bskyCursor: string | null = null;
+
+  /**
+   * Bluesky's server-side author-feed filter, derived from the page's own
+   * boosts/replies toggles.
+   *
+   * Mastodon takes these as two independent query params; Bluesky takes one
+   * enum, and it has no "replies but no reposts" member. Where they disagree the
+   * *replies* toggle wins — it's the one a reader is most likely to have set
+   * deliberately — and the reposts toggle is then applied client-side by
+   * `visibleStatuses`, which already drops boosts when `showBoosts` is off.
+   */
+  private bskyFilter(): BskyAuthorFeedFilter {
+    return this.showReplies() ? 'posts_with_replies' : 'posts_and_author_threads';
+  }
+
+  /**
+   * Follow/unfollow on Bluesky.
+   *
+   * A real network write, unlike the Twitter and RSS buttons next to it — the
+   * viewer holds a Bluesky session, so this is an actual follow that the other
+   * account will see. The relationship is merged rather than replaced because
+   * the response cannot report `followed_by`, which the header shows.
+   */
+  toggleBlueskyFollow(): void {
+    const did = this.bskyDid();
+    if (!did || this.bskyFollowBusy()) {
+      return;
+    }
+    this.bskyFollowBusy.set(true);
+    this.bskyError.set(null);
+    const following = this.relationship()?.following ?? false;
+    const call = following ? this.bskyGraph.unfollow(did) : this.bskyGraph.follow(did);
+    call.subscribe({
+      next: (updated) => {
+        this.relationship.update((current) => ({ ...current, ...updated }));
+        // Keep the header's follower count honest without a refetch.
+        this.account.update((a) =>
+          a
+            ? {
+                ...a,
+                followers_count: Math.max(0, a.followers_count + (following ? -1 : 1)),
+              }
+            : a,
+        );
+        this.bskyFollowBusy.set(false);
+        this.diagnostics.info('Profile', 'bsky:follow-toggled', { did, following: !following });
+      },
+      error: (error: unknown) => {
+        this.bskyFollowBusy.set(false);
+        this.diagnostics.error('Profile', 'bsky:follow-failed', error, { did });
+        this.bskyError.set(
+          error instanceof Error ? error.message : 'Could not update the follow on Bluesky.',
+        );
+      },
+    });
+  }
+
   /** The feed URL behind an RSS profile, for the subscribe toggle. */
   private rssFeedUrl = signal<string | null>(null);
   /** Whether the viewer is currently subscribed to this feed. */
@@ -294,9 +373,18 @@ export class Profile implements OnInit, OnDestroy {
     this.isTwitter.set(false);
     this.twitterHandle.set(null);
     this.twitterError.set(null);
+    this.isBluesky.set(false);
+    this.bskyDid.set(null);
+    this.bskyError.set(null);
+    this.bskyFollowBusy.set(false);
+    this.bskyCursor = null;
     this.tab.set('posts');
     if (id.startsWith('rss:')) {
       this.loadRss(id);
+      return;
+    }
+    if (id.startsWith('bsky:')) {
+      this.loadBluesky(id.slice('bsky:'.length));
       return;
     }
     if (id.startsWith('twitter:@')) {
@@ -532,6 +620,104 @@ export class Profile implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * A Bluesky account: the detailed profile plus its author feed.
+   *
+   * Two calls, deliberately. `getProfile` is the only thing that carries the bio,
+   * banner, counts *and* `viewer.following` — the last of which is what the follow
+   * button needs and what nothing else can supply on a cold load. The author feed
+   * is a separate cursor-paged endpoint, so unlike the Twitter branch above this
+   * one supports "load more" properly.
+   *
+   * The actor is addressed by the DID from the route rather than the handle:
+   * handles are rentable and can change, DIDs cannot, so a bookmarked profile URL
+   * keeps working after a rename.
+   */
+  private loadBluesky(did: string): void {
+    this.isBluesky.set(true);
+    this.bskyDid.set(did);
+    this.statuses.set([]);
+    this.pinnedStatuses.set([]);
+    this.featured.set([]);
+    this.statusesLoading.set(true);
+    this.exhausted.set(false);
+    const seq = ++this.loadSeq;
+
+    if (!this.bskySession.linked()) {
+      // Every app.bsky read here is authenticated; without a session there is
+      // nothing to show and no useful error from the network.
+      this.loading.set(false);
+      this.statusesLoading.set(false);
+      this.exhausted.set(true);
+      this.bskyError.set('Link a Bluesky account in Settings → Connections to view this profile.');
+      return;
+    }
+
+    this.routeLoadSub.add(
+      this.bskyApi.getProfile(did).subscribe({
+        next: (profile) => {
+          if (seq !== this.loadSeq) {
+            return;
+          }
+          this.account.set(adaptProfile(profile));
+          this.relationship.set(adaptRelationship(profile));
+          // Cache the follow record's uri so an unfollow costs one call, not two.
+          this.bskyGraph.remember(profile.did, profile.viewer?.following);
+          this.loading.set(false);
+          this.diagnostics.info('Profile', 'bsky:loaded', { did, handle: profile.handle });
+        },
+        error: (error: unknown) => {
+          if (seq !== this.loadSeq) {
+            return;
+          }
+          this.diagnostics.error('Profile', 'bsky:load-failed', error, { did });
+          this.loading.set(false);
+          this.bskyError.set(
+            error instanceof Error ? error.message : 'Could not load this Bluesky profile.',
+          );
+        },
+      }),
+    );
+
+    this.loadBlueskyPosts(seq);
+  }
+
+  /** One page of the author feed; also serves "load more" via {@link bskyCursor}. */
+  private loadBlueskyPosts(seq: number): void {
+    const did = this.bskyDid();
+    if (!did) {
+      return;
+    }
+    this.statusLoadSub = this.bskyApi
+      .getAuthorFeed(did, this.bskyCursor, this.bskyFilter())
+      .subscribe({
+        next: (page) => {
+          if (seq !== this.loadSeq) {
+            return;
+          }
+          this.bskyCursor = page.cursor ?? null;
+          const statuses = page.feed.map(adaptFeedItem);
+          this.statuses.update((current) => [...current, ...statuses]);
+          // No cursor, or a page that added nothing: the history is complete.
+          this.exhausted.set(!this.bskyCursor || statuses.length === 0);
+          this.statusesLoading.set(false);
+          this.loadingMore.set(false);
+        },
+        error: (error: unknown) => {
+          if (seq !== this.loadSeq) {
+            return;
+          }
+          this.diagnostics.error('Profile', 'bsky:posts-failed', error, { did });
+          this.statusesLoading.set(false);
+          this.loadingMore.set(false);
+          this.exhausted.set(true);
+          this.bskyError.set(
+            error instanceof Error ? error.message : 'Could not load posts for this account.',
+          );
+        },
+      });
+  }
+
   private loadRss(id: string): void {
     this.isRss.set(true);
     const feedUrl = id.slice('rss:'.length);
@@ -635,6 +821,15 @@ export class Profile implements OnInit, OnDestroy {
   }
 
   private reloadStatuses(): void {
+    // Bluesky re-queries rather than re-filters: the replies toggle is a
+    // different server-side filter, so the feed restarts from the newest post.
+    if (this.isBluesky()) {
+      this.bskyCursor = null;
+      this.statuses.set([]);
+      this.statusesLoading.set(true);
+      this.loadBlueskyPosts(++this.loadSeq);
+      return;
+    }
     const id = this.publicProfileRef?.id ?? this.account()?.id;
     if (id) {
       this.loadStatuses(id);
@@ -693,6 +888,14 @@ export class Profile implements OnInit, OnDestroy {
 
   /** Fetch one older page below the current list ("Load more" at the bottom). */
   loadMore(): void {
+    if (this.isBluesky()) {
+      if (this.loadingMore() || this.exhausted() || !this.bskyCursor) {
+        return;
+      }
+      this.loadingMore.set(true);
+      this.loadBlueskyPosts(this.loadSeq);
+      return;
+    }
     const id = this.publicProfileRef?.id ?? this.account()?.id;
     const last = this.statuses().at(-1);
     if (!id || !last || this.loadingMore() || this.exhausted()) {

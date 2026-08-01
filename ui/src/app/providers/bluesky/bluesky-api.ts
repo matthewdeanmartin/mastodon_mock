@@ -3,7 +3,13 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, Observable, switchMap, throwError } from 'rxjs';
 import { externalFetch } from '../external-fetch';
 import { BlueskySession } from './bluesky-session';
-import { BskyFacet, BskyProfile, BskyThreadNode, BskyTimeline } from './bluesky-types';
+import {
+  BskyAuthorFeedFilter,
+  BskyFacet,
+  BskyProfile,
+  BskyThreadNode,
+  BskyTimeline,
+} from './bluesky-types';
 
 interface CreateRecordResponse {
   uri: string;
@@ -39,6 +45,42 @@ export class BlueskyApi {
       params = params.set('cursor', cursor);
     }
     return this.get<BskyTimeline>('app.bsky.feed.getTimeline', params);
+  }
+
+  /**
+   * One actor's own posts, cursor-paged like the timeline.
+   *
+   * `filter` is applied by the server, so "hide replies" is a different query
+   * rather than a client-side filter over a fixed page — which matters when
+   * paging: dropping replies locally would return short pages and eventually an
+   * empty one that looks like the end of the history.
+   */
+  getAuthorFeed(
+    actor: string,
+    cursor: string | null,
+    filter: BskyAuthorFeedFilter = 'posts_and_author_threads',
+  ): Observable<BskyTimeline> {
+    let params = new HttpParams().set('actor', actor).set('limit', '20').set('filter', filter);
+    if (cursor) {
+      params = params.set('cursor', cursor);
+    }
+    return this.get<BskyTimeline>('app.bsky.feed.getAuthorFeed', params);
+  }
+
+  /**
+   * Follow an actor by DID; returns the follow record's at-uri.
+   *
+   * That uri is the handle for undoing it — Bluesky has no `unfollow` verb, only
+   * "delete the record you created" — so callers must keep it. It also comes back
+   * on any later `getProfile` as `viewer.following`, which is how a fresh page
+   * load knows.
+   */
+  follow(did: string): Observable<CreateRecordResponse> {
+    return this.createRecord('app.bsky.graph.follow', {
+      $type: 'app.bsky.graph.follow',
+      subject: did,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   /** Full thread (ancestors + replies) for a post's at-uri. */

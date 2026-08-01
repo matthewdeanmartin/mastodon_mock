@@ -54,6 +54,31 @@
             {{ twitterFollowed() ? '𝕏 Following locally' : '𝕏 Follow locally' }}
           </button>
         </div>
+      } @else if (isBluesky()) {
+        <!-- A real follow, unlike the local-only Twitter and RSS buttons above:
+             the viewer holds a Bluesky session, so this writes a follow record
+             and the other account is notified. -->
+        <div class="profile-buttons">
+          @if (a.url) {
+            <a class="btn btn-outline" [href]="a.url" target="_blank" rel="noopener noreferrer">
+              ↗ Open on Bluesky
+            </a>
+          }
+          @if (bskySession.linked() && !isSelf()) {
+            <button
+              class="btn"
+              [class.btn-outline]="relationship()?.following"
+              [disabled]="bskyFollowBusy()"
+              (click)="toggleBlueskyFollow()"
+            >
+              @if (bskyFollowBusy()) {
+                …
+              } @else {
+                {{ relationship()?.following ? '🦋 Following' : '🦋 Follow' }}
+              }
+            </button>
+          }
+        </div>
       } @else if (isOpenRouter()) {
         <!-- No follow, no lists, no moderation: this is a service you have
              connected, not an account you have a relationship with. -->
@@ -145,9 +170,12 @@
                did; without this there is no way to tell a mutual from someone who
                has never heard of you. -->
           @if (!isSelf() && relationship()?.followed_by) {
-            <span class="badge follows-you" [title]="relationship()?.following
-                ? 'You follow each other'
-                : 'This account follows you'">
+            <span
+              class="badge follows-you"
+              [title]="
+                relationship()?.following ? 'You follow each other' : 'This account follows you'
+              "
+            >
               {{ relationship()?.following ? 'Mutuals' : 'Follows you' }}
             </span>
           }
@@ -184,6 +212,9 @@
       <!-- The account is real; only the fetch failed. Saying so beats the
            page's "Account not found" fallback, which would send the reader to
            check a handle that was never the problem. -->
+      <div class="action-error" role="alert">{{ error }}</div>
+    }
+    @if (bskyError(); as error) {
       <div class="action-error" role="alert">{{ error }}</div>
     }
     @if (twitterStale()) {
@@ -223,7 +254,17 @@
         ><strong>{{ a.statuses_count | humanCount }}</strong>
         {{ isRss() ? 'items' : words().posts }}</span
       >
-      @if (!isRss() && !isTwitter()) {
+      <!-- Bluesky reports real counts but has no people browser here yet, so they
+           show as plain numbers rather than buttons that open an empty tab. -->
+      @if (isBluesky()) {
+        <span
+          ><strong>{{ a.following_count | humanCount }}</strong> following</span
+        >
+        <span
+          ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
+        >
+      }
+      @if (!isRss() && !isTwitter() && !isBluesky()) {
         <button type="button" class="count-btn" (click)="setTab('following')">
           <strong>{{
             auth.isAnonymous && isSelf()
@@ -298,7 +339,11 @@
     </section>
   }
 
-  @if (!isRss() && !isTwitter()) {
+  <!-- Bluesky is excluded here, not by oversight: every tab behind this row
+       (following, followers, collections, analytics) reads a Mastodon endpoint
+       with an account id this server has never issued. The posts feed is the
+       whole profile for now; the people browser arrives with its own sprint. -->
+  @if (!isRss() && !isTwitter() && !isBluesky()) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
       <button
         type="button"
@@ -347,7 +392,9 @@
     </div>
   }
 
-  @if (!isRss() && !isTwitter() && (tab() === 'following' || tab() === 'followers')) {
+  @if (
+    !isRss() && !isTwitter() && !isBluesky() && (tab() === 'following' || tab() === 'followers')
+  ) {
     <app-people-browser
       [accountId]="a.id"
       [mode]="tab() === 'followers' ? 'followers' : 'following'"
@@ -396,12 +443,12 @@
     </section>
   }
 
-  @if (!isRss() && !isTwitter() && tab() === 'analytics') {
+  @if (!isRss() && !isTwitter() && !isBluesky() && tab() === 'analytics') {
     <app-account-analytics [account]="a" [publicRef]="publicRef" />
   }
 
   @if (tab() === 'posts') {
-    @if (!isRss() && !isTwitter() && auth.shouldOfferLogin && isSelf()) {
+    @if (!isRss() && !isTwitter() && !isBluesky() && auth.shouldOfferLogin && isSelf()) {
       <a class="profile-login-post" routerLink="/login" (click)="auth.exitAnonymous()">
         <div class="profile-login-post-label muted">📌 Pinned</div>
         <div class="profile-login-post-body">
@@ -604,6 +651,12 @@
       </div>
     </div>
   }
+} @else if (isBluesky() && bskyError(); as error) {
+  <!-- No profile *and* a reason: an unlinked session or a failed fetch are both
+       "we could not load it", which is a different claim from "it does not
+       exist" — the fallback below would send the reader to check a handle that
+       was never the problem. -->
+  <p class="muted center">{{ error }}</p>
 } @else {
   <p class="muted center">Account not found.</p>
 }

@@ -1,6 +1,6 @@
 // Adapts app.bsky feed views into Mastodon-shaped Status objects.
 
-import { Account, MediaAttachment, Quote, Status } from '../../models';
+import { Account, MediaAttachment, Quote, Relationship, Status } from '../../models';
 import {
   BskyAuthor,
   BskyEmbeddedRecord,
@@ -8,6 +8,7 @@ import {
   BskyFacet,
   BskyFeedItem,
   BskyPostView,
+  BskyProfile,
   BskyRef,
 } from './bluesky-types';
 
@@ -101,6 +102,72 @@ export function adaptAuthor(author: BskyAuthor): Account {
     bot: false,
     locked: false,
     fields: [],
+  };
+}
+
+/**
+ * Bluesky's plain-text bio → the HTML `Account.note` the profile header renders.
+ *
+ * Not rich text: `getProfile` returns `description` as a bare string with no
+ * facets, so links in a bio arrive as text and stay text. Escaping is therefore
+ * the whole job — the profile template binds this through `innerHTML`.
+ */
+function adaptDescription(description: string | undefined): string {
+  if (!description?.trim()) {
+    return '';
+  }
+  return escapeHtml(description)
+    .split(/\n{2,}/)
+    .map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+/**
+ * A detailed actor profile → a Mastodon `Account`.
+ *
+ * The richer sibling of {@link adaptAuthor}, which only ever sees the trimmed
+ * `profileView` embedded in a post and so has to zero the counts. This one comes
+ * from `app.bsky.actor.getProfile` and carries the bio, banner and all three
+ * counts, which is what the profile page's header needs.
+ */
+export function adaptProfile(profile: BskyProfile): Account {
+  const avatar = profile.avatar ?? BSKY_AVATAR;
+  return {
+    id: `bsky:${profile.did}`,
+    username: profile.handle,
+    acct: profile.handle,
+    display_name: profile.displayName ?? profile.handle,
+    note: adaptDescription(profile.description),
+    url: `https://bsky.app/profile/${profile.handle}`,
+    avatar,
+    avatar_static: avatar,
+    header: profile.banner ?? '',
+    followers_count: profile.followersCount ?? 0,
+    following_count: profile.followsCount ?? 0,
+    statuses_count: profile.postsCount ?? 0,
+    bot: false,
+    locked: false,
+    fields: [],
+  };
+}
+
+/**
+ * The viewer's relationship to an actor, in Mastodon's shape.
+ *
+ * `requested` is always false, and that is a protocol fact rather than a gap:
+ * Bluesky has no locked accounts and no follow requests, so a follow either
+ * exists or does not. `showing_reblogs` is left unset for the same reason — the
+ * per-follow "hide boosts" toggle has no AT Protocol equivalent.
+ */
+export function adaptRelationship(profile: BskyProfile): Relationship {
+  const viewer = profile.viewer;
+  return {
+    id: `bsky:${profile.did}`,
+    following: !!viewer?.following,
+    followed_by: !!viewer?.followedBy,
+    requested: false,
+    blocking: !!viewer?.blocking,
+    muting: !!viewer?.muted,
   };
 }
 

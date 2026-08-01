@@ -7,6 +7,21 @@ export interface BskyAuthor {
   avatar?: string;
 }
 
+/**
+ * The viewer's relationship to an actor — `app.bsky.actor.defs#viewerState`.
+ *
+ * `following` and `followedBy` are not booleans: they are the at-uris of the
+ * follow *records*, which is exactly what unfollowing needs (deleteRecord takes
+ * the record's uri). Absent means "no such record", so presence is the boolean.
+ */
+export interface BskyViewerState {
+  following?: string;
+  followedBy?: string;
+  blocking?: string;
+  blockedBy?: boolean;
+  muted?: boolean;
+}
+
 /** `app.bsky.actor.defs#profileViewDetailed` — the fields the rail card shows. */
 export interface BskyProfile {
   did: string;
@@ -18,6 +33,7 @@ export interface BskyProfile {
   followersCount?: number;
   followsCount?: number;
   postsCount?: number;
+  viewer?: BskyViewerState;
 }
 
 export interface BskyFacet {
@@ -87,6 +103,19 @@ export interface BskyTimeline {
   feed: BskyFeedItem[];
   cursor?: string;
 }
+
+/**
+ * How `app.bsky.feed.getAuthorFeed` is filtered.
+ *
+ * Mastodon's profile has three toggles (boosts, replies, media); Bluesky
+ * expresses the same choices as one server-side filter, so the profile page maps
+ * its toggles onto these rather than filtering client-side and paging holes.
+ */
+export type BskyAuthorFeedFilter =
+  | 'posts_with_replies'
+  | 'posts_no_replies'
+  | 'posts_with_media'
+  | 'posts_and_author_threads';
 
 /** `app.bsky.feed.getPostThread` node; `post` is absent on notFound/blocked variants. */
 export interface BskyThreadNode {

@@ -792,6 +792,10 @@ export class StatusCard {
     if (this.display.provider === 'twitter' && id.startsWith('twitter:@')) {
       return ['/accounts', id];
     }
+    // Bluesky ids are `bsky:<did>`, and a DID is route-safe (`did:plc:abc123`).
+    if (this.display.provider === 'bluesky' && id.startsWith('bsky:')) {
+      return ['/accounts', id];
+    }
     return null;
   }
 
