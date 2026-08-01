@@ -24,6 +24,10 @@ import {
   TwitterReachabilityResult,
 } from '../../../../providers/twitter/twitter-reachability';
 import { TwitterFeed } from '../../../../providers/twitter/twitter-feed';
+import {
+  DEFAULT_INACTIVE_DAYS,
+  TwitterImport,
+} from '../../../../providers/twitter/twitter-import';
 import { TwitterSettings } from '../../../../providers/twitter/twitter-settings';
 import { TwitterUsage } from '../../../../providers/twitter/twitter-usage';
 import {
@@ -459,6 +463,51 @@ export class ConnectionTwitter implements OnInit {
     } finally {
       this.balanceLoading.set(false);
     }
+  }
+
+  // ------------------------------------------------------------- bulk import
+
+  protected readonly importer = inject(TwitterImport);
+  protected readonly importHandle = signal('');
+  protected readonly importStopAfter = signal(TWITTER_FOLLOW_LIMIT);
+  protected readonly importInactiveDays = signal(DEFAULT_INACTIVE_DAYS);
+  protected readonly importResult = signal<string | null>(null);
+
+  /** Wall clock for the liveness pass, in whole minutes — see QPS_DELAY_MS. */
+  protected readonly importMinutes = computed(() =>
+    Math.max(1, Math.round(this.importer.checkSeconds() / 60)),
+  );
+
+  protected async startImport(): Promise<void> {
+    this.importResult.set(null);
+    await this.importer.list(
+      stripAt(this.importHandle()),
+      Math.max(1, Math.min(this.importStopAfter(), TWITTER_FOLLOW_LIMIT)),
+    );
+  }
+
+  protected async checkLiveness(): Promise<void> {
+    this.importResult.set(null);
+    await this.importer.checkLiveness(Math.max(1, this.importInactiveDays()));
+  }
+
+  protected applyImport(): void {
+    const result = this.importer.apply();
+    const parts = [`Imported ${result.added}.`];
+    if (result.already) {
+      parts.push(`${result.already} were already followed.`);
+    }
+    if (result.skipped) {
+      parts.push(`${result.skipped} skipped.`);
+    }
+    if (result.capped) {
+      // Say what was left out rather than reporting a complete import that
+      // silently dropped people at the cap.
+      parts.push(`${result.capped} did not fit under the ${TWITTER_FOLLOW_LIMIT} limit.`);
+    }
+    this.importResult.set(parts.join(' '));
+    this.importer.reset();
+    void this.syncStoredCount();
   }
 
   /** Forget every saved timeline. Costs nothing; spends nothing. */

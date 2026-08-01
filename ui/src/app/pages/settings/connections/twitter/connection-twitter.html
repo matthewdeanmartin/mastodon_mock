@@ -436,6 +436,151 @@
   }
 </section>
 
+@if (canFollow()) {
+  <section class="import">
+    <h2 class="section-title">Import someone's following list</h2>
+    <p class="muted small">
+      Enter a Twitter handle and pull in the accounts they follow. Nothing is followed until you
+      press Import, so you can look at the list first. Fetching the list is effectively free —
+      200 accounts per request.
+    </p>
+
+    <div class="import-form">
+      <label class="field">
+        <span class="field-label">Whose follows?</span>
+        <input
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="@mistersql"
+          [ngModel]="importHandle()"
+          (ngModelChange)="importHandle.set($event)"
+          [disabled]="importer.running()"
+        />
+      </label>
+      <label class="field field-narrow">
+        <span class="field-label">Stop after</span>
+        <input
+          type="number"
+          min="1"
+          [max]="followLimit"
+          [ngModel]="importStopAfter()"
+          (ngModelChange)="importStopAfter.set(+$event)"
+          [disabled]="importer.running()"
+        />
+      </label>
+    </div>
+
+    <div class="actions">
+      <button
+        class="btn"
+        type="button"
+        [disabled]="importer.running() || !importHandle().trim()"
+        (click)="startImport()"
+      >
+        {{ importer.phase() === 'listing' ? 'Fetching…' : 'Fetch list' }}
+      </button>
+      @if (importer.running()) {
+        <button class="btn btn-outline" type="button" (click)="importer.stop()">Stop</button>
+      }
+      @if (importer.candidates().length && !importer.running()) {
+        <button class="btn btn-outline" type="button" (click)="importer.reset()">Clear</button>
+      }
+    </div>
+
+    @if (importer.error(); as message) {
+      <p class="feed-error">{{ message }}</p>
+    }
+
+    @if (importer.candidates().length) {
+      <p class="import-summary">
+        <strong>{{ importer.keeping().length }}</strong> to import ·
+        {{ importer.excluded().length }} skipped ·
+        {{ importer.requests() }} {{ importer.requests() === 1 ? 'request' : 'requests' }} spent
+      </p>
+
+      <!-- The expensive step, priced in minutes rather than money. The service
+           allows one request every five seconds on the free tier, so this is
+           the only thing here that takes real time. -->
+      <div class="import-liveness">
+        <label class="field field-narrow">
+          <span class="field-label">Skip if silent for</span>
+          <input
+            type="number"
+            min="1"
+            [ngModel]="importInactiveDays()"
+            (ngModelChange)="importInactiveDays.set(+$event)"
+            [disabled]="importer.running()"
+          />
+          <span class="muted small">days</span>
+        </label>
+        <button
+          class="btn btn-outline"
+          type="button"
+          [disabled]="importer.running() || !importer.unchecked().length"
+          (click)="checkLiveness()"
+        >
+          @if (importer.phase() === 'checking') {
+            Checking {{ importer.checked() }} of {{ importer.candidates().length }}…
+          } @else if (!importer.unchecked().length) {
+            All checked
+          } @else {
+            Skip dead accounts ({{ importer.unchecked().length }} requests, ~{{
+              importMinutes()
+            }} min)
+          }
+        </button>
+      </div>
+      <p class="muted small">
+        Checking costs one request per account and the free tier allows one every five seconds, so
+        it takes a while. You can stop at any point and keep what has been checked so far.
+      </p>
+
+      <ul class="import-list">
+        @for (c of importer.candidates(); track c.userId) {
+          <li class="import-row" [class.excluded]="c.excluded">
+            @if (c.avatar) {
+              <img class="follow-avatar" [src]="c.avatar" alt="" width="32" height="32" />
+            }
+            <span class="follow-text">
+              <strong>{{ c.displayName }}</strong>
+              <span class="muted small">&#64;{{ c.username }}</span>
+              @if (c.excluded) {
+                <span class="muted small">{{ c.excluded }}</span>
+              } @else if (c.lastPostedAt) {
+                <span class="muted small">Last posted {{ c.lastPostedAt.slice(0, 10) }}</span>
+              }
+            </span>
+            <button
+              class="btn btn-outline btn-small"
+              type="button"
+              (click)="importer.toggle(c.userId)"
+            >
+              {{ c.excluded ? 'Include' : 'Skip' }}
+            </button>
+          </li>
+        }
+      </ul>
+
+      <div class="actions">
+        <button
+          class="btn"
+          type="button"
+          [disabled]="importer.running() || !importer.keeping().length"
+          (click)="applyImport()"
+        >
+          Import {{ importer.keeping().length }}
+          {{ importer.keeping().length === 1 ? 'account' : 'accounts' }}
+        </button>
+      </div>
+    }
+
+    @if (importResult(); as message) {
+      <p class="connection-ok">{{ message }}</p>
+    }
+  </section>
+}
+
 @if (consentPrompt(); as prompt) {
   <app-twitter-consent-dialog
     [source]="prompt.source"

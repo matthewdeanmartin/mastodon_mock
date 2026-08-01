@@ -1,4 +1,4 @@
-/** A text file selected from an unzipped X/Twitter archive. */
+/** A text file selected from an unzipped Twitter archive. */
 export interface TwitterArchiveSource {
   name: string;
   text: string;
@@ -65,7 +65,7 @@ interface ArchiveTweet {
 const SUPPORTED_FILES = new Set(['following.js', 'tweets.js', 'deleted-tweets.js']);
 
 /**
- * Extract current follows and authored reply/mention history from an X/Twitter archive.
+ * Extract current follows and authored reply/mention history from an Twitter archive.
  *
  * Twitter's following.js contains only numeric account IDs. Tweet mention entities contain both
  * the numeric ID and contemporaneous handle, so joining them recovers handles for accounts that
@@ -272,7 +272,7 @@ function parseArchiveAssignment(text: string, filename: string): unknown[] {
   const start = text.indexOf('[');
   const end = text.lastIndexOf(']');
   if (start < 0 || end < start) {
-    throw new Error(`${filename} is not a recognized X/Twitter archive file.`);
+    throw new Error(`${filename} is not a recognized Twitter archive file.`);
   }
   try {
     const value: unknown = JSON.parse(text.slice(start, end + 1));

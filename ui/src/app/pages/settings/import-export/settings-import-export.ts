@@ -249,7 +249,7 @@ export class SettingsImportExport {
       this.twitterDiscovery.load(archive.people);
     } catch (error) {
       this.twitterArchiveError.set(
-        error instanceof Error ? error.message : 'The X/Twitter archive could not be read.',
+        error instanceof Error ? error.message : 'The Twitter archive could not be read.',
       );
     } finally {
       this.twitterArchiveReading.set(false);

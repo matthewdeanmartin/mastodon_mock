@@ -1,5 +1,11 @@
 import { TwitterApiError } from '../twitter-errors';
-import { WireEnvelope, WireTimelineData, WireTweet, WireUser } from './wire-types';
+import {
+  WireEnvelope,
+  WireFollowing,
+  WireTimelineData,
+  WireTweet,
+  WireUser,
+} from './wire-types';
 
 /**
  * Runtime validation of TwitterAPI.io responses.
@@ -165,5 +171,43 @@ export function parseTimelineResponse(body: unknown): {
     cursor: cursor && cursor.length > 0 ? cursor : null,
     hasMore: envelope.has_next_page === true,
     skipped: rawTweets.length - tweets.length,
+  };
+}
+
+/**
+ * Validate a `/twitter/user/followings` response.
+ *
+ * A **sixth** envelope shape from this API, measured 2026-08-01: `followings`
+ * at the top level, beside `has_next_page`/`next_cursor`, holding snake_case
+ * users. Neither the timeline parser nor the batch one recognises it.
+ *
+ * Entries with no handle are dropped rather than failing the page — the same
+ * rule as timelines, for the same reason: an account with no handle cannot be
+ * followed, linked to, or told apart, so it is unrenderable rather than
+ * evidence of a schema change.
+ */
+export function parseFollowingsResponse(body: unknown): {
+  users: WireFollowing[];
+  cursor: string | null;
+  hasMore: boolean;
+} {
+  if (!isObject(body)) {
+    throw changed('/twitter/user/followings', ['a JSON object body']);
+  }
+  const raw: unknown = body['followings'];
+  if (!Array.isArray(raw)) {
+    throw changed('/twitter/user/followings', ['followings']);
+  }
+  const users = (raw as unknown[]).filter(
+    (value): value is WireFollowing =>
+      isObject(value) &&
+      (typeof value['screen_name'] === 'string' || typeof value['userName'] === 'string'),
+  );
+  const cursor = typeof body['next_cursor'] === 'string' ? body['next_cursor'] : null;
+  return {
+    users,
+    // An empty cursor is "no more pages", not a usable cursor (§8.6 rule 2).
+    cursor: cursor && cursor.length > 0 ? cursor : null,
+    hasMore: body['has_next_page'] === true,
   };
 }

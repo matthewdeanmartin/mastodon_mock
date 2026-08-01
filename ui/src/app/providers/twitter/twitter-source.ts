@@ -1,5 +1,5 @@
 /**
- * The X/Twitter data services this app can read through, as inert catalog data.
+ * The Twitter data services this app can read through, as inert catalog data.
  *
  * Neither is X. Both are third-party scrapers that resell public Twitter data, and
  * both must be treated as replaceable: endpoints change without notice, fields

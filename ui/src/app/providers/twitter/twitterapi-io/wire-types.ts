@@ -186,3 +186,35 @@ export interface WireTimelineData {
   tweets?: WireTweet[];
   pin_tweet?: WireTweet | null;
 }
+
+/**
+ * One account from `/twitter/user/followings`.
+ *
+ * A **snake_case** shape, unlike `WireUser`'s camelCase — measured 2026-08-01.
+ * The same conceptual object arrives with different field names depending on
+ * which endpoint returned it (`screen_name` here vs `userName` there,
+ * `statuses_count` vs `statusesCount`), so this is a separate type rather than
+ * a loosening of `WireUser`. Making one type serve both would mean every field
+ * becomes optional and nothing is validated.
+ *
+ * Notably absent: any last-tweet timestamp. `created_at` is when the *account*
+ * was created, which says nothing about whether it is still active — see
+ * `TwitterImport` for why liveness costs a request per account.
+ */
+export interface WireFollowing {
+  id?: string;
+  /** The handle. Present as both in practice; either may be used. */
+  screen_name?: string;
+  userName?: string;
+  name?: string;
+  description?: string;
+  profile_image_url_https?: string;
+  /** Lifetime tweet count. Zero means never posted. */
+  statuses_count?: number;
+  followers_count?: number;
+  following_count?: number;
+  /** Account creation date, NOT last activity. */
+  created_at?: string;
+  protected?: boolean;
+  verified?: boolean;
+}

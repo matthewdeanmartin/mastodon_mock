@@ -2,12 +2,21 @@ import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { Account, Status } from '../../models';
 import {
+  parseFollowingsResponse,
   parsePostsResponse,
   parseTimelineResponse,
   parseUserResponse,
 } from './twitterapi-io/guards';
-import { toAccount, toStatus } from './twitterapi-io/normalizers';
+import { normalizeTimestamp, toAccount, toStatus } from './twitterapi-io/normalizers';
 import { TwitterTransport } from './twitter-transport';
+import { WireFollowing } from './twitterapi-io/wire-types';
+
+/** One page of a followings list, plus the cursor for the next. */
+export interface TwitterFollowingsPage {
+  users: WireFollowing[];
+  cursor: string | null;
+  hasMore: boolean;
+}
 
 /** One page of a timeline, plus what is needed to ask for the next. */
 export interface TwitterPage {
@@ -25,14 +34,14 @@ export interface TwitterPage {
  * Thin on purpose: it validates, normalizes, and returns `Status`/`Account`.
  * All the interesting decisions live either below it (the transport's
  * proxy-first rule) or beside it (the normalizers). Nothing above this layer
- * learns that X, or a scraper reselling it, exists.
+ * learns that Twitter, or a scraper reselling it, exists.
  *
- * ## Why there is no `getPost`, `search`, or `getFollowers` yet
+ * ## Why there is still no `search`
  *
- * Each is a billable call and a fixture nobody has captured. They are cheap to
- * add once there is a screen that needs one, and adding them now would mean
- * shipping normalizers validated against imagined responses — the exact mistake
- * this integration has been avoiding by measuring first.
+ * It is a billable call and a fixture nobody has captured. It is cheap to add
+ * once there is a screen that needs one, and adding it now would mean shipping
+ * a normalizer validated against an imagined response — the exact mistake this
+ * integration has avoided by measuring first.
  */
 @Injectable({ providedIn: 'root' })
 export class TwitterApi {
@@ -58,6 +67,62 @@ export class TwitterApi {
     return this.transport
       .request<unknown>({ path: '/oapi/my/info' })
       .pipe(map((body) => parseBalance(body)));
+  }
+
+  /**
+   * One page of the accounts a user follows — 200 per request.
+   *
+   * Measured free: 200 accounts moved the credit balance by less than its
+   * resolution, so importing a 5,000-account following list costs about 25
+   * requests and no meaningful money. What it *does* cost is time, because the
+   * free tier allows one request every five seconds.
+   *
+   * Returns raw wire objects rather than `Account`s: the import screen needs
+   * `statuses_count` and `protected`, which have no place in a Mastodon
+   * `Account`, and it never renders these as posts.
+   */
+  getFollowings(
+    ref: { userId?: string; username?: string },
+    cursor?: string,
+  ): Observable<TwitterFollowingsPage> {
+    return this.transport
+      .request<unknown>({
+        path: '/twitter/user/followings',
+        params: ref.userId
+          ? { userId: ref.userId, pageSize: 200, cursor }
+          : { userName: stripAt(ref.username ?? ''), pageSize: 200, cursor },
+      })
+      .pipe(map((body) => parseFollowingsResponse(body)));
+  }
+
+  /**
+   * When an account last posted, or null if it never has.
+   *
+   * One request. There is no cheaper way: no endpoint on this service reports a
+   * last-tweet timestamp — `created_at` on both the profile and the followings
+   * entry is when the *account* was created — so liveness has to be read off
+   * the newest item in the timeline.
+   *
+   * Uses the by-id endpoint deliberately. Measured 2026-08-01:
+   * `user/last_tweets?userName=NASA` returned an empty list while
+   * `user/tweet_timeline?userId=11348282` returned 19 tweets for the same
+   * account, so the by-handle route cannot be trusted for a liveness verdict —
+   * it would report every account as dead.
+   */
+  getLastPostedAt(userId: string): Observable<string | null> {
+    return this.transport
+      .request<unknown>({ path: '/twitter/user/tweet_timeline', params: { userId } })
+      .pipe(
+        map((body) => {
+          const page = parseTimelineResponse(body);
+          const newest = page.tweets
+            .map((tweet) => normalizeTimestamp(tweet.createdAt))
+            .filter((iso): iso is string => !!iso)
+            .sort()
+            .at(-1);
+          return newest ?? null;
+        }),
+      );
   }
 
   /**
