@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, of, throwError } from 'rxjs';
+import { firstValueFrom, Observable, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../../models';
 import { TwitterApi, TwitterPage } from './twitter-api';
@@ -49,8 +49,10 @@ describe('TwitterFeed', () => {
     it('serves a second read without a request', async () => {
       await firstValueFrom(feed.timeline(FOLLOW));
       await firstValueFrom(feed.timeline(FOLLOW));
+      // Counting happens in the transport, which this spec stubs out — see
+      // twitter-transport.spec.ts. What matters here is that the second read
+      // never reached the API at all.
       expect(getUserPosts).toHaveBeenCalledTimes(1);
-      expect(feed.requestCount()).toBe(1);
     });
 
     it('refetches once the entry is stale', async () => {
@@ -133,6 +135,85 @@ describe('TwitterFeed', () => {
       getUserPosts.mockReturnValue(of(page([status('1', 'SomeoneElse')])));
       await firstValueFrom(feed.timeline(FOLLOW));
       expect(follows.find('NASA')?.userId).toBeUndefined();
+    });
+  });
+
+  describe('refreshMany', () => {
+    const many = (names: string[]): TwitterFollow[] =>
+      names.map((username) => ({ username, displayName: username, addedAt: 0, enabled: true }));
+
+    it('loads every account', async () => {
+      const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c'])));
+      expect(result.loaded).toBe(3);
+      expect(result.failed).toEqual([]);
+      expect(result.stopped).toBe(false);
+    });
+
+    it('issues requests one at a time, not in parallel', async () => {
+      // Ten parallel requests through a free CORS proxy is the exact shape that
+      // trips its per-origin limit — observed happening in development — and
+      // the throttled ones fail *having already been billed*.
+      let inFlight = 0;
+      let peak = 0;
+      getUserPosts.mockImplementation(
+        () =>
+          new Observable<TwitterPage>((subscriber) => {
+            inFlight++;
+            peak = Math.max(peak, inFlight);
+            setTimeout(() => {
+              inFlight--;
+              subscriber.next(page([status('1')]));
+              subscriber.complete();
+            }, 5);
+          }),
+      );
+      await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c', 'd'])));
+      expect(peak).toBe(1);
+    });
+
+    it('keeps going past one dead handle', async () => {
+      // One broken account should not cost the reader the other nine.
+      let call = 0;
+      getUserPosts.mockImplementation(() => {
+        call++;
+        return call === 2
+          ? throwError(() => new Error('User not found'))
+          : of(page([status('1')]));
+      });
+      const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c'])));
+      expect(result.loaded).toBe(2);
+      expect(result.failed).toEqual(['b']);
+      expect(result.stopped).toBe(false);
+    });
+
+    it('stops the batch on a rate limit rather than paying for certain failures', async () => {
+      let call = 0;
+      getUserPosts.mockImplementation(() => {
+        call++;
+        return call === 2
+          ? throwError(() => new Error('Rate-limited — either by CORS.SH or by the X data service.'))
+          : of(page([status('1')]));
+      });
+      const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c', 'd'])));
+      expect(result.stopped).toBe(true);
+      // Two attempts made, not four.
+      expect(call).toBe(2);
+    });
+
+    it('stops when the daily limit is hit mid-batch', async () => {
+      getUserPosts.mockReturnValue(
+        throwError(() => new Error('You have reached your daily limit of 200 X data requests.')),
+      );
+      const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c'])));
+      expect(result.stopped).toBe(true);
+      expect(getUserPosts).toHaveBeenCalledTimes(1);
+    });
+
+    it('costs nothing for accounts already cached', async () => {
+      await firstValueFrom(feed.timeline(FOLLOW));
+      getUserPosts.mockClear();
+      await firstValueFrom(feed.refreshMany([FOLLOW]));
+      expect(getUserPosts).not.toHaveBeenCalled();
     });
   });
 

@@ -7,6 +7,7 @@ import { CorsProxySettings } from '../cors-proxy/cors-proxy-settings';
 import { ProxyConsent } from '../proxy-consent-store';
 import { TwitterApiError } from './twitter-errors';
 import { TwitterSettings } from './twitter-settings';
+import { TwitterUsage } from './twitter-usage';
 import { buildUrl, TwitterProxyRequired, TwitterTransport } from './twitter-transport';
 
 const PROBE = { path: '/twitter/user/info', params: { userName: 'jack' } };
@@ -77,6 +78,45 @@ describe('TwitterTransport', () => {
       const error = await firstValueFrom(transport.request(PROBE)).catch((e: unknown) => e);
       expect((error as TwitterApiError).code).toBe('INVALID_CONFIGURATION');
       httpMock.expectNone(() => true);
+    });
+  });
+
+  describe('the daily spending limit', () => {
+    it('refuses without sending once the hard limit is reached', async () => {
+      // Checked before the request, not after: a limit that only reported
+      // afterwards would be a receipt.
+      configureConsentedProxy();
+      const usage = TestBed.inject(TwitterUsage);
+      usage.setLimits(1, 2);
+      usage.record(2);
+
+      const error = await firstValueFrom(transport.request(PROBE)).catch((e: unknown) => e);
+      expect((error as TwitterApiError).code).toBe('INVALID_CONFIGURATION');
+      expect((error as TwitterApiError).message).toMatch(/daily limit/i);
+      httpMock.expectNone(() => true);
+    });
+
+    it('counts a request at send time, not on success', async () => {
+      // A failed or timed-out request has still been received and billed;
+      // counting only successes under-reports exactly when things go wrong.
+      configureConsentedProxy();
+      const usage = TestBed.inject(TwitterUsage);
+      const promise = firstValueFrom(transport.request(PROBE)).catch(() => null);
+      httpMock
+        .expectOne((r) => r.url.includes('proxy.cors.sh'))
+        .flush({}, { status: 401, statusText: 'Unauthorized' });
+      await promise;
+      expect(usage.today()).toBe(1);
+    });
+
+    it('counts the direct probe too', async () => {
+      const usage = TestBed.inject(TwitterUsage);
+      const promise = firstValueFrom(transport.probeDirect(PROBE));
+      httpMock
+        .expectOne((r) => r.url.startsWith('https://api.twitterapi.io'))
+        .error(new ProgressEvent('error'), { status: 0 });
+      await promise;
+      expect(usage.today()).toBe(1);
     });
   });
 

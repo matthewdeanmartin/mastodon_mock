@@ -9,6 +9,7 @@ import { ProxyConsent } from '../proxy-consent-store';
 import { providerErrorInBody, toTwitterApiError, TwitterApiError } from './twitter-errors';
 import { TwitterConfig, TwitterSettings } from './twitter-settings';
 import { TwitterSourceId } from './twitter-source';
+import { TwitterUsage } from './twitter-usage';
 
 /**
  * The one place an X data request is actually sent.
@@ -74,6 +75,7 @@ export class TwitterTransport {
   private settings = inject(TwitterSettings);
   private proxy = inject(CorsProxy);
   private consent = inject(ProxyConsent);
+  private usage = inject(TwitterUsage);
   private diagnostics = inject(PageDiagnostics);
 
   /**
@@ -91,6 +93,20 @@ export class TwitterTransport {
             'INVALID_CONFIGURATION',
             this.settings.blockedReason() ?? 'No X data service is configured.',
             this.settings.activeId() ?? 'twitterapi-io',
+          ),
+      );
+    }
+
+    // Checked before anything is sent. A daily hard limit that only reported
+    // afterwards would be a receipt, not a limit.
+    if (this.usage.check(1) === 'hard-limit') {
+      return throwError(
+        () =>
+          new TwitterApiError(
+            'INVALID_CONFIGURATION',
+            `You have reached your daily limit of ${this.usage.hardLimit()} X data requests. ` +
+              'It resets at midnight, or you can raise it on the X connector page.',
+            config.entry.id,
           ),
       );
     }
@@ -131,6 +147,11 @@ export class TwitterTransport {
 
     const proxyLabel = entry.label;
     const startedAt = Date.now();
+    // Counted at send time, not on success. A request that fails, times out, or
+    // is retried has still been received and billed by the provider — counting
+    // only successes would under-report exactly when things are going wrong,
+    // which is when an accurate number matters most.
+    this.usage.record(1);
     this.diagnostics.info('Twitter', 'request:start', {
       source: config.entry.id,
       path: spec.path,
@@ -191,6 +212,11 @@ export class TwitterTransport {
           ),
       );
     }
+    // Counted like any other. It usually dies at the preflight without reaching
+    // the service — and so usually costs nothing — but the app cannot observe
+    // which happened, and over-counting a request that might have been billed
+    // is the safe direction for a spend counter.
+    this.usage.record(1);
     return this.http
       .get<unknown>(buildUrl(config, spec), {
         headers: new HttpHeaders().set(config.auth.header, config.auth.value),
@@ -241,6 +267,11 @@ export class TwitterTransport {
           if (!normalized.transient) {
             return throwError(() => error);
           }
+          // A retry is another billable request. Counting it keeps the total
+          // honest, and — because `record` is what the hard limit reads — stops
+          // a backoff loop from spending past the limit that was checked once
+          // before the first attempt.
+          this.usage.record(1);
           // Honour Retry-After; otherwise exponential backoff with full jitter,
           // capped at 8s per the spec.
           const base = normalized.retryAfterMs ?? Math.min(500 * 2 ** (attempt - 1), 8000);

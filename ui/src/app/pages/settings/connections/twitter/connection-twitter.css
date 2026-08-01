@@ -88,6 +88,64 @@
 }
 
 /*
+ * The spend panel.
+ *
+ * Given real visual weight rather than tucked into muted small text, because it
+ * is the one thing on this page that is nobody else's problem in the whole app:
+ * every other connector is free to call, and a user has no other way to see
+ * what their reading is costing until a bill arrives.
+ */
+.spend {
+  margin-block: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.spend-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-block: 0.5rem 0.75rem;
+}
+
+.spend-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.spend-stat strong {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+/*
+ * Amber, not red. Passing the soft limit is information, not a fault — the
+ * request went through. Red here would train the user to ignore red, which is
+ * needed for the hard limit and for real failures.
+ */
+.spend-warning {
+  border-inline-start: 3px solid #d08700;
+  background: color-mix(in srgb, #d08700 10%, transparent);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+}
+
+.spend-limits {
+  margin-block: 0.75rem;
+}
+
+.limit-fields {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.limit-fields .field input {
+  max-width: 8rem;
+}
+
+/*
  * The confirm-before-following card.
  *
  * Bordered and set apart because it is a decision point, not a result: the

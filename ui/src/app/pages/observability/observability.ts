@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   ApiError,
   ApiMetrics,
@@ -10,6 +11,7 @@ import {
 import { EndpointDoc, endpointDoc } from '../../observability/api-docs';
 import { CorsProxySettings } from '../../providers/cors-proxy/cors-proxy-settings';
 import { CorsProxyUsageStore } from '../../providers/cors-proxy/cors-proxy-usage';
+import { TwitterUsage } from '../../providers/twitter/twitter-usage';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import {
   DatabaseInfo,
@@ -61,7 +63,7 @@ type RouteSortKey = 'visits' | 'time';
  */
 @Component({
   selector: 'app-observability',
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './observability.html',
   styleUrl: './observability.css',
 })
@@ -69,6 +71,8 @@ export class Observability {
   private metrics = inject(ApiMetrics);
   private routeLog = inject(RouteLog);
   private proxyUsageStore = inject(CorsProxyUsageStore);
+  /** X spend, for the section that exists because these requests cost money. */
+  protected twitterUsage = inject(TwitterUsage);
   private proxySettings = inject(CorsProxySettings);
   private rssSubs = inject(RssSubscriptions);
 

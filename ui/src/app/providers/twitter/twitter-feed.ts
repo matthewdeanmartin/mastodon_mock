@@ -1,8 +1,19 @@
-import { inject, Injectable, signal } from '@angular/core';
-import { catchError, map, Observable, of, tap } from 'rxjs';
+import { computed, inject, Injectable } from '@angular/core';
+import {
+  catchError,
+  concatMap,
+  from,
+  map,
+  Observable,
+  of,
+  takeWhile,
+  tap,
+  toArray,
+} from 'rxjs';
 import { Account, Status } from '../../models';
 import { TwitterApi, TwitterPage } from './twitter-api';
 import { TwitterFollow, TwitterFollows } from './twitter-follows';
+import { TwitterUsage } from './twitter-usage';
 
 /**
  * How long a fetched timeline is reused before another request is allowed.
@@ -45,13 +56,20 @@ interface CacheEntry {
 export class TwitterFeed {
   private api = inject(TwitterApi);
   private follows = inject(TwitterFollows);
+  private usage = inject(TwitterUsage);
 
   private cache = new Map<string, CacheEntry>();
   /** Handles whose last fetch failed, so a broken one is not billed repeatedly. */
   private failed = new Map<string, { message: string; at: number }>();
 
-  /** Requests spent this session, for the UI to show what browsing has cost. */
-  readonly requestCount = signal(0);
+  /**
+   * Requests spent, delegated to {@link TwitterUsage}.
+   *
+   * Kept as a passthrough rather than a second counter: the transport is the
+   * only thing that can count accurately (it sees retries and the direct probe),
+   * and two counters that disagree would be worse than one.
+   */
+  readonly requestCount = computed(() => this.usage.total());
 
   /** Whether this account's posts can be served without a request. */
   isCached(username: string): boolean {
@@ -94,7 +112,6 @@ export class TwitterFeed {
       return cached ? of(cached.page.statuses) : of([]);
     }
 
-    this.requestCount.update((n) => n + 1);
     return this.api.getUserPosts({ userId: follow.userId, username: follow.username }).pipe(
       tap((page) => {
         this.cache.set(cacheKey, { page, fetchedAt: Date.now() });
@@ -120,6 +137,55 @@ export class TwitterFeed {
   /** The last failure for an account, for a row to explain itself. */
   lastError(username: string): string | null {
     return this.failed.get(key(username))?.message ?? null;
+  }
+
+  /**
+   * Load several accounts at once, sequentially.
+   *
+   * Sequential rather than `forkJoin`, which is the opposite of what this app
+   * does everywhere else and is deliberate. Ten parallel requests through a free
+   * CORS proxy is the exact shape that trips its per-origin rate limit — which
+   * was observed happening during development — and once throttled, the
+   * remaining requests fail *having already been billed*. Paying for ten
+   * failures is the worst possible outcome, so the requests go one at a time and
+   * stop at the first sign of trouble.
+   *
+   * A per-account failure does not abort the batch — one dead handle should not
+   * cost the reader the other nine — but a rate limit does, because continuing
+   * would spend money on requests that are now certain to fail.
+   */
+  refreshMany(
+    follows: TwitterFollow[],
+    force = false,
+  ): Observable<{ loaded: number; failed: string[]; stopped: boolean }> {
+    const failed: string[] = [];
+    let loaded = 0;
+
+    return from(follows).pipe(
+      concatMap((follow) =>
+        this.timeline(follow, force).pipe(
+          map(() => {
+            loaded++;
+            return { fatal: false };
+          }),
+          catchError((error: unknown) => {
+            failed.push(follow.username);
+            // Once throttled, every further request in this batch is money spent
+            // on a certain failure.
+            const fatal =
+              error instanceof Error && /rate-limit|429|daily limit/i.test(error.message);
+            return of({ fatal });
+          }),
+        ),
+      ),
+      takeWhile((result) => !result.fatal, true),
+      toArray(),
+      map((results) => ({
+        loaded,
+        failed,
+        stopped: results.some((result) => result.fatal),
+      })),
+    );
   }
 
   /** Drop everything cached for one account, so the next read refetches. */

@@ -17,7 +17,9 @@ import {
   TwitterReachability,
   TwitterReachabilityResult,
 } from '../../../../providers/twitter/twitter-reachability';
+import { TwitterFeed } from '../../../../providers/twitter/twitter-feed';
 import { TwitterSettings } from '../../../../providers/twitter/twitter-settings';
+import { TwitterUsage } from '../../../../providers/twitter/twitter-usage';
 import {
   availableTwitterSources,
   TwitterSourceEntry,
@@ -63,6 +65,8 @@ export class ConnectionTwitter implements OnInit {
   protected settings = inject(TwitterSettings);
   protected consent = inject(ProxyConsent);
   protected follows = inject(TwitterFollows);
+  protected usage = inject(TwitterUsage);
+  private feed = inject(TwitterFeed);
   private proxy = inject(CorsProxy);
   private reachability = inject(TwitterReachability);
   private twitterApi = inject(TwitterApi);
@@ -374,6 +378,81 @@ export class ConnectionTwitter implements OnInit {
 
   protected toggleFollowEnabled(username: string, enabled: boolean): void {
     this.follows.setEnabled(username, enabled);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Spend
+  // ---------------------------------------------------------------------------
+
+  protected readonly softDraft = signal(this.usage.softLimit());
+  protected readonly hardDraft = signal(this.usage.hardLimit());
+  protected readonly refreshing = signal(false);
+  protected readonly refreshResult = signal<{ message: string; stopped: boolean } | null>(null);
+
+  /**
+   * What "Refresh all" would cost right now.
+   *
+   * Recomputed from the cache rather than fixed at render, so pressing it twice
+   * honestly reports zero the second time instead of repeating the first
+   * estimate and implying a charge that will not happen.
+   */
+  protected readonly refreshCost = computed(() =>
+    this.feed.estimateCost(this.follows.enabled().map((f) => f.username)),
+  );
+
+  protected saveLimits(): void {
+    this.usage.setLimits(Number(this.softDraft()), Number(this.hardDraft()));
+    // Read back: setLimits clamps a soft limit above the hard one, and the form
+    // should show what was actually stored rather than what was typed.
+    this.softDraft.set(this.usage.softLimit());
+    this.hardDraft.set(this.usage.hardLimit());
+    this.notice.set('Daily limits updated.');
+  }
+
+  protected resetUsage(): void {
+    this.usage.reset();
+    this.notice.set('Request counters cleared. This does not refund anything already spent.');
+  }
+
+  /**
+   * Refresh every enabled follow.
+   *
+   * The one genuinely expensive action on this page, so it states its cost on
+   * the button and refuses outright when the daily limit could not cover it —
+   * a fan-out that stops halfway has spent money for a partial answer nobody
+   * can interpret.
+   */
+  protected async refreshAll(): Promise<void> {
+    const targets = this.follows.enabled();
+    const cost = this.refreshCost();
+    if (!targets.length || this.refreshing()) {
+      return;
+    }
+    if (cost > 0 && this.usage.check(cost) === 'hard-limit') {
+      this.refreshResult.set({
+        stopped: true,
+        message:
+          `Refreshing all ${targets.length} accounts needs ${cost} requests, and only ` +
+          `${this.usage.remainingToday()} remain before today's limit. Raise the limit, or wait for midnight.`,
+      });
+      return;
+    }
+
+    this.refreshing.set(true);
+    this.refreshResult.set(null);
+    try {
+      const result = await firstValueFrom(this.feed.refreshMany(targets));
+      const parts = [`Loaded ${result.loaded} of ${targets.length}.`];
+      if (result.failed.length) {
+        parts.push(`Could not load: ${result.failed.map((u) => '@' + u).join(', ')}.`);
+      }
+      if (result.stopped) {
+        parts.push('Stopped early after a rate limit, rather than spending on requests that would also fail.');
+      }
+      this.refreshResult.set({ stopped: result.stopped, message: parts.join(' ') });
+    } finally {
+      this.refreshing.set(false);
+    }
   }
 
   /** Forget this source entirely: key, probe verdict, and proxy consents. */

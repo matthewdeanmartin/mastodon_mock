@@ -184,6 +184,78 @@
   }
 </section>
 
+@if (settings.hasKey(entry().id)) {
+  <section class="spend">
+    <h2 class="section-title">What this has cost</h2>
+    <div class="spend-figures">
+      <span class="spend-stat">
+        <strong>{{ usage.today() }}</strong>
+        <span class="muted small">requests today</span>
+      </span>
+      <span class="spend-stat">
+        <strong>{{ usage.total() }}</strong>
+        <span class="muted small">since you connected</span>
+      </span>
+      <span class="spend-stat">
+        <strong>{{ usage.remainingToday() }}</strong>
+        <span class="muted small">left before today's limit</span>
+      </span>
+    </div>
+
+    @if (usage.atHardLimit()) {
+      <p class="feed-error">
+        You have reached today's limit of {{ usage.hardLimit() }} requests. It resets at midnight,
+        or you can raise it below.
+      </p>
+    } @else if (usage.overSoftLimit()) {
+      <p class="spend-warning">
+        Past {{ usage.softLimit() }} requests today. Nothing is blocked — this is just a heads-up
+        that you are spending more than a usual day's reading.
+      </p>
+    }
+
+    <details class="spend-limits">
+      <summary class="small">Change the daily limits</summary>
+      <p class="muted small">
+        The warning is advisory; the limit is enforced. The limit exists mainly to stop a bug or a
+        stuck refresh from spending while you are not looking — set it as high as you like.
+      </p>
+      <div class="limit-fields">
+        <label class="field">
+          <span class="field-label small">Warn at</span>
+          <input
+            type="number"
+            min="1"
+            [ngModel]="softDraft()"
+            (ngModelChange)="softDraft.set($event)"
+          />
+        </label>
+        <label class="field">
+          <span class="field-label small">Stop at</span>
+          <input
+            type="number"
+            min="1"
+            [ngModel]="hardDraft()"
+            (ngModelChange)="hardDraft.set($event)"
+          />
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn btn-outline btn-small" type="button" (click)="saveLimits()">
+          Save limits
+        </button>
+        <button class="btn btn-outline btn-small" type="button" (click)="resetUsage()">
+          Reset counters
+        </button>
+      </div>
+    </details>
+    <p class="muted small">
+      Counted per request, including retries. Mawkingbird records only how many — never which
+      accounts you looked up.
+    </p>
+  </section>
+}
+
 <section class="follows">
   <h2 class="section-title">Accounts you follow</h2>
 
@@ -262,6 +334,26 @@
     }
 
     @if (follows.follows().length) {
+      <div class="actions">
+        <button
+          class="btn btn-outline btn-small"
+          type="button"
+          [disabled]="refreshing() || usage.atHardLimit()"
+          (click)="refreshAll()"
+        >
+          @if (refreshing()) {
+            Refreshing…
+          } @else if (refreshCost() === 0) {
+            Everything is up to date
+          } @else {
+            Refresh all ({{ refreshCost() }}
+            {{ refreshCost() === 1 ? 'request' : 'requests' }})
+          }
+        </button>
+      </div>
+      @if (refreshResult(); as result) {
+        <p [class]="result.stopped ? 'feed-error' : 'connection-ok'">{{ result.message }}</p>
+      }
       <ul class="follow-list">
         @for (f of follows.follows(); track f.username) {
           <li class="follow-row">
