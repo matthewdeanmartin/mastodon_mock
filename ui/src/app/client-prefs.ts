@@ -21,7 +21,14 @@ const HIDDEN_PROVIDERS_KEY_BASE = 'mockingbird_hidden_providers';
  */
 const DEFAULT_VISIBILITY_KEY_BASE = 'mockingbird_default_visibility';
 
-const PROVIDER_IDS: ProviderId[] = ['mastodon', 'anonymous-mastodon', 'bluesky', 'rss', 'paste'];
+const PROVIDER_IDS: ProviderId[] = [
+  'mastodon',
+  'anonymous-mastodon',
+  'bluesky',
+  'rss',
+  'twitter',
+  'paste',
+];
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 

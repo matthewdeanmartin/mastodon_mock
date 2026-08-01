@@ -29,6 +29,7 @@ import {
 } from '../../providers/anonymous/anonymous-feed-corpus';
 import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmarks';
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
+import { TwitterProvider } from '../../providers/twitter/twitter-provider';
 import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home-feed-cache';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
@@ -81,6 +82,7 @@ export class Home implements OnInit, OnDestroy {
   private anonymousCorpus = inject(AnonymousFeedCorpus);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   protected anonymousProvider = inject(AnonymousMastodonProvider);
+  protected twitterProvider = inject(TwitterProvider);
   private anonymousHomeCache = inject(AnonymousHomeFeedCache);
   protected anonymousFollows = inject(AnonymousFollows);
   private anonymousTags = inject(AnonymousTags);

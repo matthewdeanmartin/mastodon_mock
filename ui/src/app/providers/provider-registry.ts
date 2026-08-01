@@ -4,6 +4,7 @@ import { FeedProvider } from './provider';
 import { RssProvider } from './rss/rss-provider';
 import { AnonymousMastodonProvider } from './anonymous/anonymous-mastodon-provider';
 import { PasteFeedProvider } from './paste/paste-feed-provider';
+import { TwitterProvider } from './twitter/twitter-provider';
 import { FeatureFlags } from '../feature-flags';
 
 /**
@@ -16,9 +17,16 @@ export class ProviderRegistry {
   private rss = inject(RssProvider);
   private anonymousMastodon = inject(AnonymousMastodonProvider);
   private paste = inject(PasteFeedProvider);
+  private twitter = inject(TwitterProvider);
   private featureFlags = inject(FeatureFlags);
 
-  readonly all: FeedProvider[] = [this.anonymousMastodon, this.bluesky, this.rss, this.paste];
+  readonly all: FeedProvider[] = [
+    this.anonymousMastodon,
+    this.bluesky,
+    this.rss,
+    this.twitter,
+    this.paste,
+  ];
 
   /**
    * Providers the user has actually connected (feeds added, account linked…).

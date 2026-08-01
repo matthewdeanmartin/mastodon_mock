@@ -156,6 +156,34 @@ export class TwitterFeed {
   }
 
   /**
+   * Whether anything at all is held for this account, fresh or not.
+   *
+   * Distinct from {@link isCached}, which asks "is this good enough to serve
+   * without refetching". This asks "is there anything to show", which is the
+   * question the home feed needs: a day-old tweet belongs in Home, and fetching
+   * a newer one is a decision only the reader should make.
+   */
+  hasAnything(username: string): boolean {
+    return this.cache.has(key(username));
+  }
+
+  /**
+   * Whatever is held for this account, without ever fetching.
+   *
+   * The home feed's only read path. Deliberately incapable of spending: the
+   * aggregator pages providers in a loop, so a `cached()` that could fall
+   * through to the network would bill once per followed account per scroll.
+   *
+   * Waits for hydration, so a cold page load reads from disk rather than
+   * finding an empty map and reporting the reader has no tweets.
+   */
+  cached(username: string): Observable<Status[]> {
+    return from(this.hydrated).pipe(
+      map(() => this.cache.get(key(username))?.page.statuses ?? []),
+    );
+  }
+
+  /**
    * How many requests loading these accounts would cost right now.
    *
    * Drives the "Refresh all (7 requests)" label. Counts only what would

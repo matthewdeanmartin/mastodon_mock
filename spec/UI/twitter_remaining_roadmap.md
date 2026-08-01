@@ -1,6 +1,6 @@
-# X/Twitter provider — remaining roadmap
+# Twitter provider — remaining roadmap
 
-**Status:** §1 (caching), §2 (clicking) and §4 (parity) shipped; §5–§6 remain
+**Status:** §1–§5 shipped; §6 (bulk import + rotation) remains
 **Date:** 2026-08-01
 **Context:** Sprints 1–5 are merged (PR #13 + follow-ups). This document covers
 what is left, with the cost arithmetic measured rather than estimated.
@@ -29,7 +29,7 @@ Scaling that up is the single most useful thing in this document:
 | Follows | One full refresh | Once a day, per month |
 |---:|---:|---:|
 | 10 (today's cap) | $0.001 | $0.02 |
-| 150 (a normal X following list) | $0.009 | $0.27 |
+| 150 (a normal Twitter following list) | $0.009 | $0.27 |
 | 1,000 | $0.06 | $1.80 |
 | 5,000 | $0.30 | **$9.00** |
 
@@ -47,7 +47,7 @@ solution.
 so a reload no longer costs a request per followed account. Kept below for the
 reasoning; the original analysis follows the summary.
 
-| | RSS | X (now) |
+| | RSS | Twitter (now) |
 |---|---|---|
 | Store | IndexedDB, survives reload | IndexedDB, survives reload |
 | Freshness TTL | 24 h (`ClientPrefs.rssCacheTtlHours`) | 5 min (`TIMELINE_TTL_MS`) |
@@ -140,7 +140,7 @@ tweets. Counts render under `caps.favourite`/`caps.reblog`, which are `false`
 for Twitter *because the actions are impossible* — so the capability flag was doing
 two jobs ("can you press this" and "is there a number worth showing") and got
 the second one wrong. A new `readOnlyStats` concept separates them, and the
-bookmark/translate/••• block now includes X for signed-in readers, not just
+bookmark/translate/••• block now includes Twitter for signed-in readers, not just
 anonymous ones. Real result on a live @AnthropicAI post (the translate button
 became 🤖🌐 in §4, once it turned out the server one could only 404):
 
@@ -227,7 +227,7 @@ fields it does for Mastodon.
 
 **What is not surfaced, and could be:** `viewCount`, `quoteCount` and
 `bookmarkCount` have no Mastodon equivalent, so they are dropped. `viewCount` is
-the interesting one — X shows it prominently and it has no analogue in the
+the interesting one — Twitter shows it prominently and it has no analogue in the
 fediverse. If it is wanted, it belongs in `providerRef` (which already survives
 into the card) rather than bolted onto `Status`, so nothing outside
 `providers/twitter/` learns a new field.
@@ -239,7 +239,7 @@ into the card) rather than bolted onto `Status`, so nothing outside
 **The prediction below was wrong on three of five rows.** "Built
 provider-agnostic, so it should just work" held for the mechanisms that operate
 on a `Status`; it failed everywhere a *gate* decided whether to show a control,
-because every one of those gates was a denylist written before X existed.
+because every one of those gates was a denylist written before Twitter existed.
 
 | Feature | Predicted | Measured |
 |---|---|---|
@@ -269,7 +269,7 @@ POST /api/v1/statuses/twitter:2083317461269598348/bookmark   → 404, bookmark l
 An anonymous reader bookmarking the same post got a working local bookmark, so
 signing in made the feature *worse*. Both callers now use
 `serverKnowsStatus()`, and this also settles "the bookmark question" below in
-favour of option (1) — the local store — which is where an X bookmark was always
+favour of option (1) — the local store — which is where a Twitter bookmark was always
 going to have to live.
 
 **Translate disappeared entirely.** The server 🌐 button needs
@@ -278,7 +278,7 @@ reader looking at a tweet therefore got *neither* — the capability vanished
 rather than being unavailable. For a read-only provider **translate means "ask
 the autorouter"**: the server has never seen the post, so only the client-side
 AI path can work. The 🌐 button is now hidden for these providers and 🤖🌐 shown
-regardless of session. Final toolbar on a live X card: `🔖 | 🤖🌐`.
+regardless of session. Final toolbar on a live Twitter card: `🔖 | 🤖🌐`.
 
 **"Open in chat" was offered** for an account that exists only on Twitter. Same
 denylist, same fix.
@@ -295,32 +295,61 @@ the post's first external link" path for anyone who wants it.
 
 ---
 
-## 5. Home feed mix
+## 5. Home feed mix — **DONE (2026-08-01)**
 
-`TwitterProvider` implements `FeedProvider` but is deliberately **not** in
-`ProviderRegistry.all`. The blocker was cost controls, and those shipped in
-Sprint 5, so this is now a one-line registry change plus a filter chip.
+Shipped. Tweets now interleave with Mastodon posts in one continuous feed,
+sorted by date, with a 🐦 Twitter filter chip.
 
-It should still be a conscious step, because merging changes the *shape* of the
-spend:
+### The design changed on one insight
 
-- Today, spending is user-initiated: you open an account, you pay for a page.
-- Merged, spending becomes **scroll-initiated**. Every "load more" fans out
-  across every followed account that has run out of buffered posts.
+The plan below assumed merging would make spending **scroll-initiated** and then
+tried to cap the damage. That framing was avoidable rather than inevitable. The
+danger is real and worse than the plan states — `FeedAggregator.fetchForeignPage`
+re-invokes `fetchPage()` *in a loop* until a source yields 20 posts or returns
+empty, so a naive provider bills one request per followed account **per scroll**,
+growing as the reader scrolls further.
 
-Design constraints, in order of importance:
+The fix is to stop treating this provider as a fetcher. `TwitterProvider` is a
+**reader of the cache**: it returns everything already saved in one page, then
+reports exhausted, ending the aggregator's loop after exactly one call. Nothing
+fetches on scroll, on focus, or on reconnect. Spending stays exactly where it
+already was — an explicit "Refresh" — and the merge becomes free.
+
+That makes constraints 2 and 4 unnecessary rather than merely satisfied: there is
+no fan-out to cap and no daily limit to degrade against, because Home does not
+spend. Constraint 3 (chip off by default) also drops: a chip that costs nothing
+to leave on does not need to be hidden, and defaulting it off would have meant a
+reader who connected Twitter saw nothing in Home and assumed it was broken.
+
+The one concession is **`COLD_START_BUDGET = 3`**: a Home with *nothing* saved
+fetches up to three accounts so a freshly connected reader is not staring at an
+empty feed. Past that the section says how many accounts are unloaded and what
+loading them costs, rather than quietly omitting them. Cold-start fetches run
+sequentially — parallel requests through a free CORS proxy trip its per-origin
+limit, and a throttled request fails having already been billed.
+
+### Measured in a browser
+
+| Action | Twitter API calls |
+|---|---:|
+| Cold Home, 2 follows, nothing saved | **2** |
+| Reload | **0** |
+| Scrolling four pages | **0** |
+
+Card order on that load was `mastodon ×5, TWEET(NASA), TWEET(ESA)` — genuinely
+merged by timestamp, not appended as a block.
+
+### The original plan
 
 1. **Reuse `FeedAggregator`'s existing round model.** It already fetches per
-   source and merges by date, which is the right shape. X contributes one page
-   per account per round.
-2. **Cap the fan-out per round independently of the follow cap.** Ten follows
-   should not mean ten requests every time someone scrolls. Proposal: refresh
-   the N least-recently-fetched accounts per round (N≈3), and serve the rest
-   from cache — the same "catch-up" idea §7.2 describes.
-3. **The chip must be off by default** on first link, so nobody discovers the
-   merge by watching their balance drop.
-4. **Respect the daily hard limit**, and when it is hit, degrade to
-   cache-only with a visible note rather than an error per card.
+   source and merges by date, which is the right shape. Twitter contributes one
+   page per account per round.
+2. ~~Cap the fan-out per round independently of the follow cap.~~ Unnecessary:
+   there is no per-round fan-out.
+3. ~~The chip must be off by default.~~ Reversed: the merge is free, so hiding it
+   only makes the feature look broken.
+4. ~~Respect the daily hard limit, degrading to cache-only.~~ Unnecessary: Home
+   is already cache-only.
 
 ---
 
@@ -403,13 +432,13 @@ about what refreshing that many accounts implies.
 4. ~~Read-only parity audit (§4)~~ — **done**, and it found four real bugs
    rather than confirming the happy path: reader mode offered impossible
    actions, bookmarking a tweet 404'd once signed in, translate vanished
-   entirely, and "open in chat" was offered for an X-only account.
-5. **Home feed mix (§5)** — now the top item. §1 is settled, so this is
-   affordable. The main
+   entirely, and "open in chat" was offered for a Twitter-only account.
+5. ~~Home feed mix (§5)~~ — **done**, and free: the provider reads the cache
+   rather than fetching, so Home never spends. The main
    open question is ordering a merged feed when tweets arrive in bulk on a
    refresh rather than continuously.
-6. **Followings bulk import + rotation (§6)** — the big one, and it wants §5
-   settled first. Import is ~25 requests for 5,000 accounts; rotation is what
+6. **Followings bulk import + rotation (§6)** — the last one, and now the top
+   item. Import is ~25 requests for 5,000 accounts; rotation is what
    makes keeping them fresh tractable. §1 makes the rotation far cheaper, since
    only the accounts due for a refresh cost anything.
 

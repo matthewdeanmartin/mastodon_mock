@@ -1,4 +1,4 @@
-# Roadmap — X/Twitter via scraper services (GetXAPI, TwitterAPI.io)
+# Roadmap — Twitter via scraper services (GetXAPI, TwitterAPI.io)
 
 Status: ACCEPTED (2026-07-31). Grounded in
 `spec/ui/twitter_by_scraper_services.md` and in what this codebase already has.
@@ -161,7 +161,7 @@ press it.
 `sprint/twitter-2-consent.md`
 
 The consent machinery currently says `ShortenerId` in its types. Twitter needs
-the same thing with different copy and a materially higher stake (an X key buys
+the same thing with different copy and a materially higher stake (a Twitter key buys
 credits; a shortener key makes links).
 
 - Generalize `ShortenerProxyConsent` → `ProxyConsent` keyed by
@@ -172,7 +172,7 @@ credits; a shortener key makes links).
   descriptor instead of a `ShortenerCatalogEntry`. Twitter's `keyPowers`:
   *"spend the credits on your account"*, *"see every profile, search and post
   you look up"*.
-- The dialog must state the second one plainly. Routing X lookups through a
+- The dialog must state the second one plainly. Routing Twitter lookups through a
   proxy discloses the user's reading habits to the proxy operator — that's a
   privacy cost the shortener case didn't have, and §19 requires disclosing it.
 - Connector page lists and revokes grants (the link-shortener page already does
