@@ -1,29 +1,298 @@
-/*
- * The centre column has no horizontal padding of its own (see `.column` in
- * shell.css) — every page insets its own blocks. Doing it per block rather than
- * on a wrapper is the point: padding lives inside the element, so a section's
- * border-bottom still spans the full width of the column while its text stays
- * clear of the rail. `.tabs` is the one thing left flush, because each `.tab`
- * carries its own padding and the rule under them is meant to reach both edges.
- */
-.page-title,
-.page-intro {
-  padding: 0 16px;
+:host {
+  display: block;
+  min-height: 100vh;
 }
 
-.page-title {
-  margin: 0 0 4px;
+.public-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 60px;
+  padding: 0 max(20px, calc((100% - 880px) / 2));
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--col-bg) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.public-brand {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+.public-brand:hover,
+a.btn:hover {
+  text-decoration: none;
+}
+
+.invite-page {
+  width: min(880px, 100%);
+  margin: 0 auto;
+  padding: 48px 20px 64px;
+}
+
+.hero {
+  max-width: 720px;
+}
+
+.hero h1 {
+  margin: 2px 0 10px;
+  font-size: clamp(32px, 6vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.page-intro {
+  max-width: 670px;
+  margin: 0;
+  font-size: 17px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.anonymous-note {
+  margin-top: 22px;
+  padding: 13px 15px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 34px 0 18px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--col-bg);
+}
+
+.mode-switch button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.mode-switch button span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.mode-switch button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.mode-switch button.active span {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.advanced-options,
+.rally-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--col-bg);
+}
+
+.advanced-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.advanced-options h2,
+.section-head h2,
+.rally-card h2 {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+
+.advanced-options p,
+.rally-card p,
+.invite-head p {
+  margin: 0;
+}
+
+.field-label {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--col-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.option-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+}
+
+.option-toggle input {
+  flex: none;
+  margin-top: 3px;
+}
+
+.option-toggle input:disabled + span {
+  opacity: 0.65;
+}
+
+.nested-toggle {
+  margin-left: 24px;
+}
+
+.messages {
+  margin-top: 28px;
+}
+
+.section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+
+.section-head > p {
+  margin: 0;
+}
+
+.invite-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invite-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--col-bg);
+}
+
+.invite-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.invite-head h3 {
+  margin: 0 0 3px;
+  font-size: 17px;
+}
+
+.count {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.count.over,
+.warn {
+  color: #e0245e;
+}
+
+.invite-text {
+  display: block;
+  width: 100%;
+  min-height: 8lh;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+  field-sizing: content;
+}
+
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.copy-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rally-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 28px;
+}
+
+.rally-card > div {
+  max-width: 620px;
+}
+
+.rally-card .btn {
+  flex: none;
 }
 
 .small {
   font-size: 13px;
 }
 
-.warn {
-  color: #e0245e;
+.footnote {
+  margin: 22px 0 0;
+  text-align: center;
 }
 
-/* Visible to a screen reader, not to the eye — the textarea's own label. */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -35,129 +304,6 @@
   white-space: nowrap;
 }
 
-.tabs {
-  margin-top: 12px;
-}
-
-.invite-intro {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.invite-intro p {
-  margin: 0;
-}
-
-.profile-toggle {
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  cursor: pointer;
-}
-
-.profile-toggle input {
-  flex: none;
-  margin-top: 3px;
-}
-
-/* Campaign tracking is a sub-choice of shortening, so it is indented under it
-   rather than reading as a third independent option. */
-.nested-toggle {
-  margin-left: 24px;
-}
-
-.profile-toggle input:disabled + span {
-  opacity: 0.7;
-}
-
-.invite-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.invite-card {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.invite-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.invite-head h2 {
-  margin: 0;
-  font-size: 16px;
-}
-
-/* An estimate, so it is quiet until it is a problem — and then it says so in
-   words as well as colour (the ⚠ and the paragraph below the box). */
-.count {
-  flex: none;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-
-.count.over {
-  color: #e0245e;
-  font-weight: 700;
-}
-
-.invite-text {
-  display: block;
-  width: 100%;
-  margin: 8px 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--col-bg);
-  color: var(--text);
-  line-height: 1.45;
-  resize: vertical;
-  /* The box IS the preview, so nothing may be scrolled out of sight. Browsers
-     that have this size to the text exactly; the rest fall back to `rows`,
-     which is set large enough for the longest invitation at this width. */
-  field-sizing: content;
-  min-height: 5lh;
-}
-
-.invite-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-a.btn {
-  text-decoration: none;
-}
-
-a.btn:hover {
-  text-decoration: none;
-}
-
-.link {
-  border: none;
-  background: none;
-  padding: 0;
-  color: var(--accent);
-  font-size: 13px;
-  text-decoration: underline;
-}
-
-.copy-note {
-  font-size: 13px;
-  color: var(--muted);
-}
-
 .overlay {
   position: fixed;
   inset: 0;
@@ -166,7 +312,7 @@ a.btn:hover {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .dialog {
@@ -179,9 +325,26 @@ a.btn:hover {
 
 .dialog h2 {
   margin: 0 0 8px;
-  font-size: 18px;
 }
 
-.footnote {
-  padding: 16px 16px 32px;
+@media (max-width: 700px) {
+  .invite-page {
+    padding-top: 30px;
+  }
+
+  .invite-list {
+    grid-template-columns: 1fr;
+  }
+
+  .section-head,
+  .rally-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 460px) {
+  .mode-switch {
+    grid-template-columns: 1fr;
+  }
 }

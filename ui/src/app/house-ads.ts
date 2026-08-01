@@ -54,6 +54,13 @@ export const HOUSE_ADS_SHOWN = 2;
 
 export const HOUSE_ADS: HouseAd[] = [
   {
+    id: 'invite-people-off-twitter',
+    title: '📣 Invite people to leave Twitter',
+    text: 'Pick an invitation, make it yours, and send it wherever your friends still post.',
+    url: 'https://mawkingbird.com/invites',
+    cta: 'Build an invitation ↗',
+  },
+  {
     id: 'mastodon-mock',
     title: '🦣 Mastodon Mock',
     text: 'Mock Mastodon server, mock the REST API for testing. MIT',

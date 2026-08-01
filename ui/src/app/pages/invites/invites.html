@@ -1,202 +1,255 @@
-<h1 class="page-title">Invite people to Mastodon</h1>
-<p class="muted page-intro">
-  Invite your friends elsewhere to come find you on Mastodon. Pick a message, edit it here if you
-  like, then post it on Twitter or Bluesky. Mawkingbird doesn’t connect to either account — the button
-  just opens their composer with the text filled in, and you send it.
-</p>
+<header class="public-header">
+  <a class="public-brand" routerLink="/">Mawkingbird</a>
+  <a class="btn btn-outline btn-sm" [routerLink]="signedIn ? '/home' : '/login'">
+    {{ signedIn ? 'Back to Mawkingbird' : 'Sign in' }}
+  </a>
+</header>
 
-<div class="tabs" role="tablist" aria-label="Where to invite from">
-  <button
-    class="tab"
-    type="button"
-    role="tab"
-    id="invite-tab-x"
-    [attr.aria-selected]="network() === 'x'"
-    [class.active]="network() === 'x'"
-    (click)="setNetwork('x')"
-  >
-    Twitter
-  </button>
-  <button
-    class="tab"
-    type="button"
-    role="tab"
-    id="invite-tab-bluesky"
-    [attr.aria-selected]="network() === 'bluesky'"
-    [class.active]="network() === 'bluesky'"
-    (click)="setNetwork('bluesky')"
-  >
-    Bluesky
-  </button>
-</div>
-
-<div class="invite-intro" role="tabpanel" [attr.aria-labelledby]="'invite-tab-' + network()">
-  @if (network() === 'x') {
-    <p class="muted small">
-      These ask people to join Mastodon and come find you. Your Twitter followers probably don’t have a
-      fediverse account yet, so each one links somewhere they can start.
+<main class="invite-page">
+  <section class="hero">
+    <p class="eyebrow">Send a better invitation</p>
+    <h1>Invite people to leave Twitter</h1>
+    <p class="muted page-intro">
+      Give friends on Twitter, Bluesky, Threads, or anywhere else a practical way to try Mastodon.
+      Pick some words, make them yours, and open a composer. Mawkingbird never posts for you.
     </p>
-  } @else {
-    <p class="muted small">
-      Bluesky people don’t need convincing about the open social web — they’re just missing the
-      friends who went to Mastodon. These lead with the fact that anyone can read Mastodon through
-      Mawkingbird with no account at all, on
-      <code>{{ homeHost() || 'mastodon.social' }}</code
-      >.
-    </p>
-  }
-
-  <label class="profile-toggle">
-    <input
-      type="checkbox"
-      [checked]="naming()"
-      [disabled]="!hasProfile()"
-      (change)="toggleProfile($any($event.target).checked)"
-    />
-    <span>
-      Include my Mastodon profile
-      @if (hasProfile()) {
-        <span class="muted small">— {{ profileUrl() }}</span>
-      } @else {
-        <span class="muted small">
-          — unavailable: the Anonymous account is browser-local, so there’s no profile page to link
-          to. <a routerLink="/login">Sign in</a> to include one.
-        </span>
-      }
-    </span>
-  </label>
-  <p class="muted small">
-    Only your public profile link goes in the post. Nothing else about this browser — no tokens, no
-    server API URLs, no account IDs — is ever put in the message.
-  </p>
-
-  <label class="profile-toggle">
-    <input
-      type="checkbox"
-      [checked]="shorten()"
-      [disabled]="!shortenerReady() || shortening()"
-      (change)="toggleShorten($any($event.target).checked)"
-    />
-    <span>
-      Shorten the link with {{ shortenerLabel() }}
-      @if (!shortenerReady()) {
-        <span class="muted small">
-          — no shortener connected.
-          <a routerLink="/settings/connections/link-shortener">Set one up</a> to use this.
-        </span>
-      } @else if (shortening()) {
-        <span class="muted small">— shortening…</span>
-      } @else if (shorten()) {
-        <span class="muted small">— {{ visitUrl() }}</span>
-      } @else {
-        <span class="muted small"
-          >— saves characters against the {{ limits[network()] }} limit.</span
-        >
-      }
-    </span>
-  </label>
-
-  @if (shorten() && shortenerReady()) {
-    <label class="profile-toggle nested-toggle">
-      <input
-        type="checkbox"
-        [checked]="trackCampaign()"
-        [disabled]="shortening()"
-        (change)="toggleTracking($any($event.target).checked)"
-      />
-      <span>
-        Tag the link so you can tell which invitation worked
-        <span class="muted small">
-          — adds <code>utm_source</code>, <code>utm_medium</code> and <code>utm_campaign</code> to
-          the destination. It records which wording was clicked, never who clicked it.
-        </span>
-      </span>
-    </label>
-    <p class="muted small">
-      Off by default on purpose: tracking links in a personal invitation is a choice, not a default.
-      Either way the shortener counts clicks on its own — that is what a shortener does — and those
-      counts are visible to whoever runs it.
-    </p>
-  }
-
-  @if (shortenError(); as msg) {
-    <p class="feed-error" role="alert">{{ msg }}</p>
-  }
-
-  <button class="btn btn-outline btn-sm" type="button" (click)="shuffle()">
-    Shuffle — show a different one first
-  </button>
-</div>
-
-<ul class="invite-list">
-  @for (card of cards(); track card.variation.id) {
-    <li class="invite-card">
-      <div class="invite-head">
-        <h2>{{ card.variation.title }}</h2>
-        <span
-          class="count"
-          [class.over]="card.overLimit"
-          [attr.aria-label]="
-            card.length +
-            ' of about ' +
-            limits[card.variation.network] +
-            ' characters' +
-            (card.overLimit ? ' — too long' : '')
-          "
-        >
-          @if (card.overLimit) {
-            ⚠
-          }
-          {{ card.length }}/{{ limits[card.variation.network] }}
-        </span>
+    @if (!signedIn) {
+      <div class="anonymous-note">
+        <strong>No account required.</strong>
+        These invitations work right now. <a routerLink="/login">Sign in</a> only if you want to add
+        your Mastodon profile or connect a link shortener to count clicks.
       </div>
+    }
+  </section>
 
-      <label class="sr-only" [attr.for]="'invite-text-' + card.variation.id">
-        {{ card.variation.title }} — invitation text, editable
+  <div class="mode-switch" role="group" aria-label="Invitation mode">
+    <button
+      type="button"
+      [class.active]="mode() === 'simple'"
+      [attr.aria-pressed]="mode() === 'simple'"
+      (click)="setMode('simple')"
+    >
+      Simple
+      <span>Two good defaults</span>
+    </button>
+    <button
+      type="button"
+      [class.active]="mode() === 'advanced'"
+      [attr.aria-pressed]="mode() === 'advanced'"
+      (click)="setMode('advanced')"
+    >
+      Advanced
+      <span>More copy and link controls</span>
+    </button>
+  </div>
+
+  @if (mode() === 'advanced') {
+    <section class="advanced-options" aria-labelledby="advanced-title">
+      <h2 id="advanced-title">Build the invitation</h2>
+
+      <label class="field-label" for="promotion-target">Where should people start?</label>
+      <select
+        id="promotion-target"
+        [value]="promotion()"
+        (change)="setPromotion($any($event.target).value)"
+      >
+        <option value="join-mastodon">Promote joining Mastodon</option>
+        <option value="home-server">Promote my home server — {{ homeHost() }}</option>
+      </select>
+      <p class="muted small">
+        @if (promotion() === 'home-server') {
+          This links to <strong>{{ destinationUrl() }}</strong
+          >, the server’s public homepage. It does not compare or endorse one server over another.
+        } @else {
+          This links to the Join Mastodon server picker.
+        }
+      </p>
+
+      <label class="option-toggle">
+        <input
+          type="checkbox"
+          [checked]="includeDestination()"
+          (change)="toggleDestination($any($event.target).checked)"
+        />
+        <span>Include the “where to start” link</span>
       </label>
-      <textarea
-        class="invite-text"
-        rows="9"
-        [id]="'invite-text-' + card.variation.id"
-        [value]="card.text"
-        (input)="onEdit(card.variation.id, $any($event.target).value)"
-      ></textarea>
 
-      @if (card.overLimit) {
-        <p class="warn small">
-          Longer than {{ card.variation.network === 'x' ? 'Twitter' : 'Bluesky' }} normally allows. Both
-          networks count links their own way, so this is an estimate — but consider dropping a
-          sentence. Keep the profile link if you can; it’s the part that helps people find you.
-        </p>
+      <label class="option-toggle">
+        <input
+          type="checkbox"
+          [checked]="naming()"
+          [disabled]="!hasProfile()"
+          (change)="toggleProfile($any($event.target).checked)"
+        />
+        <span>
+          Include my Mastodon profile
+          @if (hasProfile()) {
+            <span class="muted small">— {{ profileUrl() }}</span>
+          } @else {
+            <span class="muted small">
+              — <a routerLink="/login">sign in</a> to add a public profile link.
+            </span>
+          }
+        </span>
+      </label>
+
+      <label class="option-toggle">
+        <input
+          type="checkbox"
+          [checked]="shorten()"
+          [disabled]="!shortenerReady() || shortening() || !includeDestination()"
+          (change)="toggleShorten($any($event.target).checked)"
+        />
+        <span>
+          Shorten the destination with {{ shortenerLabel() }}
+          @if (!shortenerReady()) {
+            <span class="muted small">
+              —
+              @if (!signedIn) {
+                <a routerLink="/login">sign in</a>, then add a link-shortener service to track
+                clicks.
+              } @else {
+                <a routerLink="/settings/connections/link-shortener"
+                  >add a link-shortener service</a
+                >
+                to track clicks.
+              }
+            </span>
+          } @else if (shortening()) {
+            <span class="muted small">— shortening…</span>
+          } @else if (shorten()) {
+            <span class="muted small">— {{ destinationUrl() }}</span>
+          }
+        </span>
+      </label>
+
+      @if (shorten() && shortenerReady()) {
+        <label class="option-toggle nested-toggle">
+          <input
+            type="checkbox"
+            [checked]="trackCampaign()"
+            [disabled]="shortening()"
+            (change)="toggleTracking($any($event.target).checked)"
+          />
+          <span>
+            Add campaign tags for this wording
+            <span class="muted small"
+              >— the shortener counts clicks; it does not identify people.</span
+            >
+          </span>
+        </label>
       }
 
-      <div class="invite-actions">
-        <a
-          class="btn"
-          [href]="card.intentUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          [attr.aria-label]="postLabel(card)"
-          (click)="onIntentOpen(card)"
-        >
-          {{ card.variation.network === 'x' ? 'Post on Twitter' : 'Post on Bluesky' }} ↗
-        </a>
-        <button class="btn btn-outline" type="button" (click)="copy(card)">Copy text</button>
-        @if (card.edited) {
-          <button class="link" type="button" (click)="reset(card.variation.id)">
-            Reset to the original wording
-          </button>
-        }
-        @if (copied() === card.variation.id) {
-          <span class="copy-note" role="status">✓ Invitation copied</span>
-        }
-        @if (copyFailed() === card.variation.id) {
-          <span class="copy-note warn" role="status">Couldn’t use the clipboard</span>
-        }
-      </div>
-    </li>
+      @if (shortenError(); as msg) {
+        <p class="feed-error" role="alert">{{ msg }}</p>
+      }
+    </section>
   }
-</ul>
+
+  <section class="messages" aria-labelledby="messages-title">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">{{ mode() === 'simple' ? 'Pick one' : 'Pick a tone' }}</p>
+        <h2 id="messages-title">Invitation messages</h2>
+      </div>
+      <p class="muted small">Every message is editable before you share it.</p>
+    </div>
+
+    <ul class="invite-list">
+      @for (card of cards(); track card.variation.id) {
+        <li class="invite-card">
+          <div class="invite-head">
+            <div>
+              <h3>{{ card.variation.title }}</h3>
+              <p class="muted small">{{ card.variation.description }}</p>
+            </div>
+            <span class="count" [class.over]="card.overLimit">
+              @if (card.overLimit) {
+                ⚠
+              }
+              {{ card.length }}/280
+            </span>
+          </div>
+
+          <label class="sr-only" [attr.for]="'invite-text-' + card.variation.id">
+            {{ card.variation.title }} — invitation text, editable
+          </label>
+          <textarea
+            class="invite-text"
+            rows="8"
+            [id]="'invite-text-' + card.variation.id"
+            [value]="card.text"
+            (input)="onEdit(card.variation.id, $any($event.target).value)"
+          ></textarea>
+
+          @if (card.overLimit) {
+            <p class="warn small">
+              Longer than Twitter’s usual limit. Edit it down before posting.
+            </p>
+          }
+
+          <div class="invite-actions">
+            <a
+              class="btn"
+              [href]="card.xIntentUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              [attr.aria-label]="postLabel(card, 'Twitter')"
+              (click)="onIntentOpen(card, 'x')"
+            >
+              Post on Twitter ↗
+            </a>
+            <a
+              class="btn btn-outline"
+              [href]="card.blueskyIntentUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              [attr.aria-label]="postLabel(card, 'Bluesky')"
+              (click)="onIntentOpen(card, 'bluesky')"
+            >
+              Post on Bluesky ↗
+            </a>
+            <button class="btn btn-outline" type="button" (click)="copy(card)">Copy text</button>
+            @if (card.edited) {
+              <button class="link" type="button" (click)="reset(card.variation.id)">Reset</button>
+            }
+            @if (copied() === card.variation.id) {
+              <span class="copy-note" role="status">✓ Invitation copied</span>
+            }
+            @if (copyFailed() === card.variation.id) {
+              <span class="copy-note warn" role="status">Couldn’t use the clipboard</span>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <section class="rally-card" aria-labelledby="rally-title">
+    <div>
+      <p class="eyebrow">Already on Mastodon?</p>
+      <h2 id="rally-title">Ask your community to send invitations</h2>
+      <p class="muted">
+        This Mastodon post does not promote another server. It asks people already on
+        {{ homeHost() }} to invite friends who are still elsewhere.
+      </p>
+    </div>
+    <a
+      class="btn"
+      [href]="mastodonRallyIntent()"
+      target="_blank"
+      rel="noopener noreferrer"
+      (click)="onRallyOpen()"
+    >
+      Rally Mastodon ↗
+    </a>
+  </section>
+
+  <p class="muted small footnote">
+    Need a server-generated signup code instead?
+    <a routerLink="/settings/invites">Open Settings → Invite links</a>.
+  </p>
+</main>
 
 @if (fallbackText(); as text) {
   <div
@@ -215,18 +268,9 @@
       (keyup)="$event.stopPropagation()"
     >
       <h2 id="invite-copy-fallback-title">Copy this by hand</h2>
-      <p class="muted small">
-        This browser wouldn’t give Mawkingbird clipboard access. Select the text below and copy it
-        yourself.
-      </p>
+      <p class="muted small">Select the text below and copy it yourself.</p>
       <textarea class="invite-text" rows="9" readonly>{{ text }}</textarea>
       <button class="btn" type="button" (click)="closeFallback()">Done</button>
     </div>
   </div>
 }
-
-<p class="muted small footnote">
-  Looking for invite links to your own server instead?
-  <a routerLink="/settings/invites">Settings → Invites</a> generates those. To find people you
-  already know, try <a routerLink="/settings/import-export">Find my friends</a>.
-</p>

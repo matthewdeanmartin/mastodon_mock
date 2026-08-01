@@ -11,6 +11,14 @@ describe('application routes', () => {
     expect(routes.find((route) => route.path === 'anonymous')?.loadComponent).toBeDefined();
   });
 
+  it('keeps the invitation builder outside the authenticated shell', () => {
+    const inviteRoute = routes.find((route) => route.path === 'invites');
+
+    expect(inviteRoute?.loadComponent).toBeDefined();
+    expect(inviteRoute?.canActivate).toBeUndefined();
+    expect(shellChild('invites')).toBeUndefined();
+  });
+
   it('keeps both current and legacy message links available to Anonymous', () => {
     expect(routes.find((route) => route.path === 'message/:id')?.canActivate).toBeUndefined();
     expect(routes.find((route) => route.path === 'message')?.canActivate).toBeUndefined();

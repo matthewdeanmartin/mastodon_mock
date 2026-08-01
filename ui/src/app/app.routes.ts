@@ -23,6 +23,12 @@ export const routes: Routes = [
     path: 'explore',
     loadComponent: () => import('./pages/explore/explore').then((m) => m.Explore),
   },
+  // Public recruiting tool. This must live above the guarded shell: signed-out
+  // visitors are the people house ads and shared links send here.
+  {
+    path: 'invites',
+    loadComponent: () => import('./pages/invites/invites').then((m) => m.Invites),
+  },
   // A message shared as a TinyURL short link. Un-guarded so a shared link opens
   // for anyone, signed in or not.
   {
@@ -378,13 +384,6 @@ export const routes: Routes = [
       {
         path: 'starter-kits',
         loadComponent: () => import('./pages/starter-kits/starter-kits').then((m) => m.StarterKits),
-      },
-      // Outbound recruiting: prewritten posts for Twitter and Bluesky. Available to
-      // Anonymous too — the Bluesky pitch ("no account needed") is exactly what
-      // someone browsing anonymously is living proof of.
-      {
-        path: 'invites',
-        loadComponent: () => import('./pages/invites/invites').then((m) => m.Invites),
       },
       // Feeds hub: lists, saved searches, server feeds, collections and tags in
       // one page. `/feeds/lists` and `/feeds/tags` are filtered views of the same

@@ -42,6 +42,16 @@
       <strong>fediverse.info ↗</strong>
       <span class="muted small">Opt-in people directory, browsable by hashtag.</span>
     </a>
+    @if (embedded()) {
+      <a class="invite-people-link" routerLink="/invites">
+        <span aria-hidden="true">📣</span>
+        <span>
+          <strong>Can’t find them?</strong>
+          <span class="muted small">Maybe you need to invite them to join Mastodon.</span>
+        </span>
+        <span aria-hidden="true">→</span>
+      </a>
+    }
     <p class="muted small">
       Also try <a routerLink="/search">search</a> — paste any handle or profile URL to find an
       account — and check profiles for a “featured” section: accounts they vouch for.

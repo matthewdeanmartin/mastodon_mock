@@ -3,15 +3,15 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
+import { JOIN_MASTODON_URL } from '../../invites/invite-templates';
 import { Account } from '../../models';
 import { Server } from '../../server';
-import { MAWKINGBIRD_URL } from '../../invites/invite-templates';
 import { Invites } from './invites';
 
 const ACCOUNT = {
   id: '1',
   username: 'matt',
-  acct: 'matt',
+  acct: 'matt@example.social',
   display_name: 'Matt',
   url: 'https://example.social/@matt',
 } as Account;
@@ -19,6 +19,7 @@ const ACCOUNT = {
 describe('Invites', () => {
   let account: WritableSignal<Account | null>;
   let baseUrl: WritableSignal<string>;
+  let isAuthenticated: boolean;
   let isAnonymous: boolean;
 
   function setUp(): ComponentFixture<Invites> {
@@ -29,6 +30,9 @@ describe('Invites', () => {
           provide: Auth,
           useValue: {
             account,
+            get isAuthenticated() {
+              return isAuthenticated;
+            },
             get isAnonymous() {
               return isAnonymous;
             },
@@ -54,176 +58,99 @@ describe('Invites', () => {
     return Array.from(root(fixture).querySelectorAll<HTMLTextAreaElement>('textarea.invite-text'));
   }
 
-  function tab(fixture: ComponentFixture<Invites>, label: string): HTMLButtonElement {
-    return Array.from(root(fixture).querySelectorAll<HTMLButtonElement>('button.tab')).find(
-      (button) => button.textContent?.includes(label),
-    )!;
-  }
-
-  function intentUrls(fixture: ComponentFixture<Invites>): string[] {
-    return Array.from(root(fixture).querySelectorAll<HTMLAnchorElement>('a.btn')).map(
-      (anchor) => anchor.getAttribute('href') ?? '',
-    );
-  }
-
   beforeEach(() => {
     localStorage.clear();
     account = signal<Account | null>(ACCOUNT);
     baseUrl = signal('https://example.social');
+    isAuthenticated = true;
     isAnonymous = false;
   });
 
-  it('shows ten Twitter invitations, each with the text visible and a composer link', () => {
+  it('shows exactly two invitation choices with reasonable defaults in simple mode', () => {
     const fixture = setUp();
-    expect(cards(fixture)).toHaveLength(10);
-    expect(boxes(fixture)).toHaveLength(10);
-    for (const url of intentUrls(fixture)) {
-      expect(url).toContain('https://x.com/intent/post?text=');
-    }
+
+    expect(cards(fixture)).toHaveLength(2);
+    expect(boxes(fixture).every((box) => box.value.includes(JOIN_MASTODON_URL))).toBe(true);
+    expect(boxes(fixture).some((box) => box.value.includes(ACCOUNT.url))).toBe(true);
+    expect(root(fixture).textContent).not.toContain('touch grass');
   });
 
-  it('switches to a distinct set of Bluesky invitations', () => {
-    const fixture = setUp();
-    const xText = boxes(fixture)
-      .map((box) => box.value)
-      .join('\n');
-
-    tab(fixture, 'Bluesky').click();
-    fixture.detectChanges();
-
-    const bskyText = boxes(fixture)
-      .map((box) => box.value)
-      .join('\n');
-    expect(bskyText).not.toBe(xText);
-    expect(cards(fixture).length).toBeGreaterThanOrEqual(6);
-    for (const url of intentUrls(fixture)) {
-      expect(url).toContain('https://bsky.app/intent/compose?text=');
-    }
-  });
-
-  it('points Bluesky readers at an anonymous session on the sender’s own server', () => {
-    account.set({ ...ACCOUNT, acct: 'matt@elekk.xyz' } as Account);
-    const fixture = setUp();
-    tab(fixture, 'Bluesky').click();
-    fixture.detectChanges();
-
-    const text = boxes(fixture)
-      .map((box) => box.value)
-      .join('\n');
-    expect(text).toContain(`${MAWKINGBIRD_URL}/anonymous?elekk.xyz`);
-    // Never the running deployment's own origin — this text is going somewhere else.
-    expect(text).not.toContain('localhost');
-  });
-
-  it('includes the profile by default when there is one, and drops the line when turned off', () => {
-    const fixture = setUp();
-    const toggle = root(fixture).querySelector<HTMLInputElement>('.profile-toggle input')!;
-    expect(toggle.checked).toBe(true);
-    expect(boxes(fixture).some((box) => box.value.includes('https://example.social/@matt'))).toBe(
-      true,
-    );
-
-    toggle.checked = false;
-    toggle.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-
-    const text = boxes(fixture)
-      .map((box) => box.value)
-      .join('\n');
-    expect(text).not.toContain('https://example.social/@matt');
-    expect(text).not.toContain('Follow me at');
-    expect(text).not.toContain('{');
-  });
-
-  it('picks the profile up when the account request lands after the page renders', () => {
-    // Auth.account() is filled in by a request in flight while this page mounts,
-    // so a default read once at init leaves the profile out of everything.
+  it('works signed out and explains the optional sign-in benefits', () => {
+    isAuthenticated = false;
     account.set(null);
+    baseUrl.set('');
     const fixture = setUp();
-    expect(boxes(fixture).join('')).not.toContain('example.social/@matt');
 
-    account.set(ACCOUNT);
-    fixture.detectChanges();
-
-    const toggle = root(fixture).querySelector<HTMLInputElement>('.profile-toggle input')!;
-    expect(toggle.checked).toBe(true);
-    expect(boxes(fixture).some((box) => box.value.includes('https://example.social/@matt'))).toBe(
-      true,
-    );
+    expect(cards(fixture)).toHaveLength(2);
+    expect(root(fixture).textContent).toContain('No account required.');
+    expect(boxes(fixture).every((box) => !box.value.includes('{'))).toBe(true);
   });
 
-  it('offers nothing personal for the Anonymous account, and no placeholder either', () => {
+  it('offers sign-in to the browser-local Anonymous account while using its API server', () => {
+    isAuthenticated = true;
     isAnonymous = true;
-    account.set({ ...ACCOUNT, acct: 'mastodon.social', url: '' } as Account);
+    account.set(null);
     baseUrl.set('https://mastodon.social');
     const fixture = setUp();
 
-    const toggle = root(fixture).querySelector<HTMLInputElement>('.profile-toggle input')!;
-    expect(toggle.checked).toBe(false);
-    expect(toggle.disabled).toBe(true);
-    for (const box of boxes(fixture)) {
-      expect(box.value).not.toContain('{');
-    }
+    expect(root(fixture).textContent).toContain('No account required.');
+    expect(root(fixture).textContent).toContain('Sign in');
+    expect(root(fixture).textContent).toContain('mastodon.social');
   });
 
-  it('sends the edited text to the composer, not the original', () => {
+  it('reveals the humorous option and link controls only in advanced mode', () => {
     const fixture = setUp();
-    const box = boxes(fixture)[0];
-    box.value = 'my own words #Mastodon #Fediverse';
-    box.dispatchEvent(new Event('input'));
+    const advanced = Array.from(
+      root(fixture).querySelectorAll<HTMLButtonElement>('.mode-switch button'),
+    ).find((button) => button.textContent?.includes('Advanced'))!;
+
+    advanced.click();
     fixture.detectChanges();
 
-    expect(intentUrls(fixture)[0]).toBe(
-      `https://x.com/intent/post?text=${encodeURIComponent('my own words #Mastodon #Fediverse').replace(/%20/g, '+')}`,
+    expect(cards(fixture)).toHaveLength(4);
+    expect(root(fixture).textContent).toContain('Real talk: touch grass');
+    expect(root(fixture).querySelector('#promotion-target')).toBeTruthy();
+  });
+
+  it('can promote the anonymous API server public homepage', () => {
+    isAuthenticated = false;
+    account.set(null);
+    baseUrl.set('https://mstdn.social');
+    const fixture = setUp();
+    const advanced = root(fixture).querySelectorAll<HTMLButtonElement>('.mode-switch button')[1];
+    advanced.click();
+    fixture.detectChanges();
+
+    const select = root(fixture).querySelector<HTMLSelectElement>('#promotion-target')!;
+    select.value = 'home-server';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(boxes(fixture).every((box) => box.value.includes('https://mstdn.social'))).toBe(true);
+  });
+
+  it('uses Mastodon sharing only for the rally message', () => {
+    const fixture = setUp();
+    const directLinks = Array.from(
+      root(fixture).querySelectorAll<HTMLAnchorElement>('.invite-card a.btn'),
     );
+    expect(directLinks.every((link) => !link.href.includes('/share?'))).toBe(true);
+
+    const rally = root(fixture).querySelector<HTMLAnchorElement>('.rally-card a.btn')!;
+    expect(rally.href).toContain('https://example.social/share?text=');
+    expect(decodeURIComponent(rally.href)).toContain('got+friends+still+on+Twitter');
   });
 
-  it('can put an edited card back to the original wording', () => {
+  it('sends hand-edited text to both external composers', () => {
     const fixture = setUp();
-    const original = boxes(fixture)[0].value;
     const box = boxes(fixture)[0];
-    box.value = 'scribbled over';
+    box.value = 'my own invitation';
     box.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    const reset: HTMLButtonElement = cards(fixture)[0].querySelector('button.link')!;
-    reset.click();
-    fixture.detectChanges();
-
-    expect(boxes(fixture)[0].value).toBe(original);
-  });
-
-  it('warns when an edit runs past the composer limit, in words as well as colour', () => {
-    const fixture = setUp();
-    const box = boxes(fixture)[0];
-    box.value = 'x'.repeat(281);
-    box.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    const card = cards(fixture)[0];
-    expect(card.querySelector('.count')!.textContent).toContain('281/280');
-    expect(card.querySelector('.warn')!.textContent).toContain('Longer than Twitter');
-    // Still openable — the composer is the final authority on length.
-    expect(card.querySelector('a.btn')!.getAttribute('href')).toContain('x.com/intent/post');
-  });
-
-  it('rotates a different invitation to the top when shuffled', () => {
-    const fixture = setUp();
-    const first = cards(fixture)[0].querySelector('h2')!.textContent;
-    const second = cards(fixture)[1].querySelector('h2')!.textContent;
-
-    root(fixture).querySelector<HTMLButtonElement>('.invite-intro button')!.click();
-    fixture.detectChanges();
-
-    expect(cards(fixture)[0].querySelector('h2')!.textContent).toBe(second);
-    expect(cards(fixture).map((card) => card.querySelector('h2')!.textContent)).toContain(first);
-  });
-
-  it('labels each composer link with the card title, not just an icon', () => {
-    const fixture = setUp();
-    const label = cards(fixture)[0].querySelector('a.btn')!.getAttribute('aria-label');
-    const title = cards(fixture)[0].querySelector('h2')!.textContent;
-    expect(label).toBe(`Post “${title}” on Twitter`);
+    const links = cards(fixture)[0].querySelectorAll<HTMLAnchorElement>('a.btn');
+    expect(links[0].href).toContain('text=my+own+invitation');
+    expect(links[1].href).toContain('text=my+own+invitation');
   });
 
   it('copies exactly what the card shows', async () => {
@@ -232,28 +159,11 @@ describe('Invites', () => {
     const fixture = setUp();
     const shown = boxes(fixture)[0].value;
 
-    cards(fixture)[0].querySelectorAll<HTMLButtonElement>('button')[0].click();
+    cards(fixture)[0].querySelector<HTMLButtonElement>('button.btn')!.click();
     await fixture.whenStable();
     fixture.detectChanges();
 
     expect(writeText).toHaveBeenCalledWith(shown);
     expect(cards(fixture)[0].textContent).toContain('Invitation copied');
-  });
-
-  it('falls back to a selectable dialog when the clipboard is denied', async () => {
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
-      configurable: true,
-    });
-    const fixture = setUp();
-    const shown = boxes(fixture)[0].value;
-
-    cards(fixture)[0].querySelectorAll<HTMLButtonElement>('button')[0].click();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const dialog = root(fixture).querySelector<HTMLElement>('[role="dialog"]')!;
-    expect(dialog).toBeTruthy();
-    expect(dialog.querySelector('textarea')!.value).toBe(shown);
   });
 });
