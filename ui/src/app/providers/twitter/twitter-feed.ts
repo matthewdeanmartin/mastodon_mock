@@ -178,9 +178,7 @@ export class TwitterFeed {
    * finding an empty map and reporting the reader has no tweets.
    */
   cached(username: string): Observable<Status[]> {
-    return from(this.hydrated).pipe(
-      map(() => this.cache.get(key(username))?.page.statuses ?? []),
-    );
+    return from(this.hydrated).pipe(map(() => this.cache.get(key(username))?.page.statuses ?? []));
   }
 
   /**

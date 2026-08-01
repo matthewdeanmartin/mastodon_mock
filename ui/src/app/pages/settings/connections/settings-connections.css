@@ -95,6 +95,13 @@
   display: block;
 }
 
+/* Sits under the greyed card, and is deliberately not greyed itself — it is the
+   one thing on a turned-off entry that still does something. */
+.catalog-flag-link {
+  margin: 4px 0 0;
+  padding-left: 46px;
+}
+
 .catalog-enables {
   display: flex;
   flex-wrap: wrap;

@@ -464,9 +464,7 @@ export class Thread implements OnInit {
           this.loading.set(false);
         },
         error: (error: unknown) => {
-          this.twitterError.set(
-            error instanceof Error ? error.message : 'Could not load replies.',
-          );
+          this.twitterError.set(error instanceof Error ? error.message : 'Could not load replies.');
           this.loading.set(false);
         },
       }),

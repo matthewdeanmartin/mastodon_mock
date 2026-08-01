@@ -78,9 +78,7 @@ export class TwitterProvider implements FeedProvider {
    * looks broken, and follows with no working key produce an error on every
    * Home load. Neither is worth showing a chip for.
    */
-  readonly linked = computed(
-    () => this.settings.usable() && this.follows.enabled().length > 0,
-  );
+  readonly linked = computed(() => this.settings.usable() && this.follows.enabled().length > 0);
 
   readonly errors = signal<string[]>([]);
 

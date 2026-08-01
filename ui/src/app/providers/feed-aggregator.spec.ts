@@ -347,7 +347,11 @@ describe('FeedAggregator', () => {
 
     it('reports how much was hidden, so Home can offer to widen', async () => {
       homeTimeline.mockReturnValue(
-        of([makeStatus('fresh', hoursAgo(1)), makeStatus('a', hoursAgo(48)), makeStatus('b', hoursAgo(72))]),
+        of([
+          makeStatus('fresh', hoursAgo(1)),
+          makeStatus('a', hoursAgo(48)),
+          makeStatus('b', hoursAgo(72)),
+        ]),
       );
       const aggregator = withWindow('today');
       await firstValueFrom(aggregator.nextPage());

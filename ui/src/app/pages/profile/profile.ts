@@ -8,6 +8,7 @@ import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
 import { LocalModeration } from '../../local-moderation';
 import { Account, Collection, Relationship, Status } from '../../models';
+import { homeServerLink } from '../../home-server-link';
 import { StatusCard } from '../../status-card/status-card';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { ListDialog } from '../../list-dialog/list-dialog';
@@ -122,6 +123,10 @@ export class Profile implements OnInit, OnDestroy {
   }
 
   protected account = signal<Account | null>(null);
+
+  /** Where to open this profile on its own server, or null if there is nowhere. */
+  protected homeServerLink = computed(() => homeServerLink(this.account()));
+
   protected statuses = signal<Status[]>([]);
   protected relationship = signal<Relationship | null>(null);
   protected loading = signal(true);

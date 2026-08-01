@@ -446,7 +446,10 @@
           <!-- Always present for anonymous readers, connected or not: they have no
                other translate button, so hiding this one would make the capability
                invisible rather than merely unavailable. See sprint 3 decision 8. -->
-          @if (showAiTranslate() && (capabilities.active || serverCannotTranslate || translatePref.choice() === 'ai')) {
+          @if (
+            showAiTranslate() &&
+            (capabilities.active || serverCannotTranslate || translatePref.choice() === 'ai')
+          ) {
             <button
               class="action"
               [class.on]="!!aiTranslation()"

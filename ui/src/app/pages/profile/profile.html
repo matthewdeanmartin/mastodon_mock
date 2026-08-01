@@ -79,6 +79,14 @@
                    which is indistinguishable from a follow-bot. Do not "finish"
                    this by adding a delay and enabling it for authenticated users —
                    see sprint/anonymous-great-2-clone-friends.md. -->
+              <!-- The way out to the account's own server. Hidden when there is
+                   no canonical URL to open (mock and browser-local accounts),
+                   because an "open" that goes nowhere is worse than no link. -->
+              @if (homeServerLink(); as link) {
+                <a class="menu-neutral" [href]="link.url" target="_blank" rel="noopener noreferrer">
+                  Open on {{ link.host }}
+                </a>
+              }
               @if (canCloneFriends()) {
                 <button class="menu-neutral" type="button" (click)="openCloneFriends()">
                   Clone friends list

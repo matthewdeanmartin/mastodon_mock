@@ -14,8 +14,10 @@ import {
   CredentialLifetime,
   CredentialLifetimeStore,
 } from '../../../providers/credential-lifetime';
+import { FeatureFlags } from '../../../feature-flags';
 import {
   CONNECTION_CATALOG,
+  CONNECTION_FLAGS,
   CONNECTION_SCOPE_COPY,
   ConnectionCatalogEntry,
 } from './connection-catalog';
@@ -30,6 +32,12 @@ export interface ConnectionCatalogRow {
    * reason — because a connector that silently vanishes is a support question.
    */
   unavailableReason: string | null;
+  /**
+   * True when {@link unavailableReason} is a rollout flag rather than a fact
+   * about the build. Only this case gets a link to the flags page, because only
+   * this case is something the reader can change.
+   */
+  flagged: boolean;
 }
 
 /**
@@ -60,6 +68,7 @@ export class SettingsConnections implements OnInit {
   // because a stored secret obeys the retention policy wherever it was created.
   private pastepileKey = inject(PastepileKey);
   protected lifetimes = inject(CredentialLifetimeStore);
+  private flags = inject(FeatureFlags);
 
   protected readonly lifetimeOptions = CREDENTIAL_LIFETIME_OPTIONS;
   protected readonly scopeCopy = CONNECTION_SCOPE_COPY;
@@ -73,6 +82,20 @@ export class SettingsConnections implements OnInit {
    */
   protected readonly rows = computed<ConnectionCatalogRow[]>(() =>
     CONNECTION_CATALOG.map((entry) => {
+      // A flag beats a build fact. Both can be true — Dropbox with no app key
+      // *and* flagged off — and the flag is the one the reader can act on, so
+      // it is the one the card explains.
+      const flagReason = this.flags.disabledReason(CONNECTION_FLAGS[entry.id]);
+      if (flagReason) {
+        return { entry, connected: false, unavailableReason: flagReason, flagged: true };
+      }
+      return { ...this.liveRow(entry), flagged: false };
+    }),
+  );
+
+  /** The catalog entry joined to its session state, ignoring rollout flags. */
+  private liveRow(entry: ConnectionCatalogEntry): Omit<ConnectionCatalogRow, 'flagged'> {
+    {
       switch (entry.id) {
         case 'bluesky':
           // Available to every account including Anonymous: the app password is
@@ -113,8 +136,8 @@ export class SettingsConnections implements OnInit {
           // would send them looking for a key problem that does not exist.
           return { entry, connected: this.twitter.usable(), unavailableReason: null };
       }
-    }),
-  );
+    }
+  }
 
   ngOnInit(): void {
     // Tell the policy store which connectors it governs, then apply the current

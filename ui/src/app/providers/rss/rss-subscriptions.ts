@@ -2,7 +2,35 @@ import { computed, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
 
 const FEEDS_KEY_BASE = 'mockingbird_rss_feeds';
+const LIMIT_KEY_BASE = 'mockingbird_rss_feed_limit';
+
+/**
+ * The suggested ceiling, and the default.
+ *
+ * Ten is a recommendation, not a rule. Every feed is fetched by every view that
+ * shows them, so a large list is slower to open and burns more of a free CORS
+ * proxy's quota — but that is the user's tradeoff to make, not ours, and
+ * somebody importing a real OPML file from a decade of reading has a different
+ * idea of "too many" than this default does.
+ */
 export const RSS_SUBSCRIPTION_LIMIT = 10;
+
+/**
+ * The ceiling on the ceiling. Not a judgement about patience — it is the point
+ * past which the storage this feature is built on stops being appropriate:
+ * subscriptions live in localStorage, which is synchronous and shared with
+ * every other preference in the app.
+ */
+export const RSS_SUBSCRIPTION_LIMIT_MAX = 500;
+
+/** Clamp a requested limit into something this storage can honour. */
+export function normalizeLimit(value: unknown): number {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n) || n < 1) {
+    return RSS_SUBSCRIPTION_LIMIT;
+  }
+  return Math.min(n, RSS_SUBSCRIPTION_LIMIT_MAX);
+}
 
 /** One subscribed feed. `title` is captured when the feed is first fetched. */
 export interface RssFeedSub {
@@ -41,13 +69,17 @@ function hostOf(url: string): string | null {
   }
 }
 
-function loadFeeds(key: string): RssFeedSub[] {
+function loadFeeds(key: string, limit: number): RssFeedSub[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(key) ?? '[]');
-    return Array.isArray(parsed) ? parsed.slice(0, RSS_SUBSCRIPTION_LIMIT) : [];
+    return Array.isArray(parsed) ? parsed.slice(0, limit) : [];
   } catch {
     return [];
   }
+}
+
+function loadLimit(key: string): number {
+  return normalizeLimit(localStorage.getItem(key) ?? RSS_SUBSCRIPTION_LIMIT);
 }
 
 /**
@@ -62,9 +94,35 @@ function loadFeeds(key: string): RssFeedSub[] {
 @Injectable({ providedIn: 'root' })
 export class RssSubscriptions {
   private readonly storageKey = scopedKey(FEEDS_KEY_BASE);
-  readonly feeds = signal<RssFeedSub[]>(loadFeeds(this.storageKey));
+  private readonly limitKey = scopedKey(LIMIT_KEY_BASE);
+
+  /**
+   * How many feeds this account may subscribe to.
+   *
+   * Account-scoped alongside the feeds themselves: the limit is a property of
+   * one reading list, and an alt with three feeds should not inherit a ceiling
+   * someone raised to import an OPML file into their main account.
+   */
+  readonly limit = signal<number>(loadLimit(this.limitKey));
+
+  readonly feeds = signal<RssFeedSub[]>(loadFeeds(this.storageKey, this.limit()));
 
   readonly enabledFeeds = computed(() => this.feeds().filter((f) => f.enabled));
+
+  /** Room left under the current limit. */
+  readonly remaining = computed(() => Math.max(0, this.limit() - this.feeds().length));
+
+  /**
+   * Raise or lower the ceiling. Lowering below the current count is allowed and
+   * does *not* delete anything — removing feeds someone deliberately added
+   * because they moved a number down would be the worst possible reading of the
+   * intent. It only stops new ones being added until they are back under.
+   */
+  setLimit(value: number): void {
+    const limit = normalizeLimit(value);
+    this.limit.set(limit);
+    localStorage.setItem(this.limitKey, String(limit));
+  }
 
   has(url: string): boolean {
     return this.feeds().some((f) => f.url === url);
@@ -81,8 +139,8 @@ export class RssSubscriptions {
     if (this.has(url)) {
       return null;
     }
-    if (this.feeds().length >= RSS_SUBSCRIPTION_LIMIT) {
-      return `You can subscribe to up to ${RSS_SUBSCRIPTION_LIMIT} RSS feeds.`;
+    if (this.feeds().length >= this.limit()) {
+      return `You have reached your limit of ${this.limit()} RSS feeds. Raise it on the RSS feeds settings page.`;
     }
     this.persist([
       ...this.feeds(),

@@ -244,7 +244,7 @@
         (ngModelChange)="onPasteProviderPick($event)"
         name="provider"
       >
-        @for (provider of pasteProviders.all; track provider.id) {
+        @for (provider of pasteProviders.available(); track provider.id) {
           <option [value]="provider.id">{{ provider.label }}</option>
         }
       </select>

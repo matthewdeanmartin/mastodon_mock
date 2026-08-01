@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Account, Relationship } from '../models';
+import { homeServerLink } from '../home-server-link';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { HumanCountPipe } from '../human-count.pipe';
@@ -56,17 +57,36 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
           >
         </div>
       }
-      @if (showFollowButton()) {
-        <button
-          type="button"
-          class="btn btn-sm hc-follow"
-          [class.following]="isFollowingState()"
-          [disabled]="relationshipLoading() || followBusy()"
-          (click)="toggleFollow($event)"
-        >
-          {{ relationshipLoading() || followBusy() ? '…' : followLabel() }}
-        </button>
-      }
+      <div class="hc-actions">
+        @if (showFollowButton()) {
+          <button
+            type="button"
+            class="btn btn-sm hc-follow"
+            [class.following]="isFollowingState()"
+            [disabled]="relationshipLoading() || followBusy()"
+            (click)="toggleFollow($event)"
+          >
+            {{ relationshipLoading() || followBusy() ? '…' : followLabel() }}
+          </button>
+        }
+        <!-- Parity with the profile's ••• menu, one item at a time. This card
+             has no overflow menu to put it in, so it sits next to Follow —
+             which is fine, because it is the other thing you want from a card
+             you are only hovering over. stopPropagation because the card sits
+             inside a status that navigates on click. -->
+        @if (homeServerLink(); as link) {
+          <a
+            class="btn btn-sm btn-outline hc-home"
+            [href]="link.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            [title]="'Open this profile on ' + link.host"
+            (click)="$event.stopPropagation()"
+          >
+            Open on {{ link.host }}
+          </a>
+        }
+      </div>
     </div>
   `,
   styles: `
@@ -141,10 +161,25 @@ import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
     .hc-stats strong {
       color: var(--text);
     }
+    .hc-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
     .hc-follow {
       width: auto;
       min-width: 92px;
-      margin-top: 10px;
+    }
+    /* The hostname can be long (indieweb.social, chaos.social…), so it is
+       allowed to shrink and ellipsize rather than widening the card. */
+    .hc-home {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   `,
 })
@@ -158,6 +193,10 @@ export class AccountHoverCard {
   readonly account = input.required<Account>();
   readonly allowFollow = input(true, { transform: booleanAttribute });
   readonly showStats = input(true, { transform: booleanAttribute });
+
+  /** Where to open this profile on its own server, or null if there is nowhere. */
+  protected homeServerLink = computed(() => homeServerLink(this.account()));
+
   protected relationship = signal<Relationship | null>(null);
   protected relationshipLoading = signal(false);
   protected followBusy = signal(false);

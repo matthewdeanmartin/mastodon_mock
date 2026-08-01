@@ -641,8 +641,7 @@ export class Search implements OnInit, OnDestroy {
   protected loadedCount = computed(() => this.results()?.statuses.length ?? 0);
   protected shownCount = computed(() => this.visibleStatuses().length);
 
-  // Idle-state trends: shown under the box before anything is searched.
-  protected trendingPosts = signal<Status[]>([]);
+  // Idle-state trends: shown under the box before a hashtag search is run.
   protected trendingTags = signal<Tag[]>([]);
   private trendsRequested = false;
   /** Last q/type reflected in the URL, so run() can detect an identical re-search
@@ -771,17 +770,19 @@ export class Search implements OnInit, OnDestroy {
     );
   }
 
-  /** Fetch trending posts + tags once, for the idle states. Failures show nothing. */
+  /**
+   * Fetch trending tags once, for the idle hashtag state. Failures show nothing.
+   *
+   * Trending *posts* used to be fetched here too, for the idle post-search
+   * state. That state now shows the search-syntax reference instead, so the
+   * request went with it rather than being left to cost a round trip for
+   * something nothing renders.
+   */
   private loadTrends(): void {
     if (this.trendsRequested) {
       return;
     }
     this.trendsRequested = true;
-    this.api
-      .trendingStatuses()
-      .pipe(catchError(() => EMPTY))
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((posts) => this.trendingPosts.set(posts));
     this.api
       .trendingTags()
       .pipe(catchError(() => EMPTY))
@@ -1748,14 +1749,6 @@ export class Search implements OnInit, OnDestroy {
     this.results.update((r) =>
       r ? { ...r, statuses: r.statuses.map((s) => (s.id === updated.id ? updated : s)) } : r,
     );
-  }
-
-  onTrendChanged(updated: Status): void {
-    this.trendingPosts.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
-  }
-
-  onTrendDeleted(removed: Status): void {
-    this.trendingPosts.update((list) => list.filter((s) => s.id !== removed.id));
   }
 
   onDeleted(removed: Status): void {

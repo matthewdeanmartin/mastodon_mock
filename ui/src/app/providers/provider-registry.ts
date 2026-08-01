@@ -5,7 +5,26 @@ import { RssProvider } from './rss/rss-provider';
 import { AnonymousMastodonProvider } from './anonymous/anonymous-mastodon-provider';
 import { PasteFeedProvider } from './paste/paste-feed-provider';
 import { TwitterProvider } from './twitter/twitter-provider';
-import { FeatureFlags } from '../feature-flags';
+import { FeatureFlagId, FeatureFlags } from '../feature-flags';
+
+/**
+ * The rollout flag each provider answers to, where it has one.
+ *
+ * A flagged-off provider drops out of {@link ProviderRegistry.linked}, so its
+ * posts leave the merged timeline and it stops being offered — but nothing it
+ * stored is deleted. Turning the flag back on restores the feed intact, which
+ * is the point: these flags exist for third-party outages, and an outage should
+ * not cost the user their subscriptions.
+ *
+ * Anonymous Mastodon has no entry. It is the fallback that makes the app work
+ * signed-out, not a third-party integration that can go down.
+ */
+const PROVIDER_FLAGS: Record<string, FeatureFlagId> = {
+  paste: 'pastebin',
+  bluesky: 'connector-bluesky',
+  rss: 'connector-rss',
+  twitter: 'connector-twitter',
+};
 
 /**
  * The foreign providers this build knows about. Mastodon is not listed — it is
@@ -37,9 +56,11 @@ export class ProviderRegistry {
    * the Invites page makes to Bluesky users. See
    * AnonymousCapabilities.canUseBluesky.
    */
-  readonly linked = computed(() =>
-    this.all.filter(
-      (p) => p.linked() && (p.id !== 'paste' || this.featureFlags.enabled('pastebin')),
-    ),
-  );
+  readonly linked = computed(() => this.all.filter((p) => p.linked() && this.flagAllows(p)));
+
+  /** True when no rollout flag gates this provider, or its flag is on. */
+  private flagAllows(provider: FeedProvider): boolean {
+    const flag = PROVIDER_FLAGS[provider.id];
+    return flag === undefined || this.featureFlags.enabled(flag);
+  }
 }

@@ -11,9 +11,7 @@ describe('toNitterUrl', () => {
   });
 
   it('rewrites a profile URL', () => {
-    expect(toNitterUrl('https://x.com/mistersql')).toBe(
-      `https://${DEFAULT_NITTER_HOST}/mistersql`,
-    );
+    expect(toNitterUrl('https://x.com/mistersql')).toBe(`https://${DEFAULT_NITTER_HOST}/mistersql`);
   });
 
   it.each([

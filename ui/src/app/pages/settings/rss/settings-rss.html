@@ -8,7 +8,9 @@
     Mockingbird has no server, so a feed only works if its site allows browser (CORS) access. Plenty
     don't. You'll know right away when you add one, because adding it fetches it.
   </p>
-  <p class="muted small">Up to 10 feeds can be saved in this browser.</p>
+  <p class="muted small">
+    {{ subs.feeds().length }} of {{ subs.limit() }} feeds saved in this browser.
+  </p>
 </div>
 
 <p class="proxy-summary muted small">
@@ -80,6 +82,107 @@
     <span class="muted small"> The proxy will see this feed's address and its contents. </span>
   </p>
 }
+
+<section class="opml">
+  <h2>📄 Import &amp; export (OPML)</h2>
+  <p class="muted small">
+    OPML is the subscription-list format every feed reader speaks. Export yours to move it somewhere
+    else, or import a file from a reader you are leaving. Folders in an imported file are flattened
+    — Mawkingbird has no folders yet.
+  </p>
+
+  <label class="feed-limit">
+    <span>Maximum feeds</span>
+    <input
+      type="number"
+      name="feedLimit"
+      min="1"
+      [max]="maxLimit"
+      [ngModel]="limitDraft()"
+      (ngModelChange)="limitDraft.set($event)"
+      (blur)="setLimit()"
+    />
+    <button class="btn btn-outline btn-sm" type="button" (click)="setLimit()">Save</button>
+  </label>
+  <p class="muted small">
+    We suggest no more than {{ recommendedLimit }}. Every feed is re-read by every view that shows
+    them, so a long list opens slower and uses more of a free CORS proxy's quota — but it is your
+    reading list, so set it where you want it. Lowering this never deletes a feed you already have.
+  </p>
+
+  <div class="opml-actions">
+    <button
+      class="btn btn-outline"
+      type="button"
+      (click)="exportOpml()"
+      [disabled]="!subs.feeds().length"
+    >
+      Export OPML
+    </button>
+    <label class="btn btn-outline opml-import" [class.disabled]="importProgress()">
+      {{ importProgress() ? 'Importing…' : 'Import OPML' }}
+      <input
+        type="file"
+        accept=".opml,.xml,text/xml,application/xml"
+        (change)="importOpml($event)"
+        [disabled]="!!importProgress()"
+      />
+    </label>
+  </div>
+
+  @if (importProgress(); as progress) {
+    <p class="muted small">
+      Checking feed {{ progress.done + 1 }} of {{ progress.total }} — each one is fetched to prove
+      this browser can actually read it.
+    </p>
+  }
+
+  @if (importError(); as msg) {
+    <p class="feed-error">{{ msg }}</p>
+  }
+
+  <!-- Every bucket named separately: each one has a different fix. -->
+  @if (importReport(); as report) {
+    <div class="import-report">
+      <p>
+        <strong>Added {{ report.added }} of {{ report.total }} feeds.</strong>
+      </p>
+      <ul class="muted small">
+        @if (report.alreadySubscribed) {
+          <li>{{ report.alreadySubscribed }} were already in your list.</li>
+        }
+        @if (report.skippedForLimit) {
+          <li>
+            {{ report.skippedForLimit }} went past your limit of {{ subs.limit() }}. Raise it above
+            and import the same file again to pick up the rest.
+          </li>
+        }
+        @if (report.failed.length) {
+          <li>
+            {{ report.failed.length }} could not be read
+            @if (!proxyLabel()) {
+              — usually this is CORS, which a
+              <a [routerLink]="['/settings/connections/cors-proxy']">CORS proxy</a> can fix.
+            }
+          </li>
+        }
+      </ul>
+      @if (report.failed.length) {
+        <details class="failed-feeds">
+          <summary class="muted small">Which ones failed</summary>
+          <ul class="muted small">
+            @for (failure of report.failed; track failure.url) {
+              <li>
+                <span class="failed-url">{{ failure.url }}</span>
+                <span class="failed-reason">{{ failure.reason }}</span>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+    </div>
+  }
+</section>
 
 @if (subs.feeds().length) {
   <ul class="feed-list">

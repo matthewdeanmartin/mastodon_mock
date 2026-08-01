@@ -12,6 +12,10 @@ import {
   hourHistogram,
   monthlyActivity,
   postHeatmap,
+  postLengthRange,
+  postTextLength,
+  repliesGiven,
+  replyRatio,
   sampleSpanDays,
   weekdayHistogram,
   weeklyActivity,
@@ -257,5 +261,94 @@ describe('postHeatmap', () => {
     expect(map.months[0].weekIndex).toBe(0);
     const indexes = map.months.map((m) => m.weekIndex);
     expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
+  });
+});
+
+describe('replyRatio and repliesGiven', () => {
+  const reply = () => makeStatus({ in_reply_to_id: '1' });
+
+  it('reports the share of the sample that is replies', () => {
+    const posts = [reply(), reply(), makeStatus(), makeStatus()];
+
+    expect(replyRatio(posts)).toBe(50);
+    expect(repliesGiven(posts)).toBe(2);
+  });
+
+  it('reports 0 for an account that never replies to anyone', () => {
+    // The case the metric exists for: a plausible-looking account that is
+    // nobody's correspondent. Must be 0, never null.
+    const posts = [makeStatus(), makeStatus(), makeStatus()];
+
+    expect(replyRatio(posts)).toBe(0);
+    expect(repliesGiven(posts)).toBe(0);
+  });
+
+  it('ignores boosts on both sides of the ratio', () => {
+    // Passing along someone else's post is neither replying nor declining to.
+    const boost = makeStatus({ reblog: makeStatus({ in_reply_to_id: '9' }) as never });
+    const posts = [reply(), makeStatus(), boost, boost];
+
+    expect(replyRatio(posts)).toBe(50);
+    expect(repliesGiven(posts)).toBe(1);
+  });
+
+  it('has no ratio to report when the sample holds no original posts', () => {
+    const boost = makeStatus({ reblog: makeStatus() as never });
+
+    expect(replyRatio([])).toBeNull();
+    expect(replyRatio([boost])).toBeNull();
+  });
+});
+
+describe('postTextLength', () => {
+  it('counts what is on screen, not the markup around it', () => {
+    const post = makeStatus({ content: '<p>hello <a href="https://example.test/x">there</a></p>' });
+
+    // "hello there" — the href does not count toward how much there is to read.
+    expect(postTextLength(post)).toBe('hello there'.length);
+  });
+
+  it('counts the content warning, which a reader has to read first', () => {
+    const post = makeStatus({ content: '<p>body</p>', spoiler_text: 'cw' });
+
+    expect(postTextLength(post)).toBe('body'.length + 'cw'.length);
+  });
+
+  it('decodes entities so an escaped character counts once', () => {
+    const post = makeStatus({ content: '<p>a &amp; b</p>' });
+
+    expect(postTextLength(post)).toBe('a & b'.length);
+  });
+});
+
+describe('postLengthRange', () => {
+  it('reports the shortest and longest original post', () => {
+    const posts = [
+      makeStatus({ content: '<p>hi</p>' }),
+      makeStatus({ content: `<p>${'x'.repeat(500)}</p>` }),
+      makeStatus({ content: '<p>medium length</p>' }),
+    ];
+
+    expect(postLengthRange(posts)).toEqual({ shortest: 2, longest: 500 });
+  });
+
+  it('skips image-only posts rather than pinning the shortest at zero', () => {
+    const posts = [makeStatus({ content: '' }), makeStatus({ content: '<p>words here</p>' })];
+
+    expect(postLengthRange(posts)?.shortest).toBe('words here'.length);
+  });
+
+  it('measures this account, not the people it boosts', () => {
+    const boost = makeStatus({
+      reblog: makeStatus({ content: `<p>${'x'.repeat(900)}</p>` }) as never,
+    });
+    const posts = [makeStatus({ content: '<p>short</p>' }), boost];
+
+    expect(postLengthRange(posts)).toEqual({ shortest: 5, longest: 5 });
+  });
+
+  it('has nothing to report when no post in the sample has text', () => {
+    expect(postLengthRange([])).toBeNull();
+    expect(postLengthRange([makeStatus({ content: '' })])).toBeNull();
   });
 });

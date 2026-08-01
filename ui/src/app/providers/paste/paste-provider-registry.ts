@@ -1,8 +1,9 @@
-import { inject, Injectable } from '@angular/core';
+import { computed, inject, Injectable } from '@angular/core';
 import { FeedPasteProvider, PasteProvider } from './paste-provider';
 import { PastepileMineProvider } from './pastepile-mine-provider';
 import { PastepileProvider } from './pastepile-provider';
 import { RentryProvider } from './rentry-provider';
+import { ShortenerPasteProvider } from './shortener-paste-provider';
 import { TinyurlProvider } from './tinyurl-provider';
 
 /**
@@ -36,8 +37,33 @@ export class PasteProviderRegistry {
   private pastepileMine = inject(PastepileMineProvider);
   private rentry = inject(RentryProvider);
   private tinyurl = inject(TinyurlProvider);
+  private shortener = inject(ShortenerPasteProvider);
 
-  readonly all: readonly PasteProvider[] = [this.rentry, this.tinyurl, this.pastepile];
+  /**
+   * Every provider this build knows about, whether or not it can be used now.
+   *
+   * `get()` resolves against this rather than {@link available} on purpose: a
+   * draft or a history entry created through the user's shortener must still
+   * resolve after they disconnect it, or the record becomes unreadable.
+   */
+  readonly all: readonly PasteProvider[] = [
+    this.rentry,
+    this.tinyurl,
+    this.pastepile,
+    this.shortener,
+  ];
+
+  /**
+   * What the composer offers right now.
+   *
+   * The shortener entry is the only conditional one: it needs a connected,
+   * usable service, and offering "Your link shortener" to someone who has not
+   * set one up is an option that can only fail. TinyURL covers that case with
+   * no setup at all, which is why it stays unconditional.
+   */
+  readonly available = computed<readonly PasteProvider[]>(() =>
+    this.all.filter((provider) => provider !== this.shortener || this.shortener.available()),
+  );
 
   /**
    * Feeds to subscribe to. Both are Pastepile, and that is the point.

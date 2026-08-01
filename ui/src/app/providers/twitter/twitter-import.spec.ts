@@ -3,12 +3,7 @@ import { of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TwitterApi } from './twitter-api';
 import { TwitterFollows } from './twitter-follows';
-import {
-  DEFAULT_INACTIVE_DAYS,
-  parseHandles,
-  toCandidate,
-  TwitterImport,
-} from './twitter-import';
+import { DEFAULT_INACTIVE_DAYS, parseHandles, toCandidate, TwitterImport } from './twitter-import';
 import { TwitterApiError } from './twitter-errors';
 import { FAST_DELAY_MS, TwitterPacer } from './twitter-pacer';
 import { WireFollowing } from './twitterapi-io/wire-types';
@@ -115,16 +110,17 @@ describe('TwitterImport', () => {
   it('excludes accounts silent longer than the cutoff', async () => {
     getFollowings.mockReturnValue(
       of({
-        users: [wire({ id: '1', screen_name: 'active' }), wire({ id: '2', screen_name: 'dormant' })],
+        users: [
+          wire({ id: '1', screen_name: 'active' }),
+          wire({ id: '2', screen_name: 'dormant' }),
+        ],
         cursor: null,
         hasMore: false,
       }),
     );
     await run(importer.list('mistersql', 100));
 
-    getLastPostedAt.mockImplementation((id: string) =>
-      of(id === '1' ? daysAgo(10) : daysAgo(800)),
-    );
+    getLastPostedAt.mockImplementation((id: string) => of(id === '1' ? daysAgo(10) : daysAgo(800)));
     await run(importer.checkLiveness(DEFAULT_INACTIVE_DAYS));
 
     expect(importer.keeping().map((c) => c.username)).toEqual(['active']);

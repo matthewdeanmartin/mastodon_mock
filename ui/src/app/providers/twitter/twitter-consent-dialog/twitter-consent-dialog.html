@@ -24,9 +24,8 @@
     <div id="consent-body">
       <p>
         {{ source().label }} refuses to answer web browsers at all&nbsp;— you just saw that test
-        fail. Mawkingbird has no server of its own, so the only way to read tweets here is to
-        route every request through the CORS proxy you configured, and those requests carry your
-        API key.
+        fail. Mawkingbird has no server of its own, so the only way to read tweets here is to route
+        every request through the CORS proxy you configured, and those requests carry your API key.
       </p>
 
       @if (selfHosted()) {
@@ -70,18 +69,20 @@
           </ul>
           <p>
             And separately from the key itself: because <em>every</em> X request goes through the
-            proxy, its operator can see <strong>which accounts you read and what you search
-            for</strong>. That is your reading history, not something you published.
+            proxy, its operator can see
+            <strong>which accounts you read and what you search for</strong>. That is your reading
+            history, not something you published.
           </p>
         </section>
 
         <section class="scope">
           <h4>What this does not cover</h4>
           <p>
-            Only your {{ source().label }} key and the Twitter content you look up. Mawkingbird still
-            refuses to send your Mastodon session, your Bluesky account, or any other connected
-            service through a proxy. No Twitter account password or session cookie is involved&nbsp;—
-            this app never asks for one, and reading public Twitter data does not require it.
+            Only your {{ source().label }} key and the Twitter content you look up. Mawkingbird
+            still refuses to send your Mastodon session, your Bluesky account, or any other
+            connected service through a proxy. No Twitter account password or session cookie is
+            involved&nbsp;— this app never asks for one, and reading public Twitter data does not
+            require it.
           </p>
           <p>
             If you would rather not take this risk, you can run

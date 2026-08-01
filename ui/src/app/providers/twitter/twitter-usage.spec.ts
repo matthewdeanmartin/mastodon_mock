@@ -1,10 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  DEFAULT_HARD_LIMIT,
-  DEFAULT_SOFT_LIMIT,
-  localDay,
-  TwitterUsage,
-} from './twitter-usage';
+import { DEFAULT_HARD_LIMIT, DEFAULT_SOFT_LIMIT, localDay, TwitterUsage } from './twitter-usage';
 
 describe('TwitterUsage', () => {
   let usage: TwitterUsage;

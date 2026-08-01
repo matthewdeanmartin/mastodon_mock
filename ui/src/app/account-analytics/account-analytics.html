@@ -83,6 +83,44 @@
         <span class="tile-label muted">Engagements per post</span>
         <span class="tile-value">{{ avgEngagement() }}</span>
       </div>
+      <!-- Replies given, as a share of the sample. A 0% account that posts every
+           day is usually a feed or a cross-poster rather than someone you can
+           talk to, and no other tile here would tell you that. -->
+      <div class="tile">
+        <span class="tile-label muted">Replies given</span>
+        <span class="tile-value">
+          <!-- Explicit null check, not `as pct`: 0% is falsy and is precisely
+               the value this tile exists to show. -->
+          @if (replyRatioPct() !== null) {
+            {{ replyRatioPct() }}%
+          } @else {
+            —
+          }
+          <small class="tile-sub muted"
+            >{{ fmt(repliesGiven()) }} of {{ fmt(posts().length) }}</small
+          >
+        </span>
+      </div>
+      <div class="tile">
+        <span class="tile-label muted">Shortest post</span>
+        <span class="tile-value">
+          @if (lengthRange(); as range) {
+            {{ fmt(range.shortest) }}<small class="tile-sub muted">characters</small>
+          } @else {
+            —
+          }
+        </span>
+      </div>
+      <div class="tile">
+        <span class="tile-label muted">Longest post</span>
+        <span class="tile-value">
+          @if (lengthRange(); as range) {
+            {{ fmt(range.longest) }}<small class="tile-sub muted">characters</small>
+          } @else {
+            —
+          }
+        </span>
+      </div>
       <div class="tile">
         <span class="tile-label muted">Posts per day</span>
         <span class="tile-value">{{ postsPerDay() }}</span>

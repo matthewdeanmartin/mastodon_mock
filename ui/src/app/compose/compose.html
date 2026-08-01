@@ -238,7 +238,7 @@
           (ngModelChange)="onPasteProviderChange($event)"
           title="Paste service"
         >
-          @for (provider of pasteProviders.all; track provider.id) {
+          @for (provider of pasteProviders.available(); track provider.id) {
             <option [value]="provider.id">{{ provider.label }}</option>
           }
         </select>

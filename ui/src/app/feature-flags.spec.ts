@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { FeatureFlags, isFeatureEnabled } from './feature-flags';
+import { FeatureFlags, FEATURE_FLAGS, flagsInGroup, isFeatureEnabled } from './feature-flags';
+import {
+  CONNECTION_CATALOG,
+  CONNECTION_FLAGS,
+} from './pages/settings/connections/connection-catalog';
 
 const STORAGE_KEY = 'mockingbird_feature_flags';
 
@@ -46,5 +50,41 @@ describe('FeatureFlags', () => {
 
     expect(flags.state('pastebin')).toBe('production');
     expect(stored.publishedHash).toBe(flags.publishedHash);
+  });
+
+  it('reports no disabled reason while a flag is enabled', () => {
+    const flags = new FeatureFlags();
+
+    expect(flags.disabledReason('connector-bluesky')).toBeNull();
+  });
+
+  it('explains a turned-off connector, and says so differently for canary-only', () => {
+    const flags = new FeatureFlags();
+
+    flags.setState('connector-twitter', 'off');
+    expect(flags.disabledReason('connector-twitter')).toBe('Disabled by a feature flag.');
+
+    // Canary-only on a production build is still off, but for a reason worth
+    // distinguishing: it is coming, rather than broken.
+    flags.setState('connector-twitter', 'canary');
+    expect(flags.disabledReason('connector-twitter')).toContain('canary build first');
+  });
+});
+
+describe('connector flags', () => {
+  it('gates every catalog entry with a flag that exists', () => {
+    const ids = new Set(FEATURE_FLAGS.map((flag) => flag.id));
+
+    for (const entry of CONNECTION_CATALOG) {
+      const flagId = CONNECTION_FLAGS[entry.id];
+      expect(flagId, `${entry.id} has no flag`).toBeDefined();
+      expect(ids.has(flagId), `${flagId} is not a declared flag`).toBe(true);
+    }
+  });
+
+  it('ships every connector on production, so today nothing is withheld', () => {
+    for (const flag of flagsInGroup('connectors')) {
+      expect(flag.defaultState, `${flag.id} should default to production`).toBe('production');
+    }
   });
 });

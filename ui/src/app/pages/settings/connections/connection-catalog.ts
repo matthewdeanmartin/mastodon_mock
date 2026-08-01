@@ -36,6 +36,8 @@
  * "shorten this URL" always has exactly one answer.
  */
 
+import { FeatureFlagId } from '../../../feature-flags';
+
 /** Route segment under `/settings/connections`, and the entry's identity. */
 export type ConnectionId =
   | 'github'
@@ -92,6 +94,27 @@ export const CONNECTION_SCOPE_COPY: Record<ConnectionScope, ConnectionScopeCopy>
     detail:
       'Shared by every account in this browser, but never written to long-term storage — closing the tab disconnects it.',
   },
+};
+
+/**
+ * The rollout flag that gates each connector, one per vendor.
+ *
+ * Per-vendor rather than per-category because that is how these actually break:
+ * a scraper service dies, or an API starts refusing browsers, and the answer is
+ * to stop onboarding people onto *that one* while the rest keep working.
+ *
+ * A flagged-off connector is greyed, never hidden — see
+ * {@link FeatureFlags.disabledReason}.
+ */
+export const CONNECTION_FLAGS: Record<ConnectionId, FeatureFlagId> = {
+  bluesky: 'connector-bluesky',
+  twitter: 'connector-twitter',
+  openrouter: 'connector-openrouter',
+  raindrop: 'connector-raindrop',
+  github: 'connector-github',
+  dropbox: 'connector-dropbox',
+  'link-shortener': 'connector-link-shortener',
+  'cors-proxy': 'connector-cors-proxy',
 };
 
 export interface ConnectionCatalogEntry {

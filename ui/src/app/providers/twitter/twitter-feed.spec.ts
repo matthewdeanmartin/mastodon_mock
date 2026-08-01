@@ -177,9 +177,7 @@ describe('TwitterFeed', () => {
       let call = 0;
       getUserPosts.mockImplementation(() => {
         call++;
-        return call === 2
-          ? throwError(() => new Error('User not found'))
-          : of(page([status('1')]));
+        return call === 2 ? throwError(() => new Error('User not found')) : of(page([status('1')]));
       });
       const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c'])));
       expect(result.loaded).toBe(2);
@@ -192,7 +190,9 @@ describe('TwitterFeed', () => {
       getUserPosts.mockImplementation(() => {
         call++;
         return call === 2
-          ? throwError(() => new Error('Rate-limited — either by CORS.SH or by the Twitter data service.'))
+          ? throwError(
+              () => new Error('Rate-limited — either by CORS.SH or by the Twitter data service.'),
+            )
           : of(page([status('1')]));
       });
       const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c', 'd'])));
@@ -203,7 +203,9 @@ describe('TwitterFeed', () => {
 
     it('stops when the daily limit is hit mid-batch', async () => {
       getUserPosts.mockReturnValue(
-        throwError(() => new Error('You have reached your daily limit of 200 Twitter data requests.')),
+        throwError(
+          () => new Error('You have reached your daily limit of 200 Twitter data requests.'),
+        ),
       );
       const result = await firstValueFrom(feed.refreshMany(many(['a', 'b', 'c'])));
       expect(result.stopped).toBe(true);
@@ -405,10 +407,7 @@ describe('TwitterFeed', () => {
         { handle: 'middling', statuses: [], fetchedAt: now - 60_000 },
       ]);
 
-      const picked = fresh.stalest(
-        [follow('recent'), follow('ancient'), follow('middling')],
-        2,
-      );
+      const picked = fresh.stalest([follow('recent'), follow('ancient'), follow('middling')], 2);
       expect(picked.map((f) => f.username)).toEqual(['ancient', 'middling']);
     });
 

@@ -1,4 +1,5 @@
 import { Status } from './models';
+import { stripHtml } from './sentiment';
 
 /**
  * Cheap, client-side account metrics derived entirely from a sample of an
@@ -101,6 +102,93 @@ export function sampleSpanDays(posts: Status[]): number {
     return 0;
   }
   return daysBetween(posts[0].created_at, posts[posts.length - 1].created_at);
+}
+
+// ---------------------------------------------------------------------------
+// Conversation and post length
+// ---------------------------------------------------------------------------
+
+/**
+ * A post the account actually wrote, as opposed to one it passed along.
+ *
+ * Boosts carry someone else's text and someone else's length, so counting them
+ * would measure the people this account reads rather than this account.
+ */
+function isOriginal(post: Status): boolean {
+  return post.reblog == null;
+}
+
+/**
+ * How much of this account's own posting is replies to other people.
+ *
+ * The question this answers is "is anyone home?". An account that posts daily
+ * and has *never* replied to anyone is usually a feed, a cross-poster, or a bot
+ * — worth knowing before you follow it, and invisible in every other number on
+ * the page, since an unattended account can have perfectly healthy post counts.
+ *
+ * A percentage of the sample rather than of the account's whole history: the
+ * history would cost an unbounded number of API calls to page through, and the
+ * ratio is the part that generalises anyway. Boosts are excluded from both
+ * sides — passing along someone else's post is neither replying nor declining
+ * to reply.
+ *
+ * Returns null for a sample with no original posts, where the ratio would be
+ * 0/0 and "0%" would be a claim the data does not support.
+ */
+export function replyRatio(posts: Status[]): number | null {
+  const original = posts.filter(isOriginal);
+  if (original.length === 0) {
+    return null;
+  }
+  const replies = original.filter((post) => post.in_reply_to_id != null).length;
+  return Math.round((replies / original.length) * 100);
+}
+
+/** Replies this account made in the sample — the count behind {@link replyRatio}. */
+export function repliesGiven(posts: Status[]): number {
+  return posts.filter((post) => isOriginal(post) && post.in_reply_to_id != null).length;
+}
+
+/**
+ * Visible characters in a post: tags stripped, entities decoded, CW included.
+ *
+ * Mastodon serves `content` as HTML, so the raw string counts markup nobody
+ * reads — `<p>` and every `<a href>` of a link — and a post's length would
+ * scale with how many links it has. What we want is the reading burden, so this
+ * measures what lands on screen, via the same {@link stripHtml} the sentiment
+ * scorer uses. The spoiler text counts because a reader has to read it before
+ * deciding about the rest.
+ */
+export function postTextLength(post: Status): number {
+  return stripHtml(post.content).length + stripHtml(post.spoiler_text ?? '').length;
+}
+
+export interface PostLengthRange {
+  shortest: number;
+  longest: number;
+}
+
+/**
+ * Shortest and longest original post in the sample, in visible characters.
+ *
+ * Together these say how much reading this account asks of you: an account
+ * whose longest post is 2,800 characters is a different proposition from one
+ * that never breaks 200, and the pair shows the range rather than flattening it
+ * to an average that neither end resembles.
+ *
+ * Empty posts (image-only, say) are skipped — a zero would otherwise pin
+ * "shortest" at 0 for anyone who posts pictures, which says nothing about their
+ * writing. Null when nothing in the sample has text.
+ */
+export function postLengthRange(posts: Status[]): PostLengthRange | null {
+  const lengths = posts
+    .filter(isOriginal)
+    .map(postTextLength)
+    .filter((n) => n > 0);
+  if (lengths.length === 0) {
+    return null;
+  }
+  return { shortest: Math.min(...lengths), longest: Math.max(...lengths) };
 }
 
 // ---------------------------------------------------------------------------

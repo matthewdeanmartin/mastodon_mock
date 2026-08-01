@@ -114,7 +114,9 @@ export function providerErrorInBody(
   }
 
   const providerMessage =
-    envelope.message ?? envelope.msg ?? (typeof envelope.error === 'string' ? envelope.error : undefined);
+    envelope.message ??
+    envelope.msg ??
+    (typeof envelope.error === 'string' ? envelope.error : undefined);
   const text = (providerMessage ?? '').toLowerCase();
 
   // The service is telling us why; map the cases with a specific fix.

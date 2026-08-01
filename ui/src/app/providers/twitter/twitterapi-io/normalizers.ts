@@ -1,11 +1,5 @@
 import { Account, MediaAttachment, Mention, Status } from '../../../models';
-import {
-  WireEntities,
-  WireMedia,
-  WireTweet,
-  WireUrlEntity,
-  WireUser,
-} from './wire-types';
+import { WireEntities, WireMedia, WireTweet, WireUrlEntity, WireUser } from './wire-types';
 
 /**
  * Turns TwitterAPI.io wire objects into the Mastodon shapes the whole app
@@ -162,8 +156,7 @@ function renderLine(
       const tag = match[6];
       out += match[4] ?? '';
       const path = sigil === '#' ? 'hashtag' : 'search?q=%24';
-      const href =
-        sigil === '#' ? `https://x.com/hashtag/${tag}` : `https://x.com/${path}${tag}`;
+      const href = sigil === '#' ? `https://x.com/hashtag/${tag}` : `https://x.com/${path}${tag}`;
       out += link(href, `${sigil}${tag}`, 'hashtag');
     }
   }

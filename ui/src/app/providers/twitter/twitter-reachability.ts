@@ -150,8 +150,7 @@ export class TwitterReachability {
 
 /** Verdict copy. Each states only what was observed — never a guessed cause. */
 const MESSAGES: Record<TwitterReachabilityStatus, (proxy: string) => string> = {
-  direct:
-    () =>
+  direct: () =>
     'Reachable directly from your browser — no CORS proxy needed. That is unexpected for this service; it may have changed its CORS policy.',
   proxy: (proxy) =>
     `Confirmed: your browser cannot reach this service directly, but it works through ${proxy}. Requests will use the proxy.`,

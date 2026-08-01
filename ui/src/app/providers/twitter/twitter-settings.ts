@@ -291,7 +291,11 @@ function readKeys(): StoredKeys {
     const parsed = JSON.parse(raw) as StoredKeys;
     const kept: StoredKeys = {};
     for (const [id, stored] of Object.entries(parsed ?? {})) {
-      if (twitterSourceEntry(id as TwitterSourceId) && typeof stored?.key === 'string' && stored.key) {
+      if (
+        twitterSourceEntry(id as TwitterSourceId) &&
+        typeof stored?.key === 'string' &&
+        stored.key
+      ) {
         kept[id as TwitterSourceId] = stored;
       }
     }

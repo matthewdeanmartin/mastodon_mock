@@ -1,11 +1,5 @@
 import { TwitterApiError } from '../twitter-errors';
-import {
-  WireEnvelope,
-  WireFollowing,
-  WireTimelineData,
-  WireTweet,
-  WireUser,
-} from './wire-types';
+import { WireEnvelope, WireFollowing, WireTimelineData, WireTweet, WireUser } from './wire-types';
 
 /**
  * Runtime validation of TwitterAPI.io responses.

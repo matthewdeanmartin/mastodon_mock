@@ -140,9 +140,7 @@ export class TwitterImport {
   readonly excluded = computed(() => this.candidates().filter((c) => c.excluded));
 
   /** Candidates still needing a request to decide. */
-  readonly unchecked = computed(() =>
-    this.candidates().filter((c) => !c.excluded && !c.checked),
-  );
+  readonly unchecked = computed(() => this.candidates().filter((c) => !c.excluded && !c.checked));
 
   /**
    * Wall-clock estimate for checking the rest, in seconds.
@@ -156,9 +154,7 @@ export class TwitterImport {
     Math.round((this.unchecked().length * this.pacer.delayMs()) / 1000),
   );
 
-  readonly running = computed(
-    () => this.phase() === 'listing' || this.phase() === 'checking',
-  );
+  readonly running = computed(() => this.phase() === 'listing' || this.phase() === 'checking');
 
   /**
    * Whether the service has refused us at least once this run.

@@ -375,9 +375,7 @@ export class ConnectionTwitter implements OnInit {
       this.followError.set(error);
       return;
     }
-    this.followNotice.set(
-      `Following @${account.username}. Their posts are on the Feeds page.`,
-    );
+    this.followNotice.set(`Following @${account.username}. Their posts are on the Feeds page.`);
     this.lookupResult.set(null);
     this.handleDraft.set('');
   }
@@ -502,9 +500,7 @@ export class ConnectionTwitter implements OnInit {
         );
       }
     } catch (error: unknown) {
-      this.balanceError.set(
-        error instanceof Error ? error.message : 'Could not read the balance.',
-      );
+      this.balanceError.set(error instanceof Error ? error.message : 'Could not read the balance.');
     } finally {
       this.balanceLoading.set(false);
     }

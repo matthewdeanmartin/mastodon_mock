@@ -17,6 +17,10 @@ import {
   hasWeeklyRange,
   monthlyActivity,
   postHeatmap,
+  PostLengthRange,
+  postLengthRange,
+  repliesGiven,
+  replyRatio,
   weekdayHistogram,
   weeklyActivity,
 } from '../account-metrics';
@@ -203,6 +207,22 @@ export class AccountAnalytics implements OnInit {
 
   /** When the oldest analyzed post was made — names the sample's period. */
   protected oldestPostDate = computed(() => this.posts().at(-1)?.created_at ?? null);
+
+  // --- Conversation and post length ---
+
+  /**
+   * How much of the sample is replies to other people, as a percentage.
+   *
+   * The tile that answers "is anyone actually home?" — a 0% account that posts
+   * daily is usually a feed or a cross-poster rather than a person.
+   */
+  protected replyRatioPct = computed(() => replyRatio(this.posts()));
+
+  /** The raw count behind the ratio, shown as the tile's subtitle. */
+  protected repliesGiven = computed(() => repliesGiven(this.posts()));
+
+  /** Shortest and longest original post, in visible characters. */
+  protected lengthRange = computed<PostLengthRange | null>(() => postLengthRange(this.posts()));
 
   // --- Reach (estimated; see account-metrics.ts REACH_MODEL) ---
 

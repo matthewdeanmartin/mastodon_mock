@@ -13,8 +13,7 @@ describe('TwitterFollows', () => {
     follows = new TwitterFollows();
   });
 
-  const add = (username: string) =>
-    follows.add({ username, displayName: username.toUpperCase() });
+  const add = (username: string) => follows.add({ username, displayName: username.toUpperCase() });
 
   it('follows an account and persists it', () => {
     expect(add('NASA')).toBeNull();

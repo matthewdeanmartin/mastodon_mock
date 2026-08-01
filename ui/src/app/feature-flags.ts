@@ -5,14 +5,33 @@ import { isCanaryBuild } from './build-flavor';
 const STORAGE_KEY = 'mockingbird_feature_flags';
 const DEV_BUILD_HASH = 'development';
 
-export type FeatureFlagId = 'pastebin' | 'links';
+export type FeatureFlagId =
+  | 'pastebin'
+  | 'links'
+  | 'connector-bluesky'
+  | 'connector-twitter'
+  | 'connector-openrouter'
+  | 'connector-raindrop'
+  | 'connector-github'
+  | 'connector-dropbox'
+  | 'connector-link-shortener'
+  | 'connector-cors-proxy'
+  | 'connector-rss';
 export type FeatureFlagState = 'production' | 'canary' | 'off';
+
+/**
+ * Flags are grouped only for display — a group is a heading on the settings
+ * page, never a unit you can switch. An outage is per-vendor, so the switch is
+ * per-vendor too.
+ */
+export type FeatureFlagGroup = 'features' | 'connectors';
 
 export interface FeatureFlagDefinition {
   id: FeatureFlagId;
   label: string;
   description: string;
   defaultState: FeatureFlagState;
+  group: FeatureFlagGroup;
 }
 
 interface StoredFeatureFlags {
@@ -20,27 +39,99 @@ interface StoredFeatureFlags {
   states: Partial<Record<FeatureFlagId, FeatureFlagState>>;
 }
 
+/**
+ * A connector flag's description says what stops working, not what the service
+ * is — the catalog already sells the service, and someone reading this screen
+ * is deciding whether turning it off will cost them something.
+ */
 export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
   {
     id: 'pastebin',
     label: 'Pastebin',
     description: 'Create, manage, and follow posts published through external paste services.',
     defaultState: 'production',
+    group: 'features',
   },
   {
     id: 'links',
     label: 'Links',
     description:
       'Shorten URLs through Dub, Short.io or T.LY, and manage the links you have created.',
-    // Canary first. Every provider needs a paid-or-free account and, for most
-    // people, a CORS proxy as well, so the feature cannot be verified for a
-    // general audience the way a read-only page can — it wants real use on the
-    // canary build before it reaches everyone.
-    defaultState: 'canary',
+    defaultState: 'production',
+    group: 'features',
+  },
+  {
+    id: 'connector-bluesky',
+    label: 'Bluesky',
+    description: 'Bluesky posts in your timeline, replies and likes, and Bluesky DMs in Chat.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-twitter',
+    label: 'Twitter',
+    description: 'Following and reading public Twitter accounts through a scraper service.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-openrouter',
+    label: 'OpenRouter',
+    description: 'AI search queries, hashtag suggestions and translation for read-only providers.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-raindrop',
+    label: 'Raindrop.io',
+    description: 'Saving posts and their links to a Raindrop.io collection.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-github',
+    label: 'GitHub',
+    description: 'Finding the people you follow on GitHub, and reading unread notifications.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-dropbox',
+    label: 'Dropbox',
+    description: 'Browsing an app-specific Dropbox folder.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-link-shortener',
+    label: 'Link shortener',
+    description: 'Shortening URLs as you write, and the list of links you have made.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-cors-proxy',
+    label: 'CORS proxy',
+    description:
+      'Relaying requests for sites that refuse browsers. Turning this off also stops the connectors that depend on it.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-rss',
+    label: 'RSS feeds',
+    description: 'Subscribing to RSS and Atom feeds, and merging them into your home timeline.',
+    defaultState: 'production',
+    group: 'connectors',
   },
 ];
 
 const VALID_STATES: readonly FeatureFlagState[] = ['production', 'canary', 'off'];
+
+/** Flags in one group, in declaration order — for the settings page's sections. */
+export function flagsInGroup(group: FeatureFlagGroup): readonly FeatureFlagDefinition[] {
+  return FEATURE_FLAGS.filter((flag) => flag.group === group);
+}
 
 /** Resolve a rollout state for one concrete deployment channel. */
 export function isFeatureEnabled(state: FeatureFlagState, isCanary: boolean): boolean {
@@ -72,6 +163,23 @@ export class FeatureFlags {
 
   enabled(id: FeatureFlagId): boolean {
     return isFeatureEnabled(this.states()[id], this.isCanary);
+  }
+
+  /**
+   * Why a flagged-off surface is greyed out, or null when it is on.
+   *
+   * Disabled connectors stay visible rather than disappearing: a connector that
+   * silently vanishes is a support question, and the flag is browser-local, so
+   * the person looking at the grey card is exactly the person who can turn it
+   * back on. The settings page linked from the card is where they do that.
+   */
+  disabledReason(id: FeatureFlagId): string | null {
+    if (this.enabled(id)) {
+      return null;
+    }
+    return this.state(id) === 'canary'
+      ? 'Disabled by a feature flag — it is being tried on the canary build first.'
+      : 'Disabled by a feature flag.';
   }
 
   setState(id: FeatureFlagId, state: FeatureFlagState): void {

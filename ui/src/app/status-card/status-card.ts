@@ -691,7 +691,6 @@ export class StatusCard {
     return (this.display.provider ?? 'mastodon') !== 'mastodon';
   }
 
-
   /**
    * A provider that reports real engagement counts the viewer cannot act on.
    *

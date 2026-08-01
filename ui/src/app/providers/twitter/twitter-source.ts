@@ -79,7 +79,8 @@ export const TWITTER_SOURCE_CATALOG: readonly TwitterSourceEntry[] = [
   {
     id: 'getxapi',
     label: 'GetXAPI',
-    pitch: 'Public Twitter data with a flat per-call price and dedicated thread and media endpoints.',
+    pitch:
+      'Public Twitter data with a flat per-call price and dedicated thread and media endpoints.',
     baseUrl: 'https://api.getxapi.com',
     authHeader: 'Authorization',
     authPrefix: 'Bearer ',
@@ -91,7 +92,9 @@ export const TWITTER_SOURCE_CATALOG: readonly TwitterSourceEntry[] = [
   },
 ];
 
-export function twitterSourceEntry(id: TwitterSourceId | null | undefined): TwitterSourceEntry | undefined {
+export function twitterSourceEntry(
+  id: TwitterSourceId | null | undefined,
+): TwitterSourceEntry | undefined {
   return TWITTER_SOURCE_CATALOG.find((entry) => entry.id === id);
 }
 

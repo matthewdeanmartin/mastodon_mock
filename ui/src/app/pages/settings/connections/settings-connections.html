@@ -23,7 +23,9 @@
         <span class="catalog-body">
           <span class="catalog-title">
             <span class="catalog-label">{{ row.entry.label }}</span>
-            @if (row.unavailableReason) {
+            @if (row.flagged) {
+              <span class="pill pill-off">Turned off</span>
+            } @else if (row.unavailableReason) {
               <span class="pill pill-off">Unavailable</span>
             } @else if (row.connected) {
               <span class="pill pill-on">Connected</span>
@@ -47,6 +49,13 @@
         </span>
         <span class="chev" aria-hidden="true">›</span>
       </a>
+      <!-- Outside the card: a link inside a link is invalid, and the card is
+           still worth opening — its page explains what the connector does. -->
+      @if (row.flagged) {
+        <p class="muted small catalog-flag-link">
+          <a [routerLink]="['/settings/feature-flags']">Turn it back on in feature flags</a>
+        </p>
+      }
     </li>
   }
 </ul>

@@ -143,9 +143,8 @@
   @if (twitterProvider.unloaded(); as pending) {
     <aside class="muted" role="status">
       <div>
-        {{ pending }} followed Twitter
-        {{ pending === 1 ? 'account has' : 'accounts have' }} nothing saved yet, so
-        {{ pending === 1 ? 'it is' : 'they are' }} not in this feed.
+        {{ pending }} followed Twitter {{ pending === 1 ? 'account has' : 'accounts have' }} nothing
+        saved yet, so {{ pending === 1 ? 'it is' : 'they are' }} not in this feed.
       </div>
       <a routerLink="/settings/connections/twitter">
         Load {{ pending === 1 ? 'it' : 'them' }} on the Twitter connector ({{ pending }}

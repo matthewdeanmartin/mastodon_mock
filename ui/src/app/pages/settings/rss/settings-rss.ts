@@ -1,11 +1,35 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { ClientPrefs, RSS_CACHE_TTL_OPTIONS } from '../../../client-prefs';
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import { RssCache } from '../../../providers/rss/rss-cache';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
-import { RssFeedSub, RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
+import {
+  RSS_SUBSCRIPTION_LIMIT,
+  RSS_SUBSCRIPTION_LIMIT_MAX,
+  RssFeedSub,
+  RssSubscriptions,
+} from '../../../providers/rss/rss-subscriptions';
+import { buildOpml, opmlFilename, parseOpml } from '../../../providers/rss/opml';
+
+/**
+ * What one OPML import did, reported in full.
+ *
+ * Every feed in the file lands in exactly one of these buckets, and they are
+ * kept apart on purpose: "already subscribed" is a no-op, "over your limit" is
+ * fixed by raising a number, and "failed" usually means CORS and may need a
+ * proxy. Collapsing them into one "23 of 40 imported" would leave the user with
+ * no idea which lever to pull.
+ */
+interface ImportReport {
+  added: number;
+  alreadySubscribed: number;
+  skippedForLimit: number;
+  failed: { url: string; reason: string }[];
+  total: number;
+}
 
 /**
  * Settings → RSS feeds.
@@ -131,6 +155,137 @@ export class SettingsRss implements OnInit {
         this.adding.set(false);
       },
     });
+  }
+
+  // --- OPML import / export ---
+
+  protected readonly recommendedLimit = RSS_SUBSCRIPTION_LIMIT;
+  protected readonly maxLimit = RSS_SUBSCRIPTION_LIMIT_MAX;
+
+  /** Live progress while an import runs, or null when one isn't. */
+  protected importProgress = signal<{ done: number; total: number } | null>(null);
+  /** What the last import did, once it has finished. */
+  protected importReport = signal<ImportReport | null>(null);
+  protected importError = signal<string | null>(null);
+
+  /** The limit box. Kept as a string so a half-typed value doesn't fight back. */
+  protected limitDraft = signal(String(this.subs.limit()));
+
+  /** Commit the typed limit. Invalid input snaps back to what is stored. */
+  setLimit(): void {
+    this.subs.setLimit(Number(this.limitDraft()));
+    this.limitDraft.set(String(this.subs.limit()));
+  }
+
+  /** Download the current subscriptions as an OPML file. */
+  exportOpml(): void {
+    const blob = new Blob([buildOpml(this.subs.feeds())], {
+      type: 'text/x-opml+xml;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = opmlFilename();
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Import an OPML file, checking every feed as it goes.
+   *
+   * Each feed is fetched before it is subscribed, exactly as the add-feed form
+   * does, because on this platform "is this a valid feed URL" and "can this
+   * browser actually read it" are different questions and only the second one
+   * matters. A file of forty feeds where twelve are CORS-blocked should say so
+   * at import time rather than leaving twelve rows that silently render nothing.
+   *
+   * Sequential, not parallel: forty simultaneous cross-origin fetches is a
+   * burst that free CORS proxies rate-limit outright, which would fail feeds
+   * that are actually fine.
+   *
+   * Nested folders are flattened — Mawkingbird has no folders yet, and the
+   * parser preserves the paths for when it does.
+   */
+  async importOpml(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    // Reset immediately, so picking the same file twice in a row still fires.
+    input.value = '';
+    if (!file || this.importProgress()) {
+      return;
+    }
+
+    this.importError.set(null);
+    this.importReport.set(null);
+
+    let feeds;
+    try {
+      feeds = parseOpml(await file.text()).feeds;
+    } catch (err) {
+      this.importError.set((err as Error).message);
+      return;
+    }
+    if (feeds.length === 0) {
+      this.importError.set('That OPML file lists no feeds.');
+      return;
+    }
+
+    const report: ImportReport = {
+      added: 0,
+      alreadySubscribed: 0,
+      skippedForLimit: 0,
+      failed: [],
+      total: feeds.length,
+    };
+    this.importProgress.set({ done: 0, total: feeds.length });
+
+    for (const feed of feeds) {
+      if (this.subs.has(feed.url)) {
+        report.alreadySubscribed += 1;
+      } else if (this.subs.remaining() === 0) {
+        // Everything from here on is over the ceiling. Keep counting rather
+        // than breaking, so the report can say how many were left behind.
+        report.skippedForLimit += 1;
+      } else {
+        await this.importOne(feed.url, report);
+      }
+      this.importProgress.update((p) => (p ? { ...p, done: p.done + 1 } : p));
+    }
+
+    this.importProgress.set(null);
+    this.importReport.set(report);
+    void this.loadCacheSummary();
+  }
+
+  /**
+   * Fetch one candidate and subscribe if it reads.
+   *
+   * Retries through the proxy when a direct fetch fails and a proxy is
+   * available. That is the opposite of the *manual* add path, which never
+   * retries on its own — and deliberately so: there, the user is watching one
+   * feed and can press the button. Here they have handed over a file of forty
+   * and asked for it to be dealt with, so silently making a feed work is what
+   * was asked for. The subscription still records `useProxy` only when the
+   * proxy is what actually worked.
+   */
+  private async importOne(url: string, report: ImportReport): Promise<void> {
+    for (const useProxy of this.proxySettings.usable() ? [false, true] : [false]) {
+      try {
+        const parsed = await firstValueFrom(this.rssFetch.fetchFeed(url, { useProxy }));
+        const limitError = this.subs.add(url, parsed.title, useProxy, parsed.items.length);
+        if (limitError) {
+          report.skippedForLimit += 1;
+        } else {
+          report.added += 1;
+        }
+        return;
+      } catch (err) {
+        // Only the last attempt's failure is worth reporting.
+        if (useProxy || !this.proxySettings.usable()) {
+          report.failed.push({ url, reason: (err as Error).message });
+        }
+      }
+    }
   }
 
   remove(feed: RssFeedSub): void {

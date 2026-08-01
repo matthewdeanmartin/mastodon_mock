@@ -135,9 +135,7 @@ describe('TwitterTransport', () => {
       expect(req.request.headers.get('x-cors-api-key')).toBe('proxy-key');
 
       req.flush({ status: 'success', msg: 'success', data: { id: '12' } });
-      await expect(promise).resolves.toEqual(
-        expect.objectContaining({ status: 'success' }),
-      );
+      await expect(promise).resolves.toEqual(expect.objectContaining({ status: 'success' }));
     });
 
     it('encodes the target URL exactly once', async () => {
@@ -173,9 +171,7 @@ describe('TwitterTransport', () => {
       httpMock
         .expectOne((r) => r.url.includes('proxy.cors.sh'))
         .flush({ status: 'success', data: { id: '12' } });
-      await expect(promise).resolves.toEqual(
-        expect.objectContaining({ data: { id: '12' } }),
-      );
+      await expect(promise).resolves.toEqual(expect.objectContaining({ data: { id: '12' } }));
     });
   });
 

@@ -79,7 +79,10 @@ describe('toTwitterApiError', () => {
   });
 
   it('mentions header-stripping on a proxied 401', () => {
-    const error = toTwitterApiError(http(401), SOURCE, { viaProxy: true, proxyLabel: 'AllOrigins' });
+    const error = toTwitterApiError(http(401), SOURCE, {
+      viaProxy: true,
+      proxyLabel: 'AllOrigins',
+    });
     expect(error.code).toBe('INVALID_API_KEY');
     expect(error.message).toMatch(/custom headers/i);
   });

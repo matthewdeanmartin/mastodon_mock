@@ -391,9 +391,7 @@ describe('Thread', () => {
     });
   });
 
-  function internalsWithChat(
-    fixture: ComponentFixture<Thread>,
-  ): { chatPartner: () => unknown } {
+  function internalsWithChat(fixture: ComponentFixture<Thread>): { chatPartner: () => unknown } {
     return fixture.componentInstance as unknown as { chatPartner: () => unknown };
   }
 

@@ -22,7 +22,6 @@ interface SearchInternals {
   type: WritableSignal<'accounts' | 'statuses' | 'hashtags'>;
   results: WritableSignal<SearchResults | null>;
   searching: WritableSignal<boolean>;
-  trendingPosts: WritableSignal<Status[]>;
   trendingTags: WritableSignal<Tag[]>;
   accountSource: WritableSignal<'bio' | 'posts' | 'both'>;
   followersMax: WritableSignal<string>;
@@ -185,16 +184,31 @@ describe('Search', () => {
     expect(fixture.nativeElement.querySelector('.starter-pack-card')).toBeNull();
   });
 
-  it('keeps optional idle trends empty when either trends request fails', () => {
+  it('keeps optional idle trends empty when the trends request fails', () => {
     const fixture = setUp();
 
-    httpMock
-      .expectOne('/api/v1/trends/statuses')
-      .flush('', { status: 503, statusText: 'Unavailable' });
     httpMock.expectOne('/api/v1/trends/tags').flush('', { status: 503, statusText: 'Unavailable' });
 
-    expect(internals(fixture).trendingPosts()).toEqual([]);
     expect(internals(fixture).trendingTags()).toEqual([]);
+  });
+
+  it('never asks for trending posts, which the idle state no longer shows', () => {
+    setUp();
+
+    httpMock.expectNone('/api/v1/trends/statuses');
+  });
+
+  it('shows the search syntax reference in the idle post-search state', () => {
+    const fixture = setUp();
+    // The page opens on 'accounts', whose idle state offers follow-list import.
+    // The operator reference belongs to the post search, where operators work.
+    internals(fixture).type.set('statuses');
+    fixture.detectChanges();
+
+    const help = fixture.nativeElement.querySelector('app-search-syntax-help .embedded');
+    expect(help).not.toBeNull();
+    // Embedded means no dialog chrome — the overlay would darken the page.
+    expect(fixture.nativeElement.querySelector('app-search-syntax-help .overlay')).toBeNull();
   });
 
   it('run() does nothing when query is blank', () => {

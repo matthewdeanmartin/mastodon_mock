@@ -5,7 +5,8 @@
 
 <div class="spage-body">
   <div class="ssection">
-    @for (flag of flags.definitions; track flag.id) {
+    <h2>Features</h2>
+    @for (flag of featureFlags; track flag.id) {
       <div class="srow">
         <span class="slabel">{{ flag.label }}</span>
         <div class="scontrol">
@@ -19,17 +20,36 @@
             <option value="off">Off everywhere</option>
           </select>
           <span class="hint">{{ flag.description }}</span>
-          <span class="hint">
-            Default for this release:
-            {{
-              flag.defaultState === 'production'
-                ? 'Production'
-                : flag.defaultState === 'canary'
-                  ? 'Canary only'
-                  : 'Off everywhere'
-            }}. It is currently {{ flags.enabled(flag.id) ? 'enabled' : 'disabled' }} on this
-            {{ flags.isCanary ? 'canary' : 'production' }} build.
-          </span>
+          <span class="hint">{{ defaultHint(flag) }}</span>
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="ssection" id="connectors">
+    <h2>Connectors</h2>
+    <p class="hint">
+      One switch per service, because that is how they break — when a third-party API goes down or
+      starts refusing browsers, turning that one off stops people setting it up and hitting the
+      failure. A turned-off connector still appears under
+      <a [routerLink]="['/settings/connections']">Connections</a>, greyed out. Anything you have
+      already connected keeps its credential; it just stops being offered.
+    </p>
+    @for (flag of connectorFlags; track flag.id) {
+      <div class="srow">
+        <span class="slabel">{{ flag.label }}</span>
+        <div class="scontrol">
+          <select
+            [ngModel]="state(flag)"
+            (ngModelChange)="setState(flag, $event)"
+            [attr.aria-label]="flag.label + ' rollout'"
+          >
+            <option value="production">Production</option>
+            <option value="canary">Canary only</option>
+            <option value="off">Off everywhere</option>
+          </select>
+          <span class="hint">{{ flag.description }}</span>
+          <span class="hint">{{ defaultHint(flag) }}</span>
         </div>
       </div>
     }

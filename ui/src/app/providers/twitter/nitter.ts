@@ -40,7 +40,13 @@ const NITTER_HOST_KEY = 'mockingbird_nitter_host';
 export const DEFAULT_NITTER_HOST = 'nitter.space';
 
 /** Hosts whose links are worth rewriting. */
-const X_HOSTS = new Set(['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com']);
+const X_HOSTS = new Set([
+  'x.com',
+  'www.x.com',
+  'twitter.com',
+  'www.twitter.com',
+  'mobile.twitter.com',
+]);
 
 /** The configured instance host, without scheme or trailing slash. */
 export function nitterHost(): string {

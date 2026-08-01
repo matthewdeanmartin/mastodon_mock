@@ -724,17 +724,14 @@
       }
 
       @if (!results() && type() === 'statuses') {
-        <!-- Nothing searched yet: fill the blank space with what's trending now. -->
-        @if (trendingPosts().length) {
-          <div class="page-head">Trending posts</div>
-          @for (s of trendingPosts(); track s.id) {
-            <app-status-card
-              [status]="s"
-              (changed)="onTrendChanged($event)"
-              (deleted)="onTrendDeleted($event)"
-            />
-          }
-        }
+        <!-- Nothing searched yet: answer the question an empty search box poses,
+             which is "what can I type here?". This space used to show trending
+             posts — engaging, but it taught nothing and buried the operators in
+             a dialog nobody opens. Unchanged for a search that ran and found
+             nothing: that is the results block's empty state, below. -->
+        <div class="search-idle">
+          <app-search-syntax-help [embedded]="true" />
+        </div>
       }
 
       @if (!results() && type() === 'hashtags') {

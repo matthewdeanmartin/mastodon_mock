@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { TIMELINE_ENVELOPE, TIMELINE_FIXTURE, USER_FIXTURE } from '../fixtures/twitterapi-io.fixtures';
+import {
+  TIMELINE_ENVELOPE,
+  TIMELINE_FIXTURE,
+  USER_FIXTURE,
+} from '../fixtures/twitterapi-io.fixtures';
 import { TwitterApiError } from '../twitter-errors';
 import {
   isWireTweet,

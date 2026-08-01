@@ -1,4 +1,5 @@
-import { Component, output } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, input, output } from '@angular/core';
 
 interface SyntaxRow {
   /** The operator as you would type it. */
@@ -85,76 +86,102 @@ const GROUPS: SyntaxGroup[] = [
 ];
 
 /**
- * The "Syntax?" cheat-sheet for the search bar.
+ * The "Syntax?" cheat-sheet for the search bar, in two presentations.
  *
- * Deliberately the same dialog shape as the keyboard-shortcuts help: this is
- * the second "here is what you can type" reference in the app, and two
- * references that look alike are one thing to learn instead of two.
+ * As a dialog (the default) it is deliberately the same shape as the
+ * keyboard-shortcuts help: this is the second "here is what you can type"
+ * reference in the app, and two references that look alike are one thing to
+ * learn instead of two.
+ *
+ * With `[embedded]="true"` the same content renders bare, with no overlay and
+ * no Close button, for the search page's idle state. That state used to show
+ * trending posts, which filled the space without answering the question someone
+ * staring at an empty search box actually has. One component rather than two
+ * because the operator list must not be able to drift between them — it is
+ * sourced from `mastodon-query-serializer.ts` and a stale copy would document
+ * operators that silently do nothing.
  */
 @Component({
   selector: 'app-search-syntax-help',
+  imports: [NgTemplateOutlet],
   template: `
-    <div
-      class="overlay"
-      role="presentation"
-      tabindex="-1"
-      (click)="closed.emit()"
-      (keyup.escape)="closed.emit()"
-    >
+    @if (embedded()) {
+      <section class="embedded" aria-labelledby="search-syntax-title">
+        <ng-container [ngTemplateOutlet]="body" />
+      </section>
+    } @else {
       <div
-        class="dialog"
-        role="dialog"
-        aria-labelledby="search-syntax-title"
-        (click)="$event.stopPropagation()"
-        (keyup)="$event.stopPropagation()"
+        class="overlay"
+        role="presentation"
+        tabindex="-1"
+        (click)="closed.emit()"
+        (keyup.escape)="closed.emit()"
       >
-        <h3 id="search-syntax-title">Search syntax</h3>
-        <p class="muted note">
-          These work in a <strong>post</strong> search. Account and hashtag searches match plain
-          text only — operators there are treated as words.
-        </p>
-        <div class="groups">
-          @for (group of groups; track group.title) {
-            <section>
-              <h4>{{ group.title }}</h4>
-              @if (group.note) {
-                <p class="muted group-note">{{ group.note }}</p>
-              }
-              <table>
-                <tbody>
-                  @for (row of group.rows; track row.syntax) {
-                    <tr>
-                      <td class="syntax">
-                        <code>{{ row.syntax }}</code>
-                      </td>
-                      <td>
-                        {{ row.label }}
-                        @if (row.example) {
-                          <span class="example"
-                            ><code>{{ row.example }}</code></span
-                          >
-                        }
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </section>
-          }
-        </div>
-        <p class="muted note footer-note">
-          Combine them freely, separated by spaces — everything you write must match:
-          <code>+rust from:&#64;a&#64;b.social after:2026-01-01 -is:reply</code>. Anything the
-          server doesn't recognise is quietly ignored, so if a query returns more than you expected,
-          check the spelling of the operator.
-        </p>
-        <div class="actions">
-          <button class="btn btn-outline" type="button" (click)="closed.emit()">Close</button>
+        <div
+          class="dialog"
+          role="dialog"
+          aria-labelledby="search-syntax-title"
+          (click)="$event.stopPropagation()"
+          (keyup)="$event.stopPropagation()"
+        >
+          <ng-container [ngTemplateOutlet]="body" />
+          <div class="actions">
+            <button class="btn btn-outline" type="button" (click)="closed.emit()">Close</button>
+          </div>
         </div>
       </div>
-    </div>
+    }
+
+    <ng-template #body>
+      <h3 id="search-syntax-title">Search syntax</h3>
+      <p class="muted note">
+        These work in a <strong>post</strong> search. Account and hashtag searches match plain text
+        only — operators there are treated as words.
+      </p>
+      <div class="groups">
+        @for (group of groups; track group.title) {
+          <section>
+            <h4>{{ group.title }}</h4>
+            @if (group.note) {
+              <p class="muted group-note">{{ group.note }}</p>
+            }
+            <table>
+              <tbody>
+                @for (row of group.rows; track row.syntax) {
+                  <tr>
+                    <td class="syntax">
+                      <code>{{ row.syntax }}</code>
+                    </td>
+                    <td>
+                      {{ row.label }}
+                      @if (row.example) {
+                        <span class="example"
+                          ><code>{{ row.example }}</code></span
+                        >
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </section>
+        }
+      </div>
+      <p class="muted note footer-note">
+        Combine them freely, separated by spaces — everything you write must match:
+        <code>+rust from:&#64;a&#64;b.social after:2026-01-01 -is:reply</code>. Anything the server
+        doesn't recognise is quietly ignored, so if a query returns more than you expected, check
+        the spelling of the operator.
+      </p>
+    </ng-template>
   `,
   styles: `
+    /* Embedded: no overlay, no card. The idle search page is already a panel,
+       and nesting a second bordered box inside it reads as a modal that failed
+       to open. h3 drops to the size of a section heading for the same reason. */
+    .embedded h3 {
+      font-size: 1.05em;
+    }
     .overlay {
       position: fixed;
       inset: 0;
@@ -232,6 +259,8 @@ const GROUPS: SyntaxGroup[] = [
   `,
 })
 export class SearchSyntaxHelp {
+  /** Render bare, without the overlay or the Close button. */
+  readonly embedded = input(false);
   readonly closed = output<void>();
   protected readonly groups = GROUPS;
 }
