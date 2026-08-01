@@ -274,6 +274,26 @@ to spend money by accident.
 - Pricing metadata as data (§14), not constants, with an `effectiveDate` so a
   stale number is visibly stale.
 
+**Sprints 4 and 5 status: COMPLETE (2026-08-01).**
+
+Sprint 4 verified end to end in a real browser against the live API: followed
+@NASA through the UI, 20 real posts rendered as native cards with images inline,
+retweets nested as reblogs, mentions linked. Two bugs found by driving it rather
+than testing it — a throttled fetch fell through to "Account not found" (a
+different and wrong claim), and a 429 blamed only the data service when in
+practice the free proxy tier throttles first.
+
+Sprint 5 added `TwitterUsage` (spend counter, soft/hard daily limits enforced
+before sending), priced buttons, and a sequential `refreshMany`. One real bug
+found by the rollover test: `today` memoized against signals while the wall
+clock is not one, so a browser left open overnight kept enforcing yesterday's
+exhausted limit into the new day.
+
+**Deliberately deferred: the home-timeline merge.** `TwitterProvider` is not in
+`ProviderRegistry.all`. Now that Sprint 5's controls exist the blocker is gone,
+but the merge should still be a conscious step rather than a side effect — see
+the Sprint 7+ note.
+
 ### Sprint 6 — Second source, and parity
 `sprint/twitter-6-second-source.md`
 
