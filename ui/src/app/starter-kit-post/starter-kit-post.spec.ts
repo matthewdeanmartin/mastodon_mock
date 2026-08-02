@@ -40,8 +40,17 @@ describe('StarterKitPost', () => {
     // the moment they were deciding whether to stay here.
     expect(el.querySelectorAll('button.kit-member')).toHaveLength(kit.itemCount);
     expect(el.querySelectorAll('.kit-member[href]')).toHaveLength(0);
-    expect(el.querySelectorAll('app-account-hover-card')).toHaveLength(kit.itemCount);
+    // Hover cards are expensive component trees. None should be constructed
+    // until the user asks for one, and only that member's card should exist.
+    expect(el.querySelectorAll('app-account-hover-card')).toHaveLength(0);
+    const memberShell = el.querySelector('.kit-member-shell')!;
+    memberShell.dispatchEvent(new MouseEvent('mouseenter'));
+    fixture.detectChanges();
+    expect(el.querySelectorAll('app-account-hover-card')).toHaveLength(1);
     expect(el.querySelector('app-account-hover-card button')).toBeNull();
+    memberShell.dispatchEvent(new MouseEvent('mouseleave'));
+    fixture.detectChanges();
+    expect(el.querySelectorAll('app-account-hover-card')).toHaveLength(0);
     expect((el.querySelector('.kit-link') as HTMLAnchorElement).getAttribute('href')).toBe(
       `/collections/preview/${kit.id}`,
     );
@@ -55,6 +64,8 @@ describe('StarterKitPost', () => {
     const account = SHIPPED_STARTER_KITS[0].accounts[0];
     const button = fixture.nativeElement.querySelector('.kit-member') as HTMLButtonElement;
 
+    button.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    fixture.detectChanges();
     button.click();
     const request = httpMock.expectOne(
       `/api/v2/search?q=${account.acct}&type=accounts&resolve=true&limit=5`,

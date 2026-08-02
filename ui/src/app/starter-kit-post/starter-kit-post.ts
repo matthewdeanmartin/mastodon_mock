@@ -25,6 +25,7 @@ export class StarterKitPost implements OnInit {
   protected readonly resolved = signal(new Map<string, Account>());
   protected readonly resolving = signal(new Set<string>());
   protected readonly opening = signal<string | null>(null);
+  protected readonly activeHoverAccount = signal<Account | null>(null);
   private readonly resolutionRequests = new Map<string, Promise<Account | null>>();
   protected readonly completed = computed(
     () =>
@@ -50,8 +51,15 @@ export class StarterKitPost implements OnInit {
     return this.resolved().has(account.acct.toLowerCase());
   }
 
-  protected prepareAccount(account: Account): void {
+  protected activateAccount(account: Account): void {
+    this.activeHoverAccount.set(account);
     void this.resolveAccount(account);
+  }
+
+  protected deactivateAccount(account: Account): void {
+    if (this.activeHoverAccount()?.acct === account.acct) {
+      this.activeHoverAccount.set(null);
+    }
   }
 
   protected async openAccount(account: Account): Promise<void> {

@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { ClientPrefs } from '../../client-prefs';
 import { Drafts } from '../../drafts';
@@ -88,6 +88,11 @@ describe('DraftsPage', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
+    // HumanTimePipe is intentionally impure and reads the wall clock during
+    // change detection. Pin time so Angular's development-mode second pass
+    // cannot cross a one-second display boundary mid-assertion.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-02T12:00:00Z'));
     localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
@@ -99,6 +104,10 @@ describe('DraftsPage', () => {
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   /** Sign in so the page takes its authenticated path. */

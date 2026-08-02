@@ -18,7 +18,12 @@
 
     <div class="kit-members" aria-label="All accounts in {{ kit().title }}">
       @for (account of kit().accounts; track account.url) {
-        <span class="kit-member-shell" (mouseenter)="prepareAccount(account)">
+        <span
+          class="kit-member-shell"
+          (mouseenter)="activateAccount(account)"
+          (mouseleave)="deactivateAccount(account)"
+          (focusin)="activateAccount(account)"
+        >
           <!-- Anonymous visitors used to get an off-site link here while signed-in
                ones got an in-app resolve. But reading a profile needs no account —
                it is the thing an anonymous visitor is most likely to want — and
@@ -41,10 +46,12 @@
             />
             <span>{{ accountFor(account).display_name || accountFor(account).username }}</span>
           </button>
-          <app-account-hover-card
-            [account]="accountFor(account)"
-            [allowFollow]="!auth.isAnonymous && isResolved(account)"
-          />
+          @if (activeHoverAccount()?.acct === account.acct) {
+            <app-account-hover-card
+              [account]="accountFor(account)"
+              [allowFollow]="!auth.isAnonymous && isResolved(account)"
+            />
+          }
         </span>
       }
     </div>

@@ -23,6 +23,24 @@ uv run make security        # bandit + uv audit + pip-audit
 uv run make check           # everything above together
 ```
 
+### Angular UI tests
+
+Keep feedback proportional while working in `ui/`. During an edit/test loop,
+run the colocated spec or affected area instead of rebuilding all 2,790 tests:
+
+```bash
+cd ui
+npm run test:subset -- src/app/compose/compose.spec.ts
+npm run test:subset -- src/app/pages/search
+npm test                    # persistent watch mode for a longer UI session
+```
+
+Run the complete local UI gate once before handoff with `cd ui && make test`.
+A targeted run is fast feedback, not a substitute for that final gate, and must
+be described as targeted in the handoff. Never skip, focus, delete, or weaken
+tests to reduce wait time; `npm run test:source-integrity` enforces the basic
+inventory rules. GitHub Actions intentionally does not run the Angular suite.
+
 ## Python conventions
 
 - **`_` means unused, not private.** A leading underscore on a name signals "I'm not using this

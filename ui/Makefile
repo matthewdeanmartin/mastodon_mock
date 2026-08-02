@@ -35,6 +35,7 @@ storage:
 	npm run check:storage
 
 test:
+	npm run test:source-integrity
 	npm run test:ci
 
 test-ci: test
