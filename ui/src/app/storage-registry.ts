@@ -402,6 +402,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Which providers are hidden from the merged timeline.',
   },
   {
+    base: 'mockingbird_just_my_server',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'setting',
+    note: 'Whether Home uses the generated same-server friends list.',
+  },
+  {
     base: 'mockingbird_feature_flags',
     storage: 'local',
     suffix: 'none',

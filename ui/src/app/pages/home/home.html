@@ -61,7 +61,7 @@
 }
 
 <app-command-bar
-  [providerChips]="true"
+  [providerChips]="!justMyServer.effectiveEnabled()"
   [showLangFilter]="true"
   [showCalm]="true"
   [showRefresh]="!live()"
@@ -163,7 +163,9 @@
        same person on every fresh browser, forever. One link to the hub is the
        better trade: ten ways to jump-start a feed, chosen rather than served. -->
   @if (loading()) {
-    <p class="muted center">Loading…</p>
+    <p class="muted center">
+      {{ waitingForServerList() ? 'Preparing Just My Server…' : 'Loading…' }}
+    </p>
   } @else if (!visible().length) {
     <p class="muted center">
       <a routerLink="/find-friends">Find friends to follow →</a>

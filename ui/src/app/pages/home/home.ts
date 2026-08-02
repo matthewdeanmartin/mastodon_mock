@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { map, Subscription } from 'rxjs';
+import { map, Observable, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Drafts } from '../../drafts';
@@ -39,6 +39,7 @@ import { isElizaId } from '../../eliza/eliza-identity';
 import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
+import { JustMyServer } from '../../just-my-server';
 
 /** Below this many follows, nudge toward /find-friends (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -72,6 +73,7 @@ export class Home implements OnInit, OnDestroy {
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private diagnostics = inject(HomeDiagnostics);
   private aggregator = inject(FeedAggregator);
+  protected justMyServer = inject(JustMyServer);
 
   /**
    * Whether the window actually hid something, so the offer to widen it only
@@ -80,7 +82,10 @@ export class Home implements OnInit, OnDestroy {
    * about to ask when the feed ends sooner than expected.
    */
   protected readonly olderAvailable = computed(
-    () => this.aggregator.droppedByWindow() > 0 && this.prefs.homeWindow() !== 'all',
+    () =>
+      (this.justMyServer.effectiveEnabled()
+        ? this.justMyServer.droppedByWindow()
+        : this.aggregator.droppedByWindow()) > 0 && this.prefs.homeWindow() !== 'all',
   );
 
   /** Change how far back Home reaches. Reloads, because the window bounds
@@ -175,9 +180,11 @@ export class Home implements OnInit, OnDestroy {
    *  practice posts (plus Eliza's replies) always folded in. All synthetic posts
    *  bypass the provider chips — they're explicit, local, and opt-in. */
   protected visible = computed(() => {
-    const feed = this.statuses().filter((s) =>
-      this.prefs.isProviderVisible(s.provider ?? 'mastodon'),
-    );
+    const serverOnly = this.justMyServer.effectiveEnabled();
+    const feed = serverOnly
+      ? this.statuses()
+      : this.statuses().filter((s) => this.prefs.isProviderVisible(s.provider ?? 'mastodon'));
+    if (serverOnly) return this.applyTimelineFilters(feed);
     const injected: Status[] = [...this.localPosts.posts()];
     if (this.eliza.following()) {
       injected.push(...this.eliza.timeline(this.now()));
@@ -246,7 +253,12 @@ export class Home implements OnInit, OnDestroy {
 
   /** Show "Load more" only when there's more AND we're not capped/auto-loading. */
   protected canLoadMore = computed(
-    () => this.aggregator.hasMore() && !this.capActive() && !this.autoLoading(),
+    () => this.feedHasMore() && !this.capActive() && !this.autoLoading(),
+  );
+
+  /** A persisted on-state waits for list discovery instead of flashing the normal feed. */
+  protected waitingForServerList = computed(
+    () => this.auth.isAuthenticated && this.justMyServer.enabled() && !this.justMyServer.ready(),
   );
 
   private nudgeDismissed = signal(localStorage.getItem(NUDGE_DISMISSED_KEY) === 'true');
@@ -270,15 +282,31 @@ export class Home implements OnInit, OnDestroy {
   private pageSub: Subscription | null = null;
   private bookmarkSub: Subscription | null = null;
   private anonymousCacheGeneration = 0;
+  private initialized = false;
+  private lastHomeSource: 'normal' | 'waiting' | 'server' = 'normal';
 
   /** Follow Blue → "Auto-refresh timeline" for as long as this page is open. */
   private readonly liveEffect = effect(() => this.syncLive());
+  /** Changing the rail switch swaps Home's source immediately in either direction. */
+  private readonly serverModeEffect = effect(() => {
+    const source = this.homeSourceState();
+    if (!this.initialized) {
+      this.lastHomeSource = source;
+      return;
+    }
+    if (source !== this.lastHomeSource) {
+      this.lastHomeSource = source;
+      this.load();
+    }
+  });
 
   ngOnInit(): void {
     this.diagnostics.info('page:open', {
       mode: this.auth.mode() ?? 'unauthenticated',
       server: this.server.baseUrl() || 'same-origin',
     });
+    this.lastHomeSource = this.homeSourceState();
+    this.initialized = true;
     this.load();
     // Re-tick every 30s so the cap message / cooldown updates on its own.
     this.clock = setInterval(() => this.now.set(Date.now()), 30000);
@@ -301,7 +329,8 @@ export class Home implements OnInit, OnDestroy {
    * token and have no stream to open, so they stay off whatever the pref says.
    */
   private syncLive(): void {
-    const wanted = this.prefs.autoRefreshTimeline() && !this.auth.isAnonymous;
+    const wanted =
+      this.prefs.autoRefreshTimeline() && !this.auth.isAnonymous && !this.justMyServer.enabled();
     if (wanted === this.live()) {
       return;
     }
@@ -332,7 +361,15 @@ export class Home implements OnInit, OnDestroy {
     this.loading.set(true);
     this.maxHitAt.set(null);
     this.bookmarkTail.set([]);
-    this.aggregator.reset();
+    if (this.waitingForServerList()) {
+      this.statuses.set([]);
+      return;
+    }
+    if (this.justMyServer.effectiveEnabled()) {
+      this.justMyServer.resetFeed();
+    } else {
+      this.aggregator.reset();
+    }
     this.anonymousCacheGeneration = this.anonymousHomeCache.generation();
     const anonymousSourceKey = this.anonymousSourceKey();
     this.diagnostics.info('load:request', {
@@ -343,6 +380,7 @@ export class Home implements OnInit, OnDestroy {
     });
     if (
       this.auth.isAnonymous &&
+      !this.justMyServer.effectiveEnabled() &&
       !forceRefresh &&
       this.anonymousHomeCache.matchesSources(anonymousSourceKey)
     ) {
@@ -372,10 +410,14 @@ export class Home implements OnInit, OnDestroy {
       feedMax: this.prefs.feedMax(),
     });
     if (this.auth.isAnonymous) {
+      if (this.justMyServer.effectiveEnabled()) {
+        this.loadAnonymousServerList();
+        return;
+      }
       this.loadAnonymousStreaming();
       return;
     }
-    this.pageSub = this.aggregator.nextPage().subscribe({
+    this.pageSub = this.nextFeedPage().subscribe({
       next: (s) => {
         this.statuses.set(s);
         const details = {
@@ -383,7 +425,7 @@ export class Home implements OnInit, OnDestroy {
           stored: this.statuses().length,
           visible: this.visible().length,
           providerCounts: this.providerCounts(this.statuses()),
-          hasMore: this.aggregator.hasMore(),
+          hasMore: this.feedHasMore(),
         };
         if (this.visible().length) {
           this.diagnostics.info('load:first-page-success', details);
@@ -400,6 +442,22 @@ export class Home implements OnInit, OnDestroy {
           mode: this.auth.mode() ?? 'unauthenticated',
           server: this.server.baseUrl() || 'same-origin',
         });
+        this.loading.set(false);
+      },
+    });
+  }
+
+  /** Anonymous server mode is an explicit local list, so it pages without tag/provider mixing. */
+  private loadAnonymousServerList(): void {
+    this.pageSub = this.justMyServer.nextPage().subscribe({
+      next: (statuses) => {
+        this.statuses.set(statuses);
+        this.publishMastodon(statuses);
+        this.loading.set(false);
+        this.fillToMinimum();
+      },
+      error: (error: unknown) => {
+        this.diagnostics.error('load:server-list-error', error);
         this.loading.set(false);
       },
     });
@@ -463,19 +521,19 @@ export class Home implements OnInit, OnDestroy {
     if (
       this.statuses().length >= this.prefs.feedMin() ||
       this.statuses().length >= this.prefs.feedMax() ||
-      !this.aggregator.hasMore()
+      !this.feedHasMore()
     ) {
       this.diagnostics.info('autoload:stop', {
         stored: this.statuses().length,
         feedMin: this.prefs.feedMin(),
         feedMax: this.prefs.feedMax(),
-        hasMore: this.aggregator.hasMore(),
+        hasMore: this.feedHasMore(),
       });
       this.autoLoading.set(false);
       return;
     }
     this.autoLoading.set(true);
-    this.pageSub = this.aggregator.nextPage().subscribe({
+    this.pageSub = this.nextFeedPage().subscribe({
       next: (more) => {
         this.mergeStatuses(more);
         this.diagnostics.info('autoload:page-success', {
@@ -511,7 +569,7 @@ export class Home implements OnInit, OnDestroy {
       return;
     }
     this.autoLoading.set(true);
-    this.pageSub = this.aggregator.nextPage().subscribe({
+    this.pageSub = this.nextFeedPage().subscribe({
       next: (more) => {
         this.mergeStatuses(more);
         this.diagnostics.info('load-more:page-success', {
@@ -541,6 +599,23 @@ export class Home implements OnInit, OnDestroy {
     );
   }
 
+  private feedHasMore(): boolean {
+    return this.justMyServer.effectiveEnabled()
+      ? this.justMyServer.hasMore()
+      : this.aggregator.hasMore();
+  }
+
+  private homeSourceState(): 'normal' | 'waiting' | 'server' {
+    if (!this.justMyServer.enabled()) return 'normal';
+    return this.justMyServer.ready() ? 'server' : 'waiting';
+  }
+
+  private nextFeedPage(): Observable<Status[]> {
+    return this.justMyServer.effectiveEnabled()
+      ? this.justMyServer.nextPage()
+      : this.aggregator.nextPage();
+  }
+
   /** Collapse duplicate public posts acquired through different Anonymous read routes. */
   private dedupeAnonymous(statuses: Status[]): Status[] {
     const newestFirst = statuses.sort(
@@ -566,6 +641,9 @@ export class Home implements OnInit, OnDestroy {
   /** Fetch the bookmark tail once per cap; a failure just means no tail. */
   private loadBookmarkTail(): void {
     if (this.bookmarkTail().length) {
+      return;
+    }
+    if (this.justMyServer.effectiveEnabled()) {
       return;
     }
     if (this.auth.isAnonymous) {

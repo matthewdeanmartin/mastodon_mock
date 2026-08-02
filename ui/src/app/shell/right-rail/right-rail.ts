@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -6,6 +6,7 @@ import { HouseAdStore } from '../../house-ad-store';
 import { InstanceInfo } from '../../models';
 import { SearchServer } from '../../search-server';
 import { Server } from '../../server';
+import { JustMyServer } from '../../just-my-server';
 
 /**
  * Right sidebar: house ads (inventory lives in house-ads.ts — edit that file to
@@ -20,11 +21,12 @@ import { Server } from '../../server';
   templateUrl: './right-rail.html',
   styleUrl: './right-rail.css',
 })
-export class RightRail {
+export class RightRail implements OnInit {
   private api = inject(Api);
-  private auth = inject(Auth);
+  protected auth = inject(Auth);
   private server = inject(Server);
   protected searchServer = inject(SearchServer);
+  protected justMyServer = inject(JustMyServer);
 
   /**
    * The ads, plus which of them are on and which the user has clicked. The rail
@@ -118,6 +120,12 @@ export class RightRail {
       this.server.baseUrl();
       this.fetchInstance();
     });
+  }
+
+  ngOnInit(): void {
+    if (this.justMyServer.enabled()) {
+      this.justMyServer.checkList();
+    }
   }
 
   private fetchInstance(): void {

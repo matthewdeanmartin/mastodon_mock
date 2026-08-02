@@ -34,6 +34,56 @@
   </section>
 }
 
+@if (auth.isAuthenticated) {
+  <section class="card server-mode-card">
+    <div class="server-mode-heading">
+      <div>
+        <span class="server-mode-kicker">Single Server Mode</span>
+        <h2 class="card-title server-mode-title">Just My Server</h2>
+      </div>
+      <label
+        class="server-mode-switch"
+        [class.disabled]="!justMyServer.ready() && !justMyServer.enabled()"
+      >
+        <input
+          type="checkbox"
+          [checked]="justMyServer.enabled()"
+          [disabled]="(!justMyServer.ready() && !justMyServer.enabled()) || justMyServer.updating()"
+          (change)="justMyServer.requestEnabled($any($event.target).checked)"
+          aria-label="Just My Server mode"
+        />
+        <span aria-hidden="true"></span>
+      </label>
+    </div>
+    <p class="muted server-mode-copy">
+      Home shows only people you follow on {{ justMyServer.homeHost() || 'this server' }}. Remote
+      boosts stay out.
+    </p>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm server-mode-update"
+      [disabled]="justMyServer.preparing() || justMyServer.updating()"
+      (click)="justMyServer.prepareUpdate()"
+    >
+      {{ justMyServer.preparing() ? 'Checking friends…' : 'Update My Server list' }}
+    </button>
+    @if (justMyServer.checking()) {
+      <p class="muted small server-mode-status">Checking for the generated list…</p>
+    } @else if (!justMyServer.ready() && !justMyServer.error()) {
+      <p class="muted small server-mode-status">Update the list before turning this mode on.</p>
+    }
+    @if (justMyServer.result(); as result) {
+      <p class="small server-mode-status ok">
+        Added {{ result.added }} · Removed {{ result.removed }} · Already present
+        {{ result.alreadyPresent }} · Failed {{ result.failed }}
+      </p>
+    }
+    @if (justMyServer.error()) {
+      <p class="small server-mode-status fail">{{ justMyServer.error() }}</p>
+    }
+  </section>
+}
+
 <section class="card">
   <h2 class="card-title">Fediverse</h2>
 
@@ -142,6 +192,63 @@
       }
       <div class="share-actions">
         <button class="btn btn-outline" type="button" (click)="closeShare()">Close</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (justMyServer.dialogOpen()) {
+  <div
+    class="overlay"
+    role="presentation"
+    tabindex="-1"
+    (click)="justMyServer.closeDialog()"
+    (keyup.escape)="justMyServer.closeDialog()"
+  >
+    <div
+      class="dialog"
+      role="dialog"
+      aria-labelledby="server-list-update-title"
+      (click)="$event.stopPropagation()"
+      (keyup)="$event.stopPropagation()"
+    >
+      <h3 id="server-list-update-title">Update My Server list?</h3>
+      @if (justMyServer.plan(); as plan) {
+        <p>
+          Add {{ plan.addIds.length }} {{ plan.addIds.length === 1 ? 'user' : 'users' }} and remove
+          {{ plan.removeIds.length }}
+          {{ plan.removeIds.length === 1 ? 'user' : 'users' }} so the list contains only friends on
+          {{ justMyServer.homeHost() }}?
+        </p>
+        <p class="muted small">
+          {{ plan.alreadyPresent }} already present. The list is
+          <strong>{{ justMyServer.listTitle() }}</strong
+          >.
+        </p>
+      }
+      @if (justMyServer.updating()) {
+        <div class="server-mode-progress" role="status">
+          <progress [value]="justMyServer.completed()" [max]="justMyServer.total() || 1"></progress>
+          <span>{{ justMyServer.progressLabel() }}</span>
+        </div>
+      }
+      <div class="share-actions">
+        <button
+          class="btn btn-outline"
+          type="button"
+          [disabled]="justMyServer.updating()"
+          (click)="justMyServer.closeDialog()"
+        >
+          Cancel
+        </button>
+        <button
+          class="btn"
+          type="button"
+          [disabled]="justMyServer.updating()"
+          (click)="justMyServer.confirmUpdate()"
+        >
+          {{ justMyServer.updating() ? 'Updating…' : 'Update list' }}
+        </button>
       </div>
     </div>
   </div>

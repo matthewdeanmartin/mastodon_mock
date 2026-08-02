@@ -524,9 +524,21 @@ export class Api {
     return this.http.post(`/api/v1/lists/${id}/accounts`, { account_ids: [accountId] });
   }
 
+  /** Add several accounts in one Mastodon list-membership request. */
+  addManyToList(id: string, accountIds: string[]): Observable<unknown> {
+    return this.http.post(`/api/v1/lists/${id}/accounts`, { account_ids: accountIds });
+  }
+
   removeFromList(id: string, accountId: string): Observable<unknown> {
     return this.http.request('delete', `/api/v1/lists/${id}/accounts`, {
       body: { account_ids: [accountId] },
+    });
+  }
+
+  /** Remove several accounts in one Mastodon list-membership request. */
+  removeManyFromList(id: string, accountIds: string[]): Observable<unknown> {
+    return this.http.request('delete', `/api/v1/lists/${id}/accounts`, {
+      body: { account_ids: accountIds },
     });
   }
 

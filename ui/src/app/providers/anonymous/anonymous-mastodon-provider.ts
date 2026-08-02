@@ -296,15 +296,19 @@ export class AnonymousMastodonProvider implements FeedProvider {
   }
 
   /** Independent, demand-driven cursor set for a local list timeline. */
-  createFollowFeed(follows: AnonymousFollow[]): AnonymousFollowFeedSession {
+  createFollowFeed(
+    follows: AnonymousFollow[],
+    allowsStatus: (status: Status) => boolean = () => true,
+  ): AnonymousFollowFeedSession {
     const cursors: SourceCursor[] = follows.map((follow) => ({ follow, exhausted: false }));
     const seen = new Set<string>();
-    return { fetchPage: () => this.fetchFollowFeedPage(cursors, seen) };
+    return { fetchPage: () => this.fetchFollowFeedPage(cursors, seen, allowsStatus) };
   }
 
   private fetchFollowFeedPage(
     cursors: SourceCursor[],
     seen: Set<string>,
+    allowsStatus: (status: Status) => boolean,
   ): Observable<AnonymousFollowFeedPage> {
     const active = cursors.filter((source) => !source.exhausted);
     if (!active.length) return of({ statuses: [], warnings: [], hasMore: false });
@@ -313,6 +317,11 @@ export class AnonymousMastodonProvider implements FeedProvider {
       mergeMap(
         (source) =>
           this.fetchSource(source).pipe(
+            map((statuses) => {
+              const allowed = statuses.filter(allowsStatus);
+              if (allowed.length !== statuses.length) source.exhausted = true;
+              return allowed;
+            }),
             catchError(() => {
               source.exhausted = true;
               warnings.push(`Could not load @${source.follow.handle}.`);
