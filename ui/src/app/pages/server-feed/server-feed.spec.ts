@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from '../../auth';
 import { Account, Status, TrendLink } from '../../models';
 import { ServerFeed } from './server-feed';
+import { JustMyServer } from '../../just-my-server';
 
 function makeAccount(id: string): Account {
   return { id, username: `u${id}`, acct: `u${id}`, display_name: `User ${id}` } as Account;
@@ -113,5 +114,22 @@ describe('ServerFeed', () => {
     expect(internals(fixture).notice()).toContain('Sign in');
     expect(internals(fixture).loading()).toBe(false);
     // No timeline request — verify() asserts this.
+  });
+
+  it('offers Server Friends instead of Local Feed on the local feed while server mode is on', () => {
+    TestBed.inject(Auth).mode.set('mastodon');
+    const fixture = setUp('local');
+    http.expectOne((request) => request.url === '/api/v1/timelines/public').flush([]);
+    const serverMode = TestBed.inject(JustMyServer);
+    serverMode.ready.set(true);
+    serverMode.enabled.set(true);
+    TestBed.flushEffects();
+    fixture.detectChanges();
+
+    const shortcut = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '.feed-shortcuts a[href="/home"]',
+    );
+    expect(shortcut?.textContent).toContain('Server Friends');
+    expect(shortcut?.textContent).not.toContain('Local Feed');
   });
 });

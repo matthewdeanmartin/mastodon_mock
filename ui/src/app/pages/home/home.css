@@ -65,9 +65,20 @@
 
 .home-filters {
   display: flex;
-  gap: 8px;
-  padding: 10px 16px;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.home-filters .btn-sm,
+.feed-filter {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .nudge-copy {
@@ -218,6 +229,8 @@ a.eliza-invite:hover {
   border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 13px;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .home-window select {

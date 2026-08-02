@@ -226,6 +226,20 @@ export class Home implements OnInit, OnDestroy {
     this.showReplies.update((show) => !show);
   }
 
+  protected imagesHidden(): boolean {
+    return !this.prefs.showImages() || this.prefs.feedReader();
+  }
+
+  /** Reveal images in one click even when Reader mode is what hid them. */
+  protected toggleImages(): void {
+    if (this.imagesHidden()) {
+      this.prefs.setShowImages(true);
+      if (this.prefs.feedReader()) this.prefs.setFeedReader(false);
+      return;
+    }
+    this.prefs.setShowImages(false);
+  }
+
   private applyTimelineFilters(statuses: Status[]): Status[] {
     return statuses.filter(
       (status) =>

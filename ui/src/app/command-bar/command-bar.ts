@@ -38,32 +38,14 @@ export type FeedView = 'feed' | 'members' | 'analytics';
       >
         📖 Reader
       </button>
-      <button
-        class="btn btn-outline"
-        [class.active]="imagesHidden()"
-        (click)="toggleImages()"
-        [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
-      >
-        🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
-      </button>
-      @if (showLangFilter()) {
+      @if (showImages()) {
         <button
           class="btn btn-outline"
-          [class.active]="prefs.hideForeignLangPosts()"
-          (click)="prefs.setHideForeignLangPosts(!prefs.hideForeignLangPosts())"
-          title="Hide posts that are confidently in a language you don't know, or that mislabel their own language. Never hides posts whose language is unclear. Set which languages you know under Settings → Internationalization."
+          [class.active]="imagesHidden()"
+          (click)="toggleImages()"
+          [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
         >
-          🌐 {{ prefs.hideForeignLangPosts() ? 'My languages' : 'All languages' }}
-        </button>
-      }
-      @if (showCalm()) {
-        <button
-          class="btn btn-outline"
-          [class.active]="prefs.algoCalm()"
-          (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
-          title="Calm mode: hide posts that read as inflammatory — heated wording, quote-dunks, and ratioed posts (all detected on-device)"
-        >
-          😌 Calm
+          🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
         </button>
       }
       @if (providerChips() && (!auth.isAnonymous || registry.linked().length)) {
@@ -163,10 +145,8 @@ export class CommandBar {
   readonly showRefresh = input(false);
   /** Whether this page merges foreign providers (home) — shows the filter chips. */
   readonly providerChips = input(false);
-  /** Show the 🌐 foreign-language filter toggle (Home). */
-  readonly showLangFilter = input(false);
-  /** Show the 😌 Calm toggle (Home; Algo has its own chip). */
-  readonly showCalm = input(false);
+  /** Images live in Home's compact filter row; other feeds keep them here. */
+  readonly showImages = input(true);
   /** Show the 👥 Members / 📊 Analytics view toggles (Home). */
   readonly showFeedViews = input(false);
   /** Which view the host page is currently showing. */

@@ -1,4 +1,9 @@
 <div class="page-head">{{ title() }}</div>
+@if (showServerFriendsShortcut()) {
+  <div class="feed-shortcuts">
+    <a class="btn btn-outline btn-sm" routerLink="/home">👥 Server Friends</a>
+  </div>
+}
 @if (def(); as d) {
   <p class="muted small feed-blurb">{{ d.blurb }}</p>
 }

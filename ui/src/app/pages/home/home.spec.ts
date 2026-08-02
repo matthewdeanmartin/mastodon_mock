@@ -14,6 +14,7 @@ import { Home } from './home';
 import { Auth } from '../../auth';
 import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home-feed-cache';
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
+import { JustMyServer } from '../../just-my-server';
 
 /** Exposes Home's protected signals for white-box testing. */
 interface HomeInternals {
@@ -474,6 +475,51 @@ describe('Home', () => {
     expect(labels).toContain('Members');
     expect(labels).toContain('Analytics');
     expect(internals(fixture).view()).toBe('feed');
+  });
+
+  it('puts the compact presentation filters beside Retweets, Replies, and Today', () => {
+    const fixture = setUp();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const commandBar = el.querySelector('.command-bar')?.textContent ?? '';
+    const filters = el.querySelector('.home-filters')?.textContent ?? '';
+
+    expect(commandBar).not.toContain('Images');
+    expect(commandBar).not.toContain('All languages');
+    expect(commandBar).not.toContain('Calm');
+    expect(filters).toContain('Retweets');
+    expect(filters).toContain('Replies');
+    expect(filters).toContain('Images');
+    expect(filters).toContain('All languages');
+    expect(filters).toContain('Calm');
+    expect(filters).toContain('Today');
+    expect(filters).not.toContain('Local Feed');
+  });
+
+  it('offers Local Feed only while Home is showing Server Friends', () => {
+    const auth = TestBed.inject(Auth);
+    auth.setToken('test-token');
+    auth.setAccount({
+      id: 'me',
+      username: 'me',
+      acct: 'me',
+      display_name: 'Me',
+    } as Status['account']);
+    const fixture = setUp();
+    const serverMode = TestBed.inject(JustMyServer);
+    serverMode.listId.set('server-list');
+    serverMode.ready.set(true);
+    serverMode.enabled.set(true);
+    TestBed.flushEffects();
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/timelines/list/server-list?limit=20').flush([]);
+    fixture.detectChanges();
+
+    const shortcut = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '.home-filters a[href="/feeds/local"]',
+    );
+    expect(shortcut?.textContent).toContain('Local Feed');
+    expect(shortcut?.textContent).not.toContain('Server Friends');
   });
 
   it('swaps the timeline for the members view, off the posts already loaded', () => {

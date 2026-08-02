@@ -7,6 +7,7 @@ import { Account, Status, TrendLink } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { authorsOf, ServerFeedKind } from '../../lists/list-source';
 import { serverFeedDef } from '../../lists/server-feeds';
+import { JustMyServer } from '../../just-my-server';
 
 /**
  * A built-in server feed presented as a list. Two content shapes:
@@ -29,6 +30,7 @@ export class ServerFeed implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   protected auth = inject(Auth);
+  protected justMyServer = inject(JustMyServer);
 
   protected feed = signal<ServerFeedKind>('trending');
   protected statuses = signal<Status[]>([]);
@@ -42,6 +44,9 @@ export class ServerFeed implements OnInit {
   protected def = computed(() => serverFeedDef(this.feed()));
   protected title = computed(() => this.def()?.title ?? 'Feed');
   protected isLinks = computed(() => this.def()?.content === 'links');
+  protected showServerFriendsShortcut = computed(
+    () => this.feed() === 'local' && this.justMyServer.effectiveEnabled(),
+  );
 
   // Synthetic members are computed lazily: only once the Members tab is opened,
   // and memoized against the statuses snapshot it was computed from.

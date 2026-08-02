@@ -62,8 +62,7 @@
 
 <app-command-bar
   [providerChips]="!justMyServer.effectiveEnabled()"
-  [showLangFilter]="true"
-  [showCalm]="true"
+  [showImages]="false"
   [showRefresh]="!live()"
   [showFeedViews]="true"
   [view]="view()"
@@ -98,6 +97,36 @@
     >
       💬 Replies
     </button>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm feed-filter"
+      [class.active]="imagesHidden()"
+      [attr.aria-pressed]="imagesHidden()"
+      (click)="toggleImages()"
+      [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
+    >
+      🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm feed-filter"
+      [class.active]="prefs.hideForeignLangPosts()"
+      [attr.aria-pressed]="prefs.hideForeignLangPosts()"
+      (click)="prefs.setHideForeignLangPosts(!prefs.hideForeignLangPosts())"
+      title="Hide posts that are confidently in a language you don't know, or that mislabel their own language. Never hides posts whose language is unclear. Set which languages you know under Settings → Internationalization."
+    >
+      🌐 {{ prefs.hideForeignLangPosts() ? 'My languages' : 'All languages' }}
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm feed-filter"
+      [class.active]="prefs.algoCalm()"
+      [attr.aria-pressed]="prefs.algoCalm()"
+      (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
+      title="Calm mode: hide posts that read as inflammatory — heated wording, quote-dunks, and ratioed posts (all detected on-device)"
+    >
+      😌 Calm
+    </button>
     <!-- How far back the feed reaches. A select rather than three chips: the
          bar is already crowded, and these are mutually exclusive. -->
     <label class="home-window">
@@ -112,6 +141,9 @@
         <option value="all">Everything</option>
       </select>
     </label>
+    @if (justMyServer.effectiveEnabled()) {
+      <a class="btn btn-outline btn-sm feed-filter" routerLink="/feeds/local">🏠 Local Feed</a>
+    }
   </div>
 
   <!-- Only shown when something was actually left out, so it is an offer
