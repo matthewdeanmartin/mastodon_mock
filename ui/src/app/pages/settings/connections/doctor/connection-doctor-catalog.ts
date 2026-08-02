@@ -68,6 +68,37 @@ export interface ProbeTarget {
   openUrl: string;
   /** One clause: what stops working if this host is unreachable. */
   matters: string;
+  /**
+   * Where to find out whether the *service* is having an outage, as opposed to
+   * whether your network can reach it.
+   *
+   * The third question this page can ask, and the one it cannot answer itself:
+   * a probe that fails proves only that the bytes did not arrive here. Whether
+   * that is your network or their bad afternoon is a fact about the vendor, and
+   * the vendor is the one publishing it.
+   *
+   * Null where no page of either kind was found, which is the honest state for
+   * the small free services — better to say "no status page" than to send
+   * someone to an outage aggregator whose data for a tiny host is frequently
+   * just wrong.
+   */
+  status: StatusPage | null;
+}
+
+export interface StatusPage {
+  url: string;
+  /** How the page names itself, so the link reads as what it is. */
+  label: string;
+  /**
+   * Whether the vendor runs this page themselves.
+   *
+   * Worth distinguishing in the UI rather than treating every link alike.
+   * An official page is the vendor stating its own incidents and is
+   * authoritative about them; a third-party aggregator is inference from
+   * outside, and for small services it is regularly stale or flatly wrong.
+   * Presenting the two as equivalent would launder a guess into a fact.
+   */
+  official: boolean;
 }
 
 /**
@@ -96,6 +127,10 @@ export function homeServerTarget(baseUrl: string): ProbeTarget | null {
     probeUrl: `${baseUrl}/api/v1/instance`,
     openUrl: `${baseUrl}/about`,
     matters: 'Everything. Without this there is no timeline to read.',
+    // Every Mastodon instance is run by someone different, so there is no page
+    // this file could name. The instance's own /about is the closest thing and
+    // is already the openUrl.
+    status: null,
   };
 }
 
@@ -116,6 +151,11 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://bsky.social/xrpc/com.atproto.server.describeServer',
     openUrl: 'https://bsky.social',
     matters: 'Signing in to Bluesky, and posting.',
+    status: {
+      url: 'https://status.bsky.app/',
+      label: 'Bluesky Status',
+      official: true,
+    },
   },
   {
     id: 'bsky-appview',
@@ -127,6 +167,13 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=bsky.app',
     openUrl: 'https://bsky.app',
     matters: 'Reading Bluesky posts and profiles.',
+    // Same page as sign-in: Bluesky publishes one status for the service rather
+    // than splitting the AppView out, so a reading-only outage may not show here.
+    status: {
+      url: 'https://status.bsky.app/',
+      label: 'Bluesky Status',
+      official: true,
+    },
   },
   {
     id: 'openrouter',
@@ -138,6 +185,13 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://openrouter.ai/api/v1/models',
     openUrl: 'https://openrouter.ai',
     matters: 'Plain-English search, hashtag suggestions and translation.',
+    // Unusually granular — chat completions, the Data API and account login are
+    // separate components, so "login is broken but the API is fine" is visible.
+    status: {
+      url: 'https://status.openrouter.ai/',
+      label: 'OpenRouter Status',
+      official: true,
+    },
   },
   {
     id: 'twitterapi',
@@ -147,6 +201,12 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://api.twitterapi.io/',
     openUrl: 'https://twitterapi.io',
     matters: 'Reading public tweets. Also needs a CORS proxy.',
+    // Also reports upstream X/Twitter impact, which is the usual cause here.
+    status: {
+      url: 'https://twitterapi.io/status',
+      label: 'TwitterAPI.io Service Status',
+      official: true,
+    },
   },
   {
     id: 'raindrop',
@@ -156,6 +216,12 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://api.raindrop.io/',
     openUrl: 'https://raindrop.io',
     matters: 'Saving bookmarks to Raindrop.',
+    // Has an explicit API component, separate from the website and apps.
+    status: {
+      url: 'https://status.raindrop.io/',
+      label: 'Raindrop.io Status',
+      official: true,
+    },
   },
   {
     id: 'github',
@@ -166,6 +232,12 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://api.github.com/',
     openUrl: 'https://github.com',
     matters: 'Finding the people you follow on GitHub.',
+    // API-specific components, with history.
+    status: {
+      url: 'https://www.githubstatus.com/',
+      label: 'GitHub Status',
+      official: true,
+    },
   },
   {
     id: 'dropbox',
@@ -175,6 +247,11 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://api.dropboxapi.com/',
     openUrl: 'https://www.dropbox.com',
     matters: 'Browsing your Dropbox app folder.',
+    status: {
+      url: 'https://status.dropbox.com/',
+      label: 'Dropbox Status',
+      official: true,
+    },
   },
   {
     id: 'allorigins',
@@ -184,6 +261,11 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://api.allorigins.win/raw?url=https%3A%2F%2Fexample.com',
     openUrl: 'https://allorigins.win/',
     matters: 'The no-signup CORS proxy, used for RSS feeds that block browsers.',
+    // No status page of either kind. It is a free service with no incident
+    // reporting, so the probe above is the only signal there is — and the
+    // repeated timeouts recorded in cors-proxy-catalog.ts are the reason the
+    // catalog no longer treats it as dependable.
+    status: null,
   },
   {
     id: 'corssh',
@@ -193,6 +275,8 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://proxy.cors.sh/https://example.com',
     openUrl: 'https://cors.sh/',
     matters: 'A CORS proxy that can carry API keys.',
+    // No status page found. Active service and repository, no published incidents.
+    status: null,
   },
   {
     id: 'corsfix',
@@ -202,6 +286,12 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://proxy.corsfix.com/?https://example.com',
     openUrl: 'https://corsfix.com/',
     matters: 'The fastest CORS proxy tested, and it can carry API keys.',
+    // Monitors the proxy itself and publishes uptime history.
+    status: {
+      url: 'https://status.corsfix.com/',
+      label: 'Corsfix Status',
+      official: true,
+    },
   },
   {
     id: 'corsproxy-io',
@@ -211,6 +301,12 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://corsproxy.io/?url=https%3A%2F%2Fexample.com',
     openUrl: 'https://corsproxy.io/',
     matters: 'A CORS proxy whose free tier only answers development origins.',
+    // Separate components for the proxy, dashboard and API.
+    status: {
+      url: 'https://status.corsproxy.io/',
+      label: 'CORSProxy Status',
+      official: true,
+    },
   },
   {
     id: 'dub',
@@ -220,6 +316,12 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://api.dub.co/',
     openUrl: 'https://dub.co',
     matters: 'Shortening links with Dub.',
+    // Separates App, API and Link Redirects; the API component is this row.
+    status: {
+      url: 'https://status.dub.co/',
+      label: 'Dub Status',
+      official: true,
+    },
   },
   {
     id: 'shortio',
@@ -229,6 +331,11 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://api.short.io/',
     openUrl: 'https://short.io',
     matters: 'Shortening links with Short.io.',
+    status: {
+      url: 'https://shortiostatus.com/',
+      label: 'Short.io Status',
+      official: true,
+    },
   },
   {
     id: 'tly',
@@ -238,6 +345,13 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://api.t.ly/',
     openUrl: 'https://t.ly',
     matters: 'Shortening links with T.LY.',
+    // No official page found, so this is an aggregator — supporting evidence,
+    // not a verdict.
+    status: {
+      url: 'https://statusgator.com/services/tly',
+      label: 'T.LY on StatusGator',
+      official: false,
+    },
   },
   {
     id: 'isgd',
@@ -247,6 +361,10 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://is.gd/',
     openUrl: 'https://is.gd',
     matters: 'Shortening links without an account.',
+    // Deliberately no link. No official page exists, and the outage aggregators
+    // that cover is.gd were observed reporting it down while it was demonstrably
+    // serving requests. A confidently wrong answer is worse than none.
+    status: null,
   },
   {
     id: 'control',
@@ -259,6 +377,9 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     probeUrl: 'https://example.com/',
     openUrl: 'https://example.com',
     matters: 'Nothing — this one is only here to prove the test itself works.',
+    // Not applicable: a control host is only ever asked whether the test itself
+    // works, never diagnosed.
+    status: null,
   },
 ];
 

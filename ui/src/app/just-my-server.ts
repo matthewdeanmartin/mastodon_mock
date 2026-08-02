@@ -14,7 +14,7 @@ import {
 import { Server } from './server';
 
 const STORAGE_KEY_BASE = 'mockingbird_just_my_server';
-export const JUST_MY_SERVER_LIST_PREFIX = 'Mawingbird: People on ';
+export const JUST_MY_SERVER_LIST_PREFIX = 'Mawkingbird: People on ';
 const PAGE_SIZE = 20;
 const ACCOUNT_PAGE_SIZE = 80;
 const MAX_PAGES = 100;
@@ -259,6 +259,11 @@ export class JustMyServer {
     this.total.set(updatePlan.addIds.length + updatePlan.removeIds.length);
     this.error.set('');
     this.ready.set(false);
+    console.info('[Just My Server] Synchronization started.', {
+      listId: updatePlan.listId,
+      plannedAdds: updatePlan.addIds.length,
+      plannedRemovals: updatePlan.removeIds.length,
+    });
     try {
       const applied = this.auth.isAnonymous
         ? {
@@ -276,7 +281,15 @@ export class JustMyServer {
       this.result.set(result);
       this.dialogOpen.set(false);
       this.plan.set(null);
-    } catch {
+      console.info('[Just My Server] Synchronization finished.', result);
+    } catch (cause: unknown) {
+      console.error('[Just My Server] Synchronization stopped.', {
+        listId: updatePlan.listId,
+        completed: this.completed(),
+        total: this.total(),
+        status: this.errorStatus(cause),
+        cause,
+      });
       this.result.set({
         added: 0,
         removed: 0,
@@ -485,6 +498,12 @@ export class JustMyServer {
     currentIds = new Set((await this.fetchAllListMembers(listId)).map((account) => account.id));
     const additions = addIds.filter((id) => !currentIds.has(id));
     const newlyPresent = addIds.length - additions.length;
+    console.info('[Just My Server] Reconciled current membership.', {
+      currentMembers: currentIds.size,
+      removals: removals.length,
+      additions: additions.length,
+      alreadyPresentSincePreview: newlyPresent,
+    });
     this.completed.update((count) => count + newlyPresent);
     const added = await this.applyAddBatches(listId, additions);
     return {
@@ -512,7 +531,11 @@ export class JustMyServer {
         await firstValueFrom(this.api.addManyToList(listId, batch));
         added += batch.length;
         this.completed.update((count) => count + batch.length);
-      } catch {
+      } catch (cause: unknown) {
+        console.warn('[Just My Server] Add batch rejected; reconciling individually.', {
+          batchSize: batch.length,
+          status: this.errorStatus(cause),
+        });
         const current = new Set(
           (await this.fetchAllListMembers(listId)).map((account) => account.id),
         );
@@ -520,12 +543,19 @@ export class JustMyServer {
         const present = batch.length - pending.length;
         alreadyPresent += present;
         this.completed.update((count) => count + present);
+        let rejectedAsPresent = 0;
         for (const id of pending) {
           try {
             await firstValueFrom(this.api.addManyToList(listId, [id]));
             added += 1;
             this.completed.update((count) => count + 1);
           } catch (error: unknown) {
+            if (this.errorStatus(error) === 422) {
+              alreadyPresent += 1;
+              rejectedAsPresent += 1;
+              this.completed.update((count) => count + 1);
+              continue;
+            }
             const afterFailure = new Set(
               (await this.fetchAllListMembers(listId)).map((account) => account.id),
             );
@@ -533,6 +563,11 @@ export class JustMyServer {
             alreadyPresent += 1;
             this.completed.update((count) => count + 1);
           }
+        }
+        if (rejectedAsPresent) {
+          console.info('[Just My Server] Mastodon reported accounts already on the list.', {
+            count: rejectedAsPresent,
+          });
         }
       }
     }
@@ -582,5 +617,11 @@ export class JustMyServer {
 
   private uniqueAccounts(accounts: Account[]): Account[] {
     return [...new Map(accounts.map((account) => [account.id, account])).values()];
+  }
+
+  private errorStatus(error: unknown): number | undefined {
+    if (typeof error !== 'object' || error === null || !('status' in error)) return undefined;
+    const status = error.status;
+    return typeof status === 'number' ? status : undefined;
   }
 }

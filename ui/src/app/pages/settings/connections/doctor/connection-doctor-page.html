@@ -78,6 +78,17 @@
             <p class="muted small doc-timing-hint">{{ hint }}</p>
           }
 
+          @if (row.target.status; as status) {
+            <p class="muted small doc-status">
+              <a [href]="status.url" target="_blank" rel="noopener noreferrer">{{
+                status.label
+              }}</a>
+              @if (!status.official) {
+                <span class="doc-status-third">third-party</span>
+              }
+            </p>
+          }
+
           @if (row.verdict === 'failed' || row.verdict === 'timeout') {
             <div class="doc-followup">
               <p class="small">
@@ -88,6 +99,23 @@
               <button type="button" class="btn btn-outline btn-sm" (click)="openInTab(row)">
                 Open {{ row.target.host }} in a tab ↗
               </button>
+              @if (row.target.status; as status) {
+                <p class="muted small doc-followup-status">
+                  If it reports everything operational, the problem is more likely on your side than
+                  theirs — worth ruling out an outage first:
+                  <a [href]="status.url" target="_blank" rel="noopener noreferrer">{{
+                    status.label
+                  }}</a>
+                  @if (!status.official) {
+                    <span class="doc-status-third">third-party</span>
+                  }
+                </p>
+              } @else {
+                <p class="muted small doc-followup-status">
+                  This service publishes no status page, so there is no way to check whether it is
+                  having an outage — the tab test above is the only signal available.
+                </p>
+              }
             </div>
           }
 
@@ -206,6 +234,14 @@
     browser extension can rescue it — the traffic isn't getting through at all. How long a row took
     is shown for the same reason: a refusal comes back in milliseconds, while traffic being silently
     discarded takes seconds to give up.
+  </p>
+  <p class="muted small">
+    There is a third question this page cannot answer at all: whether the service is simply having a
+    bad day. A failed probe proves the bytes didn't arrive <em>here</em>, not whose fault that is —
+    so each row links to the vendor's own status page where one exists. Read those as the authority
+    on their own incidents, and anything marked third-party as a hint rather than a verdict: outage
+    aggregators covering small services are often stale, and were observed calling is.gd down while
+    it was demonstrably serving requests. That is why a few rows link nowhere.
   </p>
   <p class="muted small">
     Anything that is reachable but unreadable gets a third check through your CORS proxy, if you

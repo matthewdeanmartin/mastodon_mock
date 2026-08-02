@@ -126,6 +126,25 @@
   color: #a06a00;
 }
 
+/* Reference material rather than a finding, so it sits quietly under the row. */
+.doc-status {
+  margin: 6px 0 0;
+}
+
+.doc-followup-status {
+  margin: 8px 0 0;
+}
+
+/* An aggregator's guess must not read like the vendor's own word. */
+.doc-status-third {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
 .doc-cors-list {
   margin: 6px 0 10px;
   padding-left: 22px;

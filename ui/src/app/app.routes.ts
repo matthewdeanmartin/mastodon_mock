@@ -8,6 +8,7 @@ import {
 import { anonymousOnlyGuard } from './providers/anonymous/anonymous-only.guard';
 import { featureFlagGuard } from './feature-flag.guard';
 import { inviteAccessGuard } from './invites/invite-access.guard';
+import { justMyServerUpdateCanDeactivate, justMyServerUpdateGuard } from './just-my-server.guard';
 // Mock-only routes; file-replaced with an empty list in the Mocking Bird build.
 import { mockOnlyChildren } from './mock-routes';
 
@@ -32,6 +33,8 @@ export const routes: Routes = [
   {
     path: 'invites',
     canActivate: [inviteAccessGuard],
+    canActivateChild: [justMyServerUpdateGuard],
+    canDeactivate: [justMyServerUpdateCanDeactivate],
     loadComponent: () => import('./shell/shell').then((m) => m.Shell),
     children: [
       {
@@ -68,6 +71,8 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard],
+    canActivateChild: [justMyServerUpdateGuard],
+    canDeactivate: [justMyServerUpdateCanDeactivate],
     loadComponent: () => import('./shell/shell').then((m) => m.Shell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'home' },

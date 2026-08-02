@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
+import { ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from './auth';
 import { ClientPrefs } from './client-prefs';
@@ -11,6 +12,7 @@ import {
   normalizeInstanceHost,
   serverOnlyStatuses,
 } from './just-my-server';
+import { justMyServerUpdateCanDeactivate, justMyServerUpdateGuard } from './just-my-server.guard';
 import { Account, Status } from './models';
 import { AnonymousFollows } from './providers/anonymous/anonymous-follows';
 import { AnonymousLists } from './providers/anonymous/anonymous-lists';
@@ -117,10 +119,33 @@ describe('JustMyServer Anonymous list synchronization', () => {
 
     expect(mode.ready()).toBe(true);
     expect(TestBed.inject(AnonymousLists).lists()[0]?.title).toBe(
-      'Mawingbird: People on example.com',
+      'Mawkingbird: People on example.com',
     );
     mode.setEnabled(true);
     expect(mode.effectiveEnabled()).toBe(true);
+  });
+
+  it('keeps the dialog open and blocks in-app navigation while an update is running', () => {
+    const mode = TestBed.inject(JustMyServer);
+    mode.dialogOpen.set(true);
+    mode.updating.set(true);
+
+    mode.closeDialog();
+    const canNavigate = TestBed.runInInjectionContext(() =>
+      justMyServerUpdateGuard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot),
+    );
+    const canLeaveShell = TestBed.runInInjectionContext(() =>
+      justMyServerUpdateCanDeactivate(
+        {},
+        {} as ActivatedRouteSnapshot,
+        {} as RouterStateSnapshot,
+        {} as RouterStateSnapshot,
+      ),
+    );
+
+    expect(mode.dialogOpen()).toBe(true);
+    expect(canNavigate).toBe(false);
+    expect(canLeaveShell).toBe(false);
   });
 
   it('removes remote and stale members until only same-server friends remain', async () => {
@@ -128,7 +153,7 @@ describe('JustMyServer Anonymous list synchronization', () => {
     follows.follow(account('local', 'example.com'), 'https://example.com');
     follows.follow(account('remote', 'remote.tld'), 'https://example.com');
     const lists = TestBed.inject(AnonymousLists);
-    const list = lists.create('Mawingbird: People on example.com');
+    const list = lists.create('Mawkingbird: People on example.com');
     lists.setMember(list.id, 'local@example.com', true);
     lists.setMember(list.id, 'remote@remote.tld', true);
     lists.setMember(list.id, 'gone@example.com', true);
@@ -164,13 +189,13 @@ describe('JustMyServer signed-in list synchronization', () => {
     mode.checkList();
     http
       .expectOne('/api/v1/lists')
-      .flush([{ id: 'server-list', title: 'Mawingbird: People on example.com' }]);
+      .flush([{ id: 'server-list', title: 'Mawkingbird: People on example.com' }]);
     expect(mode.ready()).toBe(true);
 
     const preparing = mode.prepareUpdate();
     http
       .expectOne('/api/v1/lists')
-      .flush([{ id: 'server-list', title: 'Mawingbird: People on example.com' }]);
+      .flush([{ id: 'server-list', title: 'Mawkingbird: People on example.com' }]);
     http
       .expectOne('/api/v1/accounts/me/following?limit=80')
       .flush([
@@ -230,7 +255,7 @@ describe('JustMyServer signed-in list synchronization', () => {
     mode.checkList();
     http
       .expectOne('/api/v1/lists')
-      .flush([{ id: 'server-list', title: 'Mawingbird: People on example.com' }]);
+      .flush([{ id: 'server-list', title: 'Mawkingbird: People on example.com' }]);
     mode.plan.set({
       listId: 'server-list',
       addIds: ['local', 'local'],
@@ -257,7 +282,7 @@ describe('JustMyServer signed-in list synchronization', () => {
     mode.checkList();
     http
       .expectOne('/api/v1/lists')
-      .flush([{ id: 'server-list', title: 'Mawingbird: People on example.com' }]);
+      .flush([{ id: 'server-list', title: 'Mawkingbird: People on example.com' }]);
     mode.plan.set({
       listId: 'server-list',
       addIds: ['local'],
@@ -277,6 +302,47 @@ describe('JustMyServer signed-in list synchronization', () => {
 
     http.expectNone((request) => request.method === 'POST' && request.url.includes('/accounts'));
     expect(mode.result()).toEqual({ added: 0, removed: 0, alreadyPresent: 1, failed: 0 });
+    http.verify();
+  });
+
+  it('continues after Mastodon reports an individual account is already on the list', async () => {
+    const mode = TestBed.inject(JustMyServer);
+    mode.checkList();
+    http
+      .expectOne('/api/v1/lists')
+      .flush([{ id: 'server-list', title: 'Mawkingbird: People on example.com' }]);
+    mode.plan.set({
+      listId: 'server-list',
+      addIds: ['existing', 'new'],
+      removeIds: [],
+      alreadyPresent: 0,
+    });
+
+    const updating = mode.confirmUpdate();
+    http.expectOne('/api/v1/lists/server-list/accounts?limit=80').flush([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/v1/lists/server-list/accounts?limit=80').flush([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http
+      .expectOne('/api/v1/lists/server-list/accounts')
+      .flush(
+        { error: 'Validation failed: Account is already on the list' },
+        { status: 422, statusText: 'Unprocessable Content' },
+      );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/v1/lists/server-list/accounts?limit=80').flush([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http
+      .expectOne('/api/v1/lists/server-list/accounts')
+      .flush(
+        { error: 'Validation failed: Account is already on the list' },
+        { status: 422, statusText: 'Unprocessable Content' },
+      );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/v1/lists/server-list/accounts').flush({});
+    await updating;
+
+    expect(mode.result()).toEqual({ added: 1, removed: 0, alreadyPresent: 1, failed: 0 });
     http.verify();
   });
 });

@@ -8,6 +8,7 @@ import {
   homeServerTarget,
   interpret,
   ProbeResult,
+  PROBE_TARGETS,
   ProbeTarget,
   ProbeVerdict,
   proxyHint,
@@ -35,6 +36,7 @@ function target(id: string, probeUrl = `https://${id}.example/`): ProbeTarget {
     probeUrl,
     openUrl: `https://${id}.example`,
     matters: 'nothing',
+    status: null,
   };
 }
 
@@ -286,6 +288,46 @@ describe('homeServerTarget', () => {
     // An empty base URL means same-origin, and probing your own origin from
     // your own origin proves nothing about the network.
     expect(homeServerTarget('')).toBeNull();
+  });
+});
+
+describe('status pages', () => {
+  it('links the vendor’s own page where one exists', () => {
+    const byId = new Map(PROBE_TARGETS.map((t) => [t.id, t]));
+    expect(byId.get('github')!.status).toEqual({
+      url: 'https://www.githubstatus.com/',
+      label: 'GitHub Status',
+      official: true,
+    });
+    expect(byId.get('openrouter')!.status?.official).toBe(true);
+  });
+
+  it('marks an aggregator as third-party rather than passing it off as official', () => {
+    // T.LY publishes nothing itself, so the link is inference from outside and
+    // the UI has to say so — an aggregator's guess must not read like the
+    // vendor's own word.
+    expect(PROBE_TARGETS.find((t) => t.id === 'tly')!.status).toMatchObject({ official: false });
+  });
+
+  it('links nowhere rather than somewhere wrong', () => {
+    // is.gd is the case that sets the rule: the outage aggregators covering it
+    // were observed reporting it down while it was serving requests. A
+    // confidently wrong answer is worse than no answer.
+    for (const id of ['isgd', 'allorigins', 'corssh', 'control']) {
+      expect(PROBE_TARGETS.find((t) => t.id === id)!.status).toBeNull();
+    }
+  });
+
+  it('every target states a status page or explicitly states it has none', () => {
+    // `status` is required, so a new connector cannot quietly ship without
+    // someone having looked for its status page.
+    for (const target of PROBE_TARGETS) {
+      expect(target.status === null || typeof target.status.url === 'string').toBe(true);
+      if (target.status) {
+        expect(target.status.url).toMatch(/^https:\/\//);
+        expect(target.status.label.length).toBeGreaterThan(0);
+      }
+    }
   });
 });
 

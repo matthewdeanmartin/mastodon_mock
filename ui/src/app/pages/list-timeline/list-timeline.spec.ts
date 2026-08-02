@@ -185,7 +185,7 @@ describe('ListTimeline', () => {
     const fixture = setUpWithList('server-list');
     httpMock
       .expectOne('/api/v1/lists/server-list')
-      .flush(makeList('server-list', 'Mawingbird: People on example.com'));
+      .flush(makeList('server-list', 'Mawkingbird: People on example.com'));
     const remote = {
       ...makeStatus('remote-original'),
       account: { ...makeAccount('remote'), acct: 'remote@elsewhere.social' },

@@ -251,6 +251,58 @@ describe('ConnectionDoctorPage', () => {
     expect(text).toContain('block those address ranges');
   });
 
+  it('links each host to its status page, before anything is even checked', () => {
+    const fixture = setUp();
+
+    // Useful without running the sweep: "is GitHub down?" is a question worth
+    // answering whether or not you just probed it.
+    const link = rowFor(fixture, 'api.github.com').querySelector<HTMLAnchorElement>(
+      '.doc-status a',
+    );
+    expect(link?.getAttribute('href')).toBe('https://www.githubstatus.com/');
+    expect(link?.getAttribute('rel')).toContain('noopener');
+    expect(link?.textContent).toContain('GitHub Status');
+  });
+
+  it('flags an aggregator link as third-party, and omits links it does not have', () => {
+    const fixture = setUp();
+
+    expect(rowFor(fixture, 'api.t.ly').querySelector('.doc-status-third')).not.toBeNull();
+    // is.gd's aggregators were observed reporting it down while it was serving
+    // requests, so it deliberately links nowhere.
+    expect(rowFor(fixture, 'is.gd').querySelector('.doc-status')).toBeNull();
+  });
+
+  it('points a failed host at its status page as the first thing to rule out', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.includes('openrouter.ai')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    const fixture = setUp();
+    await check(fixture);
+
+    const followup = rowFor(fixture, 'openrouter.ai').querySelector('.doc-followup-status');
+    expect(followup?.textContent).toContain('worth ruling out an outage first');
+    // The load-bearing inference: vendor says fine + we cannot reach it =
+    // look at your own network.
+    expect(followup?.textContent).toContain('more likely on your side');
+  });
+
+  it('says plainly when a failed host publishes no status page at all', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.includes('is.gd')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    const fixture = setUp();
+    await check(fixture);
+
+    expect(rowFor(fixture, 'is.gd').querySelector('.doc-followup-status')?.textContent).toContain(
+      'publishes no status page',
+    );
+  });
+
   it('warns that nothing is trustworthy when the control host fails', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
     const fixture = setUp();
