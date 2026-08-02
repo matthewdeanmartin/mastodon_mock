@@ -10,6 +10,7 @@ import { RouteLog } from './observability/route-log';
 import { ServerHealth } from './server-health';
 import { UpdateOverlay } from './update-overlay/update-overlay';
 import { UpdateRecovery } from './update-recovery';
+import { ConfigSync } from './config-sync';
 
 @Component({
   selector: 'app-root',
@@ -32,6 +33,8 @@ export class App {
   private readonly recovery = inject(UpdateRecovery);
   private readonly analytics = inject(AnalyticsTracker);
   private readonly routeLog = inject(RouteLog);
+  /** Checks an explicitly configured remote client config when its cadence is due. */
+  private readonly configSync = inject(ConfigSync);
 
   constructor() {
     // Count page views on every router navigation (GoatCounter, no_onload).
@@ -44,5 +47,6 @@ export class App {
     // Arm the deployment-recovery loop guard: if we got here after an
     // auto-reload, clear it once we've run cleanly for a bit.
     this.recovery.markApplicationStableAfterDelay();
+    this.configSync.start();
   }
 }

@@ -566,6 +566,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'User-edited prompt templates for the search and tag helpers. Only present for templates edited away from the shipped default.',
   },
   {
+    base: 'mockingbird_config_sync',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'Remote configuration URL, check cadence, last verified hash, and check timestamp. Operational sync state is never included in a portable config.',
+  },
+  {
     base: 'mockingbird_openrouter_pkce_verifier',
     storage: 'session',
     suffix: 'none',

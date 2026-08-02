@@ -159,7 +159,7 @@ to read, which is the only lever available here.
 Dropbox is deliberately exempt: it uses a real OAuth flow with short-lived
 online tokens in `sessionStorage`, which expire on their own.
 
-### Storage classification, and the road to settings export
+### Storage classification and settings export
 
 `src/app/storage-registry.ts` is the inventory of every key this app writes,
 each classified by how dangerous it is to let it leave the browser. It exists
@@ -179,11 +179,12 @@ secret/non-secret split was not enough. A followed hashtag is not a credential
 and never will be — but `#diabetesSufferers` in a published gist is a health
 disclosure the user never meant to make.
 
-Two profiles fall out of it: **`shareable`** publishes `setting` only,
-**`personal`** adds `private` and `content` for the user's own machines.
-Neither ever includes `secret` or `cache`, and an **unregistered key is refused**
-rather than allowed — forgetting to classify something can cost an export, never
-a leak.
+The registry exposes general `shareable` and `personal` classifications, while
+the shipped portable-config format is deliberately narrower: it exports global
+settings only and has a small opt-in allowlist for configuration-like private
+values. It never includes `secret`, `cache`, or `content`, and an **unregistered
+key is refused** rather than allowed — forgetting to classify something can cost
+an export, never a leak.
 
 Four credentials used to sit inside otherwise-exportable objects, which made
 that classification impossible to express. They are now stored in two halves,
@@ -279,30 +280,13 @@ runs.
 
 ---
 
-## Roadmap: settings export / import
+## Settings export / import
 
-**See [portable_config.md](./portable_config.md)** for the full design, a worked
-explanation of the scope-suffix problem, and the open decisions. Summarised
-here:
-
-**1. The export/import UI and file format.** Read storage through
-`classifyStorageKey()`, filter by profile, emit JSON with a schema version. The
-file should record which profile produced it, so importing a `shareable` file
-never silently looks like a full backup.
-
-**2. Scoped keys need symbolic scope in the file.** This is the real design
-problem, and it is worth settling before the format is fixed. The account scope
-suffix is `FNV-1a(access token)` (`account-scope.ts`), so it is derived from a
-secret and **changes every time the user re-authenticates** — which is exactly
-what happens on the new machine an import is aimed at. An export must therefore
-record scope symbolically (`acct:someone@instance.social`) and the importer must
-_remap_ it onto whatever token the new machine holds. Two ways out:
-
-- Keep the token hash and remap on import (smaller change, importer carries the
-  complexity, and orphaned keys accumulate if a remap is missed).
-- Re-scope storage on account identity (`acct@host`) instead of token hash
-  (bigger change, touches `account-scope.ts` and `account-data.ts`, but makes
-  import a straight copy and fixes the orphaning permanently).
+**See [portable_config.md](./portable_config.md)** for the implemented file
+format, global-only scope, runtime credential audit, Pastepile behavior, and
+hash-based remote change detection. Account-scoped values remain intentionally
+out of scope because token-derived suffixes and differing account sets cannot be
+mapped safely between browsers.
 
 The second is probably right, and is best done _before_ a file format ships.
 

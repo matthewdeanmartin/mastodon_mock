@@ -1,0 +1,143 @@
+<div class="spage-head">
+  <h1>Import/Export Config</h1>
+  <p>Move browser settings between devices or keep them synced from a URL.</p>
+</div>
+
+<div class="spage-body">
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Export</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="includePrivate()"
+            (ngModelChange)="includePrivate.set($event)"
+            name="includePrivate"
+          />
+          Include potentially private settings
+        </label>
+        <span class="hint">
+          Adds your home server, custom CORS proxy address, and branded link-shortener setup. Never
+          includes credentials, account-scoped settings, follows, blocks or mutes, RSS or paste
+          feeds, lists, bookmarks, saved searches, local moderation, activity history, drafts, or
+          authored content.
+        </span>
+        <div class="config-actions">
+          <button type="button" class="btn" (click)="download()">Download JSON</button>
+          <button type="button" class="btn btn-outline" (click)="copy()">Copy JSON</button>
+          <button type="button" class="btn btn-outline" (click)="publish()" [disabled]="busy()">
+            {{ busy() ? 'Publishing…' : 'Save permanent unlisted Pastepile' }}
+          </button>
+        </div>
+        <span class="hint">
+          Every export is checked at runtime against the storage registry and the credentials
+          currently stored in this browser. Pastepile publishing is anonymous and deliberately omits
+          your Pastepile API key so its permanent-paste option remains available.
+        </span>
+        @if (publishedUrl()) {
+          <a [href]="publishedUrl()" target="_blank" rel="noopener">Open published config</a>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Import file</span>
+      <div class="scontrol">
+        <input type="file" accept=".json,application/json" (change)="onFile($event)" />
+        <textarea
+          rows="7"
+          placeholder="…or paste Mockingbird config JSON here"
+          [ngModel]="importText()"
+          (ngModelChange)="importText.set($event)"
+          name="configJson"
+        ></textarea>
+        <button type="button" class="btn btn-outline config-fit" (click)="previewPasted()">
+          Preview pasted config
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Remote URL</span>
+      <div class="scontrol">
+        <input
+          type="text"
+          inputmode="url"
+          placeholder="https://example.com/mockingbird-config.json"
+          [ngModel]="remoteUrl()"
+          (ngModelChange)="remoteUrl.set($event)"
+          name="remoteUrl"
+        />
+        <div class="config-actions">
+          <button
+            type="button"
+            class="btn btn-outline"
+            (click)="loadUrl()"
+            [disabled]="busy() || !remoteUrl().trim()"
+          >
+            {{ busy() ? 'Checking…' : 'Check now' }}
+          </button>
+          <select [ngModel]="frequency()" (ngModelChange)="frequency.set($event)" name="frequency">
+            <option value="manual">On demand only</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+          <button
+            type="button"
+            class="btn btn-outline"
+            (click)="saveSource()"
+            [disabled]="!remoteResult()"
+          >
+            Save source
+          </button>
+          @if (sync.settings()) {
+            <button type="button" class="link" (click)="clearSource()">remove</button>
+          }
+        </div>
+        <span class="hint">
+          {{ syncSummary() }} Automatic checks compare the remote file's SHA-256 hash and ignore
+          local UI changes. A changed remote file prompts before import. Every remote response is
+          immediately fetched again; a source that cannot return the same hash twice is limited to
+          on-demand checks.
+        </span>
+      </div>
+    </div>
+  </div>
+
+  @if (preview(); as config) {
+    <div class="ssection config-preview">
+      <h2>Import preview</h2>
+      <p class="hint">
+        Schema {{ config.schemaVersion }} ·
+        {{ config.privacy === 'private' ? 'potentially private' : 'standard' }} profile · exported
+        {{ config.exportedAt }}
+      </p>
+      @if (changes().length) {
+        <ul>
+          @for (change of changes(); track change.key) {
+            <li>
+              <strong>{{ change.action }}</strong> <code>{{ change.key }}</code>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p>No settings would change.</p>
+      }
+      <button type="button" class="btn" (click)="apply()" [disabled]="!changes().length">
+        Import and reload
+      </button>
+    </div>
+  }
+
+  @if (message()) {
+    <p class="config-message" aria-live="polite">{{ message() }}</p>
+  }
+  @if (error()) {
+    <p class="config-error" role="alert">{{ error() }}</p>
+  }
+</div>

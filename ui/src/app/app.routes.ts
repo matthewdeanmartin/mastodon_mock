@@ -360,6 +360,12 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'config',
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/config/settings-config').then((m) => m.SettingsConfig),
+          },
+          {
             path: 'invites',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Invites', preloadSettings: true },

@@ -25,7 +25,8 @@ describe('SettingsShell', () => {
     expect(labels).toContain('Filters');
     expect(labels).toContain('Muted accounts');
     expect(labels).toContain('Approve follow requests');
-    expect(labels).toContain('Import/Export');
+    expect(labels).toContain('Import/Export Friends');
+    expect(labels).toContain('Import/Export Config');
     // Mock build shows the _mock-backed pages too.
     expect(labels).toContain('Invite links');
   });
@@ -50,6 +51,7 @@ describe('SettingsShell', () => {
       'Local storage',
       'Ads',
       'Signed-in accounts',
+      'Import/Export Config',
       'Feature flags',
     ]);
   });

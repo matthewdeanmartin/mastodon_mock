@@ -1,0 +1,38 @@
+.config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-fit {
+  align-self: flex-start;
+}
+
+.config-preview ul {
+  max-height: 240px;
+  overflow: auto;
+  padding-left: 22px;
+  font-size: 13px;
+}
+
+.config-preview li {
+  margin: 4px 0;
+}
+
+.config-message,
+.config-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.config-message {
+  background: var(--accent-soft);
+}
+
+.config-error {
+  background: color-mix(in srgb, #d93025 12%, var(--col-bg));
+  color: #b3261e;
+}
