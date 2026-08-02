@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import { Server } from '../../../../server';
 import { ConnectionDoctorPage } from './connection-doctor-page';
 import { PROBE_TARGETS } from './connection-doctor-catalog';
@@ -63,7 +64,8 @@ describe('ConnectionDoctorPage', () => {
     const fixture = setUp();
     await check(fixture);
 
-    // Two per host: reachability, then readability.
+    // Two per host: reachability, then readability. No third leg here, since
+    // everything is readable and a proxy would add nothing.
     expect(fetchMock).toHaveBeenCalledTimes(PROBE_TARGETS.length * 2);
     expect(rowFor(fixture, 'openrouter.ai').textContent).toContain('Reachable');
     expect(el(fixture).textContent).toContain(`${PROBE_TARGETS.length} reachable, 0 blocked`);
@@ -210,6 +212,43 @@ describe('ConnectionDoctorPage', () => {
     const named = el(fixture).querySelector('.doc-cors-list')?.textContent ?? '';
     expect(named).toContain('openrouter.ai');
     expect(named).not.toContain('example.com');
+  });
+
+  it('reports a working proxy as pointing past the network', async () => {
+    TestBed.inject(CorsProxySettings).select('allorigins');
+    fetchMock.mockImplementation((url: string, init: RequestInit) =>
+      init.mode === 'cors' && !url.includes('allorigins.win/raw')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    const fixture = setUp();
+    await check(fixture);
+
+    expect(rowFor(fixture, 'api.raindrop.io').querySelector('.doc-proxy')?.textContent).toContain(
+      'Confirmed working through',
+    );
+  });
+
+  it('calls out hosts a healthy proxy could not rescue', async () => {
+    TestBed.inject(CorsProxySettings).select('allorigins');
+    fetchMock.mockImplementation((url: string, init: RequestInit) => {
+      if (url.includes('allorigins.win')) {
+        // Proxy origin is alive; proxied fetches fail.
+        return init.mode === 'no-cors'
+          ? Promise.resolve(new Response())
+          : Promise.reject(new TypeError('Failed to fetch'));
+      }
+      return init.mode === 'cors'
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response());
+    });
+    const fixture = setUp();
+    await check(fixture);
+
+    const text = el(fixture).textContent ?? '';
+    expect(text).toContain("Hosts your proxy can't rescue");
+    // The actionable distinction: not misconfigured, just blocklisted.
+    expect(text).toContain('block those address ranges');
   });
 
   it('warns that nothing is trustworthy when the control host fails', async () => {

@@ -65,6 +65,15 @@
           @if (row.corsHint; as hint) {
             <p class="small doc-cors" [class.doc-cors-blocked]="row.corsBlocked">{{ hint }}</p>
           }
+          @if (row.proxyHint; as hint) {
+            <p
+              class="small doc-proxy"
+              [class.doc-proxy-ok]="row.proxyWorks"
+              [class.doc-cors-blocked]="row.proxyRefused"
+            >
+              {{ hint }}
+            </p>
+          }
           @if (row.timingHint; as hint) {
             <p class="muted small doc-timing-hint">{{ hint }}</p>
           }
@@ -136,6 +145,36 @@
       your behalf from somewhere the rule does not apply, and it is scoped to this app instead of to
       your whole browser.
     </p>
+    @if (!hasProxy()) {
+      <p class="muted small">
+        You do not have one configured, which is why these are listed as unusable rather than merely
+        indirect. <a [routerLink]="['/settings/connections/cors-proxy']">Set one up</a> and they can
+        work.
+      </p>
+    }
+  </section>
+}
+
+@if (hasRun() && proxyRefusedRows().length) {
+  <section class="doc-group">
+    <h2 class="section-title">Hosts your proxy can't rescue</h2>
+    <p class="muted small">
+      {{ proxyLabel() ?? 'Your CORS proxy' }} is working — it answered when asked. These services
+      refused it anyway:
+    </p>
+    <ul class="doc-cors-list">
+      @for (row of proxyRefusedRows(); track row.target.id) {
+        <li class="small">
+          <strong>{{ row.target.host }}</strong> — {{ row.target.label }}
+        </li>
+      }
+    </ul>
+    <p class="muted small">
+      Proxies run in datacentres, and a lot of services block those address ranges while happily
+      answering home connections. Retrying will not help and the proxy is not misconfigured; the fix
+      is a <a [routerLink]="['/settings/connections/cors-proxy']">different proxy</a> — ideally one
+      you run yourself, on an address nobody has blocklisted.
+    </p>
   </section>
 }
 
@@ -167,5 +206,11 @@
     browser extension can rescue it — the traffic isn't getting through at all. How long a row took
     is shown for the same reason: a refusal comes back in milliseconds, while traffic being silently
     discarded takes seconds to give up.
+  </p>
+  <p class="muted small">
+    Anything that is reachable but unreadable gets a third check through your CORS proxy, if you
+    have one. That is the one that tells you whether a service is actually usable — and if the proxy
+    fetches it fine while the connector still fails, the problem is past the network entirely and
+    worth looking for in your API key, your credit balance or a consent you haven't given.
   </p>
 </section>

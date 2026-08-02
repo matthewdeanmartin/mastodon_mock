@@ -1,13 +1,30 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConnectionDoctor } from './connection-doctor';
+import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import {
   corsHint,
+  CorsReadable,
   homeServerTarget,
   interpret,
+  ProbeResult,
   ProbeTarget,
+  ProbeVerdict,
+  proxyHint,
+  ProxyVerdict,
   timingHint,
 } from './connection-doctor-catalog';
+
+/** A ProbeResult with the fields a given assertion does not care about filled in. */
+function result(
+  verdict: ProbeVerdict,
+  cors: CorsReadable,
+  ms: number | null,
+  proxy: ProxyVerdict = 'unknown',
+  proxyMs: number | null = null,
+): ProbeResult {
+  return { verdict, cors, proxy, ms, proxyMs };
+}
 
 function target(id: string, probeUrl = `https://${id}.example/`): ProbeTarget {
   return {
@@ -26,10 +43,28 @@ describe('ConnectionDoctor (probes)', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    localStorage.clear();
     fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })));
     vi.stubGlobal('fetch', fetchMock);
     doctor = TestBed.inject(ConnectionDoctor);
   });
+
+  /** Select a real catalog proxy, so the probe builds a real proxied URL. */
+  function configureProxy(): void {
+    TestBed.inject(CorsProxySettings).select('allorigins');
+  }
+
+  /** Every fetch this sweep made, as (url, init) pairs. */
+  function calls(): { url: string; init: RequestInit }[] {
+    return fetchMock.mock.calls.map(([url, init]) => ({
+      url: url as string,
+      init: (init ?? {}) as RequestInit,
+    }));
+  }
+
+  function proxiedCall(): { url: string; init: RequestInit } | undefined {
+    return calls().find((call) => call.url.includes('allorigins'));
+  }
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -128,6 +163,91 @@ describe('ConnectionDoctor (probes)', () => {
     expect(doctor.results()['c'].verdict).toBe('reachable');
   });
 
+  it('tries the configured proxy only for hosts that are reachable but unreadable', async () => {
+    configureProxy();
+    fetchMock.mockImplementation((url: string, init: RequestInit) =>
+      init.mode === 'cors' && !url.includes('allorigins')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    await doctor.runAll([target('opaque')]);
+
+    // The proxied URL carries the target, and the proxy's own key header.
+    const proxied = proxiedCall();
+    expect(proxied).toBeDefined();
+    expect(proxied!.url).toContain(encodeURIComponent('https://opaque.example/'));
+    expect(doctor.results()['opaque'].proxy).toBe('works');
+  });
+
+  it('does not send any credential of ours through the proxy', async () => {
+    configureProxy();
+    fetchMock.mockImplementation((url: string, init: RequestInit) =>
+      init.mode === 'cors' && !url.includes('allorigins')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    await doctor.runAll([target('opaque')]);
+
+    // The guard in cors-proxy.ts is bypassed deliberately here, so the thing it
+    // protects has to be asserted directly: these probes are unauthenticated,
+    // and nothing but the proxy's own key may ride along.
+    const init = proxiedCall()!.init;
+    expect(init.credentials).toBe('omit');
+    expect((init.headers as Record<string, string> | undefined)?.['Authorization']).toBeUndefined();
+  });
+
+  it('skips the proxy entirely for a host that is directly readable', async () => {
+    configureProxy();
+    await doctor.runAll([target('ok')]);
+
+    // A proxy would add a hop and a middleman for nothing.
+    expect(doctor.results()['ok'].proxy).toBe('not-needed');
+    expect(proxiedCall()).toBeUndefined();
+  });
+
+  it('blames the target, not the proxy, when the proxy itself is alive', async () => {
+    configureProxy();
+    fetchMock.mockImplementation((url: string, init: RequestInit) => {
+      if (url.includes('allorigins')) {
+        // The proxied fetch fails, but the proxy's own origin answers.
+        return init.mode === 'no-cors'
+          ? Promise.resolve(new Response())
+          : Promise.reject(new TypeError('Failed to fetch'));
+      }
+      return init.mode === 'cors'
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response());
+    });
+    await doctor.runAll([target('opaque')]);
+
+    // The distinction the connector's own error message cannot make: a healthy
+    // proxy that this particular service turns away.
+    expect(doctor.results()['opaque'].proxy).toBe('target-refused');
+  });
+
+  it('blames the proxy when the proxy host is unreachable too', async () => {
+    configureProxy();
+    fetchMock.mockImplementation((url: string, init: RequestInit) =>
+      url.includes('allorigins') || init.mode === 'cors'
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    await doctor.runAll([target('opaque')]);
+
+    expect(doctor.results()['opaque'].proxy).toBe('proxy-unreachable');
+  });
+
+  it('reports that no proxy is configured rather than staying silent', async () => {
+    fetchMock.mockImplementation((_url: string, init: RequestInit) =>
+      init.mode === 'cors'
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    await doctor.runAll([target('opaque')]);
+
+    expect(doctor.results()['opaque'].proxy).toBe('none');
+  });
+
   it('ignores a second sweep while one is in flight', async () => {
     // Every leg parks until released, so the sweep is genuinely still running
     // when the second call arrives rather than merely slow.
@@ -174,7 +294,7 @@ describe('timingHint', () => {
     // The one failure shape that points at something installed locally rather
     // than at the network, which is worth separating precisely because the
     // remedy is different.
-    const hint = timingHint({ verdict: 'failed', cors: 'unknown', ms: 3 })!;
+    const hint = timingHint(result('failed', 'unknown', 3))!;
     expect(hint).toContain('too fast for anything to have gone out');
     expect(hint).toContain('3ms');
   });
@@ -184,38 +304,36 @@ describe('timingHint', () => {
     // 50-350ms. Calling that "an extension blocked it" sends the reader after
     // software that is not there.
     for (const ms of [68, 83, 342]) {
-      expect(timingHint({ verdict: 'failed', cors: 'unknown', ms })).toContain('one round trip');
+      expect(timingHint(result('failed', 'unknown', ms))).toContain('one round trip');
     }
   });
 
   it('reads a slow failure as something along the path refusing', () => {
-    expect(timingHint({ verdict: 'failed', cors: 'unknown', ms: 800 })).toContain(
+    expect(timingHint(result('failed', 'unknown', 800))).toContain(
       'reached something that refused it',
     );
   });
 
   it('reads a timeout as silent discard', () => {
-    expect(timingHint({ verdict: 'timeout', cors: 'unknown', ms: 8000 })).toContain(
-      'discarded silently',
-    );
+    expect(timingHint(result('timeout', 'unknown', 8000))).toContain('discarded silently');
   });
 
   it('flags a host that works but is slow enough to feel broken', () => {
     // AllOrigins is exactly this case, and a green row alone would mislead.
-    expect(timingHint({ verdict: 'reachable', cors: 'readable', ms: 6200 })).toContain('6.2s');
+    expect(timingHint(result('reachable', 'readable', 6200))).toContain('6.2s');
   });
 
   it('says nothing when the timing adds nothing', () => {
     // A hint on every row is noise, and noise is how a diagnostic stops being
     // read at all.
-    expect(timingHint({ verdict: 'reachable', cors: 'readable', ms: 210 })).toBeNull();
-    expect(timingHint({ verdict: 'idle', cors: 'unknown', ms: null })).toBeNull();
+    expect(timingHint(result('reachable', 'readable', 210))).toBeNull();
+    expect(timingHint(result('idle', 'unknown', null))).toBeNull();
   });
 });
 
 describe('corsHint', () => {
   it('explains that a blocked read is the host’s decision, not a local setting', () => {
-    const hint = corsHint({ verdict: 'reachable', cors: 'blocked', ms: 300 })!;
+    const hint = corsHint(result('reachable', 'blocked', 300))!;
     expect(hint).toContain('their policy');
     // The load-bearing claim: nothing installed on this side changes it, which
     // is why the extension advice is wrong.
@@ -223,15 +341,52 @@ describe('corsHint', () => {
   });
 
   it('says a readable host needs no proxy', () => {
-    expect(corsHint({ verdict: 'reachable', cors: 'readable', ms: 300 })).toContain(
-      'no proxy needed',
-    );
+    expect(corsHint(result('reachable', 'readable', 300))).toContain('no proxy needed');
   });
 
   it('refuses to mention CORS for a host that was never reached', () => {
     // Naming CORS here would invite exactly the wrong fix for a network block.
-    expect(corsHint({ verdict: 'failed', cors: 'unknown', ms: 50 })).toBeNull();
-    expect(corsHint({ verdict: 'timeout', cors: 'unknown', ms: 8000 })).toBeNull();
+    expect(corsHint(result('failed', 'unknown', 50))).toBeNull();
+    expect(corsHint(result('timeout', 'unknown', 8000))).toBeNull();
+  });
+});
+
+describe('proxyHint', () => {
+  it('points past the network when the proxy got through', () => {
+    // The whole reason for the third leg: proving the bytes can make the round
+    // trip eliminates network, proxy and CORS at once, which turns an
+    // unbounded "could not reach the service" into "check your key".
+    const hint = proxyHint(result('reachable', 'blocked', 200, 'works', 640), 'AllOrigins')!;
+    expect(hint).toContain('AllOrigins');
+    expect(hint).toContain('640ms');
+    expect(hint).toContain('an API key, a plan or credit limit, or a consent');
+  });
+
+  it('separates a healthy proxy the target refused from a broken one', () => {
+    const refused = proxyHint(
+      result('reachable', 'blocked', 200, 'target-refused', 300),
+      'CORS.SH',
+    )!;
+    expect(refused).toContain('refused the request coming from it');
+    // The actionable part: retrying will not help, a different proxy might.
+    expect(refused).toContain('datacentres');
+
+    const dead = proxyHint(
+      result('reachable', 'blocked', 200, 'proxy-unreachable', 8000),
+      'CORS.SH',
+    )!;
+    expect(dead).toContain('could not be reached at all');
+  });
+
+  it('says so when there is no proxy to try', () => {
+    expect(proxyHint(result('reachable', 'blocked', 200, 'none'), null)).toContain(
+      'none is configured',
+    );
+  });
+
+  it('stays quiet for a host that never needed a proxy', () => {
+    expect(proxyHint(result('reachable', 'readable', 200, 'not-needed'), 'AllOrigins')).toBeNull();
+    expect(proxyHint(result('failed', 'unknown', 50, 'unknown'), 'AllOrigins')).toBeNull();
   });
 });
 

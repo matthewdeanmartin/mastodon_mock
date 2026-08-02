@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { CorsProxy } from '../../../../providers/cors-proxy/cors-proxy';
 import { Server } from '../../../../server';
 import { ConnectionDoctor } from './connection-doctor';
 import {
@@ -11,6 +12,7 @@ import {
   ProbeCategory,
   ProbeTarget,
   ProbeVerdict,
+  proxyHint,
   REPORTED_OPTIONS,
   ReportedOutcome,
   timingHint,
@@ -28,6 +30,12 @@ export interface DoctorRow {
   corsHint: string | null;
   /** True when the host answers but refuses to be read — the proxy case. */
   corsBlocked: boolean;
+  /** How the configured proxy fared against this host, in words. */
+  proxyHint: string | null;
+  /** True when the proxy got through, so remaining faults are past the network. */
+  proxyWorks: boolean;
+  /** True when the proxy is healthy but this host turned it away. */
+  proxyRefused: boolean;
   reported: ReportedOutcome | null;
   /** The combined reading, once both halves are in. */
   interpretation: string | null;
@@ -61,6 +69,7 @@ interface DoctorGroup {
 export class ConnectionDoctorPage {
   protected doctor = inject(ConnectionDoctor);
   private server = inject(Server);
+  private proxy = inject(CorsProxy);
 
   protected readonly reportedOptions = REPORTED_OPTIONS;
 
@@ -82,13 +91,16 @@ export class ConnectionDoctorPage {
   protected readonly groups = computed<DoctorGroup[]>(() => {
     const results = this.doctor.results();
     const reports = this.reports();
+    const proxyLabel = this.proxy.label();
     const groups = new Map<ProbeCategory, DoctorGroup>();
 
     for (const target of this.targets()) {
       const result = results[target.id] ?? {
         verdict: 'idle' as ProbeVerdict,
         cors: 'unknown' as const,
+        proxy: 'unknown' as const,
         ms: null,
+        proxyMs: null,
       };
       const verdict = result.verdict;
       const reported = reports[target.id] ?? null;
@@ -99,6 +111,9 @@ export class ConnectionDoctorPage {
         timingHint: timingHint(result),
         corsHint: corsHint(result),
         corsBlocked: verdict === 'reachable' && result.cors === 'blocked',
+        proxyHint: proxyHint(result, proxyLabel),
+        proxyWorks: result.proxy === 'works',
+        proxyRefused: result.proxy === 'target-refused',
         reported,
         // Only meaningful once the probe has actually run: pairing a report
         // with 'idle' would let the page state a cause it has not tested.
@@ -142,6 +157,21 @@ export class ConnectionDoctorPage {
     // works, so telling the reader it needs a proxy is advice about a host
     // they will never connect to.
     this.allRows().filter((row) => row.corsBlocked && row.target.category !== 'control'),
+  );
+
+  /** Whether a proxy is configured at all, which changes what the advice says. */
+  protected readonly hasProxy = computed(() => this.proxy.available());
+
+  /** The configured proxy's name, for copy that refers to it. */
+  protected readonly proxyLabel = computed(() => this.proxy.label());
+
+  /**
+   * Hosts the proxy could not rescue — it is alive, they turned it away. Worth
+   * calling out separately because the remedy is a *different* proxy, not a
+   * working one, and no amount of retrying this one will help.
+   */
+  protected readonly proxyRefusedRows = computed(() =>
+    this.allRows().filter((row) => row.proxyRefused && row.target.category !== 'control'),
   );
 
   /**

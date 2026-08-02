@@ -107,8 +107,16 @@
 }
 
 .doc-cors,
+.doc-proxy,
 .doc-timing-hint {
   margin: 6px 0 0;
+}
+
+/* A working proxy is the one genuinely good outcome on an otherwise unreadable
+   host, and it changes where the reader should look next — so it gets the
+   success colour rather than sitting in the same grey as the diagnosis above. */
+.doc-proxy-ok {
+  color: #2b8a3e;
 }
 
 /* The readable/blocked line is the one that decides whether a proxy is needed,

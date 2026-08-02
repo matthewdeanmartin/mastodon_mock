@@ -1,5 +1,7 @@
-import { Injectable, signal } from '@angular/core';
-import { CorsReadable, ProbeResult, ProbeTarget } from './connection-doctor-catalog';
+import { inject, Injectable, signal } from '@angular/core';
+import { buildProxiedUrl } from '../../../../providers/cors-proxy/cors-proxy';
+import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
+import { CorsReadable, ProbeResult, ProbeTarget, ProxyVerdict } from './connection-doctor-catalog';
 
 /**
  * Runs the reachability probes.
@@ -26,12 +28,31 @@ import { CorsReadable, ProbeResult, ProbeTarget } from './connection-doctor-cata
  * service simply does not answer browsers" without asking the user anything —
  * and to correctly refuse to blame CORS when the host was never reached.
  *
+ * A third leg runs only for hosts that failed (2) while passing (1), which is
+ * exactly the population a CORS proxy exists for: **can the configured proxy
+ * fetch it?** Answering that separates three failures the connector itself
+ * reports identically — the proxy being blocked here, the *target* refusing the
+ * proxy's datacentre IP, and everything working (which points the user at their
+ * API key instead of at the network).
+ *
+ * ## On credentials
+ *
+ * The proxied leg builds its URL with {@link buildProxiedUrl} rather than going
+ * through `CorsProxy.proxyRequest`, which would refuse most of these hosts by
+ * design — they are on the credential-host blocklist precisely because the
+ * app's *real* traffic to them carries tokens. That guard is not weakened here:
+ * these probes are unauthenticated public URLs and carry no `Authorization`
+ * header, so there is no secret to disclose. The only header sent is the
+ * proxy's own key, which the proxy already has.
+ *
  * Probes run in parallel. Fifteen hosts at eight seconds each would be two
  * minutes serially, and the browser's own connection limits already throttle
  * this to something reasonable.
  */
 @Injectable({ providedIn: 'root' })
 export class ConnectionDoctor {
+  private proxySettings = inject(CorsProxySettings);
+
   /** Result per target id. Absent means never run. */
   readonly results = signal<Readonly<Record<string, ProbeResult>>>({});
   readonly running = signal(false);
@@ -49,7 +70,13 @@ export class ConnectionDoctor {
       Object.fromEntries(
         targets.map((t) => [
           t.id,
-          { verdict: 'checking', cors: 'unknown', ms: null } as ProbeResult,
+          {
+            verdict: 'checking',
+            cors: 'unknown',
+            proxy: 'unknown',
+            ms: null,
+            proxyMs: null,
+          } as ProbeResult,
         ]),
       ),
     );
@@ -85,12 +112,87 @@ export class ConnectionDoctor {
         signal: timeout,
       });
       const ms = Math.round(performance.now() - started);
-      return { verdict: 'reachable', cors: await this.probeCors(target, timeoutMs), ms };
+      const cors = await this.probeCors(target, timeoutMs);
+      if (cors === 'readable') {
+        // Directly readable: a proxy would add a hop and a middleman for
+        // nothing, so there is no question left to ask.
+        return { verdict: 'reachable', cors, proxy: 'not-needed', ms, proxyMs: null };
+      }
+      const { proxy, proxyMs } = await this.probeViaProxy(target, timeoutMs);
+      return { verdict: 'reachable', cors, proxy, ms, proxyMs };
     } catch {
       const ms = Math.round(performance.now() - started);
       // Distinguishing the two is the only inference this method makes, and it
       // is a safe one: the abort came from our own timer, not from the network.
-      return { verdict: timeout.aborted ? 'timeout' : 'failed', cors: 'unknown', ms };
+      return {
+        verdict: timeout.aborted ? 'timeout' : 'failed',
+        cors: 'unknown',
+        // An unreachable host tells us nothing about the proxy, and testing it
+        // here would blame the proxy for a network block.
+        proxy: 'unknown',
+        ms,
+        proxyMs: null,
+      };
+    }
+  }
+
+  /**
+   * Can the configured proxy fetch what this browser cannot?
+   *
+   * Distinguishing "the proxy is blocked" from "the target refused the proxy"
+   * needs a second data point, so a proxy failure is followed by a probe of the
+   * proxy's *own* host. If that is reachable, the proxy is alive and the target
+   * is what turned it away — which is common, since services block datacentre
+   * IP ranges far more readily than residential ones.
+   */
+  private async probeViaProxy(
+    target: ProbeTarget,
+    timeoutMs: number,
+  ): Promise<{ proxy: ProxyVerdict; proxyMs: number | null }> {
+    const config = this.proxySettings.resolve();
+    if (!config) {
+      return { proxy: 'none', proxyMs: null };
+    }
+
+    const proxiedUrl = buildProxiedUrl(config, target.probeUrl);
+    const started = performance.now();
+    try {
+      // `cors` mode, deliberately: the entire point of a proxy is that its
+      // reply is readable, so an opaque success would not answer the question.
+      const response = await fetch(proxiedUrl, {
+        mode: 'cors',
+        credentials: 'omit',
+        cache: 'no-store',
+        redirect: 'follow',
+        // The proxy's own key, when it has one. Never the target's — these
+        // probes are unauthenticated by construction.
+        headers: config.header ? { [config.header.name]: config.header.value } : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const proxyMs = Math.round(performance.now() - started);
+      // A proxy that answers with the target's error is still a working proxy;
+      // but a 4xx/5xx here usually means the proxy itself is reporting that it
+      // could not fetch the target, so it is read as the target refusing.
+      return { proxy: response.ok ? 'works' : 'target-refused', proxyMs };
+    } catch {
+      const proxyMs = Math.round(performance.now() - started);
+      return { proxy: await this.classifyProxyFailure(proxiedUrl, timeoutMs), proxyMs };
+    }
+  }
+
+  /** Was it the proxy that was unreachable, or the target that refused it? */
+  private async classifyProxyFailure(proxiedUrl: string, timeoutMs: number): Promise<ProxyVerdict> {
+    try {
+      await fetch(new URL(proxiedUrl).origin, {
+        mode: 'no-cors',
+        credentials: 'omit',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      // The proxy's host is reachable, so the failure was about this target.
+      return 'target-refused';
+    } catch {
+      return 'proxy-unreachable';
     }
   }
 

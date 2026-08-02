@@ -295,9 +295,39 @@ export type ProbeVerdict =
  */
 export type CorsReadable = 'unknown' | 'readable' | 'blocked';
 
+/**
+ * How the configured CORS proxy fared against this host.
+ *
+ * The third leg, and the one that separates two failures which look identical
+ * from the connector's own error message:
+ *
+ * - `works` — the proxy fetched it. If the feature still fails after this, the
+ *   problem is downstream of connectivity: an API key, a plan limit, a consent
+ *   not given. That is a genuinely different place to look.
+ * - `proxy-unreachable` — the proxy host itself is blocked or down. Nothing to
+ *   do with the target.
+ * - `target-refused` — the proxy is fine and answered, but the target refused
+ *   *it*. Datacentre IP ranges get blocked far more aggressively than home
+ *   ones, so a proxy can be perfectly healthy and still useless for one host.
+ * - `none` — no proxy configured, so there was nothing to test.
+ * - `not-needed` — the host is directly readable; a proxy would add latency
+ *   and a middleman for no benefit.
+ */
+export type ProxyVerdict =
+  | 'unknown'
+  | 'none'
+  | 'not-needed'
+  | 'works'
+  | 'proxy-unreachable'
+  | 'target-refused';
+
 export interface ProbeResult {
   verdict: ProbeVerdict;
   cors: CorsReadable;
+  /** How the configured proxy fared, when one was worth trying. */
+  proxy: ProxyVerdict;
+  /** How long the proxied attempt took, when it was made. */
+  proxyMs: number | null;
   /**
    * How long the reachability probe took, in milliseconds. Null before a run.
    *
@@ -465,4 +495,33 @@ export function corsHint(result: ProbeResult): string | null {
     return 'Reachable, but it refuses to let this app read the reply: the host does not send the header that would permit it. That is their policy, not a fault on your network, and not something a browser setting can grant you. Mawkingbird routes these through a CORS proxy instead.';
   }
   return null;
+}
+
+/**
+ * What the proxied attempt means — including the case where everything works
+ * and the connector still doesn't.
+ *
+ * That last one is the reason this leg exists. "Could not reach the service" is
+ * what a connector reports for a network block, a proxy problem, a missing
+ * consent and a rejected API key alike, and the user has no way to tell which.
+ * Proving the bytes can make the round trip eliminates the first three at once
+ * and says so, which turns an unbounded problem into "check your key".
+ *
+ * @param proxyLabel the configured proxy's display name, so the copy can name it.
+ */
+export function proxyHint(result: ProbeResult, proxyLabel: string | null): string | null {
+  const via = proxyLabel ?? 'your CORS proxy';
+  switch (result.proxy) {
+    case 'works':
+      return `Confirmed working through ${via}${result.proxyMs !== null ? ` (${formatMs(result.proxyMs)})` : ''}. Everything between you and this service is fine — so if the feature still fails, the cause is past connectivity: an API key, a plan or credit limit, or a consent not yet given.`;
+    case 'target-refused':
+      return `${via} is reachable and answered, but this service refused the request coming from it. Proxies run in datacentres, and plenty of services block those ranges outright while allowing home connections — so the proxy is healthy and still cannot help here. A different proxy, or one you run yourself, may work where this one does not.`;
+    case 'proxy-unreachable':
+      return `${via} could not be reached at all, so this host could not be tested through it. Fix the proxy first — the row above is about the proxy, not about this service.`;
+    case 'none':
+      return 'This host needs a CORS proxy and none is configured, so it cannot work yet. Setting one up is what makes it reachable.';
+    case 'not-needed':
+    case 'unknown':
+      return null;
+  }
 }
