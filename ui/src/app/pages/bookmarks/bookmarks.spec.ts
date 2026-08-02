@@ -1,9 +1,19 @@
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+  TestRequest,
+} from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { provideRouter } from '@angular/router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../../models';
+import {
+  RaindropBookmark,
+  RaindropCollection,
+  RaindropSession,
+} from '../../providers/raindrop/raindrop-session';
 import { BookmarkGroup } from './bookmark-groups';
 import { Bookmarks } from './bookmarks';
 
@@ -11,8 +21,27 @@ import { Bookmarks } from './bookmarks';
 interface BookmarksInternals {
   statuses: WritableSignal<Status[]>;
   loading: WritableSignal<boolean>;
+  exhausted: WritableSignal<boolean>;
+  nativePage: WritableSignal<number>;
+  provider: WritableSignal<'native' | 'raindrop'>;
+  collections: WritableSignal<RaindropCollection[]>;
+  raindropBookmarks: WritableSignal<RaindropBookmark[]>;
+  raindropPage: WritableSignal<number>;
+  filterDraft: WritableSignal<string>;
+  nativeFilter: WritableSignal<string>;
+  raindropFilter: WritableSignal<string>;
+  filteredStatuses: Signal<Status[]>;
   view: WritableSignal<'all' | 'authors' | 'hashtags' | 'media'>;
   groups: Signal<BookmarkGroup[]>;
+  nextPage(): void;
+  previousPage(): void;
+  firstPage(): void;
+  selectProvider(provider: 'native' | 'raindrop'): void;
+  selectRaindropCollection(id: number): void;
+  applyFilter(event?: Event): void;
+  clearFilter(): void;
+  moveNativeToRaindrop(status: Status): Promise<void>;
+  moveRaindropToNative(bookmark: RaindropBookmark): Promise<void>;
   onChanged(updated: Status): void;
   onDeleted(removed: Status): void;
 }
@@ -51,16 +80,21 @@ function makeStatus(id: string): Status {
 
 describe('Bookmarks', () => {
   let httpMock: HttpTestingController;
+  const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
     httpMock.verify();
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
   });
 
   function setUp(): ComponentFixture<Bookmarks> {
@@ -73,7 +107,7 @@ describe('Bookmarks', () => {
     const fixture = setUp();
     expect(internals(fixture).loading()).toBe(true);
     expect(internals(fixture).statuses()).toEqual([]);
-    httpMock.expectOne('/api/v1/bookmarks').flush([]);
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([]);
   });
 
   it('populates statuses and clears loading on successful fetch', () => {
@@ -81,7 +115,7 @@ describe('Bookmarks', () => {
     const s1 = makeStatus('1');
     const s2 = makeStatus('2');
 
-    httpMock.expectOne('/api/v1/bookmarks').flush([s1, s2]);
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([s1, s2]);
 
     expect(internals(fixture).loading()).toBe(false);
     expect(internals(fixture).statuses()).toEqual([s1, s2]);
@@ -90,17 +124,194 @@ describe('Bookmarks', () => {
   it('clears loading on HTTP error', () => {
     const fixture = setUp();
 
-    httpMock.expectOne('/api/v1/bookmarks').error(new ProgressEvent('error'));
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').error(new ProgressEvent('error'));
 
     expect(internals(fixture).loading()).toBe(false);
     expect(internals(fixture).statuses()).toEqual([]);
+  });
+
+  it('pages Native bookmarks 20 at a time and returns to a cached previous page', () => {
+    const fixture = setUp();
+    const first = Array.from({ length: 20 }, (_, index) => makeStatus(String(index + 1)));
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush(first);
+
+    internals(fixture).nextPage();
+    const next = httpMock.expectOne('/api/v1/bookmarks?max_id=20&limit=20');
+    next.flush([makeStatus('21')]);
+    expect(internals(fixture).nativePage()).toBe(1);
+    expect(internals(fixture).exhausted()).toBe(true);
+
+    internals(fixture).previousPage();
+    expect(internals(fixture).nativePage()).toBe(0);
+    expect(internals(fixture).statuses()).toEqual(first);
+    httpMock.expectNone((request) => request.url === '/api/v1/bookmarks');
+  });
+
+  it('filters only the currently visible Native page without another API call', () => {
+    const fixture = setUp();
+    const alice = makeStatus('1');
+    alice.account = { ...alice.account, acct: 'alice' };
+    alice.content = '<p>Angular notes</p>';
+    const bob = makeStatus('2');
+    bob.account = { ...bob.account, acct: 'bob' };
+    bob.content = '<p>Gardening notes</p>';
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([alice, bob]);
+
+    internals(fixture).filterDraft.set('  BOB  ');
+    internals(fixture).applyFilter();
+
+    expect(internals(fixture).nativeFilter()).toBe('BOB');
+    expect(internals(fixture).filteredStatuses()).toEqual([bob]);
+    httpMock.expectNone((request) => request.url === '/api/v1/bookmarks');
+
+    internals(fixture).clearFilter();
+    expect(internals(fixture).filteredStatuses()).toEqual([alice, bob]);
+  });
+
+  it('shows Raindrop and at most three real folders when the connector is configured', async () => {
+    TestBed.inject(RaindropSession).connect('test-token');
+    const folders = Array.from({ length: 4 }, (_, index) => ({
+      _id: index + 1,
+      title: `Folder ${index + 1}`,
+      count: index,
+    }));
+    globalThis.fetch = vi.fn().mockImplementation((input: string) => {
+      const items = input.includes('/collections') ? folders : [];
+      return Promise.resolve(new Response(JSON.stringify({ result: true, items })));
+    });
+
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([]);
+    await vi.waitFor(() => expect(internals(fixture).collections()).toHaveLength(3));
+    internals(fixture).provider.set('raindrop');
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    const folderTabs = fixture.nativeElement.querySelectorAll('.folder-tabs .tab');
+    expect(text).toContain('Native');
+    expect(text).toContain('Raindrop');
+    expect(folderTabs).toHaveLength(4);
+    expect(folderTabs[3].textContent).toContain('Folder 3');
+  });
+
+  it('pages Raindrop inside the selected folder without a Last operation', async () => {
+    TestBed.inject(RaindropSession).connect('test-token');
+    const fetchMock = vi.fn().mockImplementation((input: string) => {
+      const items = input.includes('/collections')
+        ? [{ _id: 7, title: 'Reading', count: 21 }]
+        : Array.from({ length: 20 }, (_, index) => raindropBookmark(index + 1));
+      return Promise.resolve(new Response(JSON.stringify({ result: true, items })));
+    });
+    globalThis.fetch = fetchMock;
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([]);
+    await vi.waitFor(() => expect(internals(fixture).collections()).toHaveLength(1));
+
+    internals(fixture).selectProvider('raindrop');
+    await vi.waitFor(() => expect(internals(fixture).raindropBookmarks()).toHaveLength(20));
+    internals(fixture).selectRaindropCollection(7);
+    await vi.waitFor(() => expect(internals(fixture).raindropBookmarks()).toHaveLength(20));
+    internals(fixture).nextPage();
+    await vi.waitFor(() => expect(internals(fixture).raindropPage()).toBe(1));
+    internals(fixture).previousPage();
+    await vi.waitFor(() => expect(internals(fixture).raindropPage()).toBe(0));
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toContain(
+      'https://api.raindrop.io/rest/v1/raindrops/7?page=1&perpage=20',
+    );
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Last');
+  });
+
+  it('sends the applied filter to Raindrop and resets paging to the first page', async () => {
+    TestBed.inject(RaindropSession).connect('test-token');
+    const fetchMock = vi.fn().mockImplementation((input: string) => {
+      const items = input.includes('/collections') ? [] : [raindropBookmark(1)];
+      return Promise.resolve(new Response(JSON.stringify({ result: true, items })));
+    });
+    globalThis.fetch = fetchMock;
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([]);
+
+    internals(fixture).selectProvider('raindrop');
+    await vi.waitFor(() => expect(internals(fixture).raindropBookmarks()).toHaveLength(1));
+    internals(fixture).raindropPage.set(4);
+    internals(fixture).filterDraft.set('  type:article important:true  ');
+    internals(fixture).applyFilter();
+    await vi.waitFor(() => expect(internals(fixture).raindropPage()).toBe(0));
+
+    expect(internals(fixture).raindropFilter()).toBe('type:article important:true');
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe(
+      'https://api.raindrop.io/rest/v1/raindrops/0?page=0&perpage=20&search=type%3Aarticle+important%3Atrue',
+    );
+  });
+
+  it('moves a Native bookmark only after Raindrop save and native unbookmark succeed', async () => {
+    TestBed.inject(RaindropSession).connect('test-token');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ result: true, items: [] })));
+    globalThis.fetch = fetchMock;
+    const fixture = setUp();
+    const status = makeStatus('42');
+    status.url = 'https://social.example/@alan/42';
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([status]);
+
+    const moving = internals(fixture).moveNativeToRaindrop(status);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    let unbookmark: TestRequest | undefined;
+    await vi.waitFor(() => {
+      unbookmark = httpMock.expectOne('/api/v1/statuses/42/unbookmark');
+    });
+    unbookmark!.flush({ ...status, bookmarked: false });
+    await moving;
+
+    expect(internals(fixture).statuses()).toEqual([]);
+    expect(fetchMock.mock.calls[1][0]).toBe('https://api.raindrop.io/rest/v1/raindrop');
+  });
+
+  it('resolves and moves a Raindrop post into Native bookmarks', async () => {
+    TestBed.inject(RaindropSession).connect('test-token');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ result: true, items: [] })));
+    globalThis.fetch = fetchMock;
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([]);
+    const bookmark = raindropBookmark(9);
+    internals(fixture).raindropBookmarks.set([bookmark]);
+
+    const moving = internals(fixture).moveRaindropToNative(bookmark);
+    const status = makeStatus('99');
+    status.url = bookmark.link;
+    status.bookmarked = false;
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v2/search' &&
+          request.params.get('q') === bookmark.link &&
+          request.params.get('type') === 'statuses' &&
+          request.params.get('resolve') === 'true' &&
+          request.params.get('limit') === '5',
+      )
+      .flush({ accounts: [], statuses: [status], hashtags: [] });
+    let create: TestRequest | undefined;
+    await vi.waitFor(() => {
+      create = httpMock.expectOne('/api/v1/statuses/99/bookmark');
+    });
+    create!.flush({ ...status, bookmarked: true });
+    await moving;
+
+    expect(internals(fixture).raindropBookmarks()).toEqual([]);
+    expect(internals(fixture).statuses()[0].id).toBe('99');
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe('https://api.raindrop.io/rest/v1/raindrop/9');
   });
 
   it('onChanged replaces the status with the matching id', () => {
     const fixture = setUp();
     const s1 = makeStatus('1');
     const s2 = makeStatus('2');
-    httpMock.expectOne('/api/v1/bookmarks').flush([s1, s2]);
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([s1, s2]);
 
     const updated = { ...s2, content: '<p>updated</p>' };
     internals(fixture).onChanged(updated);
@@ -112,7 +323,7 @@ describe('Bookmarks', () => {
     const fixture = setUp();
     const s1 = makeStatus('1');
     const s2 = makeStatus('2');
-    httpMock.expectOne('/api/v1/bookmarks').flush([s1, s2]);
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([s1, s2]);
 
     internals(fixture).onDeleted(s1);
 
@@ -124,7 +335,7 @@ describe('Bookmarks', () => {
     const s1 = makeStatus('1');
     const s2 = makeStatus('2');
     const s3 = makeStatus('3');
-    httpMock.expectOne('/api/v1/bookmarks').flush([s1, s2, s3]);
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([s1, s2, s3]);
 
     const updated = { ...s2, content: '<p>changed</p>' };
     internals(fixture).onChanged(updated);
@@ -154,7 +365,7 @@ describe('Bookmarks', () => {
     const fixture = setUp();
     const s1 = makeStatus('1');
     const s2 = makeStatus('2');
-    httpMock.expectOne('/api/v1/bookmarks').flush([s1, s2]);
+    httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([s1, s2]);
 
     const groups = internals(fixture).groups();
     expect(groups).toHaveLength(1);
@@ -165,7 +376,7 @@ describe('Bookmarks', () => {
   it("the 'authors' view groups by account with largest shelf first", () => {
     const fixture = setUp();
     httpMock
-      .expectOne('/api/v1/bookmarks')
+      .expectOne('/api/v1/bookmarks?limit=20')
       .flush([
         makeAuthored('1', 'alice', '<p>one</p>'),
         makeAuthored('2', 'bob', '<p>two</p>'),
@@ -181,7 +392,7 @@ describe('Bookmarks', () => {
   it("the 'hashtags' view shelves posts under every tag plus a no-hashtags shelf", () => {
     const fixture = setUp();
     httpMock
-      .expectOne('/api/v1/bookmarks')
+      .expectOne('/api/v1/bookmarks?limit=20')
       .flush([
         makeAuthored('1', 'alice', '<p>I love #cats and #dogs</p>'),
         makeAuthored('2', 'bob', '<p>more #cats</p>'),
@@ -198,7 +409,7 @@ describe('Bookmarks', () => {
   it("the 'media' view keeps only posts with attachments", () => {
     const fixture = setUp();
     httpMock
-      .expectOne('/api/v1/bookmarks')
+      .expectOne('/api/v1/bookmarks?limit=20')
       .flush([
         makeAuthored('1', 'alice', '<p>photo</p>', 2),
         makeAuthored('2', 'bob', '<p>text only</p>'),
@@ -210,3 +421,14 @@ describe('Bookmarks', () => {
     expect(groups[0].statuses.map((s) => s.id)).toEqual(['1']);
   });
 });
+
+function raindropBookmark(id: number): RaindropBookmark {
+  return {
+    _id: id,
+    title: `Raindrop ${id}`,
+    link: `https://social.example/@alice/${id}`,
+    excerpt: `Saved post ${id}`,
+    created: '2026-01-01T00:00:00Z',
+    collection: { $id: 7 },
+  };
+}

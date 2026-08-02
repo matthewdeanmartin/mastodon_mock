@@ -180,4 +180,74 @@ describe('RaindropSession', () => {
       pleaseParse: {},
     });
   });
+
+  it('lists at most three root collections', async () => {
+    localStorage.setItem(
+      'mockingbird_raindrop_token',
+      JSON.stringify({ accessToken: 'test-token' }),
+    );
+    const items = Array.from({ length: 4 }, (_, index) => ({
+      _id: index + 1,
+      title: `Folder ${index + 1}`,
+      count: index,
+    }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ result: true, items }), { status: 200 }));
+    globalThis.fetch = fetchMock;
+
+    const collections = await new RaindropSession().collections();
+
+    expect(collections.map((collection) => collection.title)).toEqual([
+      'Folder 1',
+      'Folder 2',
+      'Folder 3',
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.raindrop.io/rest/v1/collections',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+      }),
+    );
+  });
+
+  it('uses Raindrop zero-based paging with a bounded page size', async () => {
+    localStorage.setItem(
+      'mockingbird_raindrop_token',
+      JSON.stringify({ accessToken: 'test-token' }),
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ result: true, items: [] }), { status: 200 }),
+      );
+    globalThis.fetch = fetchMock;
+
+    await new RaindropSession().bookmarks(73, 2, 20);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.raindrop.io/rest/v1/raindrops/73?page=2&perpage=20',
+      expect.any(Object),
+    );
+  });
+
+  it('passes the trimmed Raindrop filter through the search parameter', async () => {
+    localStorage.setItem(
+      'mockingbird_raindrop_token',
+      JSON.stringify({ accessToken: 'test-token' }),
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ result: true, items: [] }), { status: 200 }),
+      );
+    globalThis.fetch = fetchMock;
+
+    await new RaindropSession().bookmarks(7, 0, 20, '  type:article important:true  ');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.raindrop.io/rest/v1/raindrops/7?page=0&perpage=20&search=type%3Aarticle+important%3Atrue',
+      expect.any(Object),
+    );
+  });
 });

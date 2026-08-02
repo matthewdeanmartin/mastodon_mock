@@ -1,35 +1,174 @@
-@if (loading()) {
-  <p class="muted center">Loading…</p>
-} @else if (!statuses().length) {
-  <p class="muted center">You haven't bookmarked anything yet.</p>
-} @else {
-  <div class="tabs">
-    @for (v of views; track v.id) {
-      <button class="tab" [class.active]="view() === v.id" (click)="view.set(v.id)">
-        {{ v.label }}
-      </button>
+@if (raindrop.connected()) {
+  <nav class="tabs provider-tabs" aria-label="Bookmark provider">
+    <button class="tab" [class.active]="provider() === 'native'" (click)="selectProvider('native')">
+      Native
+    </button>
+    <button
+      class="tab"
+      [class.active]="provider() === 'raindrop'"
+      (click)="selectProvider('raindrop')"
+    >
+      Raindrop
+    </button>
+  </nav>
+}
+
+@if (message()) {
+  <p class="notice success" role="status">{{ message() }}</p>
+}
+@if (error()) {
+  <p class="notice error" role="alert">{{ error() }}</p>
+}
+
+<form class="bookmark-filter" role="search" (submit)="applyFilter($event)">
+  <label for="bookmark-filter-input">Filter bookmarks</label>
+  <div class="filter-controls">
+    <input
+      id="bookmark-filter-input"
+      type="search"
+      [value]="filterDraft()"
+      [placeholder]="provider() === 'native' ? 'Words or author on this page' : 'Search Raindrop'"
+      (input)="filterDraft.set($any($event.target).value)"
+    />
+    <button class="btn" type="submit" [disabled]="provider() === 'raindrop' && raindropLoading()">
+      Filter
+    </button>
+    @if (filterDraft() || (provider() === 'native' ? nativeFilter() : raindropFilter())) {
+      <button class="btn btn-outline" type="button" (click)="clearFilter()">Clear</button>
     }
   </div>
+  <span class="muted small">
+    @if (provider() === 'native') {
+      Filters only the {{ statuses().length }} Native bookmarks on this page.
+    } @else {
+      Sent to Raindrop.io; text and Raindrop search operators are supported.
+    }
+  </span>
+</form>
 
-  @for (group of groups(); track group.label) {
-    @if (group.label && view() !== 'all') {
-      <h3 class="page-head">{{ group.label }} ({{ group.statuses.length }})</h3>
-    }
-    @if (!group.statuses.length) {
-      <p class="muted center">Nothing here.</p>
-    }
-    @for (s of group.statuses; track s.id) {
-      <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)" />
+@if (provider() === 'native') {
+  @if (loading()) {
+    <p class="muted center">Loading…</p>
+  } @else {
+    <nav class="tabs folder-tabs" aria-label="Native synthetic folders">
+      @for (v of views; track v.id) {
+        <button class="tab" [class.active]="view() === v.id" (click)="view.set(v.id)">
+          {{ v.label }}
+        </button>
+      }
+    </nav>
+
+    @if (!statuses().length) {
+      <p class="muted center">You haven't bookmarked anything here.</p>
+    } @else if (!filteredStatuses().length) {
+      <p class="muted center">No bookmarks on this page match that filter.</p>
+    } @else {
+      @for (group of groups(); track group.label) {
+        @if (group.label && view() !== 'all') {
+          <h3 class="page-head">{{ group.label }} ({{ group.statuses.length }})</h3>
+        }
+        @if (!group.statuses.length) {
+          <p class="muted center">Nothing here.</p>
+        }
+        @for (s of group.statuses; track s.id) {
+          <app-status-card
+            [status]="s"
+            (changed)="onChanged($event)"
+            (deleted)="onDeleted($event)"
+          />
+          @if (raindrop.connected()) {
+            <div class="conversion-row">
+              <button
+                class="btn btn-outline"
+                [disabled]="busy() !== null"
+                (click)="moveNativeToRaindrop(s)"
+              >
+                {{ busy() === 'native:' + s.id ? 'Moving…' : 'Move to Raindrop' }}
+              </button>
+            </div>
+          }
+        }
+      }
     }
   }
-
-  <div class="load-more-row">
-    @if (exhausted()) {
-      <span class="muted small">That's all your bookmarks.</span>
-    } @else {
-      <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+} @else {
+  <nav class="tabs folder-tabs" aria-label="Raindrop folders">
+    <button
+      class="tab"
+      [class.active]="raindropCollection() === 0"
+      (click)="selectRaindropCollection(0)"
+    >
+      All
+    </button>
+    @for (collection of collections(); track collection._id) {
+      <button
+        class="tab"
+        [class.active]="raindropCollection() === collection._id"
+        (click)="selectRaindropCollection(collection._id)"
+      >
+        {{ collection.title }}
       </button>
     }
-  </div>
+  </nav>
+
+  @if (raindropLoading()) {
+    <p class="muted center">Loading…</p>
+  } @else if (!raindropBookmarks().length) {
+    <p class="muted center">No Raindrop bookmarks in this folder.</p>
+  } @else {
+    <div class="raindrop-list">
+      @for (bookmark of raindropBookmarks(); track bookmark._id) {
+        <article class="raindrop-card">
+          @if (bookmark.cover) {
+            <img [src]="bookmark.cover" alt="" loading="lazy" referrerpolicy="no-referrer" />
+          }
+          <div class="raindrop-copy">
+            <a [href]="bookmark.link" target="_blank" rel="noopener noreferrer">
+              <strong>{{ bookmark.title || bookmark.link }}</strong>
+            </a>
+            @if (bookmark.excerpt) {
+              <p>{{ bookmark.excerpt }}</p>
+            }
+            <span class="muted small">{{ bookmark.link }}</span>
+          </div>
+          <button
+            class="btn btn-outline"
+            [disabled]="busy() !== null"
+            (click)="moveRaindropToNative(bookmark)"
+          >
+            {{ busy() === 'raindrop:' + bookmark._id ? 'Moving…' : 'Move to Native' }}
+          </button>
+        </article>
+      }
+    </div>
+  }
+}
+
+@if (!loading() && (provider() === 'native' || !raindropLoading())) {
+  <nav class="pager" aria-label="Bookmark pages">
+    <button
+      class="btn btn-outline"
+      [disabled]="provider() === 'native' ? nativePage() === 0 : raindropPage() === 0"
+      (click)="firstPage()"
+    >
+      First
+    </button>
+    <button
+      class="btn btn-outline"
+      [disabled]="provider() === 'native' ? nativePage() === 0 : raindropPage() === 0"
+      (click)="previousPage()"
+    >
+      Previous
+    </button>
+    <span class="muted small">
+      Page {{ (provider() === 'native' ? nativePage() : raindropPage()) + 1 }}
+    </span>
+    <button
+      class="btn btn-outline"
+      [disabled]="loadingMore() || (provider() === 'native' ? exhausted() : !raindropHasNext())"
+      (click)="nextPage()"
+    >
+      {{ loadingMore() ? 'Loading…' : 'Next' }}
+    </button>
+  </nav>
 }

@@ -24,6 +24,27 @@ interface RaindropErrorResponse {
 
 export type RaindropBookmarkTarget = 'post' | 'external-link';
 
+export interface RaindropCollection {
+  _id: number;
+  title: string;
+  count: number;
+}
+
+export interface RaindropBookmark {
+  _id: number;
+  title: string;
+  link: string;
+  excerpt: string;
+  created: string;
+  cover?: string;
+  collection: { $id: number };
+}
+
+interface RaindropListResponse<T> {
+  result: boolean;
+  items: T[];
+}
+
 /**
  * Browser-only Raindrop.io connection using the account's non-expiring Test token.
  *
@@ -76,6 +97,7 @@ export class RaindropSession implements ExpiringConnection {
     status: Status,
     target: RaindropBookmarkTarget,
     externalUrl?: string,
+    collectionId?: number,
   ): Promise<void> {
     const link = target === 'external-link' ? externalUrl : status.url;
     if (!link) {
@@ -84,10 +106,6 @@ export class RaindropSession implements ExpiringConnection {
           ? 'This post does not contain an external link to save.'
           : 'This post does not have a public URL to save.',
       );
-    }
-    const accessToken = this.token()?.accessToken;
-    if (!accessToken) {
-      throw new Error('Connect Raindrop.io in Settings → Connections first.');
     }
     const body =
       target === 'external-link'
@@ -98,18 +116,57 @@ export class RaindropSession implements ExpiringConnection {
             excerpt: plainText(status.content),
             pleaseParse: {},
           };
-    const response = await fetch('https://api.raindrop.io/rest/v1/raindrop', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      if (response.status === 401) this.disconnect();
-      throw new Error(await raindropError(response, "Raindrop.io couldn't save that bookmark."));
+    if (collectionId !== undefined) {
+      Object.assign(body, { collection: { $id: collectionId } });
     }
+    await this.request(
+      'https://api.raindrop.io/rest/v1/raindrop',
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+      "Raindrop.io couldn't save that bookmark.",
+    );
+  }
+
+  /** The first root collections, in Raindrop's own order. */
+  async collections(limit = 3): Promise<RaindropCollection[]> {
+    const response = await this.request(
+      'https://api.raindrop.io/rest/v1/collections',
+      {},
+      "Raindrop.io couldn't load your collections.",
+    );
+    const body = (await response.json()) as RaindropListResponse<RaindropCollection>;
+    return Array.isArray(body.items) ? body.items.slice(0, limit) : [];
+  }
+
+  /** Fetch one bounded, zero-based page from All or a collection. */
+  async bookmarks(
+    collectionId = 0,
+    page = 0,
+    perPage = 20,
+    search?: string,
+  ): Promise<RaindropBookmark[]> {
+    const params = new URLSearchParams({ page: String(page), perpage: String(perPage) });
+    if (search?.trim()) {
+      params.set('search', search.trim());
+    }
+    const response = await this.request(
+      `https://api.raindrop.io/rest/v1/raindrops/${collectionId}?${params.toString()}`,
+      {},
+      "Raindrop.io couldn't load your bookmarks.",
+    );
+    const body = (await response.json()) as RaindropListResponse<RaindropBookmark>;
+    return Array.isArray(body.items) ? body.items : [];
+  }
+
+  /** Remove one item after a successful conversion to a native bookmark. */
+  async removeBookmark(id: number): Promise<void> {
+    await this.request(
+      `https://api.raindrop.io/rest/v1/raindrop/${id}`,
+      { method: 'DELETE' },
+      "Raindrop.io couldn't remove the converted bookmark.",
+    );
   }
 
   disconnect(): void {
@@ -120,6 +177,26 @@ export class RaindropSession implements ExpiringConnection {
     localStorage.removeItem(LEGACY_CREDENTIALS_KEY_BASE);
     this.token.set(null);
     this.connected.set(false);
+  }
+
+  private async request(url: string, init: RequestInit, fallback: string): Promise<Response> {
+    const accessToken = this.token()?.accessToken;
+    if (!accessToken) {
+      throw new Error('Connect Raindrop.io in Settings → Connections first.');
+    }
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...init.headers,
+      },
+    });
+    if (!response.ok) {
+      if (response.status === 401) this.disconnect();
+      throw new Error(await raindropError(response, fallback));
+    }
+    return response;
   }
 }
 
