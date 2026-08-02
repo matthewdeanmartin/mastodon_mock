@@ -82,3 +82,27 @@
   overflow-wrap: anywhere;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+.anonymous-browsing summary {
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.anonymous-setting {
+  max-width: 620px;
+  padding-top: 14px;
+}
+
+.anonymous-setting label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.anonymous-setting p {
+  margin: 0 0 10px;
+}
+
+.anonymous-setting select {
+  min-width: 180px;
+}

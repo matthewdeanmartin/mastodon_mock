@@ -1,14 +1,12 @@
-<div class="settings-page">
-  <div class="page-head">
-    <div>
-      <h1>Signed-in accounts</h1>
-      <p class="muted">
-        Every credential saved in this browser, and the local data each one owns. Use this to clean
-        up duplicate logins, or to reset one account's local data without signing out of it.
-      </p>
-    </div>
-  </div>
+<div class="spage-head">
+  <h1>Signed-in accounts</h1>
+  <p>
+    Every credential saved in this browser, and the local data each one owns. Use this to clean up
+    duplicate logins, or to reset one account's local data without signing out of it.
+  </p>
+</div>
 
+<div class="settings-page">
   @if (notice()) {
     <p class="accounts-notice ok small">{{ notice() }}</p>
   }

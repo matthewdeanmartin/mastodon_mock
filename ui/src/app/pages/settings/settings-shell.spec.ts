@@ -23,7 +23,10 @@ describe('SettingsShell', () => {
     );
     expect(labels).toContain('Public profile');
     expect(labels).toContain('Filters');
-    expect(labels).toContain('Muted accounts');
+    expect(labels).toContain('Muted & Blocked');
+    expect(labels).toContain('Posting & Privacy');
+    expect(labels).not.toContain('Posting defaults');
+    expect(labels).not.toContain('Blocked accounts');
     expect(labels).toContain('Approve follow requests');
     expect(labels).toContain('Import/Export Friends');
     expect(labels).toContain('Import/Export Config');
@@ -42,7 +45,6 @@ describe('SettingsShell', () => {
     expect(labels).toEqual([
       'Public profile',
       'Server',
-      'Anonymous',
       'Mockingbird Blue',
       'Connections',
       'RSS feeds',

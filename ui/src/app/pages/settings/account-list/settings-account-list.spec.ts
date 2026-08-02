@@ -29,6 +29,7 @@ interface SettingsAccountListInternals {
   unfollow(acc: Account): void;
   alsoApply(acc: Account): void;
   convert(acc: Account): void;
+  show(kind: 'mutes' | 'blocks'): void;
 }
 
 function internals(fixture: ComponentFixture<SettingsAccountList>): SettingsAccountListInternals {
@@ -117,6 +118,14 @@ describe('SettingsAccountList', () => {
     fixture.detectChanges();
     flushPage([makeAccount('1')]);
     expect(internals(fixture).accounts().length).toBe(1);
+
+    const tabs = fixture.nativeElement.querySelectorAll(
+      '.restriction-tabs .tab',
+    ) as NodeListOf<HTMLButtonElement>;
+    expect(Array.from(tabs, (tab) => tab.textContent?.trim())).toEqual(['Mute', 'Block']);
+    internals(fixture).show('blocks');
+    flushPage([makeAccount('2')]);
+    expect(internals(fixture).kind()).toBe('blocks');
   });
 
   it('offers the amnesty matching the list it is showing', () => {
@@ -180,7 +189,11 @@ describe('SettingsAccountList', () => {
     flushPage([makeAccount('2')]);
 
     expect(internals(fixture).page()).toBe(1);
-    expect(internals(fixture).accounts().map((a) => a.id)).toEqual(['2']);
+    expect(
+      internals(fixture)
+        .accounts()
+        .map((a) => a.id),
+    ).toEqual(['2']);
     // No Link on that page: this is the end, and Next must go dead.
     expect(internals(fixture).lastPage()).toBe(1);
     expect(internals(fixture).canNext()).toBe(false);
@@ -200,7 +213,11 @@ describe('SettingsAccountList', () => {
     // which is what keeps clicking through a 280-entry list from pounding the
     // server on every Prev.
     expect(internals(fixture).page()).toBe(0);
-    expect(internals(fixture).accounts().map((a) => a.id)).toEqual(['1']);
+    expect(
+      internals(fixture)
+        .accounts()
+        .map((a) => a.id),
+    ).toEqual(['1']);
     httpMock.verify();
   });
 
@@ -217,7 +234,11 @@ describe('SettingsAccountList', () => {
     flushPage([makeAccount('3')]);
 
     expect(internals(fixture).page()).toBe(2);
-    expect(internals(fixture).accounts().map((a) => a.id)).toEqual(['3']);
+    expect(
+      internals(fixture)
+        .accounts()
+        .map((a) => a.id),
+    ).toEqual(['3']);
   });
 
   // ------------------------------------------------- convert / also-apply
@@ -246,7 +267,11 @@ describe('SettingsAccountList', () => {
     httpMock.expectOne('/api/v1/accounts/7/block').flush({});
 
     // No unmute: "block them as well" means both restrictions, not a swap.
-    expect(internals(fixture).accounts().map((a) => a.id)).toEqual(['7']);
+    expect(
+      internals(fixture)
+        .accounts()
+        .map((a) => a.id),
+    ).toEqual(['7']);
     expect(internals(fixture).isAlsoOther('7')).toBe(true);
   });
 
@@ -261,7 +286,11 @@ describe('SettingsAccountList', () => {
 
     // Block goes out first and the mute is still in place until it succeeds.
     httpMock.expectOne('/api/v1/accounts/7/block').flush({});
-    expect(internals(fixture).accounts().map((a) => a.id)).toEqual(['7']);
+    expect(
+      internals(fixture)
+        .accounts()
+        .map((a) => a.id),
+    ).toEqual(['7']);
 
     httpMock.expectOne('/api/v1/accounts/7/unmute').flush({});
     expect(internals(fixture).accounts()).toEqual([]);
@@ -305,7 +334,11 @@ describe('SettingsAccountList', () => {
     req.flush({});
 
     // Still muted, still listed — only the follow went away.
-    expect(internals(fixture).accounts().map((a) => a.id)).toEqual(['5']);
+    expect(
+      internals(fixture)
+        .accounts()
+        .map((a) => a.id),
+    ).toEqual(['5']);
     expect(internals(fixture).canUnfollow('5')).toBe(false);
   });
 

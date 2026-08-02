@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../../auth';
 import { MastodonServers } from '../../../mastodon-servers';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
+import { AnonymousPreferences } from '../../../providers/anonymous/anonymous-preferences';
 import { SettingsServer } from './settings-server';
 
 describe('SettingsServer', () => {
@@ -44,5 +45,16 @@ describe('SettingsServer', () => {
     expect(anonymous.server()).toBe('https://new.example');
     expect(anonymous.account().id).toBe(accountBefore.id);
     expect(auth.isAnonymous).toBe(true);
+
+    const details = fixture.nativeElement.querySelector(
+      '.anonymous-browsing',
+    ) as HTMLDetailsElement;
+    expect(details.textContent).toContain('Anonymous browsing');
+    (
+      fixture.componentInstance as unknown as {
+        setMaximumAge(days: number): void;
+      }
+    ).setMaximumAge(90);
+    expect(TestBed.inject(AnonymousPreferences).followedPostMaxAgeDays()).toBe(90);
   });
 });

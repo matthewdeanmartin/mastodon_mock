@@ -115,12 +115,8 @@ export const routes: Routes = [
           },
           {
             path: 'anonymous',
-            canActivate: [anonymousOnlyGuard],
-            data: { preloadSettings: true },
-            loadComponent: () =>
-              import('./pages/settings/anonymous/settings-anonymous').then(
-                (m) => m.SettingsAnonymous,
-              ),
+            pathMatch: 'full',
+            redirectTo: 'server',
           },
           {
             path: 'blue',
@@ -221,7 +217,7 @@ export const routes: Routes = [
           {
             path: 'privacy',
             canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Privacy and reach settings', preloadSettings: true },
+            data: { anonymousFeature: 'Posting and privacy settings', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/privacy/settings-privacy').then((m) => m.SettingsPrivacy),
           },
@@ -261,10 +257,8 @@ export const routes: Routes = [
           },
           {
             path: 'posting',
-            canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Posting defaults', preloadSettings: true },
-            loadComponent: () =>
-              import('./pages/settings/posting/settings-posting').then((m) => m.SettingsPosting),
+            pathMatch: 'full',
+            redirectTo: 'privacy',
           },
           {
             path: 'notifications',
@@ -283,9 +277,24 @@ export const routes: Routes = [
               import('./pages/settings/follows/settings-follows').then((m) => m.SettingsFollows),
           },
           {
+            path: 'moderation',
+            canActivate: [anonymousUnavailableGuard],
+            data: {
+              anonymousFeature: 'Muted and blocked accounts',
+              kind: 'mutes',
+              preloadSettings: true,
+            },
+            loadComponent: () =>
+              import('./pages/settings/account-list/settings-account-list').then(
+                (m) => m.SettingsAccountList,
+              ),
+          },
+          {
+            // Legacy deep links keep their selected list while the sidebar now
+            // exposes a single combined destination.
             path: 'mutes',
             canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Muted accounts', kind: 'mutes', preloadSettings: true },
+            data: { anonymousFeature: 'Muted accounts', kind: 'mutes' },
             loadComponent: () =>
               import('./pages/settings/account-list/settings-account-list').then(
                 (m) => m.SettingsAccountList,

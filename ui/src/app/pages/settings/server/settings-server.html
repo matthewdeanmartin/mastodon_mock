@@ -129,4 +129,26 @@
       </details>
     }
   </section>
+
+  <details class="ssection anonymous-browsing">
+    <summary>Anonymous browsing</summary>
+    <div class="anonymous-setting">
+      <label for="followed-post-max-age">
+        <strong>Maximum age of posts from followed accounts</strong>
+      </label>
+      <p class="muted small">
+        Older posts are left out when Anonymous builds Home. Posts from followed hashtags are not
+        affected.
+      </p>
+      <select
+        id="followed-post-max-age"
+        [ngModel]="anonymousPreferences.followedPostMaxAgeDays()"
+        (ngModelChange)="setMaximumAge($event)"
+      >
+        @for (option of ageOptions; track option.days) {
+          <option [ngValue]="option.days">{{ option.label }}</option>
+        }
+      </select>
+    </div>
+  </details>
 </div>

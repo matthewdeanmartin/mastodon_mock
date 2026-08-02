@@ -1,10 +1,11 @@
 <div class="spage-head">
-  <h1>Privacy and reach</h1>
-  <p>Control who can follow you and how your account is discovered.</p>
+  <h1>Posting & Privacy</h1>
+  <p>Control who sees your account and choose the defaults applied to new posts.</p>
 </div>
 
 <form class="spage-body" (ngSubmit)="save()">
   <div class="ssection">
+    <h2>Privacy and reach</h2>
     <div class="srow">
       <span class="slabel">Reach</span>
       <div class="scontrol">
@@ -40,6 +41,51 @@
         <span class="hint"
           >Signals to others that the account mainly performs automated actions.</span
         >
+      </div>
+    </div>
+  </div>
+
+  <div class="ssection">
+    <h2>Posting defaults</h2>
+    <div class="srow">
+      <span class="slabel">Posting privacy</span>
+      <div class="scontrol">
+        <select [ngModel]="privacy()" (ngModelChange)="privacy.set($event)" name="privacy">
+          <option value="public">Public</option>
+          <option value="unlisted">Quiet public</option>
+          <option value="private">Followers only</option>
+        </select>
+        <span class="hint">Default visibility for new posts. You can change it per post.</span>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Media</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="sensitive()"
+            (ngModelChange)="sensitive.set($event)"
+            name="sensitive"
+          />
+          Mark media as sensitive by default
+        </label>
+      </div>
+    </div>
+
+    <div class="srow">
+      <span class="slabel">Posting language</span>
+      <div class="scontrol">
+        <input
+          type="text"
+          maxlength="2"
+          placeholder="en"
+          [ngModel]="language()"
+          (ngModelChange)="language.set($event)"
+          name="language"
+        />
+        <span class="hint">Two-letter language code (ISO 639-1). Leave empty for no default.</span>
       </div>
     </div>
   </div>

@@ -1,7 +1,9 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Auth } from '../../../auth';
 import { MastodonServers } from '../../../mastodon-servers';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
+import { AnonymousPreferences } from '../../../providers/anonymous/anonymous-preferences';
 import { ServerDiscovery } from '../../../server-discovery/server-discovery';
 import { ServerPicker } from '../../../server-picker/server-picker';
 import { probeServerAvailability } from '../../../server-availability';
@@ -15,13 +17,14 @@ type ConnectionStatus = 'checking' | 'available' | 'degraded' | 'unreachable';
 /** Anonymous-only control for the public Mastodon instance used by read-only API calls. */
 @Component({
   selector: 'app-settings-server',
-  imports: [ServerDiscovery, ServerPicker, SearchServerDiscovery],
+  imports: [FormsModule, ServerDiscovery, ServerPicker, SearchServerDiscovery],
   templateUrl: './settings-server.html',
   styleUrl: './settings-server.css',
 })
 export class SettingsServer implements OnInit {
   private readonly auth = inject(Auth);
   private readonly anonymous = inject(AnonymousAccount);
+  protected readonly anonymousPreferences = inject(AnonymousPreferences);
   private readonly directory = inject(MastodonServers);
   private readonly searchCapability = inject(SearchCapability);
   protected readonly searchServer = inject(SearchServer);
@@ -35,6 +38,14 @@ export class SettingsServer implements OnInit {
   );
   protected readonly connectionStatus = signal<ConnectionStatus>('checking');
   protected readonly changed = signal(false);
+  protected readonly ageOptions = [
+    { days: 30, label: '30 days' },
+    { days: 90, label: '3 months' },
+    { days: 180, label: '6 months' },
+    { days: 365, label: '1 year' },
+    { days: 730, label: '2 years' },
+    { days: 1825, label: '5 years' },
+  ];
 
   ngOnInit(): void {
     void this.directory.ensureLoaded();
@@ -75,5 +86,9 @@ export class SettingsServer implements OnInit {
 
   protected forgetRejects(): void {
     this.rejects.clear();
+  }
+
+  protected setMaximumAge(days: string | number): void {
+    this.anonymousPreferences.setFollowedPostMaxAgeDays(Number(days));
   }
 }

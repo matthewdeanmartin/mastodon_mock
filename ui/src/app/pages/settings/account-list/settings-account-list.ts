@@ -12,8 +12,8 @@ type Kind = 'mutes' | 'blocks';
 const PAGE_SIZE = 40;
 
 /**
- * Muted accounts / Blocked accounts — one component, chosen by route data
- * `kind`.
+ * Combined muted / blocked account management, initially chosen by route data
+ * and switchable in place.
  *
  * Carries the matching amnesty action at the top, because looking at a list of
  * 200 blocks you no longer care about is exactly when you want to be rid of all
@@ -171,8 +171,17 @@ export class SettingsAccountList implements OnInit {
     });
   }
 
+  protected show(kind: Kind): void {
+    if (kind === this.kind()) {
+      return;
+    }
+    this.kind.set(kind);
+    this.asking.set(false);
+    this.reset();
+  }
+
   protected get title(): string {
-    return this.kind() === 'mutes' ? 'Muted accounts' : 'Blocked accounts';
+    return 'Muted & Blocked';
   }
 
   protected get subtitle(): string {
@@ -454,8 +463,7 @@ export class SettingsAccountList implements OnInit {
       return;
     }
     this.setBusy(acc.id, true);
-    const call =
-      this.kind() === 'mutes' ? this.api.block(acc.id) : this.api.muteAccount(acc.id);
+    const call = this.kind() === 'mutes' ? this.api.block(acc.id) : this.api.muteAccount(acc.id);
     call.subscribe({
       next: () => {
         const flagged = new Set(this.alsoOther()).add(acc.id);

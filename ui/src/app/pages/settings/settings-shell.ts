@@ -41,7 +41,6 @@ export class SettingsShell {
   protected readonly nav: SettingsNavItem[] = [
     { label: 'Public profile', path: 'profile', exact: true, anonymous: true },
     { label: 'Server', path: 'server', exact: true, anonymous: true, anonymousOnly: true },
-    { label: 'Anonymous', path: 'anonymous', exact: true, anonymous: true, anonymousOnly: true },
     // Client-side premium-style features; the same controls also live in Appearance.
     { label: 'Mockingbird Blue', path: 'blue', exact: true, anonymous: true },
     // Client-side (localStorage) accounts on other services: Bluesky, GitHub,
@@ -49,7 +48,7 @@ export class SettingsShell {
     { label: 'Connections', path: 'connections', exact: false, anonymous: true },
     // Many feeds rather than one account, so deliberately not a "connection".
     { label: 'RSS feeds', path: 'rss', exact: true, anonymous: true },
-    { label: 'Privacy and reach', path: 'privacy', exact: true },
+    { label: 'Posting & Privacy', path: 'privacy', exact: true },
     // Appearance is client-side (theme/accent/undo-send in localStorage) and works
     // against any instance; the page hides its server-backed rows off-mock itself.
     { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },
@@ -58,11 +57,9 @@ export class SettingsShell {
     // Path is 'spotlight' on purpose — see the route's comment in app.routes.ts.
     { label: 'Ads', path: 'spotlight', exact: true, anonymous: true },
     { label: 'Signed-in accounts', path: 'accounts', exact: true, anonymous: true },
-    { label: 'Posting defaults', path: 'posting', exact: true },
     { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
     { label: 'Approve follow requests', path: 'follows', exact: true },
-    { label: 'Muted accounts', path: 'mutes', exact: true },
-    { label: 'Blocked accounts', path: 'blocks', exact: true },
+    { label: 'Muted & Blocked', path: 'moderation', exact: true },
     // Sits under the two lists it can empty, and next to the follow-wide
     // retweet switches, because that is what all four of them operate on.
     { label: 'Bulk actions', path: 'bulk-actions', exact: true },

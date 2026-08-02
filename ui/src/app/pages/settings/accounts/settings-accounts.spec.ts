@@ -71,10 +71,15 @@ describe('SettingsAccounts', () => {
 
   it('lists every saved login plus the permanent Anonymous account', () => {
     seedTwoAccounts();
-    const rows = internals(setUp()).accounts();
+    const fixture = setUp();
+    const rows = internals(fixture).accounts();
 
     // Rows are keyed by the session's local id, never by its bearer token.
     expect(rows.map((r) => r.key)).toEqual(['mastodon:s0', 'mastodon:s1', 'anonymous']);
+    expect(fixture.nativeElement.querySelector('.spage-head p')?.textContent).toContain(
+      'Every credential saved',
+    );
+    expect(fixture.nativeElement.querySelector('.page-head p')).toBeNull();
   });
 
   it('marks the signed-in account and reports each account’s data size', () => {

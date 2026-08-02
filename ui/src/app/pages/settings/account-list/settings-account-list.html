@@ -3,6 +3,29 @@
   <p>{{ subtitle }}</p>
 </div>
 
+<div class="tabs restriction-tabs" role="tablist" aria-label="Account restriction">
+  <button
+    class="tab"
+    type="button"
+    role="tab"
+    [class.active]="kind() === 'mutes'"
+    [attr.aria-selected]="kind() === 'mutes'"
+    (click)="show('mutes')"
+  >
+    Mute
+  </button>
+  <button
+    class="tab"
+    type="button"
+    role="tab"
+    [class.active]="kind() === 'blocks'"
+    [attr.aria-selected]="kind() === 'blocks'"
+    (click)="show('blocks')"
+  >
+    Block
+  </button>
+</div>
+
 <!-- Amnesty: clear the whole list at once. Offered here as well as on the Bulk
      actions tab, because this page is where wanting it occurs to people. -->
 <div class="amnesty-bar">
@@ -114,7 +137,8 @@
       ‹ Previous
     </button>
     <span class="pager-status muted small">
-      Page {{ page() + 1 }}@if (lastPage() !== null) {
+      Page {{ page() + 1 }}
+      @if (lastPage() !== null) {
         of {{ lastPage()! + 1 }}
       }
       @if (rangeLabel()) {

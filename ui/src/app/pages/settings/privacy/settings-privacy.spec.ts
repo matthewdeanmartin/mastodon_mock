@@ -11,6 +11,9 @@ interface SettingsPrivacyInternals {
   locked: WritableSignal<boolean>;
   discoverable: WritableSignal<boolean>;
   bot: WritableSignal<boolean>;
+  privacy: WritableSignal<string>;
+  sensitive: WritableSignal<boolean>;
+  language: WritableSignal<string>;
   saved: WritableSignal<boolean>;
   save(): void;
 }
@@ -48,6 +51,7 @@ describe('SettingsPrivacy', () => {
     expect(internals(fixture).locked()).toBe(true);
     expect(internals(fixture).discoverable()).toBe(false);
     expect(internals(fixture).bot()).toBe(true);
+    expect(internals(fixture).privacy()).toBe('public');
   });
 
   it('save() PATCHes update_credentials with string booleans', () => {
@@ -57,6 +61,9 @@ describe('SettingsPrivacy', () => {
       .flush({ locked: false, discoverable: true, bot: false });
 
     internals(fixture).locked.set(true);
+    internals(fixture).privacy.set('private');
+    internals(fixture).sensitive.set(true);
+    internals(fixture).language.set('fr');
     internals(fixture).save();
 
     const req = httpMock.expectOne('/api/v1/accounts/update_credentials');
@@ -65,6 +72,9 @@ describe('SettingsPrivacy', () => {
     expect(body.get('locked')).toBe('true');
     expect(body.get('discoverable')).toBe('true');
     expect(body.get('bot')).toBe('false');
+    expect(body.get('source[privacy]')).toBe('private');
+    expect(body.get('source[sensitive]')).toBe('true');
+    expect(body.get('source[language]')).toBe('fr');
     req.flush({ locked: true, discoverable: true, bot: false });
 
     expect(internals(fixture).saved()).toBe(true);
