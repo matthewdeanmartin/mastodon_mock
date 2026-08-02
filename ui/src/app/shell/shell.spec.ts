@@ -193,7 +193,9 @@ describe('Shell account switching', () => {
     const link = fixture.nativeElement.querySelector(
       'a[href="/find-friends"]',
     ) as HTMLAnchorElement;
+    const canary = fixture.nativeElement.querySelector('a[href="canary/"]') as HTMLAnchorElement;
 
     expect(link.textContent).toContain('Find Friends');
+    expect(canary.textContent).toContain('Canary');
   });
 });

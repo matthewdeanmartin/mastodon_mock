@@ -71,22 +71,19 @@
           <p class="muted center">Nothing here.</p>
         }
         @for (s of group.statuses; track s.id) {
-          <app-status-card
-            [status]="s"
-            (changed)="onChanged($event)"
-            (deleted)="onDeleted($event)"
-          />
-          @if (raindrop.connected()) {
-            <div class="conversion-row">
-              <button
-                class="btn btn-outline"
-                [disabled]="busy() !== null"
-                (click)="moveNativeToRaindrop(s)"
-              >
-                {{ busy() === 'native:' + s.id ? 'Moving…' : 'Move to Raindrop' }}
-              </button>
-            </div>
-          }
+          <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)">
+            @if (raindrop.connected()) {
+              <div status-footer class="conversion-row">
+                <button
+                  class="btn btn-outline"
+                  [disabled]="busy() !== null"
+                  (click)="moveNativeToRaindrop(s)"
+                >
+                  {{ busy() === 'native:' + s.id ? 'Moving…' : 'Move to Raindrop' }}
+                </button>
+              </div>
+            }
+          </app-status-card>
         }
       }
     }

@@ -11,7 +11,7 @@
 .conversion-row {
   display: flex;
   justify-content: flex-end;
-  margin: -0.35rem 1rem 1rem;
+  margin-top: 0.75rem;
 }
 
 .notice {

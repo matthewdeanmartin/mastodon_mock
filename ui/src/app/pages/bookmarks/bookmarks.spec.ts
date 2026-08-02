@@ -256,6 +256,11 @@ describe('Bookmarks', () => {
     const status = makeStatus('42');
     status.url = 'https://social.example/@alan/42';
     httpMock.expectOne('/api/v1/bookmarks?limit=20').flush([status]);
+    fixture.detectChanges();
+
+    const conversion = fixture.nativeElement.querySelector('.conversion-row') as HTMLElement;
+    expect(conversion.closest('app-status-card')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-status-card + .conversion-row')).toBeNull();
 
     const moving = internals(fixture).moveNativeToRaindrop(status);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));

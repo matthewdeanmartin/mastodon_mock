@@ -80,6 +80,11 @@ describe('Profile block/unblock', () => {
     const fixture = setUp();
     const cmp = fixture.componentInstance as any;
     expect(cmp.relationship().blocking).toBe(false);
+    fixture.detectChanges();
+    const analyticsLabels = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ].filter((button) => button.textContent?.trim() === 'Analytics');
+    expect(analyticsLabels).toHaveLength(1);
 
     cmp.toggleBlock();
 

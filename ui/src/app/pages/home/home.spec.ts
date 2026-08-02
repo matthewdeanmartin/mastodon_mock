@@ -13,6 +13,7 @@ import { FakeStreaming } from '../../testing/fake-streaming';
 import { Home } from './home';
 import { Auth } from '../../auth';
 import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home-feed-cache';
+import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
 
 /** Exposes Home's protected signals for white-box testing. */
 interface HomeInternals {
@@ -179,8 +180,10 @@ describe('Home', () => {
     ).toEqual(['cached']);
     httpMock.expectNone((request) => request.url.includes('/statuses'));
 
+    const reset = vi.spyOn(TestBed.inject(AnonymousMastodonProvider), 'reset');
     fixture.componentInstance.load(true);
     expect(internals(fixture).statuses()).toEqual([]);
+    expect(reset).toHaveBeenCalledOnce();
   });
 
   // Home used to inject onboarding into a thin feed: an Eliza invite, the

@@ -412,6 +412,10 @@ export class Home implements OnInit, OnDestroy {
    * a single newest-first sort runs once the stream completes.
    */
   private loadAnonymousStreaming(): void {
+    // The aggregator resets only providers that are currently linked. Removing
+    // the final follow or hashtag makes this provider unlinked, so reset it
+    // explicitly or its old cursors keep paging posts from the removed source.
+    this.anonymousProvider.reset();
     let sawFirst = false;
     this.pageSub = this.anonymousProvider.fetchPageStreaming().subscribe({
       next: (snapshot) => {

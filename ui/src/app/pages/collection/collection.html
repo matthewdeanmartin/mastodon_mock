@@ -56,48 +56,73 @@
       </button>
     </div>
   } @else {
-    <!-- A list of names says little about whether you want these people in your
-         timeline. Sampling costs one request per member, so the size is the
-         reader's choice and nothing loads until they ask. -->
-    <div class="sample-box">
-      <label class="sample-field">
-        Sample of
-        <select
-          aria-label="How many members to sample"
-          [value]="sampleSize()"
-          (change)="setSampleSize($any($event.target).value)"
-        >
-          @for (n of sampleSizes; track n) {
-            <option [value]="n">{{ n }}</option>
-          }
-        </select>
-        members
-      </label>
-      <button class="btn btn-outline btn-sm" [disabled]="feedLoading()" (click)="loadSample()">
-        {{ feedLoading() ? 'Loading…' : sampled() ? 'Sample again' : 'Show me some posts' }}
+    <div class="tabs" role="tablist" aria-label="Bundled collection sections">
+      <button
+        class="tab"
+        type="button"
+        role="tab"
+        [class.active]="tab() === 'members'"
+        [attr.aria-selected]="tab() === 'members'"
+        (click)="setTab('members')"
+      >
+        Collection
       </button>
-      <span class="muted small">One request per member, picked at random.</span>
+      <button
+        class="tab"
+        type="button"
+        role="tab"
+        [class.active]="tab() === 'feed'"
+        [attr.aria-selected]="tab() === 'feed'"
+        (click)="setTab('feed')"
+      >
+        Posts
+      </button>
     </div>
 
-    @if (feedLoading()) {
-      <p class="muted center">Loading posts…</p>
-    } @else if (sampled()) {
-      @if (!feed().length) {
-        <p class="muted center">No recent posts from the members sampled.</p>
-      } @else {
-        @for (s of feed(); track s.id; let i = $index) {
-          <app-status-card
-            [status]="s"
-            (changed)="onChanged(i, $event)"
-            (deleted)="onDeleted($event)"
-          />
+    @if (tab() === 'feed') {
+      <!-- A list of names says little about whether you want these people in your
+           timeline. Sampling costs one request per member, so the size is the
+           reader's choice and nothing loads until they ask. -->
+      <div class="sample-box">
+        <label class="sample-field">
+          Sample of
+          <select
+            aria-label="How many members to sample"
+            [value]="sampleSize()"
+            (change)="setSampleSize($any($event.target).value)"
+          >
+            @for (n of sampleSizes; track n) {
+              <option [value]="n">{{ n }}</option>
+            }
+          </select>
+          members
+        </label>
+        <button class="btn btn-outline btn-sm" [disabled]="feedLoading()" (click)="loadSample()">
+          {{ feedLoading() ? 'Loading…' : sampled() ? 'Sample again' : 'Show me some posts' }}
+        </button>
+        <span class="muted small">One request per member, picked at random.</span>
+      </div>
+
+      @if (feedLoading()) {
+        <p class="muted center">Loading posts…</p>
+      } @else if (sampled()) {
+        @if (!feed().length) {
+          <p class="muted center">No recent posts from the members sampled.</p>
+        } @else {
+          @for (s of feed(); track s.id; let i = $index) {
+            <app-status-card
+              [status]="s"
+              (changed)="onChanged(i, $event)"
+              (deleted)="onDeleted($event)"
+            />
+          }
+          <div class="sample-rule muted small">—— end of sample ——</div>
         }
-        <div class="sample-rule muted small">—— end of sample ——</div>
       }
     }
   }
 
-  @if (tab() === 'feed') {
+  @if (tab() === 'feed' && !shipped()) {
     @if (feedLoading()) {
       <p class="muted center">Loading feed…</p>
     } @else if (!feed().length) {
@@ -111,7 +136,7 @@
         />
       }
     }
-  } @else {
+  } @else if (tab() === 'members') {
     @if (isOwner()) {
       <div class="add-member">
         <input

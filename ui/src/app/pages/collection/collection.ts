@@ -192,7 +192,10 @@ export class CollectionPage implements OnInit {
 
   setTab(tab: 'feed' | 'members'): void {
     this.tab.set(tab);
-    if (tab === 'feed') {
+    // Shipped collections use the explicit, bounded sample control on Posts;
+    // loading every member here would defeat that control and recreate the
+    // giant injected feed this split is meant to avoid.
+    if (tab === 'feed' && !this.shipped()) {
       this.loadFeed();
     }
   }

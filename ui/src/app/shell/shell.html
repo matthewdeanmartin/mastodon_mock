@@ -131,9 +131,9 @@
           <div class="menu-divider"></div>
           <a routerLink="/blog">Docs</a>
           @if (!isCanary) {
-            <a href="https://mawkingbird.com/canary/" target="_blank" rel="noopener noreferrer"
-              >Canary ↗</a
-            >
+            <!-- Relative to <base href>: /canary/ on the custom domain and
+                 /mawkingbird/canary/ on the github.io fallback. -->
+            <a href="canary/" target="_blank" rel="noopener noreferrer">Canary ↗</a>
           }
 
           @if (mockTooling || isStaff()) {

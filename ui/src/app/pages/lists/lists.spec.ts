@@ -3,11 +3,13 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Collection, UserList } from '../../models';
 import { RssCache } from '../../providers/rss/rss-cache';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { Lists } from './lists';
+import { TwitterFollows } from '../../providers/twitter/twitter-follows';
 
 /** Exposes Lists' protected signals for white-box testing. */
 interface ListsInternals {
@@ -66,11 +68,13 @@ function makeList(id: string, title = `List ${id}`): UserList {
 
 describe('Lists', () => {
   let httpMock: HttpTestingController;
+  let routeOnly: 'tags' | undefined;
 
   beforeEach(() => {
     // RSS subscriptions persist to localStorage, so a feed added by one test
     // would otherwise show up as a row in every test after it.
     localStorage.clear();
+    routeOnly = undefined;
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -78,6 +82,10 @@ describe('Lists', () => {
         provideRouter([]),
         // No IndexedDB in this environment; unsubscribing evicts through this.
         { provide: RssCache, useValue: { evict: () => Promise.resolve() } },
+        {
+          provide: ActivatedRoute,
+          useFactory: () => ({ snapshot: { data: routeOnly ? { only: routeOnly } : {} } }),
+        },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);
@@ -134,6 +142,18 @@ describe('Lists', () => {
     expect(internals(fixture).loading()).toBe(true);
     expect(internals(fixture).lists()).toEqual([]);
     httpMock.expectOne('/api/v1/lists').flush([]);
+  });
+
+  it('keeps Twitter accounts off the tags-only route', () => {
+    routeOnly = 'tags';
+    TestBed.inject(TwitterFollows).add({ username: 'NASA', displayName: 'NASA' });
+    const fixture = TestBed.createComponent(Lists);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/followed_tags').flush([]);
+    httpMock.expectOne('/api/v1/featured_tags').flush([]);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Twitter accounts');
   });
 
   // ------------------------------------------------------------------ RSS

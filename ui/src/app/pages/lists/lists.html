@@ -256,7 +256,7 @@
 <!-- Twitter accounts, like RSS, live entirely in this browser. Shown only once the
      connector is set up: an empty section advertising a connector that needs an
      API key and a CORS proxy would be noise on everyone else's Feeds page. -->
-@if (twitterFollows().length && showsSection('twitter')) {
+@if (shows('lists') && twitterFollows().length && showsSection('twitter')) {
   <div class="section-head">Twitter accounts</div>
   @for (f of twitterFollows(); track f.username) {
     <a class="list-row" [routerLink]="['/accounts', 'twitter:@' + f.username]">

@@ -190,6 +190,11 @@ describe('CollectionPage', () => {
     expect(internals(fixture).tab()).toBe('members');
     expect(internals(fixture).members()).toHaveLength(kit.itemCount);
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(kit.title);
+    const tabs = [...(fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]')].map(
+      (tab) => tab.textContent?.trim(),
+    );
+    expect(tabs).toEqual(['Collection', 'Posts']);
+    expect((fixture.nativeElement as HTMLElement).querySelector('.sample-box')).toBeNull();
   });
 
   // A preview used to link its members straight to the origin instance, which
@@ -227,6 +232,9 @@ describe('CollectionPage', () => {
     expect(internals(fixture).sampled()).toBe(false);
     httpMock.expectNone((r) => r.url.includes('/statuses'));
 
+    internals(fixture).setTab('feed');
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.sample-box')).not.toBeNull();
     internals(fixture).loadSample();
 
     // Default size is 5, so at most five member timelines get asked for.
