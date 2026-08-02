@@ -47,15 +47,27 @@
               <span class="doc-label">{{ row.target.label }}</span>
               <span class="muted small doc-hostname">{{ row.target.host }}</span>
             </span>
-            <span
-              class="doc-verdict"
-              [class.doc-ok]="row.verdict === 'reachable'"
-              [class.doc-bad]="row.verdict === 'failed' || row.verdict === 'timeout'"
-            >
-              {{ verdictLabel(row.verdict) }}
+            <span class="doc-verdict-wrap">
+              @if (row.timing) {
+                <span class="muted small doc-timing">{{ row.timing }}</span>
+              }
+              <span
+                class="doc-verdict"
+                [class.doc-ok]="row.verdict === 'reachable'"
+                [class.doc-bad]="row.verdict === 'failed' || row.verdict === 'timeout'"
+              >
+                {{ verdictLabel(row.verdict) }}
+              </span>
             </span>
           </div>
           <p class="muted small doc-matters">{{ row.target.matters }}</p>
+
+          @if (row.corsHint; as hint) {
+            <p class="small doc-cors" [class.doc-cors-blocked]="row.corsBlocked">{{ hint }}</p>
+          }
+          @if (row.timingHint; as hint) {
+            <p class="muted small doc-timing-hint">{{ hint }}</p>
+          }
 
           @if (row.verdict === 'failed' || row.verdict === 'timeout') {
             <div class="doc-followup">
@@ -97,18 +109,63 @@
   </section>
 }
 
+@if (hasRun() && corsBlockedRows().length) {
+  <section class="doc-group">
+    <h2 class="section-title">About “just disable CORS”</h2>
+    <p class="muted small">
+      These hosts answer your browser but will not let this app read the reply:
+    </p>
+    <ul class="doc-cors-list">
+      @for (row of corsBlockedRows(); track row.target.id) {
+        <li class="small">
+          <strong>{{ row.target.host }}</strong> — {{ row.target.label }}
+        </li>
+      }
+    </ul>
+    <p class="muted small">
+      It is tempting to reach for a browser extension that turns CORS off, and you will find people
+      recommending exactly that. It is a bad trade: those extensions cannot be scoped to a couple of
+      domains in any meaningful way, so you would be disabling a protection that applies to your
+      bank and your webmail in order to read a timeline — and the moment you forget it is on, every
+      site you visit is running with it.
+    </p>
+    <p class="muted small">
+      There is also nothing to whitelist. Refusing is the <em>host's</em> decision, made on their
+      server; nothing installed on this side changes their mind. That is exactly what a
+      <a [routerLink]="['/settings/connections/cors-proxy']">CORS proxy</a> is for — it fetches on
+      your behalf from somewhere the rule does not apply, and it is scoped to this app instead of to
+      your whole browser.
+    </p>
+  </section>
+}
+
 <section class="doc-group">
   <h2 class="section-title">What this can and cannot tell you</h2>
   <p class="muted small">
     A background request that fails reports nothing at all to JavaScript — not a status, not a
     reason. That is the browser's own privacy rule, not a gap in this page: a site is not allowed to
     learn what else your network can reach. So a red row means only "this did not answer", and the
-    cause could be a firewall, DNS filtering, an extension, or a service having a bad day.
+    cause could be a firewall, DNS filtering, an extension, a bot check, or a service having a bad
+    day.
   </p>
   <p class="muted small">
     Opening the host in a tab is the missing half. A top-level page load isn't subject to those
     rules, so the browser will show you the block page, the certificate warning or the DNS error
     directly. Those pages are privileged and unreadable from script, which is why the page has to
     ask you what you saw rather than detecting it.
+  </p>
+  <p class="muted small">
+    It also catches the case that isn't an error at all: if a service greets you with “verify you
+    are human”, your network is fine and the service simply doesn't want traffic it can't identify.
+    Worth knowing, because clearing that challenge in a tab does not make the connector start
+    working.
+  </p>
+  <p class="muted small">
+    Each row is checked twice, which is why “reachable” and “readable” are reported separately. The
+    first request only asks whether the bytes arrive; the second asks whether this app is allowed to
+    look at them. A red row failed the <em>first</em> question, so CORS was never involved and no
+    browser extension can rescue it — the traffic isn't getting through at all. How long a row took
+    is shown for the same reason: a refusal comes back in milliseconds, while traffic being silently
+    discarded takes seconds to give up.
   </p>
 </section>

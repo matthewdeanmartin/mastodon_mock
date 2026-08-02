@@ -4,6 +4,7 @@ import { Server } from '../../../../server';
 import { ConnectionDoctor } from './connection-doctor';
 import {
   CATEGORY_LABELS,
+  corsHint,
   homeServerTarget,
   interpret,
   PROBE_TARGETS,
@@ -12,12 +13,21 @@ import {
   ProbeVerdict,
   REPORTED_OPTIONS,
   ReportedOutcome,
+  timingHint,
 } from './connection-doctor-catalog';
 
 /** A target joined to its verdict and whatever the user reported about it. */
 export interface DoctorRow {
   target: ProbeTarget;
   verdict: ProbeVerdict;
+  /** How long the probe took, already formatted. Null before a run. */
+  timing: string | null;
+  /** What that duration suggests, when it suggests anything. */
+  timingHint: string | null;
+  /** Whether this app may read the host's replies, once it is reachable. */
+  corsHint: string | null;
+  /** True when the host answers but refuses to be read — the proxy case. */
+  corsBlocked: boolean;
   reported: ReportedOutcome | null;
   /** The combined reading, once both halves are in. */
   interpretation: string | null;
@@ -70,16 +80,25 @@ export class ConnectionDoctorPage {
   });
 
   protected readonly groups = computed<DoctorGroup[]>(() => {
-    const verdicts = this.doctor.verdicts();
+    const results = this.doctor.results();
     const reports = this.reports();
     const groups = new Map<ProbeCategory, DoctorGroup>();
 
     for (const target of this.targets()) {
-      const verdict = verdicts[target.id] ?? 'idle';
+      const result = results[target.id] ?? {
+        verdict: 'idle' as ProbeVerdict,
+        cors: 'unknown' as const,
+        ms: null,
+      };
+      const verdict = result.verdict;
       const reported = reports[target.id] ?? null;
       const row: DoctorRow = {
         target,
         verdict,
+        timing: result.ms !== null && verdict !== 'checking' ? formatDuration(result.ms) : null,
+        timingHint: timingHint(result),
+        corsHint: corsHint(result),
+        corsBlocked: verdict === 'reachable' && result.cors === 'blocked',
         reported,
         // Only meaningful once the probe has actually run: pairing a report
         // with 'idle' would let the page state a cause it has not tested.
@@ -111,6 +130,18 @@ export class ConnectionDoctorPage {
   protected readonly blockedCount = computed(
     () =>
       this.allRows().filter((row) => row.verdict === 'failed' || row.verdict === 'timeout').length,
+  );
+
+  /**
+   * Hosts that answer but refuse to be read — the population a CORS proxy
+   * exists for, and the one a "disable CORS" extension would appear to fix
+   * while breaking a browser-wide protection to do it.
+   */
+  protected readonly corsBlockedRows = computed(() =>
+    // The control is excluded deliberately: it exists only to prove the test
+    // works, so telling the reader it needs a proxy is advice about a host
+    // they will never connect to.
+    this.allRows().filter((row) => row.corsBlocked && row.target.category !== 'control'),
   );
 
   /**
@@ -162,6 +193,10 @@ export class ConnectionDoctorPage {
   protected verdictLabel(verdict: ProbeVerdict): string {
     return VERDICT_LABELS[verdict];
   }
+}
+
+function formatDuration(ms: number): string {
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
 /**

@@ -63,7 +63,8 @@ describe('ConnectionDoctorPage', () => {
     const fixture = setUp();
     await check(fixture);
 
-    expect(fetchMock).toHaveBeenCalledTimes(PROBE_TARGETS.length);
+    // Two per host: reachability, then readability.
+    expect(fetchMock).toHaveBeenCalledTimes(PROBE_TARGETS.length * 2);
     expect(rowFor(fixture, 'openrouter.ai').textContent).toContain('Reachable');
     expect(el(fixture).textContent).toContain(`${PROBE_TARGETS.length} reachable, 0 blocked`);
   });
@@ -112,6 +113,103 @@ describe('ConnectionDoctorPage', () => {
     // The payoff: page loads + request fails rules the network out entirely.
     const reading = rowFor(fixture, 'openrouter.ai').querySelector('.doc-interpretation');
     expect(reading?.textContent).toContain('CORS');
+  });
+
+  it('offers the bot-check outcome, and reads it as a service problem not a network one', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.includes('is.gd')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    vi.stubGlobal('open', vi.fn());
+    const fixture = setUp();
+    await check(fixture);
+
+    rowFor(fixture, 'is.gd').querySelector<HTMLButtonElement>('.doc-followup button')!.click();
+    fixture.detectChanges();
+
+    const botCheck = [
+      ...rowFor(fixture, 'is.gd').querySelectorAll<HTMLInputElement>('.doc-report input'),
+    ].find((input) => input.value === 'bot-check')!;
+    expect(botCheck).toBeDefined();
+    botCheck.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    // A Cloudflare interstitial exonerates the network while still meaning the
+    // connector is dead — the one pairing the other five answers cannot state.
+    const reading = rowFor(fixture, 'is.gd').querySelector('.doc-interpretation');
+    expect(reading?.textContent).toContain('your network is fine');
+  });
+
+  it('names the CORS-blocked hosts and argues against the extension fix', async () => {
+    // Reachable, but refusing to be read — the population a proxy is for.
+    fetchMock.mockImplementation((url: string, init: RequestInit) =>
+      init.mode === 'cors' && url.includes('openrouter.ai')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    const fixture = setUp();
+    await check(fixture);
+
+    const text = el(fixture).textContent ?? '';
+    expect(text).toContain('About “just disable CORS”');
+    // The specific host is named, since "which domains?" is the question asked.
+    expect(el(fixture).querySelector('.doc-cors-list')?.textContent).toContain('openrouter.ai');
+    // And the answer to it: there is nothing to whitelist, because the refusal
+    // is made on their server.
+    expect(text).toContain('nothing to whitelist');
+    expect(text).toContain('bank and your webmail');
+  });
+
+  it('keeps the CORS advice off the page when nothing is CORS-blocked', async () => {
+    const fixture = setUp();
+    await check(fixture);
+    expect(el(fixture).textContent).not.toContain('About “just disable CORS”');
+  });
+
+  it('never blames CORS for a host it could not reach', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    const fixture = setUp();
+    await check(fixture);
+
+    // A red row failed the reachability question, where CORS never applied —
+    // and saying otherwise is what sends people to a fix that cannot work.
+    expect(el(fixture).querySelector('.doc-cors-list')).toBeNull();
+    expect(rowFor(fixture, 'openrouter.ai').querySelector('.doc-cors')).toBeNull();
+  });
+
+  it('shows how long each host took, and what an instant failure suggests', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.includes('openrouter.ai')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    const fixture = setUp();
+    await check(fixture);
+
+    const row = rowFor(fixture, 'openrouter.ai');
+    expect(row.querySelector('.doc-timing')?.textContent).toMatch(/\d+(ms|\.\ds)/);
+    // A mocked rejection returns immediately, which is the local-blocker shape.
+    expect(row.querySelector('.doc-timing-hint')?.textContent).toContain(
+      'too fast for anything to have gone out',
+    );
+  });
+
+  it('keeps the control host out of the proxy advice', async () => {
+    fetchMock.mockImplementation((_url: string, init: RequestInit) =>
+      init.mode === 'cors'
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : Promise.resolve(new Response()),
+    );
+    const fixture = setUp();
+    await check(fixture);
+
+    // example.com is CORS-blocked like most of the web, but it exists only to
+    // prove the test works — advising a proxy for it is advice about a host
+    // nobody will ever connect to.
+    const named = el(fixture).querySelector('.doc-cors-list')?.textContent ?? '';
+    expect(named).toContain('openrouter.ai');
+    expect(named).not.toContain('example.com');
   });
 
   it('warns that nothing is trustworthy when the control host fails', async () => {

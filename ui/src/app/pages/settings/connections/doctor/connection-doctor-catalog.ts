@@ -34,6 +34,12 @@
  * error page — a corporate block page, a certificate warning, `DNS_PROBE_
  * FINISHED_NXDOMAIN`. Those pages are privileged and unreadable from script, so
  * the user reports what they saw and {@link interpret} combines the two.
+ *
+ * The tab also reveals things that are not error pages at all. A Cloudflare
+ * "verify you are human" interstitial is the important one, and it is why
+ * `bot-check` is a first-class outcome: it exonerates the network completely
+ * while still meaning the connector cannot work, which is a combination none of
+ * the other answers can express.
  */
 
 /** Groups the probe list so a blocked *category* is visible at a glance. */
@@ -277,9 +283,42 @@ export type ProbeVerdict =
   /** The request ran out of time without an answer. */
   | 'timeout';
 
+/**
+ * Whether this origin may *read* the host's replies, as opposed to merely
+ * reaching it.
+ *
+ * A distinct axis from {@link ProbeVerdict}, and keeping them apart is the
+ * point: "the bytes never arrived" and "the bytes arrived but the browser will
+ * not let me look at them" have completely different remedies, and only the
+ * second is what a CORS proxy is for. `unknown` is the honest answer whenever
+ * the host was never reached, since a CORS result would be meaningless there.
+ */
+export type CorsReadable = 'unknown' | 'readable' | 'blocked';
+
+export interface ProbeResult {
+  verdict: ProbeVerdict;
+  cors: CorsReadable;
+  /**
+   * How long the reachability probe took, in milliseconds. Null before a run.
+   *
+   * Kept because the *shape* of a failure is itself evidence: a refusal comes
+   * back in milliseconds, while a firewall silently discarding packets takes
+   * seconds to give up. See {@link timingHint}.
+   */
+  ms: number | null;
+}
+
 /** What the user says the browser showed them in the new tab. */
 export type ReportedOutcome =
   | 'loaded'
+  /**
+   * A Cloudflare "verify you are human" interstitial, or any equivalent bot
+   * check. Deliberately its own outcome rather than a flavour of `loaded`:
+   * the host is reachable and answering, so the *network* is exonerated, but
+   * the connector still cannot work and will keep breaking after it appears to
+   * be fixed. Neither "it loaded" nor "I was blocked" describes that.
+   */
+  | 'bot-check'
   | 'block-page'
   | 'cert-warning'
   | 'dns-error'
@@ -298,6 +337,7 @@ export interface ReportedOption {
  */
 export const REPORTED_OPTIONS: readonly ReportedOption[] = [
   { value: 'loaded', label: 'The site loaded normally' },
+  { value: 'bot-check', label: 'A “verify you are human” or CAPTCHA check' },
   { value: 'block-page', label: 'A block page from my network or workplace' },
   { value: 'cert-warning', label: 'A certificate or security warning' },
   { value: 'dns-error', label: "The browser couldn't find the server" },
@@ -321,6 +361,10 @@ export function interpret(verdict: ProbeVerdict, reported: ReportedOutcome): str
       return jsWorked
         ? 'Both worked. This host is fine on this network.'
         : 'The page loads but the background request does not. That points at CORS, a browser extension or an ad blocker rather than a network block — the host itself is reachable from here.';
+    case 'bot-check':
+      return jsWorked
+        ? 'The service is putting a bot check in front of its website, but the background request still went through — so this is about their front door, not about your connection. Nothing to do.'
+        : 'Good news and bad news: your network is fine — the host answered, it just refused to trust the visitor. A bot check cannot be passed by a background request, because there is nobody there to click it, so the connector will keep failing even after you clear the challenge in that tab. This is the service deciding it does not want browser traffic it cannot identify. A CORS proxy sometimes gets past it, and often gets the same check pointed at the proxy instead.';
     case 'block-page':
       return 'Your network or workplace is filtering this host on purpose. Nothing in the app can work around that; it needs to be allowed by whoever runs the network.';
     case 'cert-warning':
@@ -334,4 +378,91 @@ export function interpret(verdict: ProbeVerdict, reported: ReportedOutcome): str
         ? 'The background request succeeded, so the host is reachable — whatever the tab showed is about that page, not about connectivity.'
         : 'The background request failed too. Worth a second run: if the control row at the bottom also failed, the problem is the whole network rather than this host.';
   }
+}
+
+/**
+ * What the *duration* of a failure suggests, for the cases in between.
+ *
+ * How long a request takes to fail is one of the few extra signals a browser
+ * still gets, because the timing is a property of the connection attempt rather
+ * than of the response, and so escapes the cross-origin blackout. The shapes
+ * are genuinely distinguishable:
+ *
+ * - **Instant failure (under ~20ms)**: nothing was ever sent over the network.
+ *   A DNS answer already cached as NXDOMAIN, or — most often on a managed
+ *   machine — an extension or policy cancelling the request before it leaves
+ *   the browser.
+ * - **Roughly one round trip (~20ms to 1.5s)**: it reached something, which
+ *   refused it. A host declining browser traffic and a filtering proxy that
+ *   answers rather than drops both look like this.
+ * - **Slow failure short of the timeout**: something along the path deliberated
+ *   before giving up, which is more typical of a filter than of a dead host.
+ * - **Ran to the timeout**: nothing answered at all. Silent packet discard,
+ *   which is what most corporate firewalls do to a host on a blocklist.
+ *
+ * The cutoffs are measured rather than guessed — real refusals from nearby
+ * hosts came back in 50-350ms, so an earlier 100ms "this must be local"
+ * threshold was misreading ordinary refusals as extension blocks.
+ *
+ * Returns null when the timing adds nothing to what the verdict already says —
+ * a hint on every row would be noise, and noise is how a diagnostic stops being
+ * read.
+ */
+export function timingHint(result: ProbeResult): string | null {
+  const { verdict, ms } = result;
+  if (ms === null) {
+    return null;
+  }
+  if (verdict === 'timeout') {
+    return 'Nothing answered before the deadline. Traffic to this host is most likely being discarded silently rather than refused — the usual signature of a firewall blocklist.';
+  }
+  if (verdict !== 'failed') {
+    // A slow success is worth flagging: it works, but it is the kind of slow
+    // that makes a feature feel broken, and AllOrigins is exactly this.
+    return ms >= 5000
+      ? `Reachable, but slow — ${formatMs(ms)}. Features using this host will feel sluggish even though nothing is blocked.`
+      : null;
+  }
+  // Thresholds measured against real hosts rather than guessed: a genuine
+  // round trip to a nearby server lands around 50-350ms, so the earlier
+  // "instant means local" cutoff of 100ms was calling ordinary refusals
+  // extension blocks. Only single-digit milliseconds is fast enough to prove
+  // nothing went out on the wire.
+  if (ms < 20) {
+    return `Failed instantly (${formatMs(ms)}) — too fast for anything to have gone out over the network. That points at something inside the browser: an extension, an ad blocker, or a DNS failure already cached.`;
+  }
+  if (ms < 1500) {
+    return `Failed after ${formatMs(ms)}, which is about one round trip — so it reached something that refused it, rather than being ignored. A host declining browser traffic looks like this, as does a filter that answers rather than drops.`;
+  }
+  return `Failed after ${formatMs(ms)}, without running out the clock. Something along the path took its time before giving up, which is more typical of a filtering proxy than of a host that is simply down.`;
+}
+
+function formatMs(ms: number): string {
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+}
+
+/**
+ * What the CORS leg means, for a host already proven reachable.
+ *
+ * This is the answer to "which domains do I need to whitelist?" — and the
+ * answer is that whitelisting is the wrong tool. A blocked reply is the *host*
+ * choosing not to send `Access-Control-Allow-Origin`, so nothing installed on
+ * this side changes their decision. An extension that strips CORS locally makes
+ * this one page work while disabling a protection that applies to every site in
+ * the browser, which is a genuinely bad trade for reading a timeline.
+ *
+ * Returns null when the host was never reached, where a CORS verdict would be
+ * meaningless and stating one would invite exactly the wrong fix.
+ */
+export function corsHint(result: ProbeResult): string | null {
+  if (result.verdict !== 'reachable') {
+    return null;
+  }
+  if (result.cors === 'readable') {
+    return 'This app can read its replies directly — no proxy needed.';
+  }
+  if (result.cors === 'blocked') {
+    return 'Reachable, but it refuses to let this app read the reply: the host does not send the header that would permit it. That is their policy, not a fault on your network, and not something a browser setting can grant you. Mawkingbird routes these through a CORS proxy instead.';
+  }
+  return null;
 }

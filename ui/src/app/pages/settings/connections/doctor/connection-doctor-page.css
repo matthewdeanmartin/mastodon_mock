@@ -90,8 +90,41 @@
   color: #d63b3b;
 }
 
+.doc-verdict-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+/* Secondary to the verdict it sits beside: the number is evidence for the
+   hint below, not a headline of its own. */
+.doc-timing {
+  font-variant-numeric: tabular-nums;
+}
+
 .doc-matters {
   margin: 4px 0 0;
+}
+
+.doc-cors,
+.doc-timing-hint {
+  margin: 6px 0 0;
+}
+
+/* The readable/blocked line is the one that decides whether a proxy is needed,
+   so a blocked host is marked — but in the neutral warning colour, not the red
+   used for unreachable. It is a different kind of problem with a real fix. */
+.doc-cors-blocked {
+  color: #a06a00;
+}
+
+.doc-cors-list {
+  margin: 6px 0 10px;
+  padding-left: 22px;
+}
+
+.doc-cors-list li {
+  margin: 2px 0;
 }
 
 .doc-followup {
