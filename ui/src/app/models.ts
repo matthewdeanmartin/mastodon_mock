@@ -54,6 +54,8 @@ export interface Account {
   bot: boolean;
   locked: boolean;
   discoverable?: boolean | null;
+  indexable?: boolean | null;
+  noindex?: boolean | null;
   fields: AccountField[];
   // Present on verify_credentials (CredentialAccount): the current user's role, or null.
   role?: Role | null;

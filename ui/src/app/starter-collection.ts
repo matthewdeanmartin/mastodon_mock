@@ -1,10 +1,19 @@
 import { Account } from './models';
+import { BUNDLED_STARTER_KITS } from './bundled-starter-kits.generated';
 
 /** A code-shipped account snapshot used to make Anonymous follows instant and offline-first. */
 export interface StarterAccount {
   name: string;
   handle: string;
   account: Account;
+}
+
+/** A developer-curated starter kit backed by home-instance account snapshots. */
+export interface StarterKit {
+  slug: string;
+  title: string;
+  blurb: string;
+  accounts: readonly StarterAccount[];
 }
 
 function starter(name: string, handle: string, id: string): StarterAccount {
@@ -63,3 +72,27 @@ export const STARTER_COLLECTION: readonly StarterAccount[] = [
   starter('Medieval Illumination', 'medieval_illuminations@mastodon.social', '111014458979366278'),
   starter('LucasArts Places', 'lucasarts_places@mastodon.social', '113427937216241635'),
 ];
+
+export const STARTER_KITS: readonly StarterKit[] = [
+  {
+    slug: 'starter',
+    title: 'Universal starter kit',
+    blurb:
+      'A general-purpose mix of projects, reporting, art, history, science, and delightful bots — the one to take if you have no idea where to begin.',
+    accounts: STARTER_COLLECTION,
+  },
+  ...BUNDLED_STARTER_KITS.map((kit) => ({
+    slug: kit.slug,
+    title: kit.title,
+    blurb: kit.blurb,
+    accounts: kit.accounts.map((account) => ({
+      name: account.display_name || account.username,
+      handle: account.acct,
+      account,
+    })),
+  })),
+];
+
+export function starterKit(slug: string): StarterKit | null {
+  return STARTER_KITS.find((kit) => kit.slug === slug) ?? null;
+}

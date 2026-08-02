@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STARTER_COLLECTION } from './starter-collection';
+import { STARTER_COLLECTION, STARTER_KITS } from './starter-collection';
 
 // The starter roster evolves — accounts come and go. These tests assert the
 // invariants that must always hold, not a frozen count or a specific line-up.
@@ -24,5 +24,18 @@ describe('STARTER_COLLECTION', () => {
     expect(STARTER_COLLECTION.some((account) => account.handle.endsWith('@botsin.space'))).toBe(
       false,
     );
+  });
+
+  it('ships ten themed kits whose account ids came from their home instances', () => {
+    expect(STARTER_KITS).toHaveLength(11);
+    for (const kit of STARTER_KITS.slice(1)) {
+      expect(kit.accounts.length).toBeGreaterThanOrEqual(5);
+      for (const item of kit.accounts) {
+        expect(item.account.id).not.toBe('');
+        expect(item.account.discoverable).not.toBe(false);
+        expect(item.account.indexable).not.toBe(false);
+        expect(item.account.noindex).not.toBe(true);
+      }
+    }
   });
 });

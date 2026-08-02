@@ -6,14 +6,14 @@
   set or pick through it.
 </p>
 
-@for (kit of kits; track kit.link) {
-  <a class="kit-row" [routerLink]="kit.link">
+@for (kit of kits; track kit.slug) {
+  <a class="kit-row" [routerLink]="linkFor(kit.slug)">
     <div class="kit-icon" aria-hidden="true">M</div>
     <div class="kit-body">
       <strong>{{ kit.title }}</strong>
       <p class="muted small">{{ kit.blurb }}</p>
       <span class="muted small">
-        {{ kit.memberCount }} account{{ kit.memberCount === 1 ? '' : 's' }} · open the kit →
+        {{ kit.accounts.length }} account{{ kit.accounts.length === 1 ? '' : 's' }} · open the kit →
       </span>
     </div>
   </a>

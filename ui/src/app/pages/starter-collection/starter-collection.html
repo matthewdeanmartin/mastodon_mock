@@ -1,12 +1,9 @@
-<div class="page-head">Starter collection</div>
+<div class="page-head">{{ kit.title }}</div>
 
 <section class="intro">
   <div>
     <h1>A timeline in one click</h1>
-    <p class="muted">
-      A built-in mix of Fediverse projects, public-interest reporting, art, history, science, and
-      delightful bots.
-    </p>
+    <p class="muted">{{ kit.blurb }}</p>
   </div>
   <button
     class="btn"
@@ -23,7 +20,7 @@
   </button>
 </section>
 
-<div class="members" aria-label="Starter collection accounts">
+<div class="members" [attr.aria-label]="kit.title + ' accounts'">
   @for (item of accounts; track item.handle) {
     <div class="member">
       <button

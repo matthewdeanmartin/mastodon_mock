@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { STARTER_COLLECTION } from '../../starter-collection';
+import { STARTER_COLLECTION, STARTER_KITS } from '../../starter-collection';
 import { BundledStarterKits } from './bundled-starter-kits';
 
 describe('BundledStarterKits', () => {
@@ -22,6 +22,20 @@ describe('BundledStarterKits', () => {
     expect(row.getAttribute('href')).toBe('/collections/starter');
     expect(row.textContent).toContain('Universal starter kit');
     expect(row.textContent).toContain(`${STARTER_COLLECTION.length} accounts`);
+  });
+
+  it('links all eleven bundled kits with their validated member counts', () => {
+    const rows = [...render().querySelectorAll('a.kit-row')] as HTMLAnchorElement[];
+
+    expect(rows).toHaveLength(11);
+    expect(STARTER_KITS).toHaveLength(11);
+    for (const [index, kit] of STARTER_KITS.entries()) {
+      expect(rows[index].textContent).toContain(kit.title);
+      expect(rows[index].textContent).toContain(`${kit.accounts.length} accounts`);
+      expect(rows[index].getAttribute('href')).toBe(
+        kit.slug === 'starter' ? '/collections/starter' : `/collections/starter/${kit.slug}`,
+      );
+    }
   });
 
   // These are ours, and the page must not imply otherwise — that is the whole

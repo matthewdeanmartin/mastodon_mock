@@ -1,5 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -7,7 +7,7 @@ import { ImportFollows } from '../../import-follows';
 import { Account } from '../../models';
 import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
-import { STARTER_COLLECTION, StarterAccount } from '../../starter-collection';
+import { starterKit, StarterAccount } from '../../starter-collection';
 
 @Component({
   selector: 'app-starter-collection',
@@ -20,8 +20,11 @@ export class StarterCollection implements OnInit {
   private api = inject(Api);
   private auth = inject(Auth);
   private anonymousPublic = inject(AnonymousPublicApi);
+  private route = inject(ActivatedRoute);
   private router = inject(Router);
-  protected accounts = STARTER_COLLECTION;
+  protected kit =
+    starterKit(this.route.snapshot.paramMap.get('slug') ?? 'starter') ?? starterKit('starter')!;
+  protected accounts = this.kit.accounts;
   protected opening = signal<string | null>(null);
   protected completed = computed(
     () =>

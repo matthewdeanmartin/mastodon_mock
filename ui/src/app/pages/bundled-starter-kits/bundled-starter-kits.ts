@@ -1,15 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { STARTER_COLLECTION } from '../../starter-collection';
-
-/** One hand-assembled starter kit, as this page renders it. */
-interface BundledKit {
-  /** Route to the kit's own page. */
-  link: string;
-  title: string;
-  blurb: string;
-  memberCount: number;
-}
+import { STARTER_KITS } from '../../starter-collection';
 
 /**
  * Bundled starter kits: sets of accounts assembled by this app's developer.
@@ -30,13 +21,9 @@ interface BundledKit {
   styleUrl: './bundled-starter-kits.css',
 })
 export class BundledStarterKits {
-  protected readonly kits: readonly BundledKit[] = [
-    {
-      link: '/collections/starter',
-      title: 'Universal starter kit',
-      blurb:
-        'A general-purpose mix of projects, reporting, art, history, science, and delightful bots — the one to take if you have no idea where to begin.',
-      memberCount: STARTER_COLLECTION.length,
-    },
-  ];
+  protected readonly kits = STARTER_KITS;
+
+  protected linkFor(slug: string): string {
+    return slug === 'starter' ? '/collections/starter' : `/collections/starter/${slug}`;
+  }
 }

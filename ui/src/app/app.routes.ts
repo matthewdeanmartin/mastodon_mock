@@ -568,6 +568,11 @@ export const routes: Routes = [
           import('./pages/starter-collection/starter-collection').then((m) => m.StarterCollection),
       },
       {
+        path: 'collections/starter/:slug',
+        loadComponent: () =>
+          import('./pages/starter-collection/starter-collection').then((m) => m.StarterCollection),
+      },
+      {
         path: 'collections/preview/:id',
         loadComponent: () => import('./pages/collection/collection').then((m) => m.CollectionPage),
       },

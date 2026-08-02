@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { StarterCollection } from './starter-collection';
@@ -12,7 +12,15 @@ describe('StarterCollection', () => {
   beforeEach(() => {
     localStorage.clear();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { paramMap: convertToParamMap({ slug: 'infosec' }) } },
+        },
+      ],
     });
     httpMock = TestBed.inject(HttpTestingController);
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
@@ -42,5 +50,13 @@ describe('StarterCollection', () => {
       '/accounts',
       expect.stringMatching(/^anonymous-account\./),
     ]);
+  });
+
+  it('loads the themed kit selected by the route', () => {
+    const fixture = TestBed.createComponent(StarterCollection);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('InfoSec');
+    expect(fixture.componentInstance['accounts']).toHaveLength(8);
   });
 });
