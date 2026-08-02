@@ -93,6 +93,7 @@ export type FeedView = 'feed' | 'members' | 'analytics';
           📊 Analytics
         </button>
       }
+      <ng-content />
       @if (prefs.feedReader()) {
         <span class="font-controls">
           <button

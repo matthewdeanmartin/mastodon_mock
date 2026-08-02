@@ -77,15 +77,15 @@
     <div class="srow">
       <span class="slabel">Posting language</span>
       <div class="scontrol">
-        <input
-          type="text"
-          maxlength="2"
-          placeholder="en"
-          [ngModel]="language()"
-          (ngModelChange)="language.set($event)"
-          name="language"
-        />
-        <span class="hint">Two-letter language code (ISO 639-1). Leave empty for no default.</span>
+        <select [ngModel]="language()" (ngModelChange)="language.set($event)" name="language">
+          <option value="">Not specified</option>
+          @for (option of postingLanguageOptions; track option.code) {
+            <option [value]="option.code">{{ option.name }}</option>
+          }
+        </select>
+        <span class="hint"
+          >Default language attached to new posts. You can change it per post.</span
+        >
       </div>
     </div>
   </div>

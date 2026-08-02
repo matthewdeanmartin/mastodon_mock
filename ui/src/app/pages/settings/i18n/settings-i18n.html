@@ -4,6 +4,40 @@
 </div>
 
 <div class="spage-body">
+  @if (!auth.isAnonymous) {
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">Posting language</span>
+        <div class="scontrol">
+          <select
+            [ngModel]="postingLang()"
+            (ngModelChange)="postingLang.set($event); postingLanguageSaved.set(false)"
+            name="postingLanguage"
+          >
+            <option value="">Not specified</option>
+            @for (language of postingLanguageOptions; track language.code) {
+              <option [value]="language.code">{{ language.name }}</option>
+            }
+          </select>
+          <span class="hint">The default language Mastodon attaches to new posts.</span>
+          <div>
+            <button
+              type="button"
+              class="btn"
+              [disabled]="savingPostingLanguage()"
+              (click)="savePostingLanguage()"
+            >
+              {{ savingPostingLanguage() ? 'Saving…' : 'Save posting language' }}
+            </button>
+            @if (postingLanguageSaved()) {
+              <span class="saved-note">Saved ✓</span>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
   <div class="ssection">
     <div class="srow">
       <span class="slabel">Trending tags</span>
@@ -108,7 +142,7 @@
           <li>
             Posting default:
             @if (postingLang()) {
-              <strong>{{ name(postingLang()!) }}</strong>
+              <strong>{{ name(postingLang()) }}</strong>
             } @else {
               <span class="hint">not set</span>
             }

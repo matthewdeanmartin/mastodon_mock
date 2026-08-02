@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Api } from '../../../api';
 import { Auth } from '../../../auth';
 import { ClientPrefs } from '../../../client-prefs';
-import { LANG_NAMES, LangCode } from '../../../language-detect';
+import { LANG_NAMES, LangCode, POSTING_LANGUAGE_OPTIONS } from '../../../language-detect';
 import { KnownLanguages, UI_LANGUAGE } from '../../../trend-language-filter';
 
 /** Languages offered in the "add a language" picker — the ones we can name. */
@@ -31,6 +31,7 @@ const PICKER_ORDER: LangCode[] = [
   'he',
   'hi',
   'th',
+  'eo',
 ];
 
 /**
@@ -49,11 +50,14 @@ export class SettingsI18n implements OnInit {
   protected readonly prefs = inject(ClientPrefs);
   private readonly known = inject(KnownLanguages);
   private readonly api = inject(Api);
-  private readonly auth = inject(Auth);
+  protected readonly auth = inject(Auth);
 
   protected readonly uiLanguage = UI_LANGUAGE;
   /** The posting default language, once fetched (bare code) — an inferred signal. */
-  protected readonly postingLang = signal<string | null>(null);
+  protected readonly postingLang = signal('');
+  protected readonly postingLanguageOptions = POSTING_LANGUAGE_OPTIONS;
+  protected readonly savingPostingLanguage = signal(false);
+  protected readonly postingLanguageSaved = signal(false);
   /** Which language the "add" picker currently has selected. */
   protected readonly toAdd = signal<string>('');
 
@@ -83,13 +87,13 @@ export class SettingsI18n implements OnInit {
     if (!this.auth.isAnonymous) {
       this.api.verifyCredentials().subscribe({
         next: (acc) => {
-          const lang = acc.source?.language?.toLowerCase().split(/[-_]/)[0] ?? null;
+          const lang = acc.source?.language?.toLowerCase().split(/[-_]/)[0] ?? '';
           this.postingLang.set(lang);
           if (lang) {
             this.prefs.addKnownLanguage(lang);
           }
         },
-        error: () => this.postingLang.set(null),
+        error: () => this.postingLang.set(''),
       });
     }
   }
@@ -112,5 +116,21 @@ export class SettingsI18n implements OnInit {
 
   toggleExclude(on: boolean): void {
     this.prefs.setExcludeUnknownLangTrends(on);
+  }
+
+  savePostingLanguage(): void {
+    if (this.savingPostingLanguage()) return;
+    this.savingPostingLanguage.set(true);
+    this.postingLanguageSaved.set(false);
+    const form = new FormData();
+    form.append('source[language]', this.postingLang());
+    this.api.updateCredentials(form).subscribe({
+      next: () => {
+        this.savingPostingLanguage.set(false);
+        this.postingLanguageSaved.set(true);
+        if (this.postingLang()) this.prefs.addKnownLanguage(this.postingLang());
+      },
+      error: () => this.savingPostingLanguage.set(false),
+    });
   }
 }

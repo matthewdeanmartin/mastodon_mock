@@ -52,6 +52,7 @@ describe('SettingsPrivacy', () => {
     expect(internals(fixture).discoverable()).toBe(false);
     expect(internals(fixture).bot()).toBe(true);
     expect(internals(fixture).privacy()).toBe('public');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Esperanto');
   });
 
   it('save() PATCHes update_credentials with string booleans', () => {

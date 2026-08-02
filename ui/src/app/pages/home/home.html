@@ -69,7 +69,11 @@
   (refresh)="load(true)"
   (providerVisibilityChanged)="load()"
   (viewChange)="setView($event)"
-/>
+>
+  @if (justMyServer.effectiveEnabled()) {
+    <a class="btn btn-outline" routerLink="/feeds/local">🏠 Local Feed</a>
+  }
+</app-command-bar>
 
 <!-- Members and Analytics are views *of the loaded feed*, so they replace the
      timeline rather than navigating away — the command bar toggles back. -->
@@ -97,6 +101,30 @@
     >
       💬 Replies
     </button>
+    <!-- How far back the feed reaches. A select rather than three chips: these
+         choices are mutually exclusive and need to stay compact. -->
+    <label class="home-window">
+      📅
+      <select
+        [ngModel]="prefs.homeWindow()"
+        (ngModelChange)="setHomeWindow($event)"
+        aria-label="How far back to load"
+      >
+        <option value="today">Today</option>
+        <option value="week">This week</option>
+        <option value="all">Everything</option>
+      </select>
+    </label>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm feed-filter"
+      [class.active]="prefs.algoCalm()"
+      [attr.aria-pressed]="prefs.algoCalm()"
+      (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
+      title="Calm mode: hide posts that read as inflammatory — heated wording, quote-dunks, and ratioed posts (all detected on-device)"
+    >
+      😌 Calm
+    </button>
     <button
       type="button"
       class="btn btn-outline btn-sm feed-filter"
@@ -117,33 +145,6 @@
     >
       🌐 {{ prefs.hideForeignLangPosts() ? 'My languages' : 'All languages' }}
     </button>
-    <button
-      type="button"
-      class="btn btn-outline btn-sm feed-filter"
-      [class.active]="prefs.algoCalm()"
-      [attr.aria-pressed]="prefs.algoCalm()"
-      (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
-      title="Calm mode: hide posts that read as inflammatory — heated wording, quote-dunks, and ratioed posts (all detected on-device)"
-    >
-      😌 Calm
-    </button>
-    <!-- How far back the feed reaches. A select rather than three chips: the
-         bar is already crowded, and these are mutually exclusive. -->
-    <label class="home-window">
-      📅
-      <select
-        [ngModel]="prefs.homeWindow()"
-        (ngModelChange)="setHomeWindow($event)"
-        aria-label="How far back to load"
-      >
-        <option value="today">Today</option>
-        <option value="week">This week</option>
-        <option value="all">Everything</option>
-      </select>
-    </label>
-    @if (justMyServer.effectiveEnabled()) {
-      <a class="btn btn-outline btn-sm feed-filter" routerLink="/feeds/local">🏠 Local Feed</a>
-    }
   </div>
 
   <!-- Only shown when something was actually left out, so it is an offer

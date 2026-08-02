@@ -516,7 +516,7 @@ describe('Home', () => {
     fixture.detectChanges();
 
     const shortcut = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
-      '.home-filters a[href="/feeds/local"]',
+      '.command-bar a[href="/feeds/local"]',
     );
     expect(shortcut?.textContent).toContain('Local Feed');
     expect(shortcut?.textContent).not.toContain('Server Friends');

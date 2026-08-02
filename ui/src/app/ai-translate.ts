@@ -42,6 +42,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
   tr: 'Turkish',
   sv: 'Swedish',
   uk: 'Ukrainian',
+  eo: 'Esperanto',
 };
 
 /** A two-letter code as a language name, falling back to the code itself. */

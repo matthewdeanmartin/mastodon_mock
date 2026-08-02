@@ -44,6 +44,7 @@ export type LangCode =
   | 'he'
   | 'hi'
   | 'th'
+  | 'eo'
   | 'und';
 
 /** One language's share of a text, 0–1. */
@@ -78,8 +79,15 @@ export const LANG_NAMES: Record<LangCode, string> = {
   he: 'Hebrew',
   hi: 'Hindi',
   th: 'Thai',
+  eo: 'Esperanto',
   und: 'Unknown',
 };
+
+/** Named languages that can be selected as a posting default. */
+export const POSTING_LANGUAGE_OPTIONS = (Object.entries(LANG_NAMES) as [LangCode, string][])
+  .filter(([code]) => code !== 'und')
+  .map(([code, name]) => ({ code, name }))
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 // ---------------------------------------------------------------------------
 // Tier 1: script detection (Unicode ranges)

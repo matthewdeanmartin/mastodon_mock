@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../../../api';
 import { ClientPrefs } from '../../../client-prefs';
+import { POSTING_LANGUAGE_OPTIONS } from '../../../language-detect';
 
 /** Account privacy and posting defaults, saved as one credentials update. */
 @Component({
@@ -19,6 +20,7 @@ export class SettingsPrivacy implements OnInit {
   protected privacy = signal('public');
   protected sensitive = signal(false);
   protected language = signal('');
+  protected readonly postingLanguageOptions = POSTING_LANGUAGE_OPTIONS;
   protected saving = signal(false);
   protected saved = signal(false);
 
@@ -53,6 +55,7 @@ export class SettingsPrivacy implements OnInit {
         this.saving.set(false);
         this.saved.set(true);
         this.prefs.setDefaultVisibility(this.privacy());
+        if (this.language()) this.prefs.addKnownLanguage(this.language());
       },
       error: () => this.saving.set(false),
     });
