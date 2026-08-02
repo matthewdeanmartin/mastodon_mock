@@ -62,6 +62,21 @@
   </ul>
 
   <section class="conn-section">
+    <h2>🩺 Connection doctor</h2>
+    <p class="muted">
+      Some networks block whole categories of site. Rather than finding that out after making an
+      account, buying credits and pasting in a key, check first: the doctor asks every service above
+      whether this network will let your browser reach it. It needs no keys and uses none of the
+      ones you have saved.
+    </p>
+    <p>
+      <a class="btn doctor-link" [routerLink]="['/settings/connections/doctor']">
+        Check what this network allows
+      </a>
+    </p>
+  </section>
+
+  <section class="conn-section">
     <h2>🔑 How long to keep credentials</h2>
     <p class="muted">
       GitHub, Raindrop.io and Bluesky are connected by pasting a long-lived secret. There is no

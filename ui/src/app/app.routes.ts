@@ -200,6 +200,16 @@ export const routes: Routes = [
                     (m) => m.ConnectionTwitter,
                   ),
               },
+              {
+                // Not a connector, but it belongs under the connections tree:
+                // it answers "which of these is worth setting up on this
+                // network?", which is a question about all of them at once.
+                path: 'doctor',
+                loadComponent: () =>
+                  import('./pages/settings/connections/doctor/connection-doctor-page').then(
+                    (m) => m.ConnectionDoctorPage,
+                  ),
+              },
             ],
           },
           {

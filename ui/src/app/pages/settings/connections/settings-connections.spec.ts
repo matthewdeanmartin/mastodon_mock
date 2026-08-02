@@ -151,6 +151,16 @@ describe('SettingsConnections (catalog)', () => {
     expect(enforceAll).toHaveBeenCalled();
   });
 
+  it('offers the connection doctor below the catalog', () => {
+    const fixture = setUp();
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      'a.doctor-link',
+    );
+    expect(link?.getAttribute('href')).toBe('/settings/connections/doctor');
+    // Its whole value is being usable *before* you have set anything up.
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('needs no keys');
+  });
+
   it('writes the retention policy through the store', () => {
     const fixture = setUp();
     const lifetimes = TestBed.inject(CredentialLifetimeStore);

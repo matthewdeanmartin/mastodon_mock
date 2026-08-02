@@ -1,0 +1,114 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>🩺 Connection doctor</h1>
+  <p>
+    Some networks — offices, schools, hotels, some countries — block whole categories of site. This
+    checks every service Mawkingbird can talk to and tells you which ones this network will let your
+    browser reach, so you find out <em>before</em> making an account and paying for an API key,
+    rather than after.
+  </p>
+  <p class="muted small">
+    Nothing here needs a key or a login, and no credential you have already saved is used or sent.
+    Every request is an unauthenticated public URL.
+  </p>
+</div>
+
+<section class="doc-run">
+  <button type="button" class="btn" (click)="run()" [disabled]="doctor.running()">
+    {{ doctor.running() ? 'Checking…' : hasRun() ? 'Check again' : 'Check all connections' }}
+  </button>
+  @if (hasRun() && !doctor.running()) {
+    <p class="muted small doc-summary">
+      {{ reachableCount() }} reachable, {{ blockedCount() }} blocked or unreachable.
+    </p>
+  }
+</section>
+
+@if (controlFailed()) {
+  <p class="doc-control-warning">
+    The control host failed too, and nobody blocks that one on purpose. Your browser is probably
+    offline, or something is blocking everything — treat the rest of this page as untrustworthy
+    until that row is green.
+  </p>
+}
+
+@for (group of groups(); track group.category) {
+  <section class="doc-group">
+    <h2 class="section-title">{{ group.label }}</h2>
+    <ul class="doc-rows">
+      @for (row of group.rows; track row.target.id) {
+        <li
+          class="doc-row"
+          [class.doc-row-bad]="row.verdict === 'failed' || row.verdict === 'timeout'"
+        >
+          <div class="doc-row-head">
+            <span class="doc-host">
+              <span class="doc-label">{{ row.target.label }}</span>
+              <span class="muted small doc-hostname">{{ row.target.host }}</span>
+            </span>
+            <span
+              class="doc-verdict"
+              [class.doc-ok]="row.verdict === 'reachable'"
+              [class.doc-bad]="row.verdict === 'failed' || row.verdict === 'timeout'"
+            >
+              {{ verdictLabel(row.verdict) }}
+            </span>
+          </div>
+          <p class="muted small doc-matters">{{ row.target.matters }}</p>
+
+          @if (row.verdict === 'failed' || row.verdict === 'timeout') {
+            <div class="doc-followup">
+              <p class="small">
+                Your browser could not fetch this in the background — but that alone cannot tell a
+                network block from a CORS rule or an ad blocker. Opening it in a tab can, because a
+                normal page load shows you the real reason.
+              </p>
+              <button type="button" class="btn btn-outline btn-sm" (click)="openInTab(row)">
+                Open {{ row.target.host }} in a tab ↗
+              </button>
+            </div>
+          }
+
+          @if (isExpanded(row.target.id)) {
+            <fieldset class="doc-report">
+              <legend class="small">What did that tab show you?</legend>
+              @for (option of reportedOptions; track option.value) {
+                <label class="doc-report-option">
+                  <input
+                    type="radio"
+                    [name]="'report-' + row.target.id"
+                    [value]="option.value"
+                    [checked]="row.reported === option.value"
+                    (change)="report(row.target.id, option.value)"
+                  />
+                  <span class="small">{{ option.label }}</span>
+                </label>
+              }
+            </fieldset>
+          }
+
+          @if (row.interpretation; as reading) {
+            <p class="doc-interpretation small">{{ reading }}</p>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+<section class="doc-group">
+  <h2 class="section-title">What this can and cannot tell you</h2>
+  <p class="muted small">
+    A background request that fails reports nothing at all to JavaScript — not a status, not a
+    reason. That is the browser's own privacy rule, not a gap in this page: a site is not allowed to
+    learn what else your network can reach. So a red row means only "this did not answer", and the
+    cause could be a firewall, DNS filtering, an extension, or a service having a bad day.
+  </p>
+  <p class="muted small">
+    Opening the host in a tab is the missing half. A top-level page load isn't subject to those
+    rules, so the browser will show you the block page, the certificate warning or the DNS error
+    directly. Those pages are privileged and unreadable from script, which is why the page has to
+    ask you what you saw rather than detecting it.
+  </p>
+</section>

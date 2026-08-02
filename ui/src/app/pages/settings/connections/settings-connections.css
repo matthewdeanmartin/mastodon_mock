@@ -11,6 +11,13 @@
   margin: 0 0 6px;
 }
 
+/* The .btn rule is written for <button>, so an anchor wearing it needs the
+   bits an anchor does not inherit. */
+.doctor-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
 /* Credential retention policy picker. */
 .lifetime-options {
   display: flex;

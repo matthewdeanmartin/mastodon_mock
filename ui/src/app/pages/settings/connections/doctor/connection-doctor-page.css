@@ -1,0 +1,145 @@
+/* Shared with the other connector pages via connection-page.css; this file
+   holds only what the doctor's result list needs. */
+
+.section-title {
+  margin: 24px 0 8px;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.doc-run {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 18px 0 4px;
+}
+
+.doc-summary {
+  margin: 0;
+}
+
+/* Loud on purpose: when the control host fails, every other verdict on the
+   page is meaningless and the reader needs to know that before reading them. */
+.doc-control-warning {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border: 1px solid rgb(214 59 59 / 45%);
+  border-radius: 8px;
+  background: rgb(214 59 59 / 8%);
+  font-size: 14px;
+}
+
+.doc-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doc-row {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.doc-row-bad {
+  border-color: rgb(214 59 59 / 35%);
+}
+
+.doc-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.doc-host {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.doc-label {
+  font-weight: 700;
+}
+
+.doc-hostname {
+  /* Long hostnames must wrap rather than push the verdict off the row. */
+  overflow-wrap: anywhere;
+}
+
+.doc-verdict {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.doc-ok {
+  color: #2b8a3e;
+}
+
+.doc-bad {
+  color: #d63b3b;
+}
+
+.doc-matters {
+  margin: 4px 0 0;
+}
+
+.doc-followup {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.doc-followup p {
+  margin: 0 0 8px;
+}
+
+.doc-report {
+  margin: 10px 0 0;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.doc-report legend {
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+.doc-report-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.doc-report-option input {
+  cursor: pointer;
+}
+
+/* The payoff line: the one place the page names a likely cause, so it is the
+   one thing on the row that should catch the eye. */
+.doc-interpretation {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border-left: 3px solid var(--accent);
+  background: rgb(125 125 125 / 8%);
+  border-radius: 0 6px 6px 0;
+}
+
+.small {
+  font-size: 13px;
+}
