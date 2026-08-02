@@ -14,12 +14,16 @@ import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 interface ListTimelineInternals {
   title: WritableSignal<string>;
   statuses: WritableSignal<Status[]>;
+  displayedStatuses: () => Status[];
   loading: WritableSignal<boolean>;
+  loadingMore: WritableSignal<boolean>;
+  exhausted: WritableSignal<boolean>;
   tab: WritableSignal<'posts' | 'members' | 'analytics'>;
   members: WritableSignal<Account[]>;
   setTab(tab: 'posts' | 'members' | 'analytics'): void;
   removeMember(account: Account): void;
   onBulkAdded(): void;
+  loadMore(): void;
 }
 
 function makeAccount(id: string): Account {
@@ -152,6 +156,49 @@ describe('ListTimeline', () => {
       .flush('', { status: 500, statusText: 'Error' });
 
     expect(internals(fixture).loading()).toBe(false);
+  });
+
+  it('pages signed-in list posts beyond the first 40', () => {
+    const fixture = setUpWithList('paged');
+    httpMock.expectOne('/api/v1/lists/paged').flush(makeList('paged', 'Big List'));
+    const first = Array.from({ length: 40 }, (_, index) => makeStatus(`p${index}`));
+    const firstRequest = httpMock.expectOne((request) =>
+      request.url.includes('/timelines/list/paged'),
+    );
+    expect(firstRequest.request.params.get('limit')).toBe('40');
+    firstRequest.flush(first);
+    expect(internals(fixture).exhausted()).toBe(false);
+
+    internals(fixture).loadMore();
+    const nextRequest = httpMock.expectOne((request) =>
+      request.url.includes('/timelines/list/paged'),
+    );
+    expect(nextRequest.request.params.get('max_id')).toBe('p39');
+    expect(nextRequest.request.params.get('limit')).toBe('40');
+    nextRequest.flush([makeStatus('p40')]);
+
+    expect(internals(fixture).statuses()).toHaveLength(41);
+    expect(internals(fixture).exhausted()).toBe(true);
+  });
+
+  it('hides remote-authored boosts on the generated same-server list page', () => {
+    const fixture = setUpWithList('server-list');
+    httpMock
+      .expectOne('/api/v1/lists/server-list')
+      .flush(makeList('server-list', 'Mawingbird: People on example.com'));
+    const remote = {
+      ...makeStatus('remote-original'),
+      account: { ...makeAccount('remote'), acct: 'remote@elsewhere.social' },
+    };
+    httpMock
+      .expectOne((request) => request.url.includes('/timelines/list/server-list'))
+      .flush([makeStatus('local'), { ...makeStatus('remote-boost'), reblog: remote }]);
+
+    expect(
+      internals(fixture)
+        .displayedStatuses()
+        .map((status) => status.id),
+    ).toEqual(['local']);
   });
 
   // ---------------------------------------------------------------- onChanged

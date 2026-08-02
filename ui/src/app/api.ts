@@ -124,6 +124,33 @@ export class Api {
     return this.http.get<Account[]>(`/api/v1/accounts/${id}/following`, { params });
   }
 
+  /**
+   * One following page with Mastodon's opaque next cursor from the Link header.
+   * Account ids are not pagination cursors on every server, so bulk walkers must
+   * use this instead of guessing `max_id` from the last account in the body.
+   */
+  accountFollowingPage(
+    id: string,
+    maxId?: string,
+    limit = 80,
+  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
+    return this.http
+      .get<Account[]>(`/api/v1/accounts/${id}/following`, {
+        params,
+        observe: 'response',
+      })
+      .pipe(
+        map((response) => ({
+          accounts: response.body ?? [],
+          nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
+        })),
+      );
+  }
+
   unfollow(id: string): Observable<Relationship> {
     return this.http.post<Relationship>(`/api/v1/accounts/${id}/unfollow`, {});
   }

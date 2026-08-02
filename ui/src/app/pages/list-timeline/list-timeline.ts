@@ -20,6 +20,7 @@ import { AnonymousFeedCorpus } from '../../providers/anonymous/anonymous-feed-co
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 import { FeedAnalytics } from '../../feed-analytics/feed-analytics';
 import { FeedSource } from '../../feed-sample';
+import { JUST_MY_SERVER_LIST_PREFIX, serverOnlyStatuses } from '../../just-my-server';
 
 /** Posts per request when sampling the list — Mastodon's cap. */
 const SAMPLE_PAGE_SIZE = 40;
@@ -51,6 +52,12 @@ export class ListTimeline implements OnInit {
 
   protected title = signal('');
   protected statuses = signal<Status[]>([]);
+  /** The generated same-server list hides boosts whose displayed author is remote. */
+  protected displayedStatuses = computed(() => {
+    const title = this.title();
+    if (!title.startsWith(JUST_MY_SERVER_LIST_PREFIX)) return this.statuses();
+    return serverOnlyStatuses(this.statuses(), title.slice(JUST_MY_SERVER_LIST_PREFIX.length));
+  });
   protected loading = signal(true);
   protected loadingMore = signal(false);
   protected exhausted = signal(true);
@@ -127,18 +134,37 @@ export class ListTimeline implements OnInit {
       return;
     }
     this.api.getList(id).subscribe((l) => this.title.set(l.title));
-    this.api.listTimeline(id).subscribe({
-      next: (s) => {
-        this.statuses.set(s);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.fetchMastodonPage(false);
   }
 
   loadMore(): void {
-    if (!this.auth.isAnonymous || this.loadingMore() || this.exhausted()) return;
-    this.fetchAnonymousPage(true);
+    if (this.loadingMore() || this.exhausted()) return;
+    if (this.auth.isAnonymous) {
+      this.fetchAnonymousPage(true);
+    } else {
+      this.fetchMastodonPage(true);
+    }
+  }
+
+  private fetchMastodonPage(append: boolean): void {
+    this.loadingMore.set(append);
+    const maxId = append ? this.statuses().at(-1)?.id : undefined;
+    this.api.listTimeline(this.listId(), maxId, SAMPLE_PAGE_SIZE).subscribe({
+      next: (page) => {
+        this.statuses.update((current) => {
+          if (!append) return page;
+          const seen = new Set(current.map((status) => status.id));
+          return [...current, ...page.filter((status) => !seen.has(status.id))];
+        });
+        this.exhausted.set(page.length < SAMPLE_PAGE_SIZE);
+        this.loading.set(false);
+        this.loadingMore.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.loadingMore.set(false);
+      },
+    });
   }
 
   private fetchAnonymousPage(append: boolean): void {
@@ -287,8 +313,12 @@ export class ListTimeline implements OnInit {
     }
   }
 
-  onChanged(index: number, updated: Status): void {
-    this.statuses.update((list) => list.map((s, i) => (i === index ? updated : s)));
+  onChanged(target: number | Status, updated: Status): void {
+    this.statuses.update((list) =>
+      list.map((status, index) =>
+        (typeof target === 'number' ? index === target : status === target) ? updated : status,
+      ),
+    );
   }
 
   onDeleted(removed: Status): void {

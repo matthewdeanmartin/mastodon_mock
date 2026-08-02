@@ -37,17 +37,17 @@
 } @else if (tab() === 'posts') {
   @if (loading()) {
     <p class="muted center">Loading…</p>
-  } @else if (!statuses().length) {
+  } @else if (!displayedStatuses().length) {
     <p class="muted center">No statuses in this list yet.</p>
   } @else {
-    @for (s of statuses(); track s.id; let i = $index) {
+    @for (s of displayedStatuses(); track s.id) {
       <app-status-card
         [status]="s"
-        (changed)="onChanged(i, $event)"
+        (changed)="onChanged(s, $event)"
         (deleted)="onDeleted($event)"
       />
     }
-    @if (auth.isAnonymous && !exhausted()) {
+    @if (!exhausted()) {
       <button class="btn btn-outline more" [disabled]="loadingMore()" (click)="loadMore()">
         {{ loadingMore() ? 'Loading…' : 'Load more' }}
       </button>

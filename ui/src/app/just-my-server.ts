@@ -14,7 +14,7 @@ import {
 import { Server } from './server';
 
 const STORAGE_KEY_BASE = 'mockingbird_just_my_server';
-const LIST_PREFIX = 'Mawingbird: People on ';
+export const JUST_MY_SERVER_LIST_PREFIX = 'Mawingbird: People on ';
 const PAGE_SIZE = 20;
 const ACCOUNT_PAGE_SIZE = 80;
 const MAX_PAGES = 100;
@@ -38,6 +38,10 @@ export interface ServerListUpdateResult {
   removed: number;
   alreadyPresent: number;
   failed: number;
+}
+
+interface AppliedMastodonUpdate extends ServerListUpdateResult {
+  listId: string;
 }
 
 /** Convert a URL, domain, or handle host into one stable instance identifier. */
@@ -118,7 +122,9 @@ export class JustMyServer {
     return typeof location === 'undefined' ? '' : normalizeInstanceHost(location.host);
   });
 
-  readonly listTitle = computed(() => `${LIST_PREFIX}${this.homeHost() || 'server'}`);
+  readonly listTitle = computed(
+    () => `${JUST_MY_SERVER_LIST_PREFIX}${this.homeHost() || 'server'}`,
+  );
   readonly effectiveEnabled = computed(
     () => this.auth.isAuthenticated && this.enabled() && this.ready(),
   );
@@ -254,18 +260,20 @@ export class JustMyServer {
     this.error.set('');
     this.ready.set(false);
     try {
-      const listId = this.auth.isAnonymous
-        ? this.applyAnonymousUpdate(updatePlan)
+      const applied = this.auth.isAnonymous
+        ? {
+            listId: this.applyAnonymousUpdate(updatePlan),
+            added: updatePlan.addIds.length,
+            removed: updatePlan.removeIds.length,
+            alreadyPresent: updatePlan.alreadyPresent,
+            failed: 0,
+          }
         : await this.applyMastodonUpdate(updatePlan);
+      const { listId, ...result } = applied;
       this.listId.set(listId);
       this.ready.set(true);
       this.persistState();
-      this.result.set({
-        added: updatePlan.addIds.length,
-        removed: updatePlan.removeIds.length,
-        alreadyPresent: updatePlan.alreadyPresent,
-        failed: 0,
-      });
+      this.result.set(result);
       this.dialogOpen.set(false);
       this.plan.set(null);
     } catch {
@@ -419,7 +427,9 @@ export class JustMyServer {
     ]);
     const list = this.findList(lists);
     const current = list ? await this.fetchAllListMembers(list.id) : [];
-    const target = following.filter((account) => accountIsOnServer(account, this.homeHost()));
+    const target = this.uniqueAccounts(
+      following.filter((account) => accountIsOnServer(account, this.homeHost())),
+    );
     const currentIds = new Set(current.map((account) => account.id));
     const targetIds = new Set(target.map((account) => account.id));
     return {
@@ -448,14 +458,85 @@ export class JustMyServer {
     return list.id;
   }
 
-  private async applyMastodonUpdate(updatePlan: ServerListUpdatePlan): Promise<string> {
+  private async applyMastodonUpdate(
+    updatePlan: ServerListUpdatePlan,
+  ): Promise<AppliedMastodonUpdate> {
     const listId =
       updatePlan.listId ?? (await firstValueFrom(this.api.createList(this.listTitle()))).id;
-    await this.applyBatches(updatePlan.removeIds, (ids) =>
-      this.api.removeManyFromList(listId, ids),
+
+    // The confirmation dialog is a preview, not a lock. Re-read immediately
+    // before mutating so a list changed in another tab cannot make an add batch
+    // contain an account that is already present (Mastodon rejects the whole
+    // batch with 422 in that case).
+    let currentIds = new Set((await this.fetchAllListMembers(listId)).map((account) => account.id));
+    const removeIds = [...new Set(updatePlan.removeIds)];
+    const addIds = [...new Set(updatePlan.addIds)];
+    this.completed.update(
+      (count) =>
+        count +
+        (updatePlan.removeIds.length - removeIds.length) +
+        (updatePlan.addIds.length - addIds.length),
     );
-    await this.applyBatches(updatePlan.addIds, (ids) => this.api.addManyToList(listId, ids));
-    return listId;
+
+    const removals = removeIds.filter((id) => currentIds.has(id));
+    this.completed.update((count) => count + (removeIds.length - removals.length));
+    await this.applyBatches(removals, (ids) => this.api.removeManyFromList(listId, ids));
+
+    currentIds = new Set((await this.fetchAllListMembers(listId)).map((account) => account.id));
+    const additions = addIds.filter((id) => !currentIds.has(id));
+    const newlyPresent = addIds.length - additions.length;
+    this.completed.update((count) => count + newlyPresent);
+    const added = await this.applyAddBatches(listId, additions);
+    return {
+      listId,
+      added: added.added,
+      removed: removals.length,
+      alreadyPresent: updatePlan.alreadyPresent + newlyPresent + added.alreadyPresent,
+      failed: 0,
+    };
+  }
+
+  /**
+   * Add unique, known-absent ids in batches. If another client races us and a
+   * batch gets 422, reconcile and finish its still-missing ids individually.
+   */
+  private async applyAddBatches(
+    listId: string,
+    accountIds: string[],
+  ): Promise<{ added: number; alreadyPresent: number }> {
+    let added = 0;
+    let alreadyPresent = 0;
+    for (let index = 0; index < accountIds.length; index += MEMBERSHIP_BATCH_SIZE) {
+      const batch = accountIds.slice(index, index + MEMBERSHIP_BATCH_SIZE);
+      try {
+        await firstValueFrom(this.api.addManyToList(listId, batch));
+        added += batch.length;
+        this.completed.update((count) => count + batch.length);
+      } catch {
+        const current = new Set(
+          (await this.fetchAllListMembers(listId)).map((account) => account.id),
+        );
+        const pending = batch.filter((id) => !current.has(id));
+        const present = batch.length - pending.length;
+        alreadyPresent += present;
+        this.completed.update((count) => count + present);
+        for (const id of pending) {
+          try {
+            await firstValueFrom(this.api.addManyToList(listId, [id]));
+            added += 1;
+            this.completed.update((count) => count + 1);
+          } catch (error: unknown) {
+            const afterFailure = new Set(
+              (await this.fetchAllListMembers(listId)).map((account) => account.id),
+            );
+            if (!afterFailure.has(id)) throw error;
+            alreadyPresent += 1;
+            this.completed.update((count) => count + 1);
+          }
+        }
+      }
+    }
+    return { added, alreadyPresent };
   }
 
   private async applyBatches(
@@ -472,31 +553,34 @@ export class JustMyServer {
   private async fetchAllFollowing(): Promise<Account[]> {
     const account = this.auth.account();
     if (!account) throw new Error('Not signed in.');
-    const all: Account[] = [];
+    const byId = new Map<string, Account>();
     let maxId: string | undefined;
     for (let page = 0; page < MAX_PAGES; page++) {
-      const batch = await firstValueFrom(
-        this.api.accountFollowing(account.id, maxId, ACCOUNT_PAGE_SIZE),
+      const response = await firstValueFrom(
+        this.api.accountFollowingPage(account.id, maxId, ACCOUNT_PAGE_SIZE),
       );
-      all.push(...batch);
-      if (batch.length < ACCOUNT_PAGE_SIZE) break;
-      maxId = batch.at(-1)?.id;
-      if (!maxId) break;
+      for (const followed of response.accounts) byId.set(followed.id, followed);
+      if (!response.nextMaxId || !response.accounts.length) break;
+      maxId = response.nextMaxId;
     }
-    return all;
+    return [...byId.values()];
   }
 
   private async fetchAllListMembers(listId: string): Promise<Account[]> {
-    const all: Account[] = [];
+    const byId = new Map<string, Account>();
     let maxId: string | undefined;
     for (let page = 0; page < MAX_PAGES; page++) {
       const response = await firstValueFrom(
         this.api.listAccountsPage(listId, maxId, ACCOUNT_PAGE_SIZE),
       );
-      all.push(...response.accounts);
+      for (const account of response.accounts) byId.set(account.id, account);
       if (!response.nextMaxId || !response.accounts.length) break;
       maxId = response.nextMaxId;
     }
-    return all;
+    return [...byId.values()];
+  }
+
+  private uniqueAccounts(accounts: Account[]): Account[] {
+    return [...new Map(accounts.map((account) => [account.id, account])).values()];
   }
 }

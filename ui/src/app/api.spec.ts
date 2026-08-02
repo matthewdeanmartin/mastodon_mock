@@ -231,6 +231,22 @@ describe('Api service (HTTP isolated)', () => {
     httpMock.expectOne((r) => r.url === '/api/v1/blocks').flush([]);
     expect(page!.nextMaxId).toBeNull();
   });
+
+  it('accountFollowingPage uses the opaque cursor from Link instead of an account id', () => {
+    let page: { accounts: unknown[]; nextMaxId: string | null } | undefined;
+    api.accountFollowingPage('me', 'opaque-1', 80).subscribe((result) => (page = result));
+
+    const req = httpMock.expectOne((request) => request.url === '/api/v1/accounts/me/following');
+    expect(req.request.params.get('max_id')).toBe('opaque-1');
+    expect(req.request.params.get('limit')).toBe('80');
+    req.flush([{ id: 'account-id-is-not-the-cursor' }], {
+      headers: {
+        Link: '<https://x.test/api/v1/accounts/me/following?max_id=opaque-2>; rel="next"',
+      },
+    });
+
+    expect(page?.nextMaxId).toBe('opaque-2');
+  });
 });
 
 describe('nextMaxIdFrom', () => {

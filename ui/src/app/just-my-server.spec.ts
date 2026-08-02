@@ -190,10 +190,16 @@ describe('JustMyServer signed-in list synchronization', () => {
     });
 
     const updating = mode.confirmUpdate();
+    http
+      .expectOne('/api/v1/lists/server-list/accounts?limit=80')
+      .flush([account('remote', 'remote.tld')]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const remove = http.expectOne('/api/v1/lists/server-list/accounts');
     expect(remove.request.method).toBe('DELETE');
     expect(remove.request.body).toEqual({ account_ids: ['remote'] });
     remove.flush({});
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/v1/lists/server-list/accounts?limit=80').flush([]);
     await new Promise((resolve) => setTimeout(resolve, 0));
     const add = http.expectOne('/api/v1/lists/server-list/accounts');
     expect(add.request.method).toBe('POST');
@@ -216,6 +222,61 @@ describe('JustMyServer signed-in list synchronization', () => {
         status('remote-boost', local, status('remote-post', account('remote', 'remote.tld'))),
       ]);
     expect((await page).map((item) => item.id)).toEqual(['local-post']);
+    http.verify();
+  });
+
+  it('deduplicates and rechecks every add id immediately before posting it', async () => {
+    const mode = TestBed.inject(JustMyServer);
+    mode.checkList();
+    http
+      .expectOne('/api/v1/lists')
+      .flush([{ id: 'server-list', title: 'Mawingbird: People on example.com' }]);
+    mode.plan.set({
+      listId: 'server-list',
+      addIds: ['local', 'local'],
+      removeIds: [],
+      alreadyPresent: 0,
+    });
+
+    const updating = mode.confirmUpdate();
+    http.expectOne('/api/v1/lists/server-list/accounts?limit=80').flush([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/v1/lists/server-list/accounts?limit=80').flush([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const add = http.expectOne('/api/v1/lists/server-list/accounts');
+    expect(add.request.body).toEqual({ account_ids: ['local'] });
+    add.flush({});
+    await updating;
+
+    expect(mode.result()?.added).toBe(1);
+    http.verify();
+  });
+
+  it('skips an account added after the confirmation preview instead of producing a 422', async () => {
+    const mode = TestBed.inject(JustMyServer);
+    mode.checkList();
+    http
+      .expectOne('/api/v1/lists')
+      .flush([{ id: 'server-list', title: 'Mawingbird: People on example.com' }]);
+    mode.plan.set({
+      listId: 'server-list',
+      addIds: ['local'],
+      removeIds: [],
+      alreadyPresent: 0,
+    });
+
+    const updating = mode.confirmUpdate();
+    http
+      .expectOne('/api/v1/lists/server-list/accounts?limit=80')
+      .flush([{ ...account('local', 'example.com'), acct: 'local' }]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http
+      .expectOne('/api/v1/lists/server-list/accounts?limit=80')
+      .flush([{ ...account('local', 'example.com'), acct: 'local' }]);
+    await updating;
+
+    http.expectNone((request) => request.method === 'POST' && request.url.includes('/accounts'));
+    expect(mode.result()).toEqual({ added: 0, removed: 0, alreadyPresent: 1, failed: 0 });
     http.verify();
   });
 });
