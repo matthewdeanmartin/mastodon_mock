@@ -14,7 +14,25 @@ import {
   parseTags,
 } from '../../providers/bluesky/bluesky-post-search';
 import { filterLoaded, buildFacets, statusMatchesFacet, FacetKind } from './search-refine';
-import { sortStatuses, STATUS_SORTS, StatusSortKey } from './search-sort';
+import {
+  sortAccounts,
+  sortStatuses,
+  ACCOUNT_SORTS,
+  AccountSortKey,
+  STATUS_SORTS,
+  StatusSortKey,
+} from './search-sort';
+import { AccountResultCard } from './account-result-card';
+import { AccountWithMatches } from './account-refine';
+import { Account, Relationship } from '../../models';
+import {
+  BlueskyAccountResult,
+  BlueskyAccountSearch,
+} from '../../providers/bluesky/bluesky-account-search';
+import { BlueskyGraph } from '../../providers/bluesky/bluesky-graph';
+
+/** Which Bluesky index the panel is querying. */
+export type BlueskySearchTarget = 'posts' | 'accounts';
 
 /**
  * Bluesky post search: its own query form, its own results.
@@ -28,14 +46,119 @@ import { sortStatuses, STATUS_SORTS, StatusSortKey } from './search-sort';
  */
 @Component({
   selector: 'app-bluesky-search-panel',
-  imports: [FormsModule, RouterLink, StatusCard],
+  imports: [FormsModule, RouterLink, StatusCard, AccountResultCard],
   templateUrl: './bluesky-search-panel.html',
   styleUrl: './bluesky-search-panel.css',
 })
 export class BlueskySearchPanel {
   private search = inject(BlueskySearch);
+  private accountSearch = inject(BlueskyAccountSearch);
+  private graph = inject(BlueskyGraph);
   private diagnostics = inject(PageDiagnostics);
   protected session = inject(BlueskySession);
+
+  /**
+   * Posts or accounts.
+   *
+   * The two differ in more than which endpoint runs: account search works
+   * signed out (measured — `public.api.bsky.app` answers it, the entryway does
+   * not) while post search does not, and `searchActors` takes a bare query with
+   * no filters at all. So the advanced panel and the unlinked notice are both
+   * scoped to the posts target.
+   */
+  protected target = signal<BlueskySearchTarget>('posts');
+
+  protected setTarget(target: BlueskySearchTarget): void {
+    if (this.target() === target) {
+      return;
+    }
+    this.target.set(target);
+    this.clearResults();
+  }
+
+  /** Account results, hydrated with counts. */
+  protected accounts = signal<BlueskyAccountResult[]>([]);
+  protected accountSort = signal<AccountSortKey>('relevance');
+  protected readonly accountSorts = ACCOUNT_SORTS;
+  private accountCursor = signal<string | null>(null);
+  /** DIDs with a follow/unfollow in flight. */
+  protected followBusy = signal<Set<string>>(new Set());
+
+  /** Account results after the loaded-text filter and sort. */
+  protected visibleAccounts = computed(() => {
+    const needle = this.loadedFilter().trim().toLowerCase();
+    const matching = needle
+      ? this.accounts().filter((r) =>
+          `${r.account.display_name} ${r.account.acct} ${r.account.note}`
+            .toLowerCase()
+            .includes(needle),
+        )
+      : this.accounts();
+    const sorted = sortAccounts(
+      matching.map((r) => this.asItem(r)),
+      this.accountSort(),
+    );
+    // Re-attach relationships by id after sorting, which only sees the account.
+    const byId = new Map(this.accounts().map((r) => [r.account.id, r]));
+    return sorted.map((item) => byId.get(item.account.id)!).filter(Boolean);
+  });
+
+  protected asItem(result: BlueskyAccountResult): AccountWithMatches {
+    // `searchActors` matches on profile text, so there are never matching
+    // posts to show — this is the bio-only shape the card already handles.
+    return { account: result.account, matchingPosts: [] };
+  }
+
+  protected profileLink(account: Account): (string | number)[] {
+    return ['/accounts', account.id];
+  }
+
+  protected isFollowBusy(account: Account): boolean {
+    return this.followBusy().has(account.id);
+  }
+
+  /**
+   * Follow or unfollow from a result card.
+   *
+   * Only reachable signed in: an anonymous search has no `viewer` block, so no
+   * relationship is known and the card shows no follow button.
+   */
+  protected toggleFollow(account: Account, following: boolean): void {
+    const did = account.id.replace(/^bsky:/, '');
+    this.followBusy.update((busy) => new Set(busy).add(account.id));
+    const call = following ? this.graph.unfollow(did) : this.graph.follow(did);
+    call.subscribe({
+      next: (updated) => {
+        this.accounts.update((list) =>
+          list.map((r) =>
+            r.account.id === account.id
+              ? { ...r, relationship: { ...r.relationship, ...updated } }
+              : r,
+          ),
+        );
+        this.clearFollowBusy(account.id);
+      },
+      error: (error: unknown) => {
+        this.clearFollowBusy(account.id);
+        this.diagnostics.error('Search', 'bsky:follow-failed', error, { did });
+        this.error.set(
+          error instanceof Error ? error.message : 'Could not update the follow on Bluesky.',
+        );
+      },
+    });
+  }
+
+  private clearFollowBusy(id: string): void {
+    this.followBusy.update((busy) => {
+      const next = new Set(busy);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  protected relationshipFor(result: BlueskyAccountResult): Relationship | null {
+    return result.relationship;
+  }
 
   protected criteria = signal<BlueskyPostSearch>(emptyBlueskyPostSearch());
   /** Tag input is free text; parsed into the AND-matched list on search. */
@@ -48,7 +171,8 @@ export class BlueskySearchPanel {
   protected error = signal<string | null>(null);
   protected ran = signal(false);
   protected hitsTotal = signal<number | null>(null);
-  private cursor: string | null = null;
+  /** Signals, not fields: `exhausted` is a computed and must see them change. */
+  private cursor = signal<string | null>(null);
 
   // Client-side refinement over what is already loaded. Identical in behaviour
   // to the Mastodon side because it is literally the same functions.
@@ -57,7 +181,16 @@ export class BlueskySearchPanel {
   protected selectedFacets = signal<{ kind: FacetKind; value: string }[]>([]);
   protected readonly statusSorts = STATUS_SORTS;
 
-  protected exhausted = computed(() => this.ran() && !this.cursor);
+  protected exhausted = computed(() =>
+    this.target() === 'accounts'
+      ? this.ran() && !this.accountCursor()
+      : this.ran() && !this.cursor(),
+  );
+
+  /** True when the last search produced nothing at all. */
+  protected empty = computed(() =>
+    this.target() === 'accounts' ? !this.accounts().length : !this.statuses().length,
+  );
 
   protected facets = computed(() => buildFacets(this.statuses()));
 
@@ -100,15 +233,22 @@ export class BlueskySearchPanel {
     this.loadedFilter.set('');
   }
 
-  reset(): void {
-    this.criteria.set(emptyBlueskyPostSearch());
-    this.tagInput.set('');
+  /** Drop results and paging state, keeping the query the reader typed. */
+  private clearResults(): void {
     this.statuses.set([]);
+    this.accounts.set([]);
     this.clearRefinements();
+    this.cursor.set(null);
+    this.accountCursor.set(null);
     this.ran.set(false);
     this.error.set(null);
     this.hitsTotal.set(null);
-    this.cursor = null;
+  }
+
+  reset(): void {
+    this.criteria.set(emptyBlueskyPostSearch());
+    this.tagInput.set('');
+    this.clearResults();
   }
 
   run(): void {
@@ -119,16 +259,14 @@ export class BlueskySearchPanel {
     // Tags are only read at search time, so typing in the box does not silently
     // change what the "active filters" line claims about the last search.
     this.set('tags', parseTags(this.tagInput()));
-    this.statuses.set([]);
-    this.clearRefinements();
-    this.cursor = null;
+    this.clearResults();
     this.searching.set(true);
-    this.error.set(null);
     this.fetch();
   }
 
   loadMore(): void {
-    if (!this.cursor || this.loadingMore() || this.searching()) {
+    const cursor = this.target() === 'accounts' ? this.accountCursor() : this.cursor();
+    if (!cursor || this.loadingMore() || this.searching()) {
       return;
     }
     this.loadingMore.set(true);
@@ -136,30 +274,61 @@ export class BlueskySearchPanel {
   }
 
   private fetch(): void {
-    const criteria = this.criteria();
-    this.search.search(criteria, this.cursor).subscribe({
+    if (this.target() === 'accounts') {
+      this.fetchAccounts();
+      return;
+    }
+    this.fetchPosts();
+  }
+
+  private fetchPosts(): void {
+    this.search.search(this.criteria(), this.cursor()).subscribe({
       next: (page) => {
-        this.cursor = page.cursor;
+        this.cursor.set(page.cursor);
         // Dedupe: a shifting index can repeat a post across pages.
         const seen = new Set(this.statuses().map((s) => s.id));
         this.statuses.update((list) => [...list, ...page.statuses.filter((s) => !seen.has(s.id))]);
         this.hitsTotal.set(page.hitsTotal ?? null);
-        this.searching.set(false);
-        this.loadingMore.set(false);
-        this.ran.set(true);
+        this.settle();
         this.diagnostics.info('Search', 'load:bsky-posts', {
           results: page.statuses.length,
           more: !!page.cursor,
         });
       },
-      error: (error: unknown) => {
-        this.searching.set(false);
-        this.loadingMore.set(false);
-        this.ran.set(true);
-        this.cursor = null;
-        this.diagnostics.error('Search', 'load:bsky-posts-error', error);
-        this.error.set(error instanceof Error ? error.message : 'Bluesky search failed.');
-      },
+      error: (error: unknown) => this.fail(error, 'load:bsky-posts-error'),
     });
+  }
+
+  private fetchAccounts(): void {
+    this.accountSearch.search(this.criteria().text.trim(), this.accountCursor()).subscribe({
+      next: (page) => {
+        this.accountCursor.set(page.cursor);
+        const seen = new Set(this.accounts().map((r) => r.account.id));
+        this.accounts.update((list) => [
+          ...list,
+          ...page.results.filter((r) => !seen.has(r.account.id)),
+        ]);
+        this.settle();
+        this.diagnostics.info('Search', 'load:bsky-accounts', {
+          results: page.results.length,
+          more: !!page.cursor,
+        });
+      },
+      error: (error: unknown) => this.fail(error, 'load:bsky-accounts-error'),
+    });
+  }
+
+  private settle(): void {
+    this.searching.set(false);
+    this.loadingMore.set(false);
+    this.ran.set(true);
+  }
+
+  private fail(error: unknown, event: string): void {
+    this.settle();
+    this.cursor.set(null);
+    this.accountCursor.set(null);
+    this.diagnostics.error('Search', event, error);
+    this.error.set(error instanceof Error ? error.message : 'Bluesky search failed.');
   }
 }

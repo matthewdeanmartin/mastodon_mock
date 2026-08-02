@@ -38,14 +38,14 @@
       <option value="accounts">Accounts</option>
       <option value="statuses">Posts</option>
       <option value="hashtags">Hashtags</option>
-      @if (bskySession.linked()) {
-        <!-- A different engine with its own filters, not a fourth type — see
-             blueskyMode. It swaps the panel below rather than re-running the
-             Mastodon search with a flag set. -->
-        <optgroup label="Bluesky">
-          <option value="bluesky-posts">🦋 Bluesky posts</option>
-        </optgroup>
-      }
+      <!-- A different engine with its own filters, not a fourth type — see
+           blueskyMode. It swaps the panel below rather than re-running the
+           Mastodon search with a flag set.
+           Offered without a linked account because account search works signed
+           out (measured); the panel itself says which half needs a session. -->
+      <optgroup label="Bluesky">
+        <option value="bluesky-posts">🦋 Search Bluesky</option>
+      </optgroup>
       <optgroup label="Search the web ↗">
         @for (e of webEngines; track e.id) {
           <option [value]="e.id">{{ e.label }}</option>

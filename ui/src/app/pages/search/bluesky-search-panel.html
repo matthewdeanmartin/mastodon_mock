@@ -1,22 +1,23 @@
-@if (!session.linked()) {
-  <p class="muted center bsky-unlinked">
-    Bluesky post search needs a linked account —
-    <a routerLink="/settings/connections/bluesky">link one in Settings</a>. Unlike account search,
-    the posts endpoint refuses anonymous callers.
-  </p>
-} @else {
-  <div class="bsky-search-bar">
-    <input
-      type="search"
-      class="bsky-query"
-      [ngModel]="criteria().text"
-      (ngModelChange)="setText($event)"
-      (keyup.enter)="run()"
-      placeholder="Search Bluesky posts"
-      aria-label="Search Bluesky posts"
-    />
-    <!-- Ranking is a server-side choice, so it sits with the query, not with
-         the in-memory sort down in the refine bar. -->
+<div class="bsky-search-bar">
+  <div class="seg bsky-target" role="group" aria-label="Search Bluesky for">
+    <button [class.active]="target() === 'posts'" (click)="setTarget('posts')">Posts</button>
+    <button [class.active]="target() === 'accounts'" (click)="setTarget('accounts')">
+      Accounts
+    </button>
+  </div>
+  <input
+    type="search"
+    class="bsky-query"
+    [ngModel]="criteria().text"
+    (ngModelChange)="setText($event)"
+    (keyup.enter)="run()"
+    [placeholder]="target() === 'accounts' ? 'Search Bluesky accounts' : 'Search Bluesky posts'"
+    [attr.aria-label]="target() === 'accounts' ? 'Search Bluesky accounts' : 'Search Bluesky posts'"
+  />
+  <!-- Ranking is a server-side choice, so it sits with the query rather than
+       with the in-memory sort in the refine bar. searchActors has no such
+       parameter, so it is posts-only. -->
+  @if (target() === 'posts') {
     <label class="bsky-sort">
       <span class="muted small">Rank</span>
       <select
@@ -28,9 +29,11 @@
         <option value="top">Top</option>
       </select>
     </label>
-    <button class="btn" [disabled]="!criteria().text.trim() || searching()" (click)="run()">
-      Search
-    </button>
+  }
+  <button class="btn" [disabled]="!criteria().text.trim() || searching()" (click)="run()">
+    Search
+  </button>
+  @if (target() === 'posts') {
     <button
       class="btn btn-outline"
       [class.active]="advancedOpen()"
@@ -38,9 +41,24 @@
     >
       Filters{{ hasFilters() ? ' •' : '' }}
     </button>
-  </div>
+  }
+</div>
 
-  @if (advancedOpen()) {
+<!-- Posts need a session; accounts do not. Measured: public.api.bsky.app
+     answers searchActors anonymously, the entryway does not, and searchPosts
+     refuses anonymous callers at both. So the notice is scoped to posts and
+     points at the target that does work. -->
+@if (target() === 'posts' && !session.linked()) {
+  <p class="muted center bsky-unlinked">
+    Bluesky post search needs a linked account —
+    <a routerLink="/settings/connections/bluesky">link one in Settings</a>, or
+    <button type="button" class="linklike" (click)="setTarget('accounts')">
+      search accounts instead
+    </button>
+    , which works without one.
+  </p>
+} @else {
+  @if (advancedOpen() && target() === 'posts') {
     <div class="bsky-advanced">
       <!-- Bluesky's own filters, not Mastodon's. There is deliberately no
            has:media / is:reply / sensitive here: searchPosts has no such
@@ -118,6 +136,66 @@
     <p class="muted center">Searching Bluesky…</p>
   } @else if (error(); as message) {
     <p class="search-error center" role="alert">{{ message }}</p>
+  } @else if (ran() && target() === 'accounts') {
+    @if (empty()) {
+      <p class="muted center">No Bluesky accounts matched that search.</p>
+    } @else {
+      <div class="bsky-result-head muted small">
+        Showing {{ visibleAccounts().length }} of {{ accounts().length }} loaded
+      </div>
+
+      <div class="refine-bar">
+        <input
+          type="search"
+          class="refine-filter"
+          [ngModel]="loadedFilter()"
+          (ngModelChange)="loadedFilter.set($event)"
+          placeholder="Filter these results"
+          aria-label="Filter loaded results"
+        />
+        <label class="sort-by">
+          <span class="muted small">Sort</span>
+          <select
+            [ngModel]="accountSort()"
+            (ngModelChange)="accountSort.set($event)"
+            aria-label="Sort accounts"
+          >
+            @for (s of accountSorts; track s.value) {
+              <option [value]="s.value">{{ s.label }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      @if (!session.linked()) {
+        <!-- An anonymous search gets no viewer block, so follow state is
+             genuinely unknown rather than "not following". Say so instead of
+             showing a Follow button that might duplicate an existing follow. -->
+        <p class="muted small bsky-anon-note">
+          Searching without a linked account: follow state is not available.
+        </p>
+      }
+
+      @for (result of visibleAccounts(); track result.account.id) {
+        <app-account-result-card
+          [item]="asItem(result)"
+          [relationship]="relationshipFor(result)"
+          [profileLink]="profileLink(result.account)"
+          [followBusy]="isFollowBusy(result.account)"
+          [anonymous]="!session.linked()"
+          (follow)="toggleFollow($event, false)"
+          (unfollow)="toggleFollow($event, true)"
+        />
+      }
+
+      @if (!exhausted()) {
+        <div class="center">
+          <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+            {{ loadingMore() ? 'Loading…' : 'Load more' }}
+          </button>
+        </div>
+      }
+    }
   } @else if (ran()) {
     @if (activeFilters().length) {
       <div class="bsky-chips">
@@ -127,7 +205,7 @@
       </div>
     }
 
-    @if (!statuses().length) {
+    @if (empty()) {
       <p class="muted center">No Bluesky posts matched that search.</p>
     } @else {
       <div class="bsky-result-head muted small">

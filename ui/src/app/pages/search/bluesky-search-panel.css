@@ -162,6 +162,43 @@
   padding: 24px 16px;
 }
 
+.bsky-anon-note {
+  padding: 8px 16px 0;
+}
+
+/* The seg control matches the segmented groups used elsewhere on the page. */
+.bsky-target {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.bsky-target button {
+  padding: 6px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.bsky-target button.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  font-weight: 700;
+}
+
+/* A button that reads as a link, for the inline "search accounts instead". */
+.linklike {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
 .center {
   text-align: center;
   padding: 12px 0;

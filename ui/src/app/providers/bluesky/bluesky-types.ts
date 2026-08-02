@@ -125,6 +125,17 @@ export interface BskyThreadNode {
   replies?: BskyThreadNode[];
 }
 
+/**
+ * `app.bsky.actor.searchActors` output.
+ *
+ * Actors are `profileView`: handle, display name, avatar and bio, but **no
+ * counts** and — when the call was anonymous — no `viewer` either.
+ */
+export interface BskySearchActors {
+  actors: BskyProfile[];
+  cursor?: string;
+}
+
 /** `app.bsky.feed.searchPosts` output. Posts are full `postView`s. */
 export interface BskySearchPosts {
   posts: BskyPostView[];

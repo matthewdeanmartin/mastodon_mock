@@ -10,10 +10,19 @@ import {
   BskyNotificationPage,
   BskyPostView,
   BskyProfile,
+  BskySearchActors,
   BskySearchPosts,
   BskyThreadNode,
   BskyTimeline,
 } from './bluesky-types';
+
+/**
+ * The read-only AppView, which serves auth-optional queries to anyone.
+ *
+ * Distinct from the `bsky.social` entryway, which requires a session even for
+ * endpoints whose lexicon says auth is optional.
+ */
+const PUBLIC_APPVIEW = 'https://public.api.bsky.app';
 
 interface CreateRecordResponse {
   uri: string;
@@ -111,6 +120,35 @@ export class BlueskyApi {
       params = params.set('cursor', cursor);
     }
     return this.get<BskySearchPosts>('app.bsky.feed.searchPosts', params);
+  }
+
+  /**
+   * Search accounts. Works signed out, unlike post search.
+   *
+   * Returns `profileView`, which carries handle, display name, avatar and bio
+   * but **no counts** — those need {@link getProfiles}.
+   */
+  searchActors(query: string, cursor: string | null): Observable<BskySearchActors> {
+    let params = new HttpParams().set('q', query).set('limit', '25');
+    if (cursor) {
+      params = params.set('cursor', cursor);
+    }
+    return this.publicGet<BskySearchActors>('app.bsky.actor.searchActors', params);
+  }
+
+  /**
+   * Detailed profiles for up to 25 actors in one call.
+   *
+   * How a page of search results gets its follower/following/post counts
+   * without one request per row. Signed out the counts still come back; only
+   * `viewer` (the follow state) is missing.
+   */
+  getProfiles(actors: string[]): Observable<{ profiles: BskyProfile[] }> {
+    let params = new HttpParams();
+    for (const actor of actors) {
+      params = params.append('actors', actor);
+    }
+    return this.publicGet<{ profiles: BskyProfile[] }>('app.bsky.actor.getProfiles', params);
   }
 
   /**
@@ -256,6 +294,29 @@ export class BlueskyApi {
         context: externalFetch(),
       }),
     );
+  }
+
+  /**
+   * XRPC GET that works with or without a linked account.
+   *
+   * Signed in, this is an ordinary authenticated call. Signed out it goes to
+   * the **public AppView**, not the entryway: measured 2026-08-01,
+   * `bsky.social` answers an unauthenticated `searchActors` with 401
+   * `AuthMissing`, while `public.api.bsky.app` answers it 200. Only endpoints
+   * documented as auth-optional may use this — `searchPosts` refuses anonymous
+   * callers at both hosts.
+   *
+   * Anonymous responses omit `viewer`, so no follow state comes back. Callers
+   * must treat that as "unknown", not as "not following".
+   */
+  publicGet<T>(nsid: string, params: HttpParams): Observable<T> {
+    if (!this.session.session()) {
+      return this.http.get<T>(`${PUBLIC_APPVIEW}/xrpc/${nsid}`, {
+        params,
+        context: externalFetch(),
+      });
+    }
+    return this.get<T>(nsid, params);
   }
 
   /** Authenticated XRPC procedure call (POST). */

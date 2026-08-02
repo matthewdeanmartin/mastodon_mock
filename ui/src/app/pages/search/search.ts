@@ -82,7 +82,6 @@ import { SearchServer } from '../../search-server';
 import { SearchCapability } from '../../search-capability';
 import { SearchServerDiscovery } from '../../search-server-discovery/search-server-discovery';
 import { BlueskySearchPanel } from './bluesky-search-panel';
-import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { Server } from '../../server';
 import { isTagsOnly, probeSearchServer, SearchServerStatus } from '../../search-server-probe';
 import { normalizeHostUrl } from '../../host-url';
@@ -325,8 +324,6 @@ export class Search implements OnInit, OnDestroy {
   protected typeSelection = computed(() =>
     this.blueskyMode() ? 'bluesky-posts' : (this.type() as string),
   );
-
-  protected bskySession = inject(BlueskySession);
 
   // --- Web search hand-off ---
   // The four engines sit at the bottom of the type dropdown, but they are *not*

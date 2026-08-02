@@ -1,7 +1,40 @@
 # Sprint 3 — Search
 
-Status: **3a DONE** (2026-08-01), 3b READY. Grounded in the lexicons and then
-verified against the live API — see "Measured" below.
+Status: **DONE** (2026-08-01) — 3a posts and 3b accounts. Grounded in the
+lexicons and then verified against the live API — see "Measured" below.
+
+## 3b: what shipped
+
+- `bluesky-api.ts` — `searchActors`, `getProfiles`, and a `publicGet` transport
+  that routes to the read-only AppView when there is no session.
+- `bluesky-account-search.ts` — `BlueskyAccountSearch`: search, then one
+  batched hydration call, keyed by DID.
+- The panel gains a **Posts / Accounts** toggle, an account result list, sort,
+  and follow/unfollow wired to `BlueskyGraph`.
+
+**Account search works signed out** — the only Bluesky feature in this roadmap
+that does. That drove three decisions:
+
+1. `publicGet` sends anonymous reads to `public.api.bsky.app`, because the
+   `bsky.social` entryway 401s them even where the lexicon says auth is
+   optional. Only auth-optional endpoints may use it.
+2. An anonymous response carries **no `viewer` block**, so `relationship` is
+   `null` — meaning *unknown*, not "not following". The card shows no follow
+   button and the panel says why. Rendering null as "not following" would offer
+   a Follow that silently duplicates an existing one.
+3. The search page's Bluesky option is no longer gated on a linked account. The
+   panel scopes the "needs a session" notice to the Posts half and links across
+   to Accounts, which works.
+
+**Hydration is required, not an optimization.** `searchActors` returns
+`profileView`, which has no follower/following/post counts — every card would
+read "0 followers" without the second call. `getProfiles` takes 25 actors at
+once, so it costs one request per page. A hydration *failure* returns the
+un-hydrated results rather than blanking the page: the matches are still useful
+without counts.
+
+9 new tests, including the DID-keying case that Sprint 2's `getPosts` lesson
+predicted.
 
 ## 3a: what shipped
 
@@ -35,6 +68,13 @@ cost.
   anonymously → 401, entryway with a session → 200. So unlike `searchActors`
   this cannot be offered in Anonymous mode, and the panel says so rather than
   failing at click time. This settles the open question from the original plan.
+- **`searchActors` is auth-optional, but only at the right host.**
+  `public.api.bsky.app` → 200 anonymously; `bsky.social` → 401 `AuthMissing`.
+  The lexicon's "does not require auth" is true of the AppView, not the
+  entryway — a distinction worth carrying into Sprints 4 and 5.
+- **`searchActors` returns no counts, `getProfiles` fills them in one call** —
+  verified anonymously end to end: 6 actors in, 6 hydrated profiles back, all
+  with real follower/post counts and no `viewer` block.
 - **Bare handles resolve.** `author=mistersql.bsky.social` → 200 with that
   author's posts. A leading `@` is stripped by the serializer, since readers
   type one.
