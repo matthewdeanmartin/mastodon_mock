@@ -125,6 +125,59 @@ export interface BskyThreadNode {
   replies?: BskyThreadNode[];
 }
 
+// ------------------------------------------------------------- feeds & lists
+
+/**
+ * One entry in `savedFeedsPrefV2`.
+ *
+ * `type` is `feed` (an algorithm), `list` (a curated set of accounts) or
+ * `timeline` — the last being the reader's own follows feed, which Mockingbird
+ * already contributes as `BlueskyProvider` and must not show again.
+ */
+export interface BskySavedFeed {
+  id: string;
+  type: string;
+  /** An at-uri for feeds and lists; the literal `following` for `timeline`. */
+  value: string;
+  pinned: boolean;
+}
+
+/** `app.bsky.feed.defs#generatorView` — an algorithmic feed's description. */
+export interface BskyGeneratorView {
+  uri: string;
+  cid: string;
+  did: string;
+  creator: BskyProfile;
+  displayName: string;
+  description?: string;
+  avatar?: string;
+  likeCount?: number;
+  indexedAt: string;
+}
+
+/** `app.bsky.graph.defs#listView`. `purpose` decides whether it is readable. */
+export interface BskyListView {
+  uri: string;
+  cid: string;
+  creator: BskyProfile;
+  name: string;
+  purpose: string;
+  description?: string;
+  avatar?: string;
+  listItemCount?: number;
+  indexedAt: string;
+}
+
+/**
+ * The only list purpose that belongs in a feeds tab.
+ *
+ * A `modlist` is a block/mute list and a `referencelist` backs a starter pack —
+ * rendering either as a readable feed would be actively misleading. Matching
+ * this value specifically (rather than excluding the two known bad ones) stays
+ * correct when the enum grows.
+ */
+export const BSKY_CURATE_LIST = 'app.bsky.graph.defs#curatelist';
+
 /**
  * `app.bsky.graph.getFollowers` output. `subject` is the actor whose followers
  * these are — ignored here, since the profile header already has them.

@@ -435,6 +435,13 @@ export const routes: Routes = [
         data: { only: 'tags' },
         loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
       },
+      // One saved Bluesky feed or list. `:ref` is `<kind>:<at-uri>`; it sits
+      // above `feeds/:feed` for the same reason the two literals above do.
+      {
+        path: 'feeds/bluesky/:ref',
+        loadComponent: () =>
+          import('./pages/bluesky-feed/bluesky-feed').then((m) => m.BlueskyFeedPage),
+      },
       // Back-compat: the old top-level Lists/Tags entries now live under Feeds.
       { path: 'lists', pathMatch: 'full', redirectTo: 'feeds/lists' },
       { path: 'tags', pathMatch: 'full', redirectTo: 'feeds/tags' },

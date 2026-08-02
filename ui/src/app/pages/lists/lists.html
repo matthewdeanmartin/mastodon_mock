@@ -48,7 +48,6 @@
       </a>
     }
   }
-
 }
 
 @if (shows('lists') && showsSection('searches')) {
@@ -68,7 +67,6 @@
       </a>
     }
   }
-
 }
 
 @if (shows('lists') && showsSection('server')) {
@@ -103,7 +101,6 @@
       </a>
     }
   }
-
 }
 
 @if (shows('tags') && showsSection('featured-tags')) {
@@ -195,7 +192,6 @@
       }
     }
   }
-
 }
 
 @if (shows('lists') && showsSection('endorsements')) {
@@ -216,7 +212,6 @@
       </p>
     }
   }
-
 }
 
 <!-- Last section on the page. RSS feeds are the one kind of feed here that
@@ -281,6 +276,68 @@
     <a routerLink="/settings/connections/twitter">settings</a>. Opening one costs a request unless
     it was loaded in the last few minutes.
   </p>
+}
+
+<!-- Bluesky's saved feeds and lists. Three sections, because "pinned" is a
+     grouping the way "endorsed" is: an entry is in Pinned or under its kind,
+     never both. Feeds are algorithms run by other people, lists are curated
+     sets of accounts, so they stay apart — they differ in whether they have
+     members at all. -->
+@if (bskySession.linked() && shows('lists')) {
+  @if (bskyError(); as error) {
+    <div class="section-head">Bluesky feeds</div>
+    <p class="muted center small">{{ error }}</p>
+  } @else if (bskyLoading()) {
+    <div class="section-head">Bluesky feeds</div>
+    <p class="muted center small">Loading your Bluesky feeds…</p>
+  } @else {
+    @if (bskyPinned().length && showsSection('bsky-pinned')) {
+      <div class="section-head">📌 Pinned on Bluesky</div>
+      @for (entry of bskyPinned(); track entry.uri) {
+        <a class="list-row" [routerLink]="bskyFeedLink(entry)">
+          <span>
+            {{ entry.displayName }}
+            <span class="muted small">
+              · {{ entry.kind === 'list' ? 'list' : 'feed' }} by &#64;{{ entry.creatorHandle }}
+            </span>
+          </span>
+        </a>
+      }
+    }
+
+    @if (bskyUnpinnedFeeds().length && showsSection('bsky-feeds')) {
+      <div class="section-head">🦋 Bluesky feeds</div>
+      @for (entry of bskyUnpinnedFeeds(); track entry.uri) {
+        <a class="list-row" [routerLink]="bskyFeedLink(entry)">
+          <span>
+            {{ entry.displayName }}
+            <span class="muted small">· by &#64;{{ entry.creatorHandle }}</span>
+          </span>
+        </a>
+      }
+    }
+
+    @if (bskyUnpinnedLists().length && showsSection('bsky-lists')) {
+      <div class="section-head">🦋 Bluesky lists</div>
+      @for (entry of bskyUnpinnedLists(); track entry.uri) {
+        <a class="list-row" [routerLink]="bskyFeedLink(entry)">
+          <span>
+            {{ entry.displayName }}
+            <span class="muted small">
+              · {{ entry.memberCount }} members · by &#64;{{ entry.creatorHandle }}
+            </span>
+          </span>
+        </a>
+      }
+    }
+
+    @if (bskyPinned().length || bskyUnpinnedFeeds().length || bskyUnpinnedLists().length) {
+      <p class="muted center small">
+        Saved on Bluesky. Pin and unpin them in the Bluesky app — Mockingbird reads this list but
+        never rewrites it.
+      </p>
+    }
+  }
 }
 
 @if (listToDelete(); as l) {

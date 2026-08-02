@@ -1,8 +1,80 @@
-# Sprint 5 — Bluesky feeds
+# Sprint 5 — Bluesky feeds and lists
 
-Status: READY, **but has open questions for the user** (top of this document).
-Depends on Sprint 4's `PeopleSource` refactor only in spirit — the pattern it
-follows is `ListSource`, which already exists.
+Status: **DONE** (2026-08-01). 2749 tests pass, lint clean, production build
+green.
+
+## What shipped
+
+- `bluesky-types.ts` — `BskySavedFeed`, `BskyGeneratorView`, `BskyListView`,
+  `BSKY_CURATE_LIST`.
+- `bluesky-api.ts` — `getPreferences`, `getFeedGenerators`, `getList`,
+  `getFeed`, `getListFeed`.
+- `bluesky-feeds.ts` — `BlueskyFeeds`: discovery, describe, paging, and a
+  session cache. Plus `savedFeeds()`, which digs the entry out of the
+  preferences union.
+- `pages/bluesky-feed/` — a timeline page for one feed or list, at
+  `/feeds/bluesky/:ref`.
+- `pages/lists/` — three new sections and their picker entries.
+
+15 new tests.
+
+### Measured against the live API (2026-08-01)
+
+- `getPreferences` on a real account returned **7 preference types**, of which
+  `savedFeedsPrefV2` was one — so finding it by `$type` and ignoring the rest is
+  required, not defensive. It held **11 items**: 1 `timeline`, 8 pinned feeds,
+  2 unpinned. No `list` items, which is why list describing is written to
+  tolerate zero.
+- `getFeedGenerators` described all 10 feed uris in **one call**.
+- `getFeed` works **authenticated and anonymously** (via the public AppView) and
+  returns `feedViewPost[]` — identical to `getTimeline`, so `adaptFeedItem`
+  needed no changes. Anonymous responses drop `reqId` and keep `feedContext`.
+- `getListFeed` and `getList` also answer anonymously, confirming the
+  auth-optional pattern from Sprint 3b.
+- A dead feed returns **`InvalidRequest`**, not the `UnknownFeed` the lexicon
+  documents — so the page keys off the failure, not the error name.
+
+### Decisions worth keeping
+
+**Pinned is a section, not a sort.** Per the user: *"pinned is a grouping of
+feeds in the feeds tab, sort of like how endorsed is just a grouping of an
+object type."* An entry appears in 📌 Pinned **or** under its kind, never both.
+The home timeline is untouched.
+
+**Feeds and lists stay separate** because they differ in whether they have
+members at all — a feed is a third-party algorithm, a list is a curated set of
+accounts with a real count to show.
+
+**Only `curatelist` is shown.** Matching that value specifically (rather than
+excluding `modlist` and `referencelist`) stays correct as the enum grows. A
+modlist is a blocklist; showing it as a readable feed would mislead.
+
+**Read-only, deliberately.** `pinned` is read and never written. Saving and
+pinning are `putPreferences` calls that would rewrite the list the official app
+depends on, and a bug there costs the reader real state.
+
+**Its own page, not `ListTimeline`.** That page is built around Mastodon list
+*management* — bulk add, list-to-collection conversion, member editing — none of
+which applies to somebody else's algorithm.
+
+**`ListSource` was not used.** The interface exists in `lists/list-source.ts`
+but **nothing consumes it** — it is a planned model from the lists sprint, not
+live infrastructure. The Feeds page's real pattern is sections (`rss`,
+`twitter`, `server`), so these follow that instead of implementing a type no
+resolver reads.
+
+### Deliberately out
+
+- Writing preferences (pin/save/unsave from Mockingbird).
+- Feed likes (`generatorView.likeCount` is read but not actionable).
+- Feed discovery beyond what is already saved.
+- `contentMode: contentModeVideo`, which wants a different card.
+
+---
+
+Original plan follows.
+
+Depends on Sprint 4's `PeopleSource` refactor only in spirit.
 
 Demo at the end: the reader's pinned and saved Bluesky feeds — Discover, Popular
 With Friends, whatever niche feeds they subscribe to — appear in the Lists tab

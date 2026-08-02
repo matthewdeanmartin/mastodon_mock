@@ -1,6 +1,11 @@
 # Bluesky parity — roadmap
 
-Status: SPRINTS 1–4 DONE (2026-08-01). Sprint 5 READY.
+Status: **ALL FIVE SPRINTS DONE** (2026-08-01).
+
+Bluesky now has: home feed, reply, post, chat, threads, profiles, follow,
+notifications, post search, account search, followers/following, block, mute,
+and saved feeds and lists. What is left is listed under "Not done" at the
+bottom.
 
 Goal: **the Bluesky experience in Mockingbird is the same experience as
 Mastodon** — same pages, same cards, same gestures — for everything a reader
@@ -64,7 +69,7 @@ rejected below.
 | 2 | [Notifications](bsky_parity_002_notifications.md) | A Bluesky tab on /notifications: likes, reposts, follows, replies, mentions, quotes | **DONE** |
 | 3 | [Search](bsky_parity_003_search.md) | Search page finds bsky posts and accounts, with Bluesky's own filters | **DONE** |
 | 4 | [People browser](bsky_parity_004_people_browser.md) | Followers/following tabs work on a bsky profile; follow from search results | **DONE** |
-| 5 | [Feeds + lists](bsky_parity_005_feeds.md) | Bluesky's custom feeds *and* curated lists, as two new sections on the Feeds tab | READY |
+| 5 | [Feeds + lists](bsky_parity_005_feeds.md) | Bluesky's custom feeds *and* curated lists, as three new sections on the Feeds tab | **DONE** |
 
 Each sprint ends with something demoable on its own. They are ordered so that
 each one makes the previous more useful: profiles make search results clickable,
@@ -121,8 +126,37 @@ these corrected assumptions made in the initial assessment:
   sectioned structure at `/feeds/lists`, not a new page.
 - **Feeds and lists are separate kinds**, because they genuinely are different
   things: a feed is a third-party algorithm with no membership, a list is a
-  curated set of accounts. They differ in `memberOrigin`, so they render
-  differently. Two `ListSource` kinds, two sections.
-- **Deferred:** whether a *pinned* Bluesky feed should be able to feed the
-  merged home timeline. Sprint 5 reads `pinned` and sorts by it, and touches
-  nothing on /home, which keeps the option open either way.
+  curated set of accounts.
+- **Pinned is a grouping, not a merge** — a third section, the way `endorsed`
+  groups accounts. The home timeline is untouched.
+- **Deferred:** whether a pinned Bluesky feed should be able to feed the merged
+  home timeline. Sprint 5 touches nothing on /home, so the option stays open in
+  both directions.
+
+## Not done
+
+Everything the five sprints deliberately left out, in one place so it does not
+get rediscovered as a bug:
+
+**Writes we chose not to make**
+- Pin / save / unsave a feed (`putPreferences` would rewrite state the official
+  app depends on).
+- Report an account or post — reporting goes to a labeler service this app has
+  no UI for.
+- Create or edit a Bluesky list (edited in the Bluesky app).
+- Post-level mute / hide (`hiddenPostsPref`).
+
+**Reads with no Mastodon counterpart, so no place to put them**
+- `mutedOnlyReposts` / `mutedOnlyQuoteposts` on the viewer state.
+- Starter packs — `starterpack-joined` renders as a plain follow.
+- Labels and labelers, on posts, accounts and feeds.
+- `contentMode: contentModeVideo` feeds, which want a different card.
+
+**Smaller gaps**
+- The linked Bluesky account's own profile is reachable by DID but is not in the
+  left rail's profile stack.
+- Bluesky notifications are polled by a Refresh button; there is no push stream
+  to make "live" mean what it does for Mastodon.
+- The who-liked / who-reposted dialog is Mastodon-only; `getLikes` and
+  `getRepostedBy` exist and would back it.
+- Analytics and Collections tabs stay hidden on a Bluesky profile.

@@ -9,6 +9,8 @@ import {
   BskyFacet,
   BskyFollowers,
   BskyFollows,
+  BskyGeneratorView,
+  BskyListView,
   BskyNotificationPage,
   BskyPostView,
   BskyProfile,
@@ -128,6 +130,61 @@ export class BlueskyApi {
       params = params.set('cursor', cursor);
     }
     return this.get<BskySearchPosts>('app.bsky.feed.searchPosts', params);
+  }
+
+  /**
+   * The reader's account preferences.
+   *
+   * How saved feeds are discovered: there is no "my feeds" endpoint, only a
+   * `savedFeedsPrefV2` entry inside this list. The union has 16+ member types
+   * and grows, so callers must find theirs by `$type` and ignore the rest.
+   */
+  getPreferences(): Observable<{ preferences: { $type?: string }[] }> {
+    return this.get<{ preferences: { $type?: string }[] }>(
+      'app.bsky.actor.getPreferences',
+      new HttpParams(),
+    );
+  }
+
+  /** Describe a batch of feed generators — display name, creator, avatar. */
+  getFeedGenerators(uris: string[]): Observable<{ feeds: BskyGeneratorView[] }> {
+    let params = new HttpParams();
+    for (const uri of uris) {
+      params = params.append('feeds', uri);
+    }
+    return this.publicGet<{ feeds: BskyGeneratorView[] }>(
+      'app.bsky.feed.getFeedGenerators',
+      params,
+    );
+  }
+
+  /** Describe one curated list. */
+  getList(uri: string): Observable<{ list: BskyListView }> {
+    const params = new HttpParams().set('list', uri).set('limit', '1');
+    return this.publicGet<{ list: BskyListView }>('app.bsky.graph.getList', params);
+  }
+
+  /**
+   * Posts from an algorithmic feed.
+   *
+   * Returns the same `feedViewPost[]` as `getTimeline`, so `adaptFeedItem`
+   * handles it unchanged — the reason this whole feature is cheap.
+   */
+  getFeed(uri: string, cursor: string | null): Observable<BskyTimeline> {
+    let params = new HttpParams().set('feed', uri).set('limit', '30');
+    if (cursor) {
+      params = params.set('cursor', cursor);
+    }
+    return this.publicGet<BskyTimeline>('app.bsky.feed.getFeed', params);
+  }
+
+  /** Posts from the members of a curated list. Same shape as {@link getFeed}. */
+  getListFeed(uri: string, cursor: string | null): Observable<BskyTimeline> {
+    let params = new HttpParams().set('list', uri).set('limit', '30');
+    if (cursor) {
+      params = params.set('cursor', cursor);
+    }
+    return this.publicGet<BskyTimeline>('app.bsky.feed.getListFeed', params);
   }
 
   /** Accounts following this actor. Auth-optional, so it works signed out. */

@@ -1,0 +1,44 @@
+<header class="bf-header">
+  <a class="muted small" routerLink="/feeds/lists">← Feeds</a>
+  <h2>{{ title() }}</h2>
+  @if (entry(); as e) {
+    <p class="muted small">
+      🦋 {{ e.kind === 'list' ? 'List' : 'Feed' }} by &#64;{{ e.creatorHandle }}
+      @if (e.kind === 'list' && e.memberCount !== null) {
+        · {{ e.memberCount }} members
+      }
+      @if (e.pinned) {
+        · 📌 pinned
+      }
+    </p>
+    @if (e.description) {
+      <p class="bf-description">{{ e.description }}</p>
+    }
+    @if (e.kind === 'feed') {
+      <!-- Whose algorithm this is, said plainly. A custom feed is run by a
+           third party, not by Bluesky and not by us. -->
+      <p class="muted small">
+        This feed is an algorithm run by &#64;{{ e.creatorHandle }}, not by Bluesky.
+      </p>
+    }
+  }
+</header>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else if (error(); as message) {
+  <p class="muted center bf-error" role="alert">{{ message }}</p>
+} @else if (!statuses().length) {
+  <p class="muted center">This feed has no posts right now.</p>
+} @else {
+  @for (status of statuses(); track status.id) {
+    <app-status-card [status]="status" [showSource]="true" />
+  }
+  @if (!exhausted()) {
+    <div class="center bf-more">
+      <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+      </button>
+    </div>
+  }
+}

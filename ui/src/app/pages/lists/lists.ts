@@ -12,6 +12,8 @@ import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 import { RssCache } from '../../providers/rss/rss-cache';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { TwitterFollows } from '../../providers/twitter/twitter-follows';
+import { BlueskyFeedEntry, BlueskyFeeds } from '../../providers/bluesky/bluesky-feeds';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { PageDiagnostics } from '../../page-diagnostics';
 
 /**
@@ -43,7 +45,10 @@ export type FeedSection =
   | 'collections'
   | 'endorsements'
   | 'rss'
-  | 'twitter';
+  | 'twitter'
+  | 'bsky-pinned'
+  | 'bsky-feeds'
+  | 'bsky-lists';
 
 /** Picker options, in the order the sections appear down the page. */
 export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
@@ -57,6 +62,12 @@ export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
   { id: 'endorsements', label: 'Endorsed accounts' },
   { id: 'rss', label: 'RSS feeds' },
   { id: 'twitter', label: 'Twitter accounts' },
+  // Pinned is its own section rather than a sort order, because that is what
+  // pinning means upstream: promoted to a top-level tab, not merged into a
+  // stream. An entry appears here or under its kind, never both.
+  { id: 'bsky-pinned', label: 'Pinned on Bluesky' },
+  { id: 'bsky-feeds', label: 'Bluesky feeds' },
+  { id: 'bsky-lists', label: 'Bluesky lists' },
 ];
 
 @Component({
@@ -76,6 +87,64 @@ export class Lists implements OnInit {
   private rssCache = inject(RssCache);
   private diagnostics = inject(PageDiagnostics);
   private route = inject(ActivatedRoute);
+  private bskyFeeds = inject(BlueskyFeeds);
+  protected bskySession = inject(BlueskySession);
+
+  /** Saved Bluesky feeds and lists, split into the three sections below. */
+  private bskyEntries = signal<BlueskyFeedEntry[]>([]);
+  protected bskyLoading = signal(false);
+  protected bskyError = signal<string | null>(null);
+
+  /**
+   * Pinned entries, feeds and lists together.
+   *
+   * A grouping, not a sort order — the same way "endorsed" groups accounts
+   * rather than duplicating them. Anything here is excluded from the two
+   * kind-specific sections, so nothing appears twice.
+   */
+  protected bskyPinned = computed(() => this.bskyEntries().filter((e) => e.pinned));
+  protected bskyUnpinnedFeeds = computed(() =>
+    this.bskyEntries().filter((e) => !e.pinned && e.kind === 'feed'),
+  );
+  protected bskyUnpinnedLists = computed(() =>
+    this.bskyEntries().filter((e) => !e.pinned && e.kind === 'list'),
+  );
+
+  /**
+   * Route into the timeline page for one saved feed or list.
+   *
+   * The at-uri is encoded because it contains slashes, which would otherwise
+   * split into extra path segments and never match the `:ref` param.
+   */
+  protected bskyFeedLink(entry: BlueskyFeedEntry): (string | number)[] {
+    return ['/feeds/bluesky', `${entry.kind}:${encodeURIComponent(entry.uri)}`];
+  }
+
+  private loadBlueskyFeeds(): void {
+    if (!this.bskySession.linked()) {
+      return;
+    }
+    this.bskyLoading.set(true);
+    this.bskyError.set(null);
+    this.bskyFeeds.load().subscribe({
+      next: (entries) => {
+        this.bskyEntries.set(entries);
+        this.bskyLoading.set(false);
+        this.diagnostics.info('Lists', 'load:bsky-feeds', {
+          feeds: entries.filter((e) => e.kind === 'feed').length,
+          lists: entries.filter((e) => e.kind === 'list').length,
+          pinned: entries.filter((e) => e.pinned).length,
+        });
+      },
+      error: (error: unknown) => {
+        this.bskyLoading.set(false);
+        this.diagnostics.error('Lists', 'load:bsky-feeds-error', error);
+        this.bskyError.set(
+          error instanceof Error ? error.message : 'Could not load your Bluesky feeds.',
+        );
+      },
+    });
+  }
 
   /** Section filter from the route (`/feeds/lists`, `/feeds/tags`, else all). */
   protected filter: FeedFilter = (this.route.snapshot.data['only'] as FeedFilter) ?? 'all';
@@ -164,6 +233,7 @@ export class Lists implements OnInit {
       this.load();
       this.loadCollections();
       this.resolveServerFeeds();
+      this.loadBlueskyFeeds();
     }
     if (this.shows('tags')) {
       this.loadTags();
