@@ -1,6 +1,54 @@
 # Sprint 3 — Search
 
-Status: READY. Grounded in the `app.bsky.feed.searchPosts` and
+Status: **3a DONE** (2026-08-01), 3b READY. Grounded in the lexicons and then
+verified against the live API — see "Measured" below.
+
+## 3a: what shipped
+
+- `bluesky-post-search.ts` — `BlueskyPostSearch`, `parseTags`,
+  `hasBlueskyFilters`, `describeBlueskyFilters`. Its own criteria object, not an
+  extension of `MawkingbirdSearch`.
+- `bluesky-api.ts` — `searchPosts(criteria, cursor)`, serializing each criterion
+  to a typed param.
+- `bluesky-search.ts` — `BlueskySearch`: one call per page, cursor paging,
+  error messages a reader can act on.
+- `bluesky-search-panel.ts/.html/.css` — a self-contained panel with Bluesky's
+  own filters and its own results.
+- `search.ts` / `search.html` — a `🦋 Bluesky posts` option that swaps the panel
+  in. Gated on a linked account.
+
+**Reuse, without switch statements.** The panel is a separate component and
+`blueskyMode` is a separate flag from `SearchType` — deliberately, because
+`SearchType` is threaded through URL serialization, saved searches, both query
+serializers and the explain panel, all Mastodon-shaped. Widening it would have
+put a "…or bluesky" case in every one. What *is* reused is everything that
+operates on results after they exist: `StatusCard`, `filterLoaded`,
+`buildFacets`, `statusMatchesFacet`, `sortStatuses`. Those are pure functions
+over `Status[]` and needed no changes at all — the single biggest win, at zero
+cost.
+
+18 new tests.
+
+## Measured against the live API (2026-08-01)
+
+- **`searchPosts` requires auth.** `public.api.bsky.app` → 403, the entryway
+  anonymously → 401, entryway with a session → 200. So unlike `searchActors`
+  this cannot be offered in Anonymous mode, and the panel says so rather than
+  failing at click time. This settles the open question from the original plan.
+- **Bare handles resolve.** `author=mistersql.bsky.social` → 200 with that
+  author's posts. A leading `@` is stripped by the serializer, since readers
+  type one.
+- **Date-only bounds are accepted and honoured.** `since=2026-01-01&
+  until=2026-02-01` returned posts whose `createdAt` all fell inside the window.
+  So the existing `YYYY-MM-DD` pickers need **no** widening to ISO instants —
+  the original plan's worry was unfounded.
+- `lang`, `tag`, `domain`, `sort=top` all → 200 and visibly change results.
+- **`hitsTotal` is a ceiling, not a count**: a broad query returned exactly
+  `10000`. Rendered as "about N", never as a page count.
+- Empty `q` → 400 `InvalidRequest`, which the panel reports as a query problem.
+- Results are full `postView`s, so `adaptPost` handles them unchanged.
+
+Grounded in the `app.bsky.feed.searchPosts` and
 `app.bsky.actor.searchActors` lexicons read 2026-08-01.
 
 Demo at the end: the search page gets a Bluesky source. Searching finds real

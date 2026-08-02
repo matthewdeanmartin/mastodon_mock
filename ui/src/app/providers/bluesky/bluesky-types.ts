@@ -125,6 +125,18 @@ export interface BskyThreadNode {
   replies?: BskyThreadNode[];
 }
 
+/** `app.bsky.feed.searchPosts` output. Posts are full `postView`s. */
+export interface BskySearchPosts {
+  posts: BskyPostView[];
+  cursor?: string;
+  /**
+   * Approximate match count. The lexicon says it "may be rounded or
+   * incomplete" — a real query returned exactly 10000, which is a ceiling, not
+   * a count. Never use it for "page X of Y".
+   */
+  hitsTotal?: number;
+}
+
 // -------------------------------------------------------------- notifications
 
 /**

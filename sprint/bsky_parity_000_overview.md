@@ -1,6 +1,6 @@
 # Bluesky parity — roadmap
 
-Status: SPRINTS 1–2 DONE (2026-08-01). Sprints 3–5 READY.
+Status: SPRINTS 1–2 and 3a DONE (2026-08-01). Sprint 3b and 4–5 READY.
 
 Goal: **the Bluesky experience in Mockingbird is the same experience as
 Mastodon** — same pages, same cards, same gestures — for everything a reader
@@ -49,7 +49,7 @@ rejected below.
 |---|---|---|---|
 | 1 | [Profile + follow](bsky_parity_001_profile_and_follow.md) | Click any bsky avatar → real profile, with a working Follow button | **DONE** |
 | 2 | [Notifications](bsky_parity_002_notifications.md) | A Bluesky tab on /notifications: likes, reposts, follows, replies, mentions, quotes | **DONE** |
-| 3 | [Search](bsky_parity_003_search.md) | Search page finds bsky posts and accounts, with Bluesky's own filters | READY |
+| 3 | [Search](bsky_parity_003_search.md) | Search page finds bsky posts and accounts, with Bluesky's own filters | **3a DONE**, 3b ready |
 | 4 | [People browser](bsky_parity_004_people_browser.md) | Followers/following tabs work on a bsky profile; follow from search results | READY |
 | 5 | [Feeds + lists](bsky_parity_005_feeds.md) | Bluesky's custom feeds *and* curated lists, as two new sections on the Feeds tab | READY |
 
@@ -94,8 +94,10 @@ these corrected assumptions made in the initial assessment:
   crash the list.
 - `searchPosts` recommends **Lucene syntax** in `q` and has a documented
   `BadQueryString` error.
-- `searchActors` **does not require auth** — the only Bluesky read in this
-  roadmap that works for a logged-out viewer.
+- `searchActors` **does not require auth** per its lexicon — a candidate for
+  Anonymous mode, to be confirmed live in Sprint 3b. `searchPosts` by contrast
+  was **measured** to require auth (403/401 anonymously), so post search is
+  offered only with a linked account.
 - `searchPosts` warns its cursor "may not enable complete result set
   traversal", so paging must degrade gracefully rather than assert.
 

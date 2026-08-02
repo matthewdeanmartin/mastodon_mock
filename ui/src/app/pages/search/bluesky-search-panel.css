@@ -1,0 +1,168 @@
+/* Mirrors search.css rather than importing it: those styles are scoped to the
+   Search component, and the shared vocabulary here is the CSS variables. */
+
+.bsky-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bsky-query {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 15px;
+}
+
+.bsky-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bsky-sort select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  color: var(--text);
+}
+
+.bsky-advanced {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bsky-advanced label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bsky-advanced input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-weight: 400;
+}
+
+.bsky-advanced small {
+  font-weight: 400;
+}
+
+.bsky-advanced-actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.bsky-chips,
+.refine-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bsky-result-head {
+  padding: 10px 16px 0;
+}
+
+.refine-filter {
+  flex: 1;
+  min-width: 160px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.sort-by {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sort-by select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  color: var(--text);
+}
+
+.refine-facets {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.refine-facets > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.facet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.facet-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.chip-button {
+  cursor: pointer;
+}
+
+.chip-button.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.search-error {
+  padding: 16px;
+  color: var(--danger, #c0392b);
+}
+
+.bsky-unlinked {
+  padding: 24px 16px;
+}
+
+.center {
+  text-align: center;
+  padding: 12px 0;
+}

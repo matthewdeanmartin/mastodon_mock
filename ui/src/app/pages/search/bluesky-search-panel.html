@@ -1,0 +1,201 @@
+@if (!session.linked()) {
+  <p class="muted center bsky-unlinked">
+    Bluesky post search needs a linked account —
+    <a routerLink="/settings/connections/bluesky">link one in Settings</a>. Unlike account search,
+    the posts endpoint refuses anonymous callers.
+  </p>
+} @else {
+  <div class="bsky-search-bar">
+    <input
+      type="search"
+      class="bsky-query"
+      [ngModel]="criteria().text"
+      (ngModelChange)="setText($event)"
+      (keyup.enter)="run()"
+      placeholder="Search Bluesky posts"
+      aria-label="Search Bluesky posts"
+    />
+    <!-- Ranking is a server-side choice, so it sits with the query, not with
+         the in-memory sort down in the refine bar. -->
+    <label class="bsky-sort">
+      <span class="muted small">Rank</span>
+      <select
+        [ngModel]="criteria().sort"
+        (ngModelChange)="set('sort', $event)"
+        aria-label="Ranking order"
+      >
+        <option value="latest">Latest</option>
+        <option value="top">Top</option>
+      </select>
+    </label>
+    <button class="btn" [disabled]="!criteria().text.trim() || searching()" (click)="run()">
+      Search
+    </button>
+    <button
+      class="btn btn-outline"
+      [class.active]="advancedOpen()"
+      (click)="advancedOpen.set(!advancedOpen())"
+    >
+      Filters{{ hasFilters() ? ' •' : '' }}
+    </button>
+  </div>
+
+  @if (advancedOpen()) {
+    <div class="bsky-advanced">
+      <!-- Bluesky's own filters, not Mastodon's. There is deliberately no
+           has:media / is:reply / sensitive here: searchPosts has no such
+           parameters, and offering them would mean silently ignoring them. -->
+      <label>
+        <span>From account</span>
+        <input
+          type="text"
+          [ngModel]="criteria().author"
+          (ngModelChange)="set('author', $event)"
+          placeholder="handle.bsky.social"
+        />
+      </label>
+      <label>
+        <span>Mentioning</span>
+        <input
+          type="text"
+          [ngModel]="criteria().mentions"
+          (ngModelChange)="set('mentions', $event)"
+          placeholder="handle.bsky.social"
+        />
+      </label>
+      <label>
+        <span>Hashtags</span>
+        <input
+          type="text"
+          [ngModel]="tagInput()"
+          (ngModelChange)="tagInput.set($event)"
+          placeholder="angular typescript"
+        />
+        <small class="muted">Posts with <em>all</em> of these tags.</small>
+      </label>
+      <label>
+        <span>Language</span>
+        <input
+          type="text"
+          [ngModel]="criteria().language"
+          (ngModelChange)="set('language', $event)"
+          placeholder="en"
+        />
+      </label>
+      <label>
+        <span>Links to domain</span>
+        <input
+          type="text"
+          [ngModel]="criteria().domain"
+          (ngModelChange)="set('domain', $event)"
+          placeholder="github.com"
+        />
+      </label>
+      <label>
+        <span>Links to URL</span>
+        <input
+          type="url"
+          [ngModel]="criteria().url"
+          (ngModelChange)="set('url', $event)"
+          placeholder="https://example.com/post"
+        />
+      </label>
+      <label>
+        <span>After</span>
+        <input type="date" [ngModel]="criteria().after" (ngModelChange)="set('after', $event)" />
+      </label>
+      <label>
+        <span>Before</span>
+        <input type="date" [ngModel]="criteria().before" (ngModelChange)="set('before', $event)" />
+      </label>
+      <div class="bsky-advanced-actions">
+        <button class="btn btn-outline btn-sm" (click)="reset()">Clear all</button>
+      </div>
+    </div>
+  }
+
+  @if (searching()) {
+    <p class="muted center">Searching Bluesky…</p>
+  } @else if (error(); as message) {
+    <p class="search-error center" role="alert">{{ message }}</p>
+  } @else if (ran()) {
+    @if (activeFilters().length) {
+      <div class="bsky-chips">
+        @for (filter of activeFilters(); track filter) {
+          <span class="chip">{{ filter }}</span>
+        }
+      </div>
+    }
+
+    @if (!statuses().length) {
+      <p class="muted center">No Bluesky posts matched that search.</p>
+    } @else {
+      <div class="bsky-result-head muted small">
+        Showing {{ visible().length }} of {{ statuses().length }} loaded
+        @if (hitsTotal(); as total) {
+          <!-- "may be rounded or incomplete" per the lexicon, and a real query
+               returned exactly 10000 — a ceiling, not a count. Hedged wording. -->
+          <span class="muted">· about {{ total }} matches on Bluesky</span>
+        }
+      </div>
+
+      <div class="refine-bar">
+        <input
+          type="search"
+          class="refine-filter"
+          [ngModel]="loadedFilter()"
+          (ngModelChange)="loadedFilter.set($event)"
+          placeholder="Filter these results"
+          aria-label="Filter loaded results"
+        />
+        <label class="sort-by">
+          <span class="muted small">Sort</span>
+          <select
+            [ngModel]="statusSort()"
+            (ngModelChange)="statusSort.set($event)"
+            aria-label="Sort posts"
+          >
+            @for (s of statusSorts; track s.value) {
+              <option [value]="s.value">{{ s.label }}</option>
+            }
+          </select>
+        </label>
+        @if (selectedFacets().length || loadedFilter()) {
+          <button class="btn btn-outline btn-sm" (click)="clearRefinements()">Clear</button>
+        }
+      </div>
+
+      @if (facets().length) {
+        <details class="refine-facets">
+          <summary>Narrow these results</summary>
+          @for (facet of facets(); track facet.kind) {
+            <div class="facet-row">
+              <span class="facet-label muted small">{{ facet.label }}</span>
+              @for (value of facet.values.slice(0, 5); track value.value) {
+                <button
+                  class="chip chip-button"
+                  [class.active]="isFacetSelected(facet.kind, value.value)"
+                  (click)="toggleFacet(facet.kind, value.value)"
+                >
+                  {{ value.label }} ({{ value.count }})
+                </button>
+              }
+            </div>
+          }
+        </details>
+      }
+
+      @for (status of visible(); track status.id) {
+        <app-status-card [status]="status" [showSource]="true" />
+      }
+
+      @if (!exhausted()) {
+        <div class="center">
+          <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+            {{ loadingMore() ? 'Loading…' : 'Load more' }}
+          </button>
+        </div>
+      }
+    }
+  }
+}

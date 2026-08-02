@@ -81,6 +81,8 @@ import { PageDiagnostics } from '../../page-diagnostics';
 import { SearchServer } from '../../search-server';
 import { SearchCapability } from '../../search-capability';
 import { SearchServerDiscovery } from '../../search-server-discovery/search-server-discovery';
+import { BlueskySearchPanel } from './bluesky-search-panel';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { Server } from '../../server';
 import { isTagsOnly, probeSearchServer, SearchServerStatus } from '../../search-server-probe';
 import { normalizeHostUrl } from '../../host-url';
@@ -112,6 +114,7 @@ const LOAD_MORE_HARD_CAP = 30;
     SearchHelperDialog,
     SearchSyntaxHelp,
     SearchServerDiscovery,
+    BlueskySearchPanel,
   ],
   templateUrl: './search.html',
   styleUrl: './search.css',
@@ -307,6 +310,24 @@ export class Search implements OnInit, OnDestroy {
   protected searching = signal(false);
   protected type = signal<SearchType>('accounts');
 
+  /**
+   * Whether the Bluesky panel has taken over the page.
+   *
+   * Deliberately *not* a fourth `SearchType`. `SearchType` is threaded through
+   * URL serialization, saved searches, the query serializers and the explain
+   * panel, all of which are Mastodon-shaped; widening it would put a "…or
+   * bluesky" case in every one of them. A separate flag keeps the Bluesky panel
+   * self-contained and leaves the Mastodon machinery untouched.
+   */
+  protected blueskyMode = signal(false);
+
+  /** What the type `<select>` should display, including the Bluesky option. */
+  protected typeSelection = computed(() =>
+    this.blueskyMode() ? 'bluesky-posts' : (this.type() as string),
+  );
+
+  protected bskySession = inject(BlueskySession);
+
   // --- Web search hand-off ---
   // The four engines sit at the bottom of the type dropdown, but they are *not*
   // search types: picking one opens a tab and leaves the page exactly as it was.
@@ -340,6 +361,13 @@ export class Search implements OnInit, OnDestroy {
       return;
     }
     this.webDropped.set([]);
+    // Bluesky is a whole other engine with its own filters, so it swaps the
+    // panel rather than changing the Mastodon search's type.
+    if (value === 'bluesky-posts') {
+      this.blueskyMode.set(true);
+      return;
+    }
+    this.blueskyMode.set(false);
     this.type.set(value as SearchType);
   }
 

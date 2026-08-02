@@ -3,12 +3,14 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, Observable, switchMap, throwError } from 'rxjs';
 import { externalFetch } from '../external-fetch';
 import { BlueskySession } from './bluesky-session';
+import { BlueskyPostSearch } from './bluesky-post-search';
 import {
   BskyAuthorFeedFilter,
   BskyFacet,
   BskyNotificationPage,
   BskyPostView,
   BskyProfile,
+  BskySearchPosts,
   BskyThreadNode,
   BskyTimeline,
 } from './bluesky-types';
@@ -67,6 +69,48 @@ export class BlueskyApi {
       params = params.set('cursor', cursor);
     }
     return this.get<BskyTimeline>('app.bsky.feed.getAuthorFeed', params);
+  }
+
+  /**
+   * Search posts.
+   *
+   * **Requires auth**: measured 2026-08-01, anonymous calls get 403 from
+   * `public.api.bsky.app` and 401 from the entryway. So this is offered only
+   * with a linked account, unlike `searchActors`.
+   *
+   * Every criterion is a typed parameter rather than a DSL string appended to
+   * `q` — the object is canonical and the query is derived, the same rule the
+   * Mastodon serializer follows. Empty fields are omitted entirely: sending
+   * `author=` blank is a different query from sending nothing.
+   */
+  searchPosts(criteria: BlueskyPostSearch, cursor: string | null): Observable<BskySearchPosts> {
+    let params = new HttpParams().set('q', criteria.text).set('limit', '25');
+    const single: [string, string | undefined][] = [
+      // Handles are resolved server-side, so a bare handle is fine; a leading
+      // @ is not, and readers type one.
+      ['author', criteria.author?.replace(/^@/, '')],
+      ['mentions', criteria.mentions?.replace(/^@/, '')],
+      ['lang', criteria.language],
+      ['domain', criteria.domain],
+      ['url', criteria.url],
+      // Date-only bounds are accepted and honoured (measured), so the existing
+      // YYYY-MM-DD pickers need no widening to ISO instants.
+      ['since', criteria.after],
+      ['until', criteria.before],
+      ['sort', criteria.sort],
+    ];
+    for (const [key, value] of single) {
+      if (value) {
+        params = params.set(key, value);
+      }
+    }
+    for (const tag of criteria.tags ?? []) {
+      params = params.append('tag', tag);
+    }
+    if (cursor) {
+      params = params.set('cursor', cursor);
+    }
+    return this.get<BskySearchPosts>('app.bsky.feed.searchPosts', params);
   }
 
   /**

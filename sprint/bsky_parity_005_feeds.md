@@ -57,20 +57,28 @@ incremental cost of the second is small.
 
 ## Still open
 
-**Q2. Should a pinned Bluesky feed be able to feed the merged home timeline?**
-User: *"uh... I'll have to read about pinned feeds."*
+**A2. Pinned is a grouping, not a merge.** User, after reading up:
 
-Deferred, and nothing in this sprint depends on it. For context when you get to
-it: `savedFeed.pinned` is a boolean on each saved feed. In the official app,
-pinned feeds become the tabs across the top of the home screen — so "pinned"
-means "promoted to a top-level tab", not "merged into one stream". Bluesky
-itself never merges them; you swipe between them.
+> Then pinned is a grouping of feeds in the feeds tab, sort of like how endorsed
+> is just a grouping of an object type.
 
-Mockingbird's home feed *does* merge providers, so we could do something the
-official app doesn't. That is the actual question, and it is a product call
-rather than a technical one. **This sprint reads `pinned` and sorts pinned feeds
-first within the section; it does not touch the home timeline.** That keeps the
-option open in both directions.
+Exactly right, and it matches what `pinned` means upstream: in the official app
+pinned feeds are the tabs across the top of home — "promoted", not "merged".
+Bluesky never merges them; you swipe between them.
+
+So **Pinned is a third section**, not a sort order within the other two and not
+a home-timeline input:
+
+- **📌 Pinned** — the feeds and lists the reader promoted, feeds and lists
+  together, because "pinned" is the grouping and the underlying kind is a
+  detail at that point.
+- **🦋 Bluesky feeds** — the rest of the saved algorithmic feeds.
+- **🦋 Bluesky lists** — the rest of the saved curatelists.
+
+An entry appears in Pinned *or* in its kind's section, never both — the same
+way `endorsed` is a grouping over accounts rather than a copy of them. The
+home timeline is untouched; `BlueskyProvider` keeps contributing `getTimeline`
+and nothing else.
 
 **Q3. Feed discovery — how far?** Not asked again; the sprint takes the
 conservative answer (read-only, saved/pinned only) and lists the rest under
@@ -169,9 +177,10 @@ Bluesky" and, on `UnknownFeed`, "This feed's server is not responding."
 4. `getFeed(uri, cursor)` and `getListFeed(uri, cursor)` on `BlueskyApi`; both
    adapt with the existing `adaptFeedItem` — both return `feedViewPost[]`.
 5. `ListSource` gains both kinds; `ListFeedResolver` gains both arms.
-6. **Two sections** on `/feeds/lists`: "Bluesky feeds" and "Bluesky lists",
-   each badged 🦋, pinned entries first, feeds attributed to their creator.
-   Keep only `purpose: curatelist`.
+6. **Three sections** on `/feeds/lists` — "📌 Pinned" (feeds and lists
+   together), "🦋 Bluesky feeds", "🦋 Bluesky lists". An entry is in Pinned or
+   in its kind's section, never both. Feeds attributed to their creator; keep
+   only `purpose: curatelist`.
 7. `UnknownFeed` / `UnknownList` → a warning row, not an empty state.
 
 ## Deliberately out of this sprint
