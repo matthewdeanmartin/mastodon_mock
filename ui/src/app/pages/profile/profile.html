@@ -77,6 +77,33 @@
                 {{ relationship()?.following ? '🦋 Following' : '🦋 Follow' }}
               }
             </button>
+            <!-- Real Bluesky mutes and blocks, written on their network. A timed
+                 mute has no Bluesky equivalent, so those stay local — see
+                 Profile.mute. Reporting is not offered: it needs a labeler
+                 service this app has no UI for. -->
+            <details class="account-danger-menu">
+              <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
+              <div class="account-danger-panel">
+                @if (a.url) {
+                  <a class="menu-neutral" [href]="a.url" target="_blank" rel="noopener noreferrer">
+                    Open on bsky.app
+                  </a>
+                }
+                @if (relationship()?.muting || localMuted()) {
+                  <button type="button" (click)="unmute()">Unmute account</button>
+                } @else {
+                  <div class="menu-note muted small">Mute for…</div>
+                  <div class="mute-durations">
+                    @for (d of muteDurations; track d.label) {
+                      <button type="button" (click)="mute(d.seconds)">{{ d.label }}</button>
+                    }
+                  </div>
+                }
+                <button type="button" (click)="requestBlock()">
+                  {{ relationship()?.blocking ? 'Unblock account' : 'Block account' }}
+                </button>
+              </div>
+            </details>
           }
         </div>
       } @else if (isOpenRouter()) {
@@ -254,17 +281,7 @@
         ><strong>{{ a.statuses_count | humanCount }}</strong>
         {{ isRss() ? 'items' : words().posts }}</span
       >
-      <!-- Bluesky reports real counts but has no people browser here yet, so they
-           show as plain numbers rather than buttons that open an empty tab. -->
-      @if (isBluesky()) {
-        <span
-          ><strong>{{ a.following_count | humanCount }}</strong> following</span
-        >
-        <span
-          ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
-        >
-      }
-      @if (!isRss() && !isTwitter() && !isBluesky()) {
+      @if (!isRss() && !isTwitter()) {
         <button type="button" class="count-btn" (click)="setTab('following')">
           <strong>{{
             auth.isAnonymous && isSelf()
@@ -287,9 +304,11 @@
             <strong>Collections ({{ collections().length }})</strong>
           </button>
         }
-        <button type="button" class="count-btn" (click)="setTab('analytics')">
-          <strong>Analytics</strong>
-        </button>
+        @if (!isBluesky()) {
+          <button type="button" class="count-btn" (click)="setTab('analytics')">
+            <strong>Analytics</strong>
+          </button>
+        }
       }
     </div>
   </header>
@@ -343,7 +362,7 @@
        (following, followers, collections, analytics) reads a Mastodon endpoint
        with an account id this server has never issued. The posts feed is the
        whole profile for now; the people browser arrives with its own sprint. -->
-  @if (!isRss() && !isTwitter() && !isBluesky()) {
+  @if (!isRss() && !isTwitter()) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
       <button
         type="button"
@@ -381,20 +400,21 @@
           Collections
         </button>
       }
-      <button
-        type="button"
-        class="ptab"
-        [class.active]="tab() === 'analytics'"
-        (click)="setTab('analytics')"
-      >
-        Analytics
-      </button>
+      <!-- Analytics reads Mastodon status metadata this account has none of. -->
+      @if (!isBluesky()) {
+        <button
+          type="button"
+          class="ptab"
+          [class.active]="tab() === 'analytics'"
+          (click)="setTab('analytics')"
+        >
+          Analytics
+        </button>
+      }
     </div>
   }
 
-  @if (
-    !isRss() && !isTwitter() && !isBluesky() && (tab() === 'following' || tab() === 'followers')
-  ) {
+  @if (!isRss() && !isTwitter() && (tab() === 'following' || tab() === 'followers')) {
     <app-people-browser
       [accountId]="a.id"
       [mode]="tab() === 'followers' ? 'followers' : 'following'"

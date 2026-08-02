@@ -1,6 +1,71 @@
 # Sprint 4 — People browser, hover card, and the rest of the graph
 
-Status: READY. Depends on Sprint 1 (`BlueskyGraph`) and reads better after
+Status: **DONE** (2026-08-01). 2734 tests pass, lint clean, production build
+green.
+
+## What shipped
+
+- `people-source.ts` — the `PeopleSource` interface and `PeoplePage`.
+- `people-sources.ts` — four implementations (Mastodon, anonymous-public,
+  local-anonymous, Bluesky) behind a `PeopleSourceFactory`.
+- `people-browser.ts` — rewritten against the interface; **no spec changes**.
+- `bluesky-api.ts` — `getFollowers`, `getFollows`, `block`, `muteActor`,
+  `unmuteActor`.
+- `bluesky-graph.ts` — `block`/`unblock` (records, uri-cached like follow) and
+  `mute`/`unmute` (procedures, no uri).
+- Profile: tabs, counts-as-buttons and a Bluesky ••• menu with real mute/block.
+- Hover card: Bluesky follow state and follow/unfollow.
+
+11 new tests.
+
+**The refactor landed with every existing people-browser spec untouched and
+green** — which was the whole safety argument for doing it as option 2 rather
+than adding a third inline branch.
+
+### Decisions worth keeping
+
+**`canFollow` is a source property.** An anonymous Bluesky view reads fine but
+has no session to write with, so the button comes off rather than failing on
+click. The Mastodon and anonymous sources return true; only Bluesky-signed-out
+returns false.
+
+**Bluesky needs no relationship request.** Measured: `getFollowers`/`getFollows`
+populate `viewer` inline when authenticated (`following`, `followedBy`,
+`muted`, `blockedBy`, and two `mutedOnly*` flags). The source harvests it during
+`fetch` and `relationships()` returns it with no round trip. Signed out there is
+no `viewer` at all and the map is empty — which the browser reads as *unknown*,
+not "not following".
+
+**The hover card's `hasStats` now asks the data, not the id.** It excluded every
+namespaced id because foreign adapters zero-fill counts. But the same Bluesky
+account arriving from search or a people list came through `adaptProfile` and
+carries real numbers, and the id test hid those too. Now: any non-zero count
+means somebody actually told us something.
+
+**Bluesky mute/block are real, and outrank local moderation.** A linked session
+can write a block the other account sees, so `useLocalModeration` returns false
+for Bluesky. The one exception is a *timed* mute — Bluesky mutes have no
+duration, so "mute for 5 minutes" stays local and keeps meaning what it says.
+
+**Unfollowing from your own following list removes the row.** Previously
+anonymous-only via `isLocalAnonymousList()`; now `isOwnFollowingList()`, which
+covers signed-in users too. In anonymous mode `auth.account()` *is*
+`anonymous.account()`, so the old behaviour is preserved exactly.
+
+### Deliberately still out
+
+- **Report** on the Bluesky ••• menu: reporting goes to a labeler service this
+  app has no UI for.
+- **Analytics and Collections tabs** stay hidden for Bluesky — the first reads
+  Mastodon status metadata, the second is a Mastodon 4.6 feature.
+- `mutedOnlyReposts` / `mutedOnlyQuoteposts`, which arrived in the viewer block
+  and have no Mastodon counterpart.
+
+---
+
+Original plan follows.
+
+Depends on Sprint 1 (`BlueskyGraph`) and reads better after
 Sprint 3 (search results are where you meet new accounts).
 
 Demo at the end: the Following / Followers tabs work on a Bluesky profile, the

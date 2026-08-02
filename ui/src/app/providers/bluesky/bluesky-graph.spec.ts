@@ -118,4 +118,69 @@ describe('BlueskyGraph', () => {
     graph.unfollow(DID).subscribe();
     httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.repo.deleteRecord`).flush({});
   });
+
+  it('block writes a graph.block record naming the subject', () => {
+    let rel: { blocking: boolean } | null = null;
+    graph.block(DID).subscribe((r) => (rel = r));
+
+    const req = httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.repo.createRecord`);
+    expect(req.request.body).toMatchObject({
+      collection: 'app.bsky.graph.block',
+      record: { subject: DID },
+    });
+    req.flush({ uri: 'at://did:plc:me/app.bsky.graph.block/b1', cid: 'c' });
+
+    expect(rel!.blocking).toBe(true);
+  });
+
+  it('unblock deletes the remembered block record with no extra lookup', () => {
+    graph.block(DID).subscribe();
+    httpMock
+      .expectOne(`${SERVICE}/xrpc/com.atproto.repo.createRecord`)
+      .flush({ uri: 'at://did:plc:me/app.bsky.graph.block/b1', cid: 'c' });
+
+    let rel: { blocking: boolean } | null = null;
+    graph.unblock(DID).subscribe((r) => (rel = r));
+
+    const del = httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.repo.deleteRecord`);
+    expect(del.request.body).toEqual({
+      repo: 'did:plc:me',
+      collection: 'app.bsky.graph.block',
+      rkey: 'b1',
+    });
+    del.flush({});
+    expect(rel!.blocking).toBe(false);
+  });
+
+  it('unblock on a cold cache resolves the record uri from the profile', () => {
+    graph.unblock(DID).subscribe();
+
+    httpMock
+      .expectOne((r) => r.url.endsWith('/xrpc/app.bsky.actor.getProfile'))
+      .flush({
+        did: DID,
+        handle: 'them.bsky.social',
+        viewer: { blocking: 'at://did:plc:me/app.bsky.graph.block/b9' },
+      });
+
+    const del = httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.repo.deleteRecord`);
+    expect((del.request.body as { rkey: string }).rkey).toBe('b9');
+    del.flush({});
+  });
+
+  it('mute is a procedure, so unmuting needs only the DID', () => {
+    // Unlike follow and block there is no record and no uri to keep.
+    let rel: { muting: boolean } | null = null;
+    graph.mute(DID).subscribe((r) => (rel = r));
+    const mute = httpMock.expectOne(`${SERVICE}/xrpc/app.bsky.graph.muteActor`);
+    expect(mute.request.body).toEqual({ actor: DID });
+    mute.flush({});
+    expect(rel!.muting).toBe(true);
+
+    graph.unmute(DID).subscribe((r) => (rel = r));
+    const unmute = httpMock.expectOne(`${SERVICE}/xrpc/app.bsky.graph.unmuteActor`);
+    expect(unmute.request.body).toEqual({ actor: DID });
+    unmute.flush({});
+    expect(rel!.muting).toBe(false);
+  });
 });

@@ -1,6 +1,6 @@
 # Bluesky parity — roadmap
 
-Status: SPRINTS 1–3 DONE (2026-08-01). Sprints 4–5 READY.
+Status: SPRINTS 1–4 DONE (2026-08-01). Sprint 5 READY.
 
 Goal: **the Bluesky experience in Mockingbird is the same experience as
 Mastodon** — same pages, same cards, same gestures — for everything a reader
@@ -51,8 +51,10 @@ rejected below.
    at the AppView", and anonymous reads must go there. `BlueskyApi.publicGet`
    encapsulates the choice; only auth-optional endpoints may use it.
 
-   Relevant to Sprint 4 (`getFollowers`/`getFollows`) and Sprint 5
-   (`getListFeed` is documented auth-optional) — both could work signed out.
+   Confirmed in Sprint 4: `getFollowers`/`getFollows` answer anonymously at the
+   AppView and carry no `viewer` block, so follow state is genuinely unknown
+   there. Sprint 5's `getListFeed` is documented the same way and should behave
+   the same — verify it.
 
 ## Sprint list
 
@@ -61,7 +63,7 @@ rejected below.
 | 1 | [Profile + follow](bsky_parity_001_profile_and_follow.md) | Click any bsky avatar → real profile, with a working Follow button | **DONE** |
 | 2 | [Notifications](bsky_parity_002_notifications.md) | A Bluesky tab on /notifications: likes, reposts, follows, replies, mentions, quotes | **DONE** |
 | 3 | [Search](bsky_parity_003_search.md) | Search page finds bsky posts and accounts, with Bluesky's own filters | **DONE** |
-| 4 | [People browser](bsky_parity_004_people_browser.md) | Followers/following tabs work on a bsky profile; follow from search results | READY |
+| 4 | [People browser](bsky_parity_004_people_browser.md) | Followers/following tabs work on a bsky profile; follow from search results | **DONE** |
 | 5 | [Feeds + lists](bsky_parity_005_feeds.md) | Bluesky's custom feeds *and* curated lists, as two new sections on the Feeds tab | READY |
 
 Each sprint ends with something demoable on its own. They are ordered so that

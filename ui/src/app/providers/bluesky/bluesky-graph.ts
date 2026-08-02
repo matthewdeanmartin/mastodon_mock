@@ -5,6 +5,30 @@ import { adaptRelationship } from './bluesky-adapter';
 import { BlueskyApi } from './bluesky-api';
 
 /**
+ * A relationship reporting one changed dimension.
+ *
+ * Every write here learns exactly one fact — a follow response cannot say
+ * whether they follow *you*, and a mute says nothing about blocking. Callers
+ * merge this onto the relationship they already hold rather than replacing it,
+ * so the other dimensions survive.
+ */
+function changed(did: string, patch: Partial<Relationship>): Relationship {
+  return {
+    id: `bsky:${did}`,
+    following: false,
+    followed_by: false,
+    requested: false,
+    blocking: false,
+    muting: false,
+    ...patch,
+  };
+}
+
+const following = (did: string, value: boolean): Relationship => changed(did, { following: value });
+const blocked = (did: string, value: boolean): Relationship => changed(did, { blocking: value });
+const muted = (did: string, value: boolean): Relationship => changed(did, { muting: value });
+
+/**
  * Follow and unfollow on Bluesky, in Mastodon's shape.
  *
  * Exists because AT Protocol has no unfollow verb. Following creates a
@@ -23,6 +47,8 @@ export class BlueskyGraph {
 
   /** did → at-uri of the viewer's follow record, for follows made this session. */
   private followUris = new Map<string, string>();
+  /** The same, for block records — blocks are records too, so undoing needs the uri. */
+  private blockUris = new Map<string, string>();
 
   /** Seed the cache from a profile fetch, so a later unfollow needs no extra call. */
   remember(did: string, followUri: string | undefined): void {
@@ -37,16 +63,7 @@ export class BlueskyGraph {
     return this.api.follow(did).pipe(
       map(({ uri }) => {
         this.followUris.set(did, uri);
-        return {
-          id: `bsky:${did}`,
-          following: true,
-          // Unchanged by this action and unknown from the response; the caller
-          // merges onto the relationship it already holds rather than trusting this.
-          followed_by: false,
-          requested: false,
-          blocking: false,
-          muting: false,
-        } satisfies Relationship;
+        return following(did, true);
       }),
     );
   }
@@ -70,18 +87,51 @@ export class BlueskyGraph {
         }
         return this.api.deleteRecord(followUri);
       }),
-      map(
-        () =>
-          ({
-            id: `bsky:${did}`,
-            following: false,
-            followed_by: false,
-            requested: false,
-            blocking: false,
-            muting: false,
-          }) satisfies Relationship,
-      ),
+      map(() => following(did, false)),
     );
+  }
+
+  /**
+   * Block an actor.
+   *
+   * A record like a follow, so unblocking means deleting it — and the uri is
+   * cached for the same reason, with `viewer.blocking` as the cold fallback.
+   */
+  block(did: string): Observable<Relationship> {
+    return this.api.block(did).pipe(
+      map(({ uri }) => {
+        this.blockUris.set(did, uri);
+        return blocked(did, true);
+      }),
+    );
+  }
+
+  unblock(did: string): Observable<Relationship> {
+    const cached = this.blockUris.get(did);
+    const uri: Observable<string | undefined> = cached
+      ? of(cached)
+      : this.api.getProfile(did).pipe(map((profile) => profile.viewer?.blocking));
+    return uri.pipe(
+      switchMap((blockUri) => {
+        this.blockUris.delete(did);
+        return blockUri ? this.api.deleteRecord(blockUri) : of(undefined);
+      }),
+      map(() => blocked(did, false)),
+    );
+  }
+
+  /**
+   * Mute an actor.
+   *
+   * Unlike follow and block this is a procedure, not a record — there is no uri
+   * to keep, so unmuting needs only the DID.
+   */
+  mute(did: string): Observable<Relationship> {
+    return this.api.muteActor(did).pipe(map(() => muted(did, true)));
+  }
+
+  unmute(did: string): Observable<Relationship> {
+    return this.api.unmuteActor(did).pipe(map(() => muted(did, false)));
   }
 
   /** The viewer's current relationship to an actor, straight from the server. */

@@ -1,18 +1,14 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Api } from '../api';
 import { Auth } from '../auth';
-import { Account, Relationship } from '../models';
+import { Account } from '../models';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
-import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
-import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
-import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
-import { anonymousAccountRouteRef } from '../providers/anonymous/anonymous-route-ref';
-import { Observable } from 'rxjs';
 import { RenderedHtmlLinks } from '../rendered-html-links';
+import { PeopleMode, PeopleSource } from './people-source';
+import { PeopleSourceFactory } from './people-sources';
+import { Relationship } from '../models';
 
-/** Which list this widget pages through. */
-export type PeopleMode = 'followers' | 'following';
+export type { PeopleMode } from './people-source';
 
 /** Per-account follow state, so the button can show the right label + spinner. */
 type FollowState = 'idle' | 'busy';
@@ -23,6 +19,11 @@ type FollowState = 'idle' | 'busy';
  * wired to the viewer's real relationship, plus a "More" button that pages to
  * the next batch. Relationships are fetched one page at a time so the toggle is
  * always accurate without over-fetching.
+ *
+ * Which network it reads is {@link PeopleSource}'s problem, not this
+ * component's. Before that split, each of fetch, relationship-load and
+ * follow-toggle carried its own `auth.isAnonymous && server` branch, and adding
+ * Bluesky would have made three of each.
  */
 @Component({
   selector: 'app-people-browser',
@@ -31,11 +32,8 @@ type FollowState = 'idle' | 'busy';
   styleUrl: './people-browser.css',
 })
 export class PeopleBrowser {
-  private api = inject(Api);
   private auth = inject(Auth);
-  private anonymous = inject(AnonymousAccount);
-  private anonymousFollows = inject(AnonymousFollows);
-  private anonymousPublic = inject(AnonymousPublicApi);
+  private sources = inject(PeopleSourceFactory);
 
   /** Whose followers/following to show. */
   readonly accountId = input.required<string>();
@@ -60,12 +58,18 @@ export class PeopleBrowser {
 
   protected me = this.auth.account;
 
+  /** The current page's source, rebuilt whenever the target account changes. */
+  private source!: PeopleSource;
+  /** Opaque paging token; meaning is the source's business, not ours. */
+  private cursor: string | null = null;
+
   constructor() {
     // Reload from scratch whenever the target account or the mode changes.
     effect(() => {
       // Touch the inputs so the effect re-runs on either change.
-      this.accountId();
+      const id = this.accountId();
       this.mode();
+      this.source = this.sources.create(id, this.server());
       this.reset();
       this.loadFirst();
     });
@@ -79,47 +83,17 @@ export class PeopleBrowser {
     this.loadingMore.set(false);
     this.exhausted.set(false);
     this.error.set(false);
-  }
-
-  private fetch(maxId?: string): Observable<Account[]> {
-    const id = this.accountId();
-    const server = this.server();
-    if (this.auth.isAnonymous && server && !this.isLocalAnonymousList()) {
-      const ref = { server, id };
-      return this.mode() === 'followers'
-        ? this.anonymousPublic.getAccountFollowers(ref, maxId)
-        : this.anonymousPublic.getAccountFollowing(ref, maxId);
-    }
-    return this.mode() === 'followers'
-      ? this.api.accountFollowers(id, maxId)
-      : this.api.accountFollowing(id, maxId);
+    this.cursor = null;
   }
 
   private loadFirst(): void {
-    if (this.isLocalAnonymousList()) {
-      const accounts =
-        this.mode() === 'following'
-          ? this.anonymousFollows.follows().map((follow) => follow.account)
-          : [];
-      this.accounts.set(accounts);
-      this.rels.set(
-        new Map(
-          accounts.map((account) => [
-            account.id,
-            this.anonymousFollows.relationship(account, this.anonymous.server()),
-          ]),
-        ),
-      );
-      this.loading.set(false);
-      this.exhausted.set(true);
-      return;
-    }
-    this.fetch().subscribe({
+    this.source.fetch(this.mode(), null).subscribe({
       next: (page) => {
+        this.cursor = page.cursor;
         this.loading.set(false);
-        this.accounts.set(page);
-        this.exhausted.set(!page.length);
-        this.loadRelationships(page);
+        this.accounts.set(page.accounts);
+        this.exhausted.set(!page.accounts.length || !page.cursor);
+        this.loadRelationships(page.accounts);
       },
       error: () => {
         this.loading.set(false);
@@ -129,25 +103,27 @@ export class PeopleBrowser {
   }
 
   loadMore(): void {
-    const last = this.accounts().at(-1);
-    if (!last || this.loadingMore() || this.exhausted()) {
+    if (!this.cursor || this.loadingMore() || this.exhausted()) {
       return;
     }
     this.loadingMore.set(true);
-    this.fetch(last.id).subscribe({
+    this.source.fetch(this.mode(), this.cursor).subscribe({
       next: (page) => {
+        this.cursor = page.cursor;
         this.loadingMore.set(false);
-        if (!page.length) {
+        if (!page.accounts.length) {
           this.exhausted.set(true);
           return;
         }
         const seen = new Set(this.accounts().map((a) => a.id));
-        const fresh = page.filter((a) => !seen.has(a.id));
+        const fresh = page.accounts.filter((a) => !seen.has(a.id));
+        // A page that adds nothing new means the cursor is going in circles.
         if (!fresh.length) {
           this.exhausted.set(true);
           return;
         }
         this.accounts.update((list) => [...list, ...fresh]);
+        this.exhausted.set(!page.cursor);
         this.loadRelationships(fresh);
       },
       error: () => this.loadingMore.set(false),
@@ -157,31 +133,23 @@ export class PeopleBrowser {
   /** Fetch relationships for a batch (skips myself; I can't follow myself). */
   private loadRelationships(page: Account[]): void {
     const meId = this.me()?.id;
-    const ids = page.map((a) => a.id).filter((id) => id !== meId);
-    if (!ids.length) {
+    const others = page.filter((a) => a.id !== meId);
+    if (!others.length) {
       return;
     }
-    if (this.auth.isAnonymous) {
-      const server = this.server() ?? this.anonymous.server();
-      this.rels.update((map) => {
-        const next = new Map(map);
-        for (const account of page) {
-          if (account.id !== meId) {
-            next.set(account.id, this.anonymousFollows.relationship(account, server));
+    this.source.relationships(others).subscribe({
+      next: (found) => {
+        this.rels.update((map) => {
+          const next = new Map(map);
+          for (const [id, rel] of found) {
+            next.set(id, rel);
           }
-        }
-        return next;
-      });
-      return;
-    }
-    this.api.relationships(ids).subscribe((list) => {
-      this.rels.update((map) => {
-        const next = new Map(map);
-        for (const r of list) {
-          next.set(r.id, r);
-        }
-        return next;
-      });
+          return next;
+        });
+      },
+      // A relationship lookup that fails leaves the buttons in their unknown
+      // state rather than blanking a page of accounts that loaded fine.
+      error: () => undefined,
     });
   }
 
@@ -205,13 +173,17 @@ export class PeopleBrowser {
   }
 
   accountLink(a: Account): (string | number)[] {
-    const server = this.server();
-    return this.auth.isAnonymous && server
-      ? [
-          '/accounts',
-          anonymousAccountRouteRef({ server, id: a.id, ...(a.url ? { originalUrl: a.url } : {}) }),
-        ]
-      : ['/accounts', a.id];
+    return this.source.accountLink(a);
+  }
+
+  /**
+   * Whether to offer a follow button at all.
+   *
+   * False for an anonymous Bluesky view — the accounts are readable but there
+   * is no session to write a follow with, so the button would fail on click.
+   */
+  protected canFollow(): boolean {
+    return this.source.canFollow;
   }
 
   /** The label for the toggle, given follow/request/hover state. */
@@ -223,40 +195,29 @@ export class PeopleBrowser {
   }
 
   toggleFollow(a: Account): void {
-    if (this.isBusy(a) || this.isSelf(a)) {
-      return;
-    }
-    this.setPending(a.id, 'busy');
-    if (this.auth.isAnonymous) {
-      const server = this.server() ?? this.anonymous.server();
-      if (this.anonymousFollows.isFollowing(a, server)) {
-        this.anonymousFollows.unfollow(a, server);
-        if (this.isLocalAnonymousList() && this.mode() === 'following') {
-          this.accounts.update((accounts) => accounts.filter((account) => account.id !== a.id));
-        }
-        this.rels.update((rels) => {
-          const next = new Map(rels);
-          next.delete(a.id);
-          return next;
-        });
-      } else {
-        const result = this.anonymousFollows.follow(a, server);
-        if (result.ok) {
-          this.rels.update((rels) => new Map(rels).set(a.id, result.relationship));
-        }
-      }
-      this.clearPending(a.id);
+    if (this.isBusy(a) || this.isSelf(a) || !this.canFollow()) {
       return;
     }
     const following = this.isFollowing(a);
-    const call = following ? this.api.unfollow(a.id) : this.api.follow(a.id);
+    this.setPending(a.id, 'busy');
+    const call = following ? this.source.unfollow(a) : this.source.follow(a);
     call.subscribe({
       next: (rel) => {
         this.rels.update((map) => new Map(map).set(a.id, rel));
+        // Unfollowing from your *own* following list removes the row: the list
+        // is "who I follow", and they no longer belong in it.
+        if (following && !rel.following && this.isOwnFollowingList()) {
+          this.accounts.update((accounts) => accounts.filter((account) => account.id !== a.id));
+        }
         this.clearPending(a.id);
       },
       error: () => this.clearPending(a.id),
     });
+  }
+
+  /** True when this list is the viewer's own "following" — see toggleFollow. */
+  private isOwnFollowingList(): boolean {
+    return this.mode() === 'following' && this.accountId() === this.me()?.id;
   }
 
   private setPending(id: string, state: FollowState): void {
@@ -279,8 +240,4 @@ export class PeopleBrowser {
     }
     return this.mode() === 'followers' ? 'No followers yet.' : 'Not following anyone yet.';
   });
-
-  private isLocalAnonymousList(): boolean {
-    return this.auth.isAnonymous && this.accountId() === this.anonymous.account().id;
-  }
 }

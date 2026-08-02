@@ -126,6 +126,23 @@ export interface BskyThreadNode {
 }
 
 /**
+ * `app.bsky.graph.getFollowers` output. `subject` is the actor whose followers
+ * these are — ignored here, since the profile header already has them.
+ */
+export interface BskyFollowers {
+  subject: BskyProfile;
+  followers: BskyProfile[];
+  cursor?: string;
+}
+
+/** `app.bsky.graph.getFollows` output — the *following* list, not followers. */
+export interface BskyFollows {
+  subject: BskyProfile;
+  follows: BskyProfile[];
+  cursor?: string;
+}
+
+/**
  * `app.bsky.actor.searchActors` output.
  *
  * Actors are `profileView`: handle, display name, avatar and bio, but **no

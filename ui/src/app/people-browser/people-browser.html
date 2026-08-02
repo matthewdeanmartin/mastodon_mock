@@ -31,7 +31,10 @@
             <span>{{ a.following_count.toLocaleString() }} following</span>
           </div>
         </div>
-        @if (!isSelf(a)) {
+        <!-- No button when the source cannot write follows — an anonymous
+             Bluesky view reads fine but has no session to follow with, so a
+             button here could only fail on click. -->
+        @if (!isSelf(a) && canFollow()) {
           <button
             class="follow-btn"
             [class.following]="isFollowing(a)"
@@ -41,7 +44,7 @@
           >
             {{ isBusy(a) ? '…' : followLabel(a) }}
           </button>
-        } @else {
+        } @else if (isSelf(a)) {
           <span class="follow-btn is-self muted">You</span>
         }
       </div>

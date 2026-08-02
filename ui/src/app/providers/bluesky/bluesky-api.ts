@@ -7,6 +7,8 @@ import { BlueskyPostSearch } from './bluesky-post-search';
 import {
   BskyAuthorFeedFilter,
   BskyFacet,
+  BskyFollowers,
+  BskyFollows,
   BskyNotificationPage,
   BskyPostView,
   BskyProfile,
@@ -27,6 +29,12 @@ const PUBLIC_APPVIEW = 'https://public.api.bsky.app';
 interface CreateRecordResponse {
   uri: string;
   cid: string;
+}
+
+/** Shared params for the cursor-paged graph list endpoints. */
+function peoplePage(actor: string, cursor: string | null): HttpParams {
+  const params = new HttpParams().set('actor', actor).set('limit', '50');
+  return cursor ? params.set('cursor', cursor) : params;
 }
 
 /** Split an at-uri (`at://did/collection/rkey`) into deleteRecord params. */
@@ -120,6 +128,45 @@ export class BlueskyApi {
       params = params.set('cursor', cursor);
     }
     return this.get<BskySearchPosts>('app.bsky.feed.searchPosts', params);
+  }
+
+  /** Accounts following this actor. Auth-optional, so it works signed out. */
+  getFollowers(actor: string, cursor: string | null): Observable<BskyFollowers> {
+    return this.publicGet<BskyFollowers>('app.bsky.graph.getFollowers', peoplePage(actor, cursor));
+  }
+
+  /**
+   * Accounts this actor follows.
+   *
+   * Note the name: `getFollows` is the *following* list, the mirror of
+   * `getFollowers`. Swapping them would mislabel both tabs in a way that looks
+   * plausible on screen.
+   */
+  getFollows(actor: string, cursor: string | null): Observable<BskyFollows> {
+    return this.publicGet<BskyFollows>('app.bsky.graph.getFollows', peoplePage(actor, cursor));
+  }
+
+  /** Block an actor; returns the block record's at-uri (delete it to unblock). */
+  block(did: string): Observable<CreateRecordResponse> {
+    return this.createRecord('app.bsky.graph.block', {
+      $type: 'app.bsky.graph.block',
+      subject: did,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Mute an actor.
+   *
+   * A procedure, not a record — unlike follow and block there is no at-uri to
+   * keep, so unmuting needs only the DID.
+   */
+  muteActor(did: string): Observable<unknown> {
+    return this.request('app.bsky.graph.muteActor', { actor: did });
+  }
+
+  unmuteActor(did: string): Observable<unknown> {
+    return this.request('app.bsky.graph.unmuteActor', { actor: did });
   }
 
   /**

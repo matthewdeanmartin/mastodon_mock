@@ -1151,6 +1151,11 @@ export class Profile implements OnInit, OnDestroy {
    * API), and for any viewer the server can't manage relationships for.
    */
   protected get useLocalModeration(): boolean {
+    // A linked Bluesky session can write real blocks and mutes on its own
+    // network, so those do not fall back to the browser-local store.
+    if (this.useBlueskyModeration) {
+      return false;
+    }
     return this.auth.isAnonymous || !this.capabilities.canManageRelationships;
   }
 
@@ -1166,9 +1171,38 @@ export class Profile implements OnInit, OnDestroy {
     return !!acc && this.localMod.isMuted(acc);
   });
 
+  /**
+   * Server-side moderation on Bluesky, where the account lives.
+   *
+   * Checked before `useLocalModeration` because a linked Bluesky session *can*
+   * write these — a real block that the other account sees — while the local
+   * store only hides things in this browser. Without a session it falls through
+   * to local moderation, which still works and is the honest option.
+   */
+  private get useBlueskyModeration(): boolean {
+    return this.isBluesky() && this.bskySession.linked();
+  }
+
+  /** Merge a one-dimension relationship patch onto what the page already holds. */
+  private patchRelationship(patch: Relationship): void {
+    this.relationship.update((current) => ({ ...current, ...patch }));
+  }
+
   mute(seconds: number | null): void {
     const acc = this.account();
     if (!acc) {
+      return;
+    }
+    if (this.useBlueskyModeration) {
+      // Bluesky mutes have no duration; a timed mute stays local so the "for 5
+      // minutes" choice keeps meaning what it says.
+      if (seconds !== null) {
+        this.localMod.mute(acc, seconds);
+        return;
+      }
+      this.bskyGraph
+        .mute(this.bskyDid() ?? '')
+        .subscribe({ next: (rel) => this.patchRelationship(rel) });
       return;
     }
     if (this.useLocalModeration) {
@@ -1185,6 +1219,14 @@ export class Profile implements OnInit, OnDestroy {
     if (!acc) {
       return;
     }
+    if (this.useBlueskyModeration) {
+      // Clear both: a local timed mute and a server mute can coexist.
+      this.localMod.clear(acc);
+      this.bskyGraph
+        .unmute(this.bskyDid() ?? '')
+        .subscribe({ next: (rel) => this.patchRelationship(rel) });
+      return;
+    }
     if (this.useLocalModeration) {
       this.localMod.clear(acc);
       return;
@@ -1196,6 +1238,18 @@ export class Profile implements OnInit, OnDestroy {
     const acc = this.account();
     const rel = this.relationship();
     if (!acc) {
+      return;
+    }
+    if (this.useBlueskyModeration) {
+      const did = this.bskyDid() ?? '';
+      const call = rel?.blocking ? this.bskyGraph.unblock(did) : this.bskyGraph.block(did);
+      call.subscribe({
+        next: (updated) => this.patchRelationship(updated),
+        error: (error: unknown) =>
+          this.bskyError.set(
+            error instanceof Error ? error.message : 'Could not update the block on Bluesky.',
+          ),
+      });
       return;
     }
     if (this.useLocalModeration) {

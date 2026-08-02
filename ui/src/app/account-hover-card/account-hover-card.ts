@@ -16,7 +16,14 @@ import { HumanCountPipe } from '../human-count.pipe';
 import { VerifiedBadge } from '../verified-badge/verified-badge';
 import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
 import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
+import { BlueskyGraph } from '../providers/bluesky/bluesky-graph';
+import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { RenderedHtmlLinks } from '../rendered-html-links';
+
+/** `bsky:did:plc:…` → `did:plc:…`. */
+function didOf(account: Account): string {
+  return account.id.replace(/^bsky:/, '');
+}
 
 /**
  * Small card shown when hovering an account's avatar or name: bio,
@@ -206,6 +213,8 @@ export class AccountHoverCard {
   private auth = inject(Auth);
   private anonymous = inject(AnonymousAccount);
   private anonymousFollows = inject(AnonymousFollows);
+  private bskyGraph = inject(BlueskyGraph);
+  private bskySession = inject(BlueskySession);
   private destroyRef = inject(DestroyRef);
 
   readonly account = input.required<Account>();
@@ -220,11 +229,25 @@ export class AccountHoverCard {
   protected followBusy = signal(false);
   private relationshipLoadedFor: string | null = null;
 
+  /** A Bluesky account (`bsky:did:…`) with a linked session to act through. */
+  protected isBluesky = computed(
+    () => this.account().id.startsWith('bsky:') && this.bskySession.linked(),
+  );
+
+  /**
+   * Whether to offer a follow button.
+   *
+   * Namespaced ids are excluded because they name nothing this server issued —
+   * with the exception of Bluesky, which has a real graph and a real session
+   * once one is linked. Signed out, or for `rss:`/`twitter:`/`paste:` ids, the
+   * button stays off: those follows either cannot exist or are local-only and
+   * belong on the profile page.
+   */
   protected showFollowButton = computed(
     () =>
       this.account().id !== this.auth.account()?.id &&
       !!this.account().id &&
-      !this.account().id.includes(':') &&
+      (this.isBluesky() || !this.account().id.includes(':')) &&
       this.allowFollow(),
   );
   protected isFollowingState = computed(
@@ -254,6 +277,24 @@ export class AccountHoverCard {
     const account = this.account();
     if (!this.showFollowButton() || this.relationshipLoadedFor === account.id) return;
     this.relationshipLoadedFor = account.id;
+    if (this.isBluesky()) {
+      // One getProfile per newly hovered account, cached by the guard above for
+      // as long as the card stays mounted on the same person.
+      this.relationshipLoading.set(true);
+      this.bskyGraph
+        .relationship(didOf(account))
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (relationship) => this.relationship.set(relationship),
+          error: () => {
+            // Let a later hover retry rather than caching the failure.
+            this.relationshipLoadedFor = null;
+            this.relationshipLoading.set(false);
+          },
+          complete: () => this.relationshipLoading.set(false),
+        });
+      return;
+    }
     if (this.auth.isAnonymous) {
       this.relationship.set(this.anonymousFollows.relationship(account, this.anonymous.server()));
       return;
@@ -274,6 +315,22 @@ export class AccountHoverCard {
     event.stopPropagation();
     if (this.relationshipLoading() || this.followBusy()) return;
     const account = this.account();
+    if (this.isBluesky()) {
+      this.followBusy.set(true);
+      const did = didOf(account);
+      const request = this.isFollowingState()
+        ? this.bskyGraph.unfollow(did)
+        : this.bskyGraph.follow(did);
+      request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        // Merged, not replaced: the follow response cannot report followed_by,
+        // which drives the "Mutuals" / "Follows you" line.
+        next: (relationship) =>
+          this.relationship.update((current) => ({ ...current, ...relationship })),
+        error: () => this.followBusy.set(false),
+        complete: () => this.followBusy.set(false),
+      });
+      return;
+    }
     if (this.auth.isAnonymous) {
       const relationship = this.isFollowingState()
         ? this.anonymousFollows.unfollow(account, this.anonymous.server())
@@ -293,12 +350,24 @@ export class AccountHoverCard {
   }
 
   /**
-   * Foreign accounts (e.g. Bluesky, id `bsky:did:…`) carry no counts — the
-   * adapters zero-fill them — so showing "0 posts, 0 followers" would just be
-   * wrong. Hide the stats row rather than lie.
+   * Whether the counts are real enough to show.
+   *
+   * Asks the data, not the id. Foreign adapters zero-fill counts they were not
+   * given — `adaptAuthor` on a Bluesky post author has no counts to report — so
+   * "0 posts, 0 followers" would be a lie. But the *same* account arriving from
+   * search or a people list came through `adaptProfile` and carries the real
+   * numbers, and an id test would have hidden those too. Any non-zero count
+   * means somebody actually told us something.
    */
   protected get hasStats(): boolean {
     const id = this.account().id;
-    return typeof id === 'string' && !id.includes(':');
+    if (typeof id !== 'string') {
+      return false;
+    }
+    if (!id.includes(':')) {
+      return true;
+    }
+    const account = this.account();
+    return account.statuses_count > 0 || account.followers_count > 0 || account.following_count > 0;
   }
 }
