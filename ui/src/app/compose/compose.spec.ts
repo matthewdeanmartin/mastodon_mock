@@ -867,15 +867,32 @@ describe('Compose', () => {
     );
   });
 
-  it('Anonymous defaults to Paste and exposes no identity-backed destinations', () => {
+  it('Anonymous defaults to Paste and cannot reach the Mastodon-backed destinations', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
     const f = setUp();
 
     expect(internals(f).target()).toBe('paste');
     const options = [...(f.nativeElement as HTMLElement).querySelectorAll('.target-select option')];
+    // Fedi needs a token; with no Bluesky link there is nothing else to offer.
     expect(options.some((option) => option.getAttribute('value') === 'fedi')).toBe(false);
     expect(options.some((option) => option.getAttribute('value') === 'bsky')).toBe(false);
     expect(options.some((option) => option.getAttribute('value') === 'paste')).toBe(true);
+  });
+
+  it('Anonymous can post to a linked Bluesky, but not to Fedi or Both', () => {
+    // Bluesky carries its own credential, so it works without a Mastodon
+    // account — the point of the connector for Bluesky-first readers. "Both"
+    // still includes a Fedi post, so it stays out.
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    linkBsky();
+    const f = setUp();
+
+    const values = [...(f.nativeElement as HTMLElement).querySelectorAll('.target-select option')]
+      .map((option) => option.getAttribute('value'))
+      .filter((value): value is string => value !== null);
+    expect(values).toContain('bsky');
+    expect(values).not.toContain('fedi');
+    expect(values).not.toContain('both');
   });
 
   it('target=bsky posts a record to Bluesky only and emits a local status', () => {

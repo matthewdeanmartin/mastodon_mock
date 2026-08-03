@@ -1,9 +1,11 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { provideRouter } from '@angular/router';
 import { Server } from '../server';
 import { Auth } from '../auth';
+import { ServerHealth } from '../server-health';
 import { FailWhale } from './fail-whale';
 
 describe('FailWhale', () => {
@@ -13,7 +15,7 @@ describe('FailWhale', () => {
     localStorage.clear();
     TestBed.configureTestingModule({
       imports: [FailWhale],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     httpMock = TestBed.inject(HttpTestingController);
   });
@@ -32,7 +34,9 @@ describe('FailWhale', () => {
   it('shows the generic title and no status link against the mock', () => {
     const el = render();
     expect(el.querySelector('h1')!.textContent).toContain("Can't reach the server");
-    expect(el.querySelector('a')).toBeNull();
+    // Scoped to the action row: the diagnostics box has its own (always-present)
+    // link to the connection doctor, which is not a status-page link.
+    expect(el.querySelector('.actions a')).toBeNull();
   });
 
   it('names the instance and links its official status page when registered', () => {
@@ -41,7 +45,7 @@ describe('FailWhale', () => {
     expect(el.querySelector('h1')!.textContent).toContain(
       'mastodon.social appears to be unavailable',
     );
-    const link = el.querySelector('a')!;
+    const link = el.querySelector('.actions a')!;
     expect(link.getAttribute('href')).toBe('https://status.mastodon.social/');
     expect(link.textContent).toContain('Check instance status');
     expect(link.getAttribute('rel')).toBe('noopener noreferrer');
@@ -52,9 +56,59 @@ describe('FailWhale', () => {
     TestBed.inject(Server).setBaseUrl('https://example.social');
     const el = render();
     httpMock.expectOne('/api/v1/instance/extended_description').flush({ content: '' });
-    const link = el.querySelector('a')!;
+    const link = el.querySelector('.actions a')!;
     expect(link.getAttribute('href')).toBe('https://fediverse.observer/example.social');
     expect(link.textContent).toContain('View third-party uptime information');
+  });
+
+  // ---------------------------------------------------------------- diagnostics
+
+  it('shows the recorded failure and always offers the connection doctor', () => {
+    TestBed.inject(ServerHealth).markDown(
+      new HttpErrorResponse({
+        status: 0,
+        url: 'https://mastodon.social/api/v1/timelines/home',
+        statusText: 'Unknown Error',
+      }),
+    );
+    const el = render();
+
+    const details = el.querySelector('.diagnostics')!;
+    expect(details.textContent).toContain('no response reached the browser');
+    expect(details.textContent).toContain('/api/v1/timelines/home');
+    // The doctor is offered whether or not the instance looks like the culprit.
+    expect(details.querySelector('a')!.getAttribute('href')).toBe(
+      '/settings/connections/doctor',
+    );
+  });
+
+  it('says so plainly rather than showing an empty box when nothing was recorded', () => {
+    const el = render();
+    expect(el.querySelector('.diagnostics')!.textContent).toContain(
+      'No error details were recorded',
+    );
+  });
+
+  it('calls out being offline, which is a different problem from a dead server', () => {
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    TestBed.inject(ServerHealth).markDown(new HttpErrorResponse({ status: 0, url: '/api/v1/x' }));
+    const el = render();
+    expect(el.querySelector('.offline-note')!.textContent).toContain('offline');
+    onLine.mockRestore();
+  });
+
+  it('keeps the first failure, not the pile-up behind it', () => {
+    const health = TestBed.inject(ServerHealth);
+    health.markDown(new HttpErrorResponse({ status: 0, url: '/api/v1/first' }));
+    health.markDown(new HttpErrorResponse({ status: 503, url: '/api/v1/later' }));
+    expect(health.failure()?.url).toBe('/api/v1/first');
+  });
+
+  it('forgets the failure once the server answers again', () => {
+    const health = TestBed.inject(ServerHealth);
+    health.markDown(new HttpErrorResponse({ status: 0, url: '/api/v1/x' }));
+    health.markUp();
+    expect(health.failure()).toBeNull();
   });
 
   // ---------------------------------------------------------------- change server (anonymous)

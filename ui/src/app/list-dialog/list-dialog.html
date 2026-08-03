@@ -26,6 +26,36 @@
           <p class="muted small">No lists yet. Create one below.</p>
         }
 
+        @if (followGate(); as gate) {
+          <!-- Mastodon refuses list membership for accounts you don't follow.
+               Following is a visible act, so it needs an explicit yes. -->
+          <div class="follow-gate" role="alert">
+            <p>
+              Mastodon only lets you add people you follow to a list, so
+              &#64;{{ username() }} wasn't added to <strong>{{ gate.listTitle }}</strong
+              >.
+            </p>
+            <p class="muted small">Following them is public — they'll get a notification.</p>
+            <div class="gate-actions">
+              <button class="btn" type="button" [disabled]="following()" (click)="confirmFollow()">
+                {{ following() ? 'Following…' : 'Follow and add' }}
+              </button>
+              <button
+                class="btn btn-outline"
+                type="button"
+                [disabled]="following()"
+                (click)="dismissFollowGate()"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (listError(); as message) {
+          <p class="list-error" role="alert">{{ message }}</p>
+        }
+
         <div class="new-row">
           <input
             type="text"

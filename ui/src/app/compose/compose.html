@@ -230,15 +230,23 @@
           (ngModelChange)="onTargetChange($event)"
           title="Post to"
         >
+          <!-- Only Fedi needs a Mastodon token. Bluesky and the blog each carry
+               their own credential and post straight to their own service, so an
+               anonymous session that has linked one can post to it — that is the
+               whole pitch to people who are Bluesky-first and haven't signed up
+               for a Mastodon account yet. "Both" is the exception: it includes a
+               Fedi post, so it needs the token too. -->
           @if (!auth.isAnonymous) {
             <option value="fedi">🦣 Fedi</option>
-            @if (bskySession.linked()) {
-              <option value="bsky">🦋 Bluesky</option>
+          }
+          @if (bskySession.linked()) {
+            <option value="bsky">🦋 Bluesky</option>
+            @if (!auth.isAnonymous) {
               <option value="both">🦣+🦋 Both</option>
             }
-            @if (mataroa.connected() && featureFlags.enabled('connector-mataroa')) {
-              <option value="blog">✍️ Blog</option>
-            }
+          }
+          @if (mataroa.connected() && featureFlags.enabled('connector-mataroa')) {
+            <option value="blog">✍️ Blog</option>
           }
           @if (featureFlags.enabled('pastebin')) {
             <option value="paste">📋 Paste</option>

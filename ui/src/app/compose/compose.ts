@@ -1310,6 +1310,38 @@ export class Compose implements OnDestroy {
     };
   }
 
+  /**
+   * The target a restored draft may actually use, given what is linked *now*.
+   *
+   * A draft can outlive the connection it was written for — the Bluesky link
+   * gets revoked, the blog connector is flagged off, the session drops to
+   * anonymous. Rather than restoring a target whose option no longer exists in
+   * the picker (which shows a blank select and posts somewhere surprising),
+   * anything unusable falls back to the default for this session.
+   *
+   * The rules mirror the picker exactly: Fedi and "both" need a Mastodon token;
+   * Bluesky and the blog need only their own link, anonymous included.
+   */
+  private restorableTarget(target: PostTarget): PostTarget {
+    const fallback: PostTarget =
+      this.auth.isAnonymous && this.featureFlags.enabled('pastebin') ? 'paste' : 'fedi';
+    switch (target) {
+      case 'bsky':
+        return this.bskySession.linked() ? 'bsky' : fallback;
+      case 'both':
+        // Includes a Fedi post, so it needs the token as well as the link.
+        return !this.auth.isAnonymous && this.bskySession.linked() ? 'both' : fallback;
+      case 'blog':
+        return this.mataroa.connected() && this.featureFlags.enabled('connector-mataroa')
+          ? 'blog'
+          : fallback;
+      case 'paste':
+        return this.featureFlags.enabled('pastebin') ? 'paste' : fallback;
+      case 'fedi':
+        return this.auth.isAnonymous ? fallback : 'fedi';
+    }
+  }
+
   private applySnapshot(d: DraftSnapshot): void {
     this.text.set(d.segments[0] ?? '');
     this.thread.set(d.segments.slice(1));
@@ -1319,19 +1351,7 @@ export class Compose implements OnDestroy {
     if (!this.lockVisibility()) {
       this.visibility.set(d.visibility);
     }
-    const restoredTarget = d.target ?? 'fedi';
-    this.target.set(
-      this.auth.isAnonymous
-        ? this.featureFlags.enabled('pastebin')
-          ? 'paste'
-          : 'fedi'
-        : restoredTarget === 'blog' &&
-            (!this.mataroa.connected() || !this.featureFlags.enabled('connector-mataroa'))
-          ? 'fedi'
-          : (restoredTarget === 'bsky' || restoredTarget === 'both') && !this.bskySession.linked()
-            ? 'fedi'
-            : restoredTarget,
-    );
+    this.target.set(this.restorableTarget(d.target ?? 'fedi'));
     this.onPasteProviderChange(d.pasteProviderId ?? this.pasteProviders.default.id);
     const provider = this.selectedPasteProvider();
     this.pasteLanguage.set(
