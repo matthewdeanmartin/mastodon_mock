@@ -16,95 +16,104 @@ export type FeedView = 'feed' | 'members' | 'analytics';
 @Component({
   selector: 'app-command-bar',
   template: `
-    <div class="command-bar">
+    <div class="command-bar" role="toolbar" aria-label="Feed controls">
       <!-- "Go live" used to sit here. It is now Blue → "Auto-refresh timeline",
            opt-in and off by default: a feed that rewrites itself under you is an
            antipattern, and this row's space is worth more than a toggle most
            people never want. Home reads the pref directly. -->
-      @if (showRefresh()) {
+      <span class="command-group" role="group" aria-label="Feed actions">
+        @if (showRefresh()) {
+          <button
+            class="btn command-item"
+            (click)="refresh.emit()"
+            title="Reload the feed from the newest posts"
+          >
+            🔄 More
+          </button>
+        }
         <button
-          class="btn btn-outline"
-          (click)="refresh.emit()"
-          title="Reload the feed from the newest posts"
+          class="btn command-item"
+          [class.active]="prefs.feedReader()"
+          (click)="prefs.setFeedReader(!prefs.feedReader())"
+          title="Reader mode for the feed: reader typography, no pictures"
         >
-          🔄 More
+          📖 Reader
         </button>
-      }
-      <button
-        class="btn btn-outline"
-        [class.active]="prefs.feedReader()"
-        (click)="prefs.setFeedReader(!prefs.feedReader())"
-        title="Reader mode for the feed: reader typography, no pictures"
-      >
-        📖 Reader
-      </button>
-      @if (showImages()) {
-        <button
-          class="btn btn-outline"
-          [class.active]="imagesHidden()"
-          (click)="toggleImages()"
-          [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
-        >
-          🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
-        </button>
-      }
+        @if (showImages()) {
+          <button
+            class="btn command-item"
+            [class.active]="imagesHidden()"
+            (click)="toggleImages()"
+            [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
+          >
+            🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
+          </button>
+        }
+      </span>
       @if (providerChips() && (!auth.isAnonymous || registry.linked().length)) {
-        @if (!auth.isAnonymous) {
-          <button
-            class="btn btn-outline"
-            [class.active]="prefs.isProviderVisible('mastodon')"
-            (click)="toggleProvider('mastodon')"
-            title="Show or hide Mastodon posts"
-          >
-            🦣 Fedi
-          </button>
-        }
-        @for (p of registry.linked(); track p.id) {
-          <button
-            class="btn btn-outline"
-            [class.active]="prefs.isProviderVisible(p.id)"
-            (click)="toggleProvider(p.id)"
-            [title]="'Show or hide ' + p.label + ' posts'"
-          >
-            {{ p.badge }}
-          </button>
-        }
+        <!-- Keep every network source in one compact group. The outer toolbar
+             may wrap, but Fedi / Bluesky / Twitter never end up stranded on
+             separate rows. -->
+        <span class="command-group provider-group" role="group" aria-label="Feed sources">
+          @if (!auth.isAnonymous) {
+            <button
+              class="btn command-item"
+              [class.active]="prefs.isProviderVisible('mastodon')"
+              (click)="toggleProvider('mastodon')"
+              title="Show or hide Mastodon posts"
+            >
+              🦣 Fedi
+            </button>
+          }
+          @for (p of registry.linked(); track p.id) {
+            <button
+              class="btn command-item"
+              [class.active]="prefs.isProviderVisible(p.id)"
+              (click)="toggleProvider(p.id)"
+              [title]="'Show or hide ' + p.label + ' posts'"
+            >
+              {{ p.badge }}
+            </button>
+          }
+        </span>
       }
       @if (showFeedViews()) {
         <!-- Views over the feed the page already has, not navigation: they swap
              what the timeline area shows, so they read as toggles like the rest
              of the bar. -->
-        <button
-          class="btn btn-outline"
-          [class.active]="view() === 'members'"
-          [attr.aria-pressed]="view() === 'members'"
-          (click)="setView('members')"
-          title="Who is in this feed — the accounts whose posts are loaded"
-        >
-          👥 Members
-        </button>
-        <button
-          class="btn btn-outline"
-          [class.active]="view() === 'analytics'"
-          [attr.aria-pressed]="view() === 'analytics'"
-          (click)="setView('analytics')"
-          title="Analytics for the posts currently loaded in this feed"
-        >
-          📊 Analytics
-        </button>
+        <span class="command-group" role="group" aria-label="Feed views">
+          <button
+            class="btn command-item"
+            [class.active]="view() === 'members'"
+            [attr.aria-pressed]="view() === 'members'"
+            (click)="setView('members')"
+            title="Who is in this feed — the accounts whose posts are loaded"
+          >
+            👥 Members
+          </button>
+          <button
+            class="btn command-item"
+            [class.active]="view() === 'analytics'"
+            [attr.aria-pressed]="view() === 'analytics'"
+            (click)="setView('analytics')"
+            title="Analytics for the posts currently loaded in this feed"
+          >
+            📊 Analytics
+          </button>
+        </span>
       }
       <ng-content />
       @if (prefs.feedReader()) {
         <span class="font-controls">
           <button
-            class="btn btn-outline btn-sm"
+            class="btn command-item btn-sm"
             (click)="prefs.setReaderFontSize(prefs.readerFontSize() - 1)"
             title="Smaller text"
           >
             A−
           </button>
           <button
-            class="btn btn-outline btn-sm"
+            class="btn command-item btn-sm"
             (click)="prefs.setReaderFontSize(prefs.readerFontSize() + 1)"
             title="Larger text"
           >
@@ -118,17 +127,41 @@ export type FeedView = 'feed' | 'members' | 'analytics';
     .command-bar {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 2px 8px;
       flex-wrap: wrap;
-      padding: 8px 16px;
+      padding: 5px 10px;
       border-bottom: 1px solid var(--border);
+    }
+    .command-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .provider-group {
+      flex-wrap: nowrap;
+    }
+    .command-item {
+      flex: 0 0 auto;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--text);
+      padding: 6px 8px;
+      white-space: nowrap;
+    }
+    .command-item:hover {
+      background: var(--hover);
+    }
+    .command-item.active {
+      background: var(--accent-soft);
+      color: var(--accent);
     }
     .font-controls {
       display: inline-flex;
-      gap: 6px;
+      gap: 2px;
     }
     .btn-sm {
-      padding: 4px 10px;
+      padding: 4px 7px;
       font-size: 0.85em;
     }
   `,

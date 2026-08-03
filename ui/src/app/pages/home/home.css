@@ -66,19 +66,31 @@
 .home-filters {
   display: flex;
   align-items: center;
-  gap: 5px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding: 8px 16px;
+  gap: 2px;
+  flex-wrap: wrap;
+  padding: 5px 10px;
   border-bottom: 1px solid var(--border);
 }
 
 .home-filters .btn-sm,
 .feed-filter {
   flex: 0 0 auto;
-  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  padding: 5px 7px;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.home-filters .btn:hover {
+  background: var(--hover);
+}
+
+.home-filters .btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .nudge-copy {
@@ -224,13 +236,17 @@ a.eliza-invite:hover {
 .home-window {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  gap: 3px;
+  padding: 0 4px 0 7px;
+  border: 0;
+  border-radius: 5px;
   font-size: 13px;
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.home-window:hover {
+  background: var(--hover);
 }
 
 .home-window select {

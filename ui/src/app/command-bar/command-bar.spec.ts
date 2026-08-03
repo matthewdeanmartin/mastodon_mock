@@ -121,6 +121,17 @@ describe('CommandBar', () => {
     expect(changed).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps all provider controls together in one source group', () => {
+    TestBed.inject(RssSubscriptions).add('https://a.example/feed', 'A');
+    const el = setUp(true).nativeElement as HTMLElement;
+    const group = el.querySelector('.provider-group');
+
+    expect(group?.getAttribute('aria-label')).toBe('Feed sources');
+    expect(group?.textContent).toContain('Fedi');
+    expect(group?.textContent).toContain('RSS');
+    expect(group?.querySelectorAll('button')).toHaveLength(2);
+  });
+
   // "Go live" moved to Blue → "Auto-refresh timeline", opt-in and off by
   // default. The toolbar must not offer it: this row's space is the whole
   // reason it moved.
