@@ -24,19 +24,60 @@
           authored content.
         </span>
         <div class="config-actions">
+          <button type="button" class="btn btn-outline" (click)="previewExport()">
+            Preview JSON
+          </button>
           <button type="button" class="btn" (click)="download()">Download JSON</button>
           <button type="button" class="btn btn-outline" (click)="copy()">Copy JSON</button>
-          <button type="button" class="btn btn-outline" (click)="publish()" [disabled]="busy()">
-            {{ busy() ? 'Publishing…' : 'Save permanent unlisted Pastepile' }}
+          <button
+            type="button"
+            class="btn btn-outline"
+            (click)="previewExport(true)"
+            [disabled]="busy()"
+          >
+            Preview Pastepile publish
           </button>
         </div>
+        @if (exportMessage()) {
+          <span class="export-status" role="status" aria-live="polite"
+            >✓ {{ exportMessage() }}</span
+          >
+        }
         <span class="hint">
           Every export is checked at runtime against the storage registry and the credentials
           currently stored in this browser. Pastepile publishing is anonymous and deliberately omits
           your Pastepile API key so its permanent-paste option remains available.
         </span>
         @if (publishedUrl()) {
-          <a [href]="publishedUrl()" target="_blank" rel="noopener">Open published config</a>
+          <span class="published-config">
+            <a [href]="publishedUrl()" target="_blank" rel="noopener">Open published config</a>
+            · <a routerLink="/pastes">Manage in My Pastes</a>
+          </span>
+        }
+
+        @if (exportPreview()) {
+          <div class="export-preview">
+            <div class="preview-head">
+              <strong>{{ publishPrepared() ? 'Publish preview' : 'Export preview' }}</strong>
+              <button type="button" class="link" (click)="closeExportPreview()">close</button>
+            </div>
+            <textarea
+              rows="12"
+              readonly
+              aria-label="Export JSON preview"
+              [value]="exportPreview()"
+            ></textarea>
+            @if (publishPrepared()) {
+              <p class="hint">
+                This creates a permanent, unlisted Pastepile. Its edit password will be kept only in
+                this browser and the paste will appear under My Pastes for later editing or
+                deletion.
+              </p>
+              <button type="button" class="btn" (click)="publish()" [disabled]="busy()">
+                {{ busy() ? 'Publishing…' : 'Publish this preview' }}
+              </button>
+            }
+          </div>
         }
       </div>
     </div>

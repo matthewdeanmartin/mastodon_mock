@@ -30,6 +30,8 @@ export interface StoreInfo {
   name: string;
   /** Record count, or null if it couldn't be read. */
   count: number | null;
+  /** Approximate serialized payload size, or null if it couldn't be measured. */
+  bytes: number | null;
 }
 
 /** One IndexedDB database on this origin. */
@@ -82,6 +84,15 @@ function requestToPromise<T>(request: IDBRequest<T>, timeoutMs = OPEN_TIMEOUT_MS
   });
 }
 
+/** JSON is not IndexedDB's wire format, but it gives a useful, stable payload estimate. */
+function estimateBytes(values: unknown[]): number | null {
+  try {
+    return new TextEncoder().encode(JSON.stringify(values)).byteLength;
+  } catch {
+    return null;
+  }
+}
+
 /** Open a database read-only and report its stores and record counts. */
 async function describeDatabase(name: string, version: number | null): Promise<DatabaseInfo> {
   let db: IDBDatabase | null = null;
@@ -96,12 +107,18 @@ async function describeDatabase(name: string, version: number | null): Promise<D
     const stores = await Promise.all(
       storeNames.map(async (storeName): Promise<StoreInfo> => {
         try {
+          const store = tx.objectStore(storeName);
+          // Start both requests before awaiting either one. IndexedDB may close
+          // a transaction as soon as the current task stops scheduling work.
+          const count = requestToPromise(store.count());
+          const values = requestToPromise(store.getAll());
           return {
             name: storeName,
-            count: await requestToPromise(tx.objectStore(storeName).count()),
+            count: await count,
+            bytes: estimateBytes(await values),
           };
         } catch {
-          return { name: storeName, count: null };
+          return { name: storeName, count: null, bytes: null };
         }
       }),
     );
@@ -115,6 +132,24 @@ async function describeDatabase(name: string, version: number | null): Promise<D
     };
   } finally {
     // Always close: an open handle blocks another tab's upgrade.
+    db?.close();
+  }
+}
+
+/** Delete every record in one object store without dropping the database schema. */
+export async function clearIndexedDbStore(databaseName: string, storeName: string): Promise<void> {
+  if (typeof indexedDB === 'undefined') {
+    throw new Error('IndexedDB is not available in this browser context.');
+  }
+  let db: IDBDatabase | null = null;
+  try {
+    db = await requestToPromise(indexedDB.open(databaseName));
+    if (!db.objectStoreNames.contains(storeName)) {
+      throw new Error(`Object store "${storeName}" no longer exists.`);
+    }
+    const tx = db.transaction(storeName, 'readwrite');
+    await requestToPromise(tx.objectStore(storeName).clear());
+  } finally {
     db?.close();
   }
 }

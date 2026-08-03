@@ -1,43 +1,123 @@
 <div class="settings-page">
-  <div class="page-head">
-    <div>
-      <h1>Local storage</h1>
-      <p class="muted">Data saved in this browser for the currently selected account.</p>
+  <section class="storage-section">
+    <div class="page-head">
+      <div>
+        <h1>Local storage</h1>
+        <p class="muted">Inspect account-scoped data without switching the active account.</p>
+      </div>
+      <button
+        class="btn btn-outline danger"
+        type="button"
+        [disabled]="!storage().entries.length"
+        (click)="clearAll()"
+      >
+        Clear this account
+      </button>
     </div>
-    <button
-      class="btn btn-outline danger"
-      type="button"
-      [disabled]="!storage().entries.length"
-      (click)="clearAll()"
-    >
-      Clear all local storage
-    </button>
-  </div>
 
-  <p class="summary muted small">
-    {{ storage().entries.length }} keys · {{ formatBytes(storage().totalBytes) }}
-  </p>
+    <label class="account-picker">
+      <span>Account</span>
+      <select
+        [ngModel]="selectedAccount()"
+        (ngModelChange)="selectAccount($event)"
+        aria-label="Storage account"
+      >
+        @for (account of accounts(); track account.key) {
+          <option [value]="account.key">
+            {{ account.label }} · {{ account.detail }}{{ account.active ? ' (active)' : '' }}
+          </option>
+        }
+      </select>
+    </label>
 
-  @if (storage().entries.length) {
-    <div class="storage-list">
-      @for (entry of storage().entries; track entry.key) {
-        <div class="storage-row">
-          <div>
-            <code>{{ entry.key }}</code>
-            <span class="muted small">{{ formatBytes(entry.bytes) }}</span>
+    <p class="summary muted small">
+      {{ storage().entries.length }} keys · {{ formatBytes(storage().totalBytes) }}
+    </p>
+
+    @if (storage().entries.length) {
+      <div class="storage-list">
+        @for (entry of storage().entries; track entry.key) {
+          <div class="storage-row">
+            <div>
+              <code>{{ entry.key }}</code>
+              <span class="muted small">{{ formatBytes(entry.bytes) }}</span>
+            </div>
+            <button
+              class="btn btn-outline btn-sm danger"
+              type="button"
+              (click)="deleteKey(entry)"
+              [attr.aria-label]="'Delete ' + entry.key"
+            >
+              Delete
+            </button>
           </div>
-          <button
-            class="btn btn-outline btn-sm danger"
-            type="button"
-            (click)="deleteKey(entry)"
-            [attr.aria-label]="'Delete ' + entry.key"
-          >
-            Delete
-          </button>
+        }
+      </div>
+    } @else {
+      <p class="empty muted">This account has no local storage.</p>
+    }
+  </section>
+
+  <section class="storage-section idb-section">
+    <div class="section-head">
+      <div>
+        <h2>IndexedDB</h2>
+        <p class="muted small">
+          Shared browser caches, grouped by schema category. Sizes are approximate serialized
+          payload sizes.
+        </p>
+      </div>
+      <div class="idb-actions">
+        <span class="muted small">{{ quotaLabel() }}</span>
+        <button
+          class="btn btn-outline btn-sm"
+          type="button"
+          [disabled]="idbLoading()"
+          (click)="refreshIndexedDb()"
+        >
+          {{ idbLoading() ? 'Scanning…' : 'Refresh' }}
+        </button>
+      </div>
+    </div>
+
+    @if (idbError()) {
+      <p class="storage-error" role="alert">{{ idbError() }}</p>
+    }
+    @if (idb(); as report) {
+      @if (!report.supported) {
+        <p class="empty muted">{{ report.note }}</p>
+      } @else {
+        <div class="category-list">
+          @for (database of report.databases; track database.name) {
+            @for (store of database.stores; track store.name) {
+              <article class="category-row">
+                <div>
+                  <strong>{{ storeLabel(database.name, store.name) }}</strong>
+                  <span class="muted small">
+                    <code>{{ database.name }} / {{ store.name }}</code> ·
+                    {{ store.count === null ? 'unknown' : store.count.toLocaleString() }} records ·
+                    {{ store.bytes === null ? 'size unavailable' : formatBytes(store.bytes) }}
+                  </span>
+                </div>
+                <button
+                  class="btn btn-outline btn-sm danger"
+                  type="button"
+                  [disabled]="idbLoading() || !store.count"
+                  (click)="clearStore(database, store)"
+                  [attr.aria-label]="'Delete ' + storeLabel(database.name, store.name)"
+                >
+                  Delete category
+                </button>
+              </article>
+            }
+          }
+          @if (!report.databases.length) {
+            <p class="empty muted">No IndexedDB data is stored for this site.</p>
+          }
         </div>
       }
-    </div>
-  } @else {
-    <p class="empty muted">This account has no local storage.</p>
-  }
+    } @else {
+      <p class="empty muted">Scanning IndexedDB…</p>
+    }
+  </section>
 </div>

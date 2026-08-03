@@ -1,6 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ConfigSync, ConfigSyncFrequency, RemoteConfigResult } from '../../../config-sync';
+import { PasteHistory } from '../../../providers/paste/paste-history';
 import {
   configChanges,
   ConfigChange,
@@ -12,12 +14,13 @@ import {
 
 @Component({
   selector: 'app-settings-config',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './settings-config.html',
   styleUrl: './settings-config.css',
 })
 export class SettingsConfig {
   protected readonly sync = inject(ConfigSync);
+  private readonly pasteHistory = inject(PasteHistory);
 
   protected readonly includePrivate = signal(false);
   protected readonly importText = signal('');
@@ -32,6 +35,9 @@ export class SettingsConfig {
   protected readonly message = signal('');
   protected readonly error = signal('');
   protected readonly publishedUrl = signal('');
+  protected readonly exportPreview = signal('');
+  protected readonly publishPrepared = signal(false);
+  protected readonly exportMessage = signal('');
 
   protected exportText(): string {
     return JSON.stringify(exportPortableConfig(localStorage, this.includePrivate()), null, 2);
@@ -47,7 +53,7 @@ export class SettingsConfig {
       anchor.download = `mockingbird-config-${new Date().toISOString().slice(0, 10)}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
-      this.message.set('Configuration downloaded.');
+      this.exportMessage.set('Configuration downloaded.');
     } catch (error: unknown) {
       this.showError(error);
     }
@@ -57,23 +63,58 @@ export class SettingsConfig {
     this.clearNotice();
     try {
       await navigator.clipboard.writeText(this.exportText());
-      this.message.set('Configuration copied to the clipboard.');
+      this.exportMessage.set('Configuration copied to the clipboard.');
     } catch (error: unknown) {
       this.showError(error);
     }
   }
 
+  protected previewExport(forPublish = false): void {
+    this.clearNotice();
+    this.exportPreview.set(this.exportText());
+    this.publishPrepared.set(forPublish);
+    this.exportMessage.set(
+      forPublish
+        ? 'Review this exact JSON before creating the paste.'
+        : 'Export preview generated. Nothing was downloaded, copied, or published.',
+    );
+  }
+
+  protected closeExportPreview(): void {
+    this.exportPreview.set('');
+    this.publishPrepared.set(false);
+  }
+
   protected async publish(): Promise<void> {
+    const content = this.exportPreview();
+    if (!this.publishPrepared() || !content) {
+      this.previewExport(true);
+      return;
+    }
     this.clearNotice();
     this.busy.set(true);
     try {
-      const created = await this.sync.publishPermanent(this.exportText());
+      const created = await this.sync.publishPermanent(content);
+      this.pasteHistory.add(
+        'pastepile',
+        'Pastepile',
+        {
+          title: 'Mockingbird client configuration',
+          content,
+          language: 'json',
+          expiry: 'never',
+          visibility: 'unlisted',
+        },
+        created,
+      );
       this.publishedUrl.set(created.url);
       this.remoteUrl.set(created.rawUrl);
+      this.exportMessage.set('Published and saved in My Pastes with its edit password.');
       const result = await this.sync.fetchStable(created.rawUrl);
       this.remoteResult.set(result);
       this.previewConfig(result.config);
       this.message.set('Permanent unlisted Pastepile created and verified.');
+      this.publishPrepared.set(false);
     } catch (error: unknown) {
       this.showError(error);
     } finally {
@@ -182,6 +223,7 @@ export class SettingsConfig {
   private clearNotice(): void {
     this.error.set('');
     this.message.set('');
+    this.exportMessage.set('');
   }
 
   private showError(error: unknown): void {

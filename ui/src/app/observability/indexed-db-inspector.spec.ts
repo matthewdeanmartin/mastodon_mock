@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { inspectIndexedDb, totalRecords } from './indexed-db-inspector';
+import { clearIndexedDbStore, inspectIndexedDb, totalRecords } from './indexed-db-inspector';
 
 /**
  * jsdom implements neither IndexedDB nor the Storage estimate API, so both are
@@ -18,14 +18,21 @@ function fakeRequest<T>(result: T, error?: string) {
   return request;
 }
 
-/** A fake database with the object stores and counts a test asks for. */
-function fakeDb(version: number, stores: Record<string, number>) {
+/** A fake database with the object stores and values a test asks for. */
+function fakeDb(version: number, stores: Record<string, unknown[]>) {
+  const names = Object.assign(Object.keys(stores), {
+    contains: (name: string) => Object.hasOwn(stores, name),
+  });
   return {
     version,
-    objectStoreNames: Object.keys(stores),
+    objectStoreNames: names,
     close: vi.fn(),
     transaction: () => ({
-      objectStore: (name: string) => ({ count: () => fakeRequest(stores[name]) }),
+      objectStore: (name: string) => ({
+        count: () => fakeRequest(stores[name].length),
+        getAll: () => fakeRequest(stores[name]),
+        clear: () => fakeRequest(undefined),
+      }),
     }),
   };
 }
@@ -41,7 +48,12 @@ describe('inspectIndexedDb', () => {
       ],
       open: (name: string) =>
         fakeRequest(
-          name === 'alpha' ? fakeDb(1, { posts: 12, media: 3 }) : fakeDb(2, { things: 1 }),
+          name === 'alpha'
+            ? fakeDb(1, {
+                posts: Array.from({ length: 12 }, (_, id) => ({ id, text: 'post' })),
+                media: Array.from({ length: 3 }, (_, id) => ({ id })),
+              })
+            : fakeDb(2, { things: [{ id: 1 }] }),
         ),
     });
 
@@ -51,14 +63,14 @@ describe('inspectIndexedDb', () => {
     // Sorted by name, so the list is stable between refreshes.
     expect(report.databases.map((d) => d.name)).toEqual(['alpha', 'zeta']);
     expect(report.databases[0].stores).toEqual([
-      { name: 'posts', count: 12 },
-      { name: 'media', count: 3 },
+      { name: 'posts', count: 12, bytes: expect.any(Number) },
+      { name: 'media', count: 3, bytes: expect.any(Number) },
     ]);
     expect(totalRecords(report.databases[0])).toBe(15);
   });
 
   it('closes every database it opens, so it never blocks another tab upgrade', async () => {
-    const db = fakeDb(1, { posts: 1 });
+    const db = fakeDb(1, { posts: [{ id: 1 }] });
     vi.stubGlobal('indexedDB', {
       databases: async () => [{ name: 'alpha', version: 1 }],
       open: () => fakeRequest(db),
@@ -66,6 +78,24 @@ describe('inspectIndexedDb', () => {
 
     await inspectIndexedDb();
 
+    expect(db.close).toHaveBeenCalled();
+  });
+
+  it('clears one requested schema category and closes the database', async () => {
+    const db = fakeDb(1, { posts: [{ id: 1 }] });
+    const clear = vi.fn(() => fakeRequest(undefined));
+    db.transaction = () => ({
+      objectStore: () => ({
+        count: () => fakeRequest(1),
+        getAll: () => fakeRequest([{ id: 1 }]),
+        clear,
+      }),
+    });
+    vi.stubGlobal('indexedDB', { open: () => fakeRequest(db) });
+
+    await clearIndexedDbStore('alpha', 'posts');
+
+    expect(clear).toHaveBeenCalledOnce();
     expect(db.close).toHaveBeenCalled();
   });
 

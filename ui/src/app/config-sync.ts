@@ -28,8 +28,10 @@ export interface RemoteConfigResult {
 }
 
 interface PastepileCreateResponse {
+  slug: string;
   raw_url: string;
   url: string;
+  edit_key: string;
 }
 
 function readSettings(): ConfigSyncSettings | null {
@@ -123,7 +125,9 @@ export class ConfigSync {
   }
 
   /** Create an anonymous, unlisted, never-expiring paste even when this browser has a Pastepile key. */
-  async publishPermanent(content: string): Promise<{ url: string; rawUrl: string }> {
+  async publishPermanent(
+    content: string,
+  ): Promise<{ slug: string; url: string; rawUrl: string; editKey: string }> {
     const created = await firstValueFrom(
       this.http.post<PastepileCreateResponse>(
         PASTEPILE_API,
@@ -137,7 +141,12 @@ export class ConfigSync {
         { context: externalFetch() },
       ),
     );
-    return { url: created.url, rawUrl: created.raw_url };
+    return {
+      slug: created.slug,
+      url: created.url,
+      rawUrl: created.raw_url,
+      editKey: created.edit_key,
+    };
   }
 
   start(): void {
