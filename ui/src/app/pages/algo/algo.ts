@@ -3,6 +3,7 @@ import { AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
 import { isCalmHidden } from '../../sentiment';
 import { FeedLanguageFilter } from '../../trend-language-filter';
+import { FeedLanguagePicker } from '../../feed-language-picker/feed-language-picker';
 import { Status } from '../../models';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { StatusCard } from '../../status-card/status-card';
@@ -28,7 +29,7 @@ const FRIEND_SOURCES: readonly AlgoSource[] = ['mutual', 'original'];
  */
 @Component({
   selector: 'app-algo',
-  imports: [StatusCard],
+  imports: [StatusCard, FeedLanguagePicker],
   templateUrl: './algo.html',
   styleUrl: './algo.css',
 })
@@ -148,11 +149,6 @@ export class Algo implements OnInit {
     this.prefs.setAlgoCalm(enabled);
   }
 
-  toggleLangFilter(): void {
-    const enabled = !this.prefs.hideForeignLangPosts();
-    this.diagnostics.info('Algo', 'user:toggle-lang-filter', { enabled });
-    this.prefs.setHideForeignLangPosts(enabled);
-  }
 
   shuffle(): void {
     this.diagnostics.info('Algo', 'user:shuffle', { posts: this.feed.posts().length });

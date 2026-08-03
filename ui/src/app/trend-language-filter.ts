@@ -133,6 +133,20 @@ export class FeedLanguageFilter {
   private known = inject(KnownLanguages);
 
   /**
+   * The languages a post is allowed to be in: the explicit narrowed set when
+   * one is chosen, otherwise everything the user knows.
+   *
+   * Narrowing is the "I follow 400 people and want only Esperanto today" case.
+   * It never *widens* — a language outside the known set can still be selected
+   * (you might be learning it), which is why this reads the pref directly
+   * rather than intersecting with {@link KnownLanguages}.
+   */
+  private allowed(): Set<string> {
+    const chosen = this.prefs.feedLanguages();
+    return chosen.length ? new Set(chosen.map(bare)) : this.known.codes();
+  }
+
+  /**
    * A *confident* single language for a post's text, or null when the text is
    * too short or too mixed to be sure. Uses the full lexical detector (posts,
    * unlike tags, carry enough words for the stop-word tier).
@@ -169,7 +183,7 @@ export class FeedLanguageFilter {
     // A declared language is trusted as-is; otherwise fall back to confident
     // detection. If we have neither, we don't know — so we keep it.
     const effective = declared ?? detected;
-    if (effective && !this.known.knows(effective)) {
+    if (effective && !this.allowed().has(bare(effective))) {
       return 'foreign';
     }
     return null;

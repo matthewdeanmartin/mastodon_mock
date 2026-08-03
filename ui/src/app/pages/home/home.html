@@ -135,16 +135,7 @@
     >
       🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
     </button>
-    <button
-      type="button"
-      class="btn btn-outline btn-sm feed-filter"
-      [class.active]="prefs.hideForeignLangPosts()"
-      [attr.aria-pressed]="prefs.hideForeignLangPosts()"
-      (click)="prefs.setHideForeignLangPosts(!prefs.hideForeignLangPosts())"
-      title="Hide posts that are confidently in a language you don't know, or that mislabel their own language. Never hides posts whose language is unclear. Set which languages you know under Settings → Internationalization."
-    >
-      🌐 {{ prefs.hideForeignLangPosts() ? 'My languages' : 'All languages' }}
-    </button>
+    <app-feed-language-picker />
   </div>
 
   <!-- Only shown when something was actually left out, so it is an offer

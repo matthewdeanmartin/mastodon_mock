@@ -227,6 +227,33 @@ describe('FeedLanguageFilter', () => {
     expect(filter.hideReason(post(FRENCH, null))).toBe('foreign');
   });
 
+  it('narrows to the chosen languages, hiding known ones left out', () => {
+    // The point of narrowing: someone who reads English and Esperanto asks for
+    // only Esperanto today. English is still a language they know — it just
+    // isn't what they want in the feed right now.
+    prefs.setKnownLanguages(['en', 'eo']);
+    prefs.setFeedLanguages(['eo']);
+    expect(filter.hideReason(post(ENGLISH, 'en'))).toBe('foreign');
+    expect(filter.shouldShow(post('Mi ŝatas la libron kaj ĝi estas bona', 'eo'))).toBe(true);
+  });
+
+  it('choosing languages turns the filter on by itself', () => {
+    prefs.setHideForeignLangPosts(false);
+    prefs.setFeedLanguages(['eo']);
+    expect(prefs.hideForeignLangPosts()).toBe(true);
+  });
+
+  it('an empty selection means every known language, not nothing', () => {
+    prefs.setFeedLanguages([]);
+    prefs.setHideForeignLangPosts(true);
+    expect(filter.shouldShow(post(ENGLISH, 'en'))).toBe(true);
+  });
+
+  it('never keeps more than three languages', () => {
+    prefs.setFeedLanguages(['en', 'eo', 'fr', 'de']);
+    expect(prefs.feedLanguages()).toEqual(['en', 'eo', 'fr']);
+  });
+
   it('flags misrepresentation: declared en, text confidently French', () => {
     prefs.setKnownLanguages(['en', 'fr']); // knows both, so not "foreign"
     prefs.setHideForeignLangPosts(true);

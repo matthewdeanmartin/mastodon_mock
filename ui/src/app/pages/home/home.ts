@@ -12,6 +12,7 @@ import { FeedLanguageFilter } from '../../trend-language-filter';
 import { CommandBar, FeedView } from '../../command-bar/command-bar';
 import { FeedAnalytics } from '../../feed-analytics/feed-analytics';
 import { FeedMembers } from '../../feed-members/feed-members';
+import { FeedLanguagePicker } from '../../feed-language-picker/feed-language-picker';
 import { FeedSource } from '../../feed-sample';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
@@ -59,6 +60,7 @@ const BOOKMARK_TAIL_SIZE = 40;
     LocalCompose,
     FeedAnalytics,
     FeedMembers,
+    FeedLanguagePicker,
   ],
   templateUrl: './home.html',
   styleUrl: './home.css',
