@@ -256,6 +256,60 @@ describe('detectScriptCandidates (exposes zh/ja ambiguity)', () => {
   });
 });
 
+describe('detectLanguage — Esperanto', () => {
+  it('detects accented Esperanto rather than French', () => {
+    // The bug this covers: eo had no letters, no stop-words, and its diacritics
+    // were missing from the tokenizer's word alphabet, so "ĝi"/"ŝatas" were
+    // split into fragments and the shared function words (la, de, en) handed
+    // the vote to French.
+    expect(top('Mi ŝatas la libron kaj ĝi estas tre bona por ĉiuj')).toBe('eo');
+    expect(top('Ĉu vi parolas Esperanton kun ni hodiaŭ')).toBe('eo');
+  });
+
+  it('detects x-system Esperanto typed on an ASCII keyboard', () => {
+    expect(top('Mi sxatas la libron kaj gxi estas tre bona')).toBe('eo');
+    expect(top('Saluton kiel vi fartas hodiaux amiko')).toBe('eo');
+  });
+
+  it('detects diacritic-free Esperanto from its grammar alone', () => {
+    expect(top('Mi legas bonajn librojn kaj skribas leterojn')).toBe('eo');
+    expect(top('Ni havas multajn bonajn amikojn en la mondo')).toBe('eo');
+  });
+
+  it('does not mistake Romance languages for Esperanto', () => {
+    // -o and -a endings are Spanish/Italian/Portuguese too; matching those was
+    // what made "Mucho trabajo bueno" read as 82% Esperanto. Only -oj/-ajn and
+    // the verb tenses count now.
+    expect(top('Mucho trabajo bueno pero poco dinero para todo esto')).toBe('es');
+    expect(top('Molto lavoro buono ma poco denaro amico mio caro')).toBe('it');
+    expect(top('Muito trabalho bom mas pouco dinheiro para tudo isso')).toBe('pt');
+    expect(top('Le chat est sur la table et il mange du pain avec nous')).toBe('fr');
+  });
+
+  it('reports Esperanto confidently enough for the compose language warning', () => {
+    // The composer only acts on a detection above 0.6. Esperanto shares its
+    // commonest function words (la, de, en, mi, por) with the Romance
+    // languages, so without discounting their spurious votes a correct eo
+    // verdict still landed in the 40s and the banner stayed silent.
+    for (const text of [
+      'Saluton al ĉiuj! Hodiaŭ mi legis tre bonan libron pri la historio de Esperanto.',
+      'Mi sxatas la libron kaj gxi estas tre bona por cxiuj homoj en la mondo',
+    ]) {
+      const [best] = detectLanguage(text);
+      expect(best.lang).toBe('eo');
+      expect(best.share).toBeGreaterThanOrEqual(0.6);
+    }
+  });
+
+  it('pins a lone Esperanto hashtag from its supersigned letters', () => {
+    expect(detectScriptLanguage('#ĉevalo')).toBe('eo');
+    expect(detectScriptLanguage('#ĝardeno')).toBe('eo');
+    // Turkish ğ is a breve, Esperanto ĝ a circumflex — distinct code points, so
+    // the two exclusive-letter rules do not poach each other's tags.
+    expect(detectScriptLanguage('#Diyarbakır')).toBe('tr');
+  });
+});
+
 describe('helpers', () => {
   it('every LangCode has a display name', () => {
     for (const code of Object.keys(LANG_NAMES) as LangCode[]) {

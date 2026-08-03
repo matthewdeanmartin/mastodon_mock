@@ -155,6 +155,11 @@ const DIACRITIC_HINTS: { lang: LangCode; re: RegExp; weight: number }[] = [
   { lang: 'pl', re: /[ąćęłńóśźż]/i, weight: 2 },
   { lang: 'tr', re: /[ğışİ]/i, weight: 2 },
   { lang: 'it', re: /[àèìòù]/i, weight: 1 },
+  // The six supersigned letters are Esperanto's alone among living languages.
+  // Weighted heavily: unlike é or ü, seeing one is close to proof, and without
+  // this an Esperanto post loses the stop-word vote to French (both use "la",
+  // "de", "en") despite carrying letters French does not have.
+  { lang: 'eo', re: /[ĉĝĥĵŝŭ]/i, weight: 4 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -457,6 +462,62 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
     'więc',
     'lub',
   ],
+  // Esperanto. Chosen for *discrimination*, not raw frequency: "la", "de",
+  // "en", "por", "kun", "al" are all shared with Spanish, French or Italian and
+  // would hand those languages free votes. The high-value entries are the ones
+  // no Romance language has — the -as/-is/-os verb endings of esti, the
+  // ki-/ti-/ĉi- correlatives, and the accusative pronouns in -n.
+  eo: [
+    'kaj',
+    'estas',
+    'estis',
+    'estos',
+    'oni',
+    'ĉi',
+    'tio',
+    'tiu',
+    'kiu',
+    'kio',
+    'kiel',
+    'kiam',
+    'kie',
+    'ĉiu',
+    'ĉio',
+    'ankaŭ',
+    'nur',
+    'sed',
+    'aŭ',
+    'ne',
+    'jes',
+    'mi',
+    'vi',
+    'li',
+    'ŝi',
+    'ĝi',
+    'ni',
+    'ili',
+    'min',
+    'lin',
+    'ĝin',
+    'ilin',
+    'sia',
+    'siaj',
+    'esti',
+    'havas',
+    'povas',
+    'devas',
+    'iĝas',
+    'pri',
+    'per',
+    'sen',
+    'tre',
+    'jam',
+    'nun',
+    'tamen',
+    'ĉar',
+    'ke',
+    'ol',
+  ],
 };
 
 /** Words → the languages that count them, precomputed for one-pass scoring. */
@@ -510,6 +571,10 @@ const EXCLUSIVE_LETTERS: { lang: LangCode; re: RegExp }[] = [
   { lang: 'pt', re: /[ãõ]/i },
   { lang: 'pl', re: /[łżźąę]/i },
   { lang: 'tr', re: /[ıİğĞ]/ }, // dotless ı, dotted İ, soft ğ/Ğ — all Turkish
+  // Esperanto's circumflexed consonants and the breve ŭ. No other language
+  // here uses them; ĝ is distinct from Turkish ğ (circumflex vs breve), and ĥ
+  // has no counterpart at all. A single one settles a lone hashtag.
+  { lang: 'eo', re: /[ĉĝĥĵŝŭ]/i },
 ];
 
 /**
@@ -523,6 +588,89 @@ function exclusiveLetterLanguage(text: string): LangCode | null {
     }
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Tier 2c: ASCII-transliterated Esperanto (x-system / h-system)
+// ---------------------------------------------------------------------------
+
+/**
+ * Esperanto is routinely written without its diacritics, because keyboards
+ * rarely have them. Two conventions dominate:
+ *
+ *  - **x-system**: `cx gx hx jx sx ux` for `ĉ ĝ ĥ ĵ ŝ ŭ`. Unambiguous in
+ *    practice — `x` is not in the Esperanto alphabet at all, so these digraphs
+ *    cannot occur by accident in a genuine Esperanto word.
+ *  - **h-system**: `ch gh hh jh sh u` (Zamenhof's original). Far riskier to
+ *    match: `ch` and `sh` are ordinary in English, German and French, so this
+ *    is only counted when *other* Esperanto evidence is already present.
+ *
+ * Without this tier, "Mi sxatas gxin" is invisible to a detector that only
+ * knows the accented forms, and posts written on a plain keyboard — the common
+ * case — never register as Esperanto at all.
+ */
+const X_SYSTEM_RE = /\b\w*(?:cx|gx|hx|jx|sx|ux)\w*\b/gi;
+
+/**
+ * Endings that are Esperanto-*specific*, which is a much smaller set than
+ * "Esperanto's endings".
+ *
+ * The tempting rule — nouns end -o, adjectives -a — is useless here: those are
+ * precisely the Spanish, Italian and Portuguese endings too, and matching them
+ * classified ordinary Spanish ("Mucho trabajo bueno pero poco dinero") as
+ * Esperanto with 82% confidence. Only two families survive contact with
+ * Romance:
+ *
+ *  - **verb tenses `-as -is -os -us`** on a stem of 3+ letters. Romance verbs
+ *    do end in -as/-is (Spanish "hablas", "escribis"), so this is suggestive
+ *    rather than decisive — it earns a small weight, never a verdict.
+ *  - **the accusative/plural `-jn -ojn -ajn -on -an`**. The letter `j` as a
+ *    plural marker, and `-n` as a case ending, exist in no Romance language.
+ *    `-ojn`/`-ajn` in particular are unmistakable.
+ *
+ * Kept deliberately narrow. A detector that says "Esperanto" for Spanish is
+ * worse than one that stays quiet: the accented and x-system tiers already
+ * catch the overwhelming majority of real Esperanto posts, and this tier only
+ * has to cover the diacritic-free remainder.
+ */
+const EO_STRONG_ENDING_RE = /^[a-z]{2,}(?:ojn|ajn|oj|aj)$/;
+const EO_WEAK_ENDING_RE = /^[a-z]{3,}(?:as|is|os|us|on|an)$/;
+
+/**
+ * Count the Esperanto morphology signal in already-tokenized words: the share
+ * of tokens carrying a characteristic ending, plus x-system digraphs.
+ *
+ * Returns a vote weight, not a verdict. A stray "las" or "vitrolas" in another
+ * language would match one ending; the threshold is a *proportion* of the text
+ * so isolated coincidences never carry it.
+ */
+function esperantoMorphologyVotes(text: string, tokens: string[]): number {
+  let votes = 0;
+
+  // x-system digraphs are near-proof on their own — x is not an Esperanto
+  // letter, so "sxatas"/"gxi" is someone typing Esperanto on an ASCII keyboard.
+  const xMatches = text.match(X_SYSTEM_RE);
+  if (xMatches) {
+    votes += 3 * xMatches.length;
+  }
+
+  if (tokens.length >= 4) {
+    const strong = tokens.filter((t) => EO_STRONG_ENDING_RE.test(t)).length;
+    const weak = tokens.filter((t) => EO_WEAK_ENDING_RE.test(t)).length;
+
+    // -oj/-ajn have no Romance counterpart: even one is meaningful, and they
+    // scale directly.
+    votes += strong * 3;
+
+    // Verb tenses only count as a *pattern*. Spanish will land one or two
+    // ("hablas", "escribis"); a third of the text ending this way is Esperanto
+    // grammar, not coincidence. Requiring both the share and an absolute floor
+    // keeps a four-word fragment from tripping it.
+    if (weak >= 2 && weak / tokens.length >= 0.3) {
+      votes += weak;
+    }
+  }
+  return votes;
 }
 
 // ---------------------------------------------------------------------------
@@ -556,6 +704,8 @@ export function detectLanguage(text: string, metaHint?: string | null): LangShar
   // (weighted down so a stop-word-rich Latin doc isn't drowned by a few kanji).
   let latinLetters = 0;
   let ukrainianSeen = false;
+  /** Set when the text carries spelling only Esperanto uses. */
+  let eoProven = false;
   for (const ch of text) {
     if (UKRAINIAN_RE.test(ch)) {
       ukrainianSeen = true;
@@ -583,7 +733,12 @@ export function detectLanguage(text: string, metaHint?: string | null): LangShar
     }
 
     // Tier 3: stop-word vote.
-    const tokens = lower.split(/[^a-zàâäçèéêëîïôöùûüßñãõœąćęłńóśźżğış]+/i).filter(Boolean);
+    // The character class is the *word* alphabet: anything missing here is
+    // treated as a word boundary, so an omitted letter silently splits words in
+    // that language and destroys its stop-word vote. Esperanto's ĉĝĥĵŝŭ were
+    // missing, which turned "ĝi estas ĝusta" into fragments and handed the vote
+    // to whoever else matched ("la", "de", "en" → French).
+    const tokens = lower.split(/[^a-zàâäçèéêëîïôöùûüßñãõœąćęłńóśźżğışĉĝĥĵŝŭ]+/i).filter(Boolean);
     for (const tok of tokens) {
       const langs = WORD_TO_LANGS.get(tok);
       if (langs) {
@@ -593,11 +748,43 @@ export function detectLanguage(text: string, metaHint?: string | null): LangShar
       }
     }
 
+    // Tier 3b: Esperanto morphology and ASCII transliteration. Runs after the
+    // stop-word vote because it is designed to *outweigh* the Romance
+    // false-positives that vote on shared function words ("la", "de", "en").
+    const eoVotes = esperantoMorphologyVotes(lower, tokens);
+    if (eoVotes) {
+      add('eo', eoVotes);
+    }
+    // Either kind of Esperanto-exclusive spelling counts as proof: the accented
+    // letters, or the x-system digraphs that stand in for them.
+    eoProven = /[ĉĝĥĵŝŭ]/i.test(lower) || X_SYSTEM_RE.test(lower);
+    X_SYSTEM_RE.lastIndex = 0; // /g regex: .test() advances state, so reset it.
+
     // If Latin text produced no lexical signal at all, record it as latin-unknown
     // so the share math still accounts for the words (avoids false "100% en").
     const gotLatinVote = [...votes].some(([l]) => l !== 'ja' && l !== 'zh');
     if (!gotLatinVote) {
       add('und', Math.max(1, Math.round(latinLetters / 5)));
+    }
+  }
+
+  // Esperanto-exclusive spelling is proof, and it changes what the *other*
+  // votes mean. Esperanto shares "la", "de", "en",
+  // "mi", "por" with the Romance languages, so every Esperanto sentence hands
+  // free votes to French, Spanish and Italian — enough to drag eo's share under
+  // a confidence bar even while it wins the vote. Once a letter no Romance
+  // language possesses is on the page, those votes are known to be spurious and
+  // are discounted rather than left to dilute the answer.
+  //
+  // Only the Romance block is touched: a genuinely mixed post (Esperanto quoted
+  // inside German, say) should still report both, and German never voted on
+  // "la" to begin with.
+  if (eoProven && votes.has('eo')) {
+    for (const romance of ['fr', 'es', 'it', 'pt'] as const) {
+      const n = votes.get(romance);
+      if (n) {
+        votes.set(romance, n / 4);
+      }
     }
   }
 
