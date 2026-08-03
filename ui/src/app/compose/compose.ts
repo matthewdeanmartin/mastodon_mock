@@ -20,6 +20,7 @@ import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import { TagHelperDialog } from './tag-helper-dialog/tag-helper-dialog';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
+import { TranslateDialog, TranslateResult } from './translate-dialog/translate-dialog';
 import { CustomEmojis } from '../custom-emojis';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
@@ -254,6 +255,7 @@ function dragHasFiles(event: DragEvent): boolean {
     EmojiPicker,
     ConfirmDialog,
     TagHelperDialog,
+    TranslateDialog,
     ProxyConsentDialog,
   ],
   templateUrl: './compose.html',
@@ -351,6 +353,37 @@ export class Compose implements OnDestroy {
    * worse than no button (decision 9 in sprint/openrouter-0-overview.md).
    */
   protected canUseTagHelper = computed(() => this.ai.enabled() && this.openrouter.connected());
+
+  // --- LLM "translate to" ---
+  protected translateOpen = signal(false);
+
+  /** Same rule as the tag helper: no OpenRouter, no button (not a dead button). */
+  protected canTranslate = this.canUseTagHelper;
+
+  /**
+   * Apply a translation to the box being composed.
+   *
+   * Replacing also sets the post language, because a post rewritten into
+   * Esperanto that still declares `en` is exactly the mislabelling the feed
+   * filter exists to catch. The target is added to the known-languages list
+   * first, since the picker only offers those and would otherwise render a
+   * blank selection for a language the user just deliberately posted in.
+   *
+   * Appending deliberately does not touch the language: a bilingual post has no
+   * single language, and guessing one would be worse than leaving the user's
+   * choice alone.
+   */
+  useTranslation(result: TranslateResult): void {
+    this.translateOpen.set(false);
+    if (result.mode === 'replace') {
+      this.text.set(result.text);
+      this.prefs.addKnownLanguage(result.code);
+      this.onLanguageChange(result.code);
+      return;
+    }
+    const current = this.text().trimEnd();
+    this.text.set(current ? `${current}\n\n${result.text}` : result.text);
+  }
 
   /**
    * Append suggested tags to the post, skipping any already present.

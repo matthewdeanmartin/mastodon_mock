@@ -867,6 +867,32 @@ describe('Compose', () => {
     );
   });
 
+  it('replacing with a translation relabels the post language', () => {
+    const f = setUp();
+    internals(f).text.set('Hello everyone');
+    internals(f).postLanguage.set('en');
+
+    f.componentInstance.useTranslation({ text: 'Saluton al ĉiuj', mode: 'replace', code: 'eo' });
+
+    expect(internals(f).text()).toBe('Saluton al ĉiuj');
+    // A post rewritten into Esperanto that still declares en is exactly the
+    // mislabelling the feed filter is built to catch.
+    expect(internals(f).postLanguage()).toBe('eo');
+  });
+
+  it('appending keeps both versions and leaves the language alone', () => {
+    const f = setUp();
+    internals(f).text.set('Hello everyone');
+    internals(f).postLanguage.set('en');
+
+    f.componentInstance.useTranslation({ text: 'Saluton al ĉiuj', mode: 'append', code: 'eo' });
+
+    expect(internals(f).text()).toBe('Hello everyone\n\nSaluton al ĉiuj');
+    // A bilingual post has no single language, so guessing one would be worse
+    // than leaving the user's choice.
+    expect(internals(f).postLanguage()).toBe('en');
+  });
+
   it('Anonymous defaults to Paste and cannot reach the Mastodon-backed destinations', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
     const f = setUp();

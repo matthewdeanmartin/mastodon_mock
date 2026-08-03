@@ -434,6 +434,17 @@
           </button>
         }
 
+        @if (canTranslate()) {
+          <button
+            class="tool-btn"
+            type="button"
+            (click)="translateOpen.set(true)"
+            title="Translate this post into another language"
+          >
+            🤖🌐
+          </button>
+        }
+
         @if (!targetIncludesPaste() && !targetIncludesBlog()) {
           <button
             class="tool-btn thread-btn"
@@ -646,6 +657,14 @@
     [post]="text()"
     (useTags)="useSuggestedTags($event)"
     (closed)="tagHelperOpen.set(false)"
+  />
+}
+
+@if (translateOpen()) {
+  <app-translate-dialog
+    [post]="text()"
+    (applied)="useTranslation($event)"
+    (closed)="translateOpen.set(false)"
   />
 }
 

@@ -99,12 +99,17 @@ export class AiTranslate {
     return this.translateText(htmlToPlainText(html));
   }
 
-  async translateText(text: string): Promise<AiTranslation> {
+  /**
+   * Translate plain text. `targetCode` overrides the reading default: the
+   * post-reading path wants "into *my* language", but the composer wants "into
+   * the language I am about to post in", which is usually not the same one.
+   */
+  async translateText(text: string, targetCode?: string): Promise<AiTranslation> {
     const source = text.trim();
     if (!source) {
       throw new Error('There is nothing to translate.');
     }
-    const target = languageName(this.targetLanguage());
+    const target = languageName(targetCode || this.targetLanguage());
     const translated = await this.chat.complete({
       prompt: this.prompts.render('translate', { text: source, target }),
       source,
