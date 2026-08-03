@@ -37,6 +37,7 @@ export const PROVIDER_CAPS: Record<ProviderId, ProviderCapabilities> = {
   bluesky: { reply: true, favourite: true, reblog: true },
   rss: { reply: false, favourite: false, reblog: false },
   paste: { reply: false, favourite: false, reblog: false },
+  blog: { reply: false, favourite: false, reblog: false },
   // Read-only by construction, not by omission. Every write on Twitter needs an
   // authenticated Twitter account, which this app deliberately never asks for — no
   // password, no session cookie, no `auth_token`. Cards show "Open on Twitter ↗"
@@ -55,7 +56,12 @@ const NO_WRITES: ProviderCapabilities = { reply: false, favourite: false, reblog
  * id, by contrast, is a client-side construction — sending one to
  * `/api/v1/statuses/{id}/…` can only 404.
  */
-const CLIENT_SIDE_ONLY: ReadonlySet<ProviderId> = new Set<ProviderId>(['twitter', 'rss', 'paste']);
+const CLIENT_SIDE_ONLY: ReadonlySet<ProviderId> = new Set<ProviderId>([
+  'twitter',
+  'rss',
+  'paste',
+  'blog',
+]);
 
 /**
  * Whether the home server could act on this post's id at all.

@@ -47,7 +47,8 @@ export type ConnectionId =
   | 'openrouter'
   | 'cors-proxy'
   | 'link-shortener'
-  | 'twitter';
+  | 'twitter'
+  | 'mataroa';
 
 /**
  * Who a connection belongs to — which is a question users actually ask, and
@@ -109,6 +110,7 @@ export const CONNECTION_SCOPE_COPY: Record<ConnectionScope, ConnectionScopeCopy>
 export const CONNECTION_FLAGS: Record<ConnectionId, FeatureFlagId> = {
   bluesky: 'connector-bluesky',
   twitter: 'connector-twitter',
+  mataroa: 'connector-mataroa',
   openrouter: 'connector-openrouter',
   raindrop: 'connector-raindrop',
   github: 'connector-github',
@@ -172,6 +174,18 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
     enables: [
       'Follow public Twitter accounts and read their posts here',
       'Read-only: no Twitter login, and nothing you do is sent to Twitter',
+      'Needs your own API key and a CORS proxy',
+    ],
+  },
+  {
+    id: 'mataroa',
+    label: 'Blog (Mataroa)',
+    emoji: '✍️',
+    pitch: 'Your Mataroa blog, published from the composer.',
+    scope: 'account',
+    enables: [
+      'Publish Markdown posts from the Blog composer target',
+      'Optionally include your blog RSS posts on your Mawkingbird profile',
       'Needs your own API key and a CORS proxy',
     ],
   },

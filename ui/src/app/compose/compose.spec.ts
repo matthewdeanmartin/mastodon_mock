@@ -11,6 +11,7 @@ import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
 import { ShortenerSettings } from '../providers/shortener/shortener-settings';
 import { Compose, PostTarget, describePostFailure } from './compose';
+import { MataroaSettings } from '../providers/mataroa/mataroa-settings';
 
 /** Edit codes are stored apart from the records — see storage-registry.ts. */
 function storedEditKeys(): Record<string, string> {
@@ -656,6 +657,26 @@ describe('Compose', () => {
     internals(f).submit();
     httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
     httpMock.expectNone(CREATE_RECORD);
+  });
+
+  it('offers one Blog target when Mataroa is connected and requires a title', () => {
+    TestBed.inject(MataroaSettings).connect('key', 'https://writer.mataroa.blog/');
+    const f = setUp();
+    const blogOption = [
+      ...(f.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>(
+        '.target-select option',
+      ),
+    ].find((option) => option.value === 'blog');
+
+    expect(blogOption?.textContent).toContain('Blog');
+    internals(f).onTargetChange('blog');
+    internals(f).text.set('## A Markdown body');
+    expect(internals(f).canSubmit()).toBe(false);
+
+    internals(f).spoilerText.set('A title');
+    expect(internals(f).canSubmit()).toBe(true);
+    expect(internals(f).canAttachMedia()).toBe(false);
+    expect(internals(f).canAddPoll()).toBe(false);
   });
 
   // ------------------------------------------------- paste visibility clamping

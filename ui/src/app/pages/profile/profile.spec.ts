@@ -3,13 +3,15 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Account, Relationship, Status } from '../../models';
 import { Profile } from './profile';
 import { Auth } from '../../auth';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 import { ClientPrefs } from '../../client-prefs';
+import { RssProvider } from '../../providers/rss/rss-provider';
+import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
 
 /** n bare statuses with descending ids starting at s<base> (timeline order). */
 function makeStatuses(n: number, base: number): Status[] {
@@ -671,5 +673,87 @@ describe('Profile — clone friends list', () => {
 
     expect(text.indexOf('Clone friends list')).toBeLessThan(text.indexOf('Block account'));
     expect(text.indexOf('Clone friends list')).toBeLessThan(text.indexOf('Mute for'));
+  });
+});
+
+describe('Profile Mataroa RSS inclusion', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('mastodon_mock_token', 'token');
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+    localStorage.clear();
+  });
+
+  it("merges the connected blog into only the signed-in account's post feed", () => {
+    const account = {
+      id: 'self',
+      username: 'kay',
+      acct: 'kay@example.social',
+      display_name: 'Kay',
+      note: '',
+      url: 'https://example.social/@kay',
+      avatar: '',
+      avatar_static: '',
+      header: '',
+      followers_count: 0,
+      following_count: 0,
+      statuses_count: 1,
+      bot: false,
+      locked: false,
+      fields: [],
+    } as Account;
+    const blogStatus = {
+      ...makeStatuses(1, 90)[0],
+      id: 'rss:https://writer.mataroa.blog/rss/::entry',
+      provider: 'rss',
+      created_at: '2026-08-02T12:00:00Z',
+      url: 'https://writer.mataroa.blog/blog/entry/',
+    } as Status;
+    const getFeed = vi.fn(() => of({ account: blogStatus.account, statuses: [blogStatus] }));
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: 'self' })) },
+        },
+        { provide: RssProvider, useValue: { getFeed } },
+      ],
+    });
+    TestBed.inject(Auth).setAccount(account);
+    TestBed.inject(MataroaSettings).connect('key', 'https://writer.mataroa.blog/', true);
+
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('/api/v1/accounts/self').flush(account);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/self/statuses' && !request.params.has('pinned'),
+      )
+      .flush([]);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/self/statuses' &&
+          request.params.get('pinned') === 'true',
+      )
+      .flush([]);
+    httpMock.expectOne((request) => request.url === '/api/v1/accounts/relationships').flush([]);
+    httpMock.expectOne('/api/v1/accounts/self/endorsements').flush([]);
+    httpMock.expectOne('/api/v1/accounts/self/collections').flush({ collections: [] });
+
+    const visible = (fixture.componentInstance as any).visibleStatuses() as Status[];
+    expect(getFeed).toHaveBeenCalledWith('https://writer.mataroa.blog/rss/', true);
+    expect(visible.map((status) => status.id)).toContain(blogStatus.id);
+    expect(visible[0].account).toEqual(account);
   });
 });

@@ -9,6 +9,7 @@ import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-sett
 import { PastepileKey } from '../../../providers/paste/pastepile-key';
 import { ShortenerSettings } from '../../../providers/shortener/shortener-settings';
 import { TwitterSettings } from '../../../providers/twitter/twitter-settings';
+import { MataroaSettings } from '../../../providers/mataroa/mataroa-settings';
 import {
   CREDENTIAL_LIFETIME_OPTIONS,
   CredentialLifetime,
@@ -63,6 +64,7 @@ export class SettingsConnections implements OnInit {
   private corsProxy = inject(CorsProxySettings);
   private shortener = inject(ShortenerSettings);
   private twitter = inject(TwitterSettings);
+  private mataroa = inject(MataroaSettings);
   // Not a catalog entry — a paste service is a list, not a one-account
   // connector, so the key is managed on the Pastes page. Governed here anyway,
   // because a stored secret obeys the retention policy wherever it was created.
@@ -135,6 +137,8 @@ export class SettingsConnections implements OnInit {
           // Reporting "not connected" to someone who has pasted a valid key
           // would send them looking for a key problem that does not exist.
           return { entry, connected: this.twitter.usable(), unavailableReason: null };
+        case 'mataroa':
+          return { entry, connected: this.mataroa.connected(), unavailableReason: null };
       }
     }
   }
@@ -156,6 +160,7 @@ export class SettingsConnections implements OnInit {
       this.corsProxy,
       this.shortener,
       this.twitter,
+      this.mataroa,
       this.pastepileKey,
     ]);
     this.lifetimes.enforceAll();

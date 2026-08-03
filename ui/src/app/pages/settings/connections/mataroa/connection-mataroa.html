@@ -1,0 +1,123 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>✍️ Blog (Mataroa)</h1>
+  <p>
+    Publish Markdown posts to one Mataroa blog from the composer. Mawkingbird supports one blog
+    connection at a time for each signed-in account.
+  </p>
+  <p class="muted small">{{ scopeDetail }}</p>
+</div>
+
+<ol class="setup-steps muted small">
+  <li>Open Mataroa’s dashboard and copy the API key from its API page.</li>
+  <li>
+    <a [routerLink]="['/settings/connections/cors-proxy']">Set up a CORS proxy</a> that forwards
+    custom headers.
+  </li>
+  <li>Enter the public address of your blog, then save and test the connection.</li>
+</ol>
+
+<p class="credential-warning small">
+  Mataroa’s API key can publish, edit, and delete your writing. Its API does not accept browser
+  requests directly, so the configured CORS proxy will see this key and the posts you publish. Only
+  continue with a proxy operator you trust.
+</p>
+
+@if (settings.connected()) {
+  <div class="connected-row">
+    <span class="connection-ok">Connected</span>
+    <a [href]="settings.blogUrl()" target="_blank" rel="noopener noreferrer">View blog ↗</a>
+    <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
+  </div>
+  @if (expiryLabel(settings.expiresAt()); as expiry) {
+    <p class="muted small">This API key is deleted from this browser on {{ expiry }}.</p>
+  }
+  <label class="profile-feed-option">
+    <input
+      type="checkbox"
+      [ngModel]="settings.includeInProfile()"
+      (ngModelChange)="setProfileFeed($event)"
+    />
+    <span>
+      <strong>Include my blog’s RSS feed in my profile feed</strong>
+      <span class="muted small"
+        >Your published blog posts appear alongside your Mawkingbird posts on your own
+        profile.</span
+      >
+    </span>
+  </label>
+} @else {
+  <form class="mataroa-form" (ngSubmit)="connect()">
+    <label>
+      <span>API key</span>
+      <input
+        type="password"
+        name="apiKey"
+        autocomplete="off"
+        placeholder="Mataroa API key"
+        [ngModel]="apiKey()"
+        (ngModelChange)="apiKey.set($event)"
+      />
+    </label>
+    <label>
+      <span>Public blog address</span>
+      <input
+        type="url"
+        name="blogUrl"
+        placeholder="https://you.mataroa.blog/"
+        [ngModel]="blogUrl()"
+        (ngModelChange)="blogUrl.set($event)"
+      />
+    </label>
+    <label class="profile-feed-option">
+      <input
+        type="checkbox"
+        name="includeInProfile"
+        [ngModel]="includeInProfile()"
+        (ngModelChange)="includeInProfile.set($event)"
+      />
+      <span>Include this blog’s RSS feed in my profile feed</span>
+    </label>
+
+    @if (proxyEntry(); as proxy) {
+      @if (proxyReady()) {
+        <label class="proxy-consent">
+          <input
+            type="checkbox"
+            name="understandsProxy"
+            [ngModel]="understandsProxy()"
+            (ngModelChange)="understandsProxy.set($event)"
+          />
+          <span
+            >I understand that {{ proxy.label }} can read my Mataroa API key and post
+            contents.</span
+          >
+        </label>
+      } @else {
+        <p class="feed-error">
+          {{ proxy.label }} cannot forward the Authorization header Mataroa requires.
+        </p>
+      }
+    } @else {
+      <p class="feed-error">No CORS proxy is configured.</p>
+    }
+
+    <button
+      class="btn"
+      type="submit"
+      [disabled]="
+        busy() || !apiKey().trim() || !blogUrl().trim() || !proxyReady() || !understandsProxy()
+      "
+    >
+      {{ busy() ? 'Testing…' : 'Save and test connection' }}
+    </button>
+  </form>
+}
+
+@if (notice(); as message) {
+  <p class="connection-ok" role="status">{{ message }}</p>
+}
+@if (error(); as message) {
+  <p class="feed-error" role="alert">{{ message }}</p>
+}

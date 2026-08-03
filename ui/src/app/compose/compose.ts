@@ -48,6 +48,9 @@ import { FeatureFlags } from '../feature-flags';
 import { KnownLanguages } from '../trend-language-filter';
 import { LANG_NAMES, LangCode, detectLanguage } from '../language-detect';
 import { stripHtml } from '../sentiment';
+import { MataroaApi } from '../providers/mataroa/mataroa-api';
+import { MataroaSettings } from '../providers/mataroa/mataroa-settings';
+import { mataroaStatus } from '../providers/mataroa/mataroa-status';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 
@@ -55,7 +58,7 @@ const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 export const MAX_POST_CHARS = 500;
 
 /** Where a top-level compose publishes. Paste is always exclusive to avoid correlation. */
-export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste';
+export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste' | 'blog';
 
 /** Bluesky's post limit, in graphemes (not characters). */
 const BSKY_MAX_GRAPHEMES = 300;
@@ -274,6 +277,8 @@ export class Compose implements OnDestroy {
   protected featureFlags = inject(FeatureFlags);
   protected words = inject(Terminology).words;
   private knownLanguages = inject(KnownLanguages);
+  protected mataroa = inject(MataroaSettings);
+  private mataroaApi = inject(MataroaApi);
 
   ngOnDestroy(): void {
     this.clearCountdown();
@@ -618,8 +623,12 @@ export class Compose implements OnDestroy {
   protected pollExpiresIn = signal<number>(86400);
 
   /** Media and polls are mutually exclusive, matching Mastodon. */
-  protected canAttachMedia = computed(() => !this.targetIncludesPaste() && !this.pollOpen());
-  protected canAddPoll = computed(() => !this.targetIncludesPaste() && this.media().length === 0);
+  protected canAttachMedia = computed(
+    () => !this.targetIncludesPaste() && !this.targetIncludesBlog() && !this.pollOpen(),
+  );
+  protected canAddPoll = computed(
+    () => !this.targetIncludesPaste() && !this.targetIncludesBlog() && this.media().length === 0,
+  );
 
   // Live preview (rendered like the feed will render it — not WYSIWYG).
   // Appears as soon as there's a character to render, gone when empty.
@@ -652,6 +661,13 @@ export class Compose implements OnDestroy {
   protected targetIncludesPaste = computed(
     () =>
       this.showTargetPicker() && this.target() === 'paste' && this.featureFlags.enabled('pastebin'),
+  );
+  protected targetIncludesBlog = computed(
+    () =>
+      this.showTargetPicker() &&
+      this.target() === 'blog' &&
+      this.featureFlags.enabled('connector-mataroa') &&
+      this.mataroa.connected(),
   );
   protected pasteDisabledTarget = computed(
     () => this.target() === 'paste' && !this.featureFlags.enabled('pastebin'),
@@ -703,7 +719,9 @@ export class Compose implements OnDestroy {
   protected overLimit = computed(() =>
     this.targetIncludesPaste()
       ? this.pasteBytes() > MAX_PASTE_BYTES
-      : this.segments().some((s) => postLength(s) > MAX_POST_CHARS),
+      : this.targetIncludesBlog()
+        ? false
+        : this.segments().some((s) => postLength(s) > MAX_POST_CHARS),
   );
 
   /**
@@ -742,6 +760,9 @@ export class Compose implements OnDestroy {
     if (this.pasteDisabledTarget()) {
       return false;
     }
+    if (this.target() === 'blog' && !this.targetIncludesBlog()) {
+      return false;
+    }
     if (this.submitting() || this.uploading() || this.countdown() !== null) {
       return false;
     }
@@ -750,6 +771,16 @@ export class Compose implements OnDestroy {
     }
     if (this.targetIncludesPaste()) {
       return (
+        !!this.text().trim() &&
+        !this.thread().some((text) => text.trim()) &&
+        !this.media().length &&
+        !this.pollOpen() &&
+        !this.scheduleActive()
+      );
+    }
+    if (this.targetIncludesBlog()) {
+      return (
+        !!this.spoilerText().trim() &&
         !!this.text().trim() &&
         !this.thread().some((text) => text.trim()) &&
         !this.media().length &&
@@ -824,8 +855,17 @@ export class Compose implements OnDestroy {
     if (target === 'paste' && !this.featureFlags.enabled('pastebin')) {
       return;
     }
+    if (
+      target === 'blog' &&
+      (!this.featureFlags.enabled('connector-mataroa') || !this.mataroa.connected())
+    ) {
+      return;
+    }
     const wasPaste = this.target() === 'paste';
     this.target.set(target);
+    if (target === 'blog') {
+      this.cwOpen.set(true);
+    }
     if (target === 'paste') {
       this.clampVisibilityForPaste(this.pasteVisibilities());
     } else if (wasPaste) {
@@ -1285,9 +1325,12 @@ export class Compose implements OnDestroy {
         ? this.featureFlags.enabled('pastebin')
           ? 'paste'
           : 'fedi'
-        : (restoredTarget === 'bsky' || restoredTarget === 'both') && !this.bskySession.linked()
+        : restoredTarget === 'blog' &&
+            (!this.mataroa.connected() || !this.featureFlags.enabled('connector-mataroa'))
           ? 'fedi'
-          : restoredTarget,
+          : (restoredTarget === 'bsky' || restoredTarget === 'both') && !this.bskySession.linked()
+            ? 'fedi'
+            : restoredTarget,
     );
     this.onPasteProviderChange(d.pasteProviderId ?? this.pasteProviders.default.id);
     const provider = this.selectedPasteProvider();
@@ -1400,7 +1443,12 @@ export class Compose implements OnDestroy {
     // confidently reads as a *different* one, pause and let them fix it or post
     // anyway. Only fires when both are known and disagree — never on unsure text
     // or "Not specified". Skipped for paste/Bluesky targets (no fedi language).
-    if (this.postLanguage() && !this.targetIncludesPaste() && !this.targetIncludesBsky()) {
+    if (
+      this.postLanguage() &&
+      !this.targetIncludesPaste() &&
+      !this.targetIncludesBlog() &&
+      !this.targetIncludesBsky()
+    ) {
       const detected = this.detectedLanguage();
       const dismissed = this.dismissedMismatch();
       const alreadyDismissed =
@@ -1467,6 +1515,15 @@ export class Compose implements OnDestroy {
 
     if (this.targetIncludesPaste()) {
       this.sendToPaste();
+      return;
+    }
+    if (this.target() === 'blog' && !this.targetIncludesBlog()) {
+      this.crossPostError.set('Reconnect Mataroa in Settings before publishing this draft.');
+      return;
+    }
+
+    if (this.targetIncludesBlog()) {
+      this.sendToBlog();
       return;
     }
 
@@ -1621,6 +1678,29 @@ export class Compose implements OnDestroy {
           status === 0
             ? `Couldn't reach ${provider.label} (blocked or unreachable — the service may be down). Try a different paste service.`
             : `Couldn't create the ${provider.label} paste${status ? ` (HTTP ${status})` : ''} — try again.`,
+        );
+      },
+    });
+  }
+
+  private sendToBlog(): void {
+    const title = this.spoilerText().trim();
+    const body = this.text().trim();
+    const account = this.auth.account();
+    if (!account) {
+      this.submitting.set(false);
+      this.crossPostError.set('Sign in before publishing to your blog.');
+      return;
+    }
+    this.mataroaApi.createPost(title, body).subscribe({
+      next: (created) => {
+        this.reset();
+        this.posted.emit(mataroaStatus(created, title, body, account));
+      },
+      error: (error: unknown) => {
+        this.submitting.set(false);
+        this.crossPostError.set(
+          error instanceof Error ? error.message : "Mataroa couldn't publish this post.",
         );
       },
     });

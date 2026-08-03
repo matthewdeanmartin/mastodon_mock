@@ -7,13 +7,19 @@
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
 >
-  @if (cwOpen()) {
+  @if (cwOpen() || targetIncludesBlog()) {
     <input
       class="cw-input"
       type="text"
       [ngModel]="spoilerText()"
       (ngModelChange)="spoilerText.set($event)"
-      [placeholder]="targetIncludesPaste() ? 'Paste title' : 'Content warning'"
+      [placeholder]="
+        targetIncludesBlog()
+          ? 'Blog post title'
+          : targetIncludesPaste()
+            ? 'Paste title'
+            : 'Content warning'
+      "
       [attr.maxlength]="targetIncludesPaste() ? 120 : null"
     />
   }
@@ -33,7 +39,11 @@
       without sending a mention notification.
     </p>
   }
-  @if (!targetIncludesPaste() && (thread().length || charCount() > maxChars - 50)) {
+  @if (
+    !targetIncludesPaste() &&
+    !targetIncludesBlog() &&
+    (thread().length || charCount() > maxChars - 50)
+  ) {
     <div class="seg-count muted" [class.over-limit]="charCount() > maxChars">
       {{ charCount() }}/{{ maxChars }}
     </div>
@@ -42,7 +52,7 @@
   <!-- Links are counted as 23 characters by the server however long they are, so
        this never claims shortening will save budget — it says what the link
        costs, and offers to tidy it up. -->
-  @if (!targetIncludesPaste() && longLinks().length; as linkCount) {
+  @if (!targetIncludesPaste() && !targetIncludesBlog() && longLinks().length; as linkCount) {
     <div class="link-note muted">
       <span class="link-note-text">
         {{ linkCount === 1 ? 'That link counts' : 'Those links count' }} as
@@ -179,7 +189,8 @@
         <div class="preview-card">
           @if (cwOpen() && spoilerText().trim() && i === 0) {
             <div class="spoiler">
-              {{ targetIncludesPaste() ? 'Title: ' : '' }}{{ spoilerText() }}
+              {{ targetIncludesPaste() || targetIncludesBlog() ? 'Title: ' : ''
+              }}{{ spoilerText() }}
             </div>
           }
           @if (html) {
@@ -225,6 +236,9 @@
               <option value="bsky">🦋 Bluesky</option>
               <option value="both">🦣+🦋 Both</option>
             }
+            @if (mataroa.connected() && featureFlags.enabled('connector-mataroa')) {
+              <option value="blog">✍️ Blog</option>
+            }
           }
           @if (featureFlags.enabled('pastebin')) {
             <option value="paste">📋 Paste</option>
@@ -268,11 +282,12 @@
         }
       }
       @if (
+        targetIncludesBlog() ||
         lockVisibility() ||
         (targetIncludesPaste() && selectedPasteProvider().visibilities.length === 1)
       ) {
         <span class="visibility-locked" title="Visibility is fixed here"
-          >🔒 {{ visibility() }}</span
+          >🔒 {{ targetIncludesBlog() ? 'public' : visibility() }}</span
         >
       } @else {
         <select
@@ -293,7 +308,7 @@
         </select>
       }
 
-      @if (!targetIncludesPaste() && !targetIncludesBsky()) {
+      @if (!targetIncludesPaste() && !targetIncludesBlog() && !targetIncludesBsky()) {
         <select
           class="visibility-select"
           [ngModel]="postLanguage()"
@@ -322,7 +337,7 @@
 
     <div class="compose-actions">
       <div class="compose-tools">
-        @if (!targetIncludesPaste()) {
+        @if (!targetIncludesPaste() && !targetIncludesBlog()) {
           <label
             class="tool-btn"
             [class.disabled]="!canAttachMedia()"
@@ -362,16 +377,18 @@
           }
         }
 
-        <button
-          class="tool-btn"
-          [class.on]="cwOpen()"
-          (click)="toggleCw()"
-          [title]="targetIncludesPaste() ? 'Add a title' : 'Content warning'"
-        >
-          {{ targetIncludesPaste() ? 'Title' : 'CW' }}
-        </button>
+        @if (!targetIncludesBlog()) {
+          <button
+            class="tool-btn"
+            [class.on]="cwOpen()"
+            (click)="toggleCw()"
+            [title]="targetIncludesPaste() ? 'Add a title' : 'Content warning'"
+          >
+            {{ targetIncludesPaste() ? 'Title' : 'CW' }}
+          </button>
+        }
 
-        @if (!targetIncludesPaste()) {
+        @if (!targetIncludesPaste() && !targetIncludesBlog()) {
           <button
             class="tool-btn"
             [class.on]="sensitive()"
@@ -409,7 +426,7 @@
           </button>
         }
 
-        @if (!targetIncludesPaste()) {
+        @if (!targetIncludesPaste() && !targetIncludesBlog()) {
           <button
             class="tool-btn thread-btn"
             (click)="addThreadBox()"
@@ -472,9 +489,11 @@
                     ? 'Schedule'
                     : targetIncludesPaste()
                       ? 'Paste'
-                      : thread().length
-                        ? words().PostAll
-                        : words().Post
+                      : targetIncludesBlog()
+                        ? 'Publish'
+                        : thread().length
+                          ? words().PostAll
+                          : words().Post
         }}
       </button>
     </div>
@@ -580,6 +599,14 @@
   ) {
     <div class="thread-hint muted">
       Paste services accept one text document here — remove media, polls, thread boxes, or
+      scheduling.
+    </div>
+  }
+  @if (
+    targetIncludesBlog() && (media().length || pollOpen() || thread().length || scheduleActive())
+  ) {
+    <div class="thread-hint muted">
+      Blog posts accept one titled Markdown document here — remove media, polls, thread boxes, or
       scheduling.
     </div>
   }

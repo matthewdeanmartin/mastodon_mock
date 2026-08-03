@@ -10,6 +10,7 @@ export type FeatureFlagId =
   | 'links'
   | 'connector-bluesky'
   | 'connector-twitter'
+  | 'connector-mataroa'
   | 'connector-openrouter'
   | 'connector-raindrop'
   | 'connector-github'
@@ -71,6 +72,13 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     id: 'connector-twitter',
     label: 'Twitter',
     description: 'Following and reading public Twitter accounts through a scraper service.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-mataroa',
+    label: 'Blog (Mataroa)',
+    description: 'Publishing blog posts and optionally including them on your profile.',
     defaultState: 'production',
     group: 'connectors',
   },

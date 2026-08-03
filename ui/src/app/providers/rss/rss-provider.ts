@@ -79,9 +79,12 @@ export class RssProvider implements FeedProvider {
    * The whole feed as a synthetic profile: the feed's account plus every item
    * as a Status, newest first. Backs the "feed = profile" page (/accounts/rss:…).
    */
-  getFeed(feedUrl: string): Observable<{ account: Account; statuses: Status[] }> {
+  getFeed(
+    feedUrl: string,
+    useProxy: boolean = this.subs.usesProxy(feedUrl),
+  ): Observable<{ account: Account; statuses: Status[] }> {
     const fetchedAt = new Date().toISOString();
-    return this.fetch.fetchFeed(feedUrl, { useProxy: this.subs.usesProxy(feedUrl) }).pipe(
+    return this.fetch.fetchFeed(feedUrl, { useProxy }).pipe(
       map((feed) => {
         this.subs.recordFetch(feedUrl, feed.title, feed.items.length);
         return {

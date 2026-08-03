@@ -50,6 +50,7 @@ import { isOpenRouterId, openRouterAccount } from '../../providers/openrouter/op
 import { CloneFriendsDialog } from './clone-friends-dialog/clone-friends-dialog';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { RenderedHtmlLinks } from '../../rendered-html-links';
+import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analytics';
@@ -89,6 +90,7 @@ export class Profile implements OnInit, OnDestroy {
   private modelChoice = inject(OpenRouterModelChoice);
   private location = inject(Location);
   private rss = inject(RssProvider);
+  private mataroa = inject(MataroaSettings);
   private twitterFollows = inject(TwitterFollows);
   private twitterFeed = inject(TwitterFeed);
   private twitterApi = inject(TwitterApi);
@@ -216,6 +218,8 @@ export class Profile implements OnInit, OnDestroy {
   protected homeServerLink = computed(() => homeServerLink(this.account()));
 
   protected statuses = signal<Status[]>([]);
+  /** Mataroa RSS items optionally folded into the signed-in user's own profile. */
+  private blogStatuses = signal<Status[]>([]);
   protected relationship = signal<Relationship | null>(null);
   protected loading = signal(true);
   protected statusesLoading = signal(false);
@@ -251,11 +255,14 @@ export class Profile implements OnInit, OnDestroy {
 
   /** The main list, minus anything already shown in the pinned strip. */
   protected visibleStatuses = computed(() => {
+    const combined = [...this.statuses(), ...this.blogStatuses()].sort(
+      (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+    );
     if (!this.showPinned()) {
-      return this.statuses();
+      return combined;
     }
     const pinnedIds = new Set(this.pinnedStatuses().map((s) => s.id));
-    return this.statuses().filter((s) => !pinnedIds.has(s.id));
+    return combined.filter((s) => !pinnedIds.has(s.id));
   });
 
   protected showReport = signal(false);
@@ -361,6 +368,7 @@ export class Profile implements OnInit, OnDestroy {
     this.routeLoadSub = new Subscription();
     this.statusLoadSub.unsubscribe();
     this.loading.set(true);
+    this.blogStatuses.set([]);
     this.relationship.set(null);
     this.reportDone.set(false);
     this.followError.set(null);
@@ -851,6 +859,7 @@ export class Profile implements OnInit, OnDestroy {
     this.statusLoadSub.unsubscribe();
     this.statusLoadSub = new Subscription();
     const seq = ++this.loadSeq;
+    this.loadBlogStatuses(id, seq);
     this.statuses.set([]);
     this.statusesLoading.set(true);
     this.exhausted.set(false);
@@ -884,6 +893,37 @@ export class Profile implements OnInit, OnDestroy {
       );
     };
     fetchPage(undefined, [], 1);
+  }
+
+  /** Load the configured Mataroa RSS feed only on this account's own profile. */
+  private loadBlogStatuses(id: string, seq: number): void {
+    const feedUrl = this.mataroa.feedUrl();
+    const account = this.auth.account();
+    if (!feedUrl || !account || id !== account.id || !this.mataroa.includeInProfile()) {
+      this.blogStatuses.set([]);
+      return;
+    }
+    this.statusLoadSub.add(
+      this.rss.getFeed(feedUrl, true).subscribe({
+        next: ({ statuses }) => {
+          if (seq !== this.loadSeq) {
+            return;
+          }
+          // This is the user's profile feed, so blog entries retain RSS behavior
+          // while presenting the same identity as the Mastodon posts beside them.
+          this.blogStatuses.set(statuses.map((status) => ({ ...status, account })));
+        },
+        error: (error: unknown) => {
+          if (seq === this.loadSeq) {
+            this.blogStatuses.set([]);
+            this.diagnostics.warn('Profile', 'mataroa-rss:load-failed', {
+              feed: feedUrl,
+              reason: error instanceof Error ? error.message : String(error),
+            });
+          }
+        },
+      }),
+    );
   }
 
   /** Fetch one older page below the current list ("Load more" at the bottom). */

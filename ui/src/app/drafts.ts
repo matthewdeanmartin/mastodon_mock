@@ -23,7 +23,7 @@ export interface Draft {
   inReplyToId?: string;
   quotedStatusId?: string;
   /** Publishing destination. Missing on drafts saved before provider-aware compose. */
-  target?: 'fedi' | 'bsky' | 'both' | 'paste';
+  target?: 'fedi' | 'bsky' | 'both' | 'paste' | 'blog';
   /** Paste-service id, deliberately separate so another pastebin can be added later. */
   pasteProviderId?: string;
   pasteLanguage?: string;

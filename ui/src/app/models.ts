@@ -11,6 +11,7 @@ export type ProviderId =
   | 'bluesky'
   | 'rss'
   | 'paste'
+  | 'blog'
   | 'twitter';
 
 export interface Role {

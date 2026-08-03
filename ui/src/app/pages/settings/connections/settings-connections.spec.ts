@@ -9,6 +9,7 @@ import { CredentialLifetimeStore } from '../../../providers/credential-lifetime'
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import { ShortenerSettings } from '../../../providers/shortener/shortener-settings';
 import { TwitterSettings } from '../../../providers/twitter/twitter-settings';
+import { MataroaSettings } from '../../../providers/mataroa/mataroa-settings';
 import { CONNECTION_CATALOG } from './connection-catalog';
 import { SettingsConnections } from './settings-connections';
 
@@ -142,12 +143,13 @@ describe('SettingsConnections (catalog)', () => {
     // secret all the same), plus the Twitter data-service key (which spends a prepaid
     // credit balance).
     const governed = govern.mock.calls[0][0];
-    expect(governed).toHaveLength(8);
+    expect(governed).toHaveLength(9);
     // Asserted by identity, not just by count: a bare length check passes just
     // as happily when a connector is swapped for the wrong one.
     expect(governed).toContain(TestBed.inject(CorsProxySettings));
     expect(governed).toContain(TestBed.inject(ShortenerSettings));
     expect(governed).toContain(TestBed.inject(TwitterSettings));
+    expect(governed).toContain(TestBed.inject(MataroaSettings));
     expect(enforceAll).toHaveBeenCalled();
   });
 

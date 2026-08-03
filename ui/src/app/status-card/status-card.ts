@@ -827,6 +827,8 @@ export class StatusCard {
         return '🐘 Mastodon';
       case 'twitter':
         return '🐦 Twitter';
+      case 'blog':
+        return '✍️ Blog';
       default:
         return null;
     }

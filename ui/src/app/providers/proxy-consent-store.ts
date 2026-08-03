@@ -49,7 +49,7 @@ const STORAGE_KEY = 'mockingbird_proxy_consent';
 const LEGACY_SHORTENER_KEY = 'mockingbird_shortener_proxy_consent';
 
 /** Anything that can hold a key and need a proxy to use it. */
-export type ProxyConsentSubjectId = ShortenerId | TwitterSourceId;
+export type ProxyConsentSubjectId = ShortenerId | TwitterSourceId | 'mataroa';
 
 export interface ProxyConsentRecord {
   /** The connector whose traffic is covered. */

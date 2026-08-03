@@ -202,6 +202,13 @@ export const routes: Routes = [
                   ),
               },
               {
+                path: 'mataroa',
+                loadComponent: () =>
+                  import('./pages/settings/connections/mataroa/connection-mataroa').then(
+                    (m) => m.ConnectionMataroa,
+                  ),
+              },
+              {
                 // Not a connector, but it belongs under the connections tree:
                 // it answers "which of these is worth setting up on this
                 // network?", which is a question about all of them at once.

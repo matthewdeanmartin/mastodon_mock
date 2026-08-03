@@ -78,6 +78,9 @@ const CREDENTIAL_HOSTS: readonly string[] = [
   'getxapi.com',
 ];
 
+/** Credentialed API hosts whose public subdomains remain safe to proxy. */
+const EXACT_CREDENTIAL_HOSTS: readonly string[] = ['mataroa.blog'];
+
 /** Raised when a request must not be proxied. Never caught into a direct fetch. */
 export class CorsProxyRefusal extends Error {
   constructor(reason: string) {
@@ -221,6 +224,11 @@ export function assertProxyable(targetUrl: string, mastodonBaseUrl: string): voi
   assertProxyableIgnoringCredentialHosts(targetUrl, mastodonBaseUrl);
 
   const host = new URL(targetUrl).hostname.toLowerCase();
+  if (EXACT_CREDENTIAL_HOSTS.includes(host)) {
+    throw new CorsProxyRefusal(
+      `Refusing to send a request for ${host} through a CORS proxy — you have a connected account there.`,
+    );
+  }
   for (const credentialHost of CREDENTIAL_HOSTS) {
     if (hostMatches(host, credentialHost)) {
       throw new CorsProxyRefusal(

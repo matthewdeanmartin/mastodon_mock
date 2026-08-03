@@ -125,6 +125,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Raindrop.io test token. Unscoped: one bookmark drawer per browser, shared by every account. An account-suffixed copy from before that change is adopted on first read and may linger.',
   },
   {
+    base: 'mockingbird_mataroa_connection',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'secret',
+    note: 'Mataroa API key plus the linked public blog URL and profile-feed opt-in. Account-scoped because the blog is part of one public persona.',
+  },
+  {
     base: 'mockingbird_paste_edit_keys',
     storage: 'local',
     suffix: 'none',
