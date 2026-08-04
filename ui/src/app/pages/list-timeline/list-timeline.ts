@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../../api';
-import { PageDiagnostics, statusOf } from '../../page-diagnostics';
+import { describeHttpError, PageDiagnostics, statusOf } from '../../page-diagnostics';
 import { Account, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
@@ -94,6 +94,8 @@ export class ListTimeline implements OnInit {
   // Members are fetched lazily, the first time the tab is opened.
   protected members = signal<Account[]>([]);
   protected membersLoading = signal(false);
+  /** A failed membership change, shown above the member list. '' when fine. */
+  protected memberError = signal('');
   private membersLoadedFor = '';
   /** The current list id, exposed for the bulk-add dialog target. */
   protected listId = signal('');
@@ -303,18 +305,23 @@ export class ListTimeline implements OnInit {
     }
     const context = { listId: this.listId(), accountId: account.id };
     this.diagnostics.info('Lists', 'member-remove:start', context);
+    this.memberError.set('');
     this.api.removeFromList(this.listId(), account.id).subscribe({
       next: () => {
         this.diagnostics.info('Lists', 'member-remove:success', context);
         this.members.update((m) => m.filter((a) => a.id !== account.id));
       },
-      // The row stays put, which is honest — they are still on the list — but
-      // silently so, which is how a failed removal reads as a UI bug.
-      error: (error) =>
+      // The row correctly stays put — they are still on the list — but silently
+      // staying put is how a failed removal reads as a UI bug. Say it happened.
+      error: (error) => {
         this.diagnostics.error('Lists', 'member-remove:error', error, {
           ...context,
           status: statusOf(error),
-        }),
+        });
+        this.memberError.set(
+          `Couldn't remove @${account.acct}. ${describeHttpError(error)} They are still on the list.`,
+        );
+      },
     });
   }
 

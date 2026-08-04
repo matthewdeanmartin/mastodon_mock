@@ -13,9 +13,12 @@
   } @else {
     <h1 id="fail-whale-title">Can't reach the server</h1>
   }
+  <!-- Only ever shown for a request that got no response at all (status 0), so
+       this can speak plainly about reachability rather than hedging about
+       errors in general. A server that answers with an error is not this. -->
   <p class="muted">
-    The server isn't responding right now. Your connection may be down, or the instance may be
-    temporarily unavailable.
+    No reply came back at all. Your connection may be down, the instance may be unreachable from
+    here, or something between the two may be blocking it.
   </p>
   <div class="actions">
     @if (status.statusLink(); as link) {

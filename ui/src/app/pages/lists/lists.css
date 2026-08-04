@@ -18,6 +18,15 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* A create/delete that failed. Sits under the create box, where the action was. */
+.list-error {
+  margin: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: #e0245e;
+  font-size: 13px;
+}
+
 .new-list input {
   flex: 1;
   padding: 8px 12px;

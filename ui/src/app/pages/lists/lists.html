@@ -36,6 +36,10 @@
     <button class="btn" [disabled]="!newTitle().trim()" (click)="create()">Create</button>
   </div>
 
+  @if (listError(); as message) {
+    <p class="list-error" role="alert">{{ message }}</p>
+  }
+
   @if (loading()) {
     <p class="muted center small">Loading…</p>
   } @else if (!lists().length) {

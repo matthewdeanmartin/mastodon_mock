@@ -14,7 +14,7 @@ import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscripti
 import { TwitterFollows } from '../../providers/twitter/twitter-follows';
 import { BlueskyFeedEntry, BlueskyFeeds } from '../../providers/bluesky/bluesky-feeds';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
-import { PageDiagnostics } from '../../page-diagnostics';
+import { describeHttpError, PageDiagnostics } from '../../page-diagnostics';
 
 /**
  * Which sections the Feeds page shows. `/feeds` shows everything; `/feeds/lists`
@@ -94,6 +94,8 @@ export class Lists implements OnInit {
   private bskyEntries = signal<BlueskyFeedEntry[]>([]);
   protected bskyLoading = signal(false);
   protected bskyError = signal<string | null>(null);
+  /** A failed list or collection create/delete, shown by the create box. */
+  protected listError = signal('');
 
   /**
    * Pinned entries, feeds and lists together.
@@ -413,6 +415,7 @@ export class Lists implements OnInit {
     if (!title) {
       return;
     }
+    this.listError.set('');
     this.diagnostics.info('Lists', 'user:create-list', {
       anonymous: this.auth.isAnonymous,
       titleLength: title.length,
@@ -430,8 +433,10 @@ export class Lists implements OnInit {
       },
       // Keep the typed title on a failure: clearing the box would destroy the
       // user's input and leave no list to show for it.
-      error: (error) =>
-        this.diagnostics.error('Lists', 'create-list:error', error, { titleLength: title.length }),
+      error: (error) => {
+        this.diagnostics.error('Lists', 'create-list:error', error, { titleLength: title.length });
+        this.listError.set(`Couldn't create that list. ${describeHttpError(error)}`);
+      },
     });
   }
 
@@ -444,6 +449,7 @@ export class Lists implements OnInit {
   }
 
   remove(list: UserList): void {
+    this.listError.set('');
     this.diagnostics.info('Lists', 'user:confirm-delete-list', {
       id: list.id,
       anonymous: this.auth.isAnonymous,
@@ -461,7 +467,12 @@ export class Lists implements OnInit {
       },
       // The row stays on screen, which is correct — the list still exists on the
       // server. Without this the delete looked like it silently did nothing.
-      error: (error) => this.diagnostics.error('Lists', 'delete-list:error', error, { id: list.id }),
+      error: (error) => {
+        this.diagnostics.error('Lists', 'delete-list:error', error, { id: list.id });
+        this.listError.set(
+          `Couldn't delete “${list.title}”. ${describeHttpError(error)} It is still here.`,
+        );
+      },
     });
   }
 
@@ -470,6 +481,7 @@ export class Lists implements OnInit {
     if (!name) {
       return;
     }
+    this.listError.set('');
     this.diagnostics.info('Lists', 'user:create-collection', { nameLength: name.length });
     this.api.createCollection(name).subscribe({
       next: (wrapped) => {
@@ -485,10 +497,12 @@ export class Lists implements OnInit {
           this.loadCollections();
         }
       },
-      error: (error) =>
+      error: (error) => {
         this.diagnostics.error('Lists', 'create-collection:error', error, {
           nameLength: name.length,
-        }),
+        });
+        this.listError.set(`Couldn't create that collection. ${describeHttpError(error)}`);
+      },
     });
   }
 
@@ -500,6 +514,7 @@ export class Lists implements OnInit {
   }
 
   removeCollection(collection: Collection): void {
+    this.listError.set('');
     this.diagnostics.info('Lists', 'user:confirm-delete-collection', { id: collection.id });
     this.collectionToDelete.set(null);
     this.api.deleteCollection(collection.id).subscribe({
@@ -507,8 +522,12 @@ export class Lists implements OnInit {
         this.diagnostics.info('Lists', 'delete-collection:success', { id: collection.id });
         this.collections.update((c) => c.filter((x) => x.id !== collection.id));
       },
-      error: (error) =>
-        this.diagnostics.error('Lists', 'delete-collection:error', error, { id: collection.id }),
+      error: (error) => {
+        this.diagnostics.error('Lists', 'delete-collection:error', error, { id: collection.id });
+        this.listError.set(
+          `Couldn't delete “${collection.name}”. ${describeHttpError(error)} It is still here.`,
+        );
+      },
     });
   }
 

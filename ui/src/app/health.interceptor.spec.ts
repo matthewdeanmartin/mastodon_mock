@@ -32,12 +32,24 @@ describe('healthInterceptor', () => {
     expect(health.down()).toBe(true);
   });
 
-  it('marks the server down on a 5xx', () => {
+  it('does NOT mark down on a 5xx — the server answered, so it is reachable', () => {
+    // The whale claims "can't reach the server". A 503 disproves that: something
+    // replied. Raising it here blanked the app for one failed call and then
+    // dismissed itself on the next successful background request.
     http.get('/api/v1/timelines/home').subscribe({ error: () => undefined });
     httpMock
       .expectOne('/api/v1/timelines/home')
       .flush('boom', { status: 503, statusText: 'Service Unavailable' });
-    expect(health.down()).toBe(true);
+    expect(health.down()).toBe(false);
+  });
+
+  it('a 5xx clears an existing down state like any other answer', () => {
+    health.markDown();
+    http.get('/api/v1/timelines/home').subscribe({ error: () => undefined });
+    httpMock
+      .expectOne('/api/v1/timelines/home')
+      .flush('boom', { status: 500, statusText: 'Server Error' });
+    expect(health.down()).toBe(false);
   });
 
   it('does NOT mark down on 401 (that means "log in", not "server down")', () => {
@@ -62,6 +74,19 @@ describe('healthInterceptor', () => {
       .expectOne('/api/v1/statuses/nope')
       .flush('not found', { status: 404, statusText: 'Not Found' });
     expect(health.down()).toBe(false);
+  });
+
+  it('does not whale on a 5xx for a user action, which reports itself inline', () => {
+    // The reported bug: one failed list add blanked the app with a full-screen
+    // "can't reach the server", then dismissed itself when an unrelated
+    // background call succeeded — an alarm that vanished before it was read,
+    // about a failure that was never actually reported.
+    http.post('/api/v1/lists/1/accounts', {}).subscribe({ error: () => undefined });
+    httpMock
+      .expectOne('/api/v1/lists/1/accounts')
+      .flush('', { status: 503, statusText: 'Service Unavailable' });
+    expect(health.down()).toBe(false);
+    expect(health.failure()).toBeNull();
   });
 
   it('ignores external fetches entirely (a dead RSS feed is not a dead server)', () => {

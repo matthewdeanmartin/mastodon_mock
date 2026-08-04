@@ -13,6 +13,33 @@ export function statusOf(err: unknown): number | null {
   return err instanceof HttpErrorResponse ? err.status : null;
 }
 
+/**
+ * A short, user-facing sentence for a failed request.
+ *
+ * Prefers the server's own words — Mastodon's `error` field usually says
+ * something more useful than any wording we could invent — and falls back to
+ * the status. Callers put this next to the action that failed; it is the
+ * counterpart to {@link statusOf}, which is for the log.
+ */
+export function describeHttpError(err: unknown): string {
+  if (err instanceof HttpErrorResponse) {
+    const detail = String(err.error?.error ?? err.error?.message ?? '').trim();
+    if (detail) {
+      return detail;
+    }
+    if (err.status === 0) {
+      return "Couldn't reach the server.";
+    }
+    if (err.status >= 500) {
+      // Distinguished from a 4xx because the user did nothing wrong and
+      // retrying is genuinely the right next move.
+      return `The server had a problem (HTTP ${err.status}). Trying again may work.`;
+    }
+    return `The server rejected that (HTTP ${err.status}).`;
+  }
+  return 'Something went wrong.';
+}
+
 /** Low-volume, production-visible console events for page loads and user actions. */
 @Injectable({ providedIn: 'root' })
 export class PageDiagnostics {

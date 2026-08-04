@@ -5,7 +5,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { Api } from '../api';
 import { Auth } from '../auth';
-import { PageDiagnostics, statusOf } from '../page-diagnostics';
+import { describeHttpError, PageDiagnostics, statusOf } from '../page-diagnostics';
 import { Collection, UserList } from '../models';
 import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
@@ -58,20 +58,6 @@ function isNotFollowingError(err: unknown): boolean {
   return err.status === 422 && (detail.includes('follow') || detail === '');
 }
 
-/** The server's own words when we have them; a plain fallback when we don't. */
-function describeError(err: unknown): string {
-  if (err instanceof HttpErrorResponse) {
-    const detail = String(err.error?.error ?? err.error?.message ?? '').trim();
-    if (detail) {
-      return detail;
-    }
-    if (err.status === 0) {
-      return "Couldn't reach the server.";
-    }
-    return `The server rejected that (HTTP ${err.status}).`;
-  }
-  return 'Something went wrong.';
-}
 
 interface CollectionRow {
   collection: Collection;
@@ -316,7 +302,7 @@ export class ListDialog implements OnInit {
   }
 
   private reportListError(err: unknown): void {
-    this.listError.set(describeError(err));
+    this.listError.set(describeHttpError(err));
   }
 
   createAndAdd(): void {

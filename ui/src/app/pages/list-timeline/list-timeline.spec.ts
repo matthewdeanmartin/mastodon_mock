@@ -325,6 +325,27 @@ describe('ListTimeline', () => {
     ).toEqual(['b']);
   });
 
+  it('says so when a removal fails, rather than leaving the row silently in place', () => {
+    // With the fail whale narrowed to unreachable-only, a 503 here has no other
+    // surface: the row correctly stays put, and without a message that reads as
+    // the button doing nothing.
+    const fixture = setUpWithList('12');
+    loadList(fixture, '12');
+    internals(fixture).setTab('members');
+    httpMock.expectOne('/api/v1/lists/12/accounts').flush([makeAccount('a')]);
+
+    internals(fixture).removeMember(makeAccount('a'));
+    httpMock
+      .expectOne('/api/v1/lists/12/accounts')
+      .flush('', { status: 503, statusText: 'Service Unavailable' });
+    fixture.detectChanges();
+
+    expect(internals(fixture).members().map((m) => m.id)).toEqual(['a']);
+    const message = (fixture.nativeElement as HTMLElement).querySelector('.member-error')!;
+    expect(message.textContent).toContain('still on the list');
+    expect(message.textContent).toContain('503');
+  });
+
   // ---------------------------------------------------------------- analytics tab
 
   it('offers Posts, Members and Analytics', () => {

@@ -77,6 +77,9 @@
     }
   </div>
   <app-bulk-progress />
+  @if (memberError(); as message) {
+    <p class="member-error" role="alert">{{ message }}</p>
+  }
   @if (membersLoading()) {
     <p class="muted center">Loading…</p>
   } @else if (!members().length) {
