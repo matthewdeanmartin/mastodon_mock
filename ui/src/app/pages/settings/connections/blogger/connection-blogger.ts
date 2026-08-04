@@ -74,13 +74,26 @@ export class ConnectionBlogger implements OnInit {
   }
 
   choose(blog: BloggerBlog): void {
-    this.session.chooseBlog(blog.id, blog.name);
+    this.session.chooseBlog(blog.id, blog.name, blog.url);
     this.notice.set(`Posts will publish to ${blog.name}.`);
   }
 
+  toggleIncludeInProfile(include: boolean): void {
+    this.session.setIncludeInProfile(include);
+  }
+
   disconnect(): void {
+    // Signs out of Google but keeps the blog choice and profile-feed opt-in:
+    // the feed is public and needs no session, so signing out should stop
+    // publishing, not empty the user's profile.
     this.session.disconnect();
     this.blogs.set([]);
-    this.notice.set('Disconnected from Blogger.');
+    this.notice.set('Signed out of Google. Your blog is still shown on your profile.');
+  }
+
+  forget(): void {
+    this.session.forget();
+    this.blogs.set([]);
+    this.notice.set('Disconnected from Blogger and removed the blog.');
   }
 }

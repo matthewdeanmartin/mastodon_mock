@@ -51,6 +51,7 @@ import { CloneFriendsDialog } from './clone-friends-dialog/clone-friends-dialog'
 import { PageDiagnostics } from '../../page-diagnostics';
 import { RenderedHtmlLinks } from '../../rendered-html-links';
 import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
+import { BloggerSession } from '../../providers/blogger/blogger-session';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analytics';
@@ -91,6 +92,7 @@ export class Profile implements OnInit, OnDestroy {
   private location = inject(Location);
   private rss = inject(RssProvider);
   private mataroa = inject(MataroaSettings);
+  private blogger = inject(BloggerSession);
   private twitterFollows = inject(TwitterFollows);
   private twitterFeed = inject(TwitterFeed);
   private twitterApi = inject(TwitterApi);
@@ -895,35 +897,64 @@ export class Profile implements OnInit, OnDestroy {
     fetchPage(undefined, [], 1);
   }
 
-  /** Load the configured Mataroa RSS feed only on this account's own profile. */
+  /**
+   * Load the user's own blog RSS feeds onto their own profile.
+   *
+   * Both connectors can be on at once, so this merges every opted-in feed
+   * rather than assuming a single blog. Each is fetched independently: one blog
+   * being unreachable must not blank the other, which is why the failures are
+   * caught per feed and the results accumulated instead of forkJoin'd.
+   *
+   * Both go through the CORS proxy (`useProxy`). Mataroa's feed needs it, and
+   * so does Blogger's — the Blogger *API* is CORS-open, but its RSS feed is
+   * not, and usually redirects to FeedBurner besides.
+   */
   private loadBlogStatuses(id: string, seq: number): void {
-    const feedUrl = this.mataroa.feedUrl();
     const account = this.auth.account();
-    if (!feedUrl || !account || id !== account.id || !this.mataroa.includeInProfile()) {
+    if (!account || id !== account.id) {
       this.blogStatuses.set([]);
       return;
     }
-    this.statusLoadSub.add(
-      this.rss.getFeed(feedUrl, true).subscribe({
-        next: ({ statuses }) => {
-          if (seq !== this.loadSeq) {
-            return;
-          }
-          // This is the user's profile feed, so blog entries retain RSS behavior
-          // while presenting the same identity as the Mastodon posts beside them.
-          this.blogStatuses.set(statuses.map((status) => ({ ...status, account })));
-        },
-        error: (error: unknown) => {
-          if (seq === this.loadSeq) {
-            this.blogStatuses.set([]);
-            this.diagnostics.warn('Profile', 'mataroa-rss:load-failed', {
-              feed: feedUrl,
-              reason: error instanceof Error ? error.message : String(error),
-            });
-          }
-        },
-      }),
-    );
+
+    const feeds: { source: string; url: string }[] = [];
+    const mataroaFeed = this.mataroa.feedUrl();
+    if (mataroaFeed && this.mataroa.includeInProfile()) {
+      feeds.push({ source: 'mataroa', url: mataroaFeed });
+    }
+    const bloggerFeed = this.blogger.feedUrl();
+    if (bloggerFeed && this.blogger.includeInProfile()) {
+      feeds.push({ source: 'blogger', url: bloggerFeed });
+    }
+    if (!feeds.length) {
+      this.blogStatuses.set([]);
+      return;
+    }
+
+    this.blogStatuses.set([]);
+    for (const feed of feeds) {
+      this.statusLoadSub.add(
+        this.rss.getFeed(feed.url, true).subscribe({
+          next: ({ statuses }) => {
+            if (seq !== this.loadSeq) {
+              return;
+            }
+            // This is the user's profile feed, so blog entries retain RSS behavior
+            // while presenting the same identity as the Mastodon posts beside them.
+            const owned = statuses.map((status) => ({ ...status, account }));
+            this.blogStatuses.update((existing) => [...existing, ...owned]);
+          },
+          error: (error: unknown) => {
+            if (seq === this.loadSeq) {
+              // Leave whatever other feeds delivered; only this one failed.
+              this.diagnostics.warn('Profile', `${feed.source}-rss:load-failed`, {
+                feed: feed.url,
+                reason: error instanceof Error ? error.message : String(error),
+              });
+            }
+          },
+        }),
+      );
+    }
   }
 
   /** Fetch one older page below the current list ("Load more" at the bottom). */

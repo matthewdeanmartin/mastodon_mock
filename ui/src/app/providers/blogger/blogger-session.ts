@@ -30,6 +30,27 @@ const TOKEN_KEY_BASE = 'mockingbird_blogger_token';
 const VERIFIER_KEY = 'mockingbird_blogger_pkce_verifier';
 const STATE_KEY = 'mockingbird_blogger_oauth_state';
 
+/**
+ * The chosen blog and the profile-feed opt-in, kept in `localStorage`.
+ *
+ * Separate from the token on purpose. The *token* is a secret and belongs in
+ * `sessionStorage` where it dies with the tab; which blog you write to, and
+ * whether its posts appear on your profile, are preferences — losing them every
+ * time you close the browser would mean re-choosing forever. Nothing here is
+ * a credential, so it is safe to persist.
+ *
+ * This is also what lets the profile feed work when you are *not* signed in to
+ * Google: reading a public RSS feed needs no token, only the address.
+ */
+const BLOG_CHOICE_KEY_BASE = 'mockingbird_blogger_blog';
+
+interface StoredBlogChoice {
+  blogId: string;
+  blogName: string;
+  blogUrl: string;
+  includeInProfile: boolean;
+}
+
 /** Where Google sends the browser back. Must match a registered redirect URI. */
 export const BLOGGER_CALLBACK_PATH = 'integrations/blogger/callback';
 
@@ -46,9 +67,6 @@ export const BLOGGER_SCOPE = 'https://www.googleapis.com/auth/blogger';
 interface StoredBloggerToken {
   accessToken: string;
   expiresAt: number;
-  /** The blog the user chose to publish to; null until they pick one. */
-  blogId: string | null;
-  blogName: string | null;
 }
 
 interface GoogleTokenResponse {
@@ -66,6 +84,10 @@ function tokenKey(): string {
   return scopedKey(TOKEN_KEY_BASE);
 }
 
+function choiceKey(): string {
+  return scopedKey(BLOG_CHOICE_KEY_BASE);
+}
+
 function readToken(): StoredBloggerToken | null {
   try {
     const parsed = JSON.parse(
@@ -74,15 +96,50 @@ function readToken(): StoredBloggerToken | null {
     if (!parsed || typeof parsed.accessToken !== 'string' || typeof parsed.expiresAt !== 'number') {
       return null;
     }
+    return { accessToken: parsed.accessToken, expiresAt: parsed.expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+function readChoice(): StoredBlogChoice | null {
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(choiceKey()) ?? 'null',
+    ) as Partial<StoredBlogChoice> | null;
+    if (!parsed || typeof parsed.blogId !== 'string' || typeof parsed.blogUrl !== 'string') {
+      return null;
+    }
     return {
-      accessToken: parsed.accessToken,
-      expiresAt: parsed.expiresAt,
-      blogId: typeof parsed.blogId === 'string' ? parsed.blogId : null,
-      blogName: typeof parsed.blogName === 'string' ? parsed.blogName : null,
+      blogId: parsed.blogId,
+      blogName: typeof parsed.blogName === 'string' ? parsed.blogName : parsed.blogId,
+      blogUrl: parsed.blogUrl,
+      includeInProfile: parsed.includeInProfile === true,
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * A Blogger blog's RSS feed.
+ *
+ * Blogger serves this at a fixed path under the blog's own address for both
+ * `*.blogspot.com` and custom domains. Unlike the Blogger *API*, the feed sends
+ * no `Access-Control-Allow-Origin` (and often redirects to FeedBurner), so
+ * reading it from the browser goes through the user's configured CORS proxy —
+ * the same route the Mataroa profile feed takes.
+ */
+export function bloggerFeedUrl(blogUrl: string): string | null {
+  try {
+    return new URL('feeds/posts/default?alt=rss', ensureTrailingSlash(blogUrl)).toString();
+  } catch {
+    return null;
+  }
+}
+
+function ensureTrailingSlash(url: string): string {
+  return url.endsWith('/') ? url : `${url}/`;
 }
 
 /**
@@ -104,13 +161,34 @@ function readToken(): StoredBloggerToken | null {
 export class BloggerSession {
   private clientId = inject(BLOGGER_CLIENT_ID);
   private token = signal<StoredBloggerToken | null>(readToken());
+  private choice = signal<StoredBlogChoice | null>(readChoice());
 
+  /** Signed in to Google. Says nothing about whether a blog has been chosen. */
   readonly connected = computed(() => this.token() !== null);
   /** The blog posts will go to, if one has been chosen. */
-  readonly blogId = computed(() => this.token()?.blogId ?? null);
-  readonly blogName = computed(() => this.token()?.blogName ?? null);
-  /** True once a blog is chosen — the composer needs this, not just `connected`. */
-  readonly ready = computed(() => this.token()?.blogId != null);
+  readonly blogId = computed(() => this.choice()?.blogId ?? null);
+  readonly blogName = computed(() => this.choice()?.blogName ?? null);
+  readonly blogUrl = computed(() => this.choice()?.blogUrl ?? null);
+
+  /**
+   * Publishing needs *both* a token and a chosen blog — the composer keys off
+   * this so it never offers a target that would fail on send.
+   */
+  readonly ready = computed(() => this.connected() && this.choice() !== null);
+
+  /** Show this blog's posts on the user's own profile. */
+  readonly includeInProfile = computed(() => this.choice()?.includeInProfile === true);
+
+  /**
+   * The blog's RSS feed, when one is chosen. Deliberately independent of the
+   * token: a public feed needs no credential, so the profile keeps showing the
+   * blog after the Google session expires, and for an anonymous browser that
+   * never signed in at all.
+   */
+  readonly feedUrl = computed(() => {
+    const url = this.choice()?.blogUrl;
+    return url ? bloggerFeedUrl(url) : null;
+  });
 
   /** False when this build shipped without a client id; the connector hides. */
   get configured(): boolean {
@@ -209,31 +287,57 @@ export class BloggerSession {
    * caller; tests use it to reach a connected state without a browser redirect.
    */
   adoptToken(accessToken: string, expiresInSeconds: number): void {
-    this.store({
-      accessToken,
-      expiresAt: Date.now() + expiresInSeconds * 1000,
-      blogId: null,
-      blogName: null,
+    this.store({ accessToken, expiresAt: Date.now() + expiresInSeconds * 1000 });
+  }
+
+  /** Remember which blog to publish to, and where to read its feed. */
+  chooseBlog(blogId: string, blogName: string, blogUrl: string): void {
+    this.storeChoice({
+      blogId,
+      blogName,
+      blogUrl,
+      // Preserve the opt-in across a blog switch only if it was already on;
+      // turning it on for a blog the user never opted into would be a surprise.
+      includeInProfile: this.choice()?.includeInProfile === true,
     });
   }
 
-  /** Remember which blog to publish to. */
-  chooseBlog(blogId: string, blogName: string): void {
-    const token = this.token();
-    if (!token) {
+  setIncludeInProfile(include: boolean): void {
+    const current = this.choice();
+    if (!current) {
       return;
     }
-    this.store({ ...token, blogId, blogName });
+    this.storeChoice({ ...current, includeInProfile: include });
   }
 
+  /**
+   * Sign out of Google.
+   *
+   * Drops the token only. The chosen blog and the profile-feed opt-in survive,
+   * because they are not secrets and the profile feed does not need a session —
+   * signing out should stop you *publishing*, not silently empty your profile.
+   * {@link forget} is the one that clears everything.
+   */
   disconnect(): void {
     sessionStorage.removeItem(tokenKey());
     this.token.set(null);
   }
 
+  /** Disconnect and forget the blog entirely, including the profile feed. */
+  forget(): void {
+    this.disconnect();
+    localStorage.removeItem(choiceKey());
+    this.choice.set(null);
+  }
+
   private store(token: StoredBloggerToken): void {
     sessionStorage.setItem(tokenKey(), JSON.stringify(token));
     this.token.set(token);
+  }
+
+  private storeChoice(choice: StoredBlogChoice): void {
+    localStorage.setItem(choiceKey(), JSON.stringify(choice));
+    this.choice.set(choice);
   }
 
   private clearPendingAuthorization(): void {

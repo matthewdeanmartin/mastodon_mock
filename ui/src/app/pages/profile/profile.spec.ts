@@ -12,6 +12,7 @@ import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-ro
 import { ClientPrefs } from '../../client-prefs';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
+import { BloggerSession } from '../../providers/blogger/blogger-session';
 
 /** n bare statuses with descending ids starting at s<base> (timeline order). */
 function makeStatuses(n: number, base: number): Status[] {
@@ -681,12 +682,16 @@ describe('Profile Mataroa RSS inclusion', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    // The Blogger token lives in sessionStorage; leaving it set would connect
+    // a later test that never asked to be.
+    sessionStorage.clear();
     localStorage.setItem('mastodon_mock_token', 'token');
   });
 
   afterEach(() => {
     httpMock.verify();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it("merges the connected blog into only the signed-in account's post feed", () => {
@@ -755,5 +760,148 @@ describe('Profile Mataroa RSS inclusion', () => {
     expect(getFeed).toHaveBeenCalledWith('https://writer.mataroa.blog/rss/', true);
     expect(visible.map((status) => status.id)).toContain(blogStatus.id);
     expect(visible[0].account).toEqual(account);
+  });
+
+  it('merges both blogs at once, each through the proxy', () => {
+    // Mataroa and Blogger can both be connected; one must not hide the other.
+    const account = {
+      id: 'self',
+      username: 'kay',
+      acct: 'kay@example.social',
+      display_name: 'Kay',
+      note: '',
+      url: 'https://example.social/@kay',
+      avatar: '',
+      avatar_static: '',
+      header: '',
+      header_static: '',
+      followers_count: 0,
+      following_count: 0,
+      statuses_count: 1,
+      bot: false,
+      locked: false,
+      fields: [],
+    } as Account;
+    const entry = (id: string, url: string): Status =>
+      ({ ...makeStatuses(1, 90)[0], id, provider: 'rss', url }) as Status;
+    const mataroaPost = entry('rss:mataroa::a', 'https://writer.mataroa.blog/blog/a/');
+    const bloggerPost = entry('rss:blogger::b', 'https://mine.blogspot.com/2026/08/b.html');
+    const getFeed = vi.fn((url: string) =>
+      of({
+        account,
+        statuses: [url.includes('blogspot') ? bloggerPost : mataroaPost],
+      }),
+    );
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: 'self' })) },
+        },
+        { provide: RssProvider, useValue: { getFeed } },
+      ],
+    });
+    TestBed.inject(Auth).setAccount(account);
+    TestBed.inject(MataroaSettings).connect('key', 'https://writer.mataroa.blog/', true);
+    const blogger = TestBed.inject(BloggerSession);
+    blogger.adoptToken('tok', 3600);
+    blogger.chooseBlog('1', 'Mine', 'https://mine.blogspot.com/');
+    blogger.setIncludeInProfile(true);
+
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('/api/v1/accounts/self').flush(account);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/self/statuses' && !request.params.has('pinned'),
+      )
+      .flush([]);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/self/statuses' &&
+          request.params.get('pinned') === 'true',
+      )
+      .flush([]);
+    httpMock.expectOne((request) => request.url === '/api/v1/accounts/relationships').flush([]);
+    httpMock.expectOne('/api/v1/accounts/self/endorsements').flush([]);
+    httpMock.expectOne('/api/v1/accounts/self/collections').flush({ collections: [] });
+
+    // Blogger's RSS sends no ACAO and often redirects to FeedBurner, so it
+    // takes the proxy route exactly as Mataroa's does.
+    expect(getFeed).toHaveBeenCalledWith(
+      'https://mine.blogspot.com/feeds/posts/default?alt=rss',
+      true,
+    );
+    const ids = ((fixture.componentInstance as any).visibleStatuses() as Status[]).map((s) => s.id);
+    expect(ids).toContain(mataroaPost.id);
+    expect(ids).toContain(bloggerPost.id);
+  });
+
+  it('leaves the blog off the profile until it is opted in', () => {
+    const account = {
+      id: 'self',
+      username: 'kay',
+      acct: 'kay@example.social',
+      display_name: 'Kay',
+      note: '',
+      url: 'https://example.social/@kay',
+      avatar: '',
+      avatar_static: '',
+      header: '',
+      header_static: '',
+      followers_count: 0,
+      following_count: 0,
+      statuses_count: 0,
+      bot: false,
+      locked: false,
+      fields: [],
+    } as Account;
+    const getFeed = vi.fn(() => of({ account, statuses: [] }));
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: 'self' })) },
+        },
+        { provide: RssProvider, useValue: { getFeed } },
+      ],
+    });
+    TestBed.inject(Auth).setAccount(account);
+    const blogger = TestBed.inject(BloggerSession);
+    blogger.adoptToken('tok', 3600);
+    // Chosen for publishing, but never opted into the profile feed.
+    blogger.chooseBlog('1', 'Mine', 'https://mine.blogspot.com/');
+
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('/api/v1/accounts/self').flush(account);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/self/statuses' && !request.params.has('pinned'),
+      )
+      .flush([]);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/self/statuses' &&
+          request.params.get('pinned') === 'true',
+      )
+      .flush([]);
+    httpMock.expectOne((request) => request.url === '/api/v1/accounts/relationships').flush([]);
+    httpMock.expectOne('/api/v1/accounts/self/endorsements').flush([]);
+    httpMock.expectOne('/api/v1/accounts/self/collections').flush({ collections: [] });
+
+    expect(getFeed).not.toHaveBeenCalled();
   });
 });

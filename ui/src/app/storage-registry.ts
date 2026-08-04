@@ -630,7 +630,20 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     // not the same person's to publish as another.
     suffix: 'account',
     sensitivity: 'secret',
-    note: 'Short-lived Google access token plus the chosen Blogger blog.',
+    note: 'Short-lived Google access token.',
+  },
+  {
+    base: 'mockingbird_blogger_blog',
+    // localStorage, not session: which blog you write to and whether it shows
+    // on your profile are preferences, not secrets, and re-choosing them every
+    // time the tab closes would be busywork. It also lets the public profile
+    // feed work with no Google session at all.
+    storage: 'local',
+    suffix: 'account',
+    // `private`, not `setting`: a blog address names the person. It belongs in
+    // a personal backup, never in a published "here is my setup" export.
+    sensitivity: 'private',
+    note: 'Chosen Blogger blog (id, name, address) and the profile-feed opt-in.',
   },
   {
     base: 'mockingbird_blogger_pkce_verifier',

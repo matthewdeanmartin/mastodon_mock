@@ -5,6 +5,18 @@
   margin: 18px 0 10px;
 }
 
+.profile-feed-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.profile-feed-option > span {
+  display: grid;
+  gap: 3px;
+}
+
 .section-title {
   margin: 22px 0 6px;
   font-size: 16px;

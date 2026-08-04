@@ -26,7 +26,7 @@
   @if (session.connected()) {
     <div class="connected-row">
       <span class="connection-ok">Signed in to Google</span>
-      <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
+      <button class="btn btn-outline" type="button" (click)="disconnect()">Sign out</button>
     </div>
 
     <h2 class="section-title">Publish to</h2>
@@ -71,6 +71,43 @@
       <li>Pick the blog as the destination in the composer, then post.</li>
     </ol>
     <button class="btn" type="button" (click)="connect()">Sign in with Google</button>
+
+    @if (session.blogName(); as name) {
+      <!-- Signed out, but the blog is remembered. Worth saying, because the
+           profile feed keeps working and that would otherwise look like a bug. -->
+      <p class="muted small">
+        <strong>{{ name }}</strong> is still remembered. Its public posts keep appearing on your
+        profile if you enabled that; sign in again to publish.
+      </p>
+    }
+  }
+
+  @if (session.blogName()) {
+    <h2 class="section-title">On your profile</h2>
+    <!-- Reading a public feed needs no Google session, so this is offered
+         whenever a blog is known — including to an anonymous browser. -->
+    <label class="profile-feed-option">
+      <input
+        type="checkbox"
+        [checked]="session.includeInProfile()"
+        (change)="toggleIncludeInProfile($any($event.target).checked)"
+      />
+      <span>
+        <strong>Include my blog's posts in my profile feed</strong>
+        <span class="muted small">
+          Your published blog posts appear alongside your Mawkingbird posts on your own profile.
+          Reads the blog's public RSS feed through your
+          <a [routerLink]="['/settings/connections/cors-proxy']">CORS proxy</a>, which Blogger's
+          feed requires.
+        </span>
+      </span>
+    </label>
+
+    <div class="connected-row">
+      <button class="btn btn-outline danger" type="button" (click)="forget()">
+        Forget this blog
+      </button>
+    </div>
   }
 }
 

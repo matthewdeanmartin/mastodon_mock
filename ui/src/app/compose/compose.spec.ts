@@ -668,7 +668,7 @@ describe('Compose', () => {
   function linkBlogger(name = 'My Blog'): void {
     const session = TestBed.inject(BloggerSession);
     session.adoptToken('tok', 3600);
-    session.chooseBlog('123', name);
+    session.chooseBlog('123', name, 'https://my.blogspot.com/');
   }
 
   it('offers Mataroa and Blogger as separate, simultaneous blog targets', () => {

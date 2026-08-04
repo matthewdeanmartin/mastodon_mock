@@ -11,6 +11,9 @@ describe('BloggerSession', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     sessionStorage.clear();
+    // The blog choice persists in localStorage now, so it has to be cleared or
+    // it leaks a connected-looking state into the next test.
+    localStorage.clear();
   });
 
   function session(clientId = 'test-client.apps.googleusercontent.com'): BloggerSession {
@@ -98,10 +101,76 @@ describe('BloggerSession', () => {
     const state = new URL(assign.mock.calls[0][0]).searchParams.get('state')!;
     await blogger.finishAuthorization(new URLSearchParams({ code: 'c', state }));
 
-    blogger.chooseBlog('123', 'My Blog');
+    blogger.chooseBlog('123', 'My Blog', 'https://my.blogspot.com/');
     expect(blogger.ready()).toBe(true);
     expect(blogger.blogId()).toBe('123');
     expect(blogger.blogName()).toBe('My Blog');
+  });
+
+  it('derives the RSS feed from the blog address, for blogspot and custom domains', () => {
+    const blogger = session();
+    blogger.adoptToken('tok', 3600);
+
+    blogger.chooseBlog('1', 'Mine', 'https://mine.blogspot.com/');
+    expect(blogger.feedUrl()).toBe('https://mine.blogspot.com/feeds/posts/default?alt=rss');
+
+    // A custom domain with no trailing slash must not lose its last segment.
+    blogger.chooseBlog('2', 'Custom', 'https://blog.example.com');
+    expect(blogger.feedUrl()).toBe('https://blog.example.com/feeds/posts/default?alt=rss');
+  });
+
+  it('keeps the blog and profile feed after signing out of Google', () => {
+    const blogger = session();
+    blogger.adoptToken('tok', 3600);
+    blogger.chooseBlog('1', 'Mine', 'https://mine.blogspot.com/');
+    blogger.setIncludeInProfile(true);
+
+    blogger.disconnect();
+
+    // Signing out stops publishing, but the feed is public and needs no token —
+    // emptying the profile would be a surprise, not a security improvement.
+    expect(blogger.connected()).toBe(false);
+    expect(blogger.ready()).toBe(false);
+    expect(blogger.includeInProfile()).toBe(true);
+    expect(blogger.feedUrl()).toBe('https://mine.blogspot.com/feeds/posts/default?alt=rss');
+  });
+
+  it('survives a reload with no Google session, so an anonymous browser still has the feed', () => {
+    const first = session();
+    first.adoptToken('tok', 3600);
+    first.chooseBlog('1', 'Mine', 'https://mine.blogspot.com/');
+    first.setIncludeInProfile(true);
+    // A new tab: sessionStorage is gone, localStorage is not.
+    sessionStorage.clear();
+    TestBed.resetTestingModule();
+
+    const reloaded = session();
+    expect(reloaded.connected()).toBe(false);
+    expect(reloaded.includeInProfile()).toBe(true);
+    expect(reloaded.feedUrl()).toContain('/feeds/posts/default?alt=rss');
+  });
+
+  it('forget clears the blog as well as the session', () => {
+    const blogger = session();
+    blogger.adoptToken('tok', 3600);
+    blogger.chooseBlog('1', 'Mine', 'https://mine.blogspot.com/');
+    blogger.setIncludeInProfile(true);
+
+    blogger.forget();
+
+    expect(blogger.blogName()).toBeNull();
+    expect(blogger.feedUrl()).toBeNull();
+    expect(blogger.includeInProfile()).toBe(false);
+  });
+
+  it('does not switch the profile feed on by itself when changing blogs', () => {
+    const blogger = session();
+    blogger.adoptToken('tok', 3600);
+    blogger.chooseBlog('1', 'First', 'https://first.blogspot.com/');
+    expect(blogger.includeInProfile()).toBe(false);
+
+    blogger.chooseBlog('2', 'Second', 'https://second.blogspot.com/');
+    expect(blogger.includeInProfile()).toBe(false);
   });
 
   it('explains a redirect_uri_mismatch instead of echoing the raw code', async () => {
@@ -111,15 +180,13 @@ describe('BloggerSession', () => {
   });
 
   it('treats an expired token as no token, and disconnects', () => {
-    const blogger = session();
-    // Write a token that expired an hour ago, as a stale tab would have.
+    // A tab left open past the token's hour, as a returning user would have.
     sessionStorage.setItem(
       'mockingbird_blogger_token',
-      JSON.stringify({ accessToken: 'old', expiresAt: Date.now() - 3_600_000, blogId: '1' }),
+      JSON.stringify({ accessToken: 'old', expiresAt: Date.now() - 3_600_000 }),
     );
-    TestBed.resetTestingModule();
     const stale = session();
     expect(stale.accessToken()).toBeNull();
-    void blogger;
+    expect(stale.connected()).toBe(false);
   });
 });
