@@ -145,6 +145,51 @@
   }
 }
 
+@if (shows('tags') && showsSection('tag-bundles')) {
+  <div class="section-head">Tag bundles</div>
+  <p class="muted small section-note">
+    Several hashtags read as one feed, on purpose — unlike following a tag, which folds it
+    into Home forever. Up to {{ tagBundles.maxTags }} tags each, because every tag is a
+    request when the feed opens.
+  </p>
+
+  <div class="new-list">
+    <input
+      type="text"
+      [ngModel]="newBundleTitle()"
+      (ngModelChange)="newBundleTitle.set($event)"
+      (keyup.enter)="createTagBundle()"
+      placeholder="New tag bundle name"
+    />
+    <button class="btn" [disabled]="!newBundleTitle().trim()" (click)="createTagBundle()">
+      Create
+    </button>
+  </div>
+
+  @if (!tagBundles.count()) {
+    <p class="muted center small">None yet — create one above, then add tags to it.</p>
+  } @else {
+    @for (b of tagBundles.bundles(); track b.id) {
+      <a class="list-row" [routerLink]="['/tag-bundles', b.id]">
+        <span>
+          {{ b.title }}
+          @if (b.tags.length) {
+            <span class="muted small">
+              ·
+              @for (t of b.tags; track t; let last = $last) {
+                #{{ t }}{{ last ? '' : ', ' }}
+              }
+            </span>
+          } @else {
+            <span class="muted small">· no tags yet</span>
+          }
+        </span>
+        <button class="del" (click)="askDeleteBundle(b, $event)" title="Delete bundle">✕</button>
+      </a>
+    }
+  }
+}
+
 @if (shows('tags') && showsSection('featured-tags')) {
   @if (!auth.isAnonymous) {
     <div class="section-head">Featured on your profile</div>
@@ -389,6 +434,15 @@
     confirmLabel="Delete list"
     (confirmed)="remove(l)"
     (cancelled)="listToDelete.set(null)"
+  />
+}
+@if (bundleToDelete(); as b) {
+  <app-confirm-dialog
+    title="Delete this tag bundle?"
+    [message]="'“' + b.title + '” will be removed from this browser. This cannot be undone.'"
+    confirmLabel="Delete bundle"
+    (confirmed)="removeTagBundle(b)"
+    (cancelled)="bundleToDelete.set(null)"
   />
 }
 @if (clientListToDelete(); as l) {

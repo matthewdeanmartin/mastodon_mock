@@ -19,6 +19,63 @@
   <p class="muted center" role="alert">{{ error }}</p>
 }
 
+<!-- Bundling is client-side, so unlike Follow above it needs no tagInfo and no account.
+     Following a tag pushes it into Home forever; a bundle is a feed you open. -->
+<div class="bundle-bar">
+  <button
+    type="button"
+    class="btn btn-sm btn-outline"
+    (click)="bundlePickerOpen.set(!bundlePickerOpen())"
+    [attr.aria-expanded]="bundlePickerOpen()"
+  >
+    @if (bundlesWithTag().length) {
+      In {{ bundlesWithTag().length }}
+      {{ bundlesWithTag().length === 1 ? 'bundle' : 'bundles' }}
+    } @else {
+      Add to bundle
+    }
+  </button>
+
+  @if (bundlePickerOpen()) {
+    <div class="bundle-picker">
+      @for (b of bundles.bundles(); track b.id) {
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [checked]="bundles.hasTag(b.id, tag())"
+            [disabled]="!bundles.hasTag(b.id, tag()) && bundles.isFull(b.id)"
+            (change)="toggleBundle(b.id, $any($event.target).checked)"
+          />
+          {{ b.title }}
+          <span class="muted small">· {{ b.tags.length }}/{{ bundles.maxTags }}</span>
+          @if (!bundles.hasTag(b.id, tag()) && bundles.isFull(b.id)) {
+            <span class="muted small">· full</span>
+          }
+        </label>
+      } @empty {
+        <p class="muted small">No bundles yet — name one below.</p>
+      }
+
+      <div class="bundle-new">
+        <input
+          type="text"
+          [ngModel]="newBundleTitle()"
+          (ngModelChange)="newBundleTitle.set($event)"
+          (keyup.enter)="createBundleWithTag()"
+          placeholder="New bundle name"
+        />
+        <button
+          class="btn btn-sm"
+          [disabled]="!newBundleTitle().trim()"
+          (click)="createBundleWithTag()"
+        >
+          Create &amp; add
+        </button>
+      </div>
+    </div>
+  }
+</div>
+
 <div class="tabs">
   <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Feed</button>
   <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">

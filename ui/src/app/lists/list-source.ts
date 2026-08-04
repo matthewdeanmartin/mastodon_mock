@@ -12,7 +12,9 @@ export type ListSource =
   | { kind: 'collection'; id: string }
   | { kind: 'saved-search'; id: string }
   | { kind: 'server-feed'; feed: ServerFeedKind }
-  | { kind: 'endorsed'; accountId: string };
+  | { kind: 'endorsed'; accountId: string }
+  /** A client-side bundle of hashtags, read as one feed. Members are synthetic. */
+  | { kind: 'tag-bundle'; id: string };
 
 export type ServerFeedKind = 'federated' | 'local' | 'trending' | 'news';
 

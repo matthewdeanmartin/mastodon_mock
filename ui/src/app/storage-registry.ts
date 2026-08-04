@@ -458,6 +458,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Browser-local lists of accounts, stored as handles. Works signed out, and unlike server lists does not require following anyone. Treated as cache: a version bump discards it.',
   },
   {
+    base: 'mockingbird_tag_bundles',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'setting',
+    note: 'Named bundles of hashtags read as one feed, capped at 10 tags each. Works signed out. Treated as cache: a version bump discards it.',
+  },
+  {
     base: 'mockingbird_translation_usage',
     storage: 'local',
     suffix: 'none',

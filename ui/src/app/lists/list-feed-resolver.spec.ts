@@ -95,3 +95,64 @@ describe('authorsOf', () => {
     expect(authors.map((a) => a.id)).toEqual(['a', 'x']);
   });
 });
+
+describe('ListFeedResolver.mergeTagTimelines', () => {
+  let resolver: ListFeedResolver;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    resolver = TestBed.inject(ListFeedResolver);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  it('merges tag timelines newest-first', () => {
+    let result: Status[] = [];
+    resolver.mergeTagTimelines(['rust', 'zig']).subscribe((m) => (result = m.statuses));
+
+    http
+      .expectOne((r) => r.url === '/api/v1/timelines/tag/rust')
+      .flush([makeStatus('1', 'a', '2026-01-01T00:00:00Z')]);
+    http
+      .expectOne((r) => r.url === '/api/v1/timelines/tag/zig')
+      .flush([makeStatus('2', 'b', '2026-02-01T00:00:00Z')]);
+
+    expect(result.map((s) => s.id)).toEqual(['2', '1']);
+  });
+
+  it('shows a post carrying two of the bundle’s tags only once', () => {
+    // The common case for a well-chosen bundle, not an edge: someone writing about
+    // #rust and #webassembly tags both, and the post arrives in two responses.
+    let result: Status[] = [];
+    resolver.mergeTagTimelines(['rust', 'webassembly']).subscribe((m) => (result = m.statuses));
+
+    const shared = makeStatus('1', 'a', '2026-01-01T00:00:00Z');
+    http.expectOne((r) => r.url === '/api/v1/timelines/tag/rust').flush([shared]);
+    http.expectOne((r) => r.url === '/api/v1/timelines/tag/webassembly').flush([shared]);
+
+    expect(result).toHaveLength(1);
+  });
+
+  it('lets one failing tag cost nothing but itself', () => {
+    let result: Status[] = [];
+    resolver.mergeTagTimelines(['good', 'broken']).subscribe((m) => (result = m.statuses));
+
+    http
+      .expectOne((r) => r.url === '/api/v1/timelines/tag/good')
+      .flush([makeStatus('1', 'a', '2026-01-01T00:00:00Z')]);
+    http
+      .expectOne((r) => r.url === '/api/v1/timelines/tag/broken')
+      .flush('nope', { status: 404, statusText: 'Not Found' });
+
+    expect(result.map((s) => s.id)).toEqual(['1']);
+  });
+
+  it('asks for nothing when the bundle is empty', () => {
+    let result: Status[] | null = null;
+    resolver.mergeTagTimelines([]).subscribe((m) => (result = m.statuses));
+    http.expectNone(() => true);
+    expect(result).toEqual([]);
+  });
+});

@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of } from 'rxjs';
 import { Api } from '../api';
 import { Account, Status } from '../models';
+import { MAX_BUNDLE_TAGS } from './tag-bundles';
 
 /** How many statuses to pull per member when synthesizing a merged feed. */
 export const FEED_PER_MEMBER = 20;
@@ -53,6 +54,49 @@ export class ListFeedResolver {
         this.api.lookupAccount(handle).pipe(catchError(() => of(null))),
       ),
     ).pipe(map((accounts) => accounts.filter((account): account is Account => !!account)));
+  }
+
+  /**
+   * Merge several tag timelines into one reverse-chronological feed.
+   *
+   * One request per tag — which is exactly why {@link MAX_BUNDLE_TAGS} exists — fanned
+   * out in parallel and interleaved by recency. A tag that fails contributes nothing
+   * rather than failing the bundle: a typo'd or empty tag must not cost the reader the
+   * other nine.
+   *
+   * Posts are deduplicated by id, because one post carrying two tags in the same bundle
+   * would otherwise appear twice. That is the common case for a well-chosen bundle, not
+   * an edge: someone posting about `#rust` and `#webassembly` tags both.
+   */
+  mergeTagTimelines(tags: string[]): Observable<MergedFeed> {
+    const capped = tags.length > MAX_BUNDLE_TAGS;
+    const names = tags.slice(0, MAX_BUNDLE_TAGS);
+    if (!names.length) {
+      return of({ statuses: [], capped: false, cappedFrom: 0 });
+    }
+    return forkJoin(
+      names.map((tag) =>
+        this.api.tagTimeline(tag, undefined, FEED_PER_MEMBER).pipe(catchError(() => of([] as Status[]))),
+      ),
+    ).pipe(
+      map((lists) => {
+        const seen = new Set<string>();
+        const statuses: Status[] = [];
+        for (const status of lists.flat()) {
+          if (!seen.has(status.id)) {
+            seen.add(status.id);
+            statuses.push(status);
+          }
+        }
+        return {
+          statuses: statuses
+            .sort((a, b) => b.created_at.localeCompare(a.created_at))
+            .slice(0, FEED_MAX),
+          capped,
+          cappedFrom: tags.length,
+        };
+      }),
+    );
   }
 
   mergeMemberTimelines(accountIds: string[]): Observable<MergedFeed> {

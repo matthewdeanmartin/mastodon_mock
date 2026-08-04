@@ -9,6 +9,7 @@ import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 import { SavedSearches } from '../search/saved-searches';
 import { ClientList, ClientLists } from '../../lists/client-lists';
+import { TagBundle, TagBundles } from '../../lists/tag-bundles';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 import { RssCache } from '../../providers/rss/rss-cache';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
@@ -43,6 +44,7 @@ export type FeedSection =
   | 'searches'
   | 'server'
   | 'tags'
+  | 'tag-bundles'
   | 'featured-tags'
   | 'collections'
   | 'endorsements'
@@ -60,6 +62,7 @@ export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
   { id: 'searches', label: 'Saved searches' },
   { id: 'server', label: 'Server feeds' },
   { id: 'tags', label: 'Followed hashtags' },
+  { id: 'tag-bundles', label: 'Tag bundles' },
   { id: 'featured-tags', label: 'Featured hashtags' },
   { id: 'collections', label: 'Collections' },
   { id: 'endorsements', label: 'Endorsed accounts' },
@@ -237,6 +240,31 @@ export class Lists implements OnInit {
   removeClientList(list: ClientList): void {
     this.clientListToDelete.set(null);
     this.clientLists.remove(list.id);
+  }
+
+  /** Tag bundles — hashtag lists read as one feed. Anonymous-friendly. */
+  protected tagBundles = inject(TagBundles);
+  protected newBundleTitle = signal('');
+  protected bundleToDelete = signal<TagBundle | null>(null);
+
+  createTagBundle(): void {
+    const title = this.newBundleTitle().trim();
+    if (!title) {
+      return;
+    }
+    this.tagBundles.create(title);
+    this.newBundleTitle.set('');
+  }
+
+  askDeleteBundle(bundle: TagBundle, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.bundleToDelete.set(bundle);
+  }
+
+  removeTagBundle(bundle: TagBundle): void {
+    this.bundleToDelete.set(null);
+    this.tagBundles.remove(bundle.id);
   }
 
   // Collections (Mastodon 4.6+). Older servers 404 → collectionsSupported=false.

@@ -585,6 +585,12 @@ export const routes: Routes = [
           import('./pages/client-list/client-list-page').then((m) => m.ClientListPage),
       },
       {
+        // Tag timelines are readable anonymously, so bundles work in every session.
+        path: 'tag-bundles/:id',
+        loadComponent: () =>
+          import('./pages/tag-bundle/tag-bundle-page').then((m) => m.TagBundlePage),
+      },
+      {
         path: 'feeds/:feed',
         loadComponent: () => import('./pages/server-feed/server-feed').then((m) => m.ServerFeed),
       },

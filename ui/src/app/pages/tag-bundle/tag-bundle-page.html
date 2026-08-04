@@ -1,0 +1,104 @@
+@if (!bundle()) {
+  <p class="muted center small">
+    That bundle isn't in this browser. <a routerLink="/feeds">Back to feeds</a>
+  </p>
+} @else {
+  <div class="page-head">
+    <h1>{{ bundle()!.title }}</h1>
+    <p class="muted small">
+      Tag bundle · kept in this browser ·
+      {{ bundle()!.tags.length }} of {{ maxTags }} tags
+    </p>
+  </div>
+
+  <div class="bundle-tags">
+    @for (t of bundle()!.tags; track t) {
+      <span class="bundle-tag">
+        <a [routerLink]="['/tags', t]">#{{ t }}</a>
+        <button type="button" class="chip-x" (click)="removeTag(t)" [attr.aria-label]="'Remove #' + t">
+          ×
+        </button>
+      </span>
+    } @empty {
+      <p class="muted small">No tags yet — add one below to build the feed.</p>
+    }
+  </div>
+
+  <div class="bundle-add">
+    <input
+      type="text"
+      [ngModel]="newTag()"
+      (ngModelChange)="newTag.set($event)"
+      (keyup.enter)="addTag()"
+      placeholder="Add a hashtag…"
+      [disabled]="store.isFull(bundle()!.id)"
+    />
+    <button
+      class="btn"
+      (click)="addTag()"
+      [disabled]="!newTag().trim() || store.isFull(bundle()!.id)"
+    >
+      Add
+    </button>
+  </div>
+
+  @if (store.isFull(bundle()!.id)) {
+    <p class="muted small bundle-note">
+      Full at {{ maxTags }} tags. Each tag is one request every time this feed opens, so the
+      cap keeps a bundle from hammering the server.
+    </p>
+  }
+
+  @if (addError(); as message) {
+    <p class="list-error" role="alert">{{ message }}</p>
+  }
+
+  <div class="tabs">
+    <button type="button" class="tab" [class.active]="tab() === 'posts'" (click)="tab.set('posts')">
+      Posts
+    </button>
+    <button
+      type="button"
+      class="tab"
+      [class.active]="tab() === 'members'"
+      (click)="tab.set('members')"
+    >
+      People
+    </button>
+  </div>
+
+  @if (loading()) {
+    <p class="muted center small">Loading…</p>
+  } @else if (tab() === 'posts') {
+    @if (!statuses().length) {
+      <p class="muted center small">
+        @if (!bundle()!.tags.length) {
+          Add a tag to see posts.
+        } @else {
+          No recent posts in these tags.
+        }
+      </p>
+    } @else {
+      @for (s of statuses(); track s.id) {
+        <app-status-card [status]="s" />
+      }
+    }
+  } @else {
+    <p class="muted small bundle-note">
+      Everyone who wrote a post in this feed. A bundle has no real membership, so this is
+      whoever is posting in these tags right now.
+    </p>
+    @if (!members().length) {
+      <p class="muted center small">Nobody yet.</p>
+    } @else {
+      @for (m of members(); track m.id) {
+        <a class="list-row" [routerLink]="['/accounts', m.id]">
+          <span>
+            {{ m.display_name || m.username }}
+            <span class="muted small">· &#64;{{ m.acct }}</span>
+          </span>
+        </a>
+      }
+    }
+  }
+}

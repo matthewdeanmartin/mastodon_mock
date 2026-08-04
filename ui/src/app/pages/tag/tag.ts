@@ -12,13 +12,15 @@ import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import { AnonymousProviderRef } from '../../providers/anonymous/anonymous-mastodon-provider';
 import { Observable } from 'rxjs';
+import { FormsModule } from '@angular/forms';
+import { TagBundles } from '../../lists/tag-bundles';
 
 /** Posts per request when sampling the tag — Mastodon's cap. */
 const SAMPLE_PAGE_SIZE = 40;
 
 @Component({
   selector: 'app-tag',
-  imports: [StatusCard, FeedAnalytics, FeedMembers],
+  imports: [StatusCard, FeedAnalytics, FeedMembers, FormsModule],
   templateUrl: './tag.html',
   styleUrl: './tag.css',
 })
@@ -38,6 +40,29 @@ export class Tag implements OnInit {
   protected loadingMore = signal(false);
   protected exhausted = signal(false);
   protected tab = signal<'posts' | 'members' | 'analytics'>('posts');
+
+  // --- tag bundles (lists sprint 5) ---
+
+  protected bundles = inject(TagBundles);
+  protected bundlePickerOpen = signal(false);
+  protected newBundleTitle = signal('');
+
+  /** Bundles already containing this tag, for the button's label. */
+  protected bundlesWithTag = computed(() => this.bundles.bundlesWith(this.tag()));
+
+  toggleBundle(bundleId: string, member: boolean): void {
+    this.bundles.setTag(bundleId, this.tag(), member);
+  }
+
+  /** Create a bundle and put this tag in it — the reason the box was typed in. */
+  createBundleWithTag(): void {
+    const title = this.newBundleTitle().trim();
+    if (!title) {
+      return;
+    }
+    this.bundles.create(title, [this.tag()]);
+    this.newBundleTitle.set('');
+  }
 
   /**
    * The feed the Members and Analytics tabs sample. Rebuilt whenever the tag
