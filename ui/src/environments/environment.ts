@@ -23,4 +23,14 @@ export const environment = {
   allowThisServer: true,
   /** Public OAuth client id. Set this to the app key from the Dropbox App Console. */
   dropboxAppKey: 'tx5g7f50ty6r3df',
+  /**
+   * Public OAuth client id for Blogger, from a Google Cloud "web application"
+   * credential. Public like the Dropbox key: PKCE carries the proof, so the
+   * client *secret* is neither needed nor safe to ship — never put it here.
+   *
+   * Empty hides the connector entirely. To fill it in, the same OAuth client
+   * must list this build's callback as an authorized redirect URI:
+   * `<origin>/integrations/blogger/callback`.
+   */
+  bloggerClientId: '',
 };

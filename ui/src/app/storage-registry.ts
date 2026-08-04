@@ -624,6 +624,29 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Anti-CSRF state for the in-flight Dropbox authorization.',
   },
   {
+    base: 'mockingbird_blogger_token',
+    storage: 'session',
+    // Account-scoped, unlike the Dropbox token: a blog linked as one persona is
+    // not the same person's to publish as another.
+    suffix: 'account',
+    sensitivity: 'secret',
+    note: 'Short-lived Google access token plus the chosen Blogger blog.',
+  },
+  {
+    base: 'mockingbird_blogger_pkce_verifier',
+    storage: 'session',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: 'PKCE verifier for the in-flight Blogger authorization.',
+  },
+  {
+    base: 'mockingbird_blogger_oauth_state',
+    storage: 'session',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: 'Anti-CSRF state for the in-flight Blogger authorization.',
+  },
+  {
     base: 'mockingbird.update-recovery',
     storage: 'session',
     suffix: 'none',

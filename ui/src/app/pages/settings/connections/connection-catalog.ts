@@ -48,7 +48,8 @@ export type ConnectionId =
   | 'cors-proxy'
   | 'link-shortener'
   | 'twitter'
-  | 'mataroa';
+  | 'mataroa'
+  | 'blogger';
 
 /**
  * Who a connection belongs to — which is a question users actually ask, and
@@ -111,6 +112,7 @@ export const CONNECTION_FLAGS: Record<ConnectionId, FeatureFlagId> = {
   bluesky: 'connector-bluesky',
   twitter: 'connector-twitter',
   mataroa: 'connector-mataroa',
+  blogger: 'connector-blogger',
   openrouter: 'connector-openrouter',
   raindrop: 'connector-raindrop',
   github: 'connector-github',
@@ -187,6 +189,20 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
       'Publish Markdown posts from the Blog composer target',
       'Optionally include your blog RSS posts on your Mawkingbird profile',
       'Needs your own API key and a CORS proxy',
+    ],
+  },
+  {
+    id: 'blogger',
+    label: 'Blog (Blogger)',
+    emoji: '✍️',
+    pitch: 'Your Google Blogger blog, published from the composer.',
+    // Sits alongside Mataroa rather than replacing it: they are different
+    // blogs, and someone can reasonably keep both.
+    scope: 'account',
+    enables: [
+      'Publish posts from the composer, live or as a draft',
+      'Choose which of your Blogger blogs to post to',
+      'Signs in with Google; no API key or CORS proxy needed',
     ],
   },
   {

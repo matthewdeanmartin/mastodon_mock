@@ -59,6 +59,11 @@ export const routes: Routes = [
       import('./pages/dropbox-callback/dropbox-callback').then((m) => m.DropboxCallback),
   },
   {
+    path: 'integrations/blogger/callback',
+    loadComponent: () =>
+      import('./pages/blogger-callback/blogger-callback').then((m) => m.BloggerCallback),
+  },
+  {
     path: 'integrations/openrouter/callback',
     loadComponent: () =>
       import('./pages/openrouter-callback/openrouter-callback').then((m) => m.OpenRouterCallback),
@@ -206,6 +211,13 @@ export const routes: Routes = [
                 loadComponent: () =>
                   import('./pages/settings/connections/mataroa/connection-mataroa').then(
                     (m) => m.ConnectionMataroa,
+                  ),
+              },
+              {
+                path: 'blogger',
+                loadComponent: () =>
+                  import('./pages/settings/connections/blogger/connection-blogger').then(
+                    (m) => m.ConnectionBlogger,
                   ),
               },
               {

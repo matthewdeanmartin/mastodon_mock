@@ -52,14 +52,37 @@ import { stripHtml } from '../sentiment';
 import { MataroaApi } from '../providers/mataroa/mataroa-api';
 import { MataroaSettings } from '../providers/mataroa/mataroa-settings';
 import { mataroaStatus } from '../providers/mataroa/mataroa-status';
+import { BloggerApi } from '../providers/blogger/blogger-api';
+import { BloggerSession } from '../providers/blogger/blogger-session';
+import { bloggerStatus } from '../providers/blogger/blogger-status';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 
 /** Mastodon's default per-status character limit. */
 export const MAX_POST_CHARS = 500;
 
+/**
+ * True for any target that publishes to a blog rather than a timeline.
+ *
+ * Blog targets share every composer rule — a title is required, media and polls
+ * are not supported, the character limit does not apply — so the rules key off
+ * this rather than naming each service, and a third blog connector inherits
+ * them by being added here.
+ */
+export function isBlogTarget(target: PostTarget): boolean {
+  return target === 'blog' || target === 'blogger';
+}
+
 /** Where a top-level compose publishes. Paste is always exclusive to avoid correlation. */
-export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste' | 'blog';
+/**
+ * Where a top-level compose publishes. Paste is always exclusive to avoid correlation.
+ *
+ * `blog` and `blogger` are two *different blogs*, not two ways of saying one:
+ * `blog` is the Mataroa connector (named before there was a second) and
+ * `blogger` is Google's. Both can be connected at once, so the picker offers
+ * whichever are linked and the user chooses per post.
+ */
+export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste' | 'blog' | 'blogger';
 
 /** Bluesky's post limit, in graphemes (not characters). */
 const BSKY_MAX_GRAPHEMES = 300;
@@ -281,6 +304,8 @@ export class Compose implements OnDestroy {
   private knownLanguages = inject(KnownLanguages);
   protected mataroa = inject(MataroaSettings);
   private mataroaApi = inject(MataroaApi);
+  protected blogger = inject(BloggerSession);
+  private bloggerApi = inject(BloggerApi);
 
   ngOnDestroy(): void {
     this.clearCountdown();
@@ -695,13 +720,33 @@ export class Compose implements OnDestroy {
     () =>
       this.showTargetPicker() && this.target() === 'paste' && this.featureFlags.enabled('pastebin'),
   );
-  protected targetIncludesBlog = computed(
+  /** Mataroa specifically: connected, flagged on, and selected. */
+  protected targetIsMataroa = computed(
     () =>
       this.showTargetPicker() &&
       this.target() === 'blog' &&
       this.featureFlags.enabled('connector-mataroa') &&
       this.mataroa.connected(),
   );
+
+  /** Blogger specifically: connected *with a blog chosen*, flagged on, selected. */
+  protected targetIsBlogger = computed(
+    () =>
+      this.showTargetPicker() &&
+      this.target() === 'blogger' &&
+      this.featureFlags.enabled('connector-blogger') &&
+      this.blogger.ready(),
+  );
+
+  /**
+   * Any blog. This is what the *composer* cares about: every blog target takes
+   * a title, and none of them take media or polls, regardless of which service
+   * is behind it.
+   */
+  protected targetIncludesBlog = computed(() => this.targetIsMataroa() || this.targetIsBlogger());
+
+  /** Publish to Blogger as a draft rather than live. Ignored by other targets. */
+  protected blogDraft = signal(false);
   protected pasteDisabledTarget = computed(
     () => this.target() === 'paste' && !this.featureFlags.enabled('pastebin'),
   );
@@ -793,7 +838,9 @@ export class Compose implements OnDestroy {
     if (this.pasteDisabledTarget()) {
       return false;
     }
-    if (this.target() === 'blog' && !this.targetIncludesBlog()) {
+    // A blog target that isn't actually usable (disconnected, flagged off, or
+    // Blogger with no blog chosen) must not submit — it would post nowhere.
+    if (isBlogTarget(this.target()) && !this.targetIncludesBlog()) {
       return false;
     }
     if (this.submitting() || this.uploading() || this.countdown() !== null) {
@@ -894,10 +941,22 @@ export class Compose implements OnDestroy {
     ) {
       return;
     }
+    if (
+      target === 'blogger' &&
+      (!this.featureFlags.enabled('connector-blogger') || !this.blogger.ready())
+    ) {
+      return;
+    }
     const wasPaste = this.target() === 'paste';
     this.target.set(target);
-    if (target === 'blog') {
+    if (isBlogTarget(target)) {
+      // The CW box doubles as the post title for blogs, which every blog post
+      // needs — so open it rather than making the user find it.
       this.cwOpen.set(true);
+    } else {
+      // Draft is a Blogger-only concept; leaving it set would silently apply to
+      // nothing, and reappear as a surprise on the next blog post.
+      this.blogDraft.set(false);
     }
     if (target === 'paste') {
       this.clampVisibilityForPaste(this.pasteVisibilities());
@@ -1368,6 +1427,12 @@ export class Compose implements OnDestroy {
         return this.mataroa.connected() && this.featureFlags.enabled('connector-mataroa')
           ? 'blog'
           : fallback;
+      case 'blogger':
+        // `ready`, not `connected`: the session survives without a chosen blog,
+        // but a draft restored into that state has nowhere to publish.
+        return this.blogger.ready() && this.featureFlags.enabled('connector-blogger')
+          ? 'blogger'
+          : fallback;
       case 'paste':
         return this.featureFlags.enabled('pastebin') ? 'paste' : fallback;
       case 'fedi':
@@ -1570,8 +1635,18 @@ export class Compose implements OnDestroy {
       this.sendToPaste();
       return;
     }
-    if (this.target() === 'blog' && !this.targetIncludesBlog()) {
-      this.crossPostError.set('Reconnect Mataroa in Settings before publishing this draft.');
+    if (isBlogTarget(this.target()) && !this.targetIncludesBlog()) {
+      this.submitting.set(false);
+      this.crossPostError.set(
+        this.target() === 'blogger'
+          ? 'Reconnect Blogger in Settings, and choose a blog, before publishing this draft.'
+          : 'Reconnect Mataroa in Settings before publishing this draft.',
+      );
+      return;
+    }
+
+    if (this.targetIsBlogger()) {
+      this.sendToBlogger();
       return;
     }
 
@@ -1736,6 +1811,45 @@ export class Compose implements OnDestroy {
     });
   }
 
+  /**
+   * Publish to Blogger.
+   *
+   * The body is rendered to HTML with the same minimal-markdown pass the
+   * composer previews with, so what the user saw is what the blog gets. Blogger
+   * stores HTML natively, unlike Mataroa which takes Markdown — hence the two
+   * separate methods rather than one with a flag.
+   */
+  private async sendToBlogger(): Promise<void> {
+    const title = this.spoilerText().trim();
+    const body = this.text().trim();
+    const account = this.auth.account();
+    const blogId = this.blogger.blogId();
+    if (!account || !blogId) {
+      this.submitting.set(false);
+      this.crossPostError.set(
+        account ? 'Choose which blog to publish to in Settings.' : 'Sign in before publishing.',
+      );
+      return;
+    }
+    const isDraft = this.blogDraft();
+    try {
+      const created = await this.bloggerApi.createPost({
+        blogId,
+        title,
+        content: applyMinimalMarkdown(body),
+        isDraft,
+      });
+      const blogName = this.blogger.blogName();
+      this.reset();
+      this.posted.emit(bloggerStatus(created, title, body, account, { isDraft, blogName }));
+    } catch (error: unknown) {
+      this.submitting.set(false);
+      this.crossPostError.set(
+        error instanceof Error ? error.message : "Blogger couldn't publish this post.",
+      );
+    }
+  }
+
   private sendToBlog(): void {
     const title = this.spoilerText().trim();
     const body = this.text().trim();
@@ -1844,6 +1958,9 @@ export class Compose implements OnDestroy {
     this.scheduleOpen.set(false);
     this.scheduleAt.set('');
     this.emojiOpen.set(false);
+    // Draft-vs-publish is a per-post decision, not a standing preference: the
+    // next post silently going to drafts would be a nasty surprise.
+    this.blogDraft.set(false);
     this.langMismatch.set(null);
     this.lastFocusedBox = null;
     if (this.autosaveTimer) {

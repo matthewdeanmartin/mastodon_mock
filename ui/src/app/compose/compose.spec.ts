@@ -12,6 +12,7 @@ import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
 import { ShortenerSettings } from '../providers/shortener/shortener-settings';
 import { Compose, PostTarget, describePostFailure } from './compose';
 import { MataroaSettings } from '../providers/mataroa/mataroa-settings';
+import { BloggerSession } from '../providers/blogger/blogger-session';
 
 /** Edit codes are stored apart from the records — see storage-registry.ts. */
 function storedEditKeys(): Record<string, string> {
@@ -65,6 +66,7 @@ interface ComposeInternals {
   setMediaDescription(index: number, description: string): void;
   removeMedia(index: number): void;
   submit(): void;
+  blogDraft: WritableSignal<boolean>;
   postLanguage: WritableSignal<string>;
   langMismatch: WritableSignal<{ picked: string; detected: string } | null>;
   onLanguageChange(code: string): void;
@@ -89,6 +91,9 @@ describe('Compose', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    // The Blogger token lives in sessionStorage; without this a test that links
+    // it leaks a connected state into every test that follows.
+    sessionStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
@@ -659,7 +664,54 @@ describe('Compose', () => {
     httpMock.expectNone(CREATE_RECORD);
   });
 
-  it('offers one Blog target when Mataroa is connected and requires a title', () => {
+  /** A finished Blogger OAuth flow with a blog chosen, driven through real state. */
+  function linkBlogger(name = 'My Blog'): void {
+    const session = TestBed.inject(BloggerSession);
+    session.adoptToken('tok', 3600);
+    session.chooseBlog('123', name);
+  }
+
+  it('offers Mataroa and Blogger as separate, simultaneous blog targets', () => {
+    TestBed.inject(MataroaSettings).connect('key', 'https://writer.mataroa.blog/');
+    linkBlogger();
+
+    const f = setUp();
+    const values = [
+      ...(f.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>(
+        '.target-select option',
+      ),
+    ].map((option) => option.value);
+
+    // Two different blogs, not one "Blog" that means whichever is connected.
+    expect(values).toContain('blog');
+    expect(values).toContain('blogger');
+  });
+
+  it('offers the draft toggle only for Blogger, which is the only target with drafts', () => {
+    TestBed.inject(MataroaSettings).connect('key', 'https://writer.mataroa.blog/');
+    linkBlogger();
+    const f = setUp();
+
+    internals(f).onTargetChange('blog');
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).querySelector('.blog-draft')).toBeNull();
+
+    internals(f).onTargetChange('blogger');
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).querySelector('.blog-draft')).not.toBeNull();
+  });
+
+  it('clears the draft flag when leaving a blog target, so it cannot leak into a toot', () => {
+    linkBlogger();
+    const f = setUp();
+    internals(f).onTargetChange('blogger');
+    internals(f).blogDraft.set(true);
+
+    internals(f).onTargetChange('fedi');
+    expect(internals(f).blogDraft()).toBe(false);
+  });
+
+  it('names the Mataroa blog target and requires a title', () => {
     TestBed.inject(MataroaSettings).connect('key', 'https://writer.mataroa.blog/');
     const f = setUp();
     const blogOption = [
@@ -668,7 +720,9 @@ describe('Compose', () => {
       ),
     ].find((option) => option.value === 'blog');
 
-    expect(blogOption?.textContent).toContain('Blog');
+    // Named per service now that Blogger is a second, simultaneous blog target
+    // — a generic "Blog" would not say which one a post is going to.
+    expect(blogOption?.textContent).toContain('Mataroa');
     internals(f).onTargetChange('blog');
     internals(f).text.set('## A Markdown body');
     expect(internals(f).canSubmit()).toBe(false);

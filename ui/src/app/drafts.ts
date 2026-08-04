@@ -22,8 +22,17 @@ export interface Draft {
   poll: DraftPoll | null;
   inReplyToId?: string;
   quotedStatusId?: string;
-  /** Publishing destination. Missing on drafts saved before provider-aware compose. */
-  target?: 'fedi' | 'bsky' | 'both' | 'paste' | 'blog';
+  /**
+   * Publishing destination. Missing on drafts saved before provider-aware compose.
+   *
+   * Spelled out rather than importing `PostTarget`: compose imports *this*
+   * module, so pointing back at it would make a cycle. Keep the two in step —
+   * a target missing here is a compile error at the save site, which is the
+   * right place to find out. A target that is no longer valid does not need
+   * removing here, since restoring one is already filtered through
+   * `Compose.restorableTarget`.
+   */
+  target?: 'fedi' | 'bsky' | 'both' | 'paste' | 'blog' | 'blogger';
   /** Paste-service id, deliberately separate so another pastebin can be added later. */
   pasteProviderId?: string;
   pasteLanguage?: string;

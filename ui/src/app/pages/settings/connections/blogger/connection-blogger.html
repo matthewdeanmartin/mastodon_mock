@@ -1,0 +1,82 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>✍️ Blog (Blogger)</h1>
+  <p>
+    Publish posts to a Google Blogger blog from the composer, live or as a draft. This is separate
+    from the Mataroa connector — both can be connected, and the composer offers whichever are.
+  </p>
+  <p class="muted small">{{ scopeDetail }}</p>
+</div>
+
+@if (!session.configured) {
+  <!-- No client id in this build. Say why rather than showing a dead button. -->
+  <p class="muted">
+    Blogger has not been configured for this build. It needs a Google OAuth client id, which the
+    person who built this copy has to supply.
+  </p>
+} @else {
+  <p class="credential-warning small">
+    Signing in grants this app permission to read and publish to your Blogger blogs. The permission
+    lasts until you close this tab — nothing is stored long-term, so you will sign in again next
+    session. Google may warn that this app is unverified; that is about Google's review process,
+    not about what the app does.
+  </p>
+
+  @if (session.connected()) {
+    <div class="connected-row">
+      <span class="connection-ok">Signed in to Google</span>
+      <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
+    </div>
+
+    <h2 class="section-title">Publish to</h2>
+    @if (session.blogName(); as name) {
+      <p>
+        Posts go to <strong>{{ name }}</strong
+        >. Pick another below to change it.
+      </p>
+    } @else {
+      <p class="muted">Choose a blog before posting — nothing can publish until you do.</p>
+    }
+
+    <div class="connected-row">
+      <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="loadBlogs()">
+        {{ busy() ? 'Loading…' : 'Refresh blog list' }}
+      </button>
+    </div>
+
+    @if (blogs().length) {
+      <ul class="blog-list">
+        @for (blog of blogs(); track blog.id) {
+          <li>
+            <button
+              class="btn btn-outline"
+              type="button"
+              [disabled]="blog.id === session.blogId()"
+              (click)="choose(blog)"
+            >
+              {{ blog.id === session.blogId() ? '✓ ' : '' }}{{ blog.name }}
+            </button>
+            <a class="muted small" [href]="blog.url" target="_blank" rel="noopener noreferrer">
+              {{ blog.url }} ↗
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <ol class="setup-steps muted small">
+      <li>Sign in with the Google account that owns the blog.</li>
+      <li>Choose which of that account's blogs to publish to.</li>
+      <li>Pick the blog as the destination in the composer, then post.</li>
+    </ol>
+    <button class="btn" type="button" (click)="connect()">Sign in with Google</button>
+  }
+}
+
+@if (notice(); as message) {
+  <p class="connection-ok" role="status">{{ message }}</p>
+}
+@if (error(); as message) {
+  <p class="feed-error" role="alert">{{ message }}</p>
+}

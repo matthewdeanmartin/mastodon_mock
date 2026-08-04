@@ -279,6 +279,20 @@ textarea {
   padding: 4px 8px;
 }
 
+/* Sits inline with the target picker, matching its height so the row reads as
+   one control group rather than a stray checkbox. */
+.blog-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .bsky-count {
   white-space: nowrap;
 }

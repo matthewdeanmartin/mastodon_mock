@@ -14,4 +14,15 @@ export const environment = {
   allowThisServer: false,
   /** Public OAuth client id. This is safe to include in the static browser bundle. */
   dropboxAppKey: 'tx5g7f50ty6r3df',
+  /**
+   * Public OAuth client id for Blogger (Google Cloud → Credentials → OAuth
+   * client ID → Web application). Safe in the bundle; the client *secret* that
+   * Google issues alongside it is not, and is not used — PKCE replaces it.
+   *
+   * Empty hides the connector. Filling it in also requires registering
+   * `https://<this build's origin>/integrations/blogger/callback` as an
+   * authorized redirect URI on that OAuth client, including a separate entry
+   * for the /canary/ deployment.
+   */
+  bloggerClientId: '',
 };

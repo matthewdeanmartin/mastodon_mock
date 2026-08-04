@@ -10,6 +10,7 @@ import { PastepileKey } from '../../../providers/paste/pastepile-key';
 import { ShortenerSettings } from '../../../providers/shortener/shortener-settings';
 import { TwitterSettings } from '../../../providers/twitter/twitter-settings';
 import { MataroaSettings } from '../../../providers/mataroa/mataroa-settings';
+import { BloggerSession } from '../../../providers/blogger/blogger-session';
 import {
   CREDENTIAL_LIFETIME_OPTIONS,
   CredentialLifetime,
@@ -65,6 +66,7 @@ export class SettingsConnections implements OnInit {
   private shortener = inject(ShortenerSettings);
   private twitter = inject(TwitterSettings);
   private mataroa = inject(MataroaSettings);
+  private blogger = inject(BloggerSession);
   // Not a catalog entry — a paste service is a list, not a one-account
   // connector, so the key is managed on the Pastes page. Governed here anyway,
   // because a stored secret obeys the retention policy wherever it was created.
@@ -139,6 +141,19 @@ export class SettingsConnections implements OnInit {
           return { entry, connected: this.twitter.usable(), unavailableReason: null };
         case 'mataroa':
           return { entry, connected: this.mataroa.connected(), unavailableReason: null };
+        case 'blogger':
+          // A build with no OAuth client id cannot offer this at all, which is
+          // a fact about the build rather than something the user can fix —
+          // the same shape as Dropbox with no app key.
+          if (!this.blogger.configured) {
+            return {
+              entry,
+              connected: false,
+              unavailableReason: 'This build has no Blogger OAuth client id.',
+            };
+          }
+          // "Connected" means publishable: signed in *and* a blog chosen.
+          return { entry, connected: this.blogger.ready(), unavailableReason: null };
       }
     }
   }

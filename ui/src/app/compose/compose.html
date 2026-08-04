@@ -245,13 +245,30 @@
               <option value="both">🦣+🦋 Both</option>
             }
           }
+          <!-- Two blogs can be connected at once, so they are separate options
+               rather than one "Blog". Blogger needs a chosen blog, not just a
+               session, or the post would have nowhere to go. -->
           @if (mataroa.connected() && featureFlags.enabled('connector-mataroa')) {
-            <option value="blog">✍️ Blog</option>
+            <option value="blog">✍️ Mataroa</option>
+          }
+          @if (blogger.ready() && featureFlags.enabled('connector-blogger')) {
+            <option value="blogger">✍️ {{ blogger.blogName() || 'Blogger' }}</option>
           }
           @if (featureFlags.enabled('pastebin')) {
             <option value="paste">📋 Paste</option>
           }
         </select>
+      }
+      @if (targetIsBlogger()) {
+        <!-- Blogger-only: Mataroa publishes immediately and has no draft state. -->
+        <label class="blog-draft" title="Save to Blogger as a draft instead of publishing it">
+          <input
+            type="checkbox"
+            [checked]="blogDraft()"
+            (change)="blogDraft.set($any($event.target).checked)"
+          />
+          Draft
+        </label>
       }
       @if (targetIncludesPaste()) {
         <select
@@ -509,7 +526,7 @@
                     : targetIncludesPaste()
                       ? 'Paste'
                       : targetIncludesBlog()
-                        ? 'Publish'
+                        ? (blogDraft() ? 'Save draft' : 'Publish')
                         : thread().length
                           ? words().PostAll
                           : words().Post
