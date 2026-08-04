@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
@@ -13,6 +14,62 @@ import { Account } from '../models';
 interface ListRow {
   list: UserList;
   member: boolean;
+}
+
+/**
+ * A pending "you must follow them first" prompt.
+ *
+ * Mastodon refuses list membership for accounts you don't follow, so the add
+ * can't simply be retried — it needs a follow, which is a *visible social act*
+ * (the target gets a notification). We never do that silently: the failed add
+ * parks here and the user confirms.
+ *
+ * `retry` re-runs whatever the original action was (toggle an existing list, or
+ * create-then-add), so the confirm button finishes the job the user started.
+ */
+interface FollowGate {
+  listTitle: string;
+  retry: () => void;
+}
+
+/**
+ * Does this failure mean "you don't follow that account"?
+ *
+ * Mastodon is not consistent here and never has been: mainline returns **404**
+ * from `POST /lists/{id}/accounts` for a non-followed account (the account is
+ * simply not visible to the list), while other implementations and some
+ * versions answer **422 Unprocessable Entity** with a message naming the
+ * follow. Glitch/Akkoma variants phrase it differently again.
+ *
+ * So we match on status *and* keep a text check for servers that use a status
+ * we'd otherwise pass through. 404 is safe to claim here because the list id
+ * came from a listing we just fetched — a genuinely missing list is not a case
+ * we can reach from this dialog.
+ */
+function isNotFollowingError(err: unknown): boolean {
+  if (!(err instanceof HttpErrorResponse)) {
+    return false;
+  }
+  if (err.status === 404) {
+    return true;
+  }
+  const detail = String(err.error?.error ?? err.error?.message ?? '').toLowerCase();
+  return err.status === 422 && (detail.includes('follow') || detail === '');
+}
+
+/** The server's own words when we have them; a plain fallback when we don't. */
+function describeError(err: unknown): string {
+  if (err instanceof HttpErrorResponse) {
+    const detail = String(err.error?.error ?? err.error?.message ?? '').trim();
+    if (detail) {
+      return detail;
+    }
+    if (err.status === 0) {
+      return "Couldn't reach the server.";
+    }
+    return `The server rejected that (HTTP ${err.status}).`;
+  }
+  return 'Something went wrong.';
 }
 
 interface CollectionRow {
@@ -50,6 +107,13 @@ export class ListDialog implements OnInit {
   protected rows = signal<ListRow[]>([]);
   protected loading = signal(true);
   protected newTitle = signal('');
+
+  /** Set when an add failed because the viewer doesn't follow the target. */
+  protected followGate = signal<FollowGate | null>(null);
+  /** True while the follow-and-retry is in flight. */
+  protected following = signal(false);
+  /** Any other list error, shown verbatim so a failure is never silent. */
+  protected listError = signal('');
 
   // Collections (public). Older servers 404 → collectionsSupported=false.
   protected collectionRows = signal<CollectionRow[]>([]);
@@ -141,14 +205,81 @@ export class ListDialog implements OnInit {
       );
       return;
     }
-    const call = row.member
-      ? this.api.removeFromList(row.list.id, this.accountId())
-      : this.api.addToList(row.list.id, this.accountId());
-    call.subscribe(() => {
-      this.rows.update((rows) =>
-        rows.map((r) => (r.list.id === row.list.id ? { ...r, member: !r.member } : r)),
-      );
+    if (row.member) {
+      this.api.removeFromList(row.list.id, this.accountId()).subscribe({
+        next: () => this.markMember(row.list.id, false),
+        error: (err) => this.reportListError(err),
+      });
+      return;
+    }
+    this.addTo(row.list, () => this.markMember(row.list.id, true));
+  }
+
+  /**
+   * Add the account to one list, routing the "not followed" rejection to the
+   * follow gate instead of dropping it. Shared by the checkbox and by
+   * create-and-add so both fail the same way.
+   */
+  private addTo(list: UserList, onAdded: () => void): void {
+    this.clearErrors();
+    this.api.addToList(list.id, this.accountId()).subscribe({
+      next: onAdded,
+      error: (err) => {
+        if (isNotFollowingError(err)) {
+          this.followGate.set({
+            listTitle: list.title,
+            retry: () => this.addTo(list, onAdded),
+          });
+        } else {
+          this.reportListError(err);
+        }
+      },
     });
+  }
+
+  /**
+   * The user accepted the follow. Follow, then re-run the add that failed.
+   *
+   * A follow is only "processed" here once the server confirms it; Mastodon
+   * applies it synchronously for local accounts, so the immediate retry is
+   * sound. A remote account behind a slow federation hop can still bounce — in
+   * that case the retry re-arms the gate rather than pretending it worked.
+   */
+  protected confirmFollow(): void {
+    const gate = this.followGate();
+    if (!gate || this.following()) {
+      return;
+    }
+    this.following.set(true);
+    this.api.follow(this.accountId()).subscribe({
+      next: () => {
+        this.following.set(false);
+        this.followGate.set(null);
+        gate.retry();
+      },
+      error: (err) => {
+        this.following.set(false);
+        this.followGate.set(null);
+        this.reportListError(err);
+      },
+    });
+  }
+
+  protected dismissFollowGate(): void {
+    this.followGate.set(null);
+  }
+
+  private markMember(listId: string, member: boolean): void {
+    this.rows.update((rows) => rows.map((r) => (r.list.id === listId ? { ...r, member } : r)));
+  }
+
+  private clearErrors(): void {
+    this.followGate.set(null);
+    this.listError.set('');
+  }
+
+  private reportListError(err: unknown): void {
+    this.listError.set(describeError(err));
   }
 
   createAndAdd(): void {
@@ -165,11 +296,15 @@ export class ListDialog implements OnInit {
       this.rows.update((rows) => [...rows, { list, member: true }]);
       return;
     }
-    this.api.createList(title).subscribe((list) => {
-      this.newTitle.set('');
-      this.api.addToList(list.id, this.accountId()).subscribe(() => {
-        this.rows.update((rows) => [...rows, { list, member: true }]);
-      });
+    this.api.createList(title).subscribe({
+      next: (list) => {
+        this.newTitle.set('');
+        // The list exists now even if the add is refused, so show it immediately
+        // as a non-member row; addTo flips it once membership actually lands.
+        this.rows.update((rows) => [...rows, { list, member: false }]);
+        this.addTo(list, () => this.markMember(list.id, true));
+      },
+      error: (err) => this.reportListError(err),
     });
   }
 

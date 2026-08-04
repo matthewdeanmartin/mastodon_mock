@@ -14,6 +14,9 @@ interface DialogInternals {
   loading: WritableSignal<boolean>;
   collectionRows: WritableSignal<{ collection: Collection; member: boolean; itemId: string }[]>;
   collectionsSupported: WritableSignal<boolean>;
+  followGate: WritableSignal<{ listTitle: string; retry: () => void } | null>;
+  listError: WritableSignal<string>;
+  confirmFollow(): void;
   toggleCollection(row: { collection: Collection; member: boolean; itemId: string }): void;
 }
 
@@ -143,6 +146,55 @@ describe('ListDialog', () => {
     expect(follow).not.toBeNull();
     expect(lists.hasMember(list.id, follow!.key)).toBe(true);
     httpMock.expectNone(() => true);
+  });
+
+  // ----------------------------------------------------------------- follow gate
+
+  it('offers to follow when the server refuses a list add for a non-followed account', () => {
+    const fixture = setUp({ lists: [{ id: '1', title: 'Friends' }] });
+    const row = internals(fixture).rows()[0];
+
+    fixture.componentInstance.toggle(row);
+    httpMock
+      .expectOne('/api/v1/lists/1/accounts')
+      .flush('', { status: 404, statusText: 'Not Found' });
+
+    // Membership must NOT be claimed, and the reason must be on screen.
+    expect(internals(fixture).rows()[0].member).toBe(false);
+    expect(internals(fixture).followGate()?.listTitle).toBe('Friends');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('only lets you add people you follow');
+  });
+
+  it('confirmFollow follows the account then retries the add', () => {
+    const fixture = setUp({ lists: [{ id: '1', title: 'Friends' }] });
+    fixture.componentInstance.toggle(internals(fixture).rows()[0]);
+    httpMock
+      .expectOne('/api/v1/lists/1/accounts')
+      .flush('', { status: 404, statusText: 'Not Found' });
+
+    internals(fixture).confirmFollow();
+    const follow = httpMock.expectOne('/api/v1/accounts/T/follow');
+    expect(follow.request.method).toBe('POST');
+    follow.flush({ id: 'T', following: true });
+
+    // Retry of the original add, which now succeeds.
+    httpMock.expectOne('/api/v1/lists/1/accounts').flush({});
+
+    expect(internals(fixture).rows()[0].member).toBe(true);
+    expect(internals(fixture).followGate()).toBeNull();
+  });
+
+  it('surfaces other list errors instead of failing silently', () => {
+    const fixture = setUp({ lists: [{ id: '1', title: 'Friends' }] });
+    fixture.componentInstance.toggle(internals(fixture).rows()[0]);
+    httpMock
+      .expectOne('/api/v1/lists/1/accounts')
+      .flush({ error: 'List is full' }, { status: 422, statusText: 'Unprocessable' });
+
+    expect(internals(fixture).followGate()).toBeNull();
+    expect(internals(fixture).listError()).toBe('List is full');
+    expect(internals(fixture).rows()[0].member).toBe(false);
   });
 
   // ----------------------------------------------------------------- collection toggle

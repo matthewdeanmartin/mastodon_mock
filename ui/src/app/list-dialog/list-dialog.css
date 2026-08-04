@@ -74,6 +74,33 @@ h3 {
   cursor: pointer;
 }
 
+/* The follow-required prompt. Tinted with the accent rather than a red error
+   colour: nothing went wrong, the user just has one more decision to make. */
+.follow-gate {
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.follow-gate p {
+  margin: 0 0 6px;
+}
+
+.gate-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.list-error {
+  color: #d81b60;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
 .new-row {
   display: flex;
   gap: 8px;

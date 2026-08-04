@@ -11,6 +11,10 @@
   text-align: center;
   background: var(--bg, #fff);
   color: var(--text, #111);
+  /* The diagnostics box expands on demand and can outgrow a short viewport.
+     justify-content:center would then clip it off both ends with no way to
+     reach it, so let the overlay scroll instead. */
+  overflow-y: auto;
 }
 
 .whale-img {
@@ -75,4 +79,92 @@
   background: var(--col-bg);
   color: inherit;
   font-size: 14px;
+}
+
+/* "You are offline" — louder than the body copy because it changes the
+   diagnosis completely. */
+.offline-note {
+  max-width: 420px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 14px;
+}
+
+/* Diagnostics: deliberately last, quiet, and collapsed. */
+.diagnostics {
+  width: min(520px, 92vw);
+  margin-top: 8px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--col-bg);
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.diagnostics summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.diagnostics[open] summary {
+  margin-bottom: 10px;
+  color: inherit;
+}
+
+.diagnostics p {
+  max-width: none;
+  margin: 10px 0 0;
+}
+
+/* Label/value pairs. Two columns on comfortable widths, stacked when narrow so
+   long URLs and error sentences keep a usable line length. */
+.detail-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.detail-grid dt {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.detail-grid dd {
+  margin: 0;
+  /* Failed URLs and raw error text are long and unbreakable; wrap rather than
+     forcing the whole overlay to scroll sideways. */
+  overflow-wrap: anywhere;
+}
+
+.detail-message {
+  white-space: pre-wrap;
+}
+
+.diagnostics code {
+  font-size: 12px;
+  background: var(--hover);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+@media (max-width: 420px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .detail-grid dd {
+    margin-bottom: 6px;
+  }
 }

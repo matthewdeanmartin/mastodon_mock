@@ -27,7 +27,7 @@ export const healthInterceptor: HttpInterceptorFn = (req, next) => {
       },
       error: (err) => {
         if (err instanceof HttpErrorResponse && (err.status === 0 || err.status >= 500)) {
-          health.markDown();
+          health.markDown(err);
         } else {
           // The server answered (4xx, auth, etc.) — it is reachable.
           health.markUp();

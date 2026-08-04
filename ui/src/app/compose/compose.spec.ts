@@ -867,15 +867,58 @@ describe('Compose', () => {
     );
   });
 
-  it('Anonymous defaults to Paste and exposes no identity-backed destinations', () => {
+  it('replacing with a translation relabels the post language', () => {
+    const f = setUp();
+    internals(f).text.set('Hello everyone');
+    internals(f).postLanguage.set('en');
+
+    f.componentInstance.useTranslation({ text: 'Saluton al ĉiuj', mode: 'replace', code: 'eo' });
+
+    expect(internals(f).text()).toBe('Saluton al ĉiuj');
+    // A post rewritten into Esperanto that still declares en is exactly the
+    // mislabelling the feed filter is built to catch.
+    expect(internals(f).postLanguage()).toBe('eo');
+  });
+
+  it('appending keeps both versions and leaves the language alone', () => {
+    const f = setUp();
+    internals(f).text.set('Hello everyone');
+    internals(f).postLanguage.set('en');
+
+    f.componentInstance.useTranslation({ text: 'Saluton al ĉiuj', mode: 'append', code: 'eo' });
+
+    expect(internals(f).text()).toBe('Hello everyone\n\nSaluton al ĉiuj');
+    // A bilingual post has no single language, so guessing one would be worse
+    // than leaving the user's choice.
+    expect(internals(f).postLanguage()).toBe('en');
+  });
+
+  it('Anonymous defaults to Paste and cannot reach the Mastodon-backed destinations', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
     const f = setUp();
 
     expect(internals(f).target()).toBe('paste');
     const options = [...(f.nativeElement as HTMLElement).querySelectorAll('.target-select option')];
+    // Fedi needs a token; with no Bluesky link there is nothing else to offer.
     expect(options.some((option) => option.getAttribute('value') === 'fedi')).toBe(false);
     expect(options.some((option) => option.getAttribute('value') === 'bsky')).toBe(false);
     expect(options.some((option) => option.getAttribute('value') === 'paste')).toBe(true);
+  });
+
+  it('Anonymous can post to a linked Bluesky, but not to Fedi or Both', () => {
+    // Bluesky carries its own credential, so it works without a Mastodon
+    // account — the point of the connector for Bluesky-first readers. "Both"
+    // still includes a Fedi post, so it stays out.
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    linkBsky();
+    const f = setUp();
+
+    const values = [...(f.nativeElement as HTMLElement).querySelectorAll('.target-select option')]
+      .map((option) => option.getAttribute('value'))
+      .filter((value): value is string => value !== null);
+    expect(values).toContain('bsky');
+    expect(values).not.toContain('fedi');
+    expect(values).not.toContain('both');
   });
 
   it('target=bsky posts a record to Bluesky only and emits a local status', () => {

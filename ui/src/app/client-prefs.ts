@@ -242,7 +242,17 @@ interface StoredPrefs {
   excludeUnknownLangTrends?: boolean;
   knownLanguages?: string[];
   hideForeignLangPosts?: boolean;
+  feedLanguages?: string[];
 }
+
+/**
+ * How many languages the feed filter can be narrowed to at once.
+ *
+ * Three is a product decision, not a technical limit: bilingual is common,
+ * trilingual is rare, and beyond that the list no longer excludes enough to be
+ * worth maintaining — "All languages" says the same thing in one click.
+ */
+export const MAX_FEED_LANGUAGES = 3;
 
 /** ISO 639-1 codes normalized/deduped; also drives the trending-tag language filter. */
 function normalizeLangs(list: unknown): string[] {
@@ -458,6 +468,21 @@ export class ClientPrefs {
    */
   readonly hideForeignLangPosts = signal<boolean>(false);
 
+  /**
+   * The specific languages the feed is narrowed to, or empty for "every
+   * language I know".
+   *
+   * This sits *inside* {@link hideForeignLangPosts}: the toggle decides whether
+   * to filter at all, and this decides how tightly. Someone who follows several
+   * hundred accounts across languages wants "just Esperanto today" without
+   * unfollowing anyone or editing the languages they know.
+   *
+   * Capped at {@link MAX_FEED_LANGUAGES}. Past three the list stops being a
+   * filter and becomes a worse way of saying "all" — a quadrilingual reader is
+   * better served by turning the filter off.
+   */
+  readonly feedLanguages = signal<string[]>([]);
+
   /** Resolved theme actually in effect ('auto' resolved against the OS preference). */
   readonly resolvedTheme = signal<'light' | 'dark'>('light');
 
@@ -666,6 +691,19 @@ export class ClientPrefs {
     this.hideForeignLangPosts.set(on);
   }
 
+  /**
+   * Narrow the feed to specific languages. An empty list means "all the
+   * languages I know"; anything non-empty also turns the filter on, because
+   * choosing a language and seeing no change would be a broken control.
+   */
+  setFeedLanguages(list: string[]): void {
+    const next = normalizeLangs(list).slice(0, MAX_FEED_LANGUAGES);
+    this.feedLanguages.set(next);
+    if (next.length) {
+      this.hideForeignLangPosts.set(true);
+    }
+  }
+
   /** Add one language to the explicit known-languages list. */
   addKnownLanguage(code: string): void {
     this.knownLanguages.update((list) => normalizeLangs([...list, code]));
@@ -814,6 +852,7 @@ export class ClientPrefs {
     this.loadBool(stored.excludeUnknownLangTrends, this.excludeUnknownLangTrends);
     this.knownLanguages.set(normalizeLangs(stored.knownLanguages));
     this.loadBool(stored.hideForeignLangPosts, this.hideForeignLangPosts);
+    this.feedLanguages.set(normalizeLangs(stored.feedLanguages).slice(0, MAX_FEED_LANGUAGES));
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -862,6 +901,7 @@ export class ClientPrefs {
       excludeUnknownLangTrends: this.excludeUnknownLangTrends(),
       knownLanguages: this.knownLanguages(),
       hideForeignLangPosts: this.hideForeignLangPosts(),
+      feedLanguages: this.feedLanguages(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     // Hidden providers live in their own account-scoped key, not the global blob.

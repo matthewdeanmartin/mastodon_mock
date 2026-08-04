@@ -29,6 +29,14 @@
     <button class="btn" type="button" (click)="reporting.set(true)">Report this</button>
   </div>
 
+  @if (offline()) {
+    <!-- Reframes the page entirely: nothing is wrong with the instance. -->
+    <p class="offline-note">
+      Your browser reports that this device is <strong>offline</strong>. Check your network
+      connection before blaming the server.
+    </p>
+  }
+
   @if (canChangeServer) {
     <!-- Anonymous browsing isn't bound to one instance: if the chosen server is
          what's down, let the user hop to another without leaving the app. -->
@@ -37,6 +45,62 @@
       <app-server-picker (picked)="onServerPicked($event)" />
     </div>
   }
+
+  <!-- Under everything else: what actually failed. No one else is going to read
+       a log for the user, so the evidence lives here where they can act on it. -->
+  <details class="diagnostics" [open]="detailsOpen()" (toggle)="detailsOpen.set($any($event.target).open)">
+    <summary>What went wrong?</summary>
+
+    @if (health.failure(); as failure) {
+      <dl class="detail-grid">
+        <dt>Error</dt>
+        <dd class="detail-message">{{ failure.message }}</dd>
+
+        <dt>Status</dt>
+        <dd>
+          @if (failure.status === 0) {
+            <code>0</code> — no response reached the browser
+          } @else {
+            <code>{{ failure.status }}</code>
+          }
+        </dd>
+
+        <dt>Request</dt>
+        <dd><code>{{ failure.url }}</code></dd>
+
+        <dt>Server</dt>
+        <dd><code>{{ status.currentDomain() || 'unknown' }}</code></dd>
+
+        <dt>Time</dt>
+        <dd>{{ failure.at.toLocaleTimeString() }}</dd>
+
+        <dt>Network</dt>
+        <dd>{{ failure.online ? 'Browser reported online' : 'Browser reported offline' }}</dd>
+
+        @if (build.commit) {
+          <dt>Build</dt>
+          <dd><code>{{ build.commit.slice(0, 8) }}</code></dd>
+        }
+      </dl>
+    } @else {
+      <p class="muted small">
+        No error details were recorded. The server was marked unreachable without a specific failure
+        to report.
+      </p>
+    }
+
+    <p class="muted small">
+      It may not be the server at all — a proxy, DNS, or browser extension can produce exactly this.
+      The connection doctor checks each of those in turn.
+    </p>
+
+    <div class="detail-actions">
+      <a class="btn" routerLink="/settings/connections/doctor">Open connection doctor</a>
+      <button class="btn btn-outline" type="button" (click)="copyDiagnostics()">
+        {{ copied() ? 'Copied' : 'Copy details' }}
+      </button>
+    </div>
+  </details>
 </div>
 @if (reporting()) {
   <app-bug-report-dialog (closed)="reporting.set(false)" />

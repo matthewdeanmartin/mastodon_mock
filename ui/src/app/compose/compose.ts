@@ -20,6 +20,7 @@ import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import { TagHelperDialog } from './tag-helper-dialog/tag-helper-dialog';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
+import { TranslateDialog, TranslateResult } from './translate-dialog/translate-dialog';
 import { CustomEmojis } from '../custom-emojis';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
@@ -254,6 +255,7 @@ function dragHasFiles(event: DragEvent): boolean {
     EmojiPicker,
     ConfirmDialog,
     TagHelperDialog,
+    TranslateDialog,
     ProxyConsentDialog,
   ],
   templateUrl: './compose.html',
@@ -351,6 +353,37 @@ export class Compose implements OnDestroy {
    * worse than no button (decision 9 in sprint/openrouter-0-overview.md).
    */
   protected canUseTagHelper = computed(() => this.ai.enabled() && this.openrouter.connected());
+
+  // --- LLM "translate to" ---
+  protected translateOpen = signal(false);
+
+  /** Same rule as the tag helper: no OpenRouter, no button (not a dead button). */
+  protected canTranslate = this.canUseTagHelper;
+
+  /**
+   * Apply a translation to the box being composed.
+   *
+   * Replacing also sets the post language, because a post rewritten into
+   * Esperanto that still declares `en` is exactly the mislabelling the feed
+   * filter exists to catch. The target is added to the known-languages list
+   * first, since the picker only offers those and would otherwise render a
+   * blank selection for a language the user just deliberately posted in.
+   *
+   * Appending deliberately does not touch the language: a bilingual post has no
+   * single language, and guessing one would be worse than leaving the user's
+   * choice alone.
+   */
+  useTranslation(result: TranslateResult): void {
+    this.translateOpen.set(false);
+    if (result.mode === 'replace') {
+      this.text.set(result.text);
+      this.prefs.addKnownLanguage(result.code);
+      this.onLanguageChange(result.code);
+      return;
+    }
+    const current = this.text().trimEnd();
+    this.text.set(current ? `${current}\n\n${result.text}` : result.text);
+  }
 
   /**
    * Append suggested tags to the post, skipping any already present.
@@ -1310,6 +1343,38 @@ export class Compose implements OnDestroy {
     };
   }
 
+  /**
+   * The target a restored draft may actually use, given what is linked *now*.
+   *
+   * A draft can outlive the connection it was written for — the Bluesky link
+   * gets revoked, the blog connector is flagged off, the session drops to
+   * anonymous. Rather than restoring a target whose option no longer exists in
+   * the picker (which shows a blank select and posts somewhere surprising),
+   * anything unusable falls back to the default for this session.
+   *
+   * The rules mirror the picker exactly: Fedi and "both" need a Mastodon token;
+   * Bluesky and the blog need only their own link, anonymous included.
+   */
+  private restorableTarget(target: PostTarget): PostTarget {
+    const fallback: PostTarget =
+      this.auth.isAnonymous && this.featureFlags.enabled('pastebin') ? 'paste' : 'fedi';
+    switch (target) {
+      case 'bsky':
+        return this.bskySession.linked() ? 'bsky' : fallback;
+      case 'both':
+        // Includes a Fedi post, so it needs the token as well as the link.
+        return !this.auth.isAnonymous && this.bskySession.linked() ? 'both' : fallback;
+      case 'blog':
+        return this.mataroa.connected() && this.featureFlags.enabled('connector-mataroa')
+          ? 'blog'
+          : fallback;
+      case 'paste':
+        return this.featureFlags.enabled('pastebin') ? 'paste' : fallback;
+      case 'fedi':
+        return this.auth.isAnonymous ? fallback : 'fedi';
+    }
+  }
+
   private applySnapshot(d: DraftSnapshot): void {
     this.text.set(d.segments[0] ?? '');
     this.thread.set(d.segments.slice(1));
@@ -1319,19 +1384,7 @@ export class Compose implements OnDestroy {
     if (!this.lockVisibility()) {
       this.visibility.set(d.visibility);
     }
-    const restoredTarget = d.target ?? 'fedi';
-    this.target.set(
-      this.auth.isAnonymous
-        ? this.featureFlags.enabled('pastebin')
-          ? 'paste'
-          : 'fedi'
-        : restoredTarget === 'blog' &&
-            (!this.mataroa.connected() || !this.featureFlags.enabled('connector-mataroa'))
-          ? 'fedi'
-          : (restoredTarget === 'bsky' || restoredTarget === 'both') && !this.bskySession.linked()
-            ? 'fedi'
-            : restoredTarget,
-    );
+    this.target.set(this.restorableTarget(d.target ?? 'fedi'));
     this.onPasteProviderChange(d.pasteProviderId ?? this.pasteProviders.default.id);
     const provider = this.selectedPasteProvider();
     this.pasteLanguage.set(
