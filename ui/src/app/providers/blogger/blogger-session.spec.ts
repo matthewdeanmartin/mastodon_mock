@@ -173,6 +173,65 @@ describe('BloggerSession', () => {
     expect(blogger.includeInProfile()).toBe(false);
   });
 
+  it("uses the user's own client id in preference to the build's", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...location, assign, search: '' });
+    const blogger = session('shipped.apps.googleusercontent.com');
+
+    blogger.setOwnClientId('mine.apps.googleusercontent.com');
+    await blogger.connect();
+
+    const url = new URL(assign.mock.calls[0][0]);
+    expect(url.searchParams.get('client_id')).toBe('mine.apps.googleusercontent.com');
+  });
+
+  it('falls back to the shipped client id when the override is cleared', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...location, assign, search: '' });
+    const blogger = session('shipped.apps.googleusercontent.com');
+    blogger.setOwnClientId('mine.apps.googleusercontent.com');
+
+    blogger.setOwnClientId('   ');
+
+    expect(blogger.ownClientId()).toBe('');
+    await blogger.connect();
+    expect(new URL(assign.mock.calls[0][0]).searchParams.get('client_id')).toBe(
+      'shipped.apps.googleusercontent.com',
+    );
+  });
+
+  it("is configured by the user's client id even when the build ships none", () => {
+    const blogger = session('');
+    expect(blogger.configured).toBe(false);
+    expect(blogger.hasShippedClientId).toBe(false);
+
+    blogger.setOwnClientId('mine.apps.googleusercontent.com');
+    expect(blogger.configured).toBe(true);
+  });
+
+  it('drops a token minted by the previous client when the client id changes', () => {
+    const blogger = session('shipped.apps.googleusercontent.com');
+    blogger.adoptToken('tok', 3600);
+    blogger.chooseBlog('1', 'Mine', 'https://mine.blogspot.com/');
+
+    blogger.setOwnClientId('mine.apps.googleusercontent.com');
+
+    // The old token was issued to a client that is no longer in use.
+    expect(blogger.connected()).toBe(false);
+    // The blog is the same blog either way, so it survives.
+    expect(blogger.blogName()).toBe('Mine');
+  });
+
+  it('does not disturb an existing session when the client id is unchanged', () => {
+    const blogger = session('shipped.apps.googleusercontent.com');
+    blogger.setOwnClientId('mine.apps.googleusercontent.com');
+    blogger.adoptToken('tok', 3600);
+
+    blogger.setOwnClientId('mine.apps.googleusercontent.com');
+
+    expect(blogger.connected()).toBe(true);
+  });
+
   it('explains a redirect_uri_mismatch instead of echoing the raw code', async () => {
     await expect(
       session().finishAuthorization(new URLSearchParams({ error: 'redirect_uri_mismatch' })),

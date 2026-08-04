@@ -10,12 +10,21 @@
 </div>
 
 @if (!session.configured) {
-  <!-- No client id in this build. Say why rather than showing a dead button. -->
+  <!-- No client id anywhere. Say why, and point at the way out. -->
   <p class="muted">
-    Blogger has not been configured for this build. It needs a Google OAuth client id, which the
-    person who built this copy has to supply.
+    Blogger has not been configured for this build. It needs a Google OAuth client id — either from
+    whoever built this copy, or your own, below.
   </p>
 } @else {
+  <!-- Google's own words are alarming and appear mid-flow. Saying so first
+       means the interstitial reads as expected, not as this app misbehaving. -->
+  <p class="muted small">
+    Google may warn that <strong>“Google hasn't verified this app”</strong> before asking for
+    permission. That refers to Google's review of this app, not to anything being wrong with it;
+    continue past it via <em>Advanced</em>. Using your own Google project, below, removes the
+    warning entirely.
+  </p>
+
   <p class="credential-warning small">
     Signing in grants this app permission to read and publish to your Blogger blogs. The permission
     lasts until you close this tab — nothing is stored long-term, so you will sign in again next
@@ -110,6 +119,51 @@
     </div>
   }
 }
+
+<details class="own-project" [open]="showAdvanced()">
+  <summary>Use my own Google project</summary>
+
+  <p class="muted small">
+    Optional. This app ships with a shared Google project, which is enough for most people. Bring
+    your own if you hit its limits — Google caps an unverified app at 100 users, and everyone using
+    the shared project shares its Blogger quota. Your own project also skips the unverified-app
+    warning, since you own it.
+  </p>
+
+  <ol class="setup-steps muted small">
+    <li>
+      In the
+      <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer"
+        >Google Cloud console ↗</a
+      >, create a project and enable the <strong>Blogger API</strong>.
+    </li>
+    <li>Create an OAuth client id of type <strong>Web application</strong>.</li>
+    <li>
+      Add this exact address to its <strong>Authorized redirect URIs</strong>:
+      <code class="callback-url">{{ callbackUrl }}</code>
+    </li>
+    <li>Paste the client id below. The client secret is not needed — leave it in Google.</li>
+  </ol>
+
+  <label class="own-project-field">
+    <span class="muted small">Your OAuth client id</span>
+    <input
+      type="text"
+      spellcheck="false"
+      autocomplete="off"
+      placeholder="000000000000-xxxxxxxx.apps.googleusercontent.com"
+      [value]="clientIdDraft()"
+      (input)="clientIdDraft.set($any($event.target).value)"
+    />
+  </label>
+
+  <div class="connected-row">
+    <button class="btn" type="button" (click)="saveClientId()">Save</button>
+    @if (session.ownClientId()) {
+      <span class="muted small">Using your own Google project.</span>
+    }
+  </div>
+</details>
 
 @if (notice(); as message) {
   <p class="connection-ok" role="status">{{ message }}</p>

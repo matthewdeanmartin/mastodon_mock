@@ -26,6 +26,27 @@ export const BLOGGER_CLIENT_ID = new InjectionToken<string>('BLOGGER_CLIENT_ID',
   factory: () => environment.bloggerClientId,
 });
 
+/**
+ * A user's own Google OAuth client id, overriding the one this build ships.
+ *
+ * Two reasons someone needs this, and neither is exotic:
+ *
+ *  - **The shared client is capped.** Google's `auth/blogger` scope is
+ *    *sensitive*, so until the shipped client passes Google's app verification
+ *    it can only serve 100 hand-added test users. Everyone else is stuck.
+ *  - **Quota is per-project.** All users of the shipped client share its
+ *    Blogger API quota, so one heavy user can rate-limit strangers.
+ *
+ * Bringing your own project fixes both, and removes the "Google hasn't
+ * verified this app" interstitial too — you are the owner of your own project.
+ *
+ * Stored **unscoped**, like the OpenRouter key and for the same reason: a
+ * Google Cloud project belongs to the human, not to whichever Mastodon persona
+ * happens to be signed in. Not a secret — a client id is public by design — but
+ * it lives in localStorage so it survives the tab.
+ */
+const CLIENT_ID_OVERRIDE_KEY = 'mockingbird_blogger_client_id';
+
 const TOKEN_KEY_BASE = 'mockingbird_blogger_token';
 const VERIFIER_KEY = 'mockingbird_blogger_pkce_verifier';
 const STATE_KEY = 'mockingbird_blogger_oauth_state';
@@ -159,9 +180,20 @@ function ensureTrailingSlash(url: string): string {
  */
 @Injectable({ providedIn: 'root' })
 export class BloggerSession {
-  private clientId = inject(BLOGGER_CLIENT_ID);
+  private shippedClientId = inject(BLOGGER_CLIENT_ID);
   private token = signal<StoredBloggerToken | null>(readToken());
   private choice = signal<StoredBlogChoice | null>(readChoice());
+  private overrideClientId = signal<string>(localStorage.getItem(CLIENT_ID_OVERRIDE_KEY) ?? '');
+
+  /** The user's own client id, when they have supplied one. */
+  readonly ownClientId = computed(() => this.overrideClientId());
+  /** True when this build ships a client id, so "use my own" is genuinely optional. */
+  readonly hasShippedClientId = this.shippedClientId.trim().length > 0;
+
+  /** The client id actually used: the user's own if set, else the build's. */
+  private get clientId(): string {
+    return this.overrideClientId().trim() || this.shippedClientId.trim();
+  }
 
   /** Signed in to Google. Says nothing about whether a blog has been chosen. */
   readonly connected = computed(() => this.token() !== null);
@@ -190,9 +222,33 @@ export class BloggerSession {
     return url ? bloggerFeedUrl(url) : null;
   });
 
-  /** False when this build shipped without a client id; the connector hides. */
+  /**
+   * False when there is no client id at all — neither shipped nor supplied.
+   * The connector explains itself rather than offering a button that cannot work.
+   */
   get configured(): boolean {
-    return this.clientId.trim().length > 0;
+    return this.clientId.length > 0;
+  }
+
+  /**
+   * Use a different Google OAuth client from now on.
+   *
+   * Any existing token was minted by the *previous* client, so it is dropped:
+   * keeping it would leave a session that the new client did not authorize and
+   * cannot refresh. The chosen blog survives — it is the same blog either way.
+   */
+  setOwnClientId(clientId: string): void {
+    const next = clientId.trim();
+    if (next === this.overrideClientId()) {
+      return;
+    }
+    if (next) {
+      localStorage.setItem(CLIENT_ID_OVERRIDE_KEY, next);
+    } else {
+      localStorage.removeItem(CLIENT_ID_OVERRIDE_KEY);
+    }
+    this.overrideClientId.set(next);
+    this.disconnect();
   }
 
   async connect(): Promise<void> {

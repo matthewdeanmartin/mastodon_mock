@@ -1,7 +1,11 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BloggerApi, BloggerBlog } from '../../../../providers/blogger/blogger-api';
-import { BloggerSession } from '../../../../providers/blogger/blogger-session';
+import {
+  BLOGGER_CALLBACK_PATH,
+  BloggerSession,
+} from '../../../../providers/blogger/blogger-session';
+import { appCallbackUrl } from '../../../../pkce';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 
 /**
@@ -30,7 +34,19 @@ export class ConnectionBlogger implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;
 
+  /** Draft of the "use my own Google project" field. */
+  protected readonly clientIdDraft = signal('');
+  /** The advanced section stays closed unless it is already in use. */
+  protected readonly showAdvanced = signal(false);
+  /** Where the user must register the callback on their own OAuth client. */
+  protected readonly callbackUrl = appCallbackUrl(BLOGGER_CALLBACK_PATH);
+
   ngOnInit(): void {
+    this.clientIdDraft.set(this.session.ownClientId());
+    // Already using an override, or no shipped id to fall back on — either way
+    // the advanced section is the relevant part of this page, so open it.
+    this.showAdvanced.set(!!this.session.ownClientId() || !this.session.hasShippedClientId);
+
     // The OAuth callback bounces back here with its outcome in the query.
     const params = this.route.snapshot.queryParamMap;
     if (params.get('blogger') === 'error') {
@@ -80,6 +96,18 @@ export class ConnectionBlogger implements OnInit {
 
   toggleIncludeInProfile(include: boolean): void {
     this.session.setIncludeInProfile(include);
+  }
+
+  saveClientId(): void {
+    const next = this.clientIdDraft().trim();
+    this.session.setOwnClientId(next);
+    this.blogs.set([]);
+    this.error.set(null);
+    this.notice.set(
+      next
+        ? 'Saved. Sign in again to use your own Google project.'
+        : "Cleared. Signing in will use this app's own Google project.",
+    );
   }
 
   disconnect(): void {

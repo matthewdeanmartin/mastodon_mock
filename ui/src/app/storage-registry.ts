@@ -646,6 +646,17 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Chosen Blogger blog (id, name, address) and the profile-feed opt-in.',
   },
   {
+    base: 'mockingbird_blogger_client_id',
+    storage: 'local',
+    // Unscoped like the OpenRouter key: a Google Cloud project belongs to the
+    // human, not to whichever Mastodon persona is signed in.
+    suffix: 'none',
+    // A client id is public by design — it is in the bundle of every app that
+    // ships one — so this is configuration, not a credential.
+    sensitivity: 'setting',
+    note: "The user's own Google OAuth client id, overriding the build's.",
+  },
+  {
     base: 'mockingbird_blogger_pkce_verifier',
     storage: 'session',
     suffix: 'none',
