@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../../api';
+import { PageDiagnostics, statusOf } from '../../page-diagnostics';
 import { Account, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
@@ -41,6 +42,7 @@ const SAMPLE_PAGE_SIZE = 40;
 })
 export class ListTimeline implements OnInit {
   private api = inject(Api);
+  private diagnostics = inject(PageDiagnostics);
   private route = inject(ActivatedRoute);
   private converter = inject(ListCollectionConverter);
   protected auth = inject(Auth);
@@ -299,8 +301,20 @@ export class ListTimeline implements OnInit {
       this.members.update((members) => members.filter((member) => member.id !== account.id));
       return;
     }
-    this.api.removeFromList(this.listId(), account.id).subscribe(() => {
-      this.members.update((m) => m.filter((a) => a.id !== account.id));
+    const context = { listId: this.listId(), accountId: account.id };
+    this.diagnostics.info('Lists', 'member-remove:start', context);
+    this.api.removeFromList(this.listId(), account.id).subscribe({
+      next: () => {
+        this.diagnostics.info('Lists', 'member-remove:success', context);
+        this.members.update((m) => m.filter((a) => a.id !== account.id));
+      },
+      // The row stays put, which is honest — they are still on the list — but
+      // silently so, which is how a failed removal reads as a UI bug.
+      error: (error) =>
+        this.diagnostics.error('Lists', 'member-remove:error', error, {
+          ...context,
+          status: statusOf(error),
+        }),
     });
   }
 

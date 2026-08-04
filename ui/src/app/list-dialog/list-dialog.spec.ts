@@ -2,8 +2,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../auth';
+import { PageDiagnostics } from '../page-diagnostics';
 import { Account, Collection, UserList } from '../models';
 import { ListDialog } from './list-dialog';
 import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
@@ -183,6 +184,43 @@ describe('ListDialog', () => {
 
     expect(internals(fixture).rows()[0].member).toBe(true);
     expect(internals(fixture).followGate()).toBeNull();
+  });
+
+  it('logs the add outcome, distinguishing the follow gate from a real failure', () => {
+    const info = vi.spyOn(TestBed.inject(PageDiagnostics), 'info');
+    const error = vi.spyOn(TestBed.inject(PageDiagnostics), 'error');
+    const fixture = setUp({ lists: [{ id: '1', title: 'Friends' }] });
+
+    fixture.componentInstance.toggle(internals(fixture).rows()[0]);
+    httpMock
+      .expectOne('/api/v1/lists/1/accounts')
+      .flush('', { status: 404, statusText: 'Not Found' });
+
+    // The gate is an expected refusal, not a fault — but the status behind it
+    // is logged, so a real 404 misread as "follow first" is still visible.
+    expect(info).toHaveBeenCalledWith(
+      'Lists',
+      'member-add:needs-follow',
+      expect.objectContaining({ listId: '1', accountId: 'T', status: 404 }),
+    );
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('logs a server failure on add with its status', () => {
+    const error = vi.spyOn(TestBed.inject(PageDiagnostics), 'error');
+    const fixture = setUp({ lists: [{ id: '1', title: 'Friends' }] });
+
+    fixture.componentInstance.toggle(internals(fixture).rows()[0]);
+    httpMock
+      .expectOne('/api/v1/lists/1/accounts')
+      .flush('', { status: 503, statusText: 'Service Unavailable' });
+
+    expect(error).toHaveBeenCalledWith(
+      'Lists',
+      'member-add:error',
+      expect.anything(),
+      expect.objectContaining({ listId: '1', accountId: 'T', status: 503 }),
+    );
   });
 
   it('surfaces other list errors instead of failing silently', () => {

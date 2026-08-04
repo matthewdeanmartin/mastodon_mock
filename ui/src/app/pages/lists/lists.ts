@@ -422,9 +422,16 @@ export class Lists implements OnInit {
       this.newTitle.set('');
       return;
     }
-    this.api.createList(title).subscribe((list) => {
-      this.lists.update((l) => [...l, list]);
-      this.newTitle.set('');
+    this.api.createList(title).subscribe({
+      next: (list) => {
+        this.diagnostics.info('Lists', 'create-list:success', { id: list.id });
+        this.lists.update((l) => [...l, list]);
+        this.newTitle.set('');
+      },
+      // Keep the typed title on a failure: clearing the box would destroy the
+      // user's input and leave no list to show for it.
+      error: (error) =>
+        this.diagnostics.error('Lists', 'create-list:error', error, { titleLength: title.length }),
     });
   }
 
@@ -447,8 +454,14 @@ export class Lists implements OnInit {
       this.lists.update((lists) => lists.filter((item) => item.id !== list.id));
       return;
     }
-    this.api.deleteList(list.id).subscribe(() => {
-      this.lists.update((l) => l.filter((x) => x.id !== list.id));
+    this.api.deleteList(list.id).subscribe({
+      next: () => {
+        this.diagnostics.info('Lists', 'delete-list:success', { id: list.id });
+        this.lists.update((l) => l.filter((x) => x.id !== list.id));
+      },
+      // The row stays on screen, which is correct — the list still exists on the
+      // server. Without this the delete looked like it silently did nothing.
+      error: (error) => this.diagnostics.error('Lists', 'delete-list:error', error, { id: list.id }),
     });
   }
 
@@ -458,14 +471,24 @@ export class Lists implements OnInit {
       return;
     }
     this.diagnostics.info('Lists', 'user:create-collection', { nameLength: name.length });
-    this.api.createCollection(name).subscribe((wrapped) => {
-      this.newCollectionName.set('');
-      // The mock's stub returns {collection: null}; only append real payloads.
-      if (wrapped?.collection) {
-        this.collections.update((c) => [...c, wrapped.collection]);
-      } else {
-        this.loadCollections();
-      }
+    this.api.createCollection(name).subscribe({
+      next: (wrapped) => {
+        this.newCollectionName.set('');
+        // The mock's stub returns {collection: null}; only append real payloads.
+        if (wrapped?.collection) {
+          this.diagnostics.info('Lists', 'create-collection:success', {
+            id: wrapped.collection.id,
+          });
+          this.collections.update((c) => [...c, wrapped.collection]);
+        } else {
+          this.diagnostics.info('Lists', 'create-collection:no-payload', {});
+          this.loadCollections();
+        }
+      },
+      error: (error) =>
+        this.diagnostics.error('Lists', 'create-collection:error', error, {
+          nameLength: name.length,
+        }),
     });
   }
 
@@ -479,8 +502,13 @@ export class Lists implements OnInit {
   removeCollection(collection: Collection): void {
     this.diagnostics.info('Lists', 'user:confirm-delete-collection', { id: collection.id });
     this.collectionToDelete.set(null);
-    this.api.deleteCollection(collection.id).subscribe(() => {
-      this.collections.update((c) => c.filter((x) => x.id !== collection.id));
+    this.api.deleteCollection(collection.id).subscribe({
+      next: () => {
+        this.diagnostics.info('Lists', 'delete-collection:success', { id: collection.id });
+        this.collections.update((c) => c.filter((x) => x.id !== collection.id));
+      },
+      error: (error) =>
+        this.diagnostics.error('Lists', 'delete-collection:error', error, { id: collection.id }),
     });
   }
 

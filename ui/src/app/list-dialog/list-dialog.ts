@@ -5,6 +5,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { Api } from '../api';
 import { Auth } from '../auth';
+import { PageDiagnostics, statusOf } from '../page-diagnostics';
 import { Collection, UserList } from '../models';
 import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
@@ -94,6 +95,7 @@ interface CollectionRow {
 })
 export class ListDialog implements OnInit {
   private api = inject(Api);
+  private diagnostics = inject(PageDiagnostics);
   protected auth = inject(Auth);
   private anonymous = inject(AnonymousAccount);
   private anonymousFollows = inject(AnonymousFollows);
@@ -206,9 +208,26 @@ export class ListDialog implements OnInit {
       return;
     }
     if (row.member) {
+      this.diagnostics.info('Lists', 'member-remove:start', {
+        listId: row.list.id,
+        accountId: this.accountId(),
+      });
       this.api.removeFromList(row.list.id, this.accountId()).subscribe({
-        next: () => this.markMember(row.list.id, false),
-        error: (err) => this.reportListError(err),
+        next: () => {
+          this.diagnostics.info('Lists', 'member-remove:success', {
+            listId: row.list.id,
+            accountId: this.accountId(),
+          });
+          this.markMember(row.list.id, false);
+        },
+        error: (err) => {
+          this.diagnostics.error('Lists', 'member-remove:error', err, {
+            listId: row.list.id,
+            accountId: this.accountId(),
+            status: statusOf(err),
+          });
+          this.reportListError(err);
+        },
       });
       return;
     }
@@ -222,15 +241,27 @@ export class ListDialog implements OnInit {
    */
   private addTo(list: UserList, onAdded: () => void): void {
     this.clearErrors();
+    const context = { listId: list.id, accountId: this.accountId() };
+    this.diagnostics.info('Lists', 'member-add:start', context);
     this.api.addToList(list.id, this.accountId()).subscribe({
-      next: onAdded,
+      next: () => {
+        this.diagnostics.info('Lists', 'member-add:success', context);
+        onAdded();
+      },
       error: (err) => {
+        const status = statusOf(err);
         if (isNotFollowingError(err)) {
+          // Not a fault — the expected refusal for an account you don't follow.
+          // Logged at info so the console shows why the gate appeared, and so a
+          // *misclassified* failure (a real 404 read as "follow first") is
+          // visible next to the status that produced it.
+          this.diagnostics.info('Lists', 'member-add:needs-follow', { ...context, status });
           this.followGate.set({
             listTitle: list.title,
             retry: () => this.addTo(list, onAdded),
           });
         } else {
+          this.diagnostics.error('Lists', 'member-add:error', err, { ...context, status });
           this.reportListError(err);
         }
       },
@@ -251,13 +282,19 @@ export class ListDialog implements OnInit {
       return;
     }
     this.following.set(true);
+    this.diagnostics.info('Lists', 'gate-follow:start', { accountId: this.accountId() });
     this.api.follow(this.accountId()).subscribe({
       next: () => {
+        this.diagnostics.info('Lists', 'gate-follow:success', { accountId: this.accountId() });
         this.following.set(false);
         this.followGate.set(null);
         gate.retry();
       },
       error: (err) => {
+        this.diagnostics.error('Lists', 'gate-follow:error', err, {
+          accountId: this.accountId(),
+          status: statusOf(err),
+        });
         this.following.set(false);
         this.followGate.set(null);
         this.reportListError(err);
@@ -296,15 +333,23 @@ export class ListDialog implements OnInit {
       this.rows.update((rows) => [...rows, { list, member: true }]);
       return;
     }
+    this.diagnostics.info('Lists', 'create-and-add:start', { titleLength: title.length });
     this.api.createList(title).subscribe({
       next: (list) => {
+        this.diagnostics.info('Lists', 'create-and-add:list-created', { listId: list.id });
         this.newTitle.set('');
         // The list exists now even if the add is refused, so show it immediately
         // as a non-member row; addTo flips it once membership actually lands.
         this.rows.update((rows) => [...rows, { list, member: false }]);
         this.addTo(list, () => this.markMember(list.id, true));
       },
-      error: (err) => this.reportListError(err),
+      error: (err) => {
+        this.diagnostics.error('Lists', 'create-and-add:error', err, {
+          titleLength: title.length,
+          status: statusOf(err),
+        });
+        this.reportListError(err);
+      },
     });
   }
 
