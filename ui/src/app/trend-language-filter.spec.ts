@@ -506,3 +506,55 @@ describe('ClientPrefs learning languages', () => {
     expect(reloaded.appendTranslation()).toEqual({ is: true });
   });
 });
+
+describe('AutoTranslateEligibility.isAlreadyTargetLanguage', () => {
+  let prefs: ClientPrefs;
+  let eligibility: AutoTranslateEligibility;
+
+  const ENGLISH = 'the quick brown fox is in the house and that is all we have here today';
+  const FRENCH = 'le chat est dans la maison et je ne sais pas pourquoi mais il est là';
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({});
+    prefs = TestBed.inject(ClientPrefs);
+    eligibility = TestBed.inject(AutoTranslateEligibility);
+  });
+
+  it('is on by default — a call that returns the same text is never worth spending', () => {
+    expect(prefs.skipSameLanguageTranslation()).toBe(true);
+  });
+
+  it('refuses when the post declares the target language', () => {
+    expect(eligibility.isAlreadyTargetLanguage(post('anything at all', 'en'), 'en')).toBe(true);
+  });
+
+  it('refuses when undeclared text confidently reads as the target', () => {
+    // The case that prompted this: clicking translate-to-English on obvious English.
+    expect(eligibility.isAlreadyTargetLanguage(post(ENGLISH, null), 'en')).toBe(true);
+  });
+
+  it('allows a genuine translation', () => {
+    expect(eligibility.isAlreadyTargetLanguage(post(FRENCH, 'fr'), 'en')).toBe(false);
+  });
+
+  it('allows when the language cannot be determined', () => {
+    // Uncertainty resolves toward translating: withholding a translation someone needed
+    // is a worse failure than spending one request.
+    expect(eligibility.isAlreadyTargetLanguage(post('hi', null), 'en')).toBe(false);
+  });
+
+  it('matches regioned codes against the bare target', () => {
+    expect(eligibility.isAlreadyTargetLanguage(post('anything', 'en-GB'), 'en')).toBe(true);
+  });
+
+  it('uses the boost target, not the booster', () => {
+    const boost = post('', null, { reblog: post(ENGLISH, 'en') });
+    expect(eligibility.isAlreadyTargetLanguage(boost, 'en')).toBe(true);
+  });
+
+  it('does nothing when switched off', () => {
+    prefs.setSkipSameLanguageTranslation(false);
+    expect(eligibility.isAlreadyTargetLanguage(post(ENGLISH, 'en'), 'en')).toBe(false);
+  });
+});

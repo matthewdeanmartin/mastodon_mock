@@ -297,6 +297,31 @@ export class AutoTranslateEligibility {
   }
 
   /**
+   * True when translating this post into `target` would return the post itself.
+   *
+   * Guards *every* translate path, including the manual 🌐 button — a wasted call is
+   * wasted whoever asked for it, and clicking translate on an obviously-English post is
+   * the case that prompted this. Answers false when the setting is off, and when the
+   * language is anything less than confidently known: refusing a translation someone
+   * needed is a worse failure than spending one request, so uncertainty always resolves
+   * toward translating.
+   */
+  isAlreadyTargetLanguage(status: Status, target: string): boolean {
+    if (!this.prefs.skipSameLanguageTranslation()) {
+      return false;
+    }
+    const wanted = bare(target);
+    if (!wanted) {
+      return false;
+    }
+    // Declared language first, confident detection second, null when neither commits —
+    // the same derivation hiding uses, so the two can never disagree about what
+    // language a post is in.
+    const effective = this.filter.effectiveLanguage(status);
+    return !!effective && bare(effective) === wanted;
+  }
+
+  /**
    * Whether this post's translation appends below the original rather than replacing
    * it. Only learning languages append — a `$$$` translate-all post is one the reader
    * has no interest in learning, so the original is noise to them.

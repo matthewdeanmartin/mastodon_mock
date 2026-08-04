@@ -248,6 +248,7 @@ interface StoredPrefs {
   autoTranslateMode?: AutoTranslateMode;
   translateAllForeign?: boolean;
   autoTranslateUsesAi?: boolean;
+  skipSameLanguageTranslation?: boolean;
 }
 
 /** When automatic translation fires. See {@link ClientPrefs.autoTranslateMode}. */
@@ -573,6 +574,20 @@ export class ClientPrefs {
   readonly autoTranslateUsesAi = signal<boolean>(false);
 
   /**
+   * Refuse a translation when the post already looks like the target language.
+   *
+   * **On by default**, which is unusual for a setting that blocks an action the user
+   * asked for — justified because the blocked call is one that cannot produce anything:
+   * translating English into English spends a request, spends a slot in the daily
+   * budget, and returns the post you were already reading.
+   *
+   * Gated on confident detection only ({@link CONFIDENT_TRANSLATE_SHARE}). Uncertain
+   * text is translated as asked — the failure we refuse to risk is silently withholding
+   * a translation someone needed, which is worse than a wasted call.
+   */
+  readonly skipSameLanguageTranslation = signal<boolean>(true);
+
+  /**
    * The specific languages the feed is narrowed to, or empty for "every
    * language I know".
    *
@@ -878,6 +893,10 @@ export class ClientPrefs {
     this.autoTranslateUsesAi.set(on);
   }
 
+  setSkipSameLanguageTranslation(on: boolean): void {
+    this.skipSameLanguageTranslation.set(on);
+  }
+
   /**
    * Mirror the account's posting default. Called wherever a credential account
    * lands (login, boot, account switch, saving Settings → Posting). An
@@ -1027,6 +1046,7 @@ export class ClientPrefs {
     );
     this.loadBool(stored.translateAllForeign, this.translateAllForeign);
     this.loadBool(stored.autoTranslateUsesAi, this.autoTranslateUsesAi);
+    this.loadBool(stored.skipSameLanguageTranslation, this.skipSameLanguageTranslation);
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -1081,6 +1101,7 @@ export class ClientPrefs {
       autoTranslateMode: this.autoTranslateMode(),
       translateAllForeign: this.translateAllForeign(),
       autoTranslateUsesAi: this.autoTranslateUsesAi(),
+      skipSameLanguageTranslation: this.skipSameLanguageTranslation(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     // Hidden providers live in their own account-scoped key, not the global blob.

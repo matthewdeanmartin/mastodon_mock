@@ -175,9 +175,13 @@ const DIACRITIC_HINTS: { lang: LangCode; re: RegExp; weight: number }[] = [
 /**
  * The highest-frequency function words per language. Seeing many of these is
  * the classic cheap signal ("lots of the/of/and ⇒ English"). Kept compact —
- * ~20–30 words each — because this runs per post. Words that collide across
- * languages ("a", "in", "no") are tolerated: the winner is whoever collects
- * the most hits overall.
+ * ~20–30 words each — because this runs per post.
+ *
+ * **A word that appears in more than one table does not vote.** See
+ * {@link DISCRIMINATING_WORDS}. These tables may therefore contain collisions
+ * freely: "in" can stay under both `en` and `de`, and simply stops counting. That
+ * keeps each table a readable list of a language's common words rather than a
+ * hand-pruned set that must be re-audited whenever a language is added.
  */
 const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
   en: [
@@ -526,17 +530,95 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
   ],
 };
 
-/** Words → the languages that count them, precomputed for one-pass scoring. */
-const WORD_TO_LANGS = (() => {
-  const map = new Map<string, LangCode[]>();
+/**
+ * Words that belong to exactly one language's table, mapped to that language.
+ *
+ * ## Why ambiguous words are dropped rather than shared
+ *
+ * The previous scheme gave a full vote to *every* language containing a word, on the
+ * theory that the right answer would still collect the most hits. It does win — but the
+ * losers keep their votes, and shares are computed from the total, so a correct answer
+ * arrives diluted and surrounded by languages that were never plausible.
+ *
+ * Measured on this app's own tables, that was not a rounding error. Of 269 stop words,
+ * 36 collide, and they are concentrated in the highest-frequency slots: "de" is in five
+ * tables, "in" in four, "la"/"le"/"un"/"que"/"se" across the Romance block. The effect
+ * on real text:
+ *
+ *   "this is a good example of what we can do with it"  →  en:80 **nl:10 pl:10**
+ *   "el gato esta en la casa y no se por que..."        →  es:44 **pt:19 fr:15 it:11**
+ *
+ * A fifth of a plainly-English sentence attributed to Dutch and Polish is not a
+ * cosmetic problem: `FeedLanguageFilter` gates on a 0.6 share, so dilution turns
+ * confident text into "uncertain" and the analytics page reports languages the user has
+ * never written a word of.
+ *
+ * A word in two tables cannot discriminate between them — that is what ambiguity means —
+ * so counting it adds noise to both and information to neither. Dropping it costs only
+ * the words that were never evidence. What remains is each language's *exclusive*
+ * vocabulary, which is what a vote should be counted on.
+ *
+ * The cost is real and accepted: a language whose common words are mostly shared (the
+ * Romance block) has fewer signals left, so short Romance texts more often come back
+ * undetermined. That is the trade the user asked for and the right one for this app —
+ * "we don't know" is a safe answer everywhere it is consumed (undetermined text is never
+ * hidden and never auto-translated), while "this English is Dutch" is not.
+ */
+/**
+ * Words that are common in a language whose table does not happen to list them.
+ *
+ * Comparing tables catches a word claimed by two languages, but not a word claimed by
+ * one and merely *frequent* in another. Those are the more damaging case, because the
+ * table comparison certifies them as exclusive evidence:
+ *
+ *   "do"   is a Polish preposition, and one of the commonest verbs in English
+ *   "an"   is a German article, and the English indefinite article
+ *   "over" is Dutch, and an everyday English word
+ *   "come" is Italian, and an everyday English word
+ *   "man"  is Swedish, and an everyday English word
+ *
+ * Each was voting for a language the text was not in — "do" alone put ~10% Polish on
+ * every English sentence containing it, because English's own table omits it.
+ *
+ * Listing them here rather than adding them to the English table is deliberate: they
+ * should count for *nobody*. Adding "do" to `en` would make it ambiguous and drop it,
+ * which is the same outcome by a longer route — but it would also imply "do" is useful
+ * English evidence, and the next person to prune the English table might re-remove it
+ * and silently restore this bug.
+ *
+ * This list is necessarily incomplete; it holds the cases measured against real text.
+ * The rule for adding one: a word that a language's table claims exclusively, but that
+ * a reader of another language would use without noticing.
+ */
+const HOMOGRAPHS = new Set([
+  // Claimed by another table, common in English.
+  'do',
+  'an',
+  'over',
+  'come',
+  'man',
+  // Polish "ich" (their) is also the German word for "I" — one of the most frequent
+  // words in German, and absent from its table, so it was scoring German text as
+  // partly Polish.
+  'ich',
+]);
+
+const DISCRIMINATING_WORDS = (() => {
+  const owners = new Map<string, Set<LangCode>>();
   for (const [lang, words] of Object.entries(STOP_WORDS) as [LangCode, string[]][]) {
     for (const w of words) {
-      const list = map.get(w);
-      if (list) {
-        list.push(lang);
+      const set = owners.get(w);
+      if (set) {
+        set.add(lang);
       } else {
-        map.set(w, [lang]);
+        owners.set(w, new Set([lang]));
       }
+    }
+  }
+  const map = new Map<string, LangCode>();
+  for (const [word, langs] of owners) {
+    if (langs.size === 1 && !HOMOGRAPHS.has(word)) {
+      map.set(word, [...langs][0]);
     }
   }
   return map;
@@ -745,12 +827,11 @@ export function detectLanguage(text: string, metaHint?: string | null): LangShar
     // missing, which turned "ĝi estas ĝusta" into fragments and handed the vote
     // to whoever else matched ("la", "de", "en" → French).
     const tokens = lower.split(/[^a-zàâäçèéêëîïôöùûüßñãõœąćęłńóśźżğışĉĝĥĵŝŭ]+/i).filter(Boolean);
+    // Only words belonging to exactly one language vote; see DISCRIMINATING_WORDS.
     for (const tok of tokens) {
-      const langs = WORD_TO_LANGS.get(tok);
-      if (langs) {
-        for (const lang of langs) {
-          add(lang, 1);
-        }
+      const lang = DISCRIMINATING_WORDS.get(tok);
+      if (lang) {
+        add(lang, 1);
       }
     }
 

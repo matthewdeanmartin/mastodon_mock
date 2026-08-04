@@ -1,5 +1,5 @@
 {
-  "testCount": 3008,
+  "testCount": 3016,
   "tests": [
     "src/app/account-data.spec.ts :: account-data deletes Anonymous data by both prefix and suffix",
     "src/app/account-data.spec.ts :: account-data deletes only that account’s data, leaving others and globals intact",
@@ -2940,6 +2940,14 @@
     "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility translates a post in a language being learned",
     "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility translates nothing at all while the mode is off",
     "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility uses the boost target language for a reblog",
+    "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility.isAlreadyTargetLanguage allows a genuine translation",
+    "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility.isAlreadyTargetLanguage allows when the language cannot be determined",
+    "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility.isAlreadyTargetLanguage does nothing when switched off",
+    "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility.isAlreadyTargetLanguage is on by default — a call that returns the same text is never worth spending",
+    "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility.isAlreadyTargetLanguage matches regioned codes against the bare target",
+    "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility.isAlreadyTargetLanguage refuses when the post declares the target language",
+    "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility.isAlreadyTargetLanguage refuses when undeclared text confidently reads as the target",
+    "src/app/trend-language-filter.spec.ts :: AutoTranslateEligibility.isAlreadyTargetLanguage uses the boost target, not the booster",
     "src/app/trend-language-filter.spec.ts :: ClientPrefs learning languages defaults automatic translation to off, and keeps a chosen mode",
     "src/app/trend-language-filter.spec.ts :: ClientPrefs learning languages defaults to appending the translation under the original",
     "src/app/trend-language-filter.spec.ts :: ClientPrefs learning languages falls back to off for a mode it does not recognise",

@@ -27,7 +27,7 @@ import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, MediaAttachment, Poll, Status, Translation } from '../models';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
-import { AiTranslate, AiTranslation } from '../ai-translate';
+import { AiTranslate, AiTranslation, languageName } from '../ai-translate';
 import { TranslationPreference } from '../translation-preference';
 import { ENGINE_LABELS, TranslationEngine, TranslationUsage } from '../translation-usage';
 import { AutoTranslateEligibility } from '../trend-language-filter';
@@ -1085,6 +1085,12 @@ export class StatusCard {
       this.translation.set(null);
       return;
     }
+    // Already in your language: the call would hand back the post you are reading, so
+    // it is refused before it costs a request or a slot in the daily budget.
+    if (this.alreadyInTargetLanguage()) {
+      this.translateError.set(this.sameLanguageMessage());
+      return;
+    }
     // Metered against the instance's own budget, which is separate from OpenRouter's
     // (see TranslationUsage). Checked before the call, not after: a limit that only
     // notices once the request is in flight has not limited anything.
@@ -1137,6 +1143,25 @@ export class StatusCard {
    * translations" would be wrong when only half the capability is exhausted, and would
    * hide the fact that there is a second way through.
    */
+  /**
+   * True when this post already appears to be in the language we'd translate into.
+   *
+   * The target is whatever the translator would aim for — the reader's own language —
+   * so this asks `AiTranslate` for it rather than assuming English.
+   */
+  private alreadyInTargetLanguage(): boolean {
+    return this.eligibility.isAlreadyTargetLanguage(this.display, this.aiTranslate.targetLanguage());
+  }
+
+  /** Explains a refusal, and says how to override it — never a dead end. */
+  private sameLanguageMessage(): string {
+    const target = languageName(this.aiTranslate.targetLanguage());
+    return (
+      `This post already looks like ${target}, so translating it would return the same text. ` +
+      `You can turn this check off in Settings → Internationalization.`
+    );
+  }
+
   private limitMessage(engine: TranslationEngine): string {
     return (
       `You've used today's ${ENGINE_LABELS[engine]} translation limit ` +
@@ -1226,6 +1251,10 @@ export class StatusCard {
     }
     if (!this.openrouter.connected()) {
       this.translateChoiceOpen.set(true);
+      return;
+    }
+    if (this.alreadyInTargetLanguage()) {
+      this.translateError.set(this.sameLanguageMessage());
       return;
     }
     // OpenRouter's budget is its own. Spending here must never be blocked by, or
@@ -1339,6 +1368,10 @@ export class StatusCard {
       return;
     }
     if (!this.eligibility.shouldTranslate(this.display)) {
+      return;
+    }
+    // Silent here, unlike the manual path: nobody asked, so there is nothing to explain.
+    if (this.alreadyInTargetLanguage()) {
       return;
     }
     // Claimed up front: two intersection callbacks can arrive before the first request

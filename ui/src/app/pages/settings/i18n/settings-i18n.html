@@ -178,6 +178,26 @@
     </div>
 
     <div class="srow">
+      <span class="slabel">Don't waste calls</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="prefs.skipSameLanguageTranslation()"
+            (ngModelChange)="prefs.setSkipSameLanguageTranslation($event)"
+            name="skipSameLanguageTranslation"
+          />
+          Don't translate a post that's already in my language
+        </label>
+        <span class="hint">
+          Skips the request when a post declares your language, or clearly reads as it —
+          translating it would hand back the same text and still spend a call. Posts whose
+          language can't be determined are always translated when you ask.
+        </span>
+      </div>
+    </div>
+
+    <div class="srow">
       <span class="slabel">Translate automatically</span>
       <div class="scontrol">
         <select

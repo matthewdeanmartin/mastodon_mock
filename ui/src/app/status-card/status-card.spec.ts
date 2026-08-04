@@ -1319,7 +1319,11 @@ describe('StatusCard — AI translation', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: AiTranslate, useValue: { translateHtml } },
+        // `targetLanguage` is part of the real service and is consulted before every
+        // translation (to skip posts already in the reader's language), so the stub has
+        // to answer it. These posts carry no language and are too short to detect, so
+        // the same-language check declines to fire and the translation proceeds.
+        { provide: AiTranslate, useValue: { translateHtml, targetLanguage: () => 'en' } },
         { provide: OpenRouterSession, useValue: { connected: () => connected } },
       ],
     });
