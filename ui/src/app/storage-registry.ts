@@ -451,6 +451,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Which translator the 🌐 button uses: your server, AI via OpenRouter, or ask each time. Absent means the default (your server).',
   },
   {
+    base: 'mockingbird_client_lists',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'setting',
+    note: 'Browser-local lists of accounts, stored as handles. Works signed out, and unlike server lists does not require following anyone. Treated as cache: a version bump discards it.',
+  },
+  {
     base: 'mockingbird_translation_usage',
     storage: 'local',
     suffix: 'none',

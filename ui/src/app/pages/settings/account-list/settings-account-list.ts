@@ -180,9 +180,7 @@ export class SettingsAccountList implements OnInit {
     this.reset();
   }
 
-  protected get title(): string {
-    return 'Muted & Blocked';
-  }
+  protected readonly title = 'Muted & Blocked';
 
   protected get subtitle(): string {
     return this.kind() === 'mutes'

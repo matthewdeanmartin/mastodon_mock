@@ -1,0 +1,72 @@
+@if (!list()) {
+  <p class="muted center small">
+    That list isn't in this browser. <a routerLink="/feeds">Back to feeds</a>
+  </p>
+} @else {
+  <div class="page-head">
+    <h1>{{ list()!.title }}</h1>
+    <p class="muted small">
+      Client list · kept in this browser ·
+      {{ list()!.memberHandles.length }}
+      {{ list()!.memberHandles.length === 1 ? 'member' : 'members' }}
+    </p>
+  </div>
+
+  <div class="tabs">
+    <button type="button" class="tab" [class.active]="tab() === 'posts'" (click)="tab.set('posts')">
+      Posts
+    </button>
+    <button
+      type="button"
+      class="tab"
+      [class.active]="tab() === 'members'"
+      (click)="tab.set('members')"
+    >
+      Members
+    </button>
+  </div>
+
+  @if (capped()) {
+    <p class="muted small center">
+      Showing posts from the first {{ memberCap }} of
+      {{ list()!.memberHandles.length }} members — merging every member's timeline is slow
+      against a real server.
+    </p>
+  }
+
+  @if (unresolved().length) {
+    <p class="muted small center">
+      This server couldn't find {{ unresolved().length }} of these accounts, so they aren't in
+      the feed: {{ unresolved().join(', ') }}
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="muted center small">Loading…</p>
+  } @else if (tab() === 'posts') {
+    @if (!list()!.memberHandles.length) {
+      <p class="muted center small">
+        No members yet — add accounts to this list from their profile.
+      </p>
+    } @else if (!statuses().length) {
+      <p class="muted center small">No posts from these accounts.</p>
+    } @else {
+      @for (s of statuses(); track s.id) {
+        <app-status-card [status]="s" />
+      }
+    }
+  } @else {
+    @if (!members().length) {
+      <p class="muted center small">No members resolved.</p>
+    } @else {
+      @for (m of members(); track m.id) {
+        <a class="list-row" [routerLink]="['/accounts', m.id]">
+          <span>
+            {{ m.display_name || m.username }}
+            <span class="muted small">· &#64;{{ m.acct }}</span>
+          </span>
+        </a>
+      }
+    }
+  }
+}

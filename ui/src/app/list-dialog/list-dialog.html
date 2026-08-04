@@ -70,6 +70,47 @@
         </div>
       </section>
 
+      <!-- Client lists: this browser only, and no follow required — which is exactly
+           what the server's lists above will not do. -->
+      <section class="section">
+        <h4>Client lists <span class="tag">this browser</span></h4>
+        <p class="muted small">No need to follow them, and it works signed out.</p>
+
+        @if (!clientLists.count()) {
+          <p class="muted small">None yet — name one below to start.</p>
+        } @else {
+          @for (l of clientLists.lists(); track l.id) {
+            <div class="row">
+              <label class="checkline">
+                <input
+                  type="checkbox"
+                  [checked]="inClientList(l.id)"
+                  (change)="toggleClientList(l.id, $any($event.target).checked)"
+                />
+                {{ l.title }}
+              </label>
+            </div>
+          }
+        }
+
+        <div class="new-row">
+          <input
+            type="text"
+            [ngModel]="newClientListTitle()"
+            (ngModelChange)="newClientListTitle.set($event)"
+            (keyup.enter)="createClientList()"
+            placeholder="New client list name"
+          />
+          <button
+            class="btn"
+            [disabled]="!newClientListTitle().trim()"
+            (click)="createClientList()"
+          >
+            Create &amp; add
+          </button>
+        </div>
+      </section>
+
       <!-- Collections (public) are a signed-in Mastodon feature. -->
       @if (!auth.isAnonymous) {
         <section class="section">

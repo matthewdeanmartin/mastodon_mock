@@ -69,6 +69,19 @@ export class Api {
     return this.http.get<Account>(`/api/v1/accounts/${id}`);
   }
 
+  /**
+   * Resolve a `username@host` handle to an account.
+   *
+   * Exact match, no webfinger — this server answers for accounts it already knows, and
+   * 404s for anyone it doesn't. That is the right shape for client lists, which store
+   * handles and need to know which of them this instance can actually show.
+   */
+  lookupAccount(acct: string): Observable<Account> {
+    return this.http.get<Account>('/api/v1/accounts/lookup', {
+      params: new HttpParams().set('acct', acct),
+    });
+  }
+
   getAccountStatuses(id: string, opts: AccountStatusesOptions = {}): Observable<Status[]> {
     let params = new HttpParams();
     if (opts.excludeReplies) {

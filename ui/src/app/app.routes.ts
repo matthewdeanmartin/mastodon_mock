@@ -578,6 +578,13 @@ export const routes: Routes = [
           import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),
       },
       {
+        // Client-side lists work signed out as well as signed in, so this route is
+        // deliberately not behind the auth guard.
+        path: 'client-lists/:id',
+        loadComponent: () =>
+          import('./pages/client-list/client-list-page').then((m) => m.ClientListPage),
+      },
+      {
         path: 'feeds/:feed',
         loadComponent: () => import('./pages/server-feed/server-feed').then((m) => m.ServerFeed),
       },

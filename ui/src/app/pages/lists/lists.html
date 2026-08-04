@@ -54,6 +54,44 @@
   }
 }
 
+@if (shows('lists') && showsSection('client-lists')) {
+  <div class="section-head">Client lists</div>
+  <p class="muted small section-note">
+    Kept in this browser, so anyone can go in one — you don't have to follow them, and it works
+    signed out. Server lists (above) only accept accounts you follow.
+  </p>
+
+  <div class="new-list">
+    <input
+      type="text"
+      [ngModel]="newClientListTitle()"
+      (ngModelChange)="newClientListTitle.set($event)"
+      (keyup.enter)="createClientList()"
+      placeholder="New client list name"
+    />
+    <button class="btn" [disabled]="!newClientListTitle().trim()" (click)="createClientList()">
+      Create
+    </button>
+  </div>
+
+  @if (!clientLists.count()) {
+    <p class="muted center small">None yet — create one above.</p>
+  } @else {
+    @for (l of clientLists.lists(); track l.id) {
+      <a class="list-row" [routerLink]="['/client-lists', l.id]">
+        <span>
+          {{ l.title }}
+          <span class="muted small">
+            · {{ l.memberHandles.length }}
+            {{ l.memberHandles.length === 1 ? 'member' : 'members' }}
+          </span>
+        </span>
+        <button class="del" (click)="askDeleteClientList(l, $event)" title="Delete list">✕</button>
+      </a>
+    }
+  }
+}
+
 @if (shows('lists') && showsSection('searches')) {
   <div class="section-head">Saved searches</div>
   @if (!saved.count()) {
@@ -351,6 +389,15 @@
     confirmLabel="Delete list"
     (confirmed)="remove(l)"
     (cancelled)="listToDelete.set(null)"
+  />
+}
+@if (clientListToDelete(); as l) {
+  <app-confirm-dialog
+    title="Delete this client list?"
+    [message]="'“' + l.title + '” will be removed from this browser. This cannot be undone.'"
+    confirmLabel="Delete list"
+    (confirmed)="removeClientList(l)"
+    (cancelled)="clientListToDelete.set(null)"
   />
 }
 @if (rssToRemove(); as f) {

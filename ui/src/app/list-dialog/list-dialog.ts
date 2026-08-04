@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, input, OnInit, output, signal } from '@angular/core';
+import { Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -10,6 +10,8 @@ import { Collection, UserList } from '../models';
 import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
 import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
+import { ClientLists, handleFor } from '../lists/client-lists';
+import { Server } from '../server';
 import { Account } from '../models';
 
 interface ListRow {
@@ -107,6 +109,57 @@ export class ListDialog implements OnInit {
   protected collectionRows = signal<CollectionRow[]>([]);
   protected collectionsSupported = signal(true);
   protected newCollectionName = signal('');
+
+  // --- client-side lists (lists sprint 4) ---
+
+  protected clientLists = inject(ClientLists);
+
+  /**
+   * The handle this account goes into a client list under.
+   *
+   * Client lists key on `username@host`, which survives switching servers in a way an
+   * account id does not — see {@link ClientLists}.
+   */
+  private server = inject(Server);
+
+  protected handle = computed(() => {
+    const account = this.account();
+    // A local account's `acct` has no host, so the current server supplies one.
+    return account ? handleFor(account, this.server.baseUrl() || location.host) : '';
+  });
+
+  protected inClientList(listId: string): boolean {
+    const handle = this.handle();
+    return !!handle && this.clientLists.hasMember(listId, handle);
+  }
+
+  /**
+   * Add or remove this account from a client list.
+   *
+   * No follow gate and no request: this is the whole reason client lists exist. The
+   * server refuses to list anyone you don't follow; this browser has no such opinion.
+   */
+  toggleClientList(listId: string, member: boolean): void {
+    const handle = this.handle();
+    if (handle) {
+      this.clientLists.setMember(listId, handle, member);
+    }
+  }
+
+  protected newClientListTitle = signal('');
+
+  createClientList(): void {
+    const title = this.newClientListTitle().trim();
+    const handle = this.handle();
+    if (!title || !handle) {
+      return;
+    }
+    // Created and populated in one step: someone typing a list name while looking at an
+    // account means "put them in it", not "make me an empty list".
+    const list = this.clientLists.create(title);
+    this.clientLists.setMember(list.id, handle, true);
+    this.newClientListTitle.set('');
+  }
 
   ngOnInit(): void {
     this.load();

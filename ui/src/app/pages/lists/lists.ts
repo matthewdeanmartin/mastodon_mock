@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
 import { AnonymousLists } from '../../providers/anonymous/anonymous-lists';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 import { SavedSearches } from '../search/saved-searches';
+import { ClientList, ClientLists } from '../../lists/client-lists';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 import { RssCache } from '../../providers/rss/rss-cache';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
@@ -38,6 +39,7 @@ type FeedFilter = 'all' | 'lists' | 'tags';
 export type FeedSection =
   | 'all'
   | 'lists'
+  | 'client-lists'
   | 'searches'
   | 'server'
   | 'tags'
@@ -54,6 +56,7 @@ export type FeedSection =
 export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'lists', label: 'Lists' },
+  { id: 'client-lists', label: 'Client lists' },
   { id: 'searches', label: 'Saved searches' },
   { id: 'server', label: 'Server feeds' },
   { id: 'tags', label: 'Followed hashtags' },
@@ -203,6 +206,38 @@ export class Lists implements OnInit {
   protected lists = signal<UserList[]>([]);
   protected loading = signal(true);
   protected newTitle = signal('');
+
+  /**
+   * Browser-local lists, available in every session.
+   *
+   * Read straight off the store's signal rather than copied into local state: creating
+   * or deleting one anywhere in the app updates this section with no reload. Distinct
+   * from {@link lists} above, which mirrors the server's own lists and can only contain
+   * accounts you follow.
+   */
+  protected clientLists = inject(ClientLists);
+  protected newClientListTitle = signal('');
+  protected clientListToDelete = signal<ClientList | null>(null);
+
+  createClientList(): void {
+    const title = this.newClientListTitle().trim();
+    if (!title) {
+      return;
+    }
+    this.clientLists.create(title);
+    this.newClientListTitle.set('');
+  }
+
+  askDeleteClientList(list: ClientList, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.clientListToDelete.set(list);
+  }
+
+  removeClientList(list: ClientList): void {
+    this.clientListToDelete.set(null);
+    this.clientLists.remove(list.id);
+  }
 
   // Collections (Mastodon 4.6+). Older servers 404 → collectionsSupported=false.
   protected collections = signal<Collection[]>([]);
