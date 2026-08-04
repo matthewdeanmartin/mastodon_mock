@@ -161,9 +161,11 @@ describe('Profile block/unblock', () => {
     const cmp = fixture.componentInstance as any;
     cmp.relationship.set({ id: '900', following: true, showing_reblogs: true } as Relationship);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.menu-neutral').textContent).toContain(
-      'Hide boosts',
-    );
+    // Match on the panel's whole text rather than a positional selector: the menu's
+    // ordering is deliberate (keep-actions above the rule) and may grow entries.
+    const panelText = () =>
+      fixture.nativeElement.querySelector('.account-danger-panel').textContent ?? '';
+    expect(panelText()).toContain('Hide boosts');
 
     cmp.toggleAccountBoosts();
     const request = httpMock.expectOne('/api/v1/accounts/900/follow');
@@ -172,9 +174,7 @@ describe('Profile block/unblock', () => {
 
     TestBed.inject(ClientPrefs).setPostNoun('tweet');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.menu-neutral').textContent).toContain(
-      'Show retweets',
-    );
+    expect(panelText()).toContain('Show retweets');
   });
 
   it('follows locally in Anonymous without relationship mutation requests', () => {
@@ -645,7 +645,7 @@ describe('Profile — clone friends list', () => {
   /** The menu is rendered inline, so the label is enough to assert presence. */
   function menuHasClone(fixture: { nativeElement: unknown }): boolean {
     const panel = (fixture.nativeElement as HTMLElement).querySelector('.account-danger-panel');
-    return !!panel?.textContent?.includes('Clone friends list');
+    return !!panel?.textContent?.includes('Copy account');
   }
 
   it('offers the entry to an anonymous viewer', () => {
@@ -672,8 +672,31 @@ describe('Profile — clone friends list', () => {
       (fixture.nativeElement as HTMLElement).querySelector('.account-danger-panel')?.textContent ??
       '';
 
-    expect(text.indexOf('Clone friends list')).toBeLessThan(text.indexOf('Block account'));
-    expect(text.indexOf('Clone friends list')).toBeLessThan(text.indexOf('Mute for'));
+    expect(text.indexOf('Copy account')).toBeLessThan(text.indexOf('Block account'));
+    expect(text.indexOf('Copy account')).toBeLessThan(text.indexOf('Mute for'));
+  });
+
+  /**
+   * The rule is what makes the ordering legible rather than merely correct. The
+   * entry was already first in this menu and still could not be found, because the
+   * panel read as one undifferentiated stack — see
+   * sprint/anon-office-1-copy-and-exit.md.
+   */
+  it('separates keeping from destroying with a real <hr>', () => {
+    const panel = (
+      setUp({ anonymous: true }).nativeElement as HTMLElement
+    ).querySelector('.account-danger-panel');
+    const children = [...(panel?.children ?? [])];
+    const ruleAt = children.findIndex((el) => el.tagName === 'HR');
+    expect(ruleAt).toBeGreaterThan(-1);
+
+    const textUpTo = (end: number) =>
+      children
+        .slice(0, end)
+        .map((el) => el.textContent ?? '')
+        .join(' ');
+    expect(textUpTo(ruleAt)).toContain('Copy account');
+    expect(textUpTo(ruleAt)).not.toContain('Block account');
   });
 });
 

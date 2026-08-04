@@ -174,37 +174,59 @@
   display: none;
 }
 
+/* A menu, not a wall of buttons. The items used to sit flush against each other
+   at one visual weight, which is how "Clone friends list" managed to be the top
+   entry here for a week without being findable. Gaps and grouping are the fix;
+   `gap` is why the items must stay direct children of the panel. */
 .account-danger-panel {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
   z-index: 50;
-  min-width: 170px;
-  padding: 5px;
+  display: grid;
+  gap: 2px;
+  min-width: 200px;
+  padding: 6px 5px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--col-bg);
   box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
 }
 
-.account-danger-panel button {
+.account-danger-panel button,
+.account-danger-panel a {
   display: block;
   width: 100%;
   padding: 8px 10px;
   border: 0;
   border-radius: 6px;
   background: none;
-  color: #e0245e;
+  color: var(--text);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 
-.account-danger-panel button:hover {
+.account-danger-panel button:hover,
+.account-danger-panel a:hover {
   background: var(--border);
 }
 
-.account-danger-panel .menu-neutral {
-  color: var(--text);
+/* Red is opt-in, below the rule only. The default used to be red with
+   `.menu-neutral` opting out, which meant a new menu item added carelessly
+   defaulted to "alarming" — and made a constructive action look like a threat. */
+.account-danger-panel .menu-danger {
+  color: #e0245e;
+}
+
+/* Separates what a reader is keeping (open, copy, tune) from what makes someone
+   disappear (mute, block, report). A real <hr> so it is announced as a
+   separator rather than being a div only sighted users can see. */
+.account-danger-panel .menu-rule {
+  height: 0;
+  margin: 4px 2px;
+  border: 0;
+  border-top: 1px solid var(--border);
 }
 
 .account-danger-panel .menu-note {

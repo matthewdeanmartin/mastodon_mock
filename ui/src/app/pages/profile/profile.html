@@ -85,12 +85,11 @@
               <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
               <div class="account-danger-panel">
                 @if (a.url) {
-                  <a class="menu-neutral" [href]="a.url" target="_blank" rel="noopener noreferrer">
-                    Open on bsky.app
-                  </a>
+                  <a [href]="a.url" target="_blank" rel="noopener noreferrer">Open on bsky.app</a>
+                  <hr class="menu-rule" />
                 }
                 @if (relationship()?.muting || localMuted()) {
-                  <button type="button" (click)="unmute()">Unmute account</button>
+                  <button class="menu-danger" type="button" (click)="unmute()">Unmute account</button>
                 } @else {
                   <div class="menu-note muted small">Mute for…</div>
                   <div class="mute-durations">
@@ -99,7 +98,7 @@
                     }
                   </div>
                 }
-                <button type="button" (click)="requestBlock()">
+                <button class="menu-danger" type="button" (click)="requestBlock()">
                   {{ relationship()?.blocking ? 'Unblock account' : 'Block account' }}
                 </button>
               </div>
@@ -133,40 +132,44 @@
           <details class="account-danger-menu">
             <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
             <div class="account-danger-panel">
-              <!-- Constructive action first. The rest of this menu is
-                   report/mute/block, so the one thing a reader actually wants was
-                   buried under three ways to make someone disappear.
+              <!-- Two groups, split by a rule: things that make something appear in
+                   your app, then things that make someone disappear. The split is
+                   load-bearing rather than decorative — this panel was a flush stack
+                   of same-weight buttons, and "Clone friends list" sat at the top of
+                   it for a week without being findable. See
+                   sprint/anon-office-1-copy-and-exit.md.
 
-                   Anonymous only, and that is a safety property rather than an
-                   unfinished edge: an anonymous follow is a localStorage write, so
-                   cloning twenty sends zero requests to anyone's server. The same
-                   button signed in would be twenty POST /follow calls back to back,
-                   which is indistinguishable from a follow-bot. Do not "finish"
-                   this by adding a delay and enabling it for authenticated users —
-                   see sprint/anonymous-great-2-clone-friends.md. -->
+                   "Hide boosts" counts as a keeping action: it tunes a relationship
+                   you are keeping rather than ending one. -->
               <!-- The way out to the account's own server. Hidden when there is
                    no canonical URL to open (mock and browser-local accounts),
                    because an "open" that goes nowhere is worse than no link. -->
               @if (homeServerLink(); as link) {
-                <a class="menu-neutral" [href]="link.url" target="_blank" rel="noopener noreferrer">
+                <a [href]="link.url" target="_blank" rel="noopener noreferrer">
                   Open on {{ link.host }}
                 </a>
               }
+              <!-- Anonymous only, and that is a safety property rather than an
+                   unfinished edge: an anonymous follow is a localStorage write, so
+                   copying twenty sends zero requests to anyone's server. The same
+                   button signed in would be twenty POST /follow calls back to back,
+                   which is indistinguishable from a follow-bot. Do not "finish"
+                   this by adding a delay and enabling it for authenticated users —
+                   see sprint/anonymous-great-2-clone-friends.md. -->
               @if (canCloneFriends()) {
-                <button class="menu-neutral" type="button" (click)="openCloneFriends()">
-                  Clone friends list
-                </button>
+                <button type="button" (click)="openCloneFriends()">Copy account…</button>
               }
               @if (capabilities.canManageRelationships) {
                 @if (relationship()?.following) {
-                  <button class="menu-neutral" type="button" (click)="toggleAccountBoosts()">
+                  <button type="button" (click)="toggleAccountBoosts()">
                     {{ relationship()?.showing_reblogs === false ? 'Show' : 'Hide' }}
                     {{ words().boosts }}
                   </button>
                 }
               }
+              <hr class="menu-rule" />
               @if (useLocalModeration ? localMuted() : relationship()?.muting) {
-                <button type="button" (click)="unmute()">Unmute account</button>
+                <button class="menu-danger" type="button" (click)="unmute()">Unmute account</button>
               } @else {
                 <div class="menu-note muted small">Mute for…</div>
                 <div class="mute-durations">
@@ -175,7 +178,7 @@
                   }
                 </div>
               }
-              <button type="button" (click)="requestBlock()">
+              <button class="menu-danger" type="button" (click)="requestBlock()">
                 {{
                   (useLocalModeration ? localBlocked() : relationship()?.blocking)
                     ? 'Unblock account'
@@ -187,9 +190,13 @@
                    matter least. -->
               @if (capabilities.canManageRelationships) {
                 @if (relationship()?.followed_by) {
-                  <button type="button" (click)="requestRemoveFollower()">Remove follower</button>
+                  <button class="menu-danger" type="button" (click)="requestRemoveFollower()">
+                    Remove follower
+                  </button>
                 }
-                <button type="button" (click)="showReport.set(true)">Report account</button>
+                <button class="menu-danger" type="button" (click)="showReport.set(true)">
+                  Report account
+                </button>
               }
             </div>
           </details>
