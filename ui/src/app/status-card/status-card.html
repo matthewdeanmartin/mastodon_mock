@@ -12,7 +12,12 @@
   @if (boostedBy) {
     <div class="boost-label muted">🔁 {{ boostedBy }} {{ words().boosted }}</div>
   }
-  <article class="status" tabindex="-1" (keydown)="onCardKeydown($event)">
+  <article
+    class="status"
+    tabindex="-1"
+    (keydown)="onCardKeydown($event)"
+    (mouseenter)="onCardHover()"
+  >
     <span class="hover-anchor avatar-anchor">
       <a class="avatar-link" [routerLink]="accountLink">
         <img
@@ -106,12 +111,28 @@
           </div>
         }
         @if (!cwCollapsed()) {
+          <!-- In append (learner) mode the original stays put and the translation is
+               added below it. Every other case swaps the translation in, which is what
+               renderedContent() already does. -->
           <a class="content-link" [routerLink]="threadLink" (click)="onContentClick($event)">
-            <div class="content" [innerHTML]="renderedContent()"></div>
+            <div
+              class="content"
+              [innerHTML]="appendMode() ? originalContent() : renderedContent()"
+            ></div>
           </a>
+
+          @if (appendMode() && translation(); as t) {
+            <div class="learner-translation">
+              <div class="content" [innerHTML]="md(t.content)"></div>
+            </div>
+          }
+
           @if (translation()) {
             <div class="translation-note muted small">
               Translated via {{ translation()!.provider }}
+              @if (autoTranslated()) {
+                · automatic
+              }
             </div>
           }
 

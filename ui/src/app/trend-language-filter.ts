@@ -174,6 +174,25 @@ export class FeedLanguageFilter {
     const declared = target.language?.toLowerCase().split(/[-_]/)[0] || null;
     const detected = this.confidentTextLanguage(stripHtml(target.content));
 
+    // A language you are *learning* is never hidden, whatever the toggle says.
+    //
+    // This is the one place the learner rule has to live, because hiding happens before
+    // anything else gets a chance to look at the post: filtering away the Icelandic
+    // posts from someone learning Icelandic removes exactly the material they follow
+    // those accounts for. It applies even with no translation feature switched on —
+    // "show me this language" is useful by itself.
+    //
+    // Checked against both the declared and the detected language, and deliberately
+    // *before* the misrepresentation branch: a post mislabelled `en` whose text is
+    // confidently Esperanto is still Esperanto practice, and the mislabelling is the
+    // poster's mistake rather than a reason to withhold it from a learner.
+    if (
+      (declared && this.prefs.isLearning(declared)) ||
+      (detected && this.prefs.isLearning(detected))
+    ) {
+      return null;
+    }
+
     // (b) Misrepresentation: declares one language, text is confidently another.
     if (declared && detected && declared !== detected) {
       return 'misrepresented';
@@ -199,5 +218,91 @@ export class FeedLanguageFilter {
       return statuses;
     }
     return statuses.filter((s) => this.shouldShow(s));
+  }
+
+  /**
+   * The language a post is effectively in, or null when we aren't sure.
+   *
+   * Same derivation {@link hideReason} uses — declared language first, confident
+   * detection second, null when neither commits. Shared so that "which posts get
+   * hidden" and "which posts get translated" can never drift apart in their idea of
+   * what language a post is in.
+   */
+  effectiveLanguage(status: Status): string | null {
+    const target = status.reblog ?? status;
+    const declared = target.language?.toLowerCase().split(/[-_]/)[0] || null;
+    return declared ?? this.confidentTextLanguage(stripHtml(target.content));
+  }
+}
+
+/** Why a post is not eligible for automatic translation, for diagnostics and tests. */
+export type SkipReason =
+  /** Automatic translation is switched off entirely. */
+  | 'mode-off'
+  /** We can't tell what language it's in — so it's probably English. */
+  | 'undetermined'
+  /** The reader already reads this language. */
+  | 'known'
+  /** Not a language being learned, and translate-all is off. */
+  | 'not-learning';
+
+/**
+ * Decides which posts automatic translation should spend a call on.
+ *
+ * Separate from {@link FeedLanguageFilter} because the questions are different — that
+ * one decides what you see, this one decides what gets paid for — but built on its
+ * language derivation so the two always agree about what language a post is in.
+ *
+ * The rules, in the order they are checked:
+ *
+ *   1. **Mode off** ⇒ never. The default, and the only state that costs nothing.
+ *   2. **Undetermined** ⇒ never. `FeedLanguageFilter` already refuses to guess below
+ *      its confidence threshold, and this inherits that refusal. An undetermined post
+ *      is overwhelmingly likely to be English, and translating English into English is
+ *      a call spent to change nothing.
+ *   3. **Known** ⇒ never. You already read it.
+ *   4. **Learning** ⇒ yes. The point of the feature.
+ *   5. Anything else ⇒ only when the `$$$` translate-all switch is on.
+ */
+@Injectable({ providedIn: 'root' })
+export class AutoTranslateEligibility {
+  private prefs = inject(ClientPrefs);
+  private known = inject(KnownLanguages);
+  private filter = inject(FeedLanguageFilter);
+
+  /** Why this post should not be auto-translated, or null when it should be. */
+  skipReason(status: Status): SkipReason | null {
+    if (this.prefs.autoTranslateMode() === 'off') {
+      return 'mode-off';
+    }
+    const language = this.filter.effectiveLanguage(status);
+    if (!language) {
+      return 'undetermined';
+    }
+    // Learning is checked before known so that a language somehow in both lists still
+    // gets translated. `addLearningLanguage` prevents that overlap, but a hand-edited
+    // prefs blob can produce it, and silently translating nothing would be the more
+    // confusing failure.
+    if (this.prefs.isLearning(language)) {
+      return null;
+    }
+    if (this.known.knows(language)) {
+      return 'known';
+    }
+    return this.prefs.translateAllForeign() ? null : 'not-learning';
+  }
+
+  shouldTranslate(status: Status): boolean {
+    return this.skipReason(status) === null;
+  }
+
+  /**
+   * Whether this post's translation appends below the original rather than replacing
+   * it. Only learning languages append — a `$$$` translate-all post is one the reader
+   * has no interest in learning, so the original is noise to them.
+   */
+  appends(status: Status): boolean {
+    const language = this.filter.effectiveLanguage(status);
+    return !!language && this.prefs.isLearning(language) && this.prefs.appendsTranslation(language);
   }
 }

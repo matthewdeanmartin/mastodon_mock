@@ -5,6 +5,12 @@ import { Auth } from '../../../auth';
 import { ClientPrefs } from '../../../client-prefs';
 import { LANG_NAMES, LangCode, POSTING_LANGUAGE_OPTIONS } from '../../../language-detect';
 import { KnownLanguages, UI_LANGUAGE } from '../../../trend-language-filter';
+import {
+  ENGINE_LABELS,
+  TRANSLATION_ENGINES,
+  TranslationEngine,
+  TranslationUsage,
+} from '../../../translation-usage';
 
 /** Languages offered in the "add a language" picker — the ones we can name. */
 const PICKER_ORDER: LangCode[] = [
@@ -32,6 +38,7 @@ const PICKER_ORDER: LangCode[] = [
   'hi',
   'th',
   'eo',
+  'is',
 ];
 
 /**
@@ -80,6 +87,41 @@ export class SettingsI18n implements OnInit {
     return PICKER_ORDER.filter((c) => !have.has(c));
   });
 
+  // --- languages I'm learning (i18n sprint 2) ---
+
+  /** Which language the learning picker currently has selected. */
+  protected readonly toLearn = signal<string>('');
+
+  /**
+   * Learning-picker options.
+   *
+   * Excludes what is already being learned, but deliberately **not** what is already
+   * "known": the inferred known set contains the browser locale chain, and someone
+   * whose browser reports Icelandic may still be learning it. Adding it moves it out
+   * of known (see `ClientPrefs.addLearningLanguage`), which is the honest resolution
+   * of that overlap rather than hiding the option.
+   */
+  protected readonly learnable = computed(() => {
+    const already = new Set(this.prefs.learningLanguages());
+    return PICKER_ORDER.filter((c) => !already.has(c));
+  });
+
+  protected addLearning(): void {
+    const code = this.toLearn();
+    if (code) {
+      this.prefs.addLearningLanguage(code);
+      this.toLearn.set('');
+    }
+  }
+
+  protected removeLearning(code: string): void {
+    this.prefs.removeLearningLanguage(code);
+  }
+
+  protected toggleAppend(code: string, append: boolean): void {
+    this.prefs.setAppendTranslation(code, append);
+  }
+
   ngOnInit(): void {
     // Posting default language is a server-side "you know this" signal. Fetch it
     // (skip for the anonymous browser-local account, which has no credentials)
@@ -96,6 +138,54 @@ export class SettingsI18n implements OnInit {
         error: () => this.postingLang.set(''),
       });
     }
+  }
+
+  // --- translation budgets (i18n sprint 1) ---
+
+  protected readonly usage = inject(TranslationUsage);
+  protected readonly engines = TRANSLATION_ENGINES;
+  protected readonly engineLabels = ENGINE_LABELS;
+
+  /**
+   * Draft limit values, per engine, while someone is typing.
+   *
+   * Bound to the inputs rather than writing straight through to the store, because
+   * `setLimits` clamps a soft limit up to the hard one — applying that on every
+   * keystroke rewrites the number under the cursor as you type "100" through "1".
+   */
+  protected readonly draftLimits = signal<Record<TranslationEngine, { soft: string; hard: string }>>(
+    {
+      mastodon: {
+        soft: `${this.usage.softLimit('mastodon')}`,
+        hard: `${this.usage.hardLimit('mastodon')}`,
+      },
+      openrouter: {
+        soft: `${this.usage.softLimit('openrouter')}`,
+        hard: `${this.usage.hardLimit('openrouter')}`,
+      },
+    },
+  );
+
+  protected setDraft(engine: TranslationEngine, field: 'soft' | 'hard', value: string): void {
+    this.draftLimits.update((all) => ({ ...all, [engine]: { ...all[engine], [field]: value } }));
+  }
+
+  protected saveLimits(engine: TranslationEngine): void {
+    const draft = this.draftLimits()[engine];
+    const soft = Number(draft.soft);
+    const hard = Number(draft.hard);
+    if (!Number.isFinite(soft) || !Number.isFinite(hard)) {
+      return;
+    }
+    this.usage.setLimits(engine, soft, hard);
+    // Reflect whatever the store actually kept, so a clamped value is visible rather
+    // than leaving the box showing a number that was never saved.
+    this.setDraft(engine, 'soft', `${this.usage.softLimit(engine)}`);
+    this.setDraft(engine, 'hard', `${this.usage.hardLimit(engine)}`);
+  }
+
+  protected resetUsage(engine: TranslationEngine): void {
+    this.usage.reset(engine);
   }
 
   name(code: string): string {

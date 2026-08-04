@@ -1,7 +1,9 @@
 import {
   Component,
   computed,
+  DestroyRef,
   effect,
+  ElementRef,
   inject,
   input,
   linkedSignal,
@@ -27,6 +29,8 @@ import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
 import { AiTranslate, AiTranslation } from '../ai-translate';
 import { TranslationPreference } from '../translation-preference';
+import { ENGINE_LABELS, TranslationEngine, TranslationUsage } from '../translation-usage';
+import { AutoTranslateEligibility } from '../trend-language-filter';
 import { MutedPosts } from '../muted-posts';
 import { LocalModeration } from '../local-moderation';
 import { StatusVisibility } from '../status-visibility';
@@ -1081,8 +1085,16 @@ export class StatusCard {
       this.translation.set(null);
       return;
     }
+    // Metered against the instance's own budget, which is separate from OpenRouter's
+    // (see TranslationUsage). Checked before the call, not after: a limit that only
+    // notices once the request is in flight has not limited anything.
+    if (!this.usage.canSpend('mastodon')) {
+      this.translateError.set(this.limitMessage('mastodon'));
+      return;
+    }
     this.translating.set(true);
     this.translateError.set(null);
+    this.usage.record('mastodon');
     this.api.translate(this.display.id).subscribe({
       next: (t) => {
         this.translation.set(t);
@@ -1114,6 +1126,24 @@ export class StatusCard {
   protected translateError = signal<string | null>(null);
   protected translateChoiceOpen = signal(false);
   protected rememberChoice = signal(false);
+
+  /** Per-engine daily budgets. Injected here because this card owns both call sites. */
+  private usage = inject(TranslationUsage);
+
+  /**
+   * What to say when an engine's daily hard limit has been reached.
+   *
+   * Names the engine, because the other one may still have allowance — "you are out of
+   * translations" would be wrong when only half the capability is exhausted, and would
+   * hide the fact that there is a second way through.
+   */
+  private limitMessage(engine: TranslationEngine): string {
+    return (
+      `You've used today's ${ENGINE_LABELS[engine]} translation limit ` +
+      `(${this.usage.hardLimit(engine)}). It resets at midnight, or you can raise it in ` +
+      `Settings → Internationalization.`
+    );
+  }
 
   /**
    * Whether to show the 🤖🌐 button.
@@ -1198,8 +1228,15 @@ export class StatusCard {
       this.translateChoiceOpen.set(true);
       return;
     }
+    // OpenRouter's budget is its own. Spending here must never be blocked by, or
+    // consume, the instance endpoint's allowance — the two engines fail independently.
+    if (!this.usage.canSpend('openrouter')) {
+      this.translateError.set(this.limitMessage('openrouter'));
+      return;
+    }
     this.aiTranslating.set(true);
     this.translateError.set(null);
+    this.usage.record('openrouter');
     try {
       this.aiTranslation.set(await this.aiTranslate.translateHtml(this.display.content));
     } catch (error: unknown) {
@@ -1215,6 +1252,159 @@ export class StatusCard {
     event.stopPropagation();
     void this.runAiTranslate();
   }
+
+  // --- automatic translation (i18n sprint 3) ---
+
+  private eligibility = inject(AutoTranslateEligibility);
+  private host = inject(ElementRef<HTMLElement>);
+
+  /**
+   * True once this card has tried to auto-translate, successfully or not.
+   *
+   * Guards against the trigger firing repeatedly — an `IntersectionObserver` reports
+   * every scroll back into view, and a hover fires on every pass of the mouse. Without
+   * this, reading a post twice would pay for it twice. Set before the request rather
+   * than after, so an in-flight translation cannot be started again by a second event.
+   */
+  private autoTried = false;
+
+  /** Whether the translation on this card came from the automatic path. */
+  protected autoTranslated = signal(false);
+
+  /**
+   * True when this card's translation should render *below* the original rather than
+   * replacing it. Only ever set for a language the reader is learning.
+   */
+  protected appendMode = signal(false);
+
+  /** The observer watching this card, when the trigger mode is `view`. */
+  private observer: IntersectionObserver | null = null;
+
+  constructor() {
+    // The trigger is set up reactively rather than in ngOnInit because the mode can
+    // change while cards are on screen: switching to `hover` mid-scroll must detach the
+    // observers immediately, not at the next navigation.
+    effect(() => {
+      const mode = this.prefs.autoTranslateMode();
+      this.detachObserver();
+      if (mode === 'view' && !this.autoTried) {
+        this.attachObserver();
+      }
+    });
+    inject(DestroyRef).onDestroy(() => this.detachObserver());
+  }
+
+  private attachObserver(): void {
+    // jsdom has no IntersectionObserver, and neither do very old browsers. Absent it,
+    // `view` mode simply never fires — which is the safe direction for a feature that
+    // spends money.
+    if (typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void this.autoTranslate();
+        }
+      },
+      // A little over half the card visible: enough that it is genuinely being read,
+      // rather than clipping the viewport edge during a fast scroll.
+      { threshold: 0.6 },
+    );
+    this.observer.observe(this.host.nativeElement);
+  }
+
+  private detachObserver(): void {
+    this.observer?.disconnect();
+    this.observer = null;
+  }
+
+  /** The hover trigger. Does nothing unless `hover` is the chosen mode. */
+  onCardHover(): void {
+    if (this.prefs.autoTranslateMode() === 'hover') {
+      void this.autoTranslate();
+    }
+  }
+
+  /**
+   * Translate this post automatically, if it is one of the posts that should be.
+   *
+   * Every early return here is a call not spent. The eligibility rules live in
+   * {@link AutoTranslateEligibility}; the budget lives in {@link TranslationUsage}; this
+   * method's only job is to consult both before doing anything, and to stop trying once
+   * it has tried.
+   */
+  private async autoTranslate(): Promise<void> {
+    if (this.autoTried || this.translation() || this.aiTranslation()) {
+      return;
+    }
+    if (!this.eligibility.shouldTranslate(this.display)) {
+      return;
+    }
+    // Claimed up front: two intersection callbacks can arrive before the first request
+    // resolves, and each would otherwise start its own.
+    this.autoTried = true;
+    this.detachObserver();
+    this.appendMode.set(this.eligibility.appends(this.display));
+
+    // Automatic translation uses the instance endpoint unless the reader has explicitly
+    // allowed it to spend OpenRouter credit. A read-only provider's post has no server
+    // translation to ask for, so AI is the only engine that could work — but that is
+    // still not permission to spend, so it is skipped rather than silently upgraded.
+    const useAi = this.prefs.autoTranslateUsesAi() && this.openrouterConnected();
+    if (this.serverCannotTranslate && !useAi) {
+      return;
+    }
+
+    const engine = useAi ? 'openrouter' : 'mastodon';
+    if (!this.usage.canSpend(engine)) {
+      // Silent: an automatic pass hitting its ceiling is the budget working, not an
+      // error the reader needs interrupting for. The count is on the settings screen.
+      return;
+    }
+
+    this.autoTranslated.set(true);
+    if (useAi) {
+      this.usage.record('openrouter');
+      this.aiTranslating.set(true);
+      try {
+        this.aiTranslation.set(await this.aiTranslate.translateHtml(this.display.content));
+      } catch {
+        // A failed automatic translation leaves the original post exactly as it was,
+        // which is a perfectly good outcome. Errors belong to translations the reader
+        // asked for by pressing something.
+        this.autoTranslated.set(false);
+      } finally {
+        this.aiTranslating.set(false);
+      }
+      return;
+    }
+
+    this.usage.record('mastodon');
+    this.translating.set(true);
+    this.api.translate(this.display.id).subscribe({
+      next: (t) => {
+        this.translation.set(t);
+        this.translating.set(false);
+      },
+      error: () => {
+        this.translating.set(false);
+        this.autoTranslated.set(false);
+      },
+    });
+  }
+
+  /**
+   * The original post body, for the append view.
+   *
+   * `renderedContent()` swaps the translation in for the original, which is the right
+   * behaviour for replace mode and exactly wrong for a learner: they need both. This
+   * renders the untranslated body regardless of translation state, so the append block
+   * can show the original above and the translation below.
+   */
+  protected originalContent = computed(() =>
+    compactContentLinks(this.md(this.display.content), this.linkQuoteUrl()),
+  );
 
   // --- polls ---
   protected poll = computed<Poll | null>(() => this.display.poll);

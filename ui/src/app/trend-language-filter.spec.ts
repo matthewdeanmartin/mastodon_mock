@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ClientPrefs } from './client-prefs';
 import { Status, Tag } from './models';
 import {
+  AutoTranslateEligibility,
   FeedLanguageFilter,
   KnownLanguages,
   TrendLanguageFilter,
@@ -286,5 +287,222 @@ describe('FeedLanguageFilter', () => {
     expect(kept).toHaveLength(2); // English kept, French dropped, short kept
     expect(kept[0]).toBe(list[0]);
     expect(kept[1]).toBe(list[2]);
+  });
+
+  describe('languages you are learning are never hidden', () => {
+    // The learner rule: hiding the French posts from someone learning French removes
+    // exactly the material they followed those accounts for.
+
+    beforeEach(() => {
+      prefs.setHideForeignLangPosts(true);
+      prefs.setLearningLanguages(['fr']);
+    });
+
+    it('keeps a declared post in a language being learned', () => {
+      expect(filter.shouldShow(post('court texte', 'fr'))).toBe(true);
+    });
+
+    it('keeps an undeclared post detected as a language being learned', () => {
+      expect(filter.shouldShow(post(FRENCH, null))).toBe(true);
+    });
+
+    it('keeps it even when the feed is narrowed to other languages', () => {
+      // Narrowing is "just Esperanto today"; it must not silently cancel the
+      // learner exemption, or the filter would hide what you are studying.
+      prefs.setKnownLanguages(['en', 'eo']);
+      prefs.setFeedLanguages(['eo']);
+      expect(filter.shouldShow(post(FRENCH, 'fr'))).toBe(true);
+    });
+
+    it('keeps a mislabelled post whose text is confidently the learned language', () => {
+      // Declared `en`, text confidently French: that is still French practice, and
+      // the mislabelling is the poster's mistake, not a reason to withhold it.
+      expect(filter.hideReason(post(FRENCH, 'en'))).toBeNull();
+    });
+
+    it('keeps a boost of a post in a language being learned', () => {
+      const boost = post('', null, { reblog: post(FRENCH, 'fr') });
+      expect(filter.shouldShow(boost)).toBe(true);
+    });
+
+    it('still hides languages that are neither known nor being learned', () => {
+      // The exemption is narrow: it must not become "stop filtering entirely".
+      expect(filter.hideReason(post('東京は今日はとても暑いですね', 'ja'))).toBe('foreign');
+    });
+  });
+});
+
+describe('AutoTranslateEligibility', () => {
+  let prefs: ClientPrefs;
+  let eligibility: AutoTranslateEligibility;
+
+  const FRENCH = 'le chat est dans la maison et je ne sais pas pourquoi mais il est là';
+  const ENGLISH = 'the quick brown fox is in the house and that is all we have here today';
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({});
+    prefs = TestBed.inject(ClientPrefs);
+    eligibility = TestBed.inject(AutoTranslateEligibility);
+    prefs.setKnownLanguages(['en']);
+    prefs.setLearningLanguages(['fr']);
+    prefs.setAutoTranslateMode('view');
+  });
+
+  it('translates nothing at all while the mode is off', () => {
+    // The default, and the only state that costs nothing.
+    prefs.setAutoTranslateMode('off');
+    expect(eligibility.skipReason(post(FRENCH, 'fr'))).toBe('mode-off');
+  });
+
+  it('translates a post in a language being learned', () => {
+    expect(eligibility.shouldTranslate(post(FRENCH, 'fr'))).toBe(true);
+  });
+
+  it('never translates a language the reader already knows', () => {
+    expect(eligibility.skipReason(post(ENGLISH, 'en'))).toBe('known');
+  });
+
+  it('never translates an undetermined post, because it is probably English', () => {
+    // Translating English into English is a call spent to change nothing.
+    expect(eligibility.skipReason(post('hi', null))).toBe('undetermined');
+    expect(eligibility.skipReason(post('12345 !!! ???', null))).toBe('undetermined');
+  });
+
+  it('leaves other foreign languages alone until translate-all is on', () => {
+    const japanese = post('東京は今日はとても暑いですね', 'ja');
+    expect(eligibility.skipReason(japanese)).toBe('not-learning');
+    prefs.setTranslateAllForeign(true);
+    expect(eligibility.shouldTranslate(japanese)).toBe(true);
+  });
+
+  it('still refuses known and undetermined posts under translate-all', () => {
+    // The $$$ switch widens which *foreign* posts qualify. It must not start paying
+    // to translate English into English.
+    prefs.setTranslateAllForeign(true);
+    expect(eligibility.skipReason(post(ENGLISH, 'en'))).toBe('known');
+    expect(eligibility.skipReason(post('hi', null))).toBe('undetermined');
+  });
+
+  it('uses the boost target language for a reblog', () => {
+    const boost = post('', null, { reblog: post(FRENCH, 'fr') });
+    expect(eligibility.shouldTranslate(boost)).toBe(true);
+  });
+
+  it('detects the language when the post declares none', () => {
+    expect(eligibility.shouldTranslate(post(FRENCH, null))).toBe(true);
+  });
+
+  describe('append mode', () => {
+    it('appends for a learning language by default', () => {
+      expect(eligibility.appends(post(FRENCH, 'fr'))).toBe(true);
+    });
+
+    it('replaces when the reader unchecked append for that language', () => {
+      prefs.setAppendTranslation('fr', false);
+      expect(eligibility.appends(post(FRENCH, 'fr'))).toBe(false);
+    });
+
+    it('never appends for a translate-all post', () => {
+      // A post in a language you are not learning has no teaching value, so the
+      // original is just noise beneath the translation.
+      prefs.setTranslateAllForeign(true);
+      expect(eligibility.appends(post('東京は今日はとても暑いですね', 'ja'))).toBe(false);
+    });
+  });
+});
+
+describe('ClientPrefs learning languages', () => {
+  let prefs: ClientPrefs;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({});
+    prefs = TestBed.inject(ClientPrefs);
+  });
+
+  it('moves a language out of known when you start learning it', () => {
+    // Left in both lists it would be simultaneously "never translate" and "always
+    // translate", and known wins — so the learning entry would silently do nothing.
+    prefs.setKnownLanguages(['en', 'is']);
+    prefs.addLearningLanguage('is');
+    expect(prefs.knownLanguages()).not.toContain('is');
+    expect(prefs.learningLanguages()).toContain('is');
+  });
+
+  it('defaults to appending the translation under the original', () => {
+    prefs.addLearningLanguage('eo');
+    expect(prefs.appendsTranslation('eo')).toBe(true);
+  });
+
+  it('remembers append per language, so a triplet is opted into one at a time', () => {
+    prefs.setLearningLanguages(['is', 'eo']);
+    prefs.setAppendTranslation('is', false);
+    expect(prefs.appendsTranslation('is')).toBe(false);
+    expect(prefs.appendsTranslation('eo')).toBe(true);
+  });
+
+  it('forgets the append preference when the language is removed', () => {
+    prefs.addLearningLanguage('eo');
+    prefs.setAppendTranslation('eo', false);
+    prefs.removeLearningLanguage('eo');
+    prefs.addLearningLanguage('eo');
+    // Re-adding starts from the learner default rather than resurrecting a stale
+    // choice the user has no way to see.
+    expect(prefs.appendsTranslation('eo')).toBe(true);
+  });
+
+  it('normalizes regioned codes', () => {
+    prefs.addLearningLanguage('pt-BR');
+    expect(prefs.learningLanguages()).toEqual(['pt']);
+    expect(prefs.isLearning('pt_PT')).toBe(true);
+  });
+
+  it('survives a reload', () => {
+    prefs.setLearningLanguages(['is', 'eo']);
+    prefs.setAppendTranslation('is', false);
+    // Persistence runs in an effect, which a test has to flush explicitly.
+    TestBed.tick();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const reloaded = TestBed.inject(ClientPrefs);
+    expect(reloaded.learningLanguages()).toEqual(['is', 'eo']);
+    expect(reloaded.appendsTranslation('is')).toBe(false);
+  });
+
+  it('defaults automatic translation to off, and keeps a chosen mode', () => {
+    expect(prefs.autoTranslateMode()).toBe('off');
+    expect(prefs.translateAllForeign()).toBe(false);
+    expect(prefs.autoTranslateUsesAi()).toBe(false);
+    prefs.setAutoTranslateMode('hover');
+    TestBed.tick();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(ClientPrefs).autoTranslateMode()).toBe('hover');
+  });
+
+  it('falls back to off for a mode it does not recognise', () => {
+    // This key decides whether the app spends money by itself, so a hand-edited or
+    // future-version value must not be trusted into a spending state.
+    localStorage.setItem(
+      'mockingbird_client_prefs',
+      JSON.stringify({ autoTranslateMode: 'everything-always' }),
+    );
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(ClientPrefs).autoTranslateMode()).toBe('off');
+  });
+
+  it('ignores hand-edited nonsense in the stored append flags', () => {
+    // Written straight to storage: this blob is hand-editable, so the guard has to
+    // hold against values no setter would ever produce.
+    localStorage.setItem(
+      'mockingbird_client_prefs',
+      JSON.stringify({ appendTranslation: { is: true, notalang: true, eo: 'yes' } }),
+    );
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const reloaded = TestBed.inject(ClientPrefs);
+    expect(reloaded.appendTranslation()).toEqual({ is: true });
   });
 });

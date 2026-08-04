@@ -45,6 +45,11 @@ export type LangCode =
   | 'hi'
   | 'th'
   | 'eo'
+  // Nameable and selectable, but with no lexical rules below: the detector has never
+  // claimed to identify it, and adding the name does not change that. An Icelandic post
+  // therefore stays "undetermined" unless it declares `is` — which is the safe way
+  // round, since undetermined is never hidden.
+  | 'is'
   | 'und';
 
 /** One language's share of a text, 0–1. */
@@ -80,6 +85,7 @@ export const LANG_NAMES: Record<LangCode, string> = {
   hi: 'Hindi',
   th: 'Thai',
   eo: 'Esperanto',
+  is: 'Icelandic',
   und: 'Unknown',
 };
 

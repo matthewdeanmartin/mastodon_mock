@@ -376,6 +376,107 @@ a.tab:hover {
   line-height: 1.7;
 }
 
+/* Learner mode: the translation sits under the original, visibly a second thing
+   rather than a continuation of the post. */
+.learner-translation {
+  border-left: 3px solid var(--border);
+  padding-left: 10px;
+  margin: 6px 0 0;
+}
+
+/* Languages being learned: one row each, with its own append checkbox. */
+.learning-list {
+  margin: 10px 0;
+}
+
+.learning-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+}
+
+.learning-row + .learning-row {
+  margin-top: 6px;
+}
+
+.learning-name {
+  font-weight: 600;
+  min-width: 90px;
+}
+
+/* The checkbox takes the free space so the remove button sits at the far edge,
+   away from the control it must not be mistaken for. */
+.learning-row .checkline {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Per-engine translation budgets. One block per engine, stacked. */
+.budget-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 10px 0 0;
+  background: var(--col-bg);
+}
+
+.budget-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.budget-count {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Escalating, but never alarming: passing the soft limit is informational, and
+   only the hard stop is a state the reader has to do something about. */
+.budget-count.over-soft {
+  color: var(--text);
+}
+
+.budget-count.at-hard {
+  color: var(--danger, #d33);
+  font-weight: 600;
+}
+
+.budget-warn {
+  display: block;
+  margin-top: 6px;
+}
+
+.budget-limits {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0 6px;
+}
+
+.budget-limits label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.budget-limits input {
+  width: 72px;
+}
+
 .sactions {
   display: flex;
   align-items: center;

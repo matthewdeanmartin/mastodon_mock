@@ -243,7 +243,17 @@ interface StoredPrefs {
   knownLanguages?: string[];
   hideForeignLangPosts?: boolean;
   feedLanguages?: string[];
+  learningLanguages?: string[];
+  appendTranslation?: Record<string, boolean>;
+  autoTranslateMode?: AutoTranslateMode;
+  translateAllForeign?: boolean;
+  autoTranslateUsesAi?: boolean;
 }
+
+/** When automatic translation fires. See {@link ClientPrefs.autoTranslateMode}. */
+export type AutoTranslateMode = 'off' | 'view' | 'hover';
+
+export const AUTO_TRANSLATE_MODES: readonly AutoTranslateMode[] = ['off', 'view', 'hover'];
 
 /**
  * How many languages the feed filter can be narrowed to at once.
@@ -270,6 +280,26 @@ function normalizeLangs(list: unknown): string[] {
     }
   }
   return [...seen];
+}
+
+/**
+ * Per-language append flags, keyed by normalized code. Anything that isn't a plain
+ * boolean under a plausible language code is dropped rather than trusted — the same
+ * treatment `normalizeLangs` gives its input, for the same reason: this blob is
+ * hand-editable localStorage.
+ */
+function normalizeAppendFlags(value: unknown): Record<string, boolean> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  const out: Record<string, boolean> = {};
+  for (const [raw, flag] of Object.entries(value as Record<string, unknown>)) {
+    const code = raw.toLowerCase().split(/[-_]/)[0];
+    if (typeof flag === 'boolean' && /^[a-z]{2,3}$/.test(code)) {
+      out[code] = flag;
+    }
+  }
+  return out;
 }
 
 /** Feed-size bounds (see feedMin / feedMax). */
@@ -467,6 +497,80 @@ export class ClientPrefs {
    * determined — see the FeedLanguageFilter service.
    */
   readonly hideForeignLangPosts = signal<boolean>(false);
+
+  /**
+   * Languages the user is **learning** (ISO 639-1) — orthogonal to
+   * {@link knownLanguages}, never merged with it.
+   *
+   * The distinction is the whole point of learner mode. A *known* language needs no
+   * translation and is never hidden. A *learning* language is the opposite case on both
+   * counts: it is exactly what the reader wants translated, and exactly what they must
+   * not have filtered away — hiding the Icelandic posts from someone learning Icelandic
+   * defeats the reason they follow those accounts.
+   *
+   * So this list does two jobs, and {@link FeedLanguageFilter} honours the second one
+   * whether or not any translation feature is switched on:
+   *
+   *   1. it marks posts eligible for automatic translation, and
+   *   2. it exempts those posts from `hideForeignLangPosts`, always.
+   *
+   * Uncapped, unlike {@link feedLanguages}: that one is a narrowing filter where a long
+   * list stops meaning anything, whereas this is a statement about the person. Someone
+   * studying four languages is unusual, not incoherent.
+   */
+  readonly learningLanguages = signal<string[]>([]);
+
+  /**
+   * Which learning languages should have their translation **appended** below the
+   * original rather than replacing it, keyed by language code.
+   *
+   * Per-language rather than one global switch because a reader learning two languages
+   * may want them treated differently — and because showing original *plus* translation
+   * for several languages at once is the "Rosetta triplet" case, which costs a
+   * translation per language and should be opted into deliberately, one at a time.
+   *
+   * Absent means append (the learner default): seeing the original beside the
+   * translation is the entire pedagogical value, so the useful behaviour is what you
+   * get by adding a language, and replacing is the deliberate choice.
+   */
+  readonly appendTranslation = signal<Record<string, boolean>>({});
+
+  /**
+   * When automatic translation fires: never, as posts scroll into view, or on hover.
+   *
+   * Off by default, and it must stay that way — this is the setting that turns reading
+   * into spending, and a default that spends on someone's behalf is exactly what
+   * `translation-preference.ts` refuses to do for the manual button.
+   *
+   * The two live modes suit different readers rather than being better and worse.
+   * `view` matches how people actually read and needs no gesture, but a fast scroll
+   * makes translation decisions for posts nobody looked at. `hover` is deliberate and
+   * far cheaper, but it is useless on a touchscreen. Neither is right for everyone, so
+   * the reader picks.
+   */
+  readonly autoTranslateMode = signal<AutoTranslateMode>('off');
+
+  /**
+   * Translate **every** foreign post, not just the ones in a language being learned.
+   *
+   * The `$$$` switch, off by default. Learner mode is bounded by a short list of
+   * languages the reader chose; this is unbounded — every post the filter would call
+   * foreign becomes a translation call. It is genuinely useful for someone reading a
+   * timeline they don't share a language with, and genuinely expensive, so it is a
+   * separate opt-in rather than a wider setting of the same knob.
+   */
+  readonly translateAllForeign = signal<boolean>(false);
+
+  /**
+   * Allow automatic translation to spend OpenRouter credit.
+   *
+   * Off by default, and separate from {@link TranslationPreference} on purpose. That
+   * preference governs one button the reader pressed; this governs a loop that runs
+   * while they scroll. Someone who chose AI for a deliberate click has not thereby
+   * agreed to buy a translation for every post that passes, so automatic translation
+   * uses the instance endpoint unless this is explicitly switched on.
+   */
+  readonly autoTranslateUsesAi = signal<boolean>(false);
 
   /**
    * The specific languages the feed is narrowed to, or empty for "every
@@ -715,6 +819,65 @@ export class ClientPrefs {
     this.knownLanguages.update((list) => list.filter((c) => c !== bare));
   }
 
+  /** Replace the languages-I'm-learning list (deduped, normalized). */
+  setLearningLanguages(list: string[]): void {
+    this.learningLanguages.set(normalizeLangs(list));
+  }
+
+  /**
+   * Add a language to the learning list.
+   *
+   * A language you are learning is by definition one you do not yet know, so adding it
+   * here removes it from the known list. Left in both, it would be simultaneously
+   * "never translate" and "always translate" — and the known list wins that argument in
+   * {@link FeedLanguageFilter}, so the learning entry would silently do nothing.
+   */
+  addLearningLanguage(code: string): void {
+    const bare = code.toLowerCase().split(/[-_]/)[0];
+    this.learningLanguages.update((list) => normalizeLangs([...list, bare]));
+    this.knownLanguages.update((list) => list.filter((c) => c !== bare));
+  }
+
+  /** Remove one language from the learning list, and forget its append preference. */
+  removeLearningLanguage(code: string): void {
+    const bare = code.toLowerCase().split(/[-_]/)[0];
+    this.learningLanguages.update((list) => list.filter((c) => c !== bare));
+    this.appendTranslation.update((all) => {
+      const next = { ...all };
+      delete next[bare];
+      return next;
+    });
+  }
+
+  /** Whether `code`'s translation appends below the original. Defaults to true. */
+  appendsTranslation(code: string): boolean {
+    return this.appendTranslation()[code.toLowerCase().split(/[-_]/)[0]] ?? true;
+  }
+
+  setAppendTranslation(code: string, append: boolean): void {
+    const bare = code.toLowerCase().split(/[-_]/)[0];
+    this.appendTranslation.update((all) => ({ ...all, [bare]: append }));
+  }
+
+  /** True when `code` is a language the user is learning. */
+  isLearning(code: string): boolean {
+    return this.learningLanguages().includes(code.toLowerCase().split(/[-_]/)[0]);
+  }
+
+  setAutoTranslateMode(mode: AutoTranslateMode): void {
+    if (AUTO_TRANSLATE_MODES.includes(mode)) {
+      this.autoTranslateMode.set(mode);
+    }
+  }
+
+  setTranslateAllForeign(on: boolean): void {
+    this.translateAllForeign.set(on);
+  }
+
+  setAutoTranslateUsesAi(on: boolean): void {
+    this.autoTranslateUsesAi.set(on);
+  }
+
   /**
    * Mirror the account's posting default. Called wherever a credential account
    * lands (login, boot, account switch, saving Settings → Posting). An
@@ -853,6 +1016,17 @@ export class ClientPrefs {
     this.knownLanguages.set(normalizeLangs(stored.knownLanguages));
     this.loadBool(stored.hideForeignLangPosts, this.hideForeignLangPosts);
     this.feedLanguages.set(normalizeLangs(stored.feedLanguages).slice(0, MAX_FEED_LANGUAGES));
+    this.learningLanguages.set(normalizeLangs(stored.learningLanguages));
+    this.appendTranslation.set(normalizeAppendFlags(stored.appendTranslation));
+    // An unrecognised mode falls back to 'off' rather than being trusted: this key
+    // decides whether the app spends money by itself.
+    this.autoTranslateMode.set(
+      AUTO_TRANSLATE_MODES.includes(stored.autoTranslateMode as AutoTranslateMode)
+        ? (stored.autoTranslateMode as AutoTranslateMode)
+        : 'off',
+    );
+    this.loadBool(stored.translateAllForeign, this.translateAllForeign);
+    this.loadBool(stored.autoTranslateUsesAi, this.autoTranslateUsesAi);
   }
 
   private loadBool(value: boolean | undefined, target: WritableSignal<boolean>): void {
@@ -902,6 +1076,11 @@ export class ClientPrefs {
       knownLanguages: this.knownLanguages(),
       hideForeignLangPosts: this.hideForeignLangPosts(),
       feedLanguages: this.feedLanguages(),
+      learningLanguages: this.learningLanguages(),
+      appendTranslation: this.appendTranslation(),
+      autoTranslateMode: this.autoTranslateMode(),
+      translateAllForeign: this.translateAllForeign(),
+      autoTranslateUsesAi: this.autoTranslateUsesAi(),
     };
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     // Hidden providers live in their own account-scoped key, not the global blob.

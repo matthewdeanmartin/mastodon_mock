@@ -451,6 +451,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Which translator the 🌐 button uses: your server, AI via OpenRouter, or ask each time. Absent means the default (your server).',
   },
   {
+    base: 'mockingbird_translation_usage',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'setting',
+    note: 'Daily translation counts and limits, held separately for the Mastodon endpoint and OpenRouter. Counts only — never what was translated.',
+  },
+  {
     base: 'mockingbird_search_server_rejects_v1',
     storage: 'local',
     suffix: 'none',
