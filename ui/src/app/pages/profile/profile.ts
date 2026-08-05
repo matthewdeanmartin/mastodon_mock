@@ -47,7 +47,7 @@ import { AiAvailability } from '../../ai-availability';
 import { OpenRouterModelChoice } from '../../providers/openrouter/openrouter-model-choice';
 import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
 import { isOpenRouterId, openRouterAccount } from '../../providers/openrouter/openrouter-identity';
-import { CloneFriendsDialog } from './clone-friends-dialog/clone-friends-dialog';
+import { CopyAccountDialog } from './copy-account-dialog/copy-account-dialog';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { RenderedHtmlLinks } from '../../rendered-html-links';
 import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
@@ -68,7 +68,7 @@ type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analyti
     PeopleBrowser,
     AccountAnalytics,
     NgOptimizedImage,
-    CloneFriendsDialog,
+    CopyAccountDialog,
     RenderedHtmlLinks,
   ],
   templateUrl: './profile.html',
@@ -280,12 +280,12 @@ export class Profile implements OnInit, OnDestroy {
   protected isEliza = computed(() => isElizaId(this.account()?.id));
   protected isOpenRouter = computed(() => isOpenRouterId(this.account()?.id));
 
-  // --- clone friends list (anonymous-great sprint 2) ---
+  // --- copy account: follows + collections (anon-office sprint 1) ---
 
-  protected showCloneFriends = signal(false);
+  protected showCopyAccount = signal(false);
 
   /**
-   * Whether to offer "Clone friends list".
+   * Whether to offer "Copy account".
    *
    * **Anonymous only, and that is the safety property — not an unfinished edge.**
    * An anonymous follow is a row in `localStorage`, so adopting twenty accounts
@@ -295,10 +295,14 @@ export class Profile implements OnInit, OnDestroy {
    * feature is safe *because* it is anonymous-only; do not later add a rate limiter
    * and turn it on for authenticated users.
    *
-   * Also requires the profile to follow somebody (nothing to clone otherwise) and
-   * not to be an RSS pseudo-profile, which has no follow graph at all.
+   * Requires *something* to copy. `following_count` is the only signal available
+   * without spending a request — the profile payload says nothing about
+   * collections — so an account with collections but no follows is not offered the
+   * entry. That is the conservative direction: the alternative is a menu item that
+   * opens a dialog with nothing in it. Not an RSS pseudo-profile either, which has
+   * no follow graph at all.
    */
-  protected canCloneFriends = computed(
+  protected canCopyAccount = computed(
     () =>
       this.capabilities.active &&
       !this.isRss() &&
@@ -306,8 +310,8 @@ export class Profile implements OnInit, OnDestroy {
       (this.account()?.following_count ?? 0) > 0,
   );
 
-  protected openCloneFriends(): void {
-    this.showCloneFriends.set(true);
+  protected openCopyAccount(): void {
+    this.showCopyAccount.set(true);
   }
 
   /**
@@ -328,7 +332,7 @@ export class Profile implements OnInit, OnDestroy {
    * invalidated the home-feed cache, which is the state that actually moved.
    */
   protected onCloned(): void {
-    this.showCloneFriends.set(false);
+    this.showCopyAccount.set(false);
   }
 
   /** Discoverable Mastodon 4.6 Collections curated by this profile. */
@@ -377,7 +381,7 @@ export class Profile implements OnInit, OnDestroy {
     this.isRss.set(false);
     this.publicProfileRef = null;
     this.cloneRef.set(null);
-    this.showCloneFriends.set(false);
+    this.showCopyAccount.set(false);
     this.collections.set([]);
     this.rssFeedUrl.set(null);
     this.isTwitter.set(false);

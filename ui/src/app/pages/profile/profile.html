@@ -89,7 +89,9 @@
                   <hr class="menu-rule" />
                 }
                 @if (relationship()?.muting || localMuted()) {
-                  <button class="menu-danger" type="button" (click)="unmute()">Unmute account</button>
+                  <button class="menu-danger" type="button" (click)="unmute()">
+                    Unmute account
+                  </button>
                 } @else {
                   <div class="menu-note muted small">Mute for…</div>
                   <div class="mute-durations">
@@ -156,8 +158,8 @@
                    which is indistinguishable from a follow-bot. Do not "finish"
                    this by adding a delay and enabling it for authenticated users —
                    see sprint/anonymous-great-2-clone-friends.md. -->
-              @if (canCloneFriends()) {
-                <button type="button" (click)="openCloneFriends()">Copy account…</button>
+              @if (canCopyAccount()) {
+                <button type="button" (click)="openCopyAccount()">Copy account…</button>
               }
               @if (capabilities.canManageRelationships) {
                 @if (relationship()?.following) {
@@ -574,11 +576,11 @@
       (closed)="showLists.set(false)"
     />
   }
-  @if (showCloneFriends()) {
-    <app-clone-friends-dialog
+  @if (showCopyAccount()) {
+    <app-copy-account-dialog
       [account]="a"
       [publicRef]="cloneRef()"
-      (closed)="showCloneFriends.set(false)"
+      (closed)="showCopyAccount.set(false)"
       (cloned)="onCloned()"
     />
   }

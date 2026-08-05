@@ -3,14 +3,14 @@
 <button class="cf-backdrop" type="button" aria-label="Close" (click)="close()"></button>
 <section class="cf-dialog" role="dialog" aria-modal="true" aria-labelledby="cf-title">
   <div class="cf-head">
-    <h2 id="cf-title">Clone {{ handle() }}'s friends list</h2>
+    <h2 id="cf-title">Copy {{ handle() }}</h2>
     <button class="icon-close" type="button" aria-label="Close" (click)="close()">×</button>
   </div>
 
   @switch (phase()) {
     @case ('loading') {
       <p class="muted" role="status">
-        Reading who {{ handle() }} follows
+        Reading who {{ handle() }} follows, and their collections,
         @if (sourceHost()) {
           from {{ sourceHost() }}
         }
@@ -100,10 +100,51 @@
           </details>
         }
 
+        <!-- The collections half. Absent for most accounts (few publish any, and
+             servers below Mastodon 4.6 have no endpoint), which is why it is a
+             section rather than a phase — nothing to copy is not a failure.
+
+             Every list shows its own kept/skipped counts: the quality gate can
+             thin a curated collection, and a list arriving with 2 of 31 members
+             and no explanation reads as a bug. See copy-collections.ts. -->
+        @if (loadingCollections()) {
+          <p class="muted small" role="status">Checking for collections to copy as local lists…</p>
+        }
+        @if (collectionPlans().length) {
+          <div class="cf-collections">
+            <p class="cf-subhead">
+              …and {{ collectionPlans().length }} collection{{
+                collectionPlans().length === 1 ? '' : 's'
+              }}
+              as local lists
+            </p>
+            <ul class="cf-list">
+              @for (plan of collectionPlans(); track plan.collection.id) {
+                <li>
+                  <span class="cf-name">{{ plan.title }}</span>
+                  <span class="muted small">{{ describeCollection(plan) }}</span>
+                </li>
+              }
+            </ul>
+            <p class="muted small">
+              List members are followed too — that is how a local list builds its timeline — so they
+              use the same follow slots.
+            </p>
+          </div>
+        }
+
         <div class="cf-actions">
-          @if (sel.adopt.length) {
-            <button class="btn" type="button" (click)="confirm()">
-              Follow {{ sel.adopt.length }}
+          @if (sel.adopt.length || collectionPlans().length) {
+            <button class="btn" type="button" [disabled]="loadingCollections()" (click)="confirm()">
+              @if (sel.adopt.length && collectionPlans().length) {
+                Copy {{ sel.adopt.length }} follows &amp; {{ collectionPlans().length }} lists
+              } @else if (collectionPlans().length) {
+                Copy {{ collectionPlans().length }} list{{
+                  collectionPlans().length === 1 ? '' : 's'
+                }}
+              } @else {
+                Follow {{ sel.adopt.length }}
+              }
             </button>
           }
           <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
@@ -119,7 +160,11 @@
 
     @case ('done') {
       <p class="cf-summary" role="status">
-        Followed {{ progress() }} account{{ progress() === 1 ? '' : 's' }}.
+        Followed {{ progress() }} account{{ progress() === 1 ? '' : 's' }}
+        @if (listsCreated()) {
+          , and made {{ listsCreated() }} local list{{ listsCreated() === 1 ? '' : 's' }}
+        }
+        .
       </p>
       @if (error(); as msg) {
         <p class="cf-error" role="alert">{{ msg }}</p>

@@ -9,7 +9,8 @@ import {
   ANONYMOUS_FOLLOW_LIMIT,
   AnonymousFollows,
 } from '../../../providers/anonymous/anonymous-follows';
-import { CloneFriendsDialog } from './clone-friends-dialog';
+import { AnonymousLists } from '../../../providers/anonymous/anonymous-lists';
+import { CopyAccountDialog } from './copy-account-dialog';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -40,7 +41,7 @@ function dormant(id: string): Account {
   return account(id, { last_status_at: new Date(Date.now() - 400 * DAY).toISOString() });
 }
 
-describe('CloneFriendsDialog', () => {
+describe('CopyAccountDialog', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -52,8 +53,8 @@ describe('CloneFriendsDialog', () => {
     TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
   });
 
-  function open(target = account('900')): ComponentFixture<CloneFriendsDialog> {
-    const fixture = TestBed.createComponent(CloneFriendsDialog);
+  function open(target = account('900')): ComponentFixture<CopyAccountDialog> {
+    const fixture = TestBed.createComponent(CopyAccountDialog);
     fixture.componentRef.setInput('account', target);
     fixture.detectChanges();
     return fixture;
@@ -87,17 +88,56 @@ describe('CloneFriendsDialog', () => {
     (await nextRequest('/accounts/lookup')).flush({ ...account('900'), id: homeId });
   }
 
-  /** Flush the next `/following` page (after the lookup). */
+  /**
+   * Flush the next `/following` page (after the lookup).
+   *
+   * Also settles the collections read that fires once the follows resolve, so the
+   * tests below — which are about the follows half — do not each have to know that
+   * the collections half exists. Tests that *are* about collections open with
+   * {@link openWithCollections} instead.
+   */
   async function flushPage(page: Account[]): Promise<void> {
     (await nextFollowingRequest()).flush(page);
+    await settleCollections();
   }
 
-  function text(fixture: ComponentFixture<CloneFriendsDialog>): string {
+  /**
+   * Answer the collections read that runs *alongside* the confirm screen.
+   *
+   * Deliberately not awaited by the follows path — collections are the bonus half
+   * and must never hold up the follows the user actually clicked for. The confirm
+   * button is held only for as long as this is in flight, so a test asserting on
+   * that button has to settle it first.
+   */
+  async function flushCollections(collections: unknown[] = []): Promise<void> {
+    (await nextRequest('accounts/home-900/collections')).flush({ collections });
+  }
+
+  /**
+   * Settle the collections read if one is pending, without requiring every existing
+   * follows test to know it exists. Tests that care about collections call
+   * {@link flushCollections} explicitly with a payload.
+   */
+  async function settleCollections(): Promise<void> {
+    // Collections fire once, after the *last* follows page, so a multi-page test
+    // calls this on a page where nothing is pending yet. Absence is fine; the goal
+    // is only that nothing is left in flight by the time an assertion runs.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const pending = httpMock.match((r) => r.url.includes('/collections'));
+      if (pending.length) {
+        pending.forEach((request) => request.flush({ collections: [] }));
+        return;
+      }
+      await Promise.resolve();
+    }
+  }
+
+  function text(fixture: ComponentFixture<CopyAccountDialog>): string {
     fixture.detectChanges();
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  function clickButton(fixture: ComponentFixture<CloneFriendsDialog>, label: string): void {
+  function clickButton(fixture: ComponentFixture<CopyAccountDialog>, label: string): void {
     fixture.detectChanges();
     Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'))
       .find((button) => button.textContent?.includes(label))!
@@ -202,9 +242,104 @@ describe('CloneFriendsDialog', () => {
     expect(closed).toHaveLength(1);
     expect(TestBed.inject(AnonymousFollows).count()).toBe(0);
   });
+
+  /**
+   * The collections half of "Copy account".
+   *
+   * Two properties are load-bearing and easy to regress: collections must never
+   * delay or break the follows the user actually clicked for, and a copied list
+   * must account for every member it dropped.
+   */
+  describe('collections as local lists', () => {
+    function collection(id: string, name: string, itemCount = 3) {
+      return { id, name, item_count: itemCount, account_id: 'home-900' };
+    }
+
+    /** Reach the confirm screen with the follows settled but collections still open. */
+    async function openWithFollows(): Promise<ComponentFixture<CopyAccountDialog>> {
+      const fixture = open();
+      await flushLookup();
+      (await nextFollowingRequest()).flush([account('1')]);
+      return fixture;
+    }
+
+    it('copies a collection into a local list, with its members followed', async () => {
+      const fixture = await openWithFollows();
+      await flushCollections([collection('c1', 'Reading list')]);
+      (await nextRequest('/collections/c1')).flush({
+        collection: collection('c1', 'Reading list'),
+        accounts: [account('m1'), account('m2')],
+      });
+
+      await vi.waitFor(() => expect(text(fixture)).toContain('Reading list'));
+      clickButton(fixture, 'Copy');
+      await vi.waitFor(() => expect(text(fixture)).toContain('local list'));
+
+      const lists = TestBed.inject(AnonymousLists).lists();
+      expect(lists).toHaveLength(1);
+      expect(lists[0].title).toBe('Reading list');
+      expect(lists[0].memberKeys).toHaveLength(2);
+      // A list member is a follow — that is how its timeline gets built.
+      expect(TestBed.inject(AnonymousFollows).count()).toBe(3);
+      httpMock.expectNone((r) => r.method === 'POST');
+    });
+
+    it('accounts for filtered members so a thin list is never unexplained', async () => {
+      const fixture = await openWithFollows();
+      await flushCollections([collection('c1', 'Quiet folks')]);
+      (await nextRequest('/collections/c1')).flush({
+        collection: collection('c1', 'Quiet folks'),
+        accounts: [account('m1'), dormant('m2'), dormant('m3')],
+      });
+
+      await vi.waitFor(() => expect(text(fixture)).toContain('Quiet folks'));
+      expect(text(fixture)).toContain('1 of 3');
+      expect(text(fixture)).toContain('2 too quiet');
+    });
+
+    it('still offers the follows when the server has no collections endpoint', async () => {
+      const fixture = await openWithFollows();
+      (await nextRequest('accounts/home-900/collections')).flush('', {
+        status: 404,
+        statusText: 'Not Found',
+      });
+
+      // A pre-4.6 server is not a failure — the follows are the feature.
+      await vi.waitFor(() => expect(text(fixture)).not.toContain('Checking for collections'));
+      expect(text(fixture)).toContain('Follow 1');
+      // No collections section at all, rather than an empty one.
+      expect((fixture.nativeElement as HTMLElement).querySelector('.cf-collections')).toBeNull();
+    });
+
+    it('does not create an empty list when every member was filtered out', async () => {
+      const fixture = await openWithFollows();
+      await flushCollections([collection('c1', 'All dormant')]);
+      (await nextRequest('/collections/c1')).flush({
+        collection: collection('c1', 'All dormant'),
+        accounts: [dormant('m1'), dormant('m2')],
+      });
+
+      // Wait for the read to finish, or the confirm button is still held.
+      await vi.waitFor(() => expect(text(fixture)).not.toContain('Checking for collections'));
+      clickButton(fixture, 'Follow 1');
+      await vi.waitFor(() => expect(text(fixture)).toContain('Followed'));
+      expect(TestBed.inject(AnonymousLists).lists()).toHaveLength(0);
+    });
+
+    it('holds the confirm button until collections have been read', async () => {
+      const fixture = await openWithFollows();
+      await vi.waitFor(() => expect(text(fixture)).toContain('Checking for collections'));
+
+      const button = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+      ).find((b) => b.textContent?.includes('Follow 1'));
+      // Confirming mid-read would copy the follows and silently drop the lists.
+      expect(button?.disabled).toBe(true);
+    });
+  });
 });
 
-describe('CloneFriendsDialog — where the follow list comes from', () => {
+describe('CopyAccountDialog — where the follow list comes from', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -223,8 +358,8 @@ describe('CloneFriendsDialog — where the follow list comes from', () => {
   function open(
     target: Account,
     publicRef: { server: string; id: string } | null = null,
-  ): ComponentFixture<CloneFriendsDialog> {
-    const fixture = TestBed.createComponent(CloneFriendsDialog);
+  ): ComponentFixture<CopyAccountDialog> {
+    const fixture = TestBed.createComponent(CopyAccountDialog);
     fixture.componentRef.setInput('account', target);
     fixture.componentRef.setInput('publicRef', publicRef);
     fixture.detectChanges();
@@ -241,7 +376,7 @@ describe('CloneFriendsDialog — where the follow list comes from', () => {
     return found;
   }
 
-  function body(fixture: ComponentFixture<CloneFriendsDialog>): string {
+  function body(fixture: ComponentFixture<CopyAccountDialog>): string {
     fixture.detectChanges();
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }

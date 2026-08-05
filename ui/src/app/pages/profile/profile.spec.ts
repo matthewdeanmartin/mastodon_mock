@@ -587,14 +587,14 @@ describe('Profile — Eliza', () => {
 });
 
 /**
- * "Clone friends list" — the menu entry and, above all, the guard on it.
+ * "Copy account" — the menu entry and, above all, the guard on it.
  *
  * The anonymous-only rule is a safety property, not unfinished scope: cloning
  * twenty anonymous follows writes twenty localStorage rows, while the same button
  * signed in would fire twenty POST /follow calls and look exactly like a
  * follow-bot. A refactor that "tidies up" the guard must fail loudly here.
  */
-describe('Profile — clone friends list', () => {
+describe('Profile — copy account', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => localStorage.clear());
@@ -683,9 +683,9 @@ describe('Profile — clone friends list', () => {
    * sprint/anon-office-1-copy-and-exit.md.
    */
   it('separates keeping from destroying with a real <hr>', () => {
-    const panel = (
-      setUp({ anonymous: true }).nativeElement as HTMLElement
-    ).querySelector('.account-danger-panel');
+    const panel = (setUp({ anonymous: true }).nativeElement as HTMLElement).querySelector(
+      '.account-danger-panel',
+    );
     const children = [...(panel?.children ?? [])];
     const ruleAt = children.findIndex((el) => el.tagName === 'HR');
     expect(ruleAt).toBeGreaterThan(-1);

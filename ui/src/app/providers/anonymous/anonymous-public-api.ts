@@ -78,6 +78,29 @@ export class AnonymousPublicApi {
       );
   }
 
+  /**
+   * The accounts inside one collection.
+   *
+   * Readable with no token (verified against mastodon.social, 2026-08-04), and the
+   * `accounts` come back as full entities carrying `statuses_count` and
+   * `last_status_at` — so "Copy account" can quality-gate members without a single
+   * extra request. `ref.id` is the *collection* id here, in `ref.server`'s namespace.
+   */
+  getCollectionAccounts(ref: AnonymousPublicRef): Observable<Account[]> {
+    return this.http
+      .get<{
+        accounts: Account[];
+      }>(`${ref.server}/api/v1/collections/${encodeURIComponent(ref.id)}`, {
+        context: externalFetch(),
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((response) =>
+          (response.accounts ?? []).map((account) => adaptAnonymousAccount(account, ref.server)),
+        ),
+      );
+  }
+
   getAccountStatuses(
     ref: AnonymousPublicRef,
     opts: AccountStatusesOptions = {},

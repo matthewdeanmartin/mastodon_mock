@@ -122,3 +122,16 @@
   gap: 8px;
   margin-top: 14px;
 }
+
+/* The collections half, set apart from the follows list above it so the two
+   halves of "Copy account" read as two things rather than one long list. */
+.cf-collections {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.cf-subhead {
+  margin: 0 0 4px;
+  font-weight: 600;
+}

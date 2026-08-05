@@ -28,37 +28,48 @@ import {
   homeServerFor,
   selectCloneCandidates,
 } from '../clone-friends';
+import {
+  CollectionPlan,
+  describeCollectionPlan,
+  planCollectionCopy,
+  selectCollections,
+} from '../copy-collections';
+import { AnonymousLists } from '../../../providers/anonymous/anonymous-lists';
 
 type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error' | 'hidden';
 
 /**
- * "Clone friends list" — adopt the accounts this profile follows.
+ * "Copy account" — adopt who this profile follows, and their collections.
  *
  * The dialog owns the whole flow (page, filter, confirm, follow, report) so the
  * profile page only has to open it. That is worth the size: the interesting rules
- * live in `clone-friends.ts` and `follow-quality.ts`, both pure and both tested
- * without any of this.
+ * live in `clone-friends.ts`, `copy-collections.ts` and `follow-quality.ts`, all
+ * pure and all tested without any of this.
  *
- * Two things are deliberate and should survive refactoring:
+ * Three things are deliberate and should survive refactoring:
  *
  *  - **Every follow here is a local write.** `AnonymousFollows.follow` puts a row in
  *    localStorage; nothing is sent to anyone's server. That is the only reason
  *    following twenty accounts at once is a safe thing to offer, and it is why the
  *    profile page hides this entry entirely when signed in.
  *  - **The filtering is shown, not hidden.** "Followed 6 of 63" invites "why only
- *    6?", so the answer is on screen before the user commits.
+ *    6?", so the answer is on screen before the user commits — per collection too.
+ *  - **The follows never wait on the collections.** Collections are the bonus half,
+ *    absent for most accounts and unimplemented before Mastodon 4.6, so they load
+ *    after the confirm screen is already up rather than in front of it.
  */
 @Component({
-  selector: 'app-clone-friends-dialog',
+  selector: 'app-copy-account-dialog',
   imports: [RouterLink],
-  templateUrl: './clone-friends-dialog.html',
-  styleUrl: './clone-friends-dialog.css',
+  templateUrl: './copy-account-dialog.html',
+  styleUrl: './copy-account-dialog.css',
 })
-export class CloneFriendsDialog implements OnInit {
+export class CopyAccountDialog implements OnInit {
   private auth = inject(Auth);
   private anonymous = inject(AnonymousAccount);
   private anonymousPublic = inject(AnonymousPublicApi);
   private follows = inject(AnonymousFollows);
+  private lists = inject(AnonymousLists);
 
   /** The profile whose follows are being cloned. */
   readonly account = input.required<Account>();
@@ -83,6 +94,31 @@ export class CloneFriendsDialog implements OnInit {
   /** How many have been followed so far, during the `following` phase. */
   protected progress = signal(0);
   protected showSkipped = signal(false);
+
+  /**
+   * The collections half: what each of their published collections becomes locally.
+   *
+   * Empty is the normal case — most accounts have none, and a server older than
+   * Mastodon 4.6 has no collections endpoint at all. Neither is an error, so a
+   * failure here never fails the dialog; the follows half is the feature.
+   */
+  protected collectionPlans = signal<CollectionPlan[]>([]);
+  /**
+   * Collections are still being read while the follows are already on screen.
+   *
+   * Only used to hold the confirm button for the moment it takes: a user who clicks
+   * "Copy" the instant the dialog paints must not get the follows *without* the
+   * lists, silently, because their timing was good.
+   */
+  protected loadingCollections = signal(false);
+  /** Lists actually created, reported after the copy. */
+  protected listsCreated = signal(0);
+  protected readonly describeCollection = describeCollectionPlan;
+
+  /** Members to be added across every planned list, for the confirm button's count. */
+  protected collectionMemberCount = computed(() =>
+    this.collectionPlans().reduce((total, plan) => total + plan.adopt.length, 0),
+  );
 
   protected readonly maxPages = CLONE_MAX_PAGES;
   protected readonly followLimit = ANONYMOUS_FOLLOW_LIMIT;
@@ -148,11 +184,75 @@ export class CloneFriendsDialog implements OnInit {
         this.phase.set('hidden');
         return;
       }
+
+      // Show the follows as soon as they are ready. Collections are a bonus half
+      // that most accounts do not have, and blocking the thing the user actually
+      // clicked for behind an extra round trip (or a slow one, or a 404 from a
+      // pre-4.6 server) would be paying for the rare case in every case.
       this.phase.set('confirm');
+      void this.loadCollections(source.ref);
     } catch {
       this.error.set(`Couldn't load the accounts ${this.handle()} follows.`);
       this.phase.set('error');
     }
+  }
+
+  /**
+   * Plan the collections half: read their published collections, then the members
+   * of the biggest few.
+   *
+   * **Never fails the dialog.** Most accounts have no collections, and any server
+   * older than Mastodon 4.6 does not implement the endpoint at all — both come back
+   * as errors or empty arrays and both mean "there is nothing to copy here", which
+   * is not a reason to deny the user the follows they came for. One request for the
+   * list, then one per collection under {@link selectCollections}' budget.
+   */
+  private async loadCollections(ref: AnonymousPublicRef): Promise<void> {
+    this.loadingCollections.set(true);
+    try {
+      await this.planCollections(ref);
+    } finally {
+      this.loadingCollections.set(false);
+    }
+  }
+
+  private async planCollections(ref: AnonymousPublicRef): Promise<void> {
+    let collections;
+    try {
+      collections = selectCollections(
+        await firstValueFrom(this.anonymousPublic.getAccountCollections(ref)),
+      );
+    } catch {
+      return;
+    }
+
+    const plans: CollectionPlan[] = [];
+    // Titles accumulate across the run: two collections named the same thing must
+    // still become two distinct lists.
+    const taken = this.lists.lists().map((list) => list.title);
+    for (const collection of collections) {
+      try {
+        const members = await firstValueFrom(
+          this.anonymousPublic.getCollectionAccounts({ server: ref.server, id: collection.id }),
+        );
+        const plan = planCollectionCopy({
+          collection,
+          members,
+          isFollowing: (account) => this.follows.isFollowing(account, ref.server),
+          takenTitles: [...taken, ...plans.map((p) => p.title)],
+          viewerId: this.auth.account()?.id,
+        });
+        // A collection whose members were all filtered out would become an empty
+        // list. Report it in the summary rather than creating one.
+        if (plan.adopt.length) {
+          plans.push(plan);
+        }
+      } catch {
+        // One unreadable collection should not cost the others.
+        continue;
+      }
+    }
+    this.collectionPlans.set(plans);
   }
 
   /**
@@ -207,7 +307,11 @@ export class CloneFriendsDialog implements OnInit {
    */
   async confirm(): Promise<void> {
     const selection = this.selection();
-    if (!selection?.adopt.length || this.phase() === 'following') {
+    const hasWork = !!selection?.adopt.length || !!this.collectionPlans().length;
+    // `loadingCollections` is also enforced here, not just via [disabled]: copying
+    // half the feature because the click landed a moment early is the kind of thing
+    // that looks like data loss to the user.
+    if (!hasWork || this.loadingCollections() || this.phase() === 'following') {
       return;
     }
     this.phase.set('following');
@@ -217,7 +321,7 @@ export class CloneFriendsDialog implements OnInit {
     // from one instance does not resolve on another.
     const server = this.source()?.server ?? this.anonymous.server();
     let followed = 0;
-    for (const account of selection.adopt) {
+    for (const account of selection?.adopt ?? []) {
       const result = this.follows.follow(account, server);
       if (!result.ok) {
         // Hitting the cap mid-batch is not an error worth throwing away the rest
@@ -228,8 +332,51 @@ export class CloneFriendsDialog implements OnInit {
       followed += 1;
       this.progress.set(followed);
     }
+
+    this.copyCollections(server);
     this.phase.set('done');
     this.cloned.emit(followed);
+  }
+
+  /**
+   * Turn the planned collections into browser-local lists.
+   *
+   * **A list member has to be a follow.** `AnonymousLists` stores follow keys, and
+   * the key is minted by `AnonymousFollows.follow` — which is also the thing that
+   * enforces `ANONYMOUS_FOLLOW_LIMIT`. So copying a collection spends follow slots
+   * exactly like copying the friends list does, and a list is not a cheaper way to
+   * keep accounts around. That is the same recurring per-member feed cost the
+   * quality gate exists for; see `copy-collections.ts`.
+   *
+   * Running out of slots mid-copy leaves a shorter list rather than no list. A
+   * partial list is still useful and the counts in the report say what happened.
+   */
+  private copyCollections(server: string): void {
+    let created = 0;
+    for (const plan of this.collectionPlans()) {
+      const members: string[] = [];
+      for (const account of plan.adopt) {
+        const result = this.follows.follow(account, server);
+        if (!result.ok) {
+          this.error.set(result.error);
+          break;
+        }
+        const key = this.follows.find(account, server)?.key;
+        if (key) {
+          members.push(key);
+        }
+      }
+      // Don't leave an empty list behind when the cap bit before the first member.
+      if (!members.length) {
+        continue;
+      }
+      const list = this.lists.create(plan.title);
+      for (const key of members) {
+        this.lists.setMember(list.id, key, true);
+      }
+      created += 1;
+    }
+    this.listsCreated.set(created);
   }
 
   @HostListener('document:keydown.escape')
