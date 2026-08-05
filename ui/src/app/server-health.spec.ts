@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -23,11 +23,47 @@ describe('ServerHealth', () => {
     expect(health.checking()).toBe(false);
   });
 
-  it('markDown/markUp toggle the down signal', () => {
+  it('markDown/markUp toggle the down signal once the threshold is met', () => {
+    health.markDown();
     health.markDown();
     expect(health.down()).toBe(true);
     health.markUp();
     expect(health.down()).toBe(false);
+  });
+
+  /**
+   * Hysteresis. Status 0 is noisy — a wifi handover, a waking laptop, a rate
+   * limiter closing a connection — and a single one is not evidence of an
+   * outage. Whaling on the first was why the whale showed up constantly.
+   */
+  it('does not go down on a single failure', () => {
+    health.markDown();
+    expect(health.down()).toBe(false);
+  });
+
+  it('forgets failures that are too old to corroborate each other', () => {
+    const start = Date.now();
+    health.markDown(undefined, start);
+    // Well past FAILURE_WINDOW_MS: unrelated blips minutes apart are not an outage.
+    health.markDown(undefined, start + 60_000);
+    expect(health.down()).toBe(false);
+  });
+
+  it('lets a success reset the count, so old blips cannot combine with new ones', () => {
+    health.markDown();
+    health.markUp();
+    health.markDown();
+    expect(health.down()).toBe(false);
+  });
+
+  it('still records the failure for the diagnostics box before it goes down', () => {
+    // The evidence is worth keeping even when the whale is being withheld: if the
+    // second failure arrives, the box should describe the *first*.
+    health.markDown(
+      new HttpErrorResponse({ status: 0, url: 'https://mastodon.social/api/v1/timelines/home' }),
+    );
+    expect(health.down()).toBe(false);
+    expect(health.failure()?.url).toContain('/api/v1/timelines/home');
   });
 
   it('recheck() pings /api/v2/instance and clears down on success', () => {

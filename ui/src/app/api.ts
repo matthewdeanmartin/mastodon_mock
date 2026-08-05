@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { SearchServer, searchServerRequest } from './search-server';
+import { SERVER_ROLE, serverRole } from './server-role';
 import {
   Account,
   Announcement,
@@ -217,7 +218,10 @@ export class Api {
     if (limit) {
       params = params.set('limit', String(limit));
     }
-    return this.http.get<Status[]>(`/api/v1/timelines/tag/${encodeURIComponent(tag)}`, { params });
+    return this.http.get<Status[]>(`/api/v1/timelines/tag/${encodeURIComponent(tag)}`, {
+      params,
+      context: serverRole('tag'),
+    });
   }
 
   // --- statuses ---
@@ -431,7 +435,10 @@ export class Api {
     // separately chosen search server (see search-server.ts). No-op when none is set.
     return this.http.get<SearchResults>('/api/v2/search', {
       params,
-      context: searchServerRequest(),
+      // The role rides on the *same* context as the diversion flag: search may
+      // already be talking to a different host, which is exactly why its failures
+      // must not be read as the home server being down.
+      context: searchServerRequest().set(SERVER_ROLE, 'search'),
     });
   }
 
@@ -727,16 +734,20 @@ export class Api {
   }
 
   featuredTags(): Observable<FeaturedTag[]> {
-    return this.http.get<FeaturedTag[]>('/api/v1/featured_tags');
+    return this.http.get<FeaturedTag[]>('/api/v1/featured_tags', {
+      context: serverRole('background'),
+    });
   }
 
   // --- explore / discovery (anonymous-friendly) ---
   instanceInfo(): Observable<InstanceInfo> {
-    return this.http.get<InstanceInfo>('/api/v2/instance');
+    return this.http.get<InstanceInfo>('/api/v2/instance', { context: serverRole('background') });
   }
 
   trendingStatuses(): Observable<Status[]> {
-    return this.http.get<Status[]>('/api/v1/trends/statuses');
+    return this.http.get<Status[]>('/api/v1/trends/statuses', {
+      context: serverRole('background'),
+    });
   }
 
   /**
@@ -746,26 +757,34 @@ export class Api {
    */
   trendingTags(): Observable<Tag[]> {
     return this.http
-      .get<Tag[]>('/api/v1/trends/tags')
+      .get<Tag[]>('/api/v1/trends/tags', { context: serverRole('background') })
       .pipe(map((tags) => this.trendLangFilter.apply(tags)));
   }
 
   trendingLinks(): Observable<TrendLink[]> {
-    return this.http.get<TrendLink[]>('/api/v1/trends/links');
+    return this.http.get<TrendLink[]>('/api/v1/trends/links', {
+      context: serverRole('background'),
+    });
   }
 
   // --- instance "about" info ---
   instanceRules(): Observable<InstanceRule[]> {
-    return this.http.get<InstanceRule[]>('/api/v1/instance/rules');
+    return this.http.get<InstanceRule[]>('/api/v1/instance/rules', {
+      context: serverRole('background'),
+    });
   }
 
   // The endpoint 404s when no ToS is configured; callers treat that as "none".
   termsOfService(): Observable<TermsOfService> {
-    return this.http.get<TermsOfService>('/api/v1/instance/terms_of_service');
+    return this.http.get<TermsOfService>('/api/v1/instance/terms_of_service', {
+      context: serverRole('background'),
+    });
   }
 
   customEmojis(): Observable<CustomEmoji[]> {
-    return this.http.get<CustomEmoji[]>('/api/v1/custom_emojis');
+    return this.http.get<CustomEmoji[]>('/api/v1/custom_emojis', {
+      context: serverRole('background'),
+    });
   }
 
   /**

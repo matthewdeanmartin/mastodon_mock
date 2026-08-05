@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, firstValueFrom } from 'rxjs';
 import { Auth } from './auth';
 import { Server } from './server';
+import { serverRole } from './server-role';
 
 /** A parsed event from a Mastodon streaming WebSocket. */
 export interface StreamEvent {
@@ -124,9 +125,12 @@ export class Streaming {
       // advertises the *configured* domain, which the browser may not reach.
       return toWs(location.origin);
     }
+    // Background: discovering the streaming URL is an optimisation. Failing it
+    // costs live updates, not the app, so it must never raise the fail whale.
     const info = await firstValueFrom(
       this.http.get<{ configuration?: { urls?: { streaming?: string | null } } }>(
         '/api/v2/instance',
+        { context: serverRole('background') },
       ),
     );
     const advertised = info.configuration?.urls?.streaming;

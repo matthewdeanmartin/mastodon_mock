@@ -2,7 +2,9 @@ import { HttpErrorResponse, HttpInterceptorFn, HttpResponse } from '@angular/com
 import { inject } from '@angular/core';
 import { tap } from 'rxjs';
 import { EXTERNAL_FETCH } from './providers/external-fetch';
+import { ServerDegradation } from './server-degradation';
 import { ServerHealth } from './server-health';
+import { SERVER_ROLE, whales } from './server-role';
 
 /**
  * Watches API traffic to drive the fail-whale overlay.
@@ -30,21 +32,39 @@ export const healthInterceptor: HttpInterceptorFn = (req, next) => {
   if (req.context.get(EXTERNAL_FETCH)) {
     return next(req);
   }
+  const role = req.context.get(SERVER_ROLE);
   const health = inject(ServerHealth);
+  const degraded = inject(ServerDegradation);
+
   return next(req).pipe(
     tap({
       next: (event) => {
         if (event instanceof HttpResponse) {
-          health.markUp();
+          if (whales(role)) {
+            health.markUp();
+          }
+          degraded.markUp(role);
         }
       },
       error: (err) => {
-        if (err instanceof HttpErrorResponse && err.status === 0) {
-          health.markDown(err);
-        } else {
+        const unreachable = err instanceof HttpErrorResponse && err.status === 0;
+        if (!unreachable) {
           // The server answered — 4xx, 5xx, auth, anything with a status. That
           // call failed, and its caller reports it; the *server* is reachable.
-          health.markUp();
+          if (whales(role)) {
+            health.markUp();
+          }
+          degraded.markUp(role);
+          return;
+        }
+        // Unreachable, but only the home server stops the app. A dead search
+        // index, a hashtag endpoint the instance refuses anonymously, or one
+        // followed account's instance being blocked are all normal weather —
+        // they degrade a feature in place rather than blanking the screen.
+        if (whales(role)) {
+          health.markDown(err);
+        } else {
+          degraded.markDown(role, err);
         }
       },
     }),

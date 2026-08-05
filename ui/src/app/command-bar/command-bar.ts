@@ -1,4 +1,5 @@
 import { Component, inject, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { ProviderId } from '../models';
@@ -15,6 +16,7 @@ export type FeedView = 'feed' | 'members' | 'analytics';
  */
 @Component({
   selector: 'app-command-bar',
+  imports: [RouterLink],
   template: `
     <div class="command-bar" role="toolbar" aria-label="Feed controls">
       <!-- "Go live" used to sit here. It is now Blue → "Auto-refresh timeline",
@@ -100,6 +102,19 @@ export type FeedView = 'feed' | 'members' | 'analytics';
           >
             📊 Analytics
           </button>
+          <!-- A link, not a view toggle like its two neighbours: the Doctor
+               re-samples the feed itself so it works the same whether you arrive
+               from here, from the end-of-feed line, or by typing the URL. One
+               page, one implementation. -->
+          @if (showFeedDoctor()) {
+            <a
+              class="btn command-item"
+              routerLink="/feed-doctor"
+              title="Why is this feed like this — who is flooding it, and why it ended"
+            >
+              🩺 Feed Doctor
+            </a>
+          }
         </span>
       }
       <ng-content />
@@ -183,6 +198,12 @@ export class CommandBar {
   readonly showImages = input(true);
   /** Show the 👥 Members / 📊 Analytics view toggles (Home). */
   readonly showFeedViews = input(false);
+  /**
+   * Whether to offer Feed Doctor. Off by default: the Doctor diagnoses the
+   * browser-local Home feed, so it means nothing on a hashtag or list timeline
+   * that has no follow sources to report on.
+   */
+  readonly showFeedDoctor = input(false);
   /** Which view the host page is currently showing. */
   readonly view = input<FeedView>('feed');
   readonly refresh = output<void>();

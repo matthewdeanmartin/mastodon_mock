@@ -65,6 +65,7 @@
   [showImages]="false"
   [showRefresh]="!live()"
   [showFeedViews]="true"
+  [showFeedDoctor]="true"
   [view]="view()"
   (refresh)="load(true)"
   (providerVisibilityChanged)="load()"
@@ -231,7 +232,14 @@
     } @else if (canLoadMore()) {
       <button class="btn btn-outline more" (click)="loadMore()">Load more</button>
     } @else {
-      <p class="muted center small">You’re all caught up.</p>
+      <!-- The end of the feed is exactly where "why is my feed like this" gets
+           asked, and nobody goes looking for a doctor when nothing hurts. This is
+           the Doctor's primary entry point; the command bar link is the permalink.
+           See sprint/anon-office-3-feed-doctor.md. -->
+      <p class="muted center small">
+        You’re all caught up. Were you expecting more?
+        <a routerLink="/feed-doctor">Check the Feed Doctor.</a>
+      </p>
     }
   }
 }
