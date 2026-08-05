@@ -8,6 +8,9 @@ import {
   diagnoseFeed,
   diagnoseFlooding,
   diagnoseMixing,
+  diagnoseSources,
+  diagnoseTimespans,
+  sliceByProvider,
 } from './feed-doctor';
 
 function account(id: string): Account {
@@ -165,6 +168,131 @@ describe('diagnoseMixing', () => {
 
   it('handles an empty feed', () => {
     expect(diagnoseMixing({}).severity).toBe('ok');
+  });
+});
+
+/**
+ * The signed-in feed's own failure modes.
+ *
+ * Signed-in Home is `FeedAggregator` merging Mastodon, Bluesky, Twitter and RSS.
+ * It cannot say which *follow* went quiet — but a whole source stalling, or two
+ * sources covering different years, are failures the anonymous feed never has.
+ */
+describe('diagnoseSources', () => {
+  const NOW = Date.parse('2026-08-05T12:00:00Z');
+  const HOUR = 3_600_000;
+
+  function slice(label: string, count: number, newestHoursAgo: number, spanHours = 24) {
+    return {
+      id: label.toLowerCase(),
+      label,
+      count,
+      newest: NOW - newestHoursAgo * HOUR,
+      oldest: NOW - (newestHoursAgo + spanHours) * HOUR,
+    };
+  }
+
+  it('is quiet when every source is current', () => {
+    const verdict = diagnoseSources([slice('Mastodon', 100, 0.2), slice('Bluesky', 40, 1)], NOW);
+    expect(verdict.severity).toBe('ok');
+    expect(verdict.headline).toContain('current');
+  });
+
+  /** Matthew's case: "all your bsky and twitter data is from more than 24 hours ago". */
+  it('names a source that has fallen far behind the others', () => {
+    const verdict = diagnoseSources(
+      [slice('Mastodon', 100, 0.1), slice('Bluesky', 30, 72), slice('Twitter', 20, 96)],
+      NOW,
+    );
+    expect(verdict.severity).toBe('warn');
+    expect(verdict.headline).toContain('Bluesky');
+    expect(verdict.headline).toContain('Twitter');
+    expect(verdict.detail.join(' ')).toContain('stalled connector');
+  });
+
+  it('does not accuse a source when the whole feed is equally old', () => {
+    // Everyone away for a week is not a stalled connector.
+    const verdict = diagnoseSources([slice('Mastodon', 50, 168), slice('Bluesky', 40, 170)], NOW);
+    expect(verdict.severity).toBe('ok');
+  });
+
+  it('ignores a source too small to explain anything', () => {
+    // Two posts out of two hundred is not why the feed looks wrong.
+    const verdict = diagnoseSources([slice('Mastodon', 200, 0.1), slice('RSS', 2, 200)], NOW);
+    expect(verdict.severity).toBe('ok');
+  });
+
+  it('reports a connected source that returned nothing at all', () => {
+    const verdict = diagnoseSources(
+      [
+        slice('Mastodon', 100, 0.1),
+        { id: 'bluesky', label: 'Bluesky', count: 0, newest: 0, oldest: 0, silent: true },
+      ],
+      NOW,
+    );
+    expect(verdict.severity).toBe('warn');
+    expect(verdict.headline).toContain('Bluesky');
+  });
+});
+
+describe('diagnoseTimespans', () => {
+  const NOW = Date.parse('2026-08-05T12:00:00Z');
+  const HOUR = 3_600_000;
+
+  function span(label: string, count: number, newestHoursAgo: number, oldestHoursAgo: number) {
+    return {
+      id: label.toLowerCase(),
+      label,
+      count,
+      newest: NOW - newestHoursAgo * HOUR,
+      oldest: NOW - oldestHoursAgo * HOUR,
+    };
+  }
+
+  /** Matthew's case: "a big layer of mastodon, followed by RSS from 2 years ago". */
+  it('catches sources that stack in layers instead of interleaving', () => {
+    const verdict = diagnoseTimespans(
+      [span('Mastodon', 100, 0, 48), span('RSS', 40, 17_520, 26_280)],
+      NOW,
+    );
+    expect(verdict.severity).toBe('notice');
+    expect(verdict.headline).toContain('RSS');
+    expect(verdict.headline).toContain("doesn't overlap");
+    expect(verdict.detail.join(' ')).toContain('stack in layers');
+  });
+
+  it('is happy when the ranges overlap', () => {
+    const verdict = diagnoseTimespans(
+      [span('Mastodon', 100, 0, 48), span('Bluesky', 40, 2, 50)],
+      NOW,
+    );
+    expect(verdict.severity).toBe('ok');
+    expect(verdict.headline).toContain('interleave');
+  });
+
+  it('says nothing useful about a single source', () => {
+    expect(diagnoseTimespans([span('Mastodon', 100, 0, 48)], NOW).severity).toBe('ok');
+  });
+});
+
+describe('sliceByProvider', () => {
+  it('groups a merged feed and keeps each provider’s date range', () => {
+    const older = { ...post('1', 'a'), provider: 'rss', created_at: '2024-01-01T00:00:00Z' };
+    const newer = { ...post('2', 'b'), created_at: '2026-08-05T00:00:00Z' };
+    const slices = sliceByProvider([newer, older] as Status[], {
+      rss: 'RSS',
+      mastodon: 'Mastodon',
+    });
+
+    const rss = slices.find((s) => s.id === 'rss');
+    expect(rss?.label).toBe('RSS');
+    expect(rss?.count).toBe(1);
+    expect(slices.find((s) => s.id === 'mastodon')?.count).toBe(1);
+  });
+
+  it('marks a linked provider that contributed nothing as silent', () => {
+    const slices = sliceByProvider([post('1', 'a')], { bluesky: 'Bluesky' }, ['bluesky']);
+    expect(slices.find((s) => s.id === 'bluesky')?.silent).toBe(true);
   });
 });
 

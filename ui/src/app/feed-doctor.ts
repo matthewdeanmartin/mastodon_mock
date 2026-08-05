@@ -51,9 +51,27 @@ export const THIN_SOURCE_SHARE = 0.8;
 /** When this fraction of follows returned nothing, the feed's thinness has a cause. */
 export const DEAD_FOLLOW_RATIO = 0.3;
 
+/**
+ * A source whose freshest post is older than this looks stalled rather than quiet.
+ *
+ * Generous on purpose: plenty of good RSS feeds post weekly, so this is a "has
+ * the connector stopped working" test, not a liveliness contest. What makes it
+ * meaningful is the comparison — one source at three days old while another is at
+ * three minutes is a different claim from everything being slow.
+ */
+export const STALE_SOURCE_HOURS = 48;
+
+/**
+ * A source contributing less than this share is a garnish, not a section.
+ *
+ * Used only to decide whether a stalled source is worth mentioning; a provider
+ * that supplies two posts of two hundred is not why the feed looks wrong.
+ */
+export const MINOR_SOURCE_SHARE = 0.02;
+
 /** An action the page offers. Never applied automatically — the user decides. */
 export interface DoctorAction {
-  kind: 'mute' | 'unfollow' | 'review-filters' | 'review-quiet';
+  kind: 'mute' | 'unfollow' | 'review-filters' | 'review-quiet' | 'review-window';
   label: string;
   /** The account it applies to, for the account-scoped actions. */
   account?: Account;
@@ -62,7 +80,7 @@ export interface DoctorAction {
 }
 
 export interface Verdict {
-  id: 'flooding' | 'ended' | 'mixing';
+  id: 'flooding' | 'ended' | 'mixing' | 'sources' | 'timespans';
   severity: Severity;
   /** One sentence, already phrased for a human. */
   headline: string;
@@ -233,22 +251,280 @@ export function diagnoseMixing(bySource: Record<string, number>): Verdict {
   };
 }
 
+/** One provider's contribution to the merged feed, as seen in the sample. */
+export interface ProviderSlice {
+  /** Provider id (`mastodon`, `bluesky`, `rss`, …) or a display label. */
+  id: string;
+  label: string;
+  count: number;
+  /** Newest and oldest post timestamps in the sample, epoch ms. */
+  newest: number;
+  oldest: number;
+  /** Linked and visible, but contributed nothing to this sample. */
+  silent?: boolean;
+}
+
+/**
+ * Group a merged feed by the provider each post came from.
+ *
+ * Reads `status.provider`, which the aggregator stamps on every foreign post
+ * (Mastodon's own posts leave it unset). `linked` names sources the user has
+ * connected and made visible, so one that contributed nothing can be reported as
+ * silent rather than silently omitted — "Bluesky returned nothing" is exactly the
+ * finding a stalled connector produces.
+ */
+/**
+ * Fallback display name for a provider id with no registered label.
+ *
+ * A verdict reading "bluesky is behind the rest of your feed" is the kind of
+ * detail that makes a diagnostic look unfinished; the registry supplies proper
+ * labels in the app, and this covers ids that arrive without one.
+ */
+function titleCase(id: string): string {
+  return id ? id.charAt(0).toUpperCase() + id.slice(1) : id;
+}
+
+export function sliceByProvider(
+  posts: Status[],
+  labels: Record<string, string> = {},
+  linked: string[] = [],
+): ProviderSlice[] {
+  const byId = new Map<string, ProviderSlice>();
+
+  for (const post of posts) {
+    const subject = feedSubject(post);
+    const id = post.provider ?? 'mastodon';
+    const at = Date.parse(subject.created_at);
+    const slice = byId.get(id) ?? {
+      id,
+      label: labels[id] ?? titleCase(id),
+      count: 0,
+      newest: 0,
+      oldest: Number.POSITIVE_INFINITY,
+    };
+    slice.count += 1;
+    if (!Number.isNaN(at) && at > 0) {
+      slice.newest = Math.max(slice.newest, at);
+      slice.oldest = Math.min(slice.oldest, at);
+    }
+    byId.set(id, slice);
+  }
+
+  for (const id of linked) {
+    if (!byId.has(id)) {
+      byId.set(id, {
+        id,
+        label: labels[id] ?? titleCase(id),
+        count: 0,
+        newest: 0,
+        oldest: 0,
+        silent: true,
+      });
+    }
+  }
+
+  return [...byId.values()].map((slice) => ({
+    ...slice,
+    oldest: Number.isFinite(slice.oldest) ? slice.oldest : slice.newest,
+  }));
+}
+
+/** Age of the freshest post, in hours. */
+function hoursSince(at: number, now: number): number {
+  return (now - at) / 3_600_000;
+}
+
+function describeAge(hours: number): string {
+  if (hours < 1) {
+    return 'minutes ago';
+  }
+  if (hours < 48) {
+    return `${Math.round(hours)}h ago`;
+  }
+  const days = Math.round(hours / 24);
+  return days > 60 ? `${Math.round(days / 30)} months ago` : `${days} days ago`;
+}
+
+/**
+ * Is one of the connected sources stalled, or contributing nothing?
+ *
+ * Signed-in Home is not one server's timeline — `FeedAggregator` merges Mastodon
+ * with Bluesky, Twitter and RSS in per-source rounds. That makes a failure mode
+ * the anonymous feed never has: everything looks fine, but one source quietly
+ * stopped, and the only symptom is that you have not seen a Bluesky post in two
+ * days without ever noticing you stopped.
+ *
+ * Judged **relatively**. "Nothing since Tuesday" is not damning on its own — you
+ * may simply have been away — but one source at three days old while another is
+ * at three minutes is a specific, actionable claim.
+ */
+export function diagnoseSources(slices: ProviderSlice[], now: number = Date.now()): Verdict {
+  const contributing = slices.filter((slice) => slice.count > 0);
+  const silent = slices.filter((slice) => slice.silent || slice.count === 0);
+
+  if (!contributing.length) {
+    return {
+      id: 'sources',
+      severity: silent.length ? 'warn' : 'ok',
+      headline: silent.length
+        ? 'None of your connected sources returned anything.'
+        : 'No connected sources.',
+      detail: silent.map((slice) => `${slice.label} — nothing in this sample`),
+      actions: [],
+    };
+  }
+
+  // The freshest source sets the bar: it is the evidence that the app itself is
+  // fetching fine, which is what makes a lagging sibling meaningful.
+  const freshest = Math.max(...contributing.map((slice) => slice.newest));
+  const total = contributing.reduce((sum, slice) => sum + slice.count, 0);
+
+  const stalled = contributing.filter(
+    (slice) =>
+      hoursSince(slice.newest, freshest) >= STALE_SOURCE_HOURS &&
+      slice.count / total >= MINOR_SOURCE_SHARE,
+  );
+
+  const detail = contributing
+    .slice()
+    .sort((a, b) => b.newest - a.newest)
+    .map(
+      (slice) =>
+        `${slice.label} — ${slice.count} posts, newest ${describeAge(hoursSince(slice.newest, now))}`,
+    );
+  for (const slice of silent) {
+    detail.push(`${slice.label} — nothing in this sample`);
+  }
+
+  if (!stalled.length && !silent.length) {
+    return {
+      id: 'sources',
+      severity: 'ok',
+      headline: `All ${contributing.length} sources are current.`,
+      detail: contributing.length > 1 ? detail : [],
+      actions: [],
+    };
+  }
+
+  const names = [...stalled, ...silent].map((slice) => slice.label).join(', ');
+  return {
+    id: 'sources',
+    severity: 'warn',
+    headline: stalled.length
+      ? `${names} ${stalled.length + silent.length === 1 ? 'is' : 'are'} behind the rest of your feed.`
+      : `${names} contributed nothing.`,
+    detail: [
+      ...detail,
+      'A source that lags far behind the others is usually a stalled connector, or nobody you follow there has posted.',
+    ],
+    actions: [],
+  };
+}
+
+/**
+ * Do the sources cover the same stretch of time, or are they stacked in layers?
+ *
+ * The aggregator guarantees every source at least 20 posts per round and then
+ * sorts the union by date. When one source is archival — an RSS feed of a blog
+ * that stopped in 2019 — the result is a clean slab of recent Mastodon followed
+ * by a wall of very old posts, which reads as a broken feed rather than as two
+ * sources with different clocks.
+ *
+ * Disjointness is the signal: a source whose *newest* post predates another
+ * source's *oldest* cannot interleave with it at all.
+ */
+export function diagnoseTimespans(slices: ProviderSlice[], now: number = Date.now()): Verdict {
+  const contributing = slices.filter((slice) => slice.count > 0 && slice.newest > 0);
+  if (contributing.length < 2) {
+    return {
+      id: 'timespans',
+      severity: 'ok',
+      headline: 'Only one source in this sample, so nothing to interleave.',
+      detail: [],
+      actions: [],
+    };
+  }
+
+  const ranked = [...contributing].sort((a, b) => b.newest - a.newest);
+  const disjoint: [ProviderSlice, ProviderSlice][] = [];
+  for (const recent of ranked) {
+    for (const old of ranked) {
+      if (recent !== old && old.newest < recent.oldest) {
+        disjoint.push([recent, old]);
+      }
+    }
+  }
+
+  const detail = ranked.map(
+    (slice) =>
+      `${slice.label} — ${describeAge(hoursSince(slice.newest, now))} to ${describeAge(hoursSince(slice.oldest, now))}`,
+  );
+
+  if (!disjoint.length) {
+    return {
+      id: 'timespans',
+      severity: 'ok',
+      headline: 'Your sources cover overlapping time, so they interleave.',
+      detail,
+      actions: [],
+    };
+  }
+
+  const [recent, old] = disjoint[0];
+  return {
+    id: 'timespans',
+    severity: 'notice',
+    headline: `${old.label} doesn't overlap ${recent.label} in time.`,
+    detail: [
+      ...detail,
+      `Every ${old.label} post is older than every ${recent.label} post, so they stack in layers instead of mixing.`,
+    ],
+    actions: [{ kind: 'review-window', label: 'Feed settings' }],
+  };
+}
+
 export interface DiagnoseOptions {
   posts: Status[];
   outcomes: SourceOutcome[];
   bySource: Record<string, number>;
+  /**
+   * Per-provider stats for the signed-in aggregated feed. Absent for the
+   * anonymous feed, which has one kind of source and its own `outcomes`.
+   */
+  slices?: ProviderSlice[];
+  now?: number;
 }
 
-/** Run every check. Ordered most- to least-actionable, which is the reading order. */
+/**
+ * Run every check that has data behind it.
+ *
+ * Both feeds get flooding and mixing — those questions are identical whoever you
+ * are. The rest depends on what the feed can actually report:
+ *
+ *  - **Anonymous** builds Home from per-follow reads, so it can say *which
+ *    follow* went quiet or was filtered away (`outcomes`).
+ *  - **Signed in**, Home is `FeedAggregator` merging Mastodon, Bluesky, Twitter
+ *    and RSS. There are no per-follow outcomes, but there is something the
+ *    anonymous feed has no equivalent for: per-provider freshness and time
+ *    spans, which is where the signed-in feed actually goes wrong.
+ *
+ * A verdict with nothing behind it is omitted rather than rendered as a
+ * reassuring green tick — claiming "every follow returned posts" when nothing was
+ * measured is worse than saying nothing.
+ */
 export function diagnoseFeed(options: DiagnoseOptions): FeedDiagnosis {
-  return {
-    sampleSize: options.posts.length,
-    verdicts: [
-      diagnoseFlooding(options.posts),
-      diagnoseEnding(options.outcomes),
-      diagnoseMixing(options.bySource),
-    ],
-  };
+  const now = options.now ?? Date.now();
+  const verdicts: Verdict[] = [diagnoseFlooding(options.posts)];
+
+  if (options.slices?.length) {
+    verdicts.push(diagnoseSources(options.slices, now), diagnoseTimespans(options.slices, now));
+  }
+  if (options.outcomes.length) {
+    verdicts.push(diagnoseEnding(options.outcomes));
+  }
+  verdicts.push(diagnoseMixing(options.bySource));
+
+  return { sampleSize: options.posts.length, verdicts };
 }
 
 /** Re-exported so the page can render author rows without importing two modules. */

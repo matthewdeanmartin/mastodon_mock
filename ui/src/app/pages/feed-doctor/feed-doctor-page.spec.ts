@@ -9,6 +9,7 @@ import { Auth } from '../../auth';
 import { LocalModeration } from '../../local-moderation';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
+import { FeedAggregator } from '../../providers/feed-aggregator';
 import { FeedDoctorPage } from './feed-doctor-page';
 
 function account(id: string): Account {
@@ -139,6 +140,46 @@ describe('FeedDoctorPage', () => {
 
     expect(follows.count()).toBe(0);
     expect(text()).toContain('Unfollowed');
+  });
+
+  /**
+   * Signed-in Home is a different feed, not the anonymous one with a login on top:
+   * `FeedAggregator` merges Mastodon with Bluesky, Twitter and RSS. The page used
+   * to print a paragraph explaining why it had nothing to say here, which was both
+   * an excuse and wrong — the aggregator knows exactly which source gave what.
+   */
+  it('diagnoses the aggregated feed when signed in', async () => {
+    TestBed.inject(Auth).setToken('a-token');
+    const aggregator = TestBed.inject(FeedAggregator);
+    vi.spyOn(aggregator, 'reset').mockImplementation(() => undefined);
+
+    const now = Date.now();
+    const fresh = Array.from({ length: 30 }, (_, i) => ({
+      ...post(`m${i}`, `author${i % 6}`),
+      created_at: new Date(now - i * 60_000).toISOString(),
+    }));
+    // Bluesky stalled four days ago — the failure a connected account actually hits.
+    const stale = Array.from({ length: 10 }, (_, i) => ({
+      ...post(`b${i}`, `bsky${i}`),
+      provider: 'bluesky',
+      created_at: new Date(now - 96 * 3_600_000 - i * 60_000).toISOString(),
+    }));
+
+    let served = false;
+    vi.spyOn(aggregator, 'nextPage').mockImplementation(() => {
+      const page = served ? [] : [...fresh, ...stale];
+      served = true;
+      return of(page as Status[]);
+    });
+
+    fixture = TestBed.createComponent(FeedDoctorPage);
+    fixture.detectChanges();
+
+    await vi.waitFor(() => expect(text()).toContain('Bluesky'));
+    // Names the lagging source rather than shrugging at the signed-in reader.
+    expect(text()).toContain('behind the rest of your feed');
+    // And no per-follow verdict, which signed-in Home genuinely cannot answer.
+    expect(text()).not.toContain('Every follow returned posts');
   });
 
   it('stays calm about a healthy feed', async () => {

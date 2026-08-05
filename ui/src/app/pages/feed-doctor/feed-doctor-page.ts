@@ -1,12 +1,22 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Account, Status } from '../../models';
+import { Account, ProviderId, Status } from '../../models';
+import { ClientPrefs } from '../../client-prefs';
+import { FeedAggregator } from '../../providers/feed-aggregator';
+import { ProviderRegistry } from '../../providers/provider-registry';
 import { Auth } from '../../auth';
 import { LocalModeration } from '../../local-moderation';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
-import { DoctorAction, FeedDiagnosis, Verdict, diagnoseFeed } from '../../feed-doctor';
+import {
+  DoctorAction,
+  FeedDiagnosis,
+  ProviderSlice,
+  Verdict,
+  diagnoseFeed,
+  sliceByProvider,
+} from '../../feed-doctor';
 import { feedSubject } from '../../feed-metrics';
 import { sampleFeed } from '../../feed-sample';
 
@@ -36,10 +46,22 @@ export class FeedDoctorPage implements OnInit {
   private follows = inject(AnonymousFollows);
   private moderation = inject(LocalModeration);
   private anonymous = inject(AnonymousAccount);
+  private aggregator = inject(FeedAggregator);
+  private registry = inject(ProviderRegistry);
+  private prefs = inject(ClientPrefs);
 
   protected loading = signal(true);
   protected diagnosis = signal<FeedDiagnosis | null>(null);
   protected collectedAt = signal<Date | null>(null);
+  /** Per-provider breakdown, signed-in only. */
+  protected slices = signal<ProviderSlice[]>([]);
+  /**
+   * Posts the reading window excluded.
+   *
+   * Counted by the aggregator rather than inferred: "you are only seeing today"
+   * is worth saying only when there is demonstrably something older to see.
+   */
+  protected droppedByWindow = signal(0);
   /** Accounts acted on this visit, so the buttons can report what they did. */
   protected acted = signal<Record<string, string>>({});
 
@@ -49,35 +71,95 @@ export class FeedDoctorPage implements OnInit {
     this.run();
   }
 
+  /**
+   * Sample whichever Home this reader actually has.
+   *
+   * These are two genuinely different feeds, not one feed with a login on top.
+   * Anonymous Home is assembled here in the browser, one read per followed
+   * account. Signed-in Home is `FeedAggregator` merging the Mastodon timeline with
+   * Bluesky, Twitter and RSS in per-source rounds — so it cannot say which follow
+   * went quiet, but it *can* say which whole source stalled, which is the failure
+   * that actually happens to a connected account.
+   */
   protected run(): void {
     this.loading.set(true);
     this.diagnosis.set(null);
-    this.provider.reset();
 
-    // The provider keeps its own cursors and advances them on each call, so `after`
-    // is ignored here — `reset()` above is what rewinds it.
+    if (this.isAnonymous()) {
+      this.provider.reset();
+      // The provider keeps its own cursors and advances them on each call, so
+      // `after` is ignored here — `reset()` above is what rewinds it.
+      sampleFeed(
+        {
+          type: 'home',
+          query: 'Anonymous home',
+          pageSize: 20,
+          fetch: () => this.provider.fetchPage(),
+        },
+        SAMPLE_SIZE,
+      ).subscribe({
+        next: (sample) => this.reportAnonymous(sample.posts),
+        error: () => this.reportAnonymous([]),
+      });
+      return;
+    }
+
+    this.aggregator.reset();
     sampleFeed(
       {
         type: 'home',
-        query: 'Anonymous home',
+        query: 'Home',
         pageSize: 20,
-        fetch: () => this.provider.fetchPage(),
+        fetch: () => this.aggregator.nextPage(),
       },
       SAMPLE_SIZE,
     ).subscribe({
-      next: (sample) => this.report(sample.posts),
-      error: () => this.report([]),
+      next: (sample) => this.reportAggregated(sample.posts),
+      error: () => this.reportAggregated([]),
     });
   }
 
-  private report(posts: Status[]): void {
-    this.diagnosis.set(
+  private reportAnonymous(posts: Status[]): void {
+    this.report(
       diagnoseFeed({
         posts,
         outcomes: this.provider.lastOutcomes(),
         bySource: this.countSources(posts),
       }),
     );
+  }
+
+  /**
+   * The signed-in diagnosis: which of your connected sources is behind, and do
+   * they cover the same stretch of time.
+   *
+   * No `outcomes` — there are no per-follow reads to report on — so the "why did
+   * your feed end" verdict is omitted rather than faked.
+   */
+  private reportAggregated(posts: Status[]): void {
+    const labels: Record<string, string> = { mastodon: 'Mastodon' };
+    for (const provider of this.registry.linked()) {
+      labels[provider.id] = provider.label;
+    }
+    const linked = ['mastodon', ...this.registry.linked().map((provider) => provider.id)].filter(
+      (id) => this.prefs.isProviderVisible(id as ProviderId),
+    );
+
+    const slices = sliceByProvider(posts, labels, linked);
+    this.slices.set(slices);
+    this.droppedByWindow.set(this.aggregator.droppedByWindow());
+    this.report(
+      diagnoseFeed({
+        posts,
+        outcomes: [],
+        bySource: Object.fromEntries(slices.map((slice) => [slice.label, slice.count])),
+        slices,
+      }),
+    );
+  }
+
+  private report(diagnosis: FeedDiagnosis): void {
+    this.diagnosis.set(diagnosis);
     this.collectedAt.set(new Date());
     this.loading.set(false);
   }
@@ -109,6 +191,17 @@ export class FeedDoctorPage implements OnInit {
   protected verdicts = computed(() => this.diagnosis()?.verdicts ?? []);
 
   protected sampleSize = computed(() => this.diagnosis()?.sampleSize ?? 0);
+
+  /**
+   * Provenance line. Built here rather than in the template so the punctuation
+   * survives formatting — an interpolated clause between `@if` blocks renders with
+   * stray spaces before the comma and full stop.
+   */
+  protected sampleLine = computed(() => {
+    const sources = this.slices().length;
+    const base = `Based on the last ${this.sampleSize()} posts in your Home feed`;
+    return !this.isAnonymous() && sources > 1 ? `${base}, across ${sources} sources.` : `${base}.`;
+  });
 
   protected icon(verdict: Verdict): string {
     return verdict.severity === 'ok' ? '✓' : '⚠';
