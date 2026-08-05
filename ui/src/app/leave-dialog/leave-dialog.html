@@ -1,0 +1,65 @@
+<button class="ld-backdrop" type="button" aria-label="Close" (click)="close()"></button>
+<section class="ld-dialog" role="dialog" aria-modal="true" aria-labelledby="ld-title">
+  <div class="ld-head">
+    <h2 id="ld-title">
+      @if (isAnonymous()) {
+        Leave Anonymous?
+      } @else {
+        Log out of {{ who() }}?
+      }
+    </h2>
+    <button class="icon-close" type="button" aria-label="Close" (click)="close()">×</button>
+  </div>
+
+  <!-- Ordered least to most destructive, and each says what survives rather than
+       only what goes: "this can't be undone" is a warning, but "your saved accounts
+       are kept" is the part that lets someone choose confidently. -->
+  <div class="ld-options">
+    <button class="ld-option" type="button" (click)="leave()">
+      <span class="ld-option-title">Return to the login page</span>
+      <span class="muted small">
+        @if (isAnonymous()) {
+          Your follows, lists and settings stay in this browser.
+        } @else {
+          Your saved accounts and settings stay in this browser.
+        }
+      </span>
+    </button>
+
+    <!-- The emphasised one: the shared-machine case, which is the reason this
+         dialog exists at all. -->
+    <button class="ld-option ld-option-primary" type="button" (click)="deleteAnonymous()">
+      <span class="ld-option-title">Delete anonymous data, then leave</span>
+      <span class="muted small">
+        Follows, local lists, saved posts and followed hashtags from browsing without an account.
+        Any signed-in accounts you have saved are kept.
+      </span>
+    </button>
+
+    <button class="ld-option ld-option-danger" type="button" (click)="deleteEverything()">
+      <span class="ld-option-title">Remove all browser data, then leave</span>
+      <span class="muted small">
+        Everything above, plus every saved account, connection and setting. This can't be undone.
+      </span>
+    </button>
+  </div>
+
+  <div class="ld-actions">
+    <button class="btn btn-outline" type="button" (click)="downloadBackup()">
+      @if (exported()) {
+        ✓ Backup downloaded
+      } @else {
+        Download my data first
+      }
+    </button>
+    <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
+  </div>
+
+  @if (exportError(); as msg) {
+    <p class="ld-error" role="alert">{{ msg }}</p>
+  }
+  <p class="muted small">
+    The backup holds your follows, lists, saved posts and settings. It never includes passwords or
+    access tokens — you will sign in again on a new browser.
+  </p>
+</section>

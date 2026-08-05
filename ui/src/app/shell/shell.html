@@ -277,3 +277,9 @@
     </div>
   </div>
 }
+
+<!-- Leaving asks first, and offers to take the browser data with it. Owns the
+     teardown itself; the shell only handles where to go afterwards. -->
+@if (showLeave()) {
+  <app-leave-dialog (closed)="showLeave.set(false)" (chose)="finishLeave($event)" />
+}

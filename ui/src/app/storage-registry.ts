@@ -76,6 +76,21 @@ export interface StorageKeySpec {
    */
   suffix: 'none' | 'account' | 'instance';
   sensitivity: Sensitivity;
+  /**
+   * Which teardown this key belongs to, for "delete my data on the way out".
+   *
+   * `'anonymous'` marks data that belongs to the browser-local Anonymous session
+   * *and nothing else* — so it can be erased while a saved signed-in account keeps
+   * working. That is the middle option of the leave dialog, and the one most people
+   * on a shared machine actually want.
+   *
+   * Deliberately narrow. An account-suffixed key like `mockingbird_client_lists` is
+   * shared with signed-in sessions and must **not** be marked, or "delete my
+   * anonymous data" would quietly take a signed-in user's lists with it. When in
+   * doubt leave it unset: the key is still erased by the full wipe, which is the
+   * option that promises to take everything.
+   */
+  group?: 'anonymous';
   /** Why it is classified this way — the part that is not obvious from the name. */
   note: string;
 }
@@ -194,6 +209,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'private',
+    group: 'anonymous',
     note: 'The browser-local Anonymous profile.',
   },
   {
@@ -201,6 +217,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'private',
+    group: 'anonymous',
     note: 'Who the Anonymous account follows.',
   },
   {
@@ -208,6 +225,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'private',
+    group: 'anonymous',
     note: 'What the Anonymous account saved.',
   },
   {
@@ -215,6 +233,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'private',
+    group: 'anonymous',
     note: 'Anonymous account lists and their members.',
   },
   {
@@ -222,6 +241,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'private',
+    group: 'anonymous',
     note: 'Followed hashtags. The canonical example of privacy-sensitive-but-not-secret: a health or identity tag published in a gist is a disclosure.',
   },
   {
@@ -434,6 +454,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'setting',
+    group: 'anonymous',
     note: 'Preferences for the Anonymous account.',
   },
   {
@@ -548,6 +569,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'cache',
+    group: 'anonymous',
     note: 'Cached Anonymous home timeline. Derived from private follow data.',
   },
   {
@@ -555,6 +577,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'cache',
+    group: 'anonymous',
     note: 'Cached posts backing the Anonymous feed. Derived from private follow data.',
   },
   {

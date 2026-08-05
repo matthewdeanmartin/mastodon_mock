@@ -16,6 +16,7 @@ import { LeftRail } from './left-rail/left-rail';
 import { RightRail } from './right-rail/right-rail';
 import { ServerAbout } from '../server-about';
 import { FeatureFlags } from '../feature-flags';
+import { LeaveChoice, LeaveDialog } from '../leave-dialog/leave-dialog';
 
 function isWideUrl(url: string): boolean {
   // /search goes rails-off wide so facets have room to live beside results.
@@ -35,6 +36,7 @@ function isWideUrl(url: string): boolean {
     AppFooter,
     ShortcutHelp,
     NgOptimizedImage,
+    LeaveDialog,
   ],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
@@ -83,6 +85,9 @@ export class Shell implements OnInit {
     ),
     { initialValue: isWideUrl(this.router.url) },
   );
+
+  /** The leave/log-out confirmation, which also offers to erase browser data. */
+  protected showLeave = signal(false);
 
   /** Transient, non-blocking message (e.g. a failed account switch). null = hidden. */
   protected toast = signal<string | null>(null);
@@ -273,10 +278,35 @@ export class Shell implements OnInit {
     location.assign('login?add=1');
   }
 
-  /** Sign out of just the active account; fall back to another if one remains. */
+  /**
+   * Ask before leaving, so the user can take their data with them.
+   *
+   * Leaving used to be immediate, and it left every follow, list and subscribed
+   * hashtag in `localStorage` — which is the wrong default for someone reading on a
+   * machine that is not theirs. The dialog owns the teardown; this only reacts to
+   * what they chose.
+   */
   logout(): void {
+    this.showLeave.set(true);
+  }
+
+  /**
+   * Finish leaving after the dialog has already erased whatever was chosen.
+   *
+   * A wipe is always followed by a full page load rather than a soft navigation:
+   * services hold their state in signals loaded at construction, so `AnonymousFollows`
+   * and friends would happily keep serving data whose storage no longer exists. The
+   * app already relies on this for account switching.
+   */
+  finishLeave(choice: LeaveChoice): void {
+    this.showLeave.set(false);
+    if (choice === 'all-data') {
+      // Every session is gone by definition; there is nothing to fall back to.
+      location.assign('login');
+      return;
+    }
     this.auth.logout();
-    if (this.auth.isAuthenticated) {
+    if (choice === 'leave' && this.auth.isAuthenticated) {
       location.reload();
     } else {
       location.assign('login');

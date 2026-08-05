@@ -1,6 +1,29 @@
 # Anon Office — Sprint 1: copy an account, leave cleanly
 
-Status: PLANNED. Roadmap: `anon-office-0-overview.md`.
+Status: COMPLETE (implemented 2026-08-04; 3059 tests, lint, prettier and build clean).
+Roadmap: `anon-office-0-overview.md`.
+
+## What changed during implementation
+
+Three things worth knowing that the plan did not anticipate:
+
+1. **Collections load *after* the confirm screen, not before it.** Awaiting them inline
+   broke ten existing tests by stranding the dialog in `loading` — and that was the design
+   telling on itself: a slow collections read (or a 404 from a pre-4.6 server) would have
+   delayed the follows the user actually clicked for. The follows now render immediately
+   and collections fill in behind, with the confirm button held only while that read is in
+   flight so nobody can click through and silently get half the feature.
+2. **A collection member has to be followed to be listed**, so copying collections spends
+   `ANONYMOUS_FOLLOW_LIMIT` slots exactly like copying follows does. `AnonymousLists`
+   stores follow *keys*, minted by `AnonymousFollows.follow`. This is decision 2's cost
+   argument showing up directly in the storage model, and the UI says so.
+3. **The export offer needed its own exporter.** `exportPortableConfig` builds a *shareable
+   setup* — `setting` keys plus a three-key private allowlist — and contains **none** of
+   the eight anonymous keys. Wiring the dialog to it would have handed someone their theme
+   and proxy choice while deleting the follow list they thought they were saving, beside a
+   button reading "this can't be undone". Replaced with `SessionTeardown.backup(scope)`,
+   which mirrors the teardown's own registry walk minus credentials. See
+   `session-teardown.spec.ts` → "the backup has to contain what the wipe destroys".
 
 Three changes that all live within arm's reach of each other: the profile `•••` menu (make
 it readable, group it, upgrade clone-friends into `Copy account`), and the shell's exit
