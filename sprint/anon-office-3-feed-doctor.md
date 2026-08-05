@@ -1,6 +1,28 @@
 # Anon Office — Sprint 3: Feed Doctor
 
-Status: PLANNED. Roadmap: `anon-office-0-overview.md`.
+Status: COMPLETE (implemented 2026-08-04; 3084 tests, lint, prettier and build clean).
+Roadmap: `anon-office-0-overview.md`.
+
+Built **before** sprint 2 (local likes), at Matthew's request. The only coupling is that
+the "are the sources mixing" verdict will gain a `liked` row once likes exist; nothing here
+had to be stubbed or deferred for it.
+
+## What changed during implementation
+
+- **Two code paths needed instrumenting, not one.** The plan named
+  `fetchFollowFeedPage` (used by list timelines), but Home actually runs through the
+  aggregate `fetchPage()`, which returns a bare `Status[]` that a dozen callers
+  destructure. Adding outcomes to its return type would have been a wide, breaking change,
+  so that path exposes them as a `lastOutcomes` signal instead — which also suits the
+  Doctor, a separate page that wants to read them without re-fetching.
+- **The error-ending provider test was dropped.** A flushed 500 pulls in the RSS-fallback
+  machinery, leaving a request pending so the feed page never emits. `empty` and `filtered`
+  are covered at the provider; `error` is covered through `feed-doctor.spec.ts` and the page
+  spec, where the outcomes are supplied directly. Not worth more setup than the code it
+  tests.
+- **Both action targets in the plan were invented routes.** `/settings/moderation` and
+  `/settings/follows` exist but are `anonymousUnavailableGuard`-ed — useless to the reader
+  this page is for. They now point at `/settings/appearance` and `/feeds`, both unguarded.
 
 ## Three questions
 

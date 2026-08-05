@@ -53,10 +53,33 @@ interface ActiveSource {
   fetch: () => Observable<Status[]>;
 }
 
+/**
+ * Why one followed account stopped contributing to this page.
+ *
+ * The provider has always known this and always thrown it away: the branches below
+ * already distinguish "errored" from "filtered out" from "ran out", then collapse
+ * all three into an empty feed that looks identical to the reader. `filtered` is the
+ * one that surprises people — an aggressive calm-mode or language filter can end a
+ * feed the user believes is simply empty. See `feed-doctor.ts`.
+ */
+export type SourceEnding = 'ok' | 'empty' | 'error' | 'filtered';
+
+export interface SourceOutcome {
+  handle: string;
+  ending: SourceEnding;
+  /** Posts this source contributed to the page, after filtering. */
+  fetched: number;
+}
+
 export interface AnonymousFollowFeedPage {
   statuses: Status[];
   warnings: string[];
   hasMore: boolean;
+  /**
+   * Per-source diagnosis for this page. Additive — existing consumers ignore it —
+   * and the only thing that can answer "why did my feed end".
+   */
+  outcomes: SourceOutcome[];
 }
 
 export interface AnonymousFollowFeedSession {
@@ -128,6 +151,18 @@ export class AnonymousMastodonProvider implements FeedProvider {
   );
   readonly errors = signal<string[]>([]);
 
+  /**
+   * Per-source diagnosis for the last Home page, for `/feed-doctor`.
+   *
+   * A signal rather than part of the returned page because `fetchPage()` hands back
+   * a bare `Status[]` that a dozen callers already destructure — and because the
+   * Doctor is a separate page that wants to read this without re-fetching anything.
+   *
+   * Labels carry their kind (`@handle`, `#tag`, or a provider name), which is what
+   * makes the "are the sources mixing" verdict free.
+   */
+  readonly lastOutcomes = signal<SourceOutcome[]>([]);
+
   private cursors: SourceCursor[] = [];
   private tagCursors: TagCursor[] = [];
   private rssFallbacks = new Set<string>();
@@ -136,6 +171,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
 
   reset(): void {
     this.errors.set([]);
+    this.lastOutcomes.set([]);
     this.rssFallbacks.clear();
     this.seen.clear();
     this.pasteCursor = { exhausted: false };
@@ -177,19 +213,29 @@ export class AnonymousMastodonProvider implements FeedProvider {
       return of([]);
     }
     const failures: string[] = [];
+    const outcomes: SourceOutcome[] = [];
     return of(...active).pipe(
       mergeMap(
         (source) =>
           source.fetch().pipe(
+            tap((statuses) =>
+              outcomes.push({
+                handle: source.label,
+                ending: statuses.length ? 'ok' : 'empty',
+                fetched: statuses.length,
+              }),
+            ),
             catchError(() => {
               source.cursor.exhausted = true;
               failures.push(`Could not load ${source.label}.`);
+              outcomes.push({ handle: source.label, ending: 'error', fetched: 0 });
               return of<Status[]>([]);
             }),
           ),
         MAX_CONCURRENCY,
       ),
       toArray(),
+      tap(() => this.lastOutcomes.set(outcomes)),
       map((pages) => {
         this.errors.set([
           ...[...this.rssFallbacks].map((handle) => `Using RSS fallback for @${handle}.`),
@@ -311,20 +357,31 @@ export class AnonymousMastodonProvider implements FeedProvider {
     allowsStatus: (status: Status) => boolean,
   ): Observable<AnonymousFollowFeedPage> {
     const active = cursors.filter((source) => !source.exhausted);
-    if (!active.length) return of({ statuses: [], warnings: [], hasMore: false });
+    if (!active.length) return of({ statuses: [], warnings: [], hasMore: false, outcomes: [] });
     const warnings: string[] = [];
+    // Recorded where each ending is already decided, rather than inferred later:
+    // by the time the page is assembled, "returned nothing" and "was filtered to
+    // nothing" and "threw" all look the same.
+    const outcomes: SourceOutcome[] = [];
     return of(...active).pipe(
       mergeMap(
         (source) =>
           this.fetchSource(source).pipe(
             map((statuses) => {
               const allowed = statuses.filter(allowsStatus);
-              if (allowed.length !== statuses.length) source.exhausted = true;
+              const filtered = allowed.length !== statuses.length;
+              if (filtered) source.exhausted = true;
+              outcomes.push({
+                handle: source.follow.handle,
+                ending: filtered ? 'filtered' : allowed.length ? 'ok' : 'empty',
+                fetched: allowed.length,
+              });
               return allowed;
             }),
             catchError(() => {
               source.exhausted = true;
               warnings.push(`Could not load @${source.follow.handle}.`);
+              outcomes.push({ handle: source.follow.handle, ending: 'error', fetched: 0 });
               return of<Status[]>([]);
             }),
           ),
@@ -343,6 +400,7 @@ export class AnonymousMastodonProvider implements FeedProvider {
           }),
         warnings,
         hasMore: cursors.some((source) => !source.exhausted),
+        outcomes,
       })),
     );
   }

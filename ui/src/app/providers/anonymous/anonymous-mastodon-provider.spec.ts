@@ -359,4 +359,45 @@ describe('AnonymousMastodonProvider', () => {
       accountId: 'a-copy',
     });
   });
+
+  /**
+   * Why a feed ended used to be computed and thrown away: the branches below have
+   * always distinguished "returned nothing" from "threw" from "was filtered to
+   * nothing", then collapsed all three into an identical empty feed. `/feed-doctor`
+   * is the first thing to read them.
+   */
+  it('marks a source that returned nothing as empty rather than merely absent', () => {
+    const follows = TestBed.inject(AnonymousFollows);
+    follows.follow(account('quiet', 'https://one.example', 'q1'), 'https://mastodon.social');
+
+    const session = TestBed.inject(AnonymousMastodonProvider).createFollowFeed(follows.follows());
+    const pages: { handle: string; ending: string; fetched: number }[][] = [];
+    session.fetchPage().subscribe((p) => pages.push(p.outcomes));
+
+    // Match on the account id rather than a full URL: which host answers is the
+    // follow's own server, resolved from the stored read-ref.
+    httpMock.match((r) => r.url.includes('/accounts/q1/statuses'))[0].flush([]);
+
+    expect(pages[0][0].ending).toBe('empty');
+    expect(pages[0][0].fetched).toBe(0);
+  });
+
+  /** The surprising one: the reader's own filter is what ended the feed. */
+  it('marks a source whose posts were filtered away', () => {
+    const follows = TestBed.inject(AnonymousFollows);
+    follows.follow(account('alice', 'https://one.example', 'a1'), 'https://mastodon.social');
+
+    const session = TestBed.inject(AnonymousMastodonProvider).createFollowFeed(
+      follows.follows(),
+      () => false,
+    );
+    const pages: { ending: string }[][] = [];
+    session.fetchPage().subscribe((p) => pages.push(p.outcomes));
+
+    httpMock
+      .match((r) => r.url.includes('/accounts/a1/statuses'))[0]
+      .flush([status(account('alice', 'https://one.example', 'a1'), 'hidden')]);
+
+    expect(pages[0][0].ending).toBe('filtered');
+  });
 });

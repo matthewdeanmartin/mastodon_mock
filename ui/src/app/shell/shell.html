@@ -125,6 +125,9 @@
           @if (!auth.isAnonymous) {
             <a routerLink="/analytics">Analytics</a>
           }
+          <!-- Unguarded: the browser-local feed is the only one that can say why it
+               ended, so an anonymous reader is who this is for. -->
+          <a routerLink="/feed-doctor">Feed Doctor</a>
           <a routerLink="/observability">Observability</a>
 
           <!-- Docs & grab-bag -->

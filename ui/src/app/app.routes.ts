@@ -515,6 +515,13 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/analytics/analytics').then((m) => m.Analytics),
       },
       {
+        // Deliberately not anonymous-guarded: the browser-local feed is the only one
+        // that can report why it ended, so an anonymous reader is the primary user.
+        path: 'feed-doctor',
+        loadComponent: () =>
+          import('./pages/feed-doctor/feed-doctor-page').then((m) => m.FeedDoctorPage),
+      },
+      {
         path: 'observability',
         loadComponent: () =>
           import('./pages/observability/observability').then((m) => m.Observability),
