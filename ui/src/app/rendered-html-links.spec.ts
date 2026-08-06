@@ -27,7 +27,9 @@ describe('RenderedHtmlLinks', () => {
   // A bio's hashtag is an absolute URL to the origin instance. Following it left
   // Mawkingbird entirely and dropped the reader on a stranger's web UI.
   it('routes an origin-instance hashtag to the in-app tag page', () => {
-    const fixture = render('<a href="https://mastodon.social/tags/angular" class="hashtag">#angular</a>');
+    const fixture = render(
+      '<a href="https://mastodon.social/tags/angular" class="hashtag">#angular</a>',
+    );
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     const anchor = fixture.nativeElement.querySelector('a') as HTMLAnchorElement;

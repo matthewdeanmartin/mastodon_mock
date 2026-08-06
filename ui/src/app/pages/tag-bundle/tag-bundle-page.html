@@ -15,7 +15,12 @@
     @for (t of bundle()!.tags; track t) {
       <span class="bundle-tag">
         <a [routerLink]="['/tags', t]">#{{ t }}</a>
-        <button type="button" class="chip-x" (click)="removeTag(t)" [attr.aria-label]="'Remove #' + t">
+        <button
+          type="button"
+          class="chip-x"
+          (click)="removeTag(t)"
+          [attr.aria-label]="'Remove #' + t"
+        >
           ×
         </button>
       </span>
@@ -44,8 +49,8 @@
 
   @if (store.isFull(bundle()!.id)) {
     <p class="muted small bundle-note">
-      Full at {{ maxTags }} tags. Each tag is one request every time this feed opens, so the
-      cap keeps a bundle from hammering the server.
+      Full at {{ maxTags }} tags. Each tag is one request every time this feed opens, so the cap
+      keeps a bundle from hammering the server.
     </p>
   }
 
@@ -85,8 +90,8 @@
     }
   } @else {
     <p class="muted small bundle-note">
-      Everyone who wrote a post in this feed. A bundle has no real membership, so this is
-      whoever is posting in these tags right now.
+      Everyone who wrote a post in this feed. A bundle has no real membership, so this is whoever is
+      posting in these tags right now.
     </p>
     @if (!members().length) {
       <p class="muted center small">Nobody yet.</p>

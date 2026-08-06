@@ -49,7 +49,8 @@ export type ConnectionId =
   | 'link-shortener'
   | 'twitter'
   | 'mataroa'
-  | 'blogger';
+  | 'blogger'
+  | 'hugo';
 
 /**
  * Who a connection belongs to — which is a question users actually ask, and
@@ -113,6 +114,7 @@ export const CONNECTION_FLAGS: Record<ConnectionId, FeatureFlagId> = {
   twitter: 'connector-twitter',
   mataroa: 'connector-mataroa',
   blogger: 'connector-blogger',
+  hugo: 'connector-hugo',
   openrouter: 'connector-openrouter',
   raindrop: 'connector-raindrop',
   github: 'connector-github',
@@ -203,6 +205,21 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
       'Publish posts from the composer, live or as a draft',
       'Choose which of your Blogger blogs to post to',
       'Signs in with Google; no API key or CORS proxy needed',
+    ],
+  },
+  {
+    id: 'hugo',
+    label: 'Blog (Hugo)',
+    emoji: '✍️',
+    pitch: 'Your own static site on GitHub, published from the composer.',
+    // The third blog, and the only one where nobody hosts your writing: a post
+    // is a file in a repository you own. Account-scoped like the other two —
+    // a blog belongs to one public persona.
+    scope: 'account',
+    enables: [
+      'Publish Markdown posts as commits to your Hugo repository',
+      'Your posts stay files in a repo you own, not on a blog service',
+      'Needs a GitHub token; no CORS proxy, unlike the other blogs',
     ],
   },
   {

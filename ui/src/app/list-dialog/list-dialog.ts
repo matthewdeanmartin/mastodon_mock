@@ -60,7 +60,6 @@ function isNotFollowingError(err: unknown): boolean {
   return err.status === 422 && (detail.includes('follow') || detail === '');
 }
 
-
 interface CollectionRow {
   collection: Collection;
   /** Item id when this account is a member (needed to remove); '' otherwise. */

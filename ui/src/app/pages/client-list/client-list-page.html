@@ -28,16 +28,15 @@
 
   @if (capped()) {
     <p class="muted small center">
-      Showing posts from the first {{ memberCap }} of
-      {{ list()!.memberHandles.length }} members — merging every member's timeline is slow
-      against a real server.
+      Showing posts from the first {{ memberCap }} of {{ list()!.memberHandles.length }} members —
+      merging every member's timeline is slow against a real server.
     </p>
   }
 
   @if (unresolved().length) {
     <p class="muted small center">
-      This server couldn't find {{ unresolved().length }} of these accounts, so they aren't in
-      the feed: {{ unresolved().join(', ') }}
+      This server couldn't find {{ unresolved().length }} of these accounts, so they aren't in the
+      feed: {{ unresolved().join(', ') }}
     </p>
   }
 

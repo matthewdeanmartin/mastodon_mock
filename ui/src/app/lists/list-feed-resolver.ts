@@ -50,9 +50,9 @@ export class ListFeedResolver {
       return of([]);
     }
     return forkJoin(
-      handles.slice(0, MERGE_MEMBER_CAP).map((handle) =>
-        this.api.lookupAccount(handle).pipe(catchError(() => of(null))),
-      ),
+      handles
+        .slice(0, MERGE_MEMBER_CAP)
+        .map((handle) => this.api.lookupAccount(handle).pipe(catchError(() => of(null)))),
     ).pipe(map((accounts) => accounts.filter((account): account is Account => !!account)));
   }
 
@@ -76,7 +76,9 @@ export class ListFeedResolver {
     }
     return forkJoin(
       names.map((tag) =>
-        this.api.tagTimeline(tag, undefined, FEED_PER_MEMBER).pipe(catchError(() => of([] as Status[]))),
+        this.api
+          .tagTimeline(tag, undefined, FEED_PER_MEMBER)
+          .pipe(catchError(() => of([] as Status[]))),
       ),
     ).pipe(
       map((lists) => {

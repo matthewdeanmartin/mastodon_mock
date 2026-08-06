@@ -153,18 +153,18 @@ export class SettingsI18n implements OnInit {
    * `setLimits` clamps a soft limit up to the hard one — applying that on every
    * keystroke rewrites the number under the cursor as you type "100" through "1".
    */
-  protected readonly draftLimits = signal<Record<TranslationEngine, { soft: string; hard: string }>>(
-    {
-      mastodon: {
-        soft: `${this.usage.softLimit('mastodon')}`,
-        hard: `${this.usage.hardLimit('mastodon')}`,
-      },
-      openrouter: {
-        soft: `${this.usage.softLimit('openrouter')}`,
-        hard: `${this.usage.hardLimit('openrouter')}`,
-      },
+  protected readonly draftLimits = signal<
+    Record<TranslationEngine, { soft: string; hard: string }>
+  >({
+    mastodon: {
+      soft: `${this.usage.softLimit('mastodon')}`,
+      hard: `${this.usage.hardLimit('mastodon')}`,
     },
-  );
+    openrouter: {
+      soft: `${this.usage.softLimit('openrouter')}`,
+      hard: `${this.usage.hardLimit('openrouter')}`,
+    },
+  });
 
   protected setDraft(engine: TranslationEngine, field: 'soft' | 'hard', value: string): void {
     this.draftLimits.update((all) => ({ ...all, [engine]: { ...all[engine], [field]: value } }));

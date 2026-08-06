@@ -340,7 +340,11 @@ describe('ListTimeline', () => {
       .flush('', { status: 503, statusText: 'Service Unavailable' });
     fixture.detectChanges();
 
-    expect(internals(fixture).members().map((m) => m.id)).toEqual(['a']);
+    expect(
+      internals(fixture)
+        .members()
+        .map((m) => m.id),
+    ).toEqual(['a']);
     const message = (fixture.nativeElement as HTMLElement).querySelector('.member-error')!;
     expect(message.textContent).toContain('still on the list');
     expect(message.textContent).toContain('503');

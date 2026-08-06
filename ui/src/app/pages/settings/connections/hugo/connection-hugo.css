@@ -1,0 +1,39 @@
+/* Same grid as the other blog connectors, but with five fields rather than two:
+   the repo coordinates are the connection here, not just a credential. */
+.hugo-form {
+  display: grid;
+  gap: 14px;
+  max-width: 620px;
+}
+
+.hugo-form > label:not(.profile-feed-option) {
+  display: grid;
+  gap: 6px;
+}
+
+.hugo-form input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-feed-option,
+.connected-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.profile-feed-option > span {
+  display: grid;
+  gap: 3px;
+}
+
+.connected-row {
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 18px 0 10px;
+}
+
+.connected-row .btn {
+  margin-left: auto;
+}

@@ -423,8 +423,7 @@ export async function googleError(response: Response, fallback: string): Promise
   try {
     const body = (await response.json()) as GoogleErrorResponse;
     const detail =
-      body.error_description ??
-      (typeof body.error === 'string' ? body.error : body.error?.message);
+      body.error_description ?? (typeof body.error === 'string' ? body.error : body.error?.message);
     return detail ? `${fallback} ${detail}` : fallback;
   } catch {
     return fallback;

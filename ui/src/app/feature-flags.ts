@@ -12,6 +12,7 @@ export type FeatureFlagId =
   | 'connector-twitter'
   | 'connector-mataroa'
   | 'connector-blogger'
+  | 'connector-hugo'
   | 'connector-openrouter'
   | 'connector-raindrop'
   | 'connector-github'
@@ -87,6 +88,13 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     id: 'connector-blogger',
     label: 'Blog (Blogger)',
     description: 'Publishing posts and drafts to a Google Blogger blog.',
+    defaultState: 'production',
+    group: 'connectors',
+  },
+  {
+    id: 'connector-hugo',
+    label: 'Blog (Hugo)',
+    description: 'Publishing posts to a Hugo site in a GitHub repository.',
     defaultState: 'production',
     group: 'connectors',
   },

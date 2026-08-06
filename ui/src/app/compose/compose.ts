@@ -55,6 +55,8 @@ import { mataroaStatus } from '../providers/mataroa/mataroa-status';
 import { BloggerApi } from '../providers/blogger/blogger-api';
 import { BloggerSession } from '../providers/blogger/blogger-session';
 import { bloggerStatus } from '../providers/blogger/blogger-status';
+import { HugoSettings } from '../providers/hugo/hugo-settings';
+import { HugoPublish } from '../providers/hugo/hugo-publish';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 
@@ -69,20 +71,36 @@ export const MAX_POST_CHARS = 500;
  * this rather than naming each service, and a third blog connector inherits
  * them by being added here.
  */
-export function isBlogTarget(target: PostTarget): boolean {
-  return target === 'blog' || target === 'blogger';
+export function isBlogTarget(target: PostTarget): target is BlogTarget {
+  return target === 'blog' || target === 'blogger' || target === 'hugo';
 }
+
+/** The blog targets, narrowed so per-service copy can be exhaustive. */
+export type BlogTarget = 'blog' | 'blogger' | 'hugo';
+
+/**
+ * What to say when a draft's blog target is no longer publishable — the
+ * connector was disconnected, flagged off, or its credential aged out between
+ * writing the draft and sending it. Each names its own service, because
+ * "reconnect your blog" is useless to someone with three of them.
+ */
+const RECONNECT_BLOG_MESSAGE: Record<BlogTarget, string> = {
+  blogger: 'Reconnect Blogger in Settings, and choose a blog, before publishing this draft.',
+  blog: 'Reconnect Mataroa in Settings before publishing this draft.',
+  hugo: 'Reconnect your Hugo repository in Settings before publishing this draft.',
+};
 
 /** Where a top-level compose publishes. Paste is always exclusive to avoid correlation. */
 /**
  * Where a top-level compose publishes. Paste is always exclusive to avoid correlation.
  *
- * `blog` and `blogger` are two *different blogs*, not two ways of saying one:
- * `blog` is the Mataroa connector (named before there was a second) and
- * `blogger` is Google's. Both can be connected at once, so the picker offers
- * whichever are linked and the user chooses per post.
+ * `blog`, `blogger` and `hugo` are three *different blogs*, not three ways of
+ * saying one: `blog` is the Mataroa connector (named before there was a
+ * second), `blogger` is Google's, and `hugo` is a static site in a GitHub repo.
+ * All three can be connected at once, so the picker offers whichever are linked
+ * and the user chooses per post.
  */
-export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste' | 'blog' | 'blogger';
+export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste' | 'blog' | 'blogger' | 'hugo';
 
 /** Bluesky's post limit, in graphemes (not characters). */
 const BSKY_MAX_GRAPHEMES = 300;
@@ -306,6 +324,8 @@ export class Compose implements OnDestroy {
   private mataroaApi = inject(MataroaApi);
   protected blogger = inject(BloggerSession);
   private bloggerApi = inject(BloggerApi);
+  protected hugo = inject(HugoSettings);
+  private hugoPublish = inject(HugoPublish);
 
   ngOnDestroy(): void {
     this.clearCountdown();
@@ -738,12 +758,23 @@ export class Compose implements OnDestroy {
       this.blogger.ready(),
   );
 
+  /** Hugo: repo *and* token stored, flagged on, selected. */
+  protected targetIsHugo = computed(
+    () =>
+      this.showTargetPicker() &&
+      this.target() === 'hugo' &&
+      this.featureFlags.enabled('connector-hugo') &&
+      this.hugo.connected(),
+  );
+
   /**
    * Any blog. This is what the *composer* cares about: every blog target takes
    * a title, and none of them take media or polls, regardless of which service
    * is behind it.
    */
-  protected targetIncludesBlog = computed(() => this.targetIsMataroa() || this.targetIsBlogger());
+  protected targetIncludesBlog = computed(
+    () => this.targetIsMataroa() || this.targetIsBlogger() || this.targetIsHugo(),
+  );
 
   /** Publish to Blogger as a draft rather than live. Ignored by other targets. */
   protected blogDraft = signal(false);
@@ -944,6 +975,12 @@ export class Compose implements OnDestroy {
     if (
       target === 'blogger' &&
       (!this.featureFlags.enabled('connector-blogger') || !this.blogger.ready())
+    ) {
+      return;
+    }
+    if (
+      target === 'hugo' &&
+      (!this.featureFlags.enabled('connector-hugo') || !this.hugo.connected())
     ) {
       return;
     }
@@ -1433,6 +1470,10 @@ export class Compose implements OnDestroy {
         return this.blogger.ready() && this.featureFlags.enabled('connector-blogger')
           ? 'blogger'
           : fallback;
+      case 'hugo':
+        return this.hugo.connected() && this.featureFlags.enabled('connector-hugo')
+          ? 'hugo'
+          : fallback;
       case 'paste':
         return this.featureFlags.enabled('pastebin') ? 'paste' : fallback;
       case 'fedi':
@@ -1637,16 +1678,17 @@ export class Compose implements OnDestroy {
     }
     if (isBlogTarget(this.target()) && !this.targetIncludesBlog()) {
       this.submitting.set(false);
-      this.crossPostError.set(
-        this.target() === 'blogger'
-          ? 'Reconnect Blogger in Settings, and choose a blog, before publishing this draft.'
-          : 'Reconnect Mataroa in Settings before publishing this draft.',
-      );
+      this.crossPostError.set(RECONNECT_BLOG_MESSAGE[this.target() as BlogTarget]);
       return;
     }
 
     if (this.targetIsBlogger()) {
       this.sendToBlogger();
+      return;
+    }
+
+    if (this.targetIsHugo()) {
+      this.sendToHugo();
       return;
     }
 
@@ -1846,6 +1888,38 @@ export class Compose implements OnDestroy {
       this.submitting.set(false);
       this.crossPostError.set(
         error instanceof Error ? error.message : "Blogger couldn't publish this post.",
+      );
+    }
+  }
+
+  /**
+   * Publish to a Hugo site by committing a Markdown file to its repository.
+   *
+   * The body goes up as the Markdown the user typed, not as rendered HTML —
+   * the opposite of `sendToBlogger`, and for a good reason: Hugo renders
+   * Markdown itself at build time, so pre-rendering here would both duplicate
+   * that work and throw away the source the user would later want to edit.
+   */
+  private async sendToHugo(): Promise<void> {
+    const account = this.auth.account();
+    if (!account) {
+      this.submitting.set(false);
+      this.crossPostError.set('Sign in before publishing to your blog.');
+      return;
+    }
+    try {
+      const result = await this.hugoPublish.publish({
+        title: this.spoilerText().trim(),
+        body: this.text().trim(),
+        isDraft: this.blogDraft(),
+        account,
+      });
+      this.reset();
+      this.posted.emit(result.status);
+    } catch (error: unknown) {
+      this.submitting.set(false);
+      this.crossPostError.set(
+        error instanceof Error ? error.message : "Your Hugo repository couldn't accept this post.",
       );
     }
   }

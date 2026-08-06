@@ -13,6 +13,7 @@ import { ShortenerSettings } from '../providers/shortener/shortener-settings';
 import { Compose, PostTarget, describePostFailure } from './compose';
 import { MataroaSettings } from '../providers/mataroa/mataroa-settings';
 import { BloggerSession } from '../providers/blogger/blogger-session';
+import { HugoSettings } from '../providers/hugo/hugo-settings';
 
 /** Edit codes are stored apart from the records — see storage-registry.ts. */
 function storedEditKeys(): Record<string, string> {
@@ -731,6 +732,81 @@ describe('Compose', () => {
     expect(internals(f).canSubmit()).toBe(true);
     expect(internals(f).canAttachMedia()).toBe(false);
     expect(internals(f).canAddPoll()).toBe(false);
+  });
+
+  /** A connected Hugo repo, driven through real state like the others. */
+  function linkHugo(): void {
+    TestBed.inject(HugoSettings).connect('github_pat_secret', {
+      owner: 'mistersql',
+      repo: 'my-blog',
+      branch: 'main',
+      contentPath: 'content/posts',
+      siteUrl: 'https://mistersql.github.io/my-blog/',
+      includeInProfile: false,
+    });
+  }
+
+  it('offers Hugo as a third simultaneous blog target, named for its repo', () => {
+    TestBed.inject(MataroaSettings).connect('key', 'https://writer.mataroa.blog/');
+    linkBlogger();
+    linkHugo();
+    const f = setUp();
+
+    const options = [
+      ...(f.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>(
+        '.target-select option',
+      ),
+    ];
+    expect(options.map((option) => option.value)).toEqual(
+      expect.arrayContaining(['blog', 'blogger', 'hugo']),
+    );
+    // Named for the repo, so a user with three blogs can tell where a post goes.
+    expect(options.find((option) => option.value === 'hugo')?.textContent).toContain(
+      'mistersql/my-blog',
+    );
+  });
+
+  it('applies every blog rule to Hugo without naming it anywhere', () => {
+    linkHugo();
+    const f = setUp();
+    internals(f).onTargetChange('hugo');
+    internals(f).text.set('## A Markdown body');
+
+    // Title required, media and polls unavailable — all inherited from
+    // isBlogTarget rather than restated per service.
+    expect(internals(f).canSubmit()).toBe(false);
+    internals(f).spoilerText.set('A title');
+    expect(internals(f).canSubmit()).toBe(true);
+    expect(internals(f).canAttachMedia()).toBe(false);
+    expect(internals(f).canAddPoll()).toBe(false);
+  });
+
+  it('offers the draft toggle for Hugo, which has a native draft state', () => {
+    linkHugo();
+    const f = setUp();
+
+    internals(f).onTargetChange('hugo');
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).querySelector('.blog-draft')).not.toBeNull();
+  });
+
+  it('does not offer Hugo when only the repo is stored and the token has gone', () => {
+    // The state an imported-settings browser is in: coordinates, no credential.
+    // The repo half alone cannot publish, so offering the target would be a
+    // button whose only outcome is an error.
+    localStorage.setItem(
+      'mockingbird_hugo_repo',
+      JSON.stringify({ owner: 'mistersql', repo: 'my-blog' }),
+    );
+    const f = setUp();
+
+    expect(TestBed.inject(HugoSettings).repo()).not.toBeNull();
+    const values = [
+      ...(f.nativeElement as HTMLElement).querySelectorAll<HTMLOptionElement>(
+        '.target-select option',
+      ),
+    ].map((option) => option.value);
+    expect(values).not.toContain('hugo');
   });
 
   // ------------------------------------------------- paste visibility clamping

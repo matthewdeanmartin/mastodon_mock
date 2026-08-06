@@ -190,9 +190,9 @@
           Don't translate a post that's already in my language
         </label>
         <span class="hint">
-          Skips the request when a post declares your language, or clearly reads as it —
-          translating it would hand back the same text and still spend a call. Posts whose
-          language can't be determined are always translated when you ask.
+          Skips the request when a post declares your language, or clearly reads as it — translating
+          it would hand back the same text and still spend a call. Posts whose language can't be
+          determined are always translated when you ask.
         </span>
       </div>
     </div>
@@ -212,9 +212,9 @@
         <span class="hint">
           Translates posts in a language you're learning, using
           <strong>{{ engineLabels.mastodon }}</strong
-          >. Posts in a language you know are never translated, and neither are posts whose
-          language can't be determined — those are usually English. Hovering needs a mouse, so
-          it does nothing on a touchscreen.
+          >. Posts in a language you know are never translated, and neither are posts whose language
+          can't be determined — those are usually English. Hovering needs a mouse, so it does
+          nothing on a touchscreen.
         </span>
 
         @if (prefs.autoTranslateMode() !== 'off') {
@@ -229,8 +229,8 @@
           </label>
           <span class="hint">
             Unbounded, and priced accordingly: every post in a language you don't read becomes a
-            translation. Useful for reading a timeline you share no language with. Watch the
-            daily count below.
+            translation. Useful for reading a timeline you share no language with. Watch the daily
+            count below.
           </span>
 
           <label class="checkline">
@@ -255,9 +255,9 @@
       <span class="slabel">Translation budget</span>
       <div class="scontrol">
         <span class="hint">
-          Translations are counted per day and per service, and the two budgets are kept
-          separate — running out on one never blocks the other. Counts reset at midnight, your
-          time. Only the number of translations is stored, never what was translated.
+          Translations are counted per day and per service, and the two budgets are kept separate —
+          running out on one never blocks the other. Counts reset at midnight, your time. Only the
+          number of translations is stored, never what was translated.
         </span>
 
         @for (engine of engines; track engine) {

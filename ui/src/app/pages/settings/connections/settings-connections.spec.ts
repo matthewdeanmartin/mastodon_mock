@@ -66,11 +66,21 @@ describe('SettingsConnections (catalog)', () => {
     ];
   }
 
+  /**
+   * Find a card by its *heading*, not by any text anywhere inside it.
+   *
+   * A substring match over the whole card was ambiguous the moment a connector
+   * mentioned another one in its copy: the Hugo card says it needs a GitHub
+   * token, so `cardFor(…, 'GitHub')` matched Hugo whenever Hugo sorted first.
+   * The heading is the card's identity, so that is what to match on.
+   */
   function cardFor(
     fixture: ComponentFixture<SettingsConnections>,
     label: string,
   ): HTMLAnchorElement {
-    return cards(fixture).find((card) => card.textContent?.includes(label))!;
+    return cards(fixture).find(
+      (card) => card.querySelector('.catalog-label')?.textContent?.trim() === label,
+    )!;
   }
 
   it('lists every connector with its pitch and what it enables', () => {
@@ -141,9 +151,9 @@ describe('SettingsConnections (catalog)', () => {
     // can create and delete links on a domain the user publishes under), plus
     // the optional Pastepile key (pasted on the Pastes page, but a stored
     // secret all the same), plus the Twitter data-service key (which spends a prepaid
-    // credit balance).
+    // credit balance), plus the Hugo repo's write token.
     const governed = govern.mock.calls[0][0];
-    expect(governed).toHaveLength(9);
+    expect(governed).toHaveLength(10);
     // Asserted by identity, not just by count: a bare length check passes just
     // as happily when a connector is swapped for the wrong one.
     expect(governed).toContain(TestBed.inject(CorsProxySettings));

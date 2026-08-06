@@ -32,7 +32,7 @@ export interface Draft {
    * removing here, since restoring one is already filtered through
    * `Compose.restorableTarget`.
    */
-  target?: 'fedi' | 'bsky' | 'both' | 'paste' | 'blog' | 'blogger';
+  target?: 'fedi' | 'bsky' | 'both' | 'paste' | 'blog' | 'blogger' | 'hugo';
   /** Paste-service id, deliberately separate so another pastebin can be added later. */
   pasteProviderId?: string;
   pasteLanguage?: string;

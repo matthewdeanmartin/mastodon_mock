@@ -1150,7 +1150,10 @@ export class StatusCard {
    * so this asks `AiTranslate` for it rather than assuming English.
    */
   private alreadyInTargetLanguage(): boolean {
-    return this.eligibility.isAlreadyTargetLanguage(this.display, this.aiTranslate.targetLanguage());
+    return this.eligibility.isAlreadyTargetLanguage(
+      this.display,
+      this.aiTranslate.targetLanguage(),
+    );
   }
 
   /** Explains a refusal, and says how to override it — never a dead end. */

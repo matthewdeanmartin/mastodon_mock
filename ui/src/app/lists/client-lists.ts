@@ -64,7 +64,10 @@ export function handleFor(account: Account, fallbackHost = ''): string {
     return acct.toLowerCase();
   }
   const username = (acct || account.username || '').toLowerCase();
-  const host = fallbackHost.toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const host = fallbackHost
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '');
   return host ? `${username}@${host}` : username;
 }
 

@@ -149,7 +149,6 @@ export class Algo implements OnInit {
     this.prefs.setAlgoCalm(enabled);
   }
 
-
   shuffle(): void {
     this.diagnostics.info('Algo', 'user:shuffle', { posts: this.feed.posts().length });
     this.feed.shufflePosts();

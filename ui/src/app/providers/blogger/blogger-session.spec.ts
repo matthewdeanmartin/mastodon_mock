@@ -65,9 +65,11 @@ describe('BloggerSession', () => {
   it('exchanges the code without a client secret and stores the token', async () => {
     const assign = vi.fn();
     vi.stubGlobal('location', { ...location, assign, search: '' });
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 }),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 }),
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const blogger = session();

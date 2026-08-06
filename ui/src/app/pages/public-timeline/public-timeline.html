@@ -3,10 +3,7 @@
   <button class="tab" [class.active]="local()" (click)="setLocal(true)">Local</button>
 </div>
 
-<app-command-bar
-  [showRefresh]="!live()"
-  (refresh)="load()"
-/>
+<app-command-bar [showRefresh]="!live()" (refresh)="load()" />
 
 @if (loading()) {
   <p class="muted center">Loading…</p>

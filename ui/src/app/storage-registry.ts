@@ -147,6 +147,20 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Mataroa API key plus the linked public blog URL and profile-feed opt-in. Account-scoped because the blog is part of one public persona.',
   },
   {
+    base: 'mockingbird_hugo_credentials',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'secret',
+    note: 'Fine-grained GitHub token with write access to the Hugo blog repository. Deliberately separate from mockingbird_github_credentials, which is read-only.',
+  },
+  {
+    base: 'mockingbird_hugo_repo',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Hugo blog repository coordinates: owner, repo, branch, content path, public site URL, profile-feed opt-in. Account-scoped because the blog is part of one public persona.',
+  },
+  {
     base: 'mockingbird_paste_edit_keys',
     storage: 'local',
     suffix: 'none',

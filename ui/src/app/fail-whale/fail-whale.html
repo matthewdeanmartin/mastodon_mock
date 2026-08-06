@@ -51,7 +51,11 @@
 
   <!-- Under everything else: what actually failed. No one else is going to read
        a log for the user, so the evidence lives here where they can act on it. -->
-  <details class="diagnostics" [open]="detailsOpen()" (toggle)="detailsOpen.set($any($event.target).open)">
+  <details
+    class="diagnostics"
+    [open]="detailsOpen()"
+    (toggle)="detailsOpen.set($any($event.target).open)"
+  >
     <summary>What went wrong?</summary>
 
     @if (health.failure(); as failure) {
@@ -69,10 +73,14 @@
         </dd>
 
         <dt>Request</dt>
-        <dd><code>{{ failure.url }}</code></dd>
+        <dd>
+          <code>{{ failure.url }}</code>
+        </dd>
 
         <dt>Server</dt>
-        <dd><code>{{ status.currentDomain() || 'unknown' }}</code></dd>
+        <dd>
+          <code>{{ status.currentDomain() || 'unknown' }}</code>
+        </dd>
 
         <dt>Time</dt>
         <dd>{{ failure.at.toLocaleTimeString() }}</dd>
@@ -82,7 +90,9 @@
 
         @if (build.commit) {
           <dt>Build</dt>
-          <dd><code>{{ build.commit.slice(0, 8) }}</code></dd>
+          <dd>
+            <code>{{ build.commit.slice(0, 8) }}</code>
+          </dd>
         }
       </dl>
     } @else {

@@ -82,9 +82,9 @@ describe('TranslateDialog', () => {
     fixture.detectChanges();
 
     expect(internals(fixture).error()).toBe('Rate limited.');
-    expect((fixture.nativeElement as HTMLElement).querySelector('.tr-error')!.textContent).toContain(
-      'Rate limited.',
-    );
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('.tr-error')!.textContent,
+    ).toContain('Rate limited.');
   });
 
   it('does not call the model for an empty composer', async () => {

@@ -11,6 +11,7 @@ import { ShortenerSettings } from '../../../providers/shortener/shortener-settin
 import { TwitterSettings } from '../../../providers/twitter/twitter-settings';
 import { MataroaSettings } from '../../../providers/mataroa/mataroa-settings';
 import { BloggerSession } from '../../../providers/blogger/blogger-session';
+import { HugoSettings } from '../../../providers/hugo/hugo-settings';
 import {
   CREDENTIAL_LIFETIME_OPTIONS,
   CredentialLifetime,
@@ -67,6 +68,7 @@ export class SettingsConnections implements OnInit {
   private twitter = inject(TwitterSettings);
   private mataroa = inject(MataroaSettings);
   private blogger = inject(BloggerSession);
+  private hugo = inject(HugoSettings);
   // Not a catalog entry — a paste service is a list, not a one-account
   // connector, so the key is managed on the Pastes page. Governed here anyway,
   // because a stored secret obeys the retention policy wherever it was created.
@@ -154,6 +156,10 @@ export class SettingsConnections implements OnInit {
           }
           // "Connected" means publishable: signed in *and* a blog chosen.
           return { entry, connected: this.blogger.ready(), unavailableReason: null };
+        case 'hugo':
+          // Both halves: the repo can outlive the token, and in that state
+          // nothing can be published.
+          return { entry, connected: this.hugo.connected(), unavailableReason: null };
       }
     }
   }
@@ -176,6 +182,7 @@ export class SettingsConnections implements OnInit {
       this.shortener,
       this.twitter,
       this.mataroa,
+      this.hugo,
       this.pastepileKey,
     ]);
     this.lifetimes.enforceAll();

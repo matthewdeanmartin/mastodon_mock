@@ -64,11 +64,7 @@ interface TagBundleState {
  * rather than spellings of the same one.
  */
 export function normalizeTag(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^#+/, '')
-    .replace(/\s+/g, '')
-    .toLowerCase();
+  return raw.trim().replace(/^#+/, '').replace(/\s+/g, '').toLowerCase();
 }
 
 @Injectable({ providedIn: 'root' })
@@ -189,9 +185,7 @@ export class TagBundles {
       this.diagnostics.info('TagBundles', 'bundle:full', { id, attempted: name });
       return false;
     }
-    this.persist(
-      this.bundles().map((b) => (b.id === id ? { ...b, tags: [...b.tags, name] } : b)),
-    );
+    this.persist(this.bundles().map((b) => (b.id === id ? { ...b, tags: [...b.tags, name] } : b)));
     return true;
   }
 

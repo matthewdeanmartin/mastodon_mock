@@ -221,6 +221,13 @@ export const routes: Routes = [
                   ),
               },
               {
+                path: 'hugo',
+                loadComponent: () =>
+                  import('./pages/settings/connections/hugo/connection-hugo').then(
+                    (m) => m.ConnectionHugo,
+                  ),
+              },
+              {
                 // Not a connector, but it belongs under the connections tree:
                 // it answers "which of these is worth setting up on this
                 // network?", which is a question about all of them at once.

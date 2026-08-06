@@ -77,9 +77,7 @@ describe('FailWhale', () => {
     expect(details.textContent).toContain('no response reached the browser');
     expect(details.textContent).toContain('/api/v1/timelines/home');
     // The doctor is offered whether or not the instance looks like the culprit.
-    expect(details.querySelector('a')!.getAttribute('href')).toBe(
-      '/settings/connections/doctor',
-    );
+    expect(details.querySelector('a')!.getAttribute('href')).toBe('/settings/connections/doctor');
   });
 
   it('says so plainly rather than showing an empty box when nothing was recorded', () => {

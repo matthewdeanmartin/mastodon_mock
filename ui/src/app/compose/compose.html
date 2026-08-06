@@ -245,23 +245,36 @@
               <option value="both">🦣+🦋 Both</option>
             }
           }
-          <!-- Two blogs can be connected at once, so they are separate options
-               rather than one "Blog". Blogger needs a chosen blog, not just a
-               session, or the post would have nowhere to go. -->
+          <!-- Three blogs can be connected at once, so they are separate
+               options rather than one "Blog". Blogger needs a chosen blog, not
+               just a session, and Hugo needs its write token as well as its
+               repo, or the post would have nowhere to go. -->
           @if (mataroa.connected() && featureFlags.enabled('connector-mataroa')) {
             <option value="blog">✍️ Mataroa</option>
           }
           @if (blogger.ready() && featureFlags.enabled('connector-blogger')) {
             <option value="blogger">✍️ {{ blogger.blogName() || 'Blogger' }}</option>
           }
+          @if (hugo.connected() && featureFlags.enabled('connector-hugo')) {
+            <option value="hugo">✍️ {{ hugo.slug() || 'Hugo' }}</option>
+          }
           @if (featureFlags.enabled('pastebin')) {
             <option value="paste">📋 Paste</option>
           }
         </select>
       }
-      @if (targetIsBlogger()) {
-        <!-- Blogger-only: Mataroa publishes immediately and has no draft state. -->
-        <label class="blog-draft" title="Save to Blogger as a draft instead of publishing it">
+      @if (targetIsBlogger() || targetIsHugo()) {
+        <!-- Blogger and Hugo both have a native draft state; Mataroa publishes
+             immediately and has none. A Hugo draft is still committed to the
+             repo — it is just not built into the site. -->
+        <label
+          class="blog-draft"
+          [title]="
+            targetIsHugo()
+              ? 'Commit with draft = true, so Hugo leaves it out of the built site'
+              : 'Save to Blogger as a draft instead of publishing it'
+          "
+        >
           <input
             type="checkbox"
             [checked]="blogDraft()"
@@ -526,7 +539,9 @@
                     : targetIncludesPaste()
                       ? 'Paste'
                       : targetIncludesBlog()
-                        ? (blogDraft() ? 'Save draft' : 'Publish')
+                        ? blogDraft()
+                          ? 'Save draft'
+                          : 'Publish'
                         : thread().length
                           ? words().PostAll
                           : words().Post

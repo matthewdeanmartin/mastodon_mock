@@ -67,9 +67,9 @@ describe('FeedLanguagePicker', () => {
     expect(prefs.feedLanguages()).toEqual(['eo']);
     // Choosing a language must actually filter, or the control does nothing.
     expect(prefs.hideForeignLangPosts()).toBe(true);
-    expect((fixture.nativeElement as HTMLElement).querySelector('.lang-button')!.textContent).toContain(
-      'Esperanto',
-    );
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('.lang-button')!.textContent,
+    ).toContain('Esperanto');
   });
 
   it('names a pair, and falls back to a count past two', () => {

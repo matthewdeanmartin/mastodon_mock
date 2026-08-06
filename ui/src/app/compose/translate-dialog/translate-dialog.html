@@ -13,11 +13,7 @@
 
   <label class="tr-target">
     <span>Translate into</span>
-    <select
-      [value]="target()"
-      (change)="target.set($any($event.target).value)"
-      [disabled]="busy()"
-    >
+    <select [value]="target()" (change)="target.set($any($event.target).value)" [disabled]="busy()">
       @for (option of options(); track option.code) {
         <option [value]="option.code">{{ option.name }}</option>
       }

@@ -1,0 +1,166 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>✍️ Blog (Hugo)</h1>
+  <p>
+    Publish Markdown posts to your own Hugo site on GitHub. A post is a file: Mawkingbird commits it
+    to your repository, and GitHub builds the site. Nobody else hosts your writing, and there is no
+    blog service that can close your account.
+  </p>
+  <p class="muted small">{{ scopeDetail }}</p>
+</div>
+
+<ol class="setup-steps muted small">
+  <li>
+    Have a Hugo site in a GitHub repository. Starting from scratch?
+    <a href="https://gohugo.io/getting-started/quick-start/" target="_blank" rel="noopener">
+      Hugo's quick start ↗
+    </a>
+    — or fork any Hugo theme's example site, then turn on GitHub Pages for it.
+  </li>
+  <li>
+    <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener"
+      >Create a fine-grained personal access token ↗</a
+    >. Under <strong>Repository access</strong> pick <strong>Only select repositories</strong> and
+    choose your blog repo. Under <strong>Permissions → Repository</strong> set
+    <code>Contents</code> to <strong>Read and write</strong>, and <code>Actions</code> to
+    <strong>Read-only</strong> (that one is for showing build status later).
+  </li>
+  <li>Paste it below with your repository details, then save. We check them before storing.</li>
+</ol>
+
+<p class="credential-warning small">
+  This token can commit files to the repository you scope it to. It is stored in this browser's
+  localStorage, never sent to Mawkingbird, and sent only to <code>api.github.com</code> — no CORS
+  proxy is involved, because GitHub's API accepts browser requests directly. Scope it to the one
+  blog repository, and revoke it in GitHub to invalidate it.
+</p>
+
+@if (settings.connected()) {
+  <div class="connected-row">
+    <span class="connection-ok">Connected</span>
+    <a [href]="'https://github.com/' + settings.slug()" target="_blank" rel="noopener noreferrer"
+      >{{ settings.slug() }} ↗</a
+    >
+    @if (settings.siteUrl(); as site) {
+      <a [href]="site" target="_blank" rel="noopener noreferrer">View site ↗</a>
+    }
+    <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
+  </div>
+  @if (settings.repo(); as repo) {
+    <p class="muted small">
+      Publishing to <code>{{ repo.contentPath }}/</code> on <code>{{ repo.branch }}</code
+      >.
+    </p>
+  }
+  @if (expiryLabel(settings.expiresAt()); as expiry) {
+    <p class="muted small">This token is deleted from this browser on {{ expiry }}.</p>
+  }
+  <label class="profile-feed-option">
+    <input
+      type="checkbox"
+      [ngModel]="settings.includeInProfile()"
+      (ngModelChange)="setProfileFeed($event)"
+      [disabled]="!settings.siteUrl()"
+    />
+    <span>
+      <strong>Include my blog's RSS feed in my profile feed</strong>
+      <span class="muted small">
+        @if (settings.siteUrl()) {
+          Your published posts appear alongside your Mawkingbird posts on your own profile.
+        } @else {
+          Add your site address to turn this on.
+        }
+      </span>
+    </span>
+  </label>
+} @else {
+  @if (needsToken()) {
+    <p class="muted small">
+      Your repository details are saved, but the token is gone — either it aged out under the
+      retention policy, or these settings were imported from another browser. Paste a token to
+      publish again.
+    </p>
+  }
+  <form class="hugo-form" (ngSubmit)="connect()">
+    <label>
+      <span>GitHub token</span>
+      <input
+        type="password"
+        name="hugoToken"
+        autocomplete="off"
+        placeholder="github_pat_…"
+        [ngModel]="token()"
+        (ngModelChange)="token.set($event)"
+        [disabled]="busy()"
+      />
+    </label>
+    <label>
+      <span>Repository</span>
+      <input
+        type="text"
+        name="repo"
+        placeholder="you/your-blog"
+        [ngModel]="repoInput()"
+        (ngModelChange)="repoInput.set($event)"
+        [disabled]="busy()"
+      />
+      <span class="muted small">Or paste the repository's address from your browser.</span>
+    </label>
+    <label>
+      <span>Branch</span>
+      <input
+        type="text"
+        name="branch"
+        placeholder="main"
+        [ngModel]="branch()"
+        (ngModelChange)="branch.set($event)"
+        [disabled]="busy()"
+      />
+      <span class="muted small">The branch your site is built from.</span>
+    </label>
+    <label>
+      <span>Posts folder</span>
+      <input
+        type="text"
+        name="contentPath"
+        placeholder="content/posts"
+        [ngModel]="contentPath()"
+        (ngModelChange)="contentPath.set($event)"
+        [disabled]="busy()"
+      />
+      <span class="muted small">
+        Where your posts live in the repository. Some themes use
+        <code>content/post</code> or <code>content/blog</code>.
+      </span>
+    </label>
+    <label>
+      <span>Site address <span class="muted">(optional)</span></span>
+      <input
+        type="url"
+        name="siteUrl"
+        placeholder="https://you.github.io/your-blog/"
+        [ngModel]="siteUrl()"
+        (ngModelChange)="siteUrl.set($event)"
+        [disabled]="busy()"
+      />
+      <span class="muted small">
+        Used to link to a published post. Without it, posts link to the file on GitHub.
+      </span>
+    </label>
+
+    <button class="btn" type="submit" [disabled]="!canSubmit()">
+      {{ busy() ? 'Checking…' : 'Save and check repository' }}
+    </button>
+  </form>
+}
+
+@if (notice(); as message) {
+  <p class="connection-ok" role="status">{{ message }}</p>
+}
+@if (warning(); as message) {
+  <p class="muted small" role="status">{{ message }}</p>
+}
+@if (error(); as message) {
+  <p class="feed-error" role="alert">{{ message }}</p>
+}
