@@ -7,6 +7,19 @@
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
 >
+  @if (hugoEdit.current(); as edit) {
+    <!-- Unmistakable, because the failure mode is someone thinking they are
+         writing something new and instead overwriting a published post. -->
+    <div class="hugo-editing" role="status">
+      <span class="hugo-editing-what">
+        Editing <strong>{{ edit.originalTitle || edit.path }}</strong>
+        <span class="muted small">{{ edit.path }}</span>
+      </span>
+      <button class="btn btn-outline btn-sm" type="button" (click)="cancelHugoEdit()">
+        Cancel edit
+      </button>
+    </div>
+  }
   @if (cwOpen() || targetIncludesBlog()) {
     <input
       class="cw-input"
@@ -539,9 +552,11 @@
                     : targetIncludesPaste()
                       ? 'Paste'
                       : targetIncludesBlog()
-                        ? blogDraft()
-                          ? 'Save draft'
-                          : 'Publish'
+                        ? hugoEdit.editing()
+                          ? 'Update post'
+                          : blogDraft()
+                            ? 'Save draft'
+                            : 'Publish'
                         : thread().length
                           ? words().PostAll
                           : words().Post

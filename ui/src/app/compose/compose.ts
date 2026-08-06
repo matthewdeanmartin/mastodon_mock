@@ -57,6 +57,9 @@ import { BloggerSession } from '../providers/blogger/blogger-session';
 import { bloggerStatus } from '../providers/blogger/blogger-status';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
 import { HugoPublish } from '../providers/hugo/hugo-publish';
+import { HugoEditSession } from '../providers/hugo/hugo-edit-session';
+import { HugoApiError } from '../providers/hugo/hugo-contents';
+import { hugoStatus } from '../providers/hugo/hugo-post';
 
 const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 
@@ -326,6 +329,7 @@ export class Compose implements OnDestroy {
   private bloggerApi = inject(BloggerApi);
   protected hugo = inject(HugoSettings);
   private hugoPublish = inject(HugoPublish);
+  protected hugoEdit = inject(HugoEditSession);
 
   ngOnDestroy(): void {
     this.clearCountdown();
@@ -730,7 +734,14 @@ export class Compose implements OnDestroy {
 
   // Post target (top-level composes only; replies/quotes always stay on Fedi).
   protected target = signal<PostTarget>(
-    this.auth.isAnonymous && this.featureFlags.enabled('pastebin') ? 'paste' : 'fedi',
+    // A parked Hugo edit decides the target before anything else can: the user
+    // clicked "Edit" on a specific file, so opening on Fedi would offer to post
+    // their blog post as a toot.
+    this.hugoEdit.editing()
+      ? 'hugo'
+      : this.auth.isAnonymous && this.featureFlags.enabled('pastebin')
+        ? 'paste'
+        : 'fedi',
   );
   protected showTargetPicker = computed(() => !this.inReplyToId() && !this.quotedStatusId());
   protected targetIncludesBsky = computed(
@@ -983,6 +994,13 @@ export class Compose implements OnDestroy {
       (!this.featureFlags.enabled('connector-hugo') || !this.hugo.connected())
     ) {
       return;
+    }
+    if (target !== 'hugo' && this.hugoEdit.editing()) {
+      // Leaving Hugo abandons the edit rather than carrying it: a parked path
+      // and sha that outlived the target would attach to whatever the user
+      // writes next, and silently overwrite a file they had stopped thinking
+      // about. The file itself is untouched either way.
+      this.hugoEdit.cancel();
     }
     const wasPaste = this.target() === 'paste';
     this.target.set(target);
@@ -1907,10 +1925,33 @@ export class Compose implements OnDestroy {
       this.crossPostError.set('Sign in before publishing to your blog.');
       return;
     }
+    const title = this.spoilerText().trim();
+    const body = this.text().trim();
+    const edit = this.hugoEdit.current();
     try {
+      if (edit) {
+        // Rewriting a file that already exists: same path, same date, same
+        // unknown front-matter keys, new sha afterwards.
+        const result = await this.hugoPublish.update({
+          title,
+          body,
+          isDraft: this.blogDraft(),
+          edit,
+        });
+        this.hugoEdit.finish();
+        this.reset();
+        this.posted.emit(
+          hugoStatus(result.commit, title, body, account, {
+            slug: result.slug,
+            permalink: this.hugo.permalinkFor(result.slug),
+            isDraft: this.blogDraft(),
+          }),
+        );
+        return;
+      }
       const result = await this.hugoPublish.publish({
-        title: this.spoilerText().trim(),
-        body: this.text().trim(),
+        title,
+        body,
         isDraft: this.blogDraft(),
         account,
       });
@@ -1919,9 +1960,19 @@ export class Compose implements OnDestroy {
     } catch (error: unknown) {
       this.submitting.set(false);
       this.crossPostError.set(
-        error instanceof Error ? error.message : "Your Hugo repository couldn't accept this post.",
+        error instanceof HugoApiError && error.status === 409
+          ? 'This post changed on GitHub since you opened it. Reopen it from Settings to get the current version — publishing now would overwrite that change.'
+          : error instanceof Error
+            ? error.message
+            : "Your Hugo repository couldn't accept this post.",
       );
     }
+  }
+
+  /** Abandon an in-progress Hugo edit, leaving the file untouched. */
+  cancelHugoEdit(): void {
+    this.hugoEdit.cancel();
+    this.reset();
   }
 
   private sendToBlog(): void {

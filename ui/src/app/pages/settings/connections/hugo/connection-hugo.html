@@ -74,6 +74,80 @@
       </span>
     </span>
   </label>
+
+  <div class="posts-head">
+    <h2>Posts in this repository</h2>
+    <button
+      class="btn btn-outline btn-sm"
+      type="button"
+      (click)="refresh()"
+      [disabled]="posts.loading()"
+    >
+      {{ posts.loading() ? 'Reading…' : 'Refresh' }}
+    </button>
+  </div>
+
+  @if (posts.error(); as message) {
+    <p class="feed-error" role="alert">{{ message }}</p>
+  } @else if (posts.loading()) {
+    <p class="muted small">Reading your posts folder…</p>
+  } @else if (!posts.rows().length) {
+    <p class="muted small">
+      No posts yet in <code>{{ settings.repo()?.contentPath }}/</code>. Publish one from the
+      composer and it will show up here.
+    </p>
+  } @else {
+    <ul class="hugo-posts">
+      @for (row of posts.rows(); track row.path) {
+        <li class="hugo-post">
+          <span class="hugo-post-main">
+            <span class="hugo-post-title">
+              {{ row.title }}
+              @if (row.draft) {
+                <span class="pill pill-off">Draft</span>
+              }
+            </span>
+            <span class="muted small">
+              @if (row.date) {
+                {{ row.date | date: 'mediumDate' }} ·
+              }
+              <code>{{ row.slug }}.md</code>
+              @if (row.source === 'filename') {
+                <span
+                  title="Read from the file name — this post's own title and date have not been loaded yet."
+                  >· from file name</span
+                >
+              }
+            </span>
+          </span>
+          <button
+            class="btn btn-outline btn-sm"
+            type="button"
+            (click)="edit(row)"
+            [disabled]="!!opening()"
+          >
+            {{ opening() === row.path ? 'Opening…' : 'Edit' }}
+          </button>
+        </li>
+      }
+    </ul>
+    @if (posts.hasMoreToHydrate()) {
+      <button
+        class="btn btn-outline btn-sm"
+        type="button"
+        (click)="showMore()"
+        [disabled]="posts.hydrating()"
+      >
+        {{ posts.hydrating() ? 'Reading…' : 'Load more titles' }}
+      </button>
+      <p class="muted small">
+        Titles and dates are read one file at a time, so only the newest are loaded up front.
+      </p>
+    }
+  }
+  @if (openError(); as message) {
+    <p class="feed-error" role="alert">{{ message }}</p>
+  }
 } @else {
   @if (needsToken()) {
     <p class="muted small">

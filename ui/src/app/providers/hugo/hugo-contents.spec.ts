@@ -57,6 +57,10 @@ describe('HugoContents', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    // restoreAllMocks puts the original `fetch` back but does not clear the
+    // call log of a spy a previous test installed on it. Both are needed, or
+    // call counts leak forward between tests.
+    vi.clearAllMocks();
   });
 
   it('refuses to call GitHub with no token stored', async () => {

@@ -8,7 +8,7 @@ import {
   ExpiringCredential,
   stampCredential,
 } from '../credential-lifetime';
-import { normalizeContentPath } from './hugo-post';
+import { normalizeContentPath, predictedPermalink } from './hugo-post';
 
 /**
  * The Hugo repo this account publishes to, and the token that may write to it.
@@ -153,6 +153,17 @@ export class HugoSettings implements ExpiringConnection {
   /** The write token, or null. Only the contents API should need this. */
   token(): string | null {
     return this.credentials()?.accessToken ?? null;
+  }
+
+  /**
+   * Where a slug will live on the built site, or null with no site address.
+   *
+   * A convenience over {@link predictedPermalink} so callers do not each have
+   * to unpack the repo to pass its content path and site URL.
+   */
+  permalinkFor(slug: string): string | null {
+    const repo = this.repoState();
+    return repo ? predictedPermalink(repo.siteUrl, repo.contentPath, slug) : null;
   }
 
   /**

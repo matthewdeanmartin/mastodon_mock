@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Account } from '../../models';
 import { decodeBase64 } from './hugo-contents';
+import { HugoEdit } from './hugo-edit-session';
 import { parseFrontMatter } from './hugo-front-matter';
 import { HugoPublish } from './hugo-publish';
 import { HugoRepo, HugoSettings } from './hugo-settings';
@@ -69,6 +70,10 @@ describe('HugoPublish', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    // restoreAllMocks puts the original `fetch` back but does not clear the
+    // call log of a spy a previous test installed on it, so counts leak
+    // forward. Both are needed.
+    vi.clearAllMocks();
   });
 
   it('commits a post with TOML front matter and returns a blog Status', async () => {
@@ -211,5 +216,127 @@ describe('HugoPublish', () => {
     // The title itself survives intact in the front matter even though the
     // slug could not be derived from it.
     expect(parseFrontMatter(sentFile()).title).toBe('日本語のタイトル');
+  });
+
+  describe('update', () => {
+    const EDIT: HugoEdit = {
+      path: 'content/posts/hello-world.md',
+      sha: 'blob-1',
+      format: 'toml',
+      date: '2020-03-04T05:06:07Z',
+      extraLines: ['weight = 5', 'categories = ["dev"]', '[params]', 'hero = "img.png"'],
+      originalTitle: 'Hello World',
+    };
+
+    it('writes back to the same path with the sha, and keeps the slug', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(created());
+      const publish = connect();
+
+      const result = await publish.update({
+        title: 'Hello World',
+        body: 'Revised body.',
+        isDraft: false,
+        edit: EDIT,
+      });
+
+      expect(sentPath()).toContain('/contents/content/posts/hello-world.md');
+      const [, init] = githubCalls()[0];
+      expect(JSON.parse(init.body as string).sha).toBe('blob-1');
+      expect(result.slug).toBe('hello-world');
+    });
+
+    it('does not move the file when the title changes, so the URL survives', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(created());
+      const publish = connect();
+
+      const result = await publish.update({
+        title: 'A Completely Different Title',
+        body: 'x',
+        isDraft: false,
+        edit: EDIT,
+      });
+
+      // Renaming a live post breaks every link to it.
+      expect(sentPath()).toContain('hello-world.md');
+      expect(sentPath()).not.toContain('a-completely-different-title');
+      expect(result.slug).toBe('hello-world');
+      expect(parseFrontMatter(sentFile()).title).toBe('A Completely Different Title');
+    });
+
+    it('keeps the original publish date rather than restamping it', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(created());
+      const publish = connect();
+
+      await publish.update({ title: 'Hello World', body: 'x', isDraft: false, edit: EDIT });
+
+      // Restamping would reorder the whole blog on the next build.
+      expect(parseFrontMatter(sentFile()).date).toBe('2020-03-04T05:06:07Z');
+    });
+
+    it('carries every unmodelled front-matter key through untouched', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(created());
+      const publish = connect();
+
+      await publish.update({ title: 'Hello World', body: 'x', isDraft: false, edit: EDIT });
+
+      const file = sentFile();
+      for (const survivor of EDIT.extraLines) {
+        expect(file).toContain(survivor);
+      }
+    });
+
+    it('rewrites a YAML post as YAML, never converting it to TOML', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(created());
+      const publish = connect();
+
+      await publish.update({
+        title: 'Hello World',
+        body: 'x',
+        isDraft: false,
+        edit: { ...EDIT, format: 'yaml', extraLines: ['layout: special'] },
+      });
+
+      const file = sentFile();
+      expect(file.startsWith('---\n')).toBe(true);
+      expect(file).not.toContain('+++');
+      expect(file).toContain('layout: special');
+    });
+
+    it('can publish a draft by clearing the flag', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(created());
+      const publish = connect();
+
+      await publish.update({ title: 'Hello World', body: 'x', isDraft: false, edit: EDIT });
+
+      expect(parseFrontMatter(sentFile()).draft).toBe(false);
+    });
+
+    it('lets a 409 through so the caller can explain the concurrent edit', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ message: 'Conflict' }), { status: 409 }),
+      );
+      const publish = connect();
+
+      await expect(
+        publish.update({ title: 'Hello World', body: 'x', isDraft: false, edit: EDIT }),
+      ).rejects.toThrow(/changed on GitHub/);
+
+      // Never retried: retrying a 409 is how you overwrite someone's work.
+      expect(githubCalls()).toHaveLength(1);
+    });
+
+    it('refuses an empty title or body before making any request', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(created());
+      const publish = connect();
+
+      await expect(
+        publish.update({ title: ' ', body: 'x', isDraft: false, edit: EDIT }),
+      ).rejects.toThrow(/title/i);
+      await expect(
+        publish.update({ title: 'Hello', body: ' ', isDraft: false, edit: EDIT }),
+      ).rejects.toThrow(/publish/i);
+
+      expect(githubCalls()).toHaveLength(0);
+    });
   });
 });

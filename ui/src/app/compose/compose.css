@@ -497,3 +497,33 @@ textarea {
   color: var(--text);
   font-size: 14px;
 }
+
+/* "You are rewriting a published file", stated loudly enough that nobody
+   mistakes this composer for a fresh post. The failure mode is silent
+   overwriting, so this is deliberately the most prominent thing in the box. */
+.hugo-editing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+
+.hugo-editing-what {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hugo-editing-what span {
+  overflow-wrap: anywhere;
+}
+
+.hugo-editing .btn {
+  margin-left: auto;
+}

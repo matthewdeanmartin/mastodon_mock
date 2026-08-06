@@ -1,6 +1,40 @@
 # Hugo — Sprint 2: See your posts, edit one
 
-Status: PLANNED (2026-08-05). Roadmap: `hugo-0-overview.md`. Depends on sprint 1.
+Status: COMPLETE (implemented 2026-08-05; 3255 tests, lint, prettier and both builds clean;
+53 tests added). Roadmap: `hugo-0-overview.md`. Depends on sprint 1.
+
+## What changed during implementation
+
+- **The handoff mechanism already existed, and it is two halves, not one.** The plan said
+  "find how a draft is loaded into the composer and reuse that path". It turned out to be
+  `Drafts.handoff()` — an in-memory slot that /drafts and /pastes already use for "Edit for
+  post", drained once by the composer on seed. That carries the title and body perfectly.
+  It cannot carry a path, a sha, a delimiter style or unknown front-matter keys, and
+  teaching `DraftSnapshot` about shas would make every other target's storage learn what
+  git is. So a second, Hugo-owned slot rides alongside it: `HugoEditSession`. Unlike the
+  draft handoff it is deliberately **not** one-shot — the composer needs it again at submit
+  time to write back with the right sha.
+- **Leaving the Hugo target cancels the edit.** Not in the plan, and a real hazard: a
+  parked path and sha that outlived the target would attach to the next thing the user
+  wrote and silently overwrite a file they had stopped thinking about. `onTargetChange`
+  clears it, and the composer opens *on* the Hugo target when an edit is parked so the
+  question mostly does not arise.
+- **`HugoEditSession.advance()` exists because saving twice in a row would 409 against our
+  own commit.** Not in the plan; found while writing the update path.
+- **The composer's Status for an edit is built inline rather than by `HugoPublish`.**
+  `publish()` owns slug arithmetic and returns a Status; `update()` deliberately does not,
+  because the slug is fixed and the caller already knows the title and body. It returns the
+  commit, and the composer calls `hugoStatus()` — which needed a new
+  `HugoSettings.permalinkFor(slug)` helper so callers do not each unpack the repo.
+- **Hydration is capped and the cap is tested.** As planned (20 per pass, keyed cache), but
+  worth restating: `hugo-posts.spec.ts` asserts that a 100-entry directory issues exactly
+  20 file reads. That test is the whole reason the ceiling will survive future edits.
+- **A spec-hygiene bug bit twice, and is now fixed everywhere.** `vi.restoreAllMocks()`
+  restores the original `fetch` but does **not** clear the call log of a spy a previous
+  test installed on it. With one `describe` block the leak was invisible; adding a second
+  made call counts grow test-over-test and produced 13 confusing failures. Every Hugo spec
+  now calls `vi.clearAllMocks()` as well. If a future sprint sees "expected 1, got 9",
+  this is why.
 
 Sprint 1 makes the repo write-only from Mawkingbird's point of view: you can add posts and
 never see them again. This sprint closes the loop — the repo's posts become a list you can

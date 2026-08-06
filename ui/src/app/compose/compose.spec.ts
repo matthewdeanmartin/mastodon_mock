@@ -14,6 +14,7 @@ import { Compose, PostTarget, describePostFailure } from './compose';
 import { MataroaSettings } from '../providers/mataroa/mataroa-settings';
 import { BloggerSession } from '../providers/blogger/blogger-session';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
+import { HugoEdit, HugoEditSession } from '../providers/hugo/hugo-edit-session';
 
 /** Edit codes are stored apart from the records — see storage-registry.ts. */
 function storedEditKeys(): Record<string, string> {
@@ -54,6 +55,7 @@ interface ComposeInternals {
   onPasteExpiryChange(expiry: string): void;
   onTargetChange(target: PostTarget): void;
   onVisibilityChange(visibility: string): void;
+  cancelHugoEdit(): void;
   pendingSelfCleanup: WritableSignal<string | null>;
   selfCleanupError: WritableSignal<string | null>;
   deleteSelfDraftCopy(): void;
@@ -807,6 +809,75 @@ describe('Compose', () => {
       ),
     ].map((option) => option.value);
     expect(values).not.toContain('hugo');
+  });
+
+  /** The state the connector page leaves behind when you click "Edit". */
+  function parkHugoEdit(over: Partial<HugoEdit> = {}): void {
+    linkHugo();
+    TestBed.inject(HugoEditSession).start({
+      path: 'content/posts/hello-world.md',
+      sha: 'blob-1',
+      format: 'toml',
+      date: '2020-03-04T05:06:07Z',
+      extraLines: ['weight = 5'],
+      originalTitle: 'Hello World',
+      ...over,
+    });
+  }
+
+  it('opens on the Hugo target when an edit is parked, not on Fedi', () => {
+    parkHugoEdit();
+    const f = setUp();
+
+    // The user clicked Edit on a specific file; opening on Fedi would offer to
+    // post their blog post as a toot.
+    expect(internals(f).target()).toBe('hugo');
+  });
+
+  it('shows an unmistakable editing banner naming the file', () => {
+    parkHugoEdit();
+    const f = setUp();
+
+    const banner = (f.nativeElement as HTMLElement).querySelector('.hugo-editing');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain('Hello World');
+    expect(banner?.textContent).toContain('content/posts/hello-world.md');
+  });
+
+  it('labels the button Update post rather than Publish while editing', () => {
+    parkHugoEdit();
+    const f = setUp();
+    internals(f).spoilerText.set('Hello World');
+    internals(f).text.set('Revised.');
+    f.detectChanges();
+
+    const label = [
+      ...(f.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.btn'),
+    ]
+      .map((b) => b.textContent?.trim())
+      .find((t) => t === 'Update post' || t === 'Publish');
+    expect(label).toBe('Update post');
+  });
+
+  it('abandons the edit when the target moves off Hugo', () => {
+    parkHugoEdit();
+    const f = setUp();
+
+    internals(f).onTargetChange('fedi');
+
+    // A parked path and sha that outlived the target would attach to whatever
+    // the user writes next.
+    expect(TestBed.inject(HugoEditSession).editing()).toBe(false);
+  });
+
+  it('abandons the edit when the user cancels, leaving the file alone', () => {
+    parkHugoEdit();
+    const f = setUp();
+
+    internals(f).cancelHugoEdit();
+
+    expect(TestBed.inject(HugoEditSession).editing()).toBe(false);
+    expect(internals(f).text()).toBe('');
   });
 
   // ------------------------------------------------- paste visibility clamping

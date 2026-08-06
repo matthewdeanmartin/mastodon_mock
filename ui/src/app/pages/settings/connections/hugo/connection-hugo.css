@@ -37,3 +37,59 @@
 .connected-row .btn {
   margin-left: auto;
 }
+
+.posts-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 22px 0 8px;
+}
+
+.posts-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.posts-head .btn {
+  margin-left: auto;
+}
+
+.hugo-posts {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.hugo-post {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.hugo-post + .hugo-post {
+  border-top: 1px solid var(--border);
+}
+
+.hugo-post-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hugo-post-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.hugo-post .btn {
+  margin-left: auto;
+  flex: none;
+}
