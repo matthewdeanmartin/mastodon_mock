@@ -97,6 +97,8 @@ describe('HugoPublish', () => {
     expect(sentPath()).toContain('/contents/content/posts/hello-world.md');
     expect(result.slug).toBe('hello-world');
     expect(result.renamed).toBe(false);
+    // Exposed so the caller can watch the build without unpacking `status`.
+    expect(result.commit.commitSha).toBe('commit-abc');
     expect(result.status.id).toBe('blog:hugo:hello-world');
     expect(result.status.provider).toBe('blog');
     expect(result.status.url).toBe('https://mistersql.github.io/my-blog/posts/hello-world/');

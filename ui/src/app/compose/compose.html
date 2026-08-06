@@ -20,6 +20,35 @@
       </button>
     </div>
   }
+  @if (deployWatch.current(); as deploy) {
+    <!-- "Published" alone was the lie this fixes: GitHub accepting the commit
+         is not the post being live. A failed build must read as "your writing
+         is safe, the build isn't" — never as a lost post. -->
+    <div
+      class="hugo-deploy"
+      [class.deploy-live]="deploy.kind === 'live'"
+      [class.deploy-failed]="deploy.kind === 'failed'"
+      role="status"
+    >
+      <span class="hugo-deploy-text">{{ deployMessage() }}</span>
+      @if (deploy.kind === 'building' || deploy.kind === 'queued') {
+        <span class="hugo-deploy-spinner" aria-hidden="true">⏳</span>
+      }
+      @if (deploy.kind === 'live' || deploy.kind === 'failed') {
+        <a [href]="deploy.runUrl" target="_blank" rel="noopener noreferrer">
+          {{ deploy.kind === 'failed' ? 'See what failed ↗' : 'Build ↗' }}
+        </a>
+      }
+      <button
+        class="hugo-deploy-close"
+        type="button"
+        aria-label="Dismiss build status"
+        (click)="deployWatch.stop()"
+      >
+        ×
+      </button>
+    </div>
+  }
   @if (cwOpen() || targetIncludesBlog()) {
     <input
       class="cw-input"

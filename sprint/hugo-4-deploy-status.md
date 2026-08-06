@@ -1,6 +1,30 @@
 # Hugo — Sprint 4: Did it actually publish?
 
-Status: PLANNED (2026-08-05). Roadmap: `hugo-0-overview.md`. Depends on sprint 1.
+Status: COMPLETE (implemented 2026-08-05; 3297 tests, lint, prettier and both builds clean;
+31 tests added). Roadmap: `hugo-0-overview.md`. Depends on sprint 1.
+
+## What changed during implementation
+
+- **A Hugo draft is not watched at all.** Not in the plan, and obvious in hindsight: a
+  draft is committed but deliberately *not* built into the site, so there is no run to
+  match and the chip would sit on "still building…" until the five-minute ceiling. The
+  composer skips the watch for drafts entirely.
+- **`PublishResult` gained `commit`.** The composer needs the commit sha to start a watch,
+  and digging it out of `status.providerRef` means casting through `unknown` — the field is
+  deliberately opaque. Returning the `HugoPutResult` alongside is cheaper and honest.
+- **The watcher uses a monotonic token, not just a cleared timer.** Clearing the timeout
+  stops the *next* poll but not the fetch already in flight, whose `await` resumes
+  afterwards and would happily write a verdict into a watch the user had dismissed.
+  Every callback checks the token before touching state, on both sides of the await.
+- **Ordering is the safety property, and it is deliberate.** The composer publishes,
+  emits its Status, and *then* starts the watch. A watch failure can therefore never make
+  a successful commit look failed — which matters because the most likely watch failure
+  (a token without `Actions: read`) is a setup issue, not a publishing one.
+- **Spec note that cost a debugging round:** `mockResolvedValue(new Response(...))` hands
+  the *same* object to every call, and a `Response` body can only be read once — the second
+  poll fails to parse and the watcher reports `unknown`. Polling specs must mint a fresh
+  Response per call (`alwaysRespond(() => …)`). This is the sibling of the
+  `restoreAllMocks`/`clearAllMocks` trap from sprint 2; both are now commented in place.
 
 The trust sprint. After sprints 1–2 the composer says "published" the moment GitHub
 accepts the commit — which is a lie by omission. The post is not live; a build has been

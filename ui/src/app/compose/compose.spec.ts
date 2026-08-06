@@ -15,6 +15,7 @@ import { MataroaSettings } from '../providers/mataroa/mataroa-settings';
 import { BloggerSession } from '../providers/blogger/blogger-session';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
 import { HugoEdit, HugoEditSession } from '../providers/hugo/hugo-edit-session';
+import { HugoDeployWatch } from '../providers/hugo/hugo-deploy-watch';
 
 /** Edit codes are stored apart from the records — see storage-registry.ts. */
 function storedEditKeys(): Record<string, string> {
@@ -878,6 +879,35 @@ describe('Compose', () => {
 
     expect(TestBed.inject(HugoEditSession).editing()).toBe(false);
     expect(internals(f).text()).toBe('');
+  });
+
+  it('shows build status after publishing, and dismisses it on demand', () => {
+    linkHugo();
+    const f = setUp();
+    const watch = TestBed.inject(HugoDeployWatch);
+    watch.watch('commit-abc');
+    f.detectChanges();
+
+    const chip = (f.nativeElement as HTMLElement).querySelector('.hugo-deploy');
+    expect(chip).not.toBeNull();
+    // "Published" alone was the lie: the commit landed, the build has not run.
+    expect(chip?.textContent).toContain('Committed');
+
+    watch.stop();
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).querySelector('.hugo-deploy')).toBeNull();
+  });
+
+  it('stops watching a build when the composer goes away', () => {
+    linkHugo();
+    const f = setUp();
+    const watch = TestBed.inject(HugoDeployWatch);
+    watch.watch('commit-abc');
+
+    f.destroy();
+
+    // A publish followed by navigating away must not leave a poller running.
+    expect(watch.current()).toBeNull();
   });
 
   // ------------------------------------------------- paste visibility clamping

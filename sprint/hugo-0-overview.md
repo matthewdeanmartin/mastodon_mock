@@ -1,8 +1,22 @@
 # Roadmap — Hugo on GitHub as a blog destination
 
-Status: PLANNED (2026-08-05). Decisions below are answered — see "Decisions taken".
-Sprints: `hugo-1-*` … `hugo-4-*`. POSSE/webmentions is named here but has no sprint
-files yet, deliberately (decision 8).
+Status: **Sprints 1–4 COMPLETE** (2026-08-05; 3297 tests, lint, prettier and both builds
+clean). Decisions below are answered — see "Decisions taken". POSSE/webmentions is named
+here but has no sprint files yet, deliberately (decision 8) — write them now that the
+publish path is real.
+
+| Sprint | Status |
+|---|---|
+| 1 — connect and publish | COMPLETE |
+| 2 — see your posts, edit one | COMPLETE |
+| 3 — your blog back in your timeline | COMPLETE |
+| 4 — did it actually publish? | COMPLETE |
+
+**Two spec traps this connector hit, both now commented in place.** They are generic
+enough to bite the next sprint: `vi.restoreAllMocks()` does not clear a prior spy's call
+log (sprint 2), and `mockResolvedValue(new Response(...))` reuses one already-consumed body
+across calls (sprint 4). Also: never run `npm run format` and `npm run test:ci` in the same
+shell invocation — prettier rewrites spec files mid-run.
 
 ## The pitch
 

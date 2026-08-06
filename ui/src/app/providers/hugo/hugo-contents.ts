@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { ActionsRun } from './hugo-deploy';
 import { HugoSettings } from './hugo-settings';
 
 /**
@@ -144,6 +145,20 @@ export class HugoContents {
       commitSha: body.commit?.sha ?? '',
       htmlUrl: body.content?.html_url ?? '',
     };
+  }
+
+  /**
+   * Recent workflow runs on the configured branch.
+   *
+   * Ten is plenty: we are looking for one specific `head_sha` that was pushed
+   * seconds ago, and anything that has fallen off a ten-run window on this
+   * branch is older than the commit we are asking about.
+   */
+  async recentRuns(): Promise<ActionsRun[]> {
+    const repo = this.repo();
+    const url = `${API_ROOT}/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/actions/runs?branch=${encodeURIComponent(repo.branch)}&per_page=10`;
+    const body = await this.request<{ workflow_runs?: ActionsRun[] }>('GET', url);
+    return body.workflow_runs ?? [];
   }
 
   /** Whether a branch exists, used by connect-time validation. */

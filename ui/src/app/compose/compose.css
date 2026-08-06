@@ -527,3 +527,48 @@ textarea {
 .hugo-editing .btn {
   margin-left: auto;
 }
+
+/* Build status after a Hugo publish. Neutral while building, because the
+   common case is "it is working"; only the two terminal states earn a colour. */
+.hugo-deploy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--hover);
+  font-size: 13px;
+}
+
+.hugo-deploy-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hugo-deploy.deploy-live {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Failure is distinct from the composer's own error styling on purpose: the
+   post was committed, so this is not a publish error. */
+.hugo-deploy.deploy-failed {
+  border-color: var(--danger, #d33);
+}
+
+.hugo-deploy-close {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.hugo-deploy-close:hover {
+  color: var(--text);
+}

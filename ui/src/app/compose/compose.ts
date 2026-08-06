@@ -58,6 +58,8 @@ import { bloggerStatus } from '../providers/blogger/blogger-status';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
 import { HugoPublish } from '../providers/hugo/hugo-publish';
 import { HugoEditSession } from '../providers/hugo/hugo-edit-session';
+import { HugoDeployWatch } from '../providers/hugo/hugo-deploy-watch';
+import { describeDeployState } from '../providers/hugo/hugo-deploy';
 import { HugoApiError } from '../providers/hugo/hugo-contents';
 import { hugoStatus } from '../providers/hugo/hugo-post';
 
@@ -330,11 +332,20 @@ export class Compose implements OnDestroy {
   protected hugo = inject(HugoSettings);
   private hugoPublish = inject(HugoPublish);
   protected hugoEdit = inject(HugoEditSession);
+  protected deployWatch = inject(HugoDeployWatch);
 
   ngOnDestroy(): void {
     this.clearCountdown();
     this.flushAutosave();
+    // A publish followed by navigating away must not leave a poller running.
+    this.deployWatch.stop();
   }
+
+  /** One sentence about the in-flight build, for the chip under the composer. */
+  protected readonly deployMessage = computed(() => {
+    const state = this.deployWatch.current();
+    return state ? describeDeployState(state) : null;
+  });
 
   readonly inReplyToId = input<string | undefined>(undefined);
   /** When set, the composed status quotes this status id. */
@@ -1928,6 +1939,7 @@ export class Compose implements OnDestroy {
     const title = this.spoilerText().trim();
     const body = this.text().trim();
     const edit = this.hugoEdit.current();
+    const isDraft = this.blogDraft();
     try {
       if (edit) {
         // Rewriting a file that already exists: same path, same date, same
@@ -1935,16 +1947,17 @@ export class Compose implements OnDestroy {
         const result = await this.hugoPublish.update({
           title,
           body,
-          isDraft: this.blogDraft(),
+          isDraft,
           edit,
         });
         this.hugoEdit.finish();
         this.reset();
+        this.watchHugoBuild(result.commit.commitSha, isDraft);
         this.posted.emit(
           hugoStatus(result.commit, title, body, account, {
             slug: result.slug,
             permalink: this.hugo.permalinkFor(result.slug),
-            isDraft: this.blogDraft(),
+            isDraft,
           }),
         );
         return;
@@ -1952,10 +1965,11 @@ export class Compose implements OnDestroy {
       const result = await this.hugoPublish.publish({
         title,
         body,
-        isDraft: this.blogDraft(),
+        isDraft,
         account,
       });
       this.reset();
+      this.watchHugoBuild(result.commit.commitSha, isDraft);
       this.posted.emit(result.status);
     } catch (error: unknown) {
       this.submitting.set(false);
@@ -1973,6 +1987,25 @@ export class Compose implements OnDestroy {
   cancelHugoEdit(): void {
     this.hugoEdit.cancel();
     this.reset();
+  }
+
+  /**
+   * Follow the commit through its GitHub Actions build.
+   *
+   * Called *after* the post has been emitted, never before, and its failure can
+   * never affect the publish — the commit already succeeded and the writing is
+   * safe in the repo whatever Actions goes on to do. That ordering is the whole
+   * safety property of this feature.
+   *
+   * A Hugo draft is committed but deliberately not built into the site, so
+   * there is no build to watch and a "still building…" chip would never resolve.
+   */
+  private watchHugoBuild(commitSha: string, isDraft: boolean): void {
+    if (isDraft || !commitSha) {
+      this.deployWatch.stop();
+      return;
+    }
+    this.deployWatch.watch(commitSha);
   }
 
   private sendToBlog(): void {

@@ -29,6 +29,8 @@ export interface PublishResult {
   slug: string;
   /** True when a collision pushed the post onto a numbered slug. */
   renamed: boolean;
+  /** The commit, so the caller can watch its build without unpacking `status`. */
+  commit: HugoPutResult;
 }
 
 export interface UpdateRequest {
@@ -102,6 +104,7 @@ export class HugoPublish {
           }),
           slug,
           renamed: attempt > 1,
+          commit,
         };
       } catch (error: unknown) {
         // 422 here means "that path already exists" — the one error worth
