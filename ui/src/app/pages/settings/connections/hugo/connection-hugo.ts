@@ -6,6 +6,7 @@ import { ClientPrefs } from '../../../../client-prefs';
 import { Drafts } from '../../../../drafts';
 import { GitHubSession } from '../../../../providers/github/github-session';
 import { HugoEditSession } from '../../../../providers/hugo/hugo-edit-session';
+import { HugoFeed } from '../../../../providers/hugo/hugo-feed';
 import { HugoPostRow } from '../../../../providers/hugo/hugo-listing';
 import { HugoPosts } from '../../../../providers/hugo/hugo-posts';
 import {
@@ -38,6 +39,11 @@ export class ConnectionHugo implements OnInit {
   /** The row whose file is being fetched, so only that row shows a spinner. */
   protected readonly opening = signal<string | null>(null);
   protected readonly openError = signal<string | null>(null);
+
+  protected readonly feed = inject(HugoFeed);
+  protected readonly feedBusy = signal(false);
+  protected readonly feedNotice = signal<string | null>(null);
+  protected readonly feedError = signal<string | null>(null);
 
   protected readonly token = signal('');
   protected readonly repoInput = signal('');
@@ -193,6 +199,40 @@ export class ConnectionHugo implements OnInit {
     } finally {
       this.opening.set(null);
     }
+  }
+
+  /**
+   * Find the site's feed and subscribe to it.
+   *
+   * The blog becomes an ordinary RSS subscription — it counts against the feed
+   * limit, and it can be disabled or removed from the Feeds page like any
+   * other. That is correct: it *is* a feed. Subscribed state is derived from
+   * the subscription list rather than stored here, so removing it there is
+   * reflected here immediately instead of the two disagreeing.
+   */
+  async subscribeFeed(): Promise<void> {
+    if (this.feedBusy()) {
+      return;
+    }
+    this.feedBusy.set(true);
+    this.feedNotice.set(null);
+    this.feedError.set(null);
+    try {
+      const result = await this.feed.subscribe();
+      (result.ok ? this.feedNotice : this.feedError).set(result.message);
+    } catch (error: unknown) {
+      this.feedError.set(
+        error instanceof Error ? error.message : 'Could not reach your site to find its feed.',
+      );
+    } finally {
+      this.feedBusy.set(false);
+    }
+  }
+
+  unsubscribeFeed(): void {
+    this.feed.unsubscribe();
+    this.feedError.set(null);
+    this.feedNotice.set('Removed your blog from your feeds. Your posts are untouched.');
   }
 
   refresh(): void {

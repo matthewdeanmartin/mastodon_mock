@@ -47,6 +47,16 @@ export interface HugoRepo {
    * worse than linking to the file on GitHub.
    */
   siteUrl: string | null;
+  /**
+   * The feed URL that was actually found on this site, once one has been.
+   *
+   * Hugo's default is `<site>/index.xml`, but a theme or an `outputs` config can
+   * rename or move it, so {@link HugoFeed.probe} tries several names. Recording
+   * the winner means "is my blog subscribed?" and the profile feed both ask
+   * about the real URL rather than re-deriving a guess that may be wrong.
+   * Absent until a probe has succeeded.
+   */
+  feedUrl?: string | null;
   /** Show this blog's posts on the Mawkingbird profile (sprint 3). */
   includeInProfile: boolean;
 }
@@ -76,6 +86,7 @@ function loadRepo(key: string): HugoRepo | null {
           ? parsed.contentPath
           : DEFAULT_CONTENT_PATH,
       siteUrl: typeof parsed.siteUrl === 'string' && parsed.siteUrl ? parsed.siteUrl : null,
+      feedUrl: typeof parsed.feedUrl === 'string' && parsed.feedUrl ? parsed.feedUrl : null,
       includeInProfile: parsed.includeInProfile === true,
     };
   } catch {
@@ -134,11 +145,17 @@ export class HugoSettings implements ExpiringConnection {
   readonly includeInProfile = computed(() => this.repoState()?.includeInProfile === true);
 
   /**
-   * The site's RSS feed, Hugo's default location (sprint 3).
+   * The site's RSS feed: the one a probe actually found, else Hugo's default.
    *
    * Mirrors `MataroaSettings.feedUrl`, which the profile page already consumes.
+   * The stored value wins because a theme can move the feed — falling back to
+   * the default keeps this useful before any probe has run.
    */
   readonly feedUrl = computed(() => {
+    const found = this.repoState()?.feedUrl;
+    if (found) {
+      return found;
+    }
     const siteUrl = this.siteUrl();
     if (!siteUrl) {
       return null;
@@ -192,6 +209,17 @@ export class HugoSettings implements ExpiringConnection {
       return;
     }
     const next = { ...current, includeInProfile: include };
+    localStorage.setItem(this.repoKey, JSON.stringify(next));
+    this.repoState.set(next);
+  }
+
+  /** Remember the feed URL a probe actually found on this site. */
+  setFeedUrl(url: string | null): void {
+    const current = this.repoState();
+    if (!current) {
+      return;
+    }
+    const next = { ...current, feedUrl: url };
     localStorage.setItem(this.repoKey, JSON.stringify(next));
     this.repoState.set(next);
   }

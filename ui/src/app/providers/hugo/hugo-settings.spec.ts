@@ -39,6 +39,24 @@ describe('HugoSettings', () => {
     expect(settings.feedUrl()).toBe('https://mistersql.github.io/my-blog/index.xml');
   });
 
+  it('prefers a discovered feed URL over the Hugo default', () => {
+    const settings = TestBed.inject(HugoSettings);
+    settings.connect('t', REPO);
+
+    settings.setFeedUrl('https://mistersql.github.io/my-blog/feed.xml');
+
+    // A theme can move the feed, so what a probe actually found beats the guess.
+    expect(settings.feedUrl()).toBe('https://mistersql.github.io/my-blog/feed.xml');
+    expect(settings.repo()?.owner).toBe('mistersql');
+  });
+
+  it('falls back to the default when no probe has run yet', () => {
+    const settings = TestBed.inject(HugoSettings);
+    settings.connect('t', REPO);
+
+    expect(settings.feedUrl()).toBe('https://mistersql.github.io/my-blog/index.xml');
+  });
+
   it('has no feed URL when the site address was left blank', () => {
     const settings = TestBed.inject(HugoSettings);
     settings.connect('t', { ...REPO, siteUrl: null });

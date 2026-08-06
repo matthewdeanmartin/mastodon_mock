@@ -56,6 +56,12 @@
   @if (expiryLabel(settings.expiresAt()); as expiry) {
     <p class="muted small">This token is deleted from this browser on {{ expiry }}.</p>
   }
+  <h2 class="section-head">Read your blog back</h2>
+  <p class="muted small">
+    Your Hugo site publishes an RSS feed, so Mawkingbird can read your own posts the same way it
+    reads any other feed — no special handling, and no CORS proxy if your site is on GitHub Pages.
+  </p>
+
   <label class="profile-feed-option">
     <input
       type="checkbox"
@@ -64,16 +70,43 @@
       [disabled]="!settings.siteUrl()"
     />
     <span>
-      <strong>Include my blog's RSS feed in my profile feed</strong>
+      <strong>Include my blog's posts on my profile</strong>
       <span class="muted small">
         @if (settings.siteUrl()) {
           Your published posts appear alongside your Mawkingbird posts on your own profile.
         } @else {
-          Add your site address to turn this on.
+          Add your site address above to turn this on.
         }
       </span>
     </span>
   </label>
+
+  <div class="feed-row">
+    @if (feed.subscribed()) {
+      <span class="connection-ok">In your home timeline</span>
+      <button class="btn btn-outline btn-sm" type="button" (click)="unsubscribeFeed()">
+        Remove from feeds
+      </button>
+    } @else {
+      <button
+        class="btn btn-outline btn-sm"
+        type="button"
+        (click)="subscribeFeed()"
+        [disabled]="feedBusy() || !settings.siteUrl()"
+      >
+        {{ feedBusy() ? 'Looking for your feed…' : 'Add my blog to my home timeline' }}
+      </button>
+      @if (!settings.siteUrl()) {
+        <span class="muted small">Add your site address above first.</span>
+      }
+    }
+  </div>
+  @if (feedNotice(); as message) {
+    <p class="connection-ok" role="status">{{ message }}</p>
+  }
+  @if (feedError(); as message) {
+    <p class="feed-error" role="alert">{{ message }}</p>
+  }
 
   <div class="posts-head">
     <h2>Posts in this repository</h2>

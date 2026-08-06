@@ -51,6 +51,7 @@ import { CopyAccountDialog } from './copy-account-dialog/copy-account-dialog';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { RenderedHtmlLinks } from '../../rendered-html-links';
 import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
+import { HugoSettings } from '../../providers/hugo/hugo-settings';
 import { BloggerSession } from '../../providers/blogger/blogger-session';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
@@ -93,6 +94,7 @@ export class Profile implements OnInit, OnDestroy {
   private rss = inject(RssProvider);
   private mataroa = inject(MataroaSettings);
   private blogger = inject(BloggerSession);
+  private hugo = inject(HugoSettings);
   private twitterFollows = inject(TwitterFollows);
   private twitterFeed = inject(TwitterFeed);
   private twitterApi = inject(TwitterApi);
@@ -909,9 +911,12 @@ export class Profile implements OnInit, OnDestroy {
    * being unreachable must not blank the other, which is why the failures are
    * caught per feed and the results accumulated instead of forkJoin'd.
    *
-   * Both go through the CORS proxy (`useProxy`). Mataroa's feed needs it, and
-   * so does Blogger's — the Blogger *API* is CORS-open, but its RSS feed is
-   * not, and usually redirects to FeedBurner besides.
+   * Whether a feed needs the CORS proxy is a fact about that blog, so it is
+   * carried per feed rather than assumed. Mataroa's needs it, and so does
+   * Blogger's — the Blogger *API* is CORS-open, but its RSS feed is not, and
+   * usually redirects to FeedBurner besides. A Hugo site on GitHub Pages does
+   * not: Pages sends `access-control-allow-origin: *`, so proxying it would
+   * route the user's own public writing through a third party for no reason.
    */
   private loadBlogStatuses(id: string, seq: number): void {
     const account = this.auth.account();
@@ -920,14 +925,18 @@ export class Profile implements OnInit, OnDestroy {
       return;
     }
 
-    const feeds: { source: string; url: string }[] = [];
+    const feeds: { source: string; url: string; useProxy: boolean }[] = [];
     const mataroaFeed = this.mataroa.feedUrl();
     if (mataroaFeed && this.mataroa.includeInProfile()) {
-      feeds.push({ source: 'mataroa', url: mataroaFeed });
+      feeds.push({ source: 'mataroa', url: mataroaFeed, useProxy: true });
     }
     const bloggerFeed = this.blogger.feedUrl();
     if (bloggerFeed && this.blogger.includeInProfile()) {
-      feeds.push({ source: 'blogger', url: bloggerFeed });
+      feeds.push({ source: 'blogger', url: bloggerFeed, useProxy: true });
+    }
+    const hugoFeed = this.hugo.feedUrl();
+    if (hugoFeed && this.hugo.includeInProfile()) {
+      feeds.push({ source: 'hugo', url: hugoFeed, useProxy: false });
     }
     if (!feeds.length) {
       this.blogStatuses.set([]);
@@ -937,7 +946,7 @@ export class Profile implements OnInit, OnDestroy {
     this.blogStatuses.set([]);
     for (const feed of feeds) {
       this.statusLoadSub.add(
-        this.rss.getFeed(feed.url, true).subscribe({
+        this.rss.getFeed(feed.url, feed.useProxy).subscribe({
           next: ({ statuses }) => {
             if (seq !== this.loadSeq) {
               return;

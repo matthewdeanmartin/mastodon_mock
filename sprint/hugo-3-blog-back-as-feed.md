@@ -1,6 +1,36 @@
 # Hugo — Sprint 3: Your blog, back in your timeline
 
-Status: PLANNED (2026-08-05). Roadmap: `hugo-0-overview.md`. Depends on sprint 1.
+Status: COMPLETE (implemented 2026-08-05; 3266 tests, lint, prettier and both builds clean;
+11 tests added). Roadmap: `hugo-0-overview.md`. Depends on sprint 1.
+
+## What changed during implementation
+
+- **`useProxy` became per-feed on the profile page, and that is the interesting part.**
+  `profile.ts` hardcoded `this.rss.getFeed(feed.url, true)` — proxy on, for every blog —
+  because both existing blogs need it. Hugo does not: GitHub Pages sends
+  `access-control-allow-origin: *`, so proxying would route the user's own *public*
+  writing through a third party for no reason. The flag now travels with each feed. This
+  is the sprint's one real change to shared code, and it is three lines.
+- **The discovered feed URL is stored, not re-derived.** The plan had `feedUrl` computed
+  from `siteUrl + index.xml`. But `probe()` falls back through `feed.xml`, `rss.xml`,
+  `atom.xml` and `index.rss` when a theme has moved the feed — and if the winner is not
+  the default, every later "is my blog subscribed?" and every profile load would ask about
+  a URL that does not exist. `HugoRepo.feedUrl` records which name won; the computed
+  signal prefers it and falls back to the default before any probe has run. It rides
+  inside the existing `mockingbird_hugo_repo` key, so no new storage-registry row.
+- **The `<link rel="alternate">` HTML-scraping fallback was not built.** The plan listed it
+  as the last resort. Four conventional filenames already cover the realistic cases, and
+  parsing a site's HTML to find a feed is a meaningfully larger surface (encoding, relative
+  URLs, `<base>`) for the tail. The failure message points at the Feeds page for a manual
+  add instead, which is one paste and always works. Revisit if a real theme defeats the
+  four names.
+- **Subscribed state is derived, never stored.** `HugoFeed.subscribed()` asks
+  `RssSubscriptions.has()`. A second boolean would immediately disagree with reality the
+  moment someone removed the feed on the Feeds page — which is a supported thing to do,
+  since it is an ordinary feed.
+- **Spec note:** `RssSubscriptions.add()` leaves `useProxy` *absent* rather than `false`
+  when it is off (deliberately — an older subscription reads as `undefined` and keeps
+  fetching directly). Assert through `subs.usesProxy(url)`, not on the raw field.
 
 The cheapest sprint in the roadmap, because nearly all of it already exists. Hugo ships an
 RSS feed by default at `<site>/index.xml`; Mawkingbird has had an RSS provider since

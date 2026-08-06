@@ -13,6 +13,7 @@ import { ClientPrefs } from '../../client-prefs';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
 import { BloggerSession } from '../../providers/blogger/blogger-session';
+import { HugoSettings } from '../../providers/hugo/hugo-settings';
 
 /** n bare statuses with descending ids starting at s<base> (timeline order). */
 function makeStatuses(n: number, base: number): Status[] {
@@ -785,8 +786,9 @@ describe('Profile Mataroa RSS inclusion', () => {
     expect(visible[0].account).toEqual(account);
   });
 
-  it('merges both blogs at once, each through the proxy', () => {
+  it('merges Mataroa and Blogger at once, both through the proxy', () => {
     // Mataroa and Blogger can both be connected; one must not hide the other.
+    // Both need the proxy; Hugo is the exception, covered in the next test.
     const account = {
       id: 'self',
       username: 'kay',
@@ -864,6 +866,84 @@ describe('Profile Mataroa RSS inclusion', () => {
     const ids = ((fixture.componentInstance as any).visibleStatuses() as Status[]).map((s) => s.id);
     expect(ids).toContain(mataroaPost.id);
     expect(ids).toContain(bloggerPost.id);
+  });
+
+  it('reads a Hugo blog directly, without the proxy the other two need', () => {
+    const account = {
+      id: 'self',
+      username: 'kay',
+      acct: 'kay@example.social',
+      display_name: 'Kay',
+      note: '',
+      url: 'https://example.social/@kay',
+      avatar: '',
+      avatar_static: '',
+      header: '',
+      header_static: '',
+      followers_count: 0,
+      following_count: 0,
+      statuses_count: 1,
+      bot: false,
+      locked: false,
+      fields: [],
+    } as Account;
+    const hugoPost = {
+      ...makeStatuses(1, 90)[0],
+      id: 'rss:hugo::a',
+      provider: 'rss',
+      url: 'https://mistersql.github.io/my-blog/posts/a/',
+    } as Status;
+    const getFeed = vi.fn(() => of({ account, statuses: [hugoPost] }));
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: 'self' })) },
+        },
+        { provide: RssProvider, useValue: { getFeed } },
+      ],
+    });
+    TestBed.inject(Auth).setAccount(account);
+    const hugo = TestBed.inject(HugoSettings);
+    hugo.connect('tok', {
+      owner: 'mistersql',
+      repo: 'my-blog',
+      branch: 'main',
+      contentPath: 'content/posts',
+      siteUrl: 'https://mistersql.github.io/my-blog/',
+      includeInProfile: true,
+    });
+
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('/api/v1/accounts/self').flush(account);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/self/statuses' && !request.params.has('pinned'),
+      )
+      .flush([]);
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/accounts/self/statuses' &&
+          request.params.get('pinned') === 'true',
+      )
+      .flush([]);
+    httpMock.expectOne((request) => request.url === '/api/v1/accounts/relationships').flush([]);
+    httpMock.expectOne('/api/v1/accounts/self/endorsements').flush([]);
+    httpMock.expectOne('/api/v1/accounts/self/collections').flush({ collections: [] });
+
+    // GitHub Pages sends ACAO, so routing the user's own public writing through
+    // a third-party proxy would be gratuitous. This is the one blog that reads
+    // directly, which is why useProxy is per feed rather than a constant.
+    expect(getFeed).toHaveBeenCalledWith('https://mistersql.github.io/my-blog/index.xml', false);
+    const ids = ((fixture.componentInstance as any).visibleStatuses() as Status[]).map((s) => s.id);
+    expect(ids).toContain(hugoPost.id);
   });
 
   it('leaves the blog off the profile until it is opted in', () => {
