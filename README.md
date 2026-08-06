@@ -147,3 +147,5 @@ MIT. See [LICENSE](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/
 ## Changelog
 
 See [CHANGELOG.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/CHANGELOG.md).
+ 
+ 
