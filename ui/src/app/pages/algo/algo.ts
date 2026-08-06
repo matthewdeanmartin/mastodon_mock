@@ -1,10 +1,10 @@
-import { Component, computed, effect, inject, OnInit } from '@angular/core';
+import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
 import { isCalmHidden } from '../../sentiment';
 import { FeedLanguageFilter } from '../../trend-language-filter';
 import { FeedLanguagePicker } from '../../feed-language-picker/feed-language-picker';
-import { Status } from '../../models';
+import { PreviewCard, Status } from '../../models';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { StatusCard } from '../../status-card/status-card';
 import { StatusVisibility } from '../../status-visibility';
@@ -20,6 +20,12 @@ const SOURCE_LABELS: Record<AlgoSource, string> = {
 
 /** Friends means posts *authored* by follows — boosts and hashtag finds are not it. */
 const FRIEND_SOURCES: readonly AlgoSource[] = ['mutual', 'original'];
+
+interface AlgoLink {
+  post: AlgoPost;
+  status: Status;
+  card: PreviewCard;
+}
 
 /**
  * ✨ Algo — the consumer-centric algorithmic feed. Content the user already
@@ -40,6 +46,7 @@ export class Algo implements OnInit {
   private feedLangFilter = inject(FeedLanguageFilter);
   private visibility = inject(StatusVisibility);
   private diagnostics = inject(PageDiagnostics);
+  protected linksView = signal(false);
 
   /** Whether a post survives the audience + tags chips (calm applied separately). */
   private passesChips(p: AlgoPost): boolean {
@@ -67,6 +74,14 @@ export class Algo implements OnInit {
           this.feedLangFilter.shouldShow(p.status) &&
           !this.visibility.rendersNothing(p.status),
       ),
+  );
+
+  /** Preview cards from the filtered feed, using the original status behind a boost. */
+  protected links = computed(() =>
+    this.visible().flatMap((post): AlgoLink[] => {
+      const status = post.status.reblog ?? post.status;
+      return status.card?.url ? [{ post, status, card: status.card }] : [];
+    }),
   );
 
   /**
@@ -147,6 +162,12 @@ export class Algo implements OnInit {
     const enabled = !this.prefs.algoCalm();
     this.diagnostics.info('Algo', 'user:toggle-calm', { enabled });
     this.prefs.setAlgoCalm(enabled);
+  }
+
+  toggleLinks(): void {
+    const enabled = !this.linksView();
+    this.diagnostics.info('Algo', 'user:toggle-links', { enabled, links: this.links().length });
+    this.linksView.set(enabled);
   }
 
   shuffle(): void {

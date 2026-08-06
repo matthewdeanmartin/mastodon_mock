@@ -41,6 +41,16 @@
     <button
       type="button"
       class="btn btn-outline"
+      [class.active]="linksView()"
+      [attr.aria-pressed]="linksView()"
+      (click)="toggleLinks()"
+      title="Show only the link previews from these ranked posts"
+    >
+      🔗 Links
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline"
       (click)="shuffle()"
       [disabled]="feed.loading()"
       title="Re-deal the same posts in a random order"
@@ -82,6 +92,56 @@
       <p class="small">Home and Algo only fetch when you ask them to.</p>
     }
   </div>
+} @else if (linksView()) {
+  @if (!links().length) {
+    <div class="muted center">
+      <p>No link previews in these posts.</p>
+      <p class="small">Try All, Tags, or Refresh to widen the selection.</p>
+    </div>
+  } @else {
+    <div class="algo-links" aria-label="Links from the Algo feed">
+      @for (link of links(); track link.status.id) {
+        <article class="algo-link-card">
+          <a
+            class="algo-link-main"
+            [href]="link.card.url"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            @if (link.card.image) {
+              <img
+                class="algo-link-image"
+                [src]="link.card.image"
+                [alt]="''"
+                loading="lazy"
+                decoding="async"
+              />
+            }
+            <span class="algo-link-body">
+              @if (link.card.provider_name) {
+                <span class="algo-link-provider muted small">{{ link.card.provider_name }}</span>
+              }
+              <span class="algo-link-title">{{ link.card.title || link.card.url }}</span>
+              @if (link.card.description) {
+                <span class="algo-link-description muted">{{ link.card.description }}</span>
+              }
+            </span>
+          </a>
+          <footer class="algo-link-meta muted small">
+            <span>{{ sourceLabel(link.post) }} · &#64;{{ link.status.account.acct }}</span>
+            <span class="algo-link-engagement">
+              <span [attr.aria-label]="link.status.favourites_count + ' favourites'">
+                ♥ {{ link.status.favourites_count }}
+              </span>
+              <span [attr.aria-label]="link.status.reblogs_count + ' boosts'">
+                ↻ {{ link.status.reblogs_count }}
+              </span>
+            </span>
+          </footer>
+        </article>
+      }
+    </div>
+  }
 } @else {
   @for (p of visible(); track p.status.id) {
     <div class="algo-item">

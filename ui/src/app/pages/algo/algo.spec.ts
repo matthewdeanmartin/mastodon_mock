@@ -166,6 +166,81 @@ describe('Algo page', () => {
     expect(feed.shufflePosts).toHaveBeenCalled();
   });
 
+  it('Links turns the filtered feed into preview cards with engagement', () => {
+    const linked = makePost('linked', 'original', true, '<p>read this</p>');
+    linked.status.card = {
+      url: 'https://example.com/story',
+      title: 'A worthwhile story',
+      description: 'The useful summary.',
+      type: 'link',
+      provider_name: 'Example News',
+      image: 'https://example.com/image.jpg',
+    };
+    linked.status.favourites_count = 12;
+    linked.status.reblogs_count = 4;
+    feed.posts.set([linked, makePost('plain', 'original', true, '<p>no link here</p>')]);
+    fixture.detectChanges();
+
+    chip('Links').click();
+    fixture.detectChanges();
+
+    expect(text()).toContain('A worthwhile story');
+    expect(text()).toContain('The useful summary.');
+    expect(text()).toContain('Example News');
+    expect(text()).toContain('♥ 12');
+    expect(text()).toContain('↻ 4');
+    expect(text()).not.toContain('no link here');
+    const anchor = fixture.nativeElement.querySelector('.algo-link-main') as HTMLAnchorElement;
+    expect(anchor.href).toBe('https://example.com/story');
+    expect(anchor.target).toBe('_blank');
+    expect(fixture.nativeElement.querySelector('.algo-link-image')).not.toBeNull();
+
+    chip('Links').click();
+    fixture.detectChanges();
+    expect(text()).toContain('no link here');
+  });
+
+  it('Links follows a boost to the original preview and engagement counts', () => {
+    const original = makeStatus('original');
+    original.account = {
+      id: 'writer',
+      username: 'writer',
+      acct: 'writer',
+      display_name: 'Writer',
+    } as never;
+    original.card = {
+      url: 'https://example.com/boosted-story',
+      title: 'Boosted story',
+      description: '',
+      type: 'link',
+      provider_name: '',
+      image: null,
+    };
+    original.favourites_count = 9;
+    original.reblogs_count = 3;
+    const boost = makePost('boost', 'boost', true);
+    boost.status.reblog = original;
+    feed.posts.set([boost]);
+    fixture.detectChanges();
+
+    chip('Links').click();
+    fixture.detectChanges();
+
+    expect(text()).toContain('Boosted story');
+    expect(text()).toContain('@writer');
+    expect(text()).toContain('♥ 9');
+    expect(text()).toContain('↻ 3');
+  });
+
+  it('Links has a specific empty state when the Algo posts have no previews', () => {
+    feed.posts.set([makePost('plain', 'original', true)]);
+    fixture.detectChanges();
+    chip('Links').click();
+    fixture.detectChanges();
+
+    expect(text()).toContain('No link previews in these posts');
+  });
+
   it('calm mode hides heated posts and reports how many', () => {
     feed.posts.set([
       makePost('nice', 'original', true, '<p>lovely garden update</p>'),

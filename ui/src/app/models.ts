@@ -105,6 +105,24 @@ export interface Mention {
   url: string;
 }
 
+/** Link preview metadata supplied with a Mastodon status. */
+export interface PreviewCard {
+  url: string;
+  title: string;
+  description: string;
+  type: 'link' | 'photo' | 'video' | 'rich' | string;
+  author_name?: string;
+  author_url?: string;
+  provider_name: string;
+  provider_url?: string;
+  html?: string;
+  width?: number;
+  height?: number;
+  image: string | null;
+  embed_url?: string;
+  blurhash?: string | null;
+}
+
 export interface Status {
   /** Absent = Mastodon. Foreign statuses use namespaced ids (e.g. "rss:…"). */
   provider?: ProviderId;
@@ -135,6 +153,8 @@ export interface Status {
   /** ISO 639 language code Mastodon detected/declared for the post. Nullable. */
   language?: string | null;
   media_attachments: MediaAttachment[];
+  /** Preview card for a link in the post. Absent on providers that do not supply one. */
+  card?: PreviewCard | null;
   /** The app the post was made with (nullable; absent on some providers). */
   application?: { name: string; website?: string | null } | null;
   /** Optional: not every provider supplies it, but Mastodon (and the mock) do. */
