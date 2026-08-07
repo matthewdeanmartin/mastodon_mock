@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Account, Relationship, Status } from '../../models';
@@ -1006,5 +1006,125 @@ describe('Profile Mataroa RSS inclusion', () => {
     httpMock.expectOne('/api/v1/accounts/self/collections').flush({ collections: [] });
 
     expect(getFeed).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Account ids belong to the server that issued them. The same person is
+ * 109655875667638018 on mastodon.social and 109656717715863645 on fosstodon
+ * (verified against both), so opening a profile URL under a different server
+ * 404s — the reported "Loading… hangs forever" symptom, since the load had no
+ * error handler at all.
+ */
+describe('Profile cross-server recovery', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => localStorage.clear());
+  afterEach(() => httpMock.verify());
+
+  interface ProfileInternals {
+    loading: () => boolean;
+    loadError: () => string | null;
+    recovering: () => boolean;
+    recoveryFailed: () => boolean;
+  }
+
+  /** Mount the profile for `id`, optionally carrying a `?handle=` hint. */
+  function setUp(id: string, handle?: string) {
+    const queryParamMap = convertToParamMap(handle ? { handle } : {});
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id })), snapshot: { queryParamMap } },
+        },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  /** Satisfy the sibling requests `load()` fires alongside the account fetch. */
+  function settleSiblings(id: string): void {
+    httpMock.match((r) => r.url === `/api/v1/accounts/${id}/statuses`).forEach((r) => r.flush([]));
+    httpMock.match((r) => r.url === '/api/v1/accounts/relationships').forEach((r) => r.flush([]));
+    httpMock
+      .match((r) => r.url === `/api/v1/accounts/${id}/endorsements`)
+      .forEach((r) => r.flush([]));
+    httpMock
+      .match((r) => r.url === `/api/v1/accounts/${id}/collections`)
+      .forEach((r) => r.flush({ collections: [] }));
+  }
+
+  it('stops the spinner and explains a 404 instead of hanging', () => {
+    const fixture = setUp('900');
+    httpMock
+      .expectOne('/api/v1/accounts/900')
+      .flush('nope', { status: 404, statusText: 'Not Found' });
+    settleSiblings('900');
+    fixture.detectChanges();
+
+    const internals = fixture.componentInstance as unknown as ProfileInternals;
+    expect(internals.loading()).toBe(false);
+    expect(internals.loadError()).toContain('not on the server');
+  });
+
+  it('re-resolves by handle and redirects to the id this server issued', () => {
+    const fixture = setUp('109655875667638018', 'genxjamerican@hachyderm.io');
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    httpMock
+      .expectOne('/api/v1/accounts/109655875667638018')
+      .flush('nope', { status: 404, statusText: 'Not Found' });
+    settleSiblings('109655875667638018');
+
+    const lookup = httpMock.expectOne(
+      (r) =>
+        r.url === '/api/v1/accounts/lookup' &&
+        r.params.get('acct') === 'genxjamerican@hachyderm.io',
+    );
+    lookup.flush({ id: '109656717715863645', username: 'genxjamerican', fields: [] });
+    fixture.detectChanges();
+
+    // Navigating (not rendering in place) keeps the URL truthful: it ends up
+    // holding an id that actually works on this server.
+    expect(navigate).toHaveBeenCalledWith(
+      ['/accounts', '109656717715863645'],
+      expect.objectContaining({ replaceUrl: true }),
+    );
+  });
+
+  it('reports an honest dead end when the handle is unknown here too', () => {
+    const fixture = setUp('900', 'ghost@nowhere.example');
+    httpMock
+      .expectOne('/api/v1/accounts/900')
+      .flush('nope', { status: 404, statusText: 'Not Found' });
+    settleSiblings('900');
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/accounts/lookup')
+      .flush('nope', { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    const internals = fixture.componentInstance as unknown as ProfileInternals;
+    expect(internals.recovering()).toBe(false);
+    expect(internals.recoveryFailed()).toBe(true);
+    expect(internals.loadError()).toContain('ghost@nowhere.example');
+  });
+
+  it('does not attempt a lookup when the link carried no handle', () => {
+    const fixture = setUp('900');
+    httpMock
+      .expectOne('/api/v1/accounts/900')
+      .flush('nope', { status: 404, statusText: 'Not Found' });
+    settleSiblings('900');
+    fixture.detectChanges();
+
+    httpMock.expectNone((r) => r.url === '/api/v1/accounts/lookup');
   });
 });

@@ -7,6 +7,17 @@
   }
 </div>
 
+@if (!auth.isAnonymous) {
+  <!-- This page is about incoming requests, but "follows" is where people look
+       for anything to do with who they follow — including the boost switches,
+       which live on the Bulk actions page. Point rather than duplicate. -->
+  <p class="follows-crosslink muted small">
+    Looking to turn retweets on or off for everyone you follow?
+    <a routerLink="/settings/bulk-actions">Bulk actions</a> does that in one pass, and tells you how
+    many accounts it would change before you agree.
+  </p>
+}
+
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!requests().length) {

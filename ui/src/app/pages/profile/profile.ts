@@ -1,9 +1,10 @@
 import { Component, computed, DestroyRef, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Location, NgOptimizedImage } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom, map, of, Subscription, switchMap, tap } from 'rxjs';
 import { Api } from '../../api';
+import { Server } from '../../server';
 import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
 import { LocalModeration } from '../../local-moderation';
@@ -91,6 +92,8 @@ export class Profile implements OnInit, OnDestroy {
   private openRouter = inject(OpenRouterSession);
   private modelChoice = inject(OpenRouterModelChoice);
   private location = inject(Location);
+  private router = inject(Router);
+  private server = inject(Server);
   private rss = inject(RssProvider);
   private mataroa = inject(MataroaSettings);
   private blogger = inject(BloggerSession);
@@ -226,6 +229,23 @@ export class Profile implements OnInit, OnDestroy {
   private blogStatuses = signal<Status[]>([]);
   protected relationship = signal<Relationship | null>(null);
   protected loading = signal(true);
+  /**
+   * Why the Mastodon profile could not be loaded, when it could not be.
+   *
+   * The load used to have no error handler at all, so a 404 left the spinner
+   * turning forever — the reported symptom of opening an account URL against a
+   * server that never issued that id. Account ids are per-server (the same
+   * person is 109655875667638018 on mastodon.social and 109656717715863645 on
+   * fosstodon), so this is the ordinary outcome of a stale link, not an edge
+   * case.
+   */
+  protected loadError = signal<string | null>(null);
+  /** The handle from `?handle=`, if the link carried one for recovery. */
+  protected routeHandle = signal<string | null>(null);
+  /** True while re-resolving that handle against the current server. */
+  protected recovering = signal(false);
+  /** Set when recovery ran and the current server has never heard of them. */
+  protected recoveryFailed = signal(false);
   protected statusesLoading = signal(false);
   protected loadingMore = signal(false);
   /** An older page came back empty: the account's history is fully loaded. */
@@ -361,6 +381,9 @@ export class Profile implements OnInit, OnDestroy {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) {
+        // Read the handle before loading: `load` may need it the moment the
+        // id comes back 404, and the two params arrive together.
+        this.routeHandle.set(this.route.snapshot?.queryParamMap?.get('handle') ?? null);
         this.load(id);
       }
     });
@@ -376,6 +399,9 @@ export class Profile implements OnInit, OnDestroy {
     this.routeLoadSub = new Subscription();
     this.statusLoadSub.unsubscribe();
     this.loading.set(true);
+    this.loadError.set(null);
+    this.recovering.set(false);
+    this.recoveryFailed.set(false);
     this.blogStatuses.set([]);
     this.relationship.set(null);
     this.reportDone.set(false);
@@ -434,12 +460,31 @@ export class Profile implements OnInit, OnDestroy {
       return;
     }
     this.routeLoadSub.add(
-      this.api.getAccount(id).subscribe((a) => {
-        this.account.set(a);
-        if (this.auth.isAnonymous) {
-          this.relationship.set(this.anonymousFollows.relationship(a, this.anonymous.server()));
-        }
-        this.loading.set(false);
+      this.api.getAccount(id).subscribe({
+        next: (a) => {
+          this.account.set(a);
+          if (this.auth.isAnonymous) {
+            this.relationship.set(this.anonymousFollows.relationship(a, this.anonymous.server()));
+          }
+          this.loading.set(false);
+        },
+        error: (error: unknown) => {
+          // Without this handler the spinner ran forever. A 404 here almost
+          // always means "this id belongs to another server", so try the
+          // handle before giving up — that is the whole point of carrying it.
+          this.diagnostics.error('Profile', 'load:account-failed', error, { id });
+          const status = (error as { status?: number })?.status;
+          if (status === 404 && this.routeHandle()) {
+            this.recoverByHandle(this.routeHandle()!);
+            return;
+          }
+          this.loading.set(false);
+          this.loadError.set(
+            status === 404
+              ? 'This profile is not on the server you are browsing.'
+              : 'Could not load this profile.',
+          );
+        },
       }),
     );
     this.loadStatuses(id);
@@ -451,6 +496,52 @@ export class Profile implements OnInit, OnDestroy {
       );
     }
     this.loadFeatured(id);
+  }
+
+  /**
+   * Re-resolve a person by handle after their id 404'd, and navigate to the id
+   * *this* server issued for them.
+   *
+   * Ids are per-server; handles are not. `/accounts/lookup?acct=user@host`
+   * answers on any server that knows the account, including anonymously
+   * (verified against both mastodon.social and fosstodon, which return
+   * different ids for the same handle). Elk does this, and readers reasonably
+   * expect a profile link to survive a change of server.
+   *
+   * Navigating rather than rendering in place keeps the URL truthful: the
+   * address bar ends up holding an id that actually works here, so a reload or
+   * a shared link behaves the same way.
+   */
+  private recoverByHandle(handle: string): void {
+    this.recovering.set(true);
+    this.diagnostics.info('Profile', 'recover:lookup', { handle });
+    this.routeLoadSub.add(
+      this.api.lookupAccount(handle).subscribe({
+        next: (account) => {
+          this.recovering.set(false);
+          this.diagnostics.info('Profile', 'recover:resolved', { handle, id: account.id });
+          void this.router.navigate(['/accounts', account.id], {
+            queryParams: { handle },
+            replaceUrl: true,
+          });
+        },
+        error: (error: unknown) => {
+          // The current server has genuinely never federated this account —
+          // a real answer, and a different one from "the link was wrong".
+          this.diagnostics.error('Profile', 'recover:failed', error, { handle });
+          this.recovering.set(false);
+          this.recoveryFailed.set(true);
+          this.loading.set(false);
+          this.loadError.set(`${this.currentServerLabel()} doesn’t know @${handle}.`);
+        },
+      }),
+    );
+  }
+
+  /** Host of the server being browsed, for messages that name it. */
+  protected currentServerLabel(): string {
+    const base = this.auth.isAnonymous ? this.anonymous.server() : this.server.baseUrl();
+    return base.replace(/^https?:\/\//, '') || 'This server';
   }
 
   private loadAnonymousPublicProfile(ref: AnonymousPublicRef): void {

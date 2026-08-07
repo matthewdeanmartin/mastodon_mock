@@ -201,3 +201,24 @@
 .comment-content p:last-child {
   margin-bottom: 0;
 }
+
+/* Dead-end post link: an explanation plus a way out. */
+.thread-error {
+  max-width: 460px;
+  margin: 48px auto;
+  padding: 0 16px;
+  text-align: center;
+}
+
+.thread-error-msg {
+  font-weight: 700;
+  margin: 0;
+}
+
+.thread-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}

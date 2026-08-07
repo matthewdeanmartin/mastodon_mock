@@ -583,3 +583,39 @@ describe('Thread', () => {
     expect(chatInternals(fixture).chatKey()).toBeNull();
   });
 });
+
+/**
+ * Post ids are per-server, and unlike an account a post has no portable
+ * identifier to re-resolve it by. So the 404 here is a dead end — but it must
+ * be an explained one, not a spinner that never stops (the load previously had
+ * no error handler at all).
+ */
+describe('Thread cross-server dead end', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+  });
+
+  afterEach(() => httpMock.verify());
+
+  it('stops loading and explains a 404 rather than spinning forever', () => {
+    const fixture = setUpWithId('999');
+    httpMock
+      .expectOne('/api/v1/statuses/999')
+      .flush('nope', { status: 404, statusText: 'Not Found' });
+    httpMock
+      .match((r) => r.url === '/api/v1/statuses/999/context')
+      .forEach((r) => r.flush({ ancestors: [], descendants: [] }));
+    fixture.detectChanges();
+
+    const view = fixture.componentInstance as unknown as { loadError: () => string | null };
+    expect(internals(fixture).loading()).toBe(false);
+    expect(view.loadError()).toContain('isn’t on the server');
+
+    // And it offers the way out the reader can actually take.
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.thread-error-actions a[href="/home"]')).toBeTruthy();
+  });
+});

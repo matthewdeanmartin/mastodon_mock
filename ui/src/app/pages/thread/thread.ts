@@ -63,6 +63,8 @@ export class Thread implements OnInit {
   protected ancestors = signal<Status[]>([]);
   protected descendants = signal<Status[]>([]);
   protected loading = signal(true);
+  /** Why the post could not be loaded, when it could not be. */
+  protected loadError = signal<string | null>(null);
   protected isAnonymousPublic = signal(false);
   /** True while viewing a message serialized into the URL: a synthetic, read-only
    *  post with no network identity — no replies, boosts, favourites or bookmarks. */
@@ -269,6 +271,7 @@ export class Thread implements OnInit {
     this.loadSub.unsubscribe();
     this.loadSub = new Subscription();
     this.loading.set(true);
+    this.loadError.set(null);
     this.status.set(null);
     this.ancestors.set([]);
     this.descendants.set([]);
@@ -313,9 +316,24 @@ export class Thread implements OnInit {
       return;
     }
     this.loadSub.add(
-      this.api.getStatus(id).subscribe((s) => {
-        this.status.set(s);
-        this.loading.set(false);
+      this.api.getStatus(id).subscribe({
+        next: (s) => {
+          this.status.set(s);
+          this.loading.set(false);
+        },
+        error: (error: unknown) => {
+          // Without a handler the spinner never stopped. Unlike an account,
+          // there is no recovery to attempt: post ids are per-server and a
+          // post has no portable identifier to re-resolve it by, so the honest
+          // move is to say so and point somewhere that works.
+          const status = (error as { status?: number })?.status;
+          this.loading.set(false);
+          this.loadError.set(
+            status === 404
+              ? 'This post isn’t on the server you’re browsing. Post links only work on the server that hosts them.'
+              : 'Could not load this post.',
+          );
+        },
       }),
     );
     this.loadSub.add(

@@ -831,6 +831,7 @@
                 [item]="item"
                 [relationship]="relationshipFor(item.account.id)"
                 [profileLink]="accountLink(item.account)"
+                [profileParams]="accountLinkParams(item.account)"
                 [expanded]="isAccountExpanded(item.account.id)"
                 [followBusy]="isFollowBusy(item.account.id)"
                 [anonymous]="capabilities.active"

@@ -1,5 +1,11 @@
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <!-- Recovery is a second round trip after a 404, so name it rather than
+       leaving the same "Loading…" up for twice as long with no explanation. -->
+  @if (recovering()) {
+    <p class="muted center">Looking them up on {{ currentServerLabel() }}…</p>
+  } @else {
+    <p class="muted center">Loading…</p>
+  }
 } @else if (account(); as a) {
   <!-- Back rides in the tab row (below) where there is one. RSS and Twitter
        profiles have no tabs, so they keep a standalone button rather than no
@@ -687,6 +693,35 @@
        exist" — the fallback below would send the reader to check a handle that
        was never the problem. -->
   <p class="muted center">{{ error }}</p>
+} @else if (loadError(); as error) {
+  <!-- Account ids belong to the server that issued them, so a profile URL from
+       one server 404s on another. Say which server refused, and offer the two
+       things that actually recover: look the person up here by handle, or go
+       back to where the working link came from. -->
+  <div class="profile-error">
+    <p class="profile-error-msg">{{ error }}</p>
+    @if (routeHandle(); as handle) {
+      @if (recoveryFailed()) {
+        <p class="muted small">
+          They may simply not have federated here yet. Searching can pull them in.
+        </p>
+        <div class="profile-error-actions">
+          <a class="btn" [routerLink]="['/search']" [queryParams]="{ q: handle, type: 'accounts' }">
+            Search for &#64;{{ handle }}
+          </a>
+          <button class="btn btn-outline" type="button" (click)="goBack()">← Back</button>
+        </div>
+      }
+    } @else {
+      <p class="muted small">
+        This link carries an account id, which only means something on the server that issued it.
+      </p>
+      <div class="profile-error-actions">
+        <a class="btn" routerLink="/search">Search for them here</a>
+        <button class="btn btn-outline" type="button" (click)="goBack()">← Back</button>
+      </div>
+    }
+  </div>
 } @else {
   <p class="muted center">Account not found.</p>
 }

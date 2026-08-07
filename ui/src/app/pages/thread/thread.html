@@ -291,6 +291,22 @@
       />
     }
   }
+} @else if (loadError(); as error) {
+  <!-- A post id only means something on the server that issued it, and unlike
+       an account there is nothing portable to re-resolve it by. So: explain,
+       offer the original if we happen to have its URL, and otherwise send the
+       reader somewhere that definitely works. -->
+  <div class="thread-error">
+    <p class="thread-error-msg">{{ error }}</p>
+    <div class="thread-error-actions">
+      @if (publicOriginalUrl(); as originalUrl) {
+        <a class="btn" [href]="originalUrl" target="_blank" rel="noopener noreferrer">
+          Open the original post
+        </a>
+      }
+      <a class="btn btn-outline" routerLink="/home">Go to your home feed</a>
+    </div>
+  </div>
 } @else {
   <p class="muted center">
     Status not found.

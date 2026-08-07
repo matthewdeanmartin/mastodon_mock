@@ -681,6 +681,11 @@ export const routes: Routes = [
         pathMatch: 'full',
       },
       {
+        // `?handle=user@host` is optional and purely a recovery hint: account
+        // ids are per-server, so a URL carrying one is only valid on the server
+        // that issued it. With the handle along for the ride, a profile opened
+        // against a different server can re-resolve the person by lookup
+        // instead of dead-ending on a 404. See `Profile.recoverByHandle`.
         path: 'accounts/:id',
         loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
       },
