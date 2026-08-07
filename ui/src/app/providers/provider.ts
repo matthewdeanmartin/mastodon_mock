@@ -84,6 +84,38 @@ export function serverKnowsStatus(provider: ProviderId | undefined): boolean {
 }
 
 /**
+ * Providers where a like can be *recorded* even though it cannot be *sent*.
+ *
+ * A deliberate inversion of the rule above, and worth reading carefully because
+ * it looks like a contradiction. `PROVIDER_CAPS.rss.favourite` is false and must
+ * stay false: that flag means "the network accepts a like", it is what
+ * `StatusActions` consults to decide which request to make, and flipping it
+ * would POST an `rss:` id to `/api/v1/statuses/{id}/favourite`, which can only
+ * 404.
+ *
+ * But POSSE changed the premise. Liking an RSS item cannot notify the author
+ * *through the feed* — there is no endpoint in a feed — and it can still be
+ * recorded on the reader's own site. More than that: if the item's page carries
+ * a webmention endpoint, the record can genuinely be delivered, which produced
+ * the irony this exists to fix — the one provider where webmentions actually
+ * work was the one provider where you could not click like.
+ *
+ * Excludes `paste` and `blog`: those are the user's *own* content, and
+ * recording that you liked your own writing is not a thing worth a commit.
+ */
+const POSSE_ONLY: ReadonlySet<ProviderId> = new Set<ProviderId>(['rss', 'twitter']);
+
+/**
+ * Whether this provider supports record-only interactions.
+ *
+ * The caller must additionally check that POSSE is switched on: with it off,
+ * these buttons would record nowhere, which is a button that does nothing.
+ */
+export function canPosseOnly(provider: ProviderId | undefined): boolean {
+  return POSSE_ONLY.has(provider ?? 'mastodon');
+}
+
+/**
  * Capabilities for one status, given whether this browser holds a token.
  *
  * The token is what makes the difference, not the provider. With one, an

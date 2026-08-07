@@ -344,6 +344,82 @@ describe('StatusCard', () => {
     expect(TestBed.inject(PosseQueue).count()).toBe(0);
   });
 
+  // ------------------------------------------------- POSSE-only (RSS, Twitter)
+
+  function rssStatus() {
+    return makeStatus({
+      id: 'rss:https://blog.example/feed.xml::1',
+      url: 'https://blog.example/posts/hello/',
+      provider: 'rss',
+    } as Partial<Status>);
+  }
+
+  it('offers record-only like and boost on an RSS item when POSSE is on', () => {
+    enablePosse();
+    const f = setUp(rssStatus());
+
+    const buttons = [
+      ...(f.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.action'),
+    ].map((b) => b.getAttribute('title'));
+    expect(buttons.some((t) => t?.includes('Record a like'))).toBe(true);
+    expect(buttons.some((t) => t?.includes('Record a boost'))).toBe(true);
+  });
+
+  it('records an RSS like without making any request at all', () => {
+    enablePosse();
+    const f = setUp(rssStatus());
+
+    (f.componentInstance as any).togglePosseOnly('like', fakeEvent());
+
+    // There is no endpoint to call for a feed item — pretending otherwise is
+    // exactly what PROVIDER_CAPS.rss correctly refuses.
+    httpMock.verify();
+    const queue = TestBed.inject(PosseQueue);
+    expect(queue.count()).toBe(1);
+    expect(queue.entries()[0]).toMatchObject({
+      kind: 'like',
+      targetUrl: 'https://blog.example/posts/hello/',
+      provider: 'rss',
+    });
+  });
+
+  it('un-records an RSS like, since the queue is the only state there is', () => {
+    enablePosse();
+    const f = setUp(rssStatus());
+    const cmp = f.componentInstance as any;
+
+    cmp.togglePosseOnly('like', fakeEvent());
+    expect(cmp.posseQueued('like')).toBe(true);
+    cmp.togglePosseOnly('like', fakeEvent());
+
+    expect(cmp.posseQueued('like')).toBe(false);
+    expect(TestBed.inject(PosseQueue).count()).toBe(0);
+  });
+
+  it('shows no record-only buttons when POSSE is off', () => {
+    const f = setUp(rssStatus());
+
+    // A button that records nowhere is a button that does nothing.
+    const titles = [
+      ...(f.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.action'),
+    ].map((b) => b.getAttribute('title'));
+    expect(titles.some((t) => t?.includes('Record a'))).toBe(false);
+  });
+
+  it('never offers record-only buttons on the reader’s own content', () => {
+    enablePosse();
+    const f = setUp(
+      makeStatus({
+        id: 'blog:hugo:mine',
+        url: 'https://mistersql.github.io/mistersql/posts/mine/',
+        provider: 'blog',
+      } as Partial<Status>),
+    );
+
+    // Recording that you liked your own writing is not worth a commit.
+    expect((f.componentInstance as any).posseOnly()).toBe(false);
+  });
+
   // ---------------------------------------------------------------- display / boostedBy
 
   it('display returns the status itself when it is not a reblog', () => {

@@ -73,6 +73,14 @@
   <p class="feed-error" role="alert">{{ message }}</p>
 }
 
+@if (building()) {
+  <!-- The gap between commit and deliverable is a real wait, not a hang: a
+       webmention's source URL does not exist until Actions has rebuilt. -->
+  <p class="muted small building-note" role="status">
+    Recorded. Waiting for your site to rebuild before letting anyone know — a webmention points at a
+    page that has to exist first.
+  </p>
+}
 @if (notifying() || deliveries().length) {
   <div class="delivery-results">
     <h2 class="section-head">

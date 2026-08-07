@@ -110,3 +110,8 @@
 .delivery-refused {
   color: var(--danger, #d33);
 }
+
+.building-note {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+}

@@ -390,6 +390,44 @@
             }
           </button>
         }
+        @if (posseOnly()) {
+          <!-- Record-only: this provider has no network to like on (an RSS feed
+               has no endpoint), so these write to the reader's own site and make
+               no request at all. State comes from the queue, not from a server
+               flag that does not exist here. -->
+          <button
+            class="action"
+            [class.on]="posseQueued('repost')"
+            (click)="togglePosseOnly('repost', $event)"
+            [title]="
+              posseQueued('repost')
+                ? 'Remove this boost from your blog record'
+                : 'Record a boost on your blog'
+            "
+            [attr.aria-pressed]="posseQueued('repost')"
+          >
+            🔁
+            @if (posseQueued('repost')) {
+              <span class="did">Recorded</span>
+            }
+          </button>
+          <button
+            class="action"
+            [class.on]="posseQueued('like')"
+            (click)="togglePosseOnly('like', $event)"
+            [title]="
+              posseQueued('like')
+                ? 'Remove this like from your blog record'
+                : 'Record a like on your blog'
+            "
+            [attr.aria-pressed]="posseQueued('like')"
+          >
+            {{ favIcon() }}
+            @if (posseQueued('like')) {
+              <span class="did">Recorded</span>
+            }
+          </button>
+        }
         @if (auth.isAnonymous) {
           <span class="action" title="Favourites">
             {{ favIcon() }} <span>{{ display.favourites_count }}</span>

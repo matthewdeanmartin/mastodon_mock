@@ -1,10 +1,12 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, Injector, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { HugoSettings } from '../../providers/hugo/hugo-settings';
 import { PossePublish } from '../../providers/hugo/posse-publish';
 import { PosseEntry, PosseQueue } from '../../providers/hugo/posse-queue';
 import { DeliveryState, WebmentionSend } from '../../providers/hugo/webmention-send';
+import { DeployState, isTerminal } from '../../providers/hugo/hugo-deploy';
+import { HugoDeployWatch } from '../../providers/hugo/hugo-deploy-watch';
 
 /** One target's outcome, for the results list under the queue. */
 interface DeliveryReport {
@@ -33,8 +35,12 @@ export class PossePage {
   protected readonly settings = inject(HugoSettings);
   private readonly publisher = inject(PossePublish);
   private readonly sender = inject(WebmentionSend);
+  private readonly deployWatch = inject(HugoDeployWatch);
+  private readonly injector = inject(Injector);
 
   protected readonly publishing = signal(false);
+  /** Waiting for the site to rebuild, so the source pages exist. */
+  protected readonly building = signal(false);
   protected readonly notifying = signal(false);
   protected readonly notice = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -104,7 +110,9 @@ export class PossePage {
       );
       // Published is the durable part and it is now done. Notifying the other
       // sites is a courtesy on top, and its failure never retracts any of that.
-      await this.notifyTargets(published, result.sourceUrls);
+      if (await this.sourcePagesLive(result.commitSha)) {
+        await this.notifyTargets(published, result.sourceUrls);
+      }
     } catch (error: unknown) {
       this.error.set(
         error instanceof Error ? error.message : "Couldn't record these to your blog.",
@@ -112,6 +120,62 @@ export class PossePage {
     } finally {
       this.publishing.set(false);
     }
+  }
+
+  /**
+   * Wait for the commit to become a built site before notifying anyone.
+   *
+   * A webmention's `source` is fetched by any receiver that verifies, and it
+   * does not exist until Actions has rebuilt the site — sending immediately
+   * after the commit means sending a URL that 404s, and a conscientious
+   * receiver rejects it. So delivery waits.
+   *
+   * Three endings, and the middle one is the reason this is not just
+   * `await live`:
+   *  - `live` — deliver.
+   *  - `no-build` / `unknown` — deliver anyway. The site deploys some other way,
+   *    or we lack `Actions: read`; we cannot tell when it is ready and refusing
+   *    forever would be worse than one send that might be early.
+   *  - `failed` — do not deliver. The source page will not exist at all.
+   */
+  private async sourcePagesLive(commitSha: string): Promise<boolean> {
+    if (!commitSha) {
+      // Nothing was committed (everything was already recorded), so the source
+      // pages are from an earlier publish and are already built.
+      return true;
+    }
+    this.building.set(true);
+    try {
+      this.deployWatch.watch(commitSha);
+      const state = await this.settledDeployState();
+      if (state === 'failed') {
+        this.error.set(
+          'Your site build failed, so the pages these link to do not exist yet. Nothing was sent — fix the build and publish again.',
+        );
+        return false;
+      }
+      return true;
+    } finally {
+      this.building.set(false);
+      this.deployWatch.stop();
+    }
+  }
+
+  /** Resolve once the build watcher reaches a terminal verdict. */
+  private settledDeployState(): Promise<DeployState['kind']> {
+    return new Promise((resolve) => {
+      const done = effect(
+        () => {
+          const state = this.deployWatch.current();
+          if (state && isTerminal(state)) {
+            resolve(state.kind);
+            // Defer so the effect is not destroyed while it is running.
+            queueMicrotask(() => done.destroy());
+          }
+        },
+        { injector: this.injector },
+      );
+    });
   }
 
   /**

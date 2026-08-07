@@ -27,6 +27,7 @@ import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, MediaAttachment, Poll, Status, Translation } from '../models';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
 import { PosseKind, PosseQueue } from '../providers/hugo/posse-queue';
+import { canPosseOnly } from '../providers/provider';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
 import { AiTranslate, AiTranslation, languageName } from '../ai-translate';
@@ -1015,6 +1016,43 @@ export class StatusCard {
    * un-liking leaves nothing behind. Once published it is a commit in a repo
    * and the queue has no further claim on it.
    */
+  /**
+   * True where an interaction can be *recorded* but not *sent*.
+   *
+   * RSS and Twitter items have no network to like on, so with POSSE switched on
+   * their cards offer record-only buttons instead. With it off there is nowhere
+   * to record to, and the buttons are absent rather than inert.
+   */
+  protected posseOnly(): boolean {
+    return this.hugo.posseEnabled() && canPosseOnly(this.display.provider) && !!this.display.url;
+  }
+
+  /** Whether this interaction is already waiting in the queue. */
+  protected posseQueued(kind: PosseKind): boolean {
+    const url = this.display.url;
+    return !!url && this.posse.has(kind, url);
+  }
+
+  /**
+   * Record — or un-record — an interaction that has no network behind it.
+   *
+   * Issues **no HTTP request at all**, which is the entire point: there is no
+   * endpoint to call for a feed item, and pretending otherwise is what
+   * `PROVIDER_CAPS.rss` correctly refuses. This writes to localStorage and
+   * nothing else.
+   */
+  protected togglePosseOnly(kind: PosseKind, event: Event): void {
+    event.stopPropagation();
+    if (!this.posseOnly()) {
+      return;
+    }
+    if (this.posseQueued(kind)) {
+      this.posse.removeMatching(kind, this.display.url);
+    } else {
+      this.posse.add(kind, this.display);
+    }
+  }
+
   private recordPosse(kind: PosseKind, target: Status, active: boolean): void {
     if (!this.hugo.posseEnabled()) {
       return;
