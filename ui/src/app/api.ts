@@ -103,6 +103,25 @@ export class Api {
     return this.http.get<Status[]>(`/api/v1/accounts/${id}/statuses`, { params });
   }
 
+  /**
+   * Fetch many accounts in one call (Mastodon 4.3+ `GET /api/v1/accounts`).
+   *
+   * The full account entity, which the thin ones returned by some providers are
+   * missing — `last_status_at` above all, the field "when did this person last
+   * post" needs. Verified against mastodon.social: 200 with both a local and a
+   * remote id, each carrying `last_status_at` as a plain date ("2026-08-07").
+   *
+   * Ids the server doesn't know are simply absent from the response rather than
+   * erroring the batch, so callers must match on what came back, not on order.
+   */
+  getAccounts(ids: string[]): Observable<Account[]> {
+    let params = new HttpParams();
+    for (const id of ids) {
+      params = params.append('id[]', id);
+    }
+    return this.http.get<Account[]>('/api/v1/accounts', { params });
+  }
+
   relationships(ids: string[]): Observable<Relationship[]> {
     let params = new HttpParams();
     for (const id of ids) {

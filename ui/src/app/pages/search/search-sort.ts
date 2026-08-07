@@ -21,7 +21,14 @@ export type StatusSortKey =
   | 'reblogs'
   | 'replies';
 
-export type AccountSortKey = 'relevance' | 'followers' | 'following' | 'posts' | 'name' | 'matches';
+export type AccountSortKey =
+  | 'relevance'
+  | 'followers'
+  | 'following'
+  | 'posts'
+  | 'name'
+  | 'matches'
+  | 'active';
 
 export interface SortOption<K extends string> {
   value: K;
@@ -46,6 +53,7 @@ export const ACCOUNT_SORTS: SortOption<AccountSortKey>[] = [
   { value: 'posts', label: 'Most posts' },
   { value: 'name', label: 'Name (A–Z)' },
   { value: 'matches', label: 'Most matching posts' },
+  { value: 'active', label: 'Recently active' },
 ];
 
 /** Stable sort by a numeric key extractor, descending (bigger first). */
@@ -84,6 +92,26 @@ export function sortStatuses(statuses: Status[], key: StatusSortKey): Status[] {
   }
 }
 
+/**
+ * Sort weight for "recently active", in three tiers:
+ *
+ *  - a real `last_status_at` sorts by its timestamp;
+ *  - `null` means the server answered "this account has never posted" — a known
+ *    fact, so it ranks below every dated account but above the unknowns;
+ *  - `undefined` means the field was never supplied (a remote stub the search
+ *    returned thin, not yet enriched), which sorts last so an unanswered
+ *    account never displaces one we have an answer for.
+ */
+export function accountActivity(account: Account): number {
+  if (account.last_status_at === undefined) {
+    return -Infinity;
+  }
+  if (account.last_status_at === null) {
+    return -Number.MAX_VALUE;
+  }
+  return Date.parse(account.last_status_at) || -Number.MAX_VALUE;
+}
+
 /** Reorder loaded accounts by the chosen key. 'relevance' returns them as-is. */
 export function sortAccounts(
   items: AccountWithMatches[],
@@ -100,6 +128,11 @@ export function sortAccounts(
       return byDesc(items, (i) => i.account.statuses_count);
     case 'matches':
       return byDesc(items, (i) => i.matchingPosts.length);
+    case 'active':
+      // Unknown sinks below known, rather than sorting as the epoch and
+      // claiming an un-enriched account has been silent since 1970. A null
+      // `last_status_at` is a real answer ("never posted") and outranks it.
+      return byDesc(items, (i) => accountActivity(i.account));
     case 'name': {
       const label = (a: Account) => (a.display_name?.trim() || a.acct || '').toLowerCase();
       return items

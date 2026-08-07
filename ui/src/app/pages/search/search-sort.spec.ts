@@ -128,4 +128,38 @@ describe('sortAccounts', () => {
     many.matchingPosts = [status({ id: '2' }), status({ id: '3' })];
     expect(sortAccounts([few, many], 'matches').map((i) => i.account.id)).toEqual(['many', 'few']);
   });
+
+  it('sorts by last post, newest first', () => {
+    const items = [
+      account('old', { last_status_at: '2024-01-01' }),
+      account('new', { last_status_at: '2026-08-01' }),
+      account('mid', { last_status_at: '2025-06-15' }),
+    ];
+    expect(sortAccounts(items, 'active').map((i) => i.account.id)).toEqual(['new', 'mid', 'old']);
+  });
+
+  it('ranks never-posted below dated accounts, and unknown below both', () => {
+    // The three tiers of `accountActivity`: a date beats "never posted" (a real
+    // answer), which beats undefined (nobody has told us yet). Sorting unknown
+    // as the epoch would claim an un-enriched account had been silent for
+    // decades — a stronger statement than the data supports.
+    const items = [
+      account('unknown'),
+      account('never', { last_status_at: null }),
+      account('dated', { last_status_at: '2020-01-01' }),
+    ];
+    expect(sortAccounts(items, 'active').map((i) => i.account.id)).toEqual([
+      'dated',
+      'never',
+      'unknown',
+    ]);
+  });
+
+  it('keeps server order among accounts with the same activity (stable)', () => {
+    const items = [
+      account('first', { last_status_at: '2026-01-01' }),
+      account('second', { last_status_at: '2026-01-01' }),
+    ];
+    expect(sortAccounts(items, 'active').map((i) => i.account.id)).toEqual(['first', 'second']);
+  });
 });

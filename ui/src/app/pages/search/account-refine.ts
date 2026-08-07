@@ -13,7 +13,7 @@
  * carry the test coverage.
  */
 
-import { Account, Status } from '../../models';
+import { Account, Relationship, Status } from '../../models';
 import { NumericRange } from './mawkingbird-search';
 import { acctDomain, plainText } from './search-refine';
 
@@ -231,6 +231,35 @@ export function buildAccountFacets(accounts: Account[]): AccountFacet[] {
   bucketFacet('statuses', 'Posts', (a) => a.statuses_count);
 
   return facets;
+}
+
+/** The follow-state filter over account results: everyone, or one side of it. */
+export type FollowFilter = 'all' | 'following' | 'not-following';
+
+/**
+ * Split loaded accounts by whether the viewer already follows them.
+ *
+ * Unlike the facets above, this reads a `Relationship` rather than the account,
+ * because follow state is the viewer's, not the account's. A relationship that
+ * hasn't loaded yet counts as *not* following: it matches what the card shows
+ * (its follow button reads "Follow" until proven otherwise), so the filtered
+ * list never contradicts the buttons in it. A pending follow request counts as
+ * following — the intent is recorded, and it stops the account resurfacing in
+ * "not following" as something still to do.
+ */
+export function filterByFollowState(
+  items: AccountWithMatches[],
+  relationships: Record<string, Relationship>,
+  filter: FollowFilter,
+): AccountWithMatches[] {
+  if (filter === 'all') {
+    return items;
+  }
+  return items.filter((item) => {
+    const rel = relationships[item.account.id];
+    const followed = !!rel?.following || !!rel?.requested;
+    return filter === 'following' ? followed : !followed;
+  });
 }
 
 /** Does an account match a chosen facet value? Mirrors `buildAccountFacets`. */

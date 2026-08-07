@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Relationship } from '../../models';
 import { AccountSearchCriteria } from './mawkingbird-search';
-import { AccountFacetKind, AccountWithMatches } from './account-refine';
+import { AccountFacetKind, AccountWithMatches, FollowFilter } from './account-refine';
 import { AccountSortKey } from './search-sort';
 import { SearchServer } from '../../search-server';
 
@@ -32,6 +32,8 @@ export interface AccountSearchSnapshot {
   filter: string;
   /** The chosen sort of the loaded people. */
   sort: AccountSortKey;
+  /** Whether the list was narrowed to accounts the viewer does/doesn't follow. */
+  followFilter?: FollowFilter;
   /** The numeric bounds the results were gated by. */
   bounds: AccountSearchCriteria;
   /** API calls the search spent (for the honesty line). */

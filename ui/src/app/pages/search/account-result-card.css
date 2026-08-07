@@ -104,6 +104,18 @@
   color: var(--text);
 }
 
+/* Activity is the "is this account still alive" signal, so a long silence is
+   worth seeing at a glance rather than reading. Not red: a dormant account is
+   a fact about the result, not an error in it. */
+.acct-activity.stale {
+  color: var(--warn, #b26b00);
+}
+
+.acct-activity.unknown {
+  font-style: italic;
+  opacity: 0.75;
+}
+
 .acct-fields {
   margin: 6px 0 0;
   display: grid;

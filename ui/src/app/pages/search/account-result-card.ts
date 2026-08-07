@@ -66,6 +66,46 @@ export class AccountResultCard {
     Math.max(0, this.matchingPosts().length - AccountResultCard.INLINE_POST_CAP),
   );
 
+  /**
+   * "Last posted" for the stats row, in whole days.
+   *
+   * `last_status_at` is a plain date ("2026-08-07") rather than a timestamp, so
+   * `humanTime` would invent a precision it doesn't have ("3 hours ago" from a
+   * value that only names a day). Three states are worth distinguishing:
+   * `null` = the account has never posted, `undefined` = nobody has told us yet
+   * (the card offers to find out), and a date = an answer.
+   */
+  protected lastPosted = computed<{ text: string; stale: boolean } | null>(() => {
+    const raw = this.account().last_status_at;
+    if (raw === undefined) {
+      return null;
+    }
+    if (raw === null) {
+      return { text: 'never posted', stale: true };
+    }
+    const when = Date.parse(raw);
+    if (!Number.isFinite(when)) {
+      return null;
+    }
+    const days = Math.floor((Date.now() - when) / 86_400_000);
+    const text =
+      days <= 0
+        ? 'active today'
+        : days === 1
+          ? 'active yesterday'
+          : days < 30
+            ? `active ${days} days ago`
+            : days < 365
+              ? `active ${Math.floor(days / 30)} mo ago`
+              : `active ${Math.floor(days / 365)}y ago`;
+    // Six months of silence is the line where "still around?" becomes the
+    // question the reader is actually asking of a search result.
+    return { text, stale: days >= 180 };
+  });
+
+  /** True when this card could show activity but nobody has fetched it yet. */
+  protected activityUnknown = computed(() => this.account().last_status_at === undefined);
+
   protected following = computed(() => !!this.relationship()?.following);
   protected followedBy = computed(() => !!this.relationship()?.followed_by);
   protected mutual = computed(() => this.following() && this.followedBy());

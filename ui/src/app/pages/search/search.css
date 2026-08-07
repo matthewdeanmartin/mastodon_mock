@@ -382,6 +382,27 @@
   font-weight: 700;
 }
 
+/* The on-demand "check activity" offer, and its in-flight/error states. */
+.enrich-offer {
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.enrich-offer.error {
+  color: var(--danger, #c0392b);
+}
+
+.enrich-offer .link-button {
+  border: 0;
+  padding: 0 4px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .refine-facets {
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);

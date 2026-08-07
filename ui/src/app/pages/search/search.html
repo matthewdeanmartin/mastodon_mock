@@ -700,7 +700,52 @@
                 }
               </select>
             </label>
+            <!-- Follow state comes from the relationship map rather than the
+                 account, so it sits here beside the sort instead of among the
+                 facets below (which are all computed from the accounts). -->
+            <div class="seg follow-seg" role="group" aria-label="Filter by follow state">
+              <button
+                type="button"
+                [class.active]="followFilter() === 'all'"
+                (click)="followFilter.set('all')"
+              >
+                Everyone
+              </button>
+              <button
+                type="button"
+                [class.active]="followFilter() === 'following'"
+                (click)="followFilter.set('following')"
+                title="Only accounts you already follow"
+              >
+                I follow
+              </button>
+              <button
+                type="button"
+                [class.active]="followFilter() === 'not-following'"
+                (click)="followFilter.set('not-following')"
+                title="Only accounts you don't follow yet"
+              >
+                Not yet
+              </button>
+            </div>
           </div>
+
+          <!-- Only ever shown when something actually arrived without a date;
+               Mastodon's own search supplies one for every account. -->
+          @if (canEnrichActivity()) {
+            <p class="enrich-offer muted small">
+              {{ accountsMissingActivity().length }} of these arrived without a last-post date.
+              <button type="button" class="link-button" (click)="enrichActivity()">
+                Check activity
+              </button>
+              <span class="muted">(1 API call)</span>
+            </p>
+          } @else if (enrichingActivity()) {
+            <p class="enrich-offer muted small">Checking activity…</p>
+          }
+          @if (enrichError(); as error) {
+            <p class="enrich-offer error small" role="alert">{{ error }}</p>
+          }
 
           @if (accountFacets().length) {
             <details class="refine-facets" [open]="refineOpen()">

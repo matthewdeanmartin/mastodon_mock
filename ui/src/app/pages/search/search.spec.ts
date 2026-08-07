@@ -11,7 +11,7 @@ import {
 } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Account, SearchResults, Status, Tag } from '../../models';
+import { Account, Relationship, SearchResults, Status, Tag } from '../../models';
 import { Search } from './search';
 import { Auth } from '../../auth';
 import { SearchServer } from '../../search-server';
@@ -42,6 +42,12 @@ interface SearchInternals {
   onTypeSelect(value: string, el?: HTMLSelectElement): void;
   webDropped: WritableSignal<string[]>;
   replies: WritableSignal<'include' | 'only' | 'exclude'>;
+  followFilter: WritableSignal<'all' | 'following' | 'not-following'>;
+  relationships: WritableSignal<Record<string, Relationship>>;
+  accountsMissingActivity(): { account: Account; matchingPosts: Status[] }[];
+  canEnrichActivity(): boolean;
+  enrichActivity(): void;
+  enrichError: WritableSignal<string | null>;
 }
 
 function makeAccount(over: Partial<Account> = {}): Account {
@@ -477,6 +483,105 @@ describe('Search', () => {
           .map((i) => i.account.id),
       ).toEqual(['econ1']);
       httpMock.expectNone((r) => r.url === '/api/v2/search');
+    });
+
+    /** Run an account search returning `accounts`, settling the relationship call. */
+    function accountSearch(fixture: ComponentFixture<Search>, accounts: Account[]): void {
+      internals(fixture).accountSource.set('bio');
+      search(fixture, 'economist', 'accounts');
+      httpMock
+        .expectOne((r) => r.url === '/api/v2/search' && r.params.get('type') === 'accounts')
+        .flush({ accounts, statuses: [], hashtags: [] });
+      httpMock.match((r) => r.url === '/api/v1/accounts/relationships').forEach((r) => r.flush([]));
+      fixture.detectChanges();
+    }
+
+    it('offers enrichment only for accounts that arrived without a last-post date', () => {
+      const fixture = setUp();
+      accountSearch(fixture, [
+        makeAccount({ id: 'dated', last_status_at: '2026-08-01' }),
+        makeAccount({ id: 'thin' }),
+      ]);
+
+      expect(
+        internals(fixture)
+          .accountsMissingActivity()
+          .map((i) => i.account.id),
+      ).toEqual(['thin']);
+      expect(internals(fixture).canEnrichActivity()).toBe(true);
+    });
+
+    it('fills in last_status_at from one batched call', () => {
+      const fixture = setUp();
+      accountSearch(fixture, [makeAccount({ id: 'thin' })]);
+
+      internals(fixture).enrichActivity();
+      const req = httpMock.expectOne((r) => r.url === '/api/v1/accounts');
+      expect(req.request.params.getAll('id[]')).toEqual(['thin']);
+      req.flush([makeAccount({ id: 'thin', last_status_at: '2026-08-05' })]);
+      fixture.detectChanges();
+
+      expect(internals(fixture).accountItems()[0].account.last_status_at).toBe('2026-08-05');
+      // Nothing left unanswered, so the offer retires rather than repeating.
+      expect(internals(fixture).canEnrichActivity()).toBe(false);
+    });
+
+    it('leaves ids the server omitted as unknown rather than inventing a date', () => {
+      const fixture = setUp();
+      accountSearch(fixture, [makeAccount({ id: 'known' }), makeAccount({ id: 'gone' })]);
+
+      internals(fixture).enrichActivity();
+      // The batch endpoint drops unknown ids instead of erroring the request.
+      httpMock
+        .expectOne((r) => r.url === '/api/v1/accounts')
+        .flush([makeAccount({ id: 'known', last_status_at: '2026-08-05' })]);
+      fixture.detectChanges();
+
+      const byId = new Map(
+        internals(fixture)
+          .accountItems()
+          .map((i) => [i.account.id, i.account]),
+      );
+      expect(byId.get('known')!.last_status_at).toBe('2026-08-05');
+      expect(byId.get('gone')!.last_status_at).toBeUndefined();
+    });
+
+    it('reports a failed enrichment instead of silently doing nothing', () => {
+      const fixture = setUp();
+      accountSearch(fixture, [makeAccount({ id: 'thin' })]);
+
+      internals(fixture).enrichActivity();
+      httpMock
+        .expectOne((r) => r.url === '/api/v1/accounts')
+        .flush('nope', { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+
+      expect(internals(fixture).enrichError()).toBeTruthy();
+      // Still offered, so the reader can retry.
+      expect(internals(fixture).canEnrichActivity()).toBe(true);
+    });
+
+    it('filters the visible list by whether the viewer follows each account', () => {
+      const fixture = setUp();
+      accountSearch(fixture, [makeAccount({ id: 'friend' }), makeAccount({ id: 'stranger' })]);
+      internals(fixture).relationships.set({
+        friend: { id: 'friend', following: true } as Relationship,
+        stranger: { id: 'stranger', following: false } as Relationship,
+      });
+
+      internals(fixture).followFilter.set('following');
+      expect(
+        internals(fixture)
+          .visibleAccounts()
+          .map((i) => i.account.id),
+      ).toEqual(['friend']);
+
+      internals(fixture).followFilter.set('not-following');
+      expect(
+        internals(fixture)
+          .visibleAccounts()
+          .map((i) => i.account.id),
+      ).toEqual(['stranger']);
     });
   });
 

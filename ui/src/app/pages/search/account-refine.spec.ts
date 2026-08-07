@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { Account, Status } from '../../models';
+import { Account, Relationship, Status } from '../../models';
 import {
   accountMatchesFacet,
   accountMatchesNumeric,
   buildAccountFacets,
   condenseStatusesToAuthors,
   filterAccounts,
+  filterByFollowState,
   inRange,
   mergeAuthors,
 } from './account-refine';
@@ -225,5 +226,55 @@ describe('accountMatchesFacet', () => {
     expect(accountMatchesFacet(makeAccount({ followers_count: 500 }), 'followers', '10000+')).toBe(
       false,
     );
+  });
+});
+
+describe('filterByFollowState', () => {
+  function rel(id: string, over: Partial<Relationship> = {}): Relationship {
+    return {
+      id,
+      following: false,
+      followed_by: false,
+      requested: false,
+      blocking: false,
+      muting: false,
+      ...over,
+    } as Relationship;
+  }
+
+  const followed = { account: makeAccount({ id: 'f' }), matchingPosts: [] };
+  const stranger = { account: makeAccount({ id: 's' }), matchingPosts: [] };
+  const items = [followed, stranger];
+  const rels = { f: rel('f', { following: true }), s: rel('s') };
+
+  it("returns everything for 'all'", () => {
+    expect(filterByFollowState(items, rels, 'all')).toEqual(items);
+  });
+
+  it('keeps only accounts the viewer follows', () => {
+    expect(filterByFollowState(items, rels, 'following').map((i) => i.account.id)).toEqual(['f']);
+  });
+
+  it('keeps only accounts the viewer does not follow', () => {
+    expect(filterByFollowState(items, rels, 'not-following').map((i) => i.account.id)).toEqual([
+      's',
+    ]);
+  });
+
+  it('counts a pending follow request as following', () => {
+    // The intent is recorded, so it should stop appearing under "not yet" as
+    // something still to do.
+    const pending = { r: rel('r', { requested: true }) };
+    const item = [{ account: makeAccount({ id: 'r' }), matchingPosts: [] }];
+    expect(filterByFollowState(item, pending, 'following')).toHaveLength(1);
+    expect(filterByFollowState(item, pending, 'not-following')).toHaveLength(0);
+  });
+
+  it('treats an unloaded relationship as not following, matching the card', () => {
+    // The card's button reads "Follow" until a relationship proves otherwise;
+    // the filtered list must not contradict the buttons inside it.
+    const item = [{ account: makeAccount({ id: 'unknown' }), matchingPosts: [] }];
+    expect(filterByFollowState(item, {}, 'not-following')).toHaveLength(1);
+    expect(filterByFollowState(item, {}, 'following')).toHaveLength(0);
   });
 });

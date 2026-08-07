@@ -37,6 +37,8 @@ import {
   buildAccountFacets,
   condenseStatusesToAuthors,
   filterAccounts,
+  filterByFollowState,
+  FollowFilter,
   mergeAuthors,
 } from './account-refine';
 import {
@@ -747,6 +749,7 @@ export class Search implements OnInit, OnDestroy {
       facets: this.selectedAccountFacets(),
       filter: this.accountFilter(),
       sort: this.accountSort(),
+      followFilter: this.followFilter(),
       bounds: this.executedAccountBounds(),
       callsUsed: this.callsUsed(),
       // The results column doesn't scroll internally (overflow:hidden) — the page
@@ -773,6 +776,7 @@ export class Search implements OnInit, OnDestroy {
     this.selectedAccountFacets.set(snap.facets);
     this.accountFilter.set(snap.filter);
     this.accountSort.set(snap.sort ?? 'relevance');
+    this.followFilter.set(snap.followFilter ?? 'all');
     this.executedAccountBounds.set(snap.bounds);
     this.callsUsed.set(snap.callsUsed);
     this.accountSearchRan.set(true);
@@ -1227,6 +1231,8 @@ export class Search implements OnInit, OnDestroy {
     this.expandedAccounts.set(new Set());
     this.selectedAccountFacets.set([]);
     this.accountFilter.set('');
+    this.followFilter.set('all');
+    this.enrichError.set(null);
     this.accountSort.set('relevance');
     this.accountItems.set([]);
     this.accountSearchRan.set(false);
@@ -1579,6 +1585,12 @@ export class Search implements OnInit, OnDestroy {
   protected selectedAccountFacets = signal<{ kind: AccountFacetKind; value: string }[]>([]);
   /** The "filter these people" substring over loaded account cards. */
   protected accountFilter = signal('');
+  /** Show everyone, only accounts I follow, or only those I don't. */
+  protected followFilter = signal<FollowFilter>('all');
+  /** True while the on-demand "check activity" batch is in flight. */
+  protected enrichingActivity = signal(false);
+  /** Set when an enrichment attempt failed, so the offer can be retried honestly. */
+  protected enrichError = signal<string | null>(null);
   /** Snapshot of the numeric bounds that the current results are gated by. */
   private executedAccountBounds = signal<AccountSearchCriteria>({ text: '' });
 
@@ -1614,8 +1626,30 @@ export class Search implements OnInit, OnDestroy {
       ),
     );
     const filtered = gated.filter((i) => kept.has(i.account));
-    return sortAccounts(filtered, this.accountSort());
+    // Follow state is the viewer's, not the account's, so it filters from the
+    // relationship map rather than through `accountMatchesFacet`.
+    const byFollow = filterByFollowState(filtered, this.relationships(), this.followFilter());
+    return sortAccounts(byFollow, this.accountSort());
   });
+
+  /**
+   * Loaded accounts whose last-post date nobody has supplied. Mastodon's search
+   * returns `last_status_at` on every account (verified against
+   * mastodon.social, for both the account and the status-author paths), so this
+   * is normally empty — it fills with results from providers that build thinner
+   * account objects, and with anything merged in from elsewhere.
+   */
+  protected accountsMissingActivity = computed(() =>
+    this.accountItems().filter((i) => i.account.last_status_at === undefined),
+  );
+
+  /** Whether to offer the "check activity" action at all. */
+  protected canEnrichActivity = computed(
+    () =>
+      !this.capabilities.active &&
+      !this.enrichingActivity() &&
+      this.accountsMissingActivity().length > 0,
+  );
 
   protected loadedAccountCount = computed(() => this.accountItems().length);
   protected shownAccountCount = computed(() => this.visibleAccounts().length);
@@ -1640,6 +1674,7 @@ export class Search implements OnInit, OnDestroy {
   clearAccountRefinements(): void {
     this.selectedAccountFacets.set([]);
     this.accountFilter.set('');
+    this.followFilter.set('all');
   }
 
   relationshipFor(id: string): Relationship | null {
@@ -1694,6 +1729,53 @@ export class Search implements OnInit, OnDestroy {
           }
           return next;
         });
+      });
+  }
+
+  /**
+   * Fill in `last_status_at` for results that arrived without it, on demand.
+   *
+   * One batched `GET /api/v1/accounts?id[]=` covers the whole set rather than a
+   * call per card, which is what makes this affordable enough to offer as a
+   * button. It is a button and not automatic because it is only ever needed for
+   * results that came from somewhere other than Mastodon search — paying for a
+   * round trip on every search to re-fetch fields we already have would be a
+   * cost with nothing to show for it.
+   *
+   * Ids the server doesn't recognise come back absent rather than erroring, so
+   * the merge is keyed on what returned; anything still missing keeps reading
+   * "activity unknown", which is the honest answer.
+   */
+  protected enrichActivity(): void {
+    const missing = this.accountsMissingActivity().map((i) => i.account.id);
+    if (!missing.length || this.enrichingActivity()) {
+      return;
+    }
+    this.enrichingActivity.set(true);
+    this.enrichError.set(null);
+    this.diagnostics.info('Search', 'user:enrich-activity', { accounts: missing.length });
+    this.api
+      .getAccounts(missing)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (accounts) => {
+          const byId = new Map(accounts.map((a) => [a.id, a]));
+          this.accountItems.update((items) =>
+            items.map((item) => {
+              const fresh = byId.get(item.account.id);
+              // Replace the whole account: the batch entity is strictly richer
+              // than the stub it supersedes, and merging field-by-field would
+              // just be a longer way of saying the same thing.
+              return fresh ? { ...item, account: fresh } : item;
+            }),
+          );
+          this.enrichingActivity.set(false);
+          this.callsUsed.update((c) => c + 1);
+        },
+        error: () => {
+          this.enrichingActivity.set(false);
+          this.enrichError.set('Could not load activity dates. Try again.');
+        },
       });
   }
 

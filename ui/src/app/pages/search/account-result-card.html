@@ -60,6 +60,18 @@
         <span title="Followers"
           ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
         >
+        @if (lastPosted(); as last) {
+          <span
+            class="acct-activity"
+            [class.stale]="last.stale"
+            [title]="'Last posted: ' + (a.last_status_at || 'never')"
+            >{{ last.text }}</span
+          >
+        } @else if (activityUnknown()) {
+          <span class="acct-activity unknown" title="This result arrived without a last-post date"
+            >activity unknown</span
+          >
+        }
       </div>
 
       @if (a.fields.length) {
