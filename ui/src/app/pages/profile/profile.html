@@ -1,7 +1,12 @@
 @if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (account(); as a) {
-  <button class="back-button" type="button" (click)="goBack()">← Back</button>
+  <!-- Back rides in the tab row (below) where there is one. RSS and Twitter
+       profiles have no tabs, so they keep a standalone button rather than no
+       way back. -->
+  @if (isRss() || isTwitter()) {
+    <button class="back-button" type="button" (click)="goBack()">← Back</button>
+  }
   <header class="profile-header">
     <div
       class="header-banner"
@@ -368,6 +373,7 @@
        whole profile for now; the people browser arrives with its own sprint. -->
   @if (!isRss() && !isTwitter()) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
+      <button class="ptab ptab-back" type="button" (click)="goBack()" title="Back">← Back</button>
       <button
         type="button"
         class="ptab"

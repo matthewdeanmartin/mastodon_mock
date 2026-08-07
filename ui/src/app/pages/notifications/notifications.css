@@ -6,6 +6,26 @@
   flex-wrap: wrap;
 }
 
+/* A status light, not a control: the switch lives in Blue → Auto-refresh
+   timeline, and clicking through goes there to turn it off. */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent, #1d9bf0);
+  background: color-mix(in srgb, var(--accent, #1d9bf0) 12%, transparent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.live-badge:hover {
+  background: color-mix(in srgb, var(--accent, #1d9bf0) 20%, transparent);
+}
+
 .notif-filters {
   display: flex;
   align-items: center;

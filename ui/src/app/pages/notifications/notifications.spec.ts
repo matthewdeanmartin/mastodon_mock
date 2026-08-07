@@ -5,6 +5,8 @@ import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Account, MastodonNotification, Relationship, Status } from '../../models';
+import { Auth } from '../../auth';
+import { ClientPrefs } from '../../client-prefs';
 import { Streaming } from '../../streaming';
 import { FakeStreaming } from '../../testing/fake-streaming';
 import { accountsNewToMe, groupNotifications, isSameAccount, Notifications } from './notifications';
@@ -12,7 +14,8 @@ import { accountsNewToMe, groupNotifications, isSameAccount, Notifications } fro
 interface NotificationsInternals {
   items: Signal<MastodonNotification[]>;
   live: WritableSignal<boolean>;
-  toggleLive(): void;
+  setSource(source: 'mastodon' | 'bluesky'): void;
+  chatKey(n: MastodonNotification): string;
 }
 
 function internals(fixture: ComponentFixture<Notifications>): NotificationsInternals {
@@ -93,17 +96,32 @@ describe('Notifications', () => {
     return fixture;
   }
 
-  it('toggleLive() opens the user stream', () => {
-    const fixture = setUp();
-    internals(fixture).toggleLive();
+  /**
+   * Live is driven by Blue → "Auto-refresh timeline" rather than a button on
+   * this page, and the effect that follows it runs on first change detection —
+   * so the preference has to be on before the component is created.
+   */
+  function setUpLive(): ComponentFixture<Notifications> {
+    TestBed.inject(ClientPrefs).setAutoRefreshTimeline(true);
+    return setUp();
+  }
+
+  it('opens the user stream when auto-refresh is on', () => {
+    const fixture = setUpLive();
 
     expect(internals(fixture).live()).toBe(true);
     expect(fakeStreaming.lastKind).toEqual({ stream: 'user' });
   });
 
-  it('prepends an incoming "notification" event', () => {
+  it('leaves the stream shut when auto-refresh is off', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
+
+    expect(internals(fixture).live()).toBe(false);
+    expect(fakeStreaming.lastKind).toBeNull();
+  });
+
+  it('prepends an incoming "notification" event', () => {
+    const fixture = setUpLive();
 
     fakeStreaming.emit({ event: 'notification', payload: makeNotification('1', 'follow') });
 
@@ -115,8 +133,7 @@ describe('Notifications', () => {
   });
 
   it('ignores non-notification stream events (e.g. update)', () => {
-    const fixture = setUp();
-    internals(fixture).toggleLive();
+    const fixture = setUpLive();
 
     fakeStreaming.emit({ event: 'update', payload: { id: 'should-be-ignored' } });
 
@@ -352,10 +369,56 @@ describe('Notifications', () => {
     });
   });
 
-  it('toggling live off closes the stream', () => {
+  // ---------------------------------------------------------------- chatKey
+
+  function mentionOf(visibility: string, mentions: { acct: string }[]): MastodonNotification {
+    const n = makeNotification('m1', 'mention');
+    n.account = { ...n.account, acct: 'alice' };
+    n.status = {
+      id: 's1',
+      visibility,
+      mentions: mentions.map((m, i) => ({
+        id: `${i}`,
+        username: m.acct.split('@')[0],
+        acct: m.acct,
+        url: `https://example.social/@${m.acct}`,
+      })),
+    } as unknown as Status;
+    return n;
+  }
+
+  it('keys a public mention by its author', () => {
     const fixture = setUp();
-    internals(fixture).toggleLive();
-    internals(fixture).toggleLive();
+
+    expect(internals(fixture).chatKey(mentionOf('public', [{ acct: 'me' }]))).toBe('pub:alice');
+  });
+
+  it('keys a direct mention by participant set, so it matches the private row', () => {
+    const fixture = setUp();
+    TestBed.inject(Auth).account.set({ id: '1', acct: 'me' } as Account);
+
+    // Sorted, and without my own handle: the format `privateKey` builds on the
+    // Conversations side. A `pub:` key here matched no row and drafted a stub.
+    expect(internals(fixture).chatKey(mentionOf('direct', [{ acct: 'me' }, { acct: 'bob' }]))).toBe(
+      'priv:alice,bob',
+    );
+  });
+
+  it('turning auto-refresh off closes the stream', () => {
+    const fixture = setUpLive();
+
+    TestBed.inject(ClientPrefs).setAutoRefreshTimeline(false);
+    fixture.detectChanges();
+
+    expect(internals(fixture).live()).toBe(false);
+    expect(fakeStreaming.closed).toBe(true);
+  });
+
+  it('closes the stream on the Bluesky source, which has none to open', () => {
+    const fixture = setUpLive();
+
+    internals(fixture).setSource('bluesky');
+    fixture.detectChanges();
 
     expect(internals(fixture).live()).toBe(false);
     expect(fakeStreaming.closed).toBe(true);

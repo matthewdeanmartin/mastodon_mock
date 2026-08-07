@@ -2,7 +2,7 @@
   <div class="algo-chips" role="group" aria-label="Filter the Algo feed">
     <button
       type="button"
-      class="btn btn-outline"
+      class="btn btn-outline btn-sm"
       [class.active]="prefs.algoAudience() === 'all'"
       (click)="setAudience('all')"
     >
@@ -10,7 +10,7 @@
     </button>
     <button
       type="button"
-      class="btn btn-outline"
+      class="btn btn-outline btn-sm"
       [class.active]="prefs.algoAudience() === 'friends'"
       (click)="setAudience('friends')"
       title="Only posts written by people you follow — no boosts, no hashtag finds"
@@ -20,7 +20,7 @@
     @if (prefs.algoAudience() === 'all') {
       <button
         type="button"
-        class="btn btn-outline"
+        class="btn btn-outline btn-sm"
         [class.active]="prefs.algoTags()"
         (click)="toggleTags()"
         title="Include popular recent posts from hashtags you follow"
@@ -30,7 +30,7 @@
     }
     <button
       type="button"
-      class="btn btn-outline"
+      class="btn btn-outline btn-sm"
       [class.active]="prefs.algoCalm()"
       (click)="toggleCalm()"
       title="Hide posts that read as inflammatory: heated wording, quote-dunks, and ratioed posts (all detected on-device — no server involved)"
@@ -40,7 +40,7 @@
     <app-feed-language-picker />
     <button
       type="button"
-      class="btn btn-outline"
+      class="btn btn-outline btn-sm"
       [class.active]="linksView()"
       [attr.aria-pressed]="linksView()"
       (click)="toggleLinks()"
@@ -50,7 +50,7 @@
     </button>
     <button
       type="button"
-      class="btn btn-outline"
+      class="btn btn-outline btn-sm"
       (click)="shuffle()"
       [disabled]="feed.loading()"
       title="Re-deal the same posts in a random order"
@@ -59,7 +59,7 @@
     </button>
     <button
       type="button"
-      class="btn btn-outline"
+      class="btn btn-outline btn-sm"
       (click)="refresh()"
       [disabled]="feed.loading()"
       title="Rebuild the feed from fresh data"

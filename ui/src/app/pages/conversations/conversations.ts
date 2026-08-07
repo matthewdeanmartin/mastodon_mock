@@ -215,7 +215,15 @@ export class Conversations implements OnInit, OnDestroy {
       const chat = this.chats().find((c) => c.key === want);
       if (chat) {
         this.openHandled = true;
-        this.prefs.setChatKind(chat.kind);
+        // Widen the kind filter only as far as it takes to show this row.
+        // Snapping it straight to `chat.kind` narrowed the list every time you
+        // followed a notification: arriving from a private mention while on
+        // 'all' would hide every public chat you were just looking at. A filter
+        // that already shows the row is left exactly as the user set it.
+        const kind = this.prefs.chatKind();
+        if (kind !== 'all' && kind !== chat.kind) {
+          this.prefs.setChatKind('all');
+        }
         // The audience filter can hide the row we were sent to open — 'mutuals'
         // excludes bots by definition. Widen it rather than selecting something
         // the list refuses to show.

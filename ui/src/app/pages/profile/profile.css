@@ -348,6 +348,17 @@ h2 {
   color: var(--text);
 }
 
+/* Back is an action, not a section, so it sits apart from the tabs it shares a
+   row with: lighter weight, no active state to ever earn, and a rule between. */
+.ptab-back {
+  font-weight: 500;
+  padding-left: 0;
+  padding-right: 14px;
+  margin-right: 6px;
+  border-right: 1px solid var(--border);
+  border-bottom-color: transparent;
+}
+
 .ptab.active {
   color: var(--text);
   border-bottom-color: var(--accent);

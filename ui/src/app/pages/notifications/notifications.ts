@@ -324,6 +324,9 @@ export class Notifications implements OnInit, OnDestroy {
 
   private liveSub: Subscription | null = null;
 
+  /** Follow Blue → "Auto-refresh timeline" for as long as this page is open. */
+  private readonly liveEffect = effect(() => this.syncLive());
+
   ngOnInit(): void {
     this.diagnostics.info('Notifications', 'page:open');
     this.load();
@@ -368,7 +371,8 @@ export class Notifications implements OnInit, OnDestroy {
     this.audience.set('all');
     this.typeFilter.set('all');
     this.view.set('notifications');
-    this.stopLive();
+    // No explicit stop: `syncLive` reads `source()`, so switching to Bluesky
+    // closes the stream and switching back reopens it if the pref is on.
     this.diagnostics.info('Notifications', 'user:set-source', { source });
     this.load();
   }
@@ -459,8 +463,21 @@ export class Notifications implements OnInit, OnDestroy {
     this.live.set(false);
   }
 
-  toggleLive(): void {
-    if (this.live()) {
+  /**
+   * Open or close the stream to match Blue → "Auto-refresh timeline", the same
+   * preference Home and the public timeline follow. The "Go live" button that
+   * used to sit in this page's header is gone: one setting now governs every
+   * live surface, rather than each page carrying its own switch.
+   *
+   * Bluesky has no notification stream — it is polled — so the stream stays
+   * shut while that source is selected no matter what the preference says.
+   */
+  private syncLive(): void {
+    const wanted = this.prefs.autoRefreshTimeline() && this.source() === 'mastodon';
+    if (wanted === this.live()) {
+      return;
+    }
+    if (!wanted) {
       this.stopLive();
       return;
     }
@@ -617,8 +634,30 @@ export class Notifications implements OnInit, OnDestroy {
    * opens straight onto that chat — we nudge people toward the chat view over
    * the raw thread.
    */
+  /**
+   * The chat row a mention belongs to, in the key format the Conversations page
+   * groups by. Direct mentions are grouped there by participant set under
+   * `priv:`, everything else by author under `pub:`.
+   *
+   * Sending a direct mention to a `pub:` key was the old behaviour and it
+   * matched no row at all: Conversations then drafted an empty public stub
+   * while the real DM sat unopened in the private tab. The participant set is
+   * me plus everyone mentioned — the same list `privateKey` sorts and joins.
+   */
   chatKey(n: MastodonNotification): string {
-    return `pub:${n.account.acct}`;
+    if (n.status?.visibility !== 'direct') {
+      return `pub:${n.account.acct}`;
+    }
+    const me = this.auth.account()?.acct;
+    const accts = new Set<string>([n.account.acct]);
+    for (const mention of n.status.mentions ?? []) {
+      // My own handle is in `mentions` (I'm the one notified) but the
+      // conversation's account list is the *other* participants, so drop it.
+      if (mention.acct !== me) {
+        accts.add(mention.acct);
+      }
+    }
+    return `priv:${[...accts].sort().join(',')}`;
   }
 
   label(type: string): string {

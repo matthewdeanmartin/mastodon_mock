@@ -237,8 +237,17 @@
            the Doctor's primary entry point; the command bar link is the permalink.
            See sprint/anon-office-3-feed-doctor.md. -->
       <p class="muted center small">
-        You’re all caught up. Were you expecting more?
-        <a routerLink="/feed-doctor">Check the Feed Doctor.</a>
+        @if (hiddenByFilters(); as hidden) {
+          <!-- Saying "all caught up" while filters hold posts back is the claim
+               that sent readers hunting for a bug. Name the number instead. -->
+          That’s everything matching your filters.
+          <button type="button" class="link-button" (click)="showEverything()">
+            Show {{ hidden }} more hidden by Boosts/Replies.
+          </button>
+        } @else {
+          You’re all caught up. Were you expecting more?
+          <a routerLink="/feed-doctor">Check the Feed Doctor.</a>
+        }
       </p>
     }
   }

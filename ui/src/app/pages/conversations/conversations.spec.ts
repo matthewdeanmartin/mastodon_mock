@@ -232,12 +232,29 @@ describe('Conversations', () => {
     expect(chats[0].lastStatus?.id).toBe('s2');
   });
 
-  it('switches the highlighted kind tab when a notification deep link opens a public reply', () => {
+  it('widens a mismatched kind filter to All when a notification deep link opens a chat', () => {
     const alice = makeAccount('2', 'alice');
     const status = makeStatus('s1', { visibility: 'public', account: alice });
     const fixture = setUp([], [makeMention('n1', status)]);
     const prefs = TestBed.inject(ClientPrefs);
     prefs.setChatKind('bsky');
+
+    internals(fixture).pendingOpen.set('pub:alice');
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/statuses/s1/context').flush({ ancestors: [], descendants: [] });
+
+    // 'all', not 'public': widening far enough to show the row beats snapping
+    // the filter shut around it and hiding every other chat.
+    expect(prefs.chatKind()).toBe('all');
+    expect(internals(fixture).selected()?.kind).toBe('public');
+  });
+
+  it('leaves a kind filter that already shows the deep-linked chat untouched', () => {
+    const alice = makeAccount('2', 'alice');
+    const status = makeStatus('s1', { visibility: 'public', account: alice });
+    const fixture = setUp([], [makeMention('n1', status)]);
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.setChatKind('public');
 
     internals(fixture).pendingOpen.set('pub:alice');
     fixture.detectChanges();

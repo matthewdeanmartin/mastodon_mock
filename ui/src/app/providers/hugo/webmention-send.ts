@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { PageDiagnostics } from '../../page-diagnostics';
 import { CorsProxy, CorsProxyRefusal } from '../cors-proxy/cors-proxy';
 import { resolveEndpoint } from './webmention-discovery';
 
@@ -49,6 +50,7 @@ export interface DeliveryResult {
 @Injectable({ providedIn: 'root' })
 export class WebmentionSend {
   private readonly proxy = inject(CorsProxy);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   /**
    * Per-batch endpoint memo.
@@ -117,13 +119,27 @@ export class WebmentionSend {
       headers: toHeaderRecord(proxied.headers),
     });
     if (!response.ok) {
+      this.diagnostics.warn('POSSE', 'webmention:unreadable', {
+        target: targetUrl,
+        via: proxied.url,
+        status: response.status,
+      });
       throw new Error(`HTTP ${response.status}`);
     }
-    const endpoint = resolveEndpoint(
-      targetUrl,
-      response.headers.get('Link'),
-      await response.text(),
-    );
+    const body = await response.text();
+    // The Link header is the *proxy's*, not the target's — a proxy that does not
+    // forward headers loses any endpoint advertised that way, and the markup is
+    // the only source left. Logged so a missing endpoint can be told apart from
+    // a lost one.
+    const linkHeader = response.headers.get('Link');
+    const endpoint = resolveEndpoint(targetUrl, linkHeader, body);
+    this.diagnostics.info('POSSE', 'webmention:discover', {
+      target: targetUrl,
+      via: proxied.url,
+      endpoint: endpoint ?? '(none advertised)',
+      from: endpoint === null ? 'none' : linkHeader ? 'link-header' : 'markup',
+      bytes: body.length,
+    });
     this.cache.set(targetUrl, endpoint);
     return endpoint;
   }
@@ -170,18 +186,92 @@ export class WebmentionSend {
     if (response.ok) {
       // Many endpoints return 202 and verify asynchronously, so this means
       // "accepted for processing", never "verified". The copy says so.
+      this.diagnostics.info('POSSE', 'webmention:delivered', {
+        endpoint,
+        target: targetUrl,
+        source: sourceUrl,
+        status: response.status,
+      });
       return {
         state: 'delivered',
         endpoint,
         message: 'Webmention accepted — the other site will verify it shortly.',
       };
     }
+
+    // The endpoint's own explanation, which is almost always the actionable
+    // part. Throwing it away and reporting a bare status code is what made a
+    // real 404 ("target domain not found on this account") unactionable.
+    const detail = await readEndpointError(response);
+    this.diagnostics.warn('POSSE', 'webmention:refused', {
+      endpoint,
+      target: targetUrl,
+      source: sourceUrl,
+      status: response.status,
+      detail,
+    });
     return {
       state: 'failed',
       endpoint,
-      message: `That site's webmention endpoint refused this (HTTP ${response.status}).`,
+      message: refusalMessage(response.status, detail, endpoint, targetUrl),
     };
   }
+}
+
+/** The endpoint's error text, JSON or plain, trimmed to something readable. */
+async function readEndpointError(response: Response): Promise<string> {
+  let body: string;
+  try {
+    body = (await response.text()).trim();
+  } catch {
+    return '';
+  }
+  if (!body) {
+    return '';
+  }
+  try {
+    const parsed = JSON.parse(body) as {
+      error_description?: string;
+      error?: string;
+      message?: string;
+    };
+    const described = parsed.error_description ?? parsed.message ?? parsed.error;
+    if (described) {
+      return described;
+    }
+  } catch {
+    // Not JSON; fall through to the raw text.
+  }
+  // An HTML error page is noise, not an explanation.
+  if (/^\s*</.test(body)) {
+    return '';
+  }
+  return body.length > 200 ? `${body.slice(0, 199)}…` : body;
+}
+
+/**
+ * Turn a refusal into something the user can act on.
+ *
+ * `invalid_target` is called out by name because it is the mistake this setup
+ * invites: webmention.io registers a site under the exact URL you signed in
+ * with, and a target under a *different* path — or the same path with the
+ * trailing slash flipped — is "not on this account". The endpoint says so
+ * clearly; the previous version of this code discarded that sentence.
+ */
+function refusalMessage(
+  status: number,
+  detail: string,
+  endpoint: string,
+  targetUrl: string,
+): string {
+  const base = `${endpoint} refused this (HTTP ${status})`;
+  if (!detail) {
+    return `${base}.`;
+  }
+  if (/not found on this account|invalid_target/i.test(detail)) {
+    return `${base}: ${detail}. That receiver is registered for a different address than ${targetUrl} — check the exact URL (including the trailing slash) you signed up with.`;
+  }
+  return `${base}: ${detail}`;
 }
 
 /** `HttpHeaders`-ish to a plain record, since this uses `fetch` not HttpClient. */

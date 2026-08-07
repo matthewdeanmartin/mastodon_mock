@@ -55,22 +55,20 @@
       </select>
     }
   </div>
-  <!-- Live is a Mastodon WebSocket. Bluesky has no notification stream — it is
-       polled — so rather than a "live" button that quietly means something
-       weaker, the Bluesky side gets an honest Refresh. -->
+  <!-- Live is a Mastodon WebSocket, governed by Blue → "Auto-refresh timeline"
+       rather than a button here, so one setting covers every live surface. What
+       is left is a status light. Bluesky has no notification stream — it is
+       polled — so that side gets an honest Refresh instead. -->
   @if (source() === 'mastodon') {
-    <button
-      class="btn btn-outline"
-      [class.active]="live()"
-      (click)="toggleLive()"
-      [title]="
-        live()
-          ? 'Live: new notifications stream in as they arrive — click to stop'
-          : 'Stream new notifications live as they arrive'
-      "
-    >
-      {{ live() ? '● Live' : 'Go live' }}
-    </button>
+    @if (live()) {
+      <a
+        class="live-badge"
+        routerLink="/settings/blue"
+        title="Live: new notifications stream in as they arrive. Turn off in Blue → Auto-refresh timeline."
+      >
+        ● Live
+      </a>
+    }
   } @else {
     <button
       class="btn btn-outline"
