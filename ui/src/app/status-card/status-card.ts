@@ -25,6 +25,8 @@ import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
 import { FilterContext, FilterResult, MediaAttachment, Poll, Status, Translation } from '../models';
+import { HugoSettings } from '../providers/hugo/hugo-settings';
+import { PosseKind, PosseQueue } from '../providers/hugo/posse-queue';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
 import { AiTranslate, AiTranslation, languageName } from '../ai-translate';
@@ -145,6 +147,8 @@ export class StatusCard {
   private localMod = inject(LocalModeration);
   private visibility = inject(StatusVisibility);
   protected capabilities = inject(AnonymousCapabilities);
+  private hugo = inject(HugoSettings);
+  private posse = inject(PosseQueue);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   private anonymousPublic = inject(AnonymousPublicApi);
   private raindrop = inject(RaindropSession);
@@ -963,9 +967,11 @@ export class StatusCard {
     // (a silently dead Bluesky session used to make this button "do nothing").
     this.actionBusy.set(true);
     this.actionError.set(null);
-    this.actions.toggleFavourite(this.display).subscribe({
+    const target = this.display;
+    this.actions.toggleFavourite(target).subscribe({
       next: (updated) => {
         this.actionBusy.set(false);
+        this.recordPosse('like', target, updated.favourited);
         this.changed.emit(updated);
       },
       error: () => {
@@ -982,16 +988,42 @@ export class StatusCard {
     }
     this.actionBusy.set(true);
     this.actionError.set(null);
-    this.actions.toggleReblog(this.display).subscribe({
+    const target = this.display;
+    this.actions.toggleReblog(target).subscribe({
       next: (updated) => {
         this.actionBusy.set(false);
-        this.changed.emit(updated.reblog ?? updated);
+        const result = updated.reblog ?? updated;
+        this.recordPosse('repost', target, result.reblogged || !!updated.reblog);
+        this.changed.emit(result);
       },
       error: () => {
         this.actionBusy.set(false);
         this.actionError.set(this.actionFailureMessage('boost'));
       },
     });
+  }
+
+  /**
+   * Mirror an interaction into the POSSE queue, when that is switched on.
+   *
+   * Called only from the *success* path of the real action, and deliberately
+   * additive: the Mastodon (or Bluesky) request above is unchanged, and nothing
+   * here can make a working like look broken. Queueing is a synchronous
+   * localStorage write whose failures are swallowed by the queue itself.
+   *
+   * Un-toggling removes a still-queued entry, so liking and immediately
+   * un-liking leaves nothing behind. Once published it is a commit in a repo
+   * and the queue has no further claim on it.
+   */
+  private recordPosse(kind: PosseKind, target: Status, active: boolean): void {
+    if (!this.hugo.posseEnabled()) {
+      return;
+    }
+    if (active) {
+      this.posse.add(kind, target);
+    } else {
+      this.posse.removeMatching(kind, target.url);
+    }
   }
 
   private actionFailureMessage(verb: string): string {

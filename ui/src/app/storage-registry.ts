@@ -154,6 +154,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Fine-grained GitHub token with write access to the Hugo blog repository. Deliberately separate from mockingbird_github_credentials, which is read-only.',
   },
   {
+    base: 'mockingbird_posse_queue',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Interactions (likes, boosts, replies) waiting to be recorded to the Hugo blog. Holds no credentials — public post URLs and the user’s own reply text. Account-scoped because a POSSE record is a claim by one persona.',
+  },
+  {
     base: 'mockingbird_hugo_repo',
     storage: 'local',
     suffix: 'account',

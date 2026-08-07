@@ -152,6 +152,10 @@ export class ConnectionHugo implements OnInit {
     this.settings.setIncludeInProfile(include);
   }
 
+  setPosse(enabled: boolean): void {
+    this.settings.setPosse(enabled);
+  }
+
   /**
    * Open a post in the composer.
    *

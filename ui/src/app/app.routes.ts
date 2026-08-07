@@ -529,6 +529,13 @@ export const routes: Routes = [
           import('./pages/feed-doctor/feed-doctor-page').then((m) => m.FeedDoctorPage),
       },
       {
+        // The POSSE queue: interactions waiting to be recorded on the user's
+        // own site. A page you act on, so it sits in the main routes rather
+        // than under settings.
+        path: 'posse',
+        loadComponent: () => import('./pages/posse/posse-page').then((m) => m.PossePage),
+      },
+      {
         path: 'observability',
         loadComponent: () =>
           import('./pages/observability/observability').then((m) => m.Observability),

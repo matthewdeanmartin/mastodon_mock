@@ -108,6 +108,26 @@
     <p class="feed-error" role="alert">{{ message }}</p>
   }
 
+  <h2 class="section-head">Record what you like and boost</h2>
+  <label class="profile-feed-option">
+    <input type="checkbox" [ngModel]="settings.posseEnabled()" (ngModelChange)="setPosse($event)" />
+    <span>
+      <strong>Record interactions on my blog</strong>
+      <span class="muted small">
+        Liking or boosting a post also keeps a record of it on your own site, so it survives whether
+        or not the other server does. The post is still liked normally — this is additional. Records
+        collect under
+        <a [routerLink]="['/posse']">Waiting to publish</a> and are committed when you say so, not
+        one commit per like.
+      </span>
+      <span class="muted small">
+        Turn this on once your blog is set up to receive: a webmention endpoint, a template that
+        renders these records, and the scheduled job that pulls mentions in. Before that, it writes
+        files nothing displays.
+      </span>
+    </span>
+  </label>
+
   <div class="posts-head">
     <h2>Posts in this repository</h2>
     <button

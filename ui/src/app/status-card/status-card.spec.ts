@@ -16,6 +16,8 @@ import { AiTranslate } from '../ai-translate';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { TranslationPreference } from '../translation-preference';
 import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
+import { HugoSettings } from '../providers/hugo/hugo-settings';
+import { PosseQueue } from '../providers/hugo/posse-queue';
 
 /** Expose protected signals/methods for white-box testing. */
 interface StatusCardInternals {
@@ -256,6 +258,90 @@ describe('StatusCard', () => {
     expect(cmp.actionBusy()).toBe(false);
     expect(cmp.actionError()).toBeNull();
     expect(changed[0]?.favourited).toBe(true);
+  });
+
+  // ---------------------------------------------------------------- POSSE
+
+  /** A connected Hugo blog with interaction recording switched on. */
+  function enablePosse(): void {
+    TestBed.inject(HugoSettings).connect('tok', {
+      owner: 'mistersql',
+      repo: 'my-blog',
+      branch: 'main',
+      contentPath: 'content/posts',
+      siteUrl: null,
+      includeInProfile: false,
+      posse: true,
+    });
+  }
+
+  it('issues exactly the same request whether or not POSSE is on', () => {
+    // The safety property of the whole feature: recording is additive, and a
+    // POSSE bug must never make a working like look broken.
+    enablePosse();
+    const f = setUp(makeStatus({ id: '5', url: 'https://m.social/@u/5' }));
+
+    (f.componentInstance as any).toggleFavourite(fakeEvent());
+
+    httpMock
+      .expectOne('/api/v1/statuses/5/favourite')
+      .flush(makeStatus({ id: '5', favourited: true }));
+    httpMock.verify();
+    expect((f.componentInstance as any).actionError()).toBeNull();
+  });
+
+  it('records a like to the queue when POSSE is on', () => {
+    enablePosse();
+    const f = setUp(makeStatus({ id: '5', url: 'https://m.social/@u/5' }));
+
+    (f.componentInstance as any).toggleFavourite(fakeEvent());
+    httpMock
+      .expectOne('/api/v1/statuses/5/favourite')
+      .flush(makeStatus({ id: '5', url: 'https://m.social/@u/5', favourited: true }));
+
+    const queue = TestBed.inject(PosseQueue);
+    expect(queue.count()).toBe(1);
+    expect(queue.entries()[0]).toMatchObject({
+      kind: 'like',
+      targetUrl: 'https://m.social/@u/5',
+    });
+  });
+
+  it('records nothing at all when POSSE is off', () => {
+    const f = setUp(makeStatus({ id: '5', url: 'https://m.social/@u/5' }));
+
+    (f.componentInstance as any).toggleFavourite(fakeEvent());
+    httpMock
+      .expectOne('/api/v1/statuses/5/favourite')
+      .flush(makeStatus({ id: '5', favourited: true }));
+
+    expect(TestBed.inject(PosseQueue).count()).toBe(0);
+  });
+
+  it('un-liking removes a record that has not been published yet', () => {
+    enablePosse();
+    const f = setUp(makeStatus({ id: '5', url: 'https://m.social/@u/5', favourited: true }));
+
+    (f.componentInstance as any).toggleFavourite(fakeEvent());
+    httpMock
+      .expectOne('/api/v1/statuses/5/unfavourite')
+      .flush(makeStatus({ id: '5', url: 'https://m.social/@u/5', favourited: false }));
+
+    // Liking and immediately un-liking leaves nothing behind.
+    expect(TestBed.inject(PosseQueue).count()).toBe(0);
+  });
+
+  it('records nothing when a like fails', () => {
+    enablePosse();
+    const f = setUp(makeStatus({ id: '5', url: 'https://m.social/@u/5' }));
+
+    (f.componentInstance as any).toggleFavourite(fakeEvent());
+    httpMock
+      .expectOne('/api/v1/statuses/5/favourite')
+      .flush({}, { status: 500, statusText: 'Server Error' });
+
+    // Only the success path records: a like that did not happen is not a like.
+    expect(TestBed.inject(PosseQueue).count()).toBe(0);
   });
 
   // ---------------------------------------------------------------- display / boostedBy

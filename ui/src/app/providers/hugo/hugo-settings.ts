@@ -59,6 +59,16 @@ export interface HugoRepo {
   feedUrl?: string | null;
   /** Show this blog's posts on the Mawkingbird profile (sprint 3). */
   includeInProfile: boolean;
+  /**
+   * Record likes, boosts and replies to this blog (POSSE).
+   *
+   * Not a preference so much as an **assertion about the blog**: that it has a
+   * webmention endpoint, a template that renders these records, and a job
+   * pulling mentions in — i.e. that `posse-1-receive.md` has been done. Ticking
+   * it before that produces files nothing renders, which is not harmful but is
+   * confusing, so the copy says so. Off by default.
+   */
+  posse?: boolean;
 }
 
 interface StoredCredentials extends ExpiringCredential {
@@ -88,6 +98,7 @@ function loadRepo(key: string): HugoRepo | null {
       siteUrl: typeof parsed.siteUrl === 'string' && parsed.siteUrl ? parsed.siteUrl : null,
       feedUrl: typeof parsed.feedUrl === 'string' && parsed.feedUrl ? parsed.feedUrl : null,
       includeInProfile: parsed.includeInProfile === true,
+      posse: parsed.posse === true,
     };
   } catch {
     return null;
@@ -143,6 +154,15 @@ export class HugoSettings implements ExpiringConnection {
 
   readonly siteUrl = computed(() => this.repoState()?.siteUrl ?? null);
   readonly includeInProfile = computed(() => this.repoState()?.includeInProfile === true);
+
+  /**
+   * Whether interactions should be recorded to this blog.
+   *
+   * Requires a live connection as well as the opt-in: the repo half can outlive
+   * the token, and queueing records that can never be published would be a
+   * queue that only grows.
+   */
+  readonly posseEnabled = computed(() => this.connected() && this.repoState()?.posse === true);
 
   /**
    * The site's RSS feed: the one a probe actually found, else Hugo's default.
@@ -209,6 +229,16 @@ export class HugoSettings implements ExpiringConnection {
       return;
     }
     const next = { ...current, includeInProfile: include };
+    localStorage.setItem(this.repoKey, JSON.stringify(next));
+    this.repoState.set(next);
+  }
+
+  setPosse(enabled: boolean): void {
+    const current = this.repoState();
+    if (!current) {
+      return;
+    }
+    const next = { ...current, posse: enabled };
     localStorage.setItem(this.repoKey, JSON.stringify(next));
     this.repoState.set(next);
   }

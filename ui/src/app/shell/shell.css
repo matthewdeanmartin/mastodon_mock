@@ -608,3 +608,19 @@
   border-color: #e0245e;
   color: #e0245e;
 }
+
+/* Pending count on the "Waiting to publish" row (the POSSE queue). The only
+   badge in this menu — see the note above about notification badges — so it
+   stays small and unemphatic rather than demanding attention. */
+.nav-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  vertical-align: middle;
+}

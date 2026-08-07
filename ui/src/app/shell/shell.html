@@ -106,6 +106,14 @@
           <!-- Write / draft-likes -->
           <div class="menu-divider"></div>
           <a routerLink="/drafts">Drafts</a>
+          @if (posse.count(); as pending) {
+            <!-- Only rendered while something is actually waiting: a queue you
+                 have emptied should not leave a row behind advertising itself. -->
+            <a routerLink="/posse">
+              Waiting to publish
+              <span class="nav-count">{{ pending }}</span>
+            </a>
+          }
           @if (featureFlags.enabled('pastebin')) {
             <a routerLink="/pastes">Pastes</a>
           }
