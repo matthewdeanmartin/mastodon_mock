@@ -104,6 +104,11 @@ export class Home implements OnInit, OnDestroy {
   protected widenWindow(): void {
     this.setHomeWindow(this.prefs.homeWindow() === 'today' ? 'week' : 'all');
   }
+
+  /** The current window in words, for the end-of-feed note that names it. */
+  protected windowLabel = computed(() =>
+    this.prefs.homeWindow() === 'today' ? 'the last day' : 'the last week',
+  );
   private registry = inject(ProviderRegistry);
   private server = inject(Server);
   private anonymousCorpus = inject(AnonymousFeedCorpus);
@@ -222,12 +227,10 @@ export class Home implements OnInit, OnDestroy {
 
   protected toggleBoosts(): void {
     this.showBoosts.update((show) => !show);
-    this.refillAfterFilterChange();
   }
 
   protected toggleReplies(): void {
     this.showReplies.update((show) => !show);
-    this.refillAfterFilterChange();
   }
 
   /**
@@ -260,19 +263,6 @@ export class Home implements OnInit, OnDestroy {
   protected showEverything(): void {
     this.showBoosts.set(true);
     this.showReplies.set(true);
-  }
-
-  /**
-   * Tightening a filter can drop the visible feed below the minimum, so top it
-   * up rather than leaving a short page that claims to be the whole timeline.
-   * Loosening one is free — it only reveals posts already in `statuses()` — and
-   * `fillToMinimum` no-ops in that case because the target is already met.
-   */
-  private refillAfterFilterChange(): void {
-    if (this.autoLoading() || this.loading() || this.capActive()) {
-      return;
-    }
-    this.fillToMinimum();
   }
 
   protected imagesHidden(): boolean {
@@ -577,24 +567,22 @@ export class Home implements OnInit, OnDestroy {
   }
 
   /**
-   * Keep fetching pages until the feed *shows* at least `feedMin` items, the
-   * timeline is exhausted, or the stored maximum is hit. Runs one page at a
-   * time.
+   * Keep fetching pages until the feed holds at least `feedMin` items, the
+   * timeline is exhausted, or the maximum is hit. Runs one page at a time.
    *
-   * The target is `visible()`, not `statuses()`. Every timeline filter (boosts,
-   * replies, calm, language) is applied client-side after fetching, so a page
-   * of forty posts can leave ten on screen. Counting stored items declared the
-   * feed full while it looked empty, and — because "load more" is gated on the
-   * server cursor rather than on what survived — the reader got "that's the end
-   * of your feed" with pages still unread. Turning a filter off then revealed
-   * posts that were in memory all along.
+   * Deliberately counts `statuses()` — what was *fetched* — and not `visible()`.
+   * Chasing the visible count reads as the more helpful rule, but it makes the
+   * filters drive network traffic: with replies hidden, a reply-heavy timeline
+   * would burn page after page trying to reach a number it may never reach,
+   * auto-loading far past what the reader asked for. Hiding replies is a
+   * display choice, not an instruction to go fetch more.
    *
-   * The stored cap still uses `statuses()`: that one is about memory and
-   * request budget, which filtering does not make cheaper.
+   * A short visible page is handled where it belongs — in the UI, by keeping
+   * "Load more" available (see {@link canLoadMore}) so the reader decides.
    */
   private fillToMinimum(): void {
     if (
-      this.visible().length >= this.prefs.feedMin() ||
+      this.statuses().length >= this.prefs.feedMin() ||
       this.statuses().length >= this.prefs.feedMax() ||
       !this.feedHasMore()
     ) {

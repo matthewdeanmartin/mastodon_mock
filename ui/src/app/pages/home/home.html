@@ -231,6 +231,17 @@
       <p class="muted center">Loading more…</p>
     } @else if (canLoadMore()) {
       <button class="btn btn-outline more" (click)="loadMore()">Load more</button>
+    } @else if (olderAvailable()) {
+      <!-- Not the end of the timeline: the *window* stopped the fetch, because a
+           page crossed the cutoff. Saying "all caught up" here is false — there
+           are older posts one click away — so offer the click that gets them
+           rather than a dead end. -->
+      <div class="feed-window-end">
+        <p class="muted small">
+          That’s everything from {{ windowLabel() }}. There are older posts.
+        </p>
+        <button class="btn btn-outline more" (click)="widenWindow()">Load older posts</button>
+      </div>
     } @else {
       <!-- The end of the feed is exactly where "why is my feed like this" gets
            asked, and nobody goes looking for a doctor when nothing hurts. This is
@@ -239,10 +250,12 @@
       <p class="muted center small">
         @if (hiddenByFilters(); as hidden) {
           <!-- Saying "all caught up" while filters hold posts back is the claim
-               that sent readers hunting for a bug. Name the number instead. -->
+               that sent readers hunting for a bug. Name the number instead. The
+               chips only re-show posts already fetched, so this never implies a
+               new page is coming — "Load more" above is what fetches. -->
           That’s everything matching your filters.
           <button type="button" class="link-button" (click)="showEverything()">
-            Show {{ hidden }} more hidden by Boosts/Replies.
+            Show {{ hidden }} more already loaded (hidden by Boosts/Replies).
           </button>
         } @else {
           You’re all caught up. Were you expecting more?

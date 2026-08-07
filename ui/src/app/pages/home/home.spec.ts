@@ -163,17 +163,17 @@ describe('Home', () => {
     ).toEqual(['original', 'reply']);
   });
 
-  it('keeps paging when a filter hides most of a page, rather than stopping short', () => {
+  it('does not fetch more just because a filter hides most of a page', () => {
+    // Hiding replies is a display choice, not an instruction to go fetch more.
+    // Auto-loading until the *visible* count reached feedMin turned a reply-heavy
+    // timeline into a page-burning loop, and (because each page can latch the
+    // window cutoff) took "Load more" away in the process.
     const prefs = TestBed.inject(ClientPrefs);
     prefs.setFeedMin(4);
     const fixture = TestBed.createComponent(Home);
     fixture.detectChanges();
     httpMock.expectOne('/api/v1/announcements').flush([]);
 
-    // A *full* page (a short one would exhaust the source, which is a genuine
-    // end of feed). Replies are hidden by default, so all but one of these 20
-    // are dropped on the way to the screen — and counting stored items called
-    // that "enough" and declared the feed over with pages still unread.
     const page1 = [
       makeStatus('keep-1'),
       ...Array.from({ length: 19 }, (_, i) => ({
@@ -183,18 +183,51 @@ describe('Home', () => {
     ];
     httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page1);
 
-    // It must ask for more instead: one visible post is short of the minimum.
-    const second = httpMock.expectOne(
-      (r) => r.url === '/api/v1/timelines/home' && !!r.params.get('max_id'),
-    );
-    second.flush([makeStatus('keep-2'), makeStatus('keep-3'), makeStatus('keep-4')]);
-
-    // Four showing, so the loop stops here rather than paging the whole archive.
-    const visible = internals(fixture)
-      .visible()
-      .map((s) => s.id);
-    expect(visible).toEqual(['keep-1', 'keep-2', 'keep-3', 'keep-4']);
+    // Twenty fetched is twenty fetched: the minimum is already satisfied, so no
+    // second page is requested even though only one post is on screen.
+    httpMock.expectNone((r) => r.url === '/api/v1/timelines/home' && !!r.params.get('max_id'));
+    expect(
+      internals(fixture)
+        .visible()
+        .map((s) => s.id),
+    ).toEqual(['keep-1']);
     expect(internals(fixture).autoLoading()).toBe(false);
+  });
+
+  it('leaves "Load more" available after a page the filters mostly hid', () => {
+    // The regression: a short visible page must never imply the timeline is over.
+    // Paging is the reader's call, and the button has to still be there to make it.
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([
+      makeStatus('keep-1'),
+      ...Array.from({ length: 19 }, (_, i) => ({
+        ...makeStatus(`r${i}`),
+        in_reply_to_id: 'p',
+      })),
+    ]);
+    fixture.detectChanges();
+
+    expect(internals(fixture).canLoadMore()).toBe(true);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(
+      [...el.querySelectorAll('button')].some((b) => b.textContent?.includes('Load more')),
+    ).toBe(true);
+  });
+
+  it('toggling a filter chip fetches nothing', () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock
+      .expectOne('/api/v1/timelines/home?limit=20')
+      .flush([makeStatus('a'), { ...makeStatus('b'), in_reply_to_id: 'p' }]);
+
+    internals(fixture).toggleReplies();
+    internals(fixture).toggleBoosts();
+
+    httpMock.expectNone((r) => r.url === '/api/v1/timelines/home');
   });
 
   it('reuses a populated Anonymous feed until the user explicitly refreshes', () => {
