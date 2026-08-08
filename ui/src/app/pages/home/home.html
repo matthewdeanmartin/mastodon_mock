@@ -133,8 +133,9 @@
       [attr.aria-pressed]="imagesHidden()"
       (click)="toggleImages()"
       [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
+      [attr.aria-label]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
     >
-      🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
+      <span aria-hidden="true">🖼️</span> {{ imagesHidden() ? 'No images' : 'Images' }}
     </button>
     <app-feed-language-picker />
   </div>

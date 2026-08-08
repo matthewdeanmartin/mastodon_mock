@@ -139,32 +139,36 @@
               [class.on]="replyingTo() === post.id"
               (click)="toggleReaderReply(post.id)"
               title="Reply"
+              aria-label="Reply"
             >
-              💬 {{ post.replies_count }}
+              <span aria-hidden="true">💬</span> {{ post.replies_count }}
             </button>
             <button
               class="raction"
               [class.on]="post.reblogged"
               (click)="toggleReblog(post)"
               [title]="post.reblogged ? words().UndoBoost : words().Boost"
+              [attr.aria-label]="post.reblogged ? words().UndoBoost : words().Boost"
             >
-              🔁 {{ post.reblogs_count }}
+              <span aria-hidden="true">🔁</span> {{ post.reblogs_count }}
             </button>
             <button
               class="raction"
               [class.on]="post.favourited"
               (click)="toggleFavourite(post)"
               [title]="post.favourited ? 'Undo favourite' : 'Favourite'"
+              [attr.aria-label]="post.favourited ? 'Undo favourite' : 'Favourite'"
             >
-              ⭐ {{ post.favourites_count }}
+              <span aria-hidden="true">⭐</span> {{ post.favourites_count }}
             </button>
             <button
               class="raction"
               [class.on]="post.bookmarked"
               (click)="toggleBookmark(post)"
               [title]="post.bookmarked ? 'Remove bookmark' : 'Bookmark'"
+              [attr.aria-label]="post.bookmarked ? 'Remove bookmark' : 'Bookmark'"
             >
-              🔖
+              <span aria-hidden="true">🔖</span>
             </button>
           </div>
           @if (replyingTo() === post.id) {

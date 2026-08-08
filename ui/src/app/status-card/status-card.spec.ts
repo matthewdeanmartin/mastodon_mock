@@ -128,7 +128,11 @@ describe('StatusCard', () => {
     expect(el.querySelector('[aria-label="Reply"]')).toBeNull();
     expect(el.querySelector('[aria-label="Boost"]')).toBeNull();
     expect(el.querySelector('[aria-label="Favourite"]')).toBeNull();
-    expect(el.querySelector('[aria-label="Bookmark"]')).toBeNull();
+    // Bookmarking is deliberately available here: AnonymousCapabilities sets
+    // canBookmark, because it is client-side only and never reaches the server.
+    // This used to be asserted absent, which only passed because the button had
+    // no accessible name to find it by.
+    expect(el.querySelector('[aria-label="Bookmark"]')).not.toBeNull();
     expect(el.textContent).not.toContain('Translate');
     expect(el.textContent).not.toContain('Report');
     expect(el.textContent).toContain('2');

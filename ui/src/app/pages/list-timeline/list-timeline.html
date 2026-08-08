@@ -103,7 +103,14 @@
             <span class="acct muted">&#64;{{ a.acct }}</span>
           </span>
         </a>
-        <button class="del" title="Remove from list" (click)="memberToRemove.set(a)">✕</button>
+        <button
+          class="del"
+          title="Remove from list"
+          (click)="memberToRemove.set(a)"
+          aria-label="Remove from list"
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
       </div>
     }
   }

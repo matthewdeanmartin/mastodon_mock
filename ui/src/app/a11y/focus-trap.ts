@@ -4,8 +4,8 @@ import { Directive, ElementRef, OnDestroy, inject, input, output } from '@angula
  * Focusable descendants, in document order.
  *
  * `:not([tabindex="-1"])` keeps out programmatic-only targets (the routed
- * <main>, dialog containers), and `offset` filtering drops anything currently
- * hidden — collapsed panels inside a dialog would otherwise be Tab stops
+ * <main>, dialog containers). Hidden elements are filtered separately, in
+ * `isHidden` — collapsed panels inside a dialog would otherwise be Tab stops
  * leading nowhere visible.
  */
 const FOCUSABLE = [
@@ -78,9 +78,32 @@ export class FocusTrap implements OnDestroy {
     return this.host.nativeElement;
   }
 
+  /**
+   * Hidden here means "explicitly hidden", not "has no box".
+   *
+   * An offsetWidth/offsetHeight test looks like the obvious visibility check
+   * but is wrong in any context without layout — jsdom reports 0 for every
+   * element, which would empty the list and disable the trap entirely under
+   * test. These attribute/style checks are what actually distinguishes a
+   * collapsed panel from a perfectly visible button.
+   */
+  private isHidden(el: HTMLElement): boolean {
+    if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') return true;
+    if (el.closest('[hidden],[aria-hidden="true"]')) return true;
+    const style = getComputedStyle(el);
+    return style.display === 'none' || style.visibility === 'hidden';
+  }
+
   private focusable(): HTMLElement[] {
-    return Array.from(this.element.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-      (el) => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement,
+    return (
+      Array.from(this.element.querySelectorAll<HTMLElement>(FOCUSABLE))
+        .filter((el) => !this.isHidden(el))
+        // querySelectorAll with a comma-separated selector does not reliably
+        // return document order — some engines group results by clause, so a
+        // dialog of <button><input><button> comes back button,button,input.
+        // "First" and "last" are meaningless until this is sorted, and Tab
+        // would wrap to the wrong end.
+        .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
     );
   }
 

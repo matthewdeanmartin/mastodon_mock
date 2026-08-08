@@ -6,8 +6,9 @@
   aria-haspopup="menu"
   (click)="toggleOpen()"
   title="Choose which languages the feed shows. Posts whose language can't be determined are never hidden. Languages come from Settings → Internationalization."
+  aria-label="Choose which languages the feed shows. Posts whose language can't be determined are never hidden. Languages come from Settings → Internationalization."
 >
-  🌐 {{ label() }}
+  <span aria-hidden="true">🌐</span> {{ label() }}
 </button>
 
 @if (open()) {

@@ -1,5 +1,10 @@
 import { ApplicationConfig, ErrorHandler, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter, TitleStrategy, withInMemoryScrolling, withPreloading } from '@angular/router';
+import {
+  provideRouter,
+  TitleStrategy,
+  withInMemoryScrolling,
+  withPreloading,
+} from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
 import { routes } from './app.routes';

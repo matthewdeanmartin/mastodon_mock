@@ -10,7 +10,9 @@
   </div>
 } @else if (!hiddenByFilter()) {
   @if (boostedBy) {
-    <div class="boost-label muted">🔁 {{ boostedBy }} {{ words().boosted }}</div>
+    <div class="boost-label muted">
+      <span aria-hidden="true">🔁</span> {{ boostedBy }} {{ words().boosted }}
+    </div>
   }
   <article
     class="status"
@@ -19,11 +21,14 @@
     (mouseenter)="onCardHover()"
   >
     <span class="hover-anchor avatar-anchor">
-      <a class="avatar-link" [routerLink]="accountLink">
+      <!-- alt="" and aria-hidden: the display-name link immediately below is
+           the same destination with the same name, so a described avatar makes
+           every post announce its author twice. -->
+      <a class="avatar-link" [routerLink]="accountLink" tabindex="-1" aria-hidden="true">
         <img
           class="avatar"
           [ngSrc]="display.account.avatar_static || display.account.avatar || 'favicon-32x32.png'"
-          [alt]="display.account.username"
+          alt=""
           width="48"
           height="48"
         />
@@ -56,10 +61,15 @@
           </a>
         }
         @if (display.pinned) {
-          <span class="badge" title="Pinned">📌</span>
+          <span class="badge" title="Pinned"
+            ><span aria-hidden="true">📌</span><span class="sr-only">Pinned</span></span
+          >
         }
         @if (display.visibility === 'private') {
-          <span class="badge" title="Followers-only post">🔒</span>
+          <span class="badge" title="Followers-only post"
+            ><span aria-hidden="true">🔒</span
+            ><span class="sr-only">Followers-only post</span></span
+          >
         }
         @if (providerBadge; as badge) {
           <span class="badge muted provider-badge" title="Source">{{ badge }}</span>
@@ -293,11 +303,10 @@
             [class.on]="replying()"
             (click)="toggleReply($event)"
             title="Reply"
-            [attr.aria-label]="'Reply. ' + display.replies_count + ' replies'"
+            aria-label="Reply"
           >
-            <span aria-hidden="true">💬</span> <span aria-hidden="true">{{
-              display.replies_count
-            }}</span>
+            <span aria-hidden="true">💬</span>
+            <span>{{ display.replies_count }}</span> <span class="sr-only">replies</span>
           </button>
         } @else if (auth.isAnonymous || readOnlyStats) {
           <span class="action" title="Replies"
@@ -312,8 +321,9 @@
             [queryParams]="{ reader: 1 }"
             (click)="$event.stopPropagation()"
             title="Read thread as article"
+            aria-label="Read thread as article"
           >
-            📖
+            <span aria-hidden="true">📖</span>
           </a>
         }
         @if (display.provider === 'rss' && threadable) {
@@ -348,12 +358,11 @@
               type="button"
               class="action"
               title="Share elsewhere"
-              [attr.aria-label]="'Share elsewhere. ' + display.reblogs_count + ' reposts'"
+              aria-label="Share elsewhere"
               (click)="showShare.set(true); $event.stopPropagation()"
             >
-              <span aria-hidden="true">🔁</span> <span aria-hidden="true">{{
-                display.reblogs_count
-              }}</span>
+              <span aria-hidden="true">🔁</span>
+              <span>{{ display.reblogs_count }}</span> <span class="sr-only">reposts</span>
             </button>
           } @else {
             <span class="action" title="Reposts"
@@ -390,7 +399,10 @@
                attach them to. When `caps.reblog` already rendered a button above,
                this fallback would be a second 🔁 on the same row — the case a
                signed-in viewer hits on every Bluesky post. -->
-          <span class="action" title="Reposts">🔁 {{ display.reblogs_count }}</span>
+          <span class="action" title="Reposts"
+            ><span aria-hidden="true">🔁</span> {{ display.reblogs_count }}
+            <span class="sr-only">reposts</span></span
+          >
         }
         @if (caps.favourite) {
           <button
@@ -400,10 +412,11 @@
             (click)="toggleFavourite($event)"
             [title]="display.favourited ? 'Undo favourite' : 'Favourite'"
             [attr.aria-pressed]="display.favourited"
+            [attr.aria-label]="display.favourited ? 'Undo favourite' : 'Favourite'"
           >
-            {{ favIcon() }}
+            <span aria-hidden="true">{{ favIcon() }}</span>
             @if (display.favourited) {
-              <span class="did">Favourited</span>
+              <span class="did" aria-hidden="true">Favourited</span>
             }
           </button>
         }
@@ -447,7 +460,8 @@
         }
         @if (auth.isAnonymous) {
           <span class="action" title="Favourites">
-            {{ favIcon() }} <span>{{ display.favourites_count }}</span>
+            <span aria-hidden="true">{{ favIcon() }}</span>
+            <span>{{ display.favourites_count }}</span> <span class="sr-only">favourites</span>
           </span>
         } @else if (!foreign) {
           @if (capabilities.canUseServerActions) {
@@ -455,16 +469,22 @@
               class="action count-link"
               (click)="openAccountList('favourited_by', $event)"
               title="Favourited by"
+              [attr.aria-label]="display.favourites_count + ' favourited by'"
             >
               {{ display.favourites_count }}
             </button>
           } @else {
-            <span class="action">{{ display.favourites_count }}</span>
+            <span class="action"
+              >{{ display.favourites_count }} <span class="sr-only">favourites</span></span
+            >
           }
         } @else if (!caps.favourite && readOnlyStats) {
           <!-- Same pairing as the boost fallback above: only stand in for the
                button when there is no button. -->
-          <span class="action" title="Likes">⭐ {{ display.favourites_count }}</span>
+          <span class="action" title="Likes"
+            ><span aria-hidden="true">⭐</span> {{ display.favourites_count }}
+            <span class="sr-only">likes</span></span
+          >
         }
         @if (foreign) {
           @if (nitterLink; as nitter) {
@@ -507,8 +527,9 @@
               [disabled]="actionBusy()"
               [title]="bookmarkActive() ? 'Remove bookmark' : 'Bookmark'"
               [attr.aria-pressed]="bookmarkActive()"
+              [attr.aria-label]="bookmarkActive() ? 'Remove bookmark' : 'Bookmark'"
             >
-              🔖
+              <span aria-hidden="true">🔖</span>
             </button>
           }
           <!-- Server translation needs a status the server actually has. For a
@@ -521,8 +542,9 @@
               [disabled]="translating()"
               (click)="translateByPreference($event)"
               title="Translate"
+              aria-label="Translate"
             >
-              🌐
+              <span aria-hidden="true">🌐</span>
             </button>
           }
           <!-- Always present for anonymous readers, connected or not: they have no
@@ -545,7 +567,14 @@
           }
           @if (capabilities.canUseServerActions) {
             @if (display.edited_at) {
-              <button class="action" (click)="openHistory($event)" title="Edit history">🕘</button>
+              <button
+                class="action"
+                (click)="openHistory($event)"
+                title="Edit history"
+                aria-label="Edit history"
+              >
+                <span aria-hidden="true">🕘</span>
+              </button>
             }
             @if (isOwn()) {
               <button
@@ -553,20 +582,27 @@
                 [class.on]="display.pinned"
                 (click)="togglePin($event)"
                 title="Pin"
+                aria-label="Pin"
               >
-                📌
+                <span aria-hidden="true">📌</span>
               </button>
               <button
                 class="action"
                 [class.on]="display.muted"
                 (click)="toggleMute($event)"
                 title="Mute thread"
+                aria-label="Mute thread"
               >
-                🔕
+                <span aria-hidden="true">🔕</span>
               </button>
               <div class="policy-wrap">
-                <button class="action" (click)="togglePolicyMenu($event)" title="Who can quote">
-                  💬🔒
+                <button
+                  class="action"
+                  (click)="togglePolicyMenu($event)"
+                  title="Who can quote"
+                  aria-label="Who can quote"
+                >
+                  <span aria-hidden="true">💬🔒</span>
                 </button>
                 @if (showPolicyMenu()) {
                   <div class="policy-menu" (click)="$event.stopPropagation()">
@@ -583,10 +619,19 @@
                   </div>
                 }
               </div>
-              <button class="action" (click)="startEdit($event)" title="Edit">✏️</button>
-              <button class="action" (click)="remove($event)" title="Delete">🗑️</button>
-              <button class="action" (click)="deleteAndRedraft($event)" title="Delete &amp; repost">
-                ♻️
+              <button class="action" (click)="startEdit($event)" title="Edit" aria-label="Edit">
+                <span aria-hidden="true">✏️</span>
+              </button>
+              <button class="action" (click)="remove($event)" title="Delete" aria-label="Delete">
+                <span aria-hidden="true">🗑️</span>
+              </button>
+              <button
+                class="action"
+                (click)="deleteAndRedraft($event)"
+                title="Delete &amp; repost"
+                aria-label="Delete &amp; repost"
+              >
+                <span aria-hidden="true">♻️</span>
               </button>
               @if (display.url || display.account.url) {
                 <details class="danger-menu" (click)="$event.stopPropagation()">
@@ -681,7 +726,14 @@
             <!-- Providers without server actions (Anonymous, foreign feeds) still
                  get a ••• menu for client-side mute/block + open-original. -->
             @if (canViewPublicHistory) {
-              <button class="action" (click)="openHistory($event)" title="Edit history">🕘</button>
+              <button
+                class="action"
+                (click)="openHistory($event)"
+                title="Edit history"
+                aria-label="Edit history"
+              >
+                <span aria-hidden="true">🕘</span>
+              </button>
             }
             <details class="danger-menu" (click)="$event.stopPropagation()">
               <summary class="action" aria-label="More post actions">•••</summary>

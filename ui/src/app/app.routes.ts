@@ -19,7 +19,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/anonymous-entry/anonymous-entry').then((m) => m.AnonymousEntry),
   },
-  { path: 'login', title: 'Sign in', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
+  {
+    path: 'login',
+    title: 'Sign in',
+    loadComponent: () => import('./pages/login/login').then((m) => m.Login),
+  },
   // New-user landing: bookmark this, sign up on your instance, come back and sign in.
   {
     path: 'welcome-back',
@@ -91,7 +95,11 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/shell').then((m) => m.Shell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'home' },
-      { path: 'home', title: 'Home', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
+      {
+        path: 'home',
+        title: 'Home',
+        loadComponent: () => import('./pages/home/home').then((m) => m.Home),
+      },
       {
         path: 'algo',
         title: 'Algo',

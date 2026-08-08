@@ -1,6 +1,8 @@
 @for (a of announcements(); track a.id) {
   <div class="announcement" [class.read]="a.read">
-    <button class="dismiss" title="Dismiss" (click)="dismiss(a)">✕</button>
+    <button class="dismiss" title="Dismiss" (click)="dismiss(a)" aria-label="Dismiss">
+      <span aria-hidden="true">✕</span>
+    </button>
     <div class="label">📣 Announcement</div>
     <div class="content" [innerHTML]="a.content"></div>
     <div class="reactions">

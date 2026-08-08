@@ -26,7 +26,15 @@
             {{ n }}
           </button>
         }
-        <button type="button" class="sample-btn" title="Look again" (click)="refresh()">↻</button>
+        <button
+          type="button"
+          class="sample-btn"
+          title="Look again"
+          (click)="refresh()"
+          aria-label="Look again"
+        >
+          <span aria-hidden="true">↻</span>
+        </button>
       </span>
     }
   </div>

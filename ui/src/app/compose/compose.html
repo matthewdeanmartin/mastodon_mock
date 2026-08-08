@@ -146,8 +146,9 @@
             type="button"
             (click)="removeThreadBox(i)"
             title="Remove this post from the thread"
+            aria-label="Remove this post from the thread"
           >
-            ✕
+            <span aria-hidden="true">✕</span>
           </button>
         </div>
       </div>
@@ -171,7 +172,14 @@
             (ngModelChange)="setMediaDescription(i, $event)"
             placeholder="Describe for the visually impaired"
           />
-          <button class="btn btn-outline btn-sm" (click)="removeMedia(i)" title="Remove">✕</button>
+          <button
+            class="btn btn-outline btn-sm"
+            (click)="removeMedia(i)"
+            title="Remove"
+            aria-label="Remove"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
         </div>
       }
     </div>
@@ -197,8 +205,9 @@
               class="btn btn-outline btn-sm"
               (click)="removePollOption(i)"
               title="Remove choice"
+              aria-label="Remove choice"
             >
-              ✕
+              <span aria-hidden="true">✕</span>
             </button>
           }
         </div>
@@ -439,8 +448,9 @@
             [disabled]="!canAddPoll()"
             (click)="togglePoll()"
             title="Add poll"
+            aria-label="Add poll"
           >
-            📊
+            <span aria-hidden="true">📊</span>
           </button>
 
           <!-- Scheduling is a way to publish without deciding now, which is the
@@ -451,8 +461,9 @@
               [class.on]="scheduleOpen()"
               (click)="toggleSchedule()"
               title="Schedule post"
+              aria-label="Schedule post"
             >
-              🕒
+              <span aria-hidden="true">🕒</span>
             </button>
           }
         }
@@ -474,8 +485,9 @@
             [class.on]="sensitive()"
             (click)="sensitive.set(!sensitive())"
             title="Mark media sensitive"
+            aria-label="Mark media sensitive"
           >
-            ⚠️
+            <span aria-hidden="true">⚠️</span>
           </button>
         }
 
@@ -485,8 +497,9 @@
             [class.on]="emojiOpen()"
             (click)="toggleEmoji()"
             title="Insert emoji"
+            aria-label="Insert emoji"
           >
-            🙂
+            <span aria-hidden="true">🙂</span>
           </button>
           @if (emojiOpen()) {
             <div class="emoji-popover">
@@ -512,8 +525,9 @@
             type="button"
             (click)="translateOpen.set(true)"
             title="Translate this post into another language"
+            aria-label="Translate this post into another language"
           >
-            🤖🌐
+            <span aria-hidden="true">🤖🌐</span>
           </button>
         }
 
@@ -522,8 +536,9 @@
             class="tool-btn thread-btn"
             (click)="addThreadBox()"
             title="Add another post (thread / tweet storm)"
+            aria-label="Add another post (thread / tweet storm)"
           >
-            ➕🧵
+            <span aria-hidden="true">➕🧵</span>
           </button>
         }
 
@@ -533,16 +548,18 @@
             [class.on]="draftsOpen()"
             (click)="draftsOpen.set(!draftsOpen())"
             title="Show drafts"
+            aria-label="Show drafts"
           >
-            📝
+            <span aria-hidden="true">📝</span>
           </button>
           <button
             class="tool-btn preview-toggle"
             [class.on]="previewOn()"
             (click)="previewOn.set(!previewOn())"
             title="Toggle preview"
+            aria-label="Toggle preview"
           >
-            👁
+            <span aria-hidden="true">👁</span>
           </button>
         }
       </div>
@@ -630,8 +647,14 @@
           </dl>
         }
       </div>
-      <button class="post-error-dismiss" type="button" title="Dismiss" (click)="dismissPostError()">
-        ×
+      <button
+        class="post-error-dismiss"
+        type="button"
+        title="Dismiss"
+        (click)="dismissPostError()"
+        aria-label="Dismiss"
+      >
+        <span aria-hidden="true">×</span>
       </button>
     </div>
   }

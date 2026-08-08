@@ -375,16 +375,18 @@
                     [class.on]="m.favourited"
                     (click)="toggleFave(m)"
                     title="Like"
+                    aria-label="Like"
                   >
-                    {{ prefs.favStyle() === 'heart' ? '❤️' : '⭐' }}
+                    <span aria-hidden="true">{{ prefs.favStyle() === 'heart' ? '❤️' : '⭐' }}</span>
                   </button>
                   <button
                     class="bubble-action"
                     [class.on]="m.bookmarked"
                     (click)="toggleBookmark(m)"
                     title="Bookmark"
+                    aria-label="Bookmark"
                   >
-                    🔖
+                    <span aria-hidden="true">🔖</span>
                   </button>
                   @if (chat.kind === 'public') {
                     <button
@@ -392,8 +394,9 @@
                       [class.on]="m.reblogged"
                       (click)="toggleBoost(m)"
                       title="Boost"
+                      aria-label="Boost"
                     >
-                      🔁
+                      <span aria-hidden="true">🔁</span>
                     </button>
                   }
                   <a class="bubble-action" [routerLink]="['/statuses', m.id]" title="Open as post"

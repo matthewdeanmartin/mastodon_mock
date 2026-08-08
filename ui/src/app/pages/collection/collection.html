@@ -186,8 +186,13 @@
             <span class="muted small">pending</span>
           }
           @if (isOwner()) {
-            <button class="del" title="Remove from collection" (click)="memberToRemove.set(m)">
-              ✕
+            <button
+              class="del"
+              title="Remove from collection"
+              (click)="memberToRemove.set(m)"
+              aria-label="Remove from collection"
+            >
+              <span aria-hidden="true">✕</span>
             </button>
           }
         </div>

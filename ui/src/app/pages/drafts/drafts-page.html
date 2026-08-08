@@ -151,8 +151,9 @@
           type="button"
           [title]="item.kind === 'paste' ? 'Remove from this list' : 'Remove draft'"
           (click)="askRemove(item)"
+          [attr.aria-label]="item.kind === 'paste' ? 'Remove from this list' : 'Remove draft'"
         >
-          🗑
+          <span aria-hidden="true">🗑</span>
         </button>
       </div>
     </div>

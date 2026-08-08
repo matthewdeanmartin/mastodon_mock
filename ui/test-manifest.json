@@ -1,6 +1,15 @@
 {
-  "testCount": 3418,
+  "testCount": 3427,
   "tests": [
+    "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
+    "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
+    "src/app/a11y/focus-trap.spec.ts :: FocusTrap emits dismissed on Escape from anywhere, not just inside",
+    "src/app/a11y/focus-trap.spec.ts :: FocusTrap moves focus into the dialog when it opens",
+    "src/app/a11y/focus-trap.spec.ts :: FocusTrap pulls focus back when it has escaped the dialog",
+    "src/app/a11y/focus-trap.spec.ts :: FocusTrap restores focus to the opener when it closes",
+    "src/app/a11y/page-title-strategy.spec.ts :: PageTitleStrategy falls back to the bare brand when a route declares no title",
+    "src/app/a11y/page-title-strategy.spec.ts :: PageTitleStrategy puts the page name before the brand",
+    "src/app/a11y/page-title-strategy.spec.ts :: PageTitleStrategy replaces a previous page title rather than leaving it stale",
     "src/app/account-data.spec.ts :: account-data deletes Anonymous data by both prefix and suffix",
     "src/app/account-data.spec.ts :: account-data deletes only that account’s data, leaving others and globals intact",
     "src/app/account-data.spec.ts :: account-data derives a distinct, token-free scope per saved login",
