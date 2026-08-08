@@ -1,4 +1,9 @@
-<div class="page-head"><h2>Drafts</h2></div>
+<div class="page-head">
+  <h2>Drafts</h2>
+  @if (featureFlags.enabled('write')) {
+    <a class="btn btn-outline btn-sm" routerLink="/write">Open in Write →</a>
+  }
+</div>
 <p class="page-note">
   Everything you've written but not published — wherever you parked it. Mastodon has no drafts API,
   so each of these lives somewhere different.

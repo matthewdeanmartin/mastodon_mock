@@ -663,6 +663,13 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/drafts/drafts-page').then((m) => m.DraftsPage),
       },
       {
+        path: 'write',
+        title: 'Write',
+        canActivate: [featureFlagGuard],
+        data: { featureFlag: 'write' },
+        loadComponent: () => import('./pages/write/write-page').then((m) => m.WritePage),
+      },
+      {
         path: 'pastes',
         title: 'Pastes',
         canActivate: [featureFlagGuard],

@@ -403,6 +403,18 @@
   grid-template-columns: minmax(0, var(--col-width));
 }
 
+/* Writing zen: the header is gone as well as the rails, so the column has the
+   whole viewport rather than the viewport minus a topbar that isn't there. */
+.layout.layout-writing-zen {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layout-writing-zen .column {
+  min-height: 100vh;
+  border: 0;
+  background: transparent;
+}
+
 @media (max-width: 1240px) {
   .layout {
     grid-template-columns: 290px minmax(0, var(--col-width));

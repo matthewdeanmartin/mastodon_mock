@@ -1,0 +1,291 @@
+@if (zen.active()) {
+  <!-- Writing zen. Everything is gone: the rails, the header, the footer, both
+       side panes. What's left is the text and the way out — which stays on
+       screen, because a mode you can't see the way out of is a trap. -->
+  <div class="zen">
+    <!-- Escape is bound on the textarea rather than a wrapper: that is where
+         focus actually is in this mode, and a keydown handler on a plain div
+         is one a keyboard user can never reach. -->
+    <textarea
+      #editorBox
+      class="zen-box"
+      spellcheck="true"
+      aria-label="Write"
+      [ngModel]="body()"
+      (ngModelChange)="onBodyInput($event)"
+      (keydown)="onZenKeydown($event)"
+    ></textarea>
+    <div class="zen-bar">
+      <span class="zen-count muted">
+        {{ segments().length }} {{ segments().length === 1 ? 'post' : 'posts' }}
+        @if (overLimitCount()) {
+          <span class="over">· {{ overLimitCount() }} too long</span>
+        }
+      </span>
+      <button class="btn btn-outline btn-sm" type="button" (click)="exitZen()">
+        Leave zen mode
+      </button>
+      <button class="btn btn-sm" type="button" [disabled]="!hasContent()" (click)="save()">
+        Save draft
+      </button>
+    </div>
+  </div>
+} @else {
+  <div class="write">
+    <div class="write-head">
+      <h2>Write</h2>
+      <div class="write-head-actions">
+        <button
+          class="btn btn-outline btn-sm pane-toggle"
+          type="button"
+          [attr.aria-expanded]="leftOpen()"
+          (click)="toggleLeft()"
+        >
+          Drafts
+        </button>
+        <button
+          class="btn btn-outline btn-sm pane-toggle"
+          type="button"
+          [attr.aria-expanded]="rightOpen()"
+          (click)="toggleRight()"
+        >
+          Notes
+        </button>
+        <a class="btn btn-outline btn-sm" routerLink="/drafts">All drafts →</a>
+      </div>
+    </div>
+    <p class="page-note">
+      Everything you need to write, and nothing you don't. No trending tags, no one new to follow —
+      those live on the feeds, where being distracted is the point.
+    </p>
+
+    <div class="panes">
+      <!-- Drafts ------------------------------------------------------------ -->
+      <aside class="pane pane-left" [class.open]="leftOpen()" aria-label="Drafts">
+        <div class="pane-head">
+          <h3>Drafts</h3>
+          <button class="btn btn-sm" type="button" (click)="newDraft()">New</button>
+        </div>
+
+        <div class="draft-chips" role="group" aria-label="Filter drafts by kind">
+          @for (chip of chips; track chip.id) {
+            <button
+              class="chip"
+              type="button"
+              [class.on]="filter() === chip.id"
+              [disabled]="!count(chip.id)"
+              [attr.aria-pressed]="filter() === chip.id"
+              (click)="select(chip.id)"
+            >
+              {{ chip.label }}
+              <span class="chip-count">{{ count(chip.id) }}</span>
+            </button>
+          }
+        </div>
+
+        @for (error of sources.sourceErrors(); track error.kind) {
+          <p class="write-warning" role="status">⚠ {{ error.message }}</p>
+        }
+
+        <div class="pane-body">
+          @if (sources.loading() && !sources.items().length) {
+            <p class="muted center">Loading drafts…</p>
+          } @else if (!visible().length) {
+            <p class="muted center">
+              @if (sources.items().length) {
+                No drafts of that kind.
+              } @else {
+                Nothing in progress yet. Hit <strong>New</strong> and start writing.
+              }
+            </p>
+          } @else {
+            @for (item of visible(); track item.key) {
+              <button
+                class="draft-row"
+                type="button"
+                [class.current]="editing()?.key === item.key"
+                (click)="open(item)"
+              >
+                <span class="draft-text">{{ item.preview }}</span>
+                <span class="draft-meta muted">
+                  @switch (item.kind) {
+                    @case ('local') {
+                      <span title="Saved in this browser only">💾 local</span>
+                    }
+                    @case ('scheduled') {
+                      <span title="Parked as a far-future scheduled post">⏳ parked</span>
+                    }
+                    @case ('self') {
+                      <span title="A post visible only to you">🔒 self</span>
+                    }
+                    @case ('paste') {
+                      <span title="Published to a paste service">📋 paste</span>
+                    }
+                  }
+                  <span>{{ item.at | humanTime }}</span>
+                </span>
+              </button>
+            }
+          }
+        </div>
+      </aside>
+
+      <!-- Editor ------------------------------------------------------------ -->
+      <section class="pane pane-editor" aria-label="Editor">
+        @if (editing(); as current) {
+          <div class="editor-head">
+            <div class="editor-id">
+              <strong>{{ current.title }}</strong>
+              @if (current.savedAt) {
+                <span class="muted">saved {{ current.savedAt | humanTime }}</span>
+              } @else if (current.origin && current.origin !== 'local') {
+                <span class="muted">a copy — the original is untouched</span>
+              } @else {
+                <span class="muted">not saved yet</span>
+              }
+              @if (dirty()) {
+                <span class="dirty-dot" title="Unsaved changes">•</span>
+              }
+            </div>
+
+            <div class="split-picker">
+              <label class="muted" [attr.for]="'split-mode'">Split</label>
+              <select
+                id="split-mode"
+                [ngModel]="splitMode()"
+                (ngModelChange)="setSplitMode($event)"
+              >
+                @for (mode of splitModes; track mode) {
+                  <option [value]="mode">{{ modeLabel(mode) }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <p class="split-hint muted">{{ modeHint(splitMode()) }}</p>
+
+          <textarea
+            #editorBox
+            class="editor-box"
+            spellcheck="true"
+            aria-label="Write"
+            [attr.placeholder]="'Write. A line of --- starts a new post.'"
+            [ngModel]="body()"
+            (ngModelChange)="onBodyInput($event)"
+          ></textarea>
+
+          @if (saveError()) {
+            <p class="write-warning" role="alert">⚠ {{ saveError() }}</p>
+          }
+          @if (notice()) {
+            <p class="write-notice" role="status">✓ {{ notice() }}</p>
+          }
+
+          <div class="editor-bar">
+            <button
+              #zenButton
+              class="btn btn-outline btn-sm"
+              type="button"
+              (click)="enterZen()"
+              aria-label="Enter zen mode, hiding everything but the text"
+            >
+              Zen mode
+            </button>
+            @if (splitMode() === 'demand') {
+              <button class="btn btn-outline btn-sm" type="button" (click)="splitHere()">
+                Split here
+              </button>
+            }
+            <span class="bar-gap"></span>
+            <button
+              class="btn btn-outline btn-sm"
+              type="button"
+              [disabled]="!hasContent()"
+              (click)="save()"
+            >
+              Save draft
+            </button>
+            <button class="btn btn-sm" type="button" [disabled]="!hasContent()" (click)="publish()">
+              Publish →
+            </button>
+          </div>
+
+          <!-- The split preview: the first of the virtuous distractions. -->
+          @if (segments().length) {
+            <div class="segments" aria-label="Split preview">
+              <div class="segments-head muted">
+                {{ segments().length }} {{ segments().length === 1 ? 'post' : 'posts' }}
+                @if (overLimitCount()) {
+                  <span class="over">· {{ overLimitCount() }} over the limit</span>
+                }
+              </div>
+              @for (segment of segments(); track $index) {
+                <div class="segment" [class.over]="segment.overLimit">
+                  <div class="segment-num muted">{{ $index + 1 }}</div>
+                  <div class="segment-text">{{ segment.text }}</div>
+                  <div class="segment-len muted" [class.over]="segment.overLimit">
+                    {{ segment.length }}
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        } @else {
+          <div class="editor-empty muted">
+            <p>Pick a draft on the left, or start a new one.</p>
+            <button class="btn" type="button" (click)="newDraft()">New draft</button>
+          </div>
+        }
+      </section>
+
+      <!-- Notes ------------------------------------------------------------- -->
+      <aside class="pane pane-right" [class.open]="rightOpen()" aria-label="Notes">
+        <div class="pane-head"><h3>Notes</h3></div>
+        <div class="pane-body">
+          <p class="muted pane-placeholder">
+            Your own notes and to-dos will live here — the things worth being distracted by while
+            you write. Nothing to show yet: tagging posts <code>#NOTE</code> and <code>#TODO</code>
+            lands in the next release.
+          </p>
+        </div>
+      </aside>
+    </div>
+  </div>
+}
+
+@if (pendingSwitch()) {
+  <!-- Three outcomes, so this is its own dialog rather than app-confirm-dialog,
+       which is a yes/no. "Save" is the default and the safe one; discarding is
+       the only irreversible choice on this page and is styled as such. -->
+  <div
+    class="overlay"
+    role="presentation"
+    tabindex="-1"
+    (click)="cancelSwitch()"
+    (keyup.escape)="cancelSwitch()"
+  >
+    <div
+      class="dialog"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="unsaved-title"
+      aria-describedby="unsaved-message"
+      appFocusTrap
+      (dismissed)="cancelSwitch()"
+      (click)="$event.stopPropagation()"
+      (keyup)="$event.stopPropagation()"
+    >
+      <h3 id="unsaved-title">You have unsaved writing</h3>
+      <p id="unsaved-message">
+        Save it as a local draft before moving on, or discard it. Discarding cannot be undone.
+      </p>
+      <div class="unsaved-actions">
+        <button class="btn btn-outline" type="button" (click)="cancelSwitch()">Cancel</button>
+        <button class="btn btn-outline btn-danger" type="button" (click)="discardAndContinue()">
+          Discard
+        </button>
+        <button class="btn" type="button" (click)="saveAndContinue()">Save and continue</button>
+      </div>
+    </div>
+  </div>
+}

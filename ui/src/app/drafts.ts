@@ -89,6 +89,34 @@ export class Drafts {
     return draft.id;
   }
 
+  /**
+   * Overwrite an existing draft in place, keeping its id and list position.
+   *
+   * Without this, editing a saved draft and saving it again meant `save()` — a
+   * second row with the same text, and no way to tell which one is current. The
+   * writing workspace edits one draft over a long session, so "save" there has
+   * to mean *this* draft rather than another copy of it.
+   *
+   * Position is preserved rather than bumping the draft to the top: in a list
+   * you are working *through*, having the row you just touched jump out from
+   * under the cursor is worse than having it stay put. `updatedAt` still
+   * advances, so anything that sorts by time can order it however it likes.
+   *
+   * Returns false when the id is gone — deleted in another tab, or from
+   * `/drafts` while the workspace held it — so the caller can save a fresh copy
+   * rather than silently discarding the user's edit.
+   */
+  update(id: string, snapshot: DraftSnapshot): boolean {
+    if (!this.drafts().some((d) => d.id === id)) {
+      return false;
+    }
+    this.drafts.update((list) =>
+      list.map((d) => (d.id === id ? { ...snapshot, id, updatedAt: new Date().toISOString() } : d)),
+    );
+    this.persist();
+    return true;
+  }
+
   remove(id: string): void {
     this.drafts.update((list) => list.filter((d) => d.id !== id));
     this.persist();

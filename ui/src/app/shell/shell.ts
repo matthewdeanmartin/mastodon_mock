@@ -18,11 +18,17 @@ import { ServerAbout } from '../server-about';
 import { FeatureFlags } from '../feature-flags';
 import { PosseQueue } from '../providers/hugo/posse-queue';
 import { LeaveChoice, LeaveDialog } from '../leave-dialog/leave-dialog';
+import { WritingZen } from '../writing-zen';
 
 function isWideUrl(url: string): boolean {
   // /search goes rails-off wide so facets have room to live beside results.
+  // /write does too, and for the mirror-image reason: it spends the width on
+  // drafts and notes instead of on trending tags and people to follow.
   return (
-    url.startsWith('/settings') || url.startsWith('/conversations') || url.startsWith('/search')
+    url.startsWith('/settings') ||
+    url.startsWith('/conversations') ||
+    url.startsWith('/search') ||
+    url.startsWith('/write')
   );
 }
 
@@ -62,6 +68,13 @@ export class Shell implements OnInit {
   /** Mastodon-compatible keyboard shortcuts (and the "?" help dialog). */
   protected hotkeys = inject(Hotkeys);
   protected prefs = inject(ClientPrefs);
+  /**
+   * Writing zen, which hides the header and footer too — those are shell-owned
+   * and outside the router outlet, so /write cannot hide them by itself. This is
+   * a different feature from `prefs.zenMode` (see {@link WritingZen}); writing
+   * zen hides a strict superset, so the two are safe to have on at once.
+   */
+  protected writingZen = inject(WritingZen);
   protected serverAbout = inject(ServerAbout);
   protected featureFlags = inject(FeatureFlags);
   /** POSSE queue depth, for the "Waiting to publish" row and its count. */

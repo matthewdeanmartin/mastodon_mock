@@ -1,251 +1,270 @@
-<a class="skip-link" href="#main" (click)="skipToMain($event)">Skip to main content</a>
+<!-- Writing zen hides the universal chrome as well as the rails — the header and
+     footer live here, outside the outlet, so /write cannot hide them itself.
+     This is deliberately a superset of the global zen preference: with both on,
+     the result is indistinguishable from writing zen alone. -->
+@if (!writingZen.active()) {
+  <a class="skip-link" href="#main" (click)="skipToMain($event)">Skip to main content</a>
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
-      <img
-        class="brand-mark"
-        [src]="logoSrc"
-        alt=""
-        aria-hidden="true"
-        width="36"
-        height="36"
-        loading="eager"
-        fetchpriority="high"
-      />
-      <span class="brand-name">{{ brand }}</span>
-    </a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
+        <img
+          class="brand-mark"
+          [src]="logoSrc"
+          alt=""
+          aria-hidden="true"
+          width="36"
+          height="36"
+          loading="eager"
+          fetchpriority="high"
+        />
+        <span class="brand-name">{{ brand }}</span>
+      </a>
 
-    <nav class="primary-nav" aria-label="Primary navigation">
-      <a routerLink="/home" routerLinkActive="active">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5.5v-6h-5v6H4a1 1 0 0 1-1-1z" />
-        </svg>
-        <span>Home</span>
-      </a>
-      <a routerLink="/algo" routerLinkActive="active">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M11 4l1.8 4.7L17.5 10.5l-4.7 1.8L11 17l-1.8-4.7L4.5 10.5l4.7-1.8zM18.5 14l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z"
-          />
-        </svg>
-        <span>Algo</span>
-      </a>
-      @if (!auth.isAnonymous) {
-        <a routerLink="/notifications" routerLinkActive="active">
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <a routerLink="/home" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5" />
+            <path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5.5v-6h-5v6H4a1 1 0 0 1-1-1z" />
           </svg>
-          <span>Inbox</span>
+          <span>Home</span>
         </a>
-        <a routerLink="/conversations" routerLinkActive="active">
+        <a routerLink="/algo" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 5h16v12H8l-4 4z" />
+            <path
+              d="M11 4l1.8 4.7L17.5 10.5l-4.7 1.8L11 17l-1.8-4.7L4.5 10.5l4.7-1.8zM18.5 14l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z"
+            />
           </svg>
-          <span>Chat</span>
+          <span>Algo</span>
         </a>
-      }
-      <!-- Anonymous visitors get Chat too, and it is the same page signed-in
+        @if (!auth.isAnonymous) {
+          <a routerLink="/notifications" routerLinkActive="active">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5" />
+            </svg>
+            <span>Inbox</span>
+          </a>
+          <a routerLink="/conversations" routerLinkActive="active">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5h16v12H8l-4 4z" />
+            </svg>
+            <span>Chat</span>
+          </a>
+        }
+        <!-- Anonymous visitors get Chat too, and it is the same page signed-in
            users see. There is no notification badge any more: Eliza no longer
            generates notifications, which is the point of removing her inbox. -->
-      @if (auth.isAnonymous && hasLocalChat()) {
-        <a routerLink="/conversations" routerLinkActive="active">
+        @if (auth.isAnonymous && hasLocalChat()) {
+          <a routerLink="/conversations" routerLinkActive="active">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5h16v12H8l-4 4z" />
+            </svg>
+            <span>Chat</span>
+          </a>
+        }
+        <a routerLink="/search" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 5h16v12H8l-4 4z" />
+            <circle cx="10.5" cy="10.5" r="6.5" />
+            <path d="m15.5 15.5 5 5" />
           </svg>
-          <span>Chat</span>
+          <span>Search</span>
         </a>
-      }
-      <a routerLink="/search" routerLinkActive="active">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="m15.5 15.5 5 5" />
-        </svg>
-        <span>Search</span>
-      </a>
-      <a routerLink="/feeds" routerLinkActive="active">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
-        </svg>
-        <span>Feeds</span>
-      </a>
-      @if (auth.shouldOfferLogin) {
-        <a class="login-nav" routerLink="/login" (click)="auth.exitAnonymous()">
+        <a routerLink="/feeds" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
+            <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
           </svg>
-          <span>Login</span>
+          <span>Feeds</span>
         </a>
-      }
-    </nav>
+        @if (auth.shouldOfferLogin) {
+          <a class="login-nav" routerLink="/login" (click)="auth.exitAnonymous()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
+            </svg>
+            <span>Login</span>
+          </a>
+        }
+      </nav>
 
-    <div class="header-actions">
-      <details class="more-menu" (toggle)="onMoreToggle($event)">
-        <summary aria-label="More navigation">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="5" cy="12" r="1.5" />
-            <circle cx="12" cy="12" r="1.5" />
-            <circle cx="19" cy="12" r="1.5" />
-          </svg>
-          <span>More</span>
-        </summary>
-        <div class="menu-panel">
-          <!-- "Meet Eliza" used to sit here. She is an easter egg, not a
+      <div class="header-actions">
+        <details class="more-menu" (toggle)="onMoreToggle($event)">
+          <summary aria-label="More navigation">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="19" cy="12" r="1.5" />
+            </svg>
+            <span>More</span>
+          </summary>
+          <div class="menu-panel">
+            <!-- "Meet Eliza" used to sit here. She is an easter egg, not a
                headline feature, and this menu is short on room — she is found
                in Chat, or at /eliza by anyone who goes looking. -->
 
-          <a routerLink="/settings">Settings</a>
+            <a routerLink="/settings">Settings</a>
 
-          <!-- Feed-likes -->
-          <div class="menu-divider"></div>
-          @if (!auth.isAnonymous) {
-            <a routerLink="/favourites">Favourites</a>
-          }
-          <a routerLink="/bookmarks">Bookmarks</a>
-          <a routerLink="/feeds/lists">Lists</a>
-          <a routerLink="/feeds/tags">Tags</a>
+            <!-- Feed-likes -->
+            <div class="menu-divider"></div>
+            @if (!auth.isAnonymous) {
+              <a routerLink="/favourites">Favourites</a>
+            }
+            <a routerLink="/bookmarks">Bookmarks</a>
+            <a routerLink="/feeds/lists">Lists</a>
+            <a routerLink="/feeds/tags">Tags</a>
 
-          <!-- Write / draft-likes -->
-          <div class="menu-divider"></div>
-          <a routerLink="/drafts">Drafts</a>
-          @if (posse.count(); as pending) {
-            <!-- Only rendered while something is actually waiting: a queue you
+            <!-- Write / draft-likes -->
+            <div class="menu-divider"></div>
+            @if (featureFlags.enabled('write')) {
+              <a routerLink="/write">Write</a>
+            }
+            <a routerLink="/drafts">Drafts</a>
+            @if (posse.count(); as pending) {
+              <!-- Only rendered while something is actually waiting: a queue you
                  have emptied should not leave a row behind advertising itself. -->
-            <a routerLink="/posse">
-              Waiting to publish
-              <span class="nav-count">{{ pending }}</span>
-            </a>
-          }
-          @if (featureFlags.enabled('pastebin')) {
-            <a routerLink="/pastes">Pastes</a>
-          }
-          @if (featureFlags.enabled('links')) {
-            <a routerLink="/links">Links</a>
-          }
+              <a routerLink="/posse">
+                Waiting to publish
+                <span class="nav-count">{{ pending }}</span>
+              </a>
+            }
+            @if (featureFlags.enabled('pastebin')) {
+              <a routerLink="/pastes">Pastes</a>
+            }
+            @if (featureFlags.enabled('links')) {
+              <a routerLink="/links">Links</a>
+            }
 
-          <!-- Find people to follow. Starter Kits and "Find my friends" used to
+            <!-- Find people to follow. Starter Kits and "Find my friends" used to
                sit here as separate rows; both are now on the Find Friends hub,
                along with search, the directory and the people browser. -->
-          <div class="menu-divider"></div>
-          <a routerLink="/find-friends">Find Friends</a>
-          <a routerLink="/invites">Invites</a>
+            <div class="menu-divider"></div>
+            <a routerLink="/find-friends">Find Friends</a>
+            <a routerLink="/invites">Invites</a>
 
-          <!-- Analytics (of self + the client) -->
-          <div class="menu-divider"></div>
-          @if (!auth.isAnonymous) {
-            <a routerLink="/analytics">Analytics</a>
-          }
-          <!-- Feed Doctor is deliberately *not* here. This menu is full, and a
+            <!-- Analytics (of self + the client) -->
+            <div class="menu-divider"></div>
+            @if (!auth.isAnonymous) {
+              <a routerLink="/analytics">Analytics</a>
+            }
+            <!-- Feed Doctor is deliberately *not* here. This menu is full, and a
                diagnostic nobody can find is a diagnostic nobody runs — it belongs
                where the symptom appears: the feed's own button bar, and the
                end-of-feed line. See sprint/anon-office-3-feed-doctor.md. -->
-          <a routerLink="/observability">Observability</a>
+            <a routerLink="/observability">Observability</a>
 
-          <!-- Docs & grab-bag -->
-          <div class="menu-divider"></div>
-          <a routerLink="/blog">Docs</a>
-          @if (!isCanary) {
-            <!-- Relative to <base href>: /canary/ on the custom domain and
-                 /mawkingbird/canary/ on the github.io fallback. -->
-            <a href="canary/" target="_blank" rel="noopener noreferrer">Canary ↗</a>
-          }
-
-          @if (mockTooling || isStaff()) {
+            <!-- Docs & grab-bag -->
             <div class="menu-divider"></div>
-            @if (mockTooling) {
-              <a routerLink="/dev/faults">Faults</a>
-              <a href="/docs" target="_blank" rel="noopener">API Docs ↗</a>
+            <a routerLink="/blog">Docs</a>
+            @if (!isCanary) {
+              <!-- Relative to <base href>: /canary/ on the custom domain and
+                 /mawkingbird/canary/ on the github.io fallback. -->
+              <a href="canary/" target="_blank" rel="noopener noreferrer">Canary ↗</a>
             }
-            @if (isStaff()) {
-              <a routerLink="/admin" class="admin-link">Admin</a>
-            }
-          }
-        </div>
-      </details>
 
-      @if (auth.account(); as acc) {
-        <details class="account-menu">
-          <summary class="account-pill" [attr.aria-label]="'Account menu for ' + acc.display_name">
-            <img
-              [ngSrc]="acc.avatar_static || acc.avatar || 'favicon-32x32.png'"
-              alt=""
-              width="32"
-              height="32"
-            />
-            <span>{{ acc.display_name }}</span>
-            <svg class="caret" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </summary>
-          <div class="menu-panel account-panel">
-            <a [routerLink]="['/accounts', acc.id]" class="menu-current">
+            @if (mockTooling || isStaff()) {
+              <div class="menu-divider"></div>
+              @if (mockTooling) {
+                <a routerLink="/dev/faults">Faults</a>
+                <a href="/docs" target="_blank" rel="noopener">API Docs ↗</a>
+              }
+              @if (isStaff()) {
+                <a routerLink="/admin" class="admin-link">Admin</a>
+              }
+            }
+          </div>
+        </details>
+
+        @if (auth.account(); as acc) {
+          <details class="account-menu">
+            <summary
+              class="account-pill"
+              [attr.aria-label]="'Account menu for ' + acc.display_name"
+            >
               <img
                 [ngSrc]="acc.avatar_static || acc.avatar || 'favicon-32x32.png'"
                 alt=""
-                width="36"
-                height="36"
+                width="32"
+                height="32"
               />
-              <span class="menu-current-name">
-                {{ acc.display_name }}
-                <small class="muted">&#64;{{ acc.username }}</small>
-              </span>
-            </a>
+              <span>{{ acc.display_name }}</span>
+              <svg class="caret" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+            <div class="menu-panel account-panel">
+              <a [routerLink]="['/accounts', acc.id]" class="menu-current">
+                <img
+                  [ngSrc]="acc.avatar_static || acc.avatar || 'favicon-32x32.png'"
+                  alt=""
+                  width="36"
+                  height="36"
+                />
+                <span class="menu-current-name">
+                  {{ acc.display_name }}
+                  <small class="muted">&#64;{{ acc.username }}</small>
+                </span>
+              </a>
 
-            @if (auth.otherSessions().length) {
+              @if (auth.otherSessions().length) {
+                <div class="menu-divider"></div>
+                <p class="menu-label">Switch account</p>
+                @for (s of auth.otherSessions(); track s.key) {
+                  <button type="button" class="switch-row" (click)="switchTo(s)">
+                    <img
+                      [src]="s.account?.avatar_static || s.account?.avatar || ''"
+                      alt=""
+                      width="36"
+                      height="36"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <span class="switch-name">
+                      {{
+                        s.account?.display_name ||
+                          (s.kind === 'anonymous' ? 'Anonymous' : 'Saved account')
+                      }}
+                      @if (s.account?.username) {
+                        <small class="muted">&#64;{{ s.account?.username }}</small>
+                      }
+                    </span>
+                  </button>
+                }
+              }
+
               <div class="menu-divider"></div>
-              <p class="menu-label">Switch account</p>
-              @for (s of auth.otherSessions(); track s.key) {
-                <button type="button" class="switch-row" (click)="switchTo(s)">
-                  <img
-                    [src]="s.account?.avatar_static || s.account?.avatar || ''"
-                    alt=""
-                    width="36"
-                    height="36"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <span class="switch-name">
-                    {{
-                      s.account?.display_name ||
-                        (s.kind === 'anonymous' ? 'Anonymous' : 'Saved account')
-                    }}
-                    @if (s.account?.username) {
-                      <small class="muted">&#64;{{ s.account?.username }}</small>
-                    }
-                  </span>
+              @if (!auth.isAnonymous || auth.shouldOfferLogin) {
+                <button type="button" class="menu-action" (click)="addAccount()">
+                  + Add an account
                 </button>
               }
-            }
-
-            <div class="menu-divider"></div>
-            @if (!auth.isAnonymous || auth.shouldOfferLogin) {
-              <button type="button" class="menu-action" (click)="addAccount()">
-                + Add an account
+              <button type="button" class="menu-action danger" (click)="logout()">
+                {{ auth.isAnonymous ? 'Exit anonymous' : 'Log out' }}
               </button>
-            }
-            <button type="button" class="menu-action danger" (click)="logout()">
-              {{ auth.isAnonymous ? 'Exit anonymous' : 'Log out' }}
-            </button>
-          </div>
-        </details>
-      } @else {
-        <button class="logout-button" type="button" (click)="logout()">Log out</button>
-      }
+            </div>
+          </details>
+        } @else {
+          <button class="logout-button" type="button" (click)="logout()">Log out</button>
+        }
+      </div>
     </div>
-  </div>
-</header>
+  </header>
+}
 
-<div class="layout" [class.layout-wide]="wide()" [class.layout-zen]="!wide() && prefs.zenMode()">
-  @if (!wide() && !prefs.zenMode()) {
+<div
+  class="layout"
+  [class.layout-wide]="wide()"
+  [class.layout-zen]="!wide() && prefs.zenMode()"
+  [class.layout-writing-zen]="writingZen.active()"
+>
+  @if (!wide() && !prefs.zenMode() && !writingZen.active()) {
     <aside class="rail rail-left">
       <app-left-rail />
     </aside>
   }
   <main class="column" id="main" tabindex="-1" #mainColumn>
     <router-outlet />
-    <app-app-footer />
+    @if (!writingZen.active()) {
+      <app-app-footer />
+    }
   </main>
-  @if (!wide() && !prefs.zenMode()) {
+  @if (!wide() && !prefs.zenMode() && !writingZen.active()) {
     <aside class="rail rail-right">
       <app-right-rail />
     </aside>

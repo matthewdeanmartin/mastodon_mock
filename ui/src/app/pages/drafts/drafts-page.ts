@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Compose } from '../../compose/compose';
@@ -111,7 +111,7 @@ function kindNoun(kind: DraftKind): string {
  */
 @Component({
   selector: 'app-drafts-page',
-  imports: [Compose, ConfirmDialog, FormsModule, HumanTimePipe],
+  imports: [Compose, ConfirmDialog, FormsModule, HumanTimePipe, RouterLink],
   templateUrl: './drafts-page.html',
   styleUrl: './drafts-page.css',
 })

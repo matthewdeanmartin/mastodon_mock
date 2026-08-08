@@ -4,8 +4,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from '../auth';
+import { ClientPrefs } from '../client-prefs';
 import { Server } from '../server';
 import { serverInterceptor } from '../server.interceptor';
+import { WritingZen } from '../writing-zen';
 import { Shell } from './shell';
 
 describe('Shell account switching', () => {
@@ -197,5 +199,120 @@ describe('Shell account switching', () => {
 
     expect(link.textContent).toContain('Find Friends');
     expect(canary.textContent).toContain('Canary');
+  });
+});
+
+/**
+ * The two zens are different features and the shell is where that shows.
+ *
+ * Global zen (`ClientPrefs.zenMode`) drops the rails and keeps the header and
+ * footer. Writing zen drops everything. The interesting case is both at once:
+ * writing zen hides a strict superset, so the result must be indistinguishable
+ * from writing zen alone.
+ */
+describe('Shell zen modes', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([serverInterceptor])),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    // Anonymous: no verify_credentials, so the shell renders in one pass.
+    TestBed.inject(Auth).mode.set('anonymous');
+  });
+
+  afterEach(() => {
+    httpMock.match(() => true);
+    httpMock.verify();
+  });
+
+  function render() {
+    const fixture = TestBed.createComponent(Shell);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function chrome(fixture: ReturnType<typeof render>) {
+    const host = fixture.nativeElement as HTMLElement;
+    return {
+      header: !!host.querySelector('.topbar'),
+      skipLink: !!host.querySelector('.skip-link'),
+      footer: !!host.querySelector('app-app-footer'),
+      leftRail: !!host.querySelector('.rail-left'),
+      rightRail: !!host.querySelector('.rail-right'),
+    };
+  }
+
+  it('shows the whole chrome by default', () => {
+    expect(chrome(render())).toEqual({
+      header: true,
+      skipLink: true,
+      footer: true,
+      leftRail: true,
+      rightRail: true,
+    });
+  });
+
+  it('global zen drops the rails but keeps the header and footer', () => {
+    const fixture = render();
+    TestBed.inject(ClientPrefs).zenMode.set(true);
+    fixture.detectChanges();
+
+    expect(chrome(fixture)).toEqual({
+      header: true,
+      skipLink: true,
+      footer: true,
+      leftRail: false,
+      rightRail: false,
+    });
+  });
+
+  it('writing zen drops everything, header and footer included', () => {
+    const fixture = render();
+    TestBed.inject(WritingZen).enter();
+    fixture.detectChanges();
+
+    expect(chrome(fixture)).toEqual({
+      header: false,
+      skipLink: false,
+      footer: false,
+      leftRail: false,
+      rightRail: false,
+    });
+  });
+
+  it('both zens at once is indistinguishable from writing zen alone', () => {
+    const fixture = render();
+    TestBed.inject(WritingZen).enter();
+    fixture.detectChanges();
+    const writingZenOnly = chrome(fixture);
+
+    TestBed.inject(ClientPrefs).zenMode.set(true);
+    fixture.detectChanges();
+
+    expect(chrome(fixture)).toEqual(writingZenOnly);
+  });
+
+  it('restores the chrome when writing zen ends', () => {
+    const fixture = render();
+    const zen = TestBed.inject(WritingZen);
+    zen.enter();
+    fixture.detectChanges();
+    zen.exit();
+    fixture.detectChanges();
+
+    expect(chrome(fixture)).toEqual({
+      header: true,
+      skipLink: true,
+      footer: true,
+      leftRail: true,
+      rightRail: true,
+    });
   });
 });

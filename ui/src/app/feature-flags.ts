@@ -8,6 +8,7 @@ const DEV_BUILD_HASH = 'development';
 export type FeatureFlagId =
   | 'pastebin'
   | 'links'
+  | 'write'
   | 'connector-bluesky'
   | 'connector-twitter'
   | 'connector-mataroa'
@@ -60,6 +61,14 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     label: 'Links',
     description:
       'Shorten URLs through Dub, Short.io or T.LY, and manage the links you have created.',
+    defaultState: 'production',
+    group: 'features',
+  },
+  {
+    id: 'write',
+    label: 'Write',
+    description:
+      'The writing workspace at /write — drafts, editor and notes side by side, plus zen mode.',
     defaultState: 'production',
     group: 'features',
   },

@@ -46,4 +46,18 @@ describe('application routes', () => {
   it('keeps interaction-only routes guarded from Anonymous', () => {
     expect(shellChild('favourites')?.canActivate).toHaveLength(1);
   });
+
+  it('guards the writing workspace behind the write feature flag', () => {
+    const route = shellChild('write');
+
+    expect(route?.data?.['featureFlag']).toBe('write');
+    expect(route?.canActivate).toHaveLength(1);
+  });
+
+  it('leaves the writing workspace open to Anonymous, who have local drafts too', () => {
+    // The flag guard is the only guard: an anonymous visitor's drafts and notes
+    // are browser-local, so the whole page works without a server identity.
+    expect(shellChild('write')?.canActivate).toHaveLength(1);
+    expect(shellChild('drafts')?.canActivate).toBeUndefined();
+  });
 });

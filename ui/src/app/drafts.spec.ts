@@ -76,6 +76,53 @@ describe('Drafts', () => {
     expect(drafts.loadAutosave('reply:9')).not.toBeNull();
   });
 
+  it('update() overwrites in place rather than appending a second copy', () => {
+    const drafts = TestBed.inject(Drafts);
+    const id = drafts.save(snapshot({ segments: ['first'] }));
+
+    expect(drafts.update(id, snapshot({ segments: ['edited'] }))).toBe(true);
+    expect(drafts.drafts()).toHaveLength(1);
+    expect(drafts.get(id)?.segments).toEqual(['edited']);
+  });
+
+  it('update() keeps the draft where it is in the list', () => {
+    // The row you just touched jumping out from under the cursor is worse than
+    // it staying put, in a list you are working through.
+    const drafts = TestBed.inject(Drafts);
+    const older = drafts.save(snapshot({ segments: ['older'] }));
+    const newer = drafts.save(snapshot({ segments: ['newer'] }));
+
+    drafts.update(older, snapshot({ segments: ['older, edited'] }));
+    expect(drafts.drafts().map((d) => d.id)).toEqual([newer, older]);
+  });
+
+  it('update() advances updatedAt', () => {
+    const drafts = TestBed.inject(Drafts);
+    const id = drafts.save(snapshot());
+    const before = drafts.get(id)!.updatedAt;
+
+    drafts.update(id, snapshot({ segments: ['edited'] }));
+    expect(Date.parse(drafts.get(id)!.updatedAt)).toBeGreaterThanOrEqual(Date.parse(before));
+  });
+
+  it('update() persists, so the change survives a new service instance', () => {
+    const first = TestBed.inject(Drafts);
+    const id = first.save(snapshot());
+    first.update(id, snapshot({ segments: ['edited'] }));
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(Drafts).get(id)?.segments).toEqual(['edited']);
+  });
+
+  it('update() reports false for an id that is gone, and adds nothing', () => {
+    // Deleted in another tab or from /drafts. The caller saves a fresh copy
+    // rather than silently discarding what was just written.
+    const drafts = TestBed.inject(Drafts);
+    expect(drafts.update('never-existed', snapshot())).toBe(false);
+    expect(drafts.drafts()).toHaveLength(0);
+  });
+
   it('draftHasContent() is true for text, CW or poll — not blank segments', () => {
     expect(draftHasContent(snapshot())).toBe(true);
     expect(draftHasContent(snapshot({ segments: ['', ' '] }))).toBe(false);
