@@ -9,15 +9,35 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { LowerCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FocusTrap } from '../../a11y/focus-trap';
+import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { ClientPrefs } from '../../client-prefs';
+import { FeatureFlags } from '../../feature-flags';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
+import { BloggerSession } from '../../providers/blogger/blogger-session';
+import { HugoSettings } from '../../providers/hugo/hugo-settings';
+import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
-import { MAX_POST_CHARS } from '../../compose/compose';
+import { MAX_POST_CHARS, PostTarget } from '../../compose/compose';
+import { TargetAvailability, targetLabel, usableTargets } from '../../compose/post-targets';
+import { applyMinimalMarkdown } from '../../markdown';
 import { stripHtml } from '../../sentiment';
+import {
+  WizardStep,
+  activeSteps,
+  firstStep,
+  forwardLabel,
+  nextStep,
+  previousStep,
+  stepPosition,
+  stepTitle,
+} from '../../publish-wizard';
+import { runQualityChecks } from './quality-checks';
 import { WritingZen } from '../../writing-zen';
 import { PkmItem, PkmSource } from '../../pkm/pkm-source';
 import { PKM_KINDS, PkmKind, pkmLabel, pkmNoun, withPkmTag } from '../../pkm/pkm-tags';
@@ -81,7 +101,7 @@ interface PendingSwitch {
  */
 @Component({
   selector: 'app-write-page',
-  imports: [FocusTrap, FormsModule, HumanTimePipe, RouterLink],
+  imports: [FocusTrap, FormsModule, HumanTimePipe, LowerCasePipe, RouterLink],
   templateUrl: './write-page.html',
   styleUrl: './write-page.css',
 })
@@ -93,6 +113,31 @@ export class WritePage implements OnInit, OnDestroy {
   protected auth = inject(Auth);
   private drafts = inject(Drafts);
   protected prefs = inject(ClientPrefs);
+  private api = inject(Api);
+  private featureFlags = inject(FeatureFlags);
+  private bskySession = inject(BlueskySession);
+  private mataroa = inject(MataroaSettings);
+  private blogger = inject(BloggerSession);
+  private hugo = inject(HugoSettings);
+
+  /**
+   * What is linked, flagged on and signed in — the same snapshot the composer
+   * builds, read by the same rules in `post-targets.ts`. The wizard must never
+   * offer a destination the composer would then refuse.
+   */
+  private availability(): TargetAvailability {
+    return {
+      anonymous: this.auth.isAnonymous,
+      bskyLinked: this.bskySession.linked(),
+      mataroaConnected: this.mataroa.connected(),
+      bloggerReady: this.blogger.ready(),
+      hugoConnected: this.hugo.connected(),
+      pastebinEnabled: this.featureFlags.enabled('pastebin'),
+      mataroaEnabled: this.featureFlags.enabled('connector-mataroa'),
+      bloggerEnabled: this.featureFlags.enabled('connector-blogger'),
+      hugoEnabled: this.featureFlags.enabled('connector-hugo'),
+    };
+  }
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -460,13 +505,169 @@ export class WritePage implements OnInit, OnDestroy {
     if (!this.hasContent()) {
       return;
     }
-    // Deliberately not guarded. The unsaved-work guard exists to stop writing
-    // being thrown away, and handing it to the composer is the opposite of
-    // throwing it away — the text goes with you. Prompting "you have unsaved
-    // writing" on the way to publishing it would be nonsense.
-    this.drafts.handoff(this.snapshot());
+    const first = firstStep(this.prefs.wizardSteps());
+    if (!first) {
+      // Every step switched off. An empty dialog would be worse than none.
+      this.handOffToComposer();
+      return;
+    }
+    this.wizardStep.set(first);
+  }
+
+  /**
+   * Hand the text to the composer, which owns publishing.
+   *
+   * Deliberately not guarded. The unsaved-work guard exists to stop writing
+   * being thrown away, and handing it to the composer is the opposite of
+   * throwing it away — the text goes with you. Prompting "you have unsaved
+   * writing" on the way to publishing it would be nonsense.
+   */
+  private handOffToComposer(): void {
+    this.drafts.handoff({ ...this.snapshot(), target: this.wizardTarget() });
     this.dirty.set(false);
+    this.wizardStep.set(null);
     void this.router.navigate(['/home']);
+  }
+
+  // ------------------------------------------------------------ publish wizard
+
+  /** The step showing, or null when the wizard is closed. */
+  protected wizardStep = signal<WizardStep | null>(null);
+  protected wizardTarget = signal<PostTarget>('fedi');
+  /** A datetime-local value, or empty for "now". */
+  protected wizardScheduleAt = signal('');
+  protected wizardError = signal<string | null>(null);
+  protected wizardBusy = signal(false);
+
+  protected readonly stepTitle = stepTitle;
+  protected readonly targetLabel = targetLabel;
+
+  protected wizardEnabled = computed(() => this.prefs.wizardSteps());
+
+  protected wizardPosition = computed(() => {
+    const step = this.wizardStep();
+    return step ? stepPosition(step, this.wizardEnabled()) : 0;
+  });
+
+  protected wizardTotal = computed(() => activeSteps(this.wizardEnabled()).length);
+
+  protected wizardForwardLabel = computed(() => {
+    const step = this.wizardStep();
+    return step ? forwardLabel(step, this.wizardEnabled()) : 'Publish';
+  });
+
+  protected wizardCanGoBack = computed(() => {
+    const step = this.wizardStep();
+    return !!step && previousStep(step, this.wizardEnabled()) !== null;
+  });
+
+  /** Targets this session can actually post to, asked of the composer's own rules. */
+  protected wizardTargets = computed(() => usableTargets(this.availability()));
+
+  protected qualityFindings = computed(() =>
+    runQualityChecks(this.body(), {
+      limit: MAX_POST_CHARS,
+      segments: this.segments().map((s) => s.text),
+      vocab: this.prefs.pkmVocabulary(),
+    }),
+  );
+
+  /**
+   * Each segment as the markup it will become.
+   *
+   * `applyMinimalMarkdown` operates on a status's *HTML*, so the plain body is
+   * escaped and wrapped in paragraphs first — the same shape a server-rendered
+   * status arrives in. It returns its input untouched when the text contains
+   * nothing markdown-ish, which is the common case and costs nothing.
+   */
+  protected previewHtml = computed(() =>
+    this.segments().map((segment) => applyMinimalMarkdown(toParagraphs(segment.text))),
+  );
+
+  protected setWizardTarget(target: PostTarget): void {
+    this.wizardTarget.set(target);
+  }
+
+  protected setWizardScheduleAt(at: string): void {
+    this.wizardScheduleAt.set(at);
+  }
+
+  protected wizardBack(): void {
+    const step = this.wizardStep();
+    if (step) {
+      this.wizardError.set(null);
+      this.wizardStep.set(previousStep(step, this.wizardEnabled()));
+    }
+  }
+
+  /** Cancel: back to the editor, nothing published, nothing lost. */
+  protected wizardCancel(): void {
+    this.wizardStep.set(null);
+    this.wizardError.set(null);
+    this.wizardBusy.set(false);
+  }
+
+  protected wizardForward(): void {
+    const step = this.wizardStep();
+    if (!step) {
+      return;
+    }
+    const next = nextStep(step, this.wizardEnabled());
+    if (next) {
+      this.wizardError.set(null);
+      this.wizardStep.set(next);
+      return;
+    }
+    this.wizardFinish();
+  }
+
+  /**
+   * The end of the wizard.
+   *
+   * A scheduled post is sent from here, because scheduling is a fire-and-forget
+   * server call with nothing left to edit. An immediate one is handed to the
+   * composer instead — that is where visibility, media, polls and the
+   * thoughtful-posting gate live, and re-implementing them here would mean two
+   * publish paths drifting apart.
+   */
+  private wizardFinish(): void {
+    const at = this.wizardScheduleAt();
+    if (!at) {
+      this.handOffToComposer();
+      return;
+    }
+    const when = new Date(at);
+    if (Number.isNaN(when.getTime())) {
+      this.wizardError.set('That date could not be read. Pick a time, or publish now.');
+      return;
+    }
+    const text = this.segments()
+      .map((s) => s.text)
+      .join('\n\n');
+    this.wizardBusy.set(true);
+    this.wizardError.set(null);
+    this.api
+      .postStatus(text, {
+        visibility: this.prefs.defaultVisibility(),
+        scheduledAt: when.toISOString(),
+      })
+      .subscribe({
+        next: () => {
+          this.wizardBusy.set(false);
+          this.wizardStep.set(null);
+          this.dirty.set(false);
+          this.flash('Scheduled. It is in your drafts under Parked until it publishes.');
+          this.sources.load();
+        },
+        error: () => {
+          this.wizardBusy.set(false);
+          // Refusal is ordinary error handling — some instances simply decline a
+          // date. Nothing was published and the body is untouched.
+          this.wizardError.set(
+            'That publish time was refused. Try a nearer one — nothing was published.',
+          );
+        },
+      });
   }
 
   // --------------------------------------------------------- unsaved guarding
@@ -570,6 +771,29 @@ export class WritePage implements OnInit, OnDestroy {
  */
 function joinSegments(segments: readonly string[]): string {
   return segments.filter((s) => s.trim() !== '').join('\n\n---\n\n');
+}
+
+/**
+ * Plain text as escaped paragraph HTML.
+ *
+ * Escaping first is not optional: the body is whatever the user typed, and it
+ * reaches the preview through `[innerHTML]`. Anything that looks like a tag has
+ * to arrive as text, or the preview becomes an injection point into the app's
+ * own page.
+ */
+function toParagraphs(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function kindTitle(kind: DraftKind): string {

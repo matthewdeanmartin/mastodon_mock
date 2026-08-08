@@ -3,6 +3,7 @@ import { scopedKey } from './account-scope';
 import { isCanaryBuild } from './build-flavor';
 import { ProviderId } from './models';
 import { DEFAULT_PKM_VOCABULARY, PkmVocabulary, normalizeVocabulary } from './pkm/pkm-tags';
+import { ALL_STEPS_ON, WIZARD_STEPS, WizardStep, WizardSteps } from './publish-wizard';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
 
@@ -248,6 +249,7 @@ interface StoredPrefs {
   requireAltText?: boolean;
   thoughtfulPosting?: boolean;
   warnOnPkmPublish?: boolean;
+  wizardSteps?: Partial<Record<WizardStep, boolean>>;
   customBg?: CustomColor;
   customLink?: CustomColor;
   customSidebar?: CustomColor;
@@ -489,6 +491,14 @@ export class ClientPrefs {
 
   /** Whether to warn before publishing a post carrying a PKM tag. */
   readonly warnOnPkmPublish = signal<boolean>(true);
+
+  /**
+   * Which publish-wizard steps to show.
+   *
+   * All on by default. The opposite default would ship the feature invisible —
+   * and turning steps off one at a time is the safe direction to discover it.
+   */
+  readonly wizardSteps = signal<WizardSteps>(ALL_STEPS_ON);
 
   // Custom colors (null = keep the theme's own value).
   readonly customBg = signal<CustomColor>(null);
@@ -1011,6 +1021,17 @@ export class ClientPrefs {
     this.loadDefaultVisibility();
     this.loadPkmVocabulary();
     this.loadBool(stored.warnOnPkmPublish, this.warnOnPkmPublish);
+    // Each step read independently: a stored blob written by an older build
+    // simply leaves the steps it never knew about switched on.
+    if (stored.wizardSteps && typeof stored.wizardSteps === 'object') {
+      const steps = { ...ALL_STEPS_ON };
+      for (const step of WIZARD_STEPS) {
+        if (typeof stored.wizardSteps[step] === 'boolean') {
+          steps[step] = stored.wizardSteps[step];
+        }
+      }
+      this.wizardSteps.set(steps);
+    }
     // 'everyone' was this setting's name for 'all' before the Bots filter
     // arrived. Migrated rather than dropped: silently resetting someone's chat
     // filter is the kind of small betrayal nobody reports but everybody notices.
@@ -1116,6 +1137,7 @@ export class ClientPrefs {
       requireAltText: this.requireAltText(),
       thoughtfulPosting: this.thoughtfulPosting(),
       warnOnPkmPublish: this.warnOnPkmPublish(),
+      wizardSteps: this.wizardSteps(),
       customBg: this.customBg(),
       customLink: this.customLink(),
       customSidebar: this.customSidebar(),
@@ -1179,6 +1201,11 @@ export class ClientPrefs {
   /** Restore the built-in words, for the settings page's reset affordance. */
   resetPkmVocabulary(): void {
     this.pkmVocabulary.set(DEFAULT_PKM_VOCABULARY);
+  }
+
+  /** Switch one publish-wizard step on or off. */
+  setWizardStep(step: WizardStep, on: boolean): void {
+    this.wizardSteps.update((steps) => ({ ...steps, [step]: on }));
   }
 
   /**

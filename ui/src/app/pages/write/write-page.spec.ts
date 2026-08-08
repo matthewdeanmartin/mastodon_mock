@@ -8,8 +8,11 @@ import { Auth } from '../../auth';
 import { ClientPrefs } from '../../client-prefs';
 import { Drafts } from '../../drafts';
 import { Account, ScheduledStatus, Status } from '../../models';
+import { PostTarget } from '../../compose/compose';
 import { PkmItem } from '../../pkm/pkm-source';
 import { PkmKind } from '../../pkm/pkm-tags';
+import { WIZARD_STEPS, WizardStep } from '../../publish-wizard';
+import { QualityFinding } from './quality-checks';
 import { PasteHistory } from '../../providers/paste/paste-history';
 import { WritingZen } from '../../writing-zen';
 import { DraftItem } from '../drafts/draft-items';
@@ -34,6 +37,16 @@ interface PageInternals {
   jot(): void;
   openNote(item: PkmItem): void;
   setPkmFilter(kind: PkmKind | null): void;
+  wizardStep: WritableSignal<WizardStep | null>;
+  wizardError: WritableSignal<string | null>;
+  wizardTargets: Signal<PostTarget[]>;
+  qualityFindings: Signal<QualityFinding[]>;
+  previewHtml: Signal<string[]>;
+  wizardForward(): void;
+  wizardBack(): void;
+  wizardCancel(): void;
+  setWizardTarget(target: PostTarget): void;
+  setWizardScheduleAt(at: string): void;
   newDraft(): void;
   open(item: DraftItem): void;
   save(): void;
@@ -127,6 +140,22 @@ describe('WritePage', () => {
   function flushStatusScans(rows: Status[]): void {
     for (const request of httpMock.match((r) => r.url.includes('/statuses'))) {
       request.flush(rows);
+    }
+  }
+
+  /**
+   * Publish, then click through every wizard step to the end.
+   *
+   * `publish()` opens the wizard rather than handing off directly, so anything
+   * asserting on what reaches the composer has to walk it.
+   */
+  function runWizardToEnd(fixture: ComponentFixture<WritePage>): void {
+    const page = internals(fixture);
+    page.publish();
+    // Bounded rather than `while`, so a bug in the step machine fails the test
+    // instead of hanging the run.
+    for (let i = 0; i < WIZARD_STEPS.length && page.wizardStep(); i++) {
+      page.wizardForward();
     }
   }
 
@@ -454,10 +483,11 @@ describe('WritePage', () => {
 
   it('hands the text to the composer rather than posting from here', () => {
     TestBed.inject(Auth).mode.set('anonymous');
-    const page = internals(setUp());
+    const fixture = setUp();
+    const page = internals(fixture);
     page.newDraft();
     page.onBodyInput('ready to go\n---\nsecond post');
-    page.publish();
+    runWizardToEnd(fixture);
 
     const handoff = TestBed.inject(Drafts).takeHandoff();
     expect(handoff?.snapshot.segments).toEqual(['ready to go', 'second post']);
@@ -470,10 +500,11 @@ describe('WritePage', () => {
     // Handing the text to the composer is the opposite of throwing it away, so
     // prompting "you have unsaved writing" on the way there would be nonsense.
     TestBed.inject(Auth).mode.set('anonymous');
-    const page = internals(setUp());
+    const fixture = setUp();
+    const page = internals(fixture);
     page.newDraft();
     page.onBodyInput('never saved, straight to publish');
-    page.publish();
+    runWizardToEnd(fixture);
 
     expect(page.pendingSwitch()).toBeNull();
     expect(TestBed.inject(Drafts).takeHandoff()?.snapshot.segments).toEqual([
@@ -621,6 +652,241 @@ describe('WritePage', () => {
     fixture.detectChanges();
 
     expect(page.body()).toBe('half a paragraph');
+  });
+
+  // ------------------------------------------------------------ publish wizard
+
+  /** Open the wizard with a body ready to go. */
+  function openWizard(fixture: ComponentFixture<WritePage>, body = 'ready to publish'): void {
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput(body);
+    page.publish();
+  }
+
+  it('opens on the first step instead of publishing immediately', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    openWizard(fixture);
+
+    expect(internals(fixture).wizardStep()).toBe('targets');
+    // Nothing handed over yet.
+    expect(TestBed.inject(Drafts).takeHandoff()).toBeNull();
+  });
+
+  it('walks forward through the steps and publishes at the end', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture, 'the finished piece');
+
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('preview');
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('quality');
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('when');
+    page.wizardForward();
+
+    expect(page.wizardStep()).toBeNull();
+    expect(TestBed.inject(Drafts).takeHandoff()?.snapshot.segments).toEqual(['the finished piece']);
+  });
+
+  it('publishes immediately when every step is switched off', () => {
+    // Someone who turned the whole wizard off must not get an empty dialog.
+    TestBed.inject(Auth).mode.set('anonymous');
+    TestBed.inject(ClientPrefs).wizardSteps.set({
+      targets: false,
+      preview: false,
+      quality: false,
+      when: false,
+    });
+    const fixture = setUp();
+    openWizard(fixture, 'straight out');
+
+    expect(internals(fixture).wizardStep()).toBeNull();
+    expect(TestBed.inject(Drafts).takeHandoff()?.snapshot.segments).toEqual(['straight out']);
+  });
+
+  it('skips a disabled step in both directions', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    TestBed.inject(ClientPrefs).setWizardStep('preview', false);
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture);
+
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('quality');
+    page.wizardBack();
+    // Not a hidden preview step that would render nothing.
+    expect(page.wizardStep()).toBe('targets');
+  });
+
+  it('cancel publishes nothing and leaves the body alone', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture, 'not going out after all');
+    page.wizardForward();
+    page.wizardCancel();
+
+    expect(page.wizardStep()).toBeNull();
+    expect(page.body()).toBe('not going out after all');
+    expect(TestBed.inject(Drafts).takeHandoff()).toBeNull();
+    expect(httpMock.match((r) => r.method === 'POST')).toHaveLength(0);
+  });
+
+  it('does not open for an empty body', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('   ');
+    page.publish();
+
+    expect(page.wizardStep()).toBeNull();
+  });
+
+  it('offers no target the composer would refuse', () => {
+    // Anonymous: no Mastodon token, so fedi and "both" are not on offer.
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    openWizard(fixture);
+
+    const targets = internals(fixture).wizardTargets();
+    expect(targets).not.toContain('fedi');
+    expect(targets).not.toContain('both');
+    expect(targets).toContain('paste');
+  });
+
+  it('offers the fedi target once signed in', () => {
+    signIn();
+    const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([]);
+    openWizard(fixture);
+
+    expect(internals(fixture).wizardTargets()).toContain('fedi');
+  });
+
+  it('carries the chosen target into the handoff', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture);
+    page.setWizardTarget('paste');
+    page.wizardForward();
+    page.wizardForward();
+    page.wizardForward();
+    page.wizardForward();
+
+    expect(TestBed.inject(Drafts).takeHandoff()?.snapshot.target).toBe('paste');
+  });
+
+  it('previews the same splits the editor shows', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture, 'one\n---\ntwo');
+
+    expect(page.segments().map((s) => s.text)).toEqual(['one', 'two']);
+    expect(page.previewHtml()).toHaveLength(2);
+  });
+
+  it('escapes markup in the preview rather than rendering it', () => {
+    // The body is whatever the user typed and it reaches the preview through
+    // [innerHTML]. Elsewhere in this app that binding is only safe because the
+    // *server* sanitized the HTML first (see status-card.html); here nobody has,
+    // so the escaping is what makes it safe.
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture, '<img src=x onerror=alert(1)>');
+
+    expect(page.previewHtml()[0]).not.toContain('<img');
+    expect(page.previewHtml()[0]).toContain('&lt;img');
+  });
+
+  it('renders the escaped preview as visible text in the DOM', () => {
+    // The end-to-end half: what actually lands on the page is a text node, not
+    // an element the browser would act on.
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture, '<script>alert(1)</script>');
+    page.wizardStep.set('preview');
+    fixture.detectChanges();
+
+    const preview = fixture.nativeElement.querySelector('.preview-body') as HTMLElement;
+    expect(preview.querySelector('script')).toBeNull();
+    expect(preview.querySelector('img')).toBeNull();
+    expect(preview.textContent).toContain('<script>');
+  });
+
+  it('still renders ordinary markdown emphasis in the preview', () => {
+    // Escaping must not have cost the feature its actual job.
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture, 'a **bold** claim');
+
+    expect(page.previewHtml()[0]).toContain('<strong>bold</strong>');
+  });
+
+  it('surfaces quality findings without blocking the step', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture, 'a tagged thought #todo');
+
+    expect(page.qualityFindings().map((f) => f.id)).toContain('pkm-tagged');
+    // Advisory only: the step still moves on.
+    page.wizardStep.set('quality');
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('when');
+  });
+
+  it('schedules from the last step instead of handing off', () => {
+    signIn();
+    const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([]);
+    const page = internals(fixture);
+    openWizard(fixture, 'later, please');
+
+    page.wizardStep.set('when');
+    page.setWizardScheduleAt('2027-01-01T09:00');
+    page.wizardForward();
+
+    const request = httpMock.expectOne('/api/v1/statuses');
+    expect(request.request.body.scheduled_at).toBeTruthy();
+    request.flush({ id: 'sched-1' });
+
+    expect(page.wizardStep()).toBeNull();
+    // Scheduling is a server call, not a composer handoff.
+    expect(TestBed.inject(Drafts).takeHandoff()).toBeNull();
+    httpMock.match(() => true);
+  });
+
+  it('keeps the body when a scheduled date is refused', () => {
+    signIn();
+    const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([]);
+    const page = internals(fixture);
+    openWizard(fixture, 'refused, but not lost');
+
+    page.wizardStep.set('when');
+    page.setWizardScheduleAt('2124-01-01T09:00');
+    page.wizardForward();
+    httpMock
+      .expectOne('/api/v1/statuses')
+      .flush('nope', { status: 422, statusText: 'Unprocessable' });
+
+    expect(page.wizardError()).toContain('refused');
+    expect(page.body()).toBe('refused, but not lost');
+    // Still open, so the user can pick a nearer date.
+    expect(page.wizardStep()).toBe('when');
   });
 
   it('remembers a split mode per draft across reopens', () => {

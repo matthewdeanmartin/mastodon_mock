@@ -24,6 +24,7 @@ import { TranslateDialog, TranslateResult } from './translate-dialog/translate-d
 import { CustomEmojis } from '../custom-emojis';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
 import { PkmKind, pkmKinds, pkmLabel } from '../pkm/pkm-tags';
+import { TargetAvailability, restorableTarget } from './post-targets';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
 import { ComposeOptions, MediaAttachment, Status } from '../models';
 import { BlueskyApi } from '../providers/bluesky/bluesky-api';
@@ -1505,45 +1506,29 @@ export class Compose implements OnDestroy {
   }
 
   /**
-   * The target a restored draft may actually use, given what is linked *now*.
+   * What is linked, flagged on and signed in right now, as plain data.
    *
-   * A draft can outlive the connection it was written for — the Bluesky link
-   * gets revoked, the blog connector is flagged off, the session drops to
-   * anonymous. Rather than restoring a target whose option no longer exists in
-   * the picker (which shows a blank select and posts somewhere surprising),
-   * anything unusable falls back to the default for this session.
-   *
-   * The rules mirror the picker exactly: Fedi and "both" need a Mastodon token;
-   * Bluesky and the blog need only their own link, anonymous included.
+   * The rules that read it live in `post-targets.ts` so the publish wizard can
+   * ask the same question without acquiring all of these providers — and, more
+   * to the point, so it cannot offer a destination this composer would refuse.
    */
+  targetAvailability(): TargetAvailability {
+    return {
+      anonymous: this.auth.isAnonymous,
+      bskyLinked: this.bskySession.linked(),
+      mataroaConnected: this.mataroa.connected(),
+      bloggerReady: this.blogger.ready(),
+      hugoConnected: this.hugo.connected(),
+      pastebinEnabled: this.featureFlags.enabled('pastebin'),
+      mataroaEnabled: this.featureFlags.enabled('connector-mataroa'),
+      bloggerEnabled: this.featureFlags.enabled('connector-blogger'),
+      hugoEnabled: this.featureFlags.enabled('connector-hugo'),
+    };
+  }
+
+  /** See {@link restorableTarget} — the rule itself is shared, not duplicated. */
   private restorableTarget(target: PostTarget): PostTarget {
-    const fallback: PostTarget =
-      this.auth.isAnonymous && this.featureFlags.enabled('pastebin') ? 'paste' : 'fedi';
-    switch (target) {
-      case 'bsky':
-        return this.bskySession.linked() ? 'bsky' : fallback;
-      case 'both':
-        // Includes a Fedi post, so it needs the token as well as the link.
-        return !this.auth.isAnonymous && this.bskySession.linked() ? 'both' : fallback;
-      case 'blog':
-        return this.mataroa.connected() && this.featureFlags.enabled('connector-mataroa')
-          ? 'blog'
-          : fallback;
-      case 'blogger':
-        // `ready`, not `connected`: the session survives without a chosen blog,
-        // but a draft restored into that state has nowhere to publish.
-        return this.blogger.ready() && this.featureFlags.enabled('connector-blogger')
-          ? 'blogger'
-          : fallback;
-      case 'hugo':
-        return this.hugo.connected() && this.featureFlags.enabled('connector-hugo')
-          ? 'hugo'
-          : fallback;
-      case 'paste':
-        return this.featureFlags.enabled('pastebin') ? 'paste' : fallback;
-      case 'fedi':
-        return this.auth.isAnonymous ? fallback : 'fedi';
-    }
+    return restorableTarget(target, this.targetAvailability());
   }
 
   private applySnapshot(d: DraftSnapshot): void {

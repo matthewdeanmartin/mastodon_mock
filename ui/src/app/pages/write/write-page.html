@@ -482,3 +482,147 @@
     </div>
   </div>
 }
+
+<!-- The publish wizard. Cancel from any step means: back to the editor,
+     nothing published, nothing lost. That is the invariant. -->
+@if (wizardStep(); as step) {
+  <div
+    class="overlay"
+    role="presentation"
+    tabindex="-1"
+    (click)="wizardCancel()"
+    (keyup.escape)="wizardCancel()"
+  >
+    <div
+      class="dialog wizard"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="wizard-title"
+      appFocusTrap
+      (dismissed)="wizardCancel()"
+      (click)="$event.stopPropagation()"
+      (keyup)="$event.stopPropagation()"
+    >
+      <p class="wizard-step muted small">Step {{ wizardPosition() }} of {{ wizardTotal() }}</p>
+      <h3 id="wizard-title" tabindex="-1">{{ stepTitle(step) }}</h3>
+
+      <div class="wizard-body">
+        @switch (step) {
+          @case ('targets') {
+            @if (wizardTargets().length) {
+              <div class="wizard-targets" role="radiogroup" aria-label="Publish to">
+                @for (target of wizardTargets(); track target) {
+                  <label class="wizard-target">
+                    <input
+                      type="radio"
+                      name="wizard-target"
+                      [value]="target"
+                      [checked]="wizardTarget() === target"
+                      (change)="setWizardTarget(target)"
+                    />
+                    <span>{{ targetLabel(target) }}</span>
+                  </label>
+                }
+              </div>
+            } @else {
+              <p class="muted">
+                Nothing is connected that this could be published to. Link a service under
+                <a routerLink="/settings/connections">Connections</a>, or sign in.
+              </p>
+            }
+          }
+
+          @case ('preview') {
+            <p class="muted small">
+              {{ segments().length }} {{ segments().length === 1 ? 'post' : 'posts' }}, split by
+              {{ modeLabel(splitMode()) | lowercase }}.
+              @if (overLimitCount()) {
+                <span class="over"
+                  >{{ overLimitCount() }} over the limit — the server will refuse
+                  {{ overLimitCount() === 1 ? 'it' : 'them' }}.</span
+                >
+              }
+            </p>
+            <div class="wizard-preview">
+              @for (segment of segments(); track $index) {
+                <article class="preview-post" [class.over]="segment.overLimit">
+                  <header class="preview-num muted small">
+                    {{ $index + 1 }}/{{ segments().length }}
+                    <span [class.over]="segment.overLimit">{{ segment.length }}</span>
+                  </header>
+                  <div class="preview-body" [innerHTML]="previewHtml()[$index]"></div>
+                </article>
+              }
+            </div>
+          }
+
+          @case ('quality') {
+            @if (qualityFindings().length) {
+              <ul class="wizard-findings">
+                @for (finding of qualityFindings(); track finding.id) {
+                  <li class="finding" [class.warn]="finding.severity === 'warn'">
+                    <span class="finding-mark" aria-hidden="true">
+                      {{ finding.severity === 'warn' ? '⚠' : 'ℹ' }}
+                    </span>
+                    <span>
+                      {{ finding.message }}
+                      @if (finding.samples?.length) {
+                        <span class="finding-samples muted small">
+                          @for (sample of finding.samples; track sample) {
+                            <code>{{ sample }}</code>
+                          }
+                        </span>
+                      }
+                    </span>
+                  </li>
+                }
+              </ul>
+              <p class="muted small">
+                All advisory — none of this stops you publishing. Spelling is your browser's job; it
+                underlines as you type.
+              </p>
+            } @else {
+              <p class="muted">Nothing worth mentioning. Spelling is your browser's job.</p>
+            }
+          }
+
+          @case ('when') {
+            <label class="wizard-when">
+              <span>Publish at</span>
+              <input
+                type="datetime-local"
+                [ngModel]="wizardScheduleAt()"
+                (ngModelChange)="setWizardScheduleAt($event)"
+                name="wizard-schedule"
+              />
+            </label>
+            <p class="muted small">
+              @if (wizardScheduleAt()) {
+                The server holds it and publishes it then. It appears under Parked in your drafts
+                until it does.
+              } @else {
+                Leave this empty to publish now. You'll get the composer, with a moment to change
+                your mind.
+              }
+            </p>
+          }
+        }
+      </div>
+
+      @if (wizardError()) {
+        <p class="write-warning" role="alert">⚠ {{ wizardError() }}</p>
+      }
+
+      <div class="wizard-actions">
+        <button class="btn btn-outline" type="button" (click)="wizardCancel()">Cancel</button>
+        <span class="bar-gap"></span>
+        @if (wizardCanGoBack()) {
+          <button class="btn btn-outline" type="button" (click)="wizardBack()">Back</button>
+        }
+        <button class="btn" type="button" [disabled]="wizardBusy()" (click)="wizardForward()">
+          {{ wizardBusy() ? 'Scheduling…' : wizardForwardLabel() }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

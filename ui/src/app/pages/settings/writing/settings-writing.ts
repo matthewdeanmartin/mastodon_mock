@@ -10,6 +10,7 @@ import {
   parseVocabularyField,
   pkmNoun,
 } from '../../../pkm/pkm-tags';
+import { WIZARD_STEPS, WizardStep, activeSteps, stepTitle } from '../../../publish-wizard';
 
 /**
  * Writing settings: the words that mark a post as a note, a to-do or a calendar
@@ -32,6 +33,20 @@ export class SettingsWriting {
   protected readonly kinds = PKM_KINDS;
   protected readonly noun = pkmNoun;
   protected saved = signal(false);
+
+  protected readonly wizardSteps = WIZARD_STEPS;
+  protected readonly stepTitle = stepTitle;
+
+  /** True when every step is off, so Publish goes straight through. */
+  protected wizardOff = computed(() => activeSteps(this.prefs.wizardSteps()).length === 0);
+
+  protected stepOn(step: WizardStep): boolean {
+    return this.prefs.wizardSteps()[step];
+  }
+
+  protected toggleStep(step: WizardStep, on: boolean): void {
+    this.prefs.setWizardStep(step, on);
+  }
 
   /**
    * The editable text of each field, seeded from the stored vocabulary.

@@ -55,6 +55,31 @@
     }
   </div>
 
+  <h2>The publish wizard</h2>
+  <p class="muted small">
+    What <a routerLink="/write">Write</a> shows you between hitting Publish and the post going out.
+    Turn off the steps you don't want; the ones left run in this order.
+  </p>
+
+  @for (step of wizardSteps; track step) {
+    <label class="pkm-toggle">
+      <input
+        type="checkbox"
+        [ngModel]="stepOn(step)"
+        (ngModelChange)="toggleStep(step, $event)"
+        [attr.name]="'wizard-' + step"
+      />
+      <span>{{ stepTitle(step) }}</span>
+    </label>
+  }
+
+  @if (wizardOff()) {
+    <p class="muted small" role="status">
+      ⚠ Every step is off, so Publish goes straight to the composer — which is exactly how it
+      behaved before this wizard existed.
+    </p>
+  }
+
   <h2>Publishing</h2>
   <label class="pkm-toggle">
     <input

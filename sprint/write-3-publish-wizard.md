@@ -1,6 +1,6 @@
 # Write — Sprint 3: the publish wizard
 
-Status: PLANNED (written 2026-08-08, after sprints 1–2 shipped)
+Status: COMPLETE (implemented 2026-08-08; not yet smoke-tested against a live account)
 
 Read `write-0-overview.md`, then the **Delivered** and **Found while implementing** sections of
 `write-1-workspace-and-zen.md` and `write-2-pkm-notes-and-todos.md`. Those are this sprint's ground
@@ -180,3 +180,89 @@ Carried from sprints 1–2, all hit for real:
 `npm run lint`, `npm run format:check`, `npm run test:ci`, `npm run build`,
 `npm run build:mockingbird` all pass. Append **Delivered** and **Found while implementing**
 sections to this file. Sprint 4 (kanban) is written after this lands.
+
+---
+
+## Delivered
+
+### New files
+
+| File | What it is |
+| --- | --- |
+| `publish-wizard.ts` (+spec) | The step machine. Pure; **at app root, not under `pages/write/`** — see below. |
+| `compose/post-targets.ts` | `isTargetUsable` / `restorableTarget` / `usableTargets`, extracted from the composer. |
+| `pages/write/quality-checks.ts` (+spec) | The heuristics: readability, repeated words, caps runs, tag count, long links, PKM tags, alt text. |
+
+### Changed
+
+- `compose/compose.ts` — `restorableTarget` is now a two-line call into `post-targets.ts`; the
+  composer exposes `targetAvailability()` as plain data.
+- `client-prefs.ts` — `wizardSteps` (global blob, all steps on by default), `setWizardStep()`.
+- `pages/write/write-page.{ts,html,css}` — `publish()` opens the wizard; `handOffToComposer()`
+  keeps the old behaviour; four steps, `previewHtml`, `qualityFindings`, scheduling.
+- `pages/settings/writing/settings-writing.{ts,html}` — per-step toggles and an honest
+  "every step is off" note.
+
+### Decisions taken while building
+
+- **`publish-wizard.ts` lives at app root.** It started under `pages/write/`, but `ClientPrefs`
+  needs `WizardSteps` to type its own pref, and a root service importing from a page directory is
+  the wrong dependency direction. Moved before it could set a precedent.
+- **The wizard schedules, but hands off to publish now.** Scheduling is a fire-and-forget server
+  call with nothing left to edit, so the wizard does it directly. An immediate publish still goes
+  through the composer, which owns visibility, media, polls and the thoughtful-posting gate.
+  Re-implementing those here would be the second publish path this epic has avoided twice.
+- **A refused schedule leaves the wizard open** on the "when" step with the date still filled in,
+  so picking a nearer one is one edit rather than four clicks.
+- **Quality findings never block.** `over-limit` is a `warn` and says the server will refuse it,
+  but Continue still works — the user may know something the check doesn't, and the failure is
+  recoverable either way.
+
+## Found while implementing
+
+**The preview is an `[innerHTML]` binding over text nobody sanitized.** `status-card.html` carries
+a comment warning that its own `applyMinimalMarkdown` → `[innerHTML]` path "is safe only because
+the server sanitized the HTML first" — and notes that AI output, sanitized by nobody, is therefore
+rendered as *text* instead. The wizard preview is the same shape with the same problem: the body is
+whatever the user typed. It escapes first (`toParagraphs` → `escapeHtml`), then renders. There are
+three specs: the escaped string, the rendered DOM containing no `<script>`/`<img>` element, and
+`**bold**` still working — because escaping that broke the feature would be a silent regression.
+
+**`restorableTarget` had to be extracted, not copied.** The wizard needed "which targets can this
+session actually post to", and the composer already answered it privately. A forked copy would have
+meant the wizard offering a destination the composer then silently swapped out — the user picking
+Bluesky, and finding out one screen later that it went to Mastodon. Both now read one function.
+
+**Two sprint-1 specs asserted `publish()` hands off immediately.** That is no longer true — it opens
+the wizard. Both were kept and rewritten around a `runWizardToEnd()` helper rather than deleted:
+the properties they protect (the composer receives the split segments; the unsaved-work guard never
+fires on the way to publishing) are exactly as important now. The helper loops a **bounded** number
+of times, so a bug in the step machine fails the test rather than hanging the run.
+
+**A `.repeat(2)` bound tighter than the `+` chain it looked attached to**, so the "dense prose"
+fixture was a quarter of its intended length and fell under the 60-word floor — `readingEase`
+correctly returned null and the test failed. Worth recording because the fixture *looked* right;
+the parenthesisation is the whole story.
+
+**`applyMinimalMarkdown` expects a status's HTML**, not plain text — it parses for `<p>` elements
+and returns its input untouched when there is nothing markdown-ish. Feeding it raw text would have
+silently rendered nothing.
+
+## Verification
+
+- `npm run lint`, `npm run format:check` — pass.
+- `npm run test:ci` — **3621 tests pass, 0 fail** (59 added this sprint). Manifest updated.
+- `npm run build`, `npm run build:mockingbird` — pass; only the two pre-existing budget warnings.
+
+## Carried forward
+
+- **Not smoke-tested against a live account.** Specifically unproven: whether a real instance
+  accepts the wizard's `scheduled_at`, and whether the target list matches what mastodon.social
+  actually accepts for a connected Bluesky/blog account.
+- **The quality step does not offer to fix anything.** It names long links but does not run the
+  shortener, and names over-limit posts but does not offer to re-split them. Both are natural next
+  steps and both were left out to keep every check purely advisory.
+- **Alt-text checking is wired but never fires from `/write`** — the workspace editor has no media
+  attachments, so `missingAltText` is always false. The check exists for when it does.
+- **`countSyllables` is an English heuristic.** It degrades to "roughly one per vowel group" on
+  other languages rather than refusing, which is why the score is only ever shown as a band.
