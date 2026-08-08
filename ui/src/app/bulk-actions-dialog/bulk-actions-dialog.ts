@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { BulkActionId, BulkActions, BulkPreview, BulkTarget, bulkAction } from '../bulk-actions';
+import { FocusTrap } from '../a11y/focus-trap';
 
 /**
  * "Here is exactly what is about to happen — do you still want it?" for a bulk
@@ -18,7 +19,7 @@ import { BulkActionId, BulkActions, BulkPreview, BulkTarget, bulkAction } from '
  */
 @Component({
   selector: 'app-bulk-actions-dialog',
-  imports: [],
+  imports: [FocusTrap],
   templateUrl: './bulk-actions-dialog.html',
   styleUrl: './bulk-actions-dialog.css',
 })

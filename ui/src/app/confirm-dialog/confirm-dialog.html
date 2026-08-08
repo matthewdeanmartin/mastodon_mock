@@ -8,7 +8,10 @@
   <div
     class="dialog"
     role="alertdialog"
+    aria-modal="true"
     aria-labelledby="confirm-title"
+    appFocusTrap
+    (dismissed)="cancelled.emit()"
     (click)="$event.stopPropagation()"
     (keyup)="$event.stopPropagation()"
   >

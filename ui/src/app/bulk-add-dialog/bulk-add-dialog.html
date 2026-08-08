@@ -8,8 +8,11 @@
   <div
     class="dialog"
     role="dialog"
+    aria-modal="true"
     aria-label="Add people by name"
     tabindex="-1"
+    appFocusTrap
+    (dismissed)="closed.emit()"
     (click)="$event.stopPropagation()"
     (keyup)="$event.stopPropagation()"
   >

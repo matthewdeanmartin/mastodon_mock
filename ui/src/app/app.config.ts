@@ -1,5 +1,5 @@
 import { ApplicationConfig, ErrorHandler, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter, withInMemoryScrolling, withPreloading } from '@angular/router';
+import { provideRouter, TitleStrategy, withInMemoryScrolling, withPreloading } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
 import { routes } from './app.routes';
@@ -11,6 +11,7 @@ import { GlobalErrorHandler } from './global-error-handler';
 import { SettingsPreloading } from './pages/settings/settings-preloading';
 import { dedupeInterceptor } from './dedupe.interceptor';
 import { rateLimitInterceptor } from './rate-limit.interceptor';
+import { PageTitleStrategy } from './a11y/page-title-strategy';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -18,6 +19,9 @@ export const appConfig: ApplicationConfig = {
     // so a failed dynamic import (a rejected promise) reaches GlobalErrorHandler.
     provideBrowserGlobalErrorListeners(),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
+    // Per-route document titles; see page-title-strategy.ts for why the
+    // default strategy is not enough.
+    { provide: TitleStrategy, useClass: PageTitleStrategy },
     provideRouter(
       routes,
       withPreloading(SettingsPreloading),

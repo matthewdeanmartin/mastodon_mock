@@ -8,7 +8,10 @@
   <div
     class="dialog"
     role="dialog"
+    aria-modal="true"
     aria-labelledby="bug-title"
+    appFocusTrap
+    (dismissed)="closed.emit()"
     (click)="$event.stopPropagation()"
     (keyup)="$event.stopPropagation()"
   >

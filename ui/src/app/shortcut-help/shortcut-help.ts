@@ -1,5 +1,6 @@
 import { Component, computed, inject, output } from '@angular/core';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
+import { FocusTrap } from '../a11y/focus-trap';
 
 interface ShortcutRow {
   keys: string[];
@@ -61,6 +62,7 @@ const GROUPS: ShortcutGroup[] = [
 /** The "?" keyboard shortcuts cheat-sheet, bindings identical to mastodon.social. */
 @Component({
   selector: 'app-shortcut-help',
+  imports: [FocusTrap],
   template: `
     <div
       class="overlay"
@@ -72,7 +74,10 @@ const GROUPS: ShortcutGroup[] = [
       <div
         class="dialog"
         role="dialog"
+        aria-modal="true"
         aria-labelledby="shortcut-help-title"
+        appFocusTrap
+        (dismissed)="closed.emit()"
         (click)="$event.stopPropagation()"
         (keyup)="$event.stopPropagation()"
       >

@@ -1,3 +1,5 @@
+<a class="skip-link" href="#main" (click)="skipToMain($event)">Skip to main content</a>
+
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
@@ -239,7 +241,7 @@
       <app-left-rail />
     </aside>
   }
-  <main class="column">
+  <main class="column" id="main" tabindex="-1" #mainColumn>
     <router-outlet />
     <app-app-footer />
   </main>

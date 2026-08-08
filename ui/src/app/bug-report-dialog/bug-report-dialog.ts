@@ -2,6 +2,7 @@ import { Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BugReport } from '../bug-report';
 import { ErrorLog } from '../error-log';
+import { FocusTrap } from '../a11y/focus-trap';
 
 /**
  * "Report a bug" dialog. It assembles a Markdown report — the user's
@@ -13,7 +14,7 @@ import { ErrorLog } from '../error-log';
  */
 @Component({
   selector: 'app-bug-report-dialog',
-  imports: [FormsModule],
+  imports: [FocusTrap, FormsModule],
   templateUrl: './bug-report-dialog.html',
   styleUrl: './bug-report-dialog.css',
 })

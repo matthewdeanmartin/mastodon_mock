@@ -15,23 +15,27 @@ import { mockOnlyChildren } from './mock-routes';
 export const routes: Routes = [
   {
     path: 'anonymous',
+    title: 'Browse anonymously',
     loadComponent: () =>
       import('./pages/anonymous-entry/anonymous-entry').then((m) => m.AnonymousEntry),
   },
-  { path: 'login', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
+  { path: 'login', title: 'Sign in', loadComponent: () => import('./pages/login/login').then((m) => m.Login) },
   // New-user landing: bookmark this, sign up on your instance, come back and sign in.
   {
     path: 'welcome-back',
+    title: 'Welcome back',
     loadComponent: () => import('./pages/welcome-back/welcome-back').then((m) => m.WelcomeBack),
   },
   {
     path: 'explore',
+    title: 'Explore',
     loadComponent: () => import('./pages/explore/explore').then((m) => m.Explore),
   },
   // Public recruiting tool in the normal three-column shell. Fresh visitors
   // enter Anonymous against ?server.example (mastodon.social by default).
   {
     path: 'invites',
+    title: 'Invites',
     canActivate: [inviteAccessGuard],
     canActivateChild: [justMyServerUpdateGuard],
     canDeactivate: [justMyServerUpdateCanDeactivate],
@@ -47,29 +51,35 @@ export const routes: Routes = [
   // for anyone, signed in or not.
   {
     path: 'message/:id',
+    title: 'Shared message',
     loadComponent: () => import('./pages/message/message').then((m) => m.MessagePage),
   },
   {
     path: 'message',
+    title: 'Shared message',
     loadComponent: () => import('./pages/message/message').then((m) => m.MessagePage),
   },
   {
     path: 'integrations/dropbox/callback',
+    title: 'Connecting Dropbox',
     loadComponent: () =>
       import('./pages/dropbox-callback/dropbox-callback').then((m) => m.DropboxCallback),
   },
   {
     path: 'integrations/blogger/callback',
+    title: 'Connecting Blogger',
     loadComponent: () =>
       import('./pages/blogger-callback/blogger-callback').then((m) => m.BloggerCallback),
   },
   {
     path: 'integrations/openrouter/callback',
+    title: 'Connecting OpenRouter',
     loadComponent: () =>
       import('./pages/openrouter-callback/openrouter-callback').then((m) => m.OpenRouterCallback),
   },
   {
     path: 'fail-whale',
+    title: 'Something went wrong',
     loadComponent: () =>
       import('./pages/fail-whale-demo/fail-whale-demo').then((m) => m.FailWhaleDemo),
   },
@@ -81,18 +91,21 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/shell').then((m) => m.Shell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'home' },
-      { path: 'home', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
+      { path: 'home', title: 'Home', loadComponent: () => import('./pages/home/home').then((m) => m.Home) },
       {
         path: 'algo',
+        title: 'Algo',
         loadComponent: () => import('./pages/algo/algo').then((m) => m.Algo),
       },
       {
         path: 'public',
+        title: 'Public timeline',
         loadComponent: () =>
           import('./pages/public-timeline/public-timeline').then((m) => m.PublicTimeline),
       },
       {
         path: 'notifications',
+        title: 'Inbox',
         canActivate: [anonymousUnavailableGuard],
         data: { anonymousFeature: 'Inbox' },
         loadComponent: () =>
@@ -100,6 +113,7 @@ export const routes: Routes = [
       },
       {
         path: 'conversations',
+        title: 'Chat',
         canActivate: [anonymousChatGuard],
         data: { anonymousFeature: 'Chat' },
         loadComponent: () =>
@@ -107,17 +121,20 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
+        title: 'Settings',
         loadComponent: () => import('./pages/settings/settings-shell').then((m) => m.SettingsShell),
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'profile' },
           {
             path: 'profile',
+            title: 'Profile',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/profile/settings-profile').then((m) => m.SettingsProfile),
           },
           {
             path: 'server',
+            title: 'Server',
             canActivate: [anonymousOnlyGuard],
             data: { preloadSettings: true },
             loadComponent: () =>
@@ -125,11 +142,13 @@ export const routes: Routes = [
           },
           {
             path: 'anonymous',
+            title: 'Browse anonymously',
             pathMatch: 'full',
             redirectTo: 'server',
           },
           {
             path: 'blue',
+            title: 'Bluesky',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/blue/settings-blue').then((m) => m.SettingsBlue),
@@ -152,6 +171,7 @@ export const routes: Routes = [
               },
               {
                 path: 'github',
+                title: 'GitHub',
                 loadComponent: () =>
                   import('./pages/settings/connections/github/connection-github').then(
                     (m) => m.ConnectionGitHub,
@@ -159,6 +179,7 @@ export const routes: Routes = [
               },
               {
                 path: 'dropbox',
+                title: 'Dropbox',
                 loadComponent: () =>
                   import('./pages/settings/connections/dropbox/connection-dropbox').then(
                     (m) => m.ConnectionDropbox,
@@ -166,6 +187,7 @@ export const routes: Routes = [
               },
               {
                 path: 'raindrop',
+                title: 'Raindrop',
                 loadComponent: () =>
                   import('./pages/settings/connections/raindrop/connection-raindrop').then(
                     (m) => m.ConnectionRaindrop,
@@ -173,6 +195,7 @@ export const routes: Routes = [
               },
               {
                 path: 'openrouter',
+                title: 'OpenRouter',
                 loadComponent: () =>
                   import('./pages/settings/connections/openrouter/connection-openrouter').then(
                     (m) => m.ConnectionOpenRouter,
@@ -180,6 +203,7 @@ export const routes: Routes = [
               },
               {
                 path: 'bluesky',
+                title: 'Bluesky',
                 loadComponent: () =>
                   import('./pages/settings/connections/bluesky/connection-bluesky').then(
                     (m) => m.ConnectionBluesky,
@@ -187,6 +211,7 @@ export const routes: Routes = [
               },
               {
                 path: 'cors-proxy',
+                title: 'CORS proxy',
                 loadComponent: () =>
                   import('./pages/settings/connections/cors-proxy/connection-cors-proxy').then(
                     (m) => m.ConnectionCorsProxy,
@@ -194,6 +219,7 @@ export const routes: Routes = [
               },
               {
                 path: 'link-shortener',
+                title: 'Link shortener',
                 loadComponent: () =>
                   import('./pages/settings/connections/link-shortener/connection-link-shortener').then(
                     (m) => m.ConnectionLinkShortener,
@@ -201,6 +227,7 @@ export const routes: Routes = [
               },
               {
                 path: 'twitter',
+                title: 'Twitter',
                 loadComponent: () =>
                   import('./pages/settings/connections/twitter/connection-twitter').then(
                     (m) => m.ConnectionTwitter,
@@ -208,6 +235,7 @@ export const routes: Routes = [
               },
               {
                 path: 'mataroa',
+                title: 'Mataroa',
                 loadComponent: () =>
                   import('./pages/settings/connections/mataroa/connection-mataroa').then(
                     (m) => m.ConnectionMataroa,
@@ -215,6 +243,7 @@ export const routes: Routes = [
               },
               {
                 path: 'blogger',
+                title: 'Blogger',
                 loadComponent: () =>
                   import('./pages/settings/connections/blogger/connection-blogger').then(
                     (m) => m.ConnectionBlogger,
@@ -222,6 +251,7 @@ export const routes: Routes = [
               },
               {
                 path: 'hugo',
+                title: 'Hugo',
                 loadComponent: () =>
                   import('./pages/settings/connections/hugo/connection-hugo').then(
                     (m) => m.ConnectionHugo,
@@ -232,6 +262,7 @@ export const routes: Routes = [
                 // it answers "which of these is worth setting up on this
                 // network?", which is a question about all of them at once.
                 path: 'doctor',
+                title: 'Connection doctor',
                 loadComponent: () =>
                   import('./pages/settings/connections/doctor/connection-doctor-page').then(
                     (m) => m.ConnectionDoctorPage,
@@ -241,12 +272,14 @@ export const routes: Routes = [
           },
           {
             path: 'rss',
+            title: 'RSS',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/rss/settings-rss').then((m) => m.SettingsRss),
           },
           {
             path: 'privacy',
+            title: 'Privacy',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Posting and privacy settings', preloadSettings: true },
             loadComponent: () =>
@@ -254,6 +287,7 @@ export const routes: Routes = [
           },
           {
             path: 'appearance',
+            title: 'Appearance',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/appearance/settings-appearance').then(
@@ -262,6 +296,7 @@ export const routes: Routes = [
           },
           {
             path: 'storage',
+            title: 'Storage',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/storage/settings-storage').then((m) => m.SettingsStorage),
@@ -272,6 +307,7 @@ export const routes: Routes = [
             // and a deep-linked path containing /ads is the same hazard one
             // layer out. The page is titled "Ads" where it counts.
             path: 'spotlight',
+            title: 'Spotlight',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/spotlight/settings-spotlight').then(
@@ -282,17 +318,20 @@ export const routes: Routes = [
             // Account-level cleanup of saved credentials and their local data —
             // the coarse counterpart to the key-by-key 'storage' page above.
             path: 'accounts',
+            title: 'Accounts',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/accounts/settings-accounts').then((m) => m.SettingsAccounts),
           },
           {
             path: 'posting',
+            title: 'Posting',
             pathMatch: 'full',
             redirectTo: 'privacy',
           },
           {
             path: 'notifications',
+            title: 'Inbox',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Email notifications', preloadSettings: true },
             loadComponent: () =>
@@ -302,6 +341,7 @@ export const routes: Routes = [
           },
           {
             path: 'follows',
+            title: 'Follows',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Follow request approval', preloadSettings: true },
             loadComponent: () =>
@@ -309,6 +349,7 @@ export const routes: Routes = [
           },
           {
             path: 'moderation',
+            title: 'Moderation',
             canActivate: [anonymousUnavailableGuard],
             data: {
               anonymousFeature: 'Muted and blocked accounts',
@@ -324,6 +365,7 @@ export const routes: Routes = [
             // Legacy deep links keep their selected list while the sidebar now
             // exposes a single combined destination.
             path: 'mutes',
+            title: 'Mutes',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Muted accounts', kind: 'mutes' },
             loadComponent: () =>
@@ -333,6 +375,7 @@ export const routes: Routes = [
           },
           {
             path: 'blocks',
+            title: 'Blocks',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Blocked accounts', kind: 'blocks', preloadSettings: true },
             loadComponent: () =>
@@ -344,6 +387,7 @@ export const routes: Routes = [
             // Whole-account operations (retweets for every follow, mute/block
             // amnesty). Server-backed throughout, so Anonymous can't use it.
             path: 'bulk-actions',
+            title: 'Bulk actions',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Bulk actions', preloadSettings: true },
             loadComponent: () =>
@@ -353,6 +397,7 @@ export const routes: Routes = [
           },
           {
             path: 'filters',
+            title: 'Filters',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Content filters', preloadSettings: true },
             loadComponent: () =>
@@ -360,6 +405,7 @@ export const routes: Routes = [
           },
           {
             path: 'filters/new',
+            title: 'New filter',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Content filters', preloadSettings: true },
             loadComponent: () =>
@@ -369,6 +415,7 @@ export const routes: Routes = [
           },
           {
             path: 'filters/:id',
+            title: 'Edit filter',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Content filters', preloadSettings: true },
             loadComponent: () =>
@@ -378,6 +425,7 @@ export const routes: Routes = [
           },
           {
             path: 'deletion',
+            title: 'Delete account',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Automatic post deletion', preloadSettings: true },
             loadComponent: () =>
@@ -385,6 +433,7 @@ export const routes: Routes = [
           },
           {
             path: 'account',
+            title: 'Account',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Account settings', preloadSettings: true },
             loadComponent: () =>
@@ -392,6 +441,7 @@ export const routes: Routes = [
           },
           {
             path: 'import-export',
+            title: 'Import and export',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Import/Export', preloadSettings: true },
             loadComponent: () =>
@@ -401,12 +451,14 @@ export const routes: Routes = [
           },
           {
             path: 'config',
+            title: 'Config',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/config/settings-config').then((m) => m.SettingsConfig),
           },
           {
             path: 'invites',
+            title: 'Invites',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Invites', preloadSettings: true },
             loadComponent: () =>
@@ -414,12 +466,14 @@ export const routes: Routes = [
           },
           {
             path: 'i18n',
+            title: 'Languages',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/i18n/settings-i18n').then((m) => m.SettingsI18n),
           },
           {
             path: 'feature-flags',
+            title: 'Feature flags',
             data: { featureFlagSettings: true, preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/feature-flags/settings-feature-flags').then(
@@ -428,6 +482,7 @@ export const routes: Routes = [
           },
           {
             path: 'development',
+            title: 'Development',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Development settings', preloadSettings: true },
             loadComponent: () =>
@@ -440,6 +495,7 @@ export const routes: Routes = [
       ...mockOnlyChildren,
       {
         path: 'offsite-directories',
+        title: 'Offsite directories',
         loadComponent: () =>
           import('./pages/offsite-directories/offsite-directories').then(
             (m) => m.OffsiteDirectories,
@@ -453,10 +509,12 @@ export const routes: Routes = [
       // browsing strangers is exactly what an anonymous visitor is here to do.
       {
         path: 'directory',
+        title: 'Directory',
         loadComponent: () => import('./pages/directory/directory').then((m) => m.Directory),
       },
       {
         path: 'bundled-collections',
+        title: 'Bundled collections',
         loadComponent: () =>
           import('./pages/bundled-collections/bundled-collections').then(
             (m) => m.BundledCollections,
@@ -464,6 +522,7 @@ export const routes: Routes = [
       },
       {
         path: 'bundled-starter-kits',
+        title: 'Starter kits',
         loadComponent: () =>
           import('./pages/bundled-starter-kits/bundled-starter-kits').then(
             (m) => m.BundledStarterKits,
@@ -479,15 +538,18 @@ export const routes: Routes = [
       // `feeds/:feed` server-feed route below so they aren't swallowed by it.
       {
         path: 'feeds',
+        title: 'Feeds',
         loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
       },
       {
         path: 'feeds/lists',
+        title: 'Lists',
         data: { only: 'lists' },
         loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
       },
       {
         path: 'feeds/tags',
+        title: 'Tags',
         data: { only: 'tags' },
         loadComponent: () => import('./pages/lists/lists').then((m) => m.Lists),
       },
@@ -495,6 +557,7 @@ export const routes: Routes = [
       // above `feeds/:feed` for the same reason the two literals above do.
       {
         path: 'feeds/bluesky/:ref',
+        title: 'Bluesky feed',
         loadComponent: () =>
           import('./pages/bluesky-feed/bluesky-feed').then((m) => m.BlueskyFeedPage),
       },
@@ -503,20 +566,24 @@ export const routes: Routes = [
       { path: 'tags', pathMatch: 'full', redirectTo: 'feeds/tags' },
       {
         path: 'search',
+        title: 'Search',
         loadComponent: () => import('./pages/search/search').then((m) => m.Search),
       },
       {
         path: 'favourites',
+        title: 'Favourites',
         canActivate: [anonymousUnavailableGuard],
         data: { anonymousFeature: 'Favourites' },
         loadComponent: () => import('./pages/favourites/favourites').then((m) => m.Favourites),
       },
       {
         path: 'bookmarks',
+        title: 'Bookmarks',
         loadComponent: () => import('./pages/bookmarks/bookmarks').then((m) => m.Bookmarks),
       },
       {
         path: 'analytics',
+        title: 'Analytics',
         canActivate: [anonymousUnavailableGuard],
         data: { anonymousFeature: 'Analytics' },
         loadComponent: () => import('./pages/analytics/analytics').then((m) => m.Analytics),
@@ -525,6 +592,7 @@ export const routes: Routes = [
         // Deliberately not anonymous-guarded: the browser-local feed is the only one
         // that can report why it ended, so an anonymous reader is the primary user.
         path: 'feed-doctor',
+        title: 'Feed doctor',
         loadComponent: () =>
           import('./pages/feed-doctor/feed-doctor-page').then((m) => m.FeedDoctorPage),
       },
@@ -533,10 +601,12 @@ export const routes: Routes = [
         // own site. A page you act on, so it sits in the main routes rather
         // than under settings.
         path: 'posse',
+        title: 'POSSE queue',
         loadComponent: () => import('./pages/posse/posse-page').then((m) => m.PossePage),
       },
       {
         path: 'observability',
+        title: 'Observability',
         loadComponent: () =>
           import('./pages/observability/observability').then((m) => m.Observability),
       },
@@ -548,53 +618,64 @@ export const routes: Routes = [
         // pages), not `/docs` — the mock backend's FastAPI serves Swagger UI at
         // `/docs`, so an in-app `/docs` route would be shadowed on hard-nav.
         path: 'blog',
+        title: 'Blog',
         loadComponent: () => import('./pages/docs/docs').then((m) => m.Docs),
       },
       {
         // "Design" — the project story, as a virtual tweet in the centre column.
         path: 'about',
+        title: 'About',
         loadComponent: () => import('./pages/about/about').then((m) => m.About),
       },
       {
         // "Funding" — who pays for what, also a virtual tweet. Its own route
         // rather than a tail section of Design, so it can be linked to.
         path: 'funding',
+        title: 'Funding',
         loadComponent: () => import('./pages/funding/funding').then((m) => m.Funding),
       },
       {
         path: 'server-rules',
+        title: 'Server rules',
         loadComponent: () => import('./pages/server-rules/server-rules').then((m) => m.ServerRules),
       },
       {
         path: 'terms',
+        title: 'Terms',
         loadComponent: () => import('./pages/terms/terms').then((m) => m.Terms),
       },
       {
         path: 'credits',
+        title: 'Credits',
         loadComponent: () => import('./pages/credits/credits').then((m) => m.Credits),
       },
       {
         path: 'drafts',
+        title: 'Drafts',
         loadComponent: () => import('./pages/drafts/drafts-page').then((m) => m.DraftsPage),
       },
       {
         path: 'pastes',
+        title: 'Pastes',
         canActivate: [featureFlagGuard],
         data: { featureFlag: 'pastebin' },
         loadComponent: () => import('./pages/pastes/pastes-page').then((m) => m.PastesPage),
       },
       {
         path: 'links',
+        title: 'Links',
         canActivate: [featureFlagGuard],
         data: { featureFlag: 'links' },
         loadComponent: () => import('./pages/links/links-page').then((m) => m.LinksPage),
       },
       {
         path: 'find-friends',
+        title: 'Find friends',
         loadComponent: () => import('./pages/find-friends/find-friends').then((m) => m.FindFriends),
       },
       {
         path: 'lists/:id',
+        title: 'List',
         loadComponent: () =>
           import('./pages/list-timeline/list-timeline').then((m) => m.ListTimeline),
       },
@@ -602,59 +683,71 @@ export const routes: Routes = [
         // Client-side lists work signed out as well as signed in, so this route is
         // deliberately not behind the auth guard.
         path: 'client-lists/:id',
+        title: 'List',
         loadComponent: () =>
           import('./pages/client-list/client-list-page').then((m) => m.ClientListPage),
       },
       {
         // Tag timelines are readable anonymously, so bundles work in every session.
         path: 'tag-bundles/:id',
+        title: 'Tag bundle',
         loadComponent: () =>
           import('./pages/tag-bundle/tag-bundle-page').then((m) => m.TagBundlePage),
       },
       {
         path: 'feeds/:feed',
+        title: 'Feed',
         loadComponent: () => import('./pages/server-feed/server-feed').then((m) => m.ServerFeed),
       },
       {
         path: 'endorsed/:accountId',
+        title: 'Endorsed accounts',
         loadComponent: () =>
           import('./pages/endorsed-list/endorsed-list').then((m) => m.EndorsedList),
       },
       {
         path: 'collections/starter',
+        title: 'Starter collections',
         loadComponent: () =>
           import('./pages/starter-collection/starter-collection').then((m) => m.StarterCollection),
       },
       {
         path: 'collections/starter/:slug',
+        title: 'Starter collection',
         loadComponent: () =>
           import('./pages/starter-collection/starter-collection').then((m) => m.StarterCollection),
       },
       {
         path: 'collections/preview/:id',
+        title: 'Collection preview',
         loadComponent: () => import('./pages/collection/collection').then((m) => m.CollectionPage),
       },
       {
         path: 'collections/:id',
+        title: 'Collection',
         canActivate: [anonymousUnavailableGuard],
         data: { anonymousFeature: 'Collections' },
         loadComponent: () => import('./pages/collection/collection').then((m) => m.CollectionPage),
       },
       {
         path: 'tags/:tag',
+        title: 'Tag',
         loadComponent: () => import('./pages/tag/tag').then((m) => m.Tag),
       },
       {
         path: 'unavailable',
+        title: 'Unavailable',
         loadComponent: () => import('./pages/unavailable/unavailable').then((m) => m.Unavailable),
       },
       {
         path: 'statuses/:id',
+        title: 'Post',
         loadComponent: () => import('./pages/thread/thread').then((m) => m.Thread),
       },
       {
         // Friendly alias for Eliza's synthetic profile (id `eliza:self`).
         path: 'eliza',
+        title: 'Eliza',
         redirectTo: 'accounts/eliza:self',
         pathMatch: 'full',
       },
@@ -662,6 +755,7 @@ export const routes: Routes = [
         // The same for OpenRouter's (id `openrouter:self`). The profile itself
         // reports "not found" unless a key is connected and AI is on.
         path: 'openrouter',
+        title: 'OpenRouter',
         redirectTo: 'accounts/openrouter:self',
         pathMatch: 'full',
       },
@@ -672,11 +766,13 @@ export const routes: Routes = [
         // removed entirely. Redirected rather than deleted so old bookmarks and
         // any link still pointing here land somewhere sensible.
         path: 'eliza/chat',
+        title: 'Eliza chat',
         redirectTo: 'conversations',
         pathMatch: 'full',
       },
       {
         path: 'eliza/inbox',
+        title: 'Eliza inbox',
         redirectTo: 'conversations',
         pathMatch: 'full',
       },
@@ -687,47 +783,56 @@ export const routes: Routes = [
         // silently. The handle is what makes that recoverable, so it must
         // survive truncation and hand-typed URLs, which a query param does not.
         path: 'accounts/:id/:handle',
+        title: 'Profile',
         loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
       },
       {
         // One segment: either a bare id (every existing link in the app) or a
         // bare `@user@host`. See `parseAccountRoute`.
         path: 'accounts/:id',
+        title: 'Profile',
         loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
       },
       {
         path: 'admin',
+        title: 'Admin',
         canActivate: [adminGuard],
         loadComponent: () => import('./admin/admin-shell/admin-shell').then((m) => m.AdminShell),
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'accounts' },
           {
             path: 'accounts',
+            title: 'Accounts',
             loadComponent: () =>
               import('./admin/accounts/admin-accounts').then((m) => m.AdminAccounts),
           },
           {
             path: 'reports',
+            title: 'Reports',
             loadComponent: () =>
               import('./admin/reports/admin-reports').then((m) => m.AdminReports),
           },
           {
             path: 'domains',
+            title: 'Domains',
             loadComponent: () =>
               import('./admin/domains/admin-domains').then((m) => m.AdminDomains),
           },
           {
             path: 'domain-allows',
+            title: 'Allowed domains',
             loadComponent: () =>
               import('./admin/domain-allows/admin-domain-allows').then((m) => m.AdminDomainAllows),
           },
           {
             path: 'email-blocks',
+            title: 'Email blocks',
             loadComponent: () =>
               import('./admin/email-blocks/admin-email-blocks').then((m) => m.AdminEmailBlocks),
           },
           {
             path: 'canonical-blocks',
+            title: 'Canonical blocks',
             loadComponent: () =>
               import('./admin/canonical-blocks/admin-canonical-blocks').then(
                 (m) => m.AdminCanonicalBlocks,
@@ -735,20 +840,24 @@ export const routes: Routes = [
           },
           {
             path: 'ip-blocks',
+            title: 'IP blocks',
             loadComponent: () =>
               import('./admin/ip-blocks/admin-ip-blocks').then((m) => m.AdminIpBlocks),
           },
           {
             path: 'announcements',
+            title: 'Announcements',
             loadComponent: () =>
               import('./admin/announcements/admin-announcements').then((m) => m.AdminAnnouncements),
           },
           {
             path: 'trends',
+            title: 'Trends',
             loadComponent: () => import('./admin/trends/admin-trends').then((m) => m.AdminTrends),
           },
           {
             path: 'metrics',
+            title: 'Metrics',
             loadComponent: () =>
               import('./admin/metrics/admin-metrics').then((m) => m.AdminMetrics),
           },

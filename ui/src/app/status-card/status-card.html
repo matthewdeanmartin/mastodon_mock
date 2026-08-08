@@ -293,12 +293,16 @@
             [class.on]="replying()"
             (click)="toggleReply($event)"
             title="Reply"
+            [attr.aria-label]="'Reply. ' + display.replies_count + ' replies'"
           >
-            💬 <span>{{ display.replies_count }}</span>
+            <span aria-hidden="true">💬</span> <span aria-hidden="true">{{
+              display.replies_count
+            }}</span>
           </button>
         } @else if (auth.isAnonymous || readOnlyStats) {
           <span class="action" title="Replies"
-            >💬 <span>{{ display.replies_count }}</span></span
+            ><span aria-hidden="true">💬</span> <span>{{ display.replies_count }}</span>
+            <span class="sr-only">replies</span></span
           >
         }
         @if (!foreign && (display.replies_count > 0 || display.in_reply_to_id)) {
@@ -330,10 +334,11 @@
             (click)="toggleReblog($event)"
             [title]="display.reblogged ? words().UndoBoost : words().Boost"
             [attr.aria-pressed]="display.reblogged"
+            [attr.aria-label]="display.reblogged ? words().UndoBoost : words().Boost"
           >
-            🔁
+            <span aria-hidden="true">🔁</span>
             @if (display.reblogged) {
-              <span class="did">{{ words().Boosted }}</span>
+              <span class="did" aria-hidden="true">{{ words().Boosted }}</span>
             }
           </button>
         }
@@ -343,30 +348,42 @@
               type="button"
               class="action"
               title="Share elsewhere"
-              aria-label="Share elsewhere"
+              [attr.aria-label]="'Share elsewhere. ' + display.reblogs_count + ' reposts'"
               (click)="showShare.set(true); $event.stopPropagation()"
             >
-              🔁 <span>{{ display.reblogs_count }}</span>
+              <span aria-hidden="true">🔁</span> <span aria-hidden="true">{{
+                display.reblogs_count
+              }}</span>
             </button>
           } @else {
             <span class="action" title="Reposts"
-              >🔁 <span>{{ display.reblogs_count }}</span></span
+              ><span aria-hidden="true">🔁</span> <span>{{ display.reblogs_count }}</span>
+              <span class="sr-only">reposts</span></span
             >
           }
         } @else if (!foreign && capabilities.canCompose) {
-          <button class="action" [class.on]="quoting()" (click)="toggleQuote($event)" title="Quote">
-            ❝
+          <button
+            class="action"
+            [class.on]="quoting()"
+            (click)="toggleQuote($event)"
+            title="Quote"
+            aria-label="Quote"
+          >
+            <span aria-hidden="true">❝</span>
           </button>
           @if (capabilities.canUseServerActions) {
             <button
               class="action count-link"
               (click)="openAccountList('reblogged_by', $event)"
               [title]="words().BoostedBy"
+              [attr.aria-label]="display.reblogs_count + ' ' + words().BoostedBy"
             >
               {{ display.reblogs_count }}
             </button>
           } @else {
-            <span class="action">{{ display.reblogs_count }}</span>
+            <span class="action"
+              >{{ display.reblogs_count }} <span class="sr-only">reposts</span></span
+            >
           }
         } @else if (!caps.reblog && readOnlyStats) {
           <!-- Read-only providers (Twitter) report real counts with no button to

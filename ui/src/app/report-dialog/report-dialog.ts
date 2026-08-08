@@ -1,12 +1,13 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../api';
+import { FocusTrap } from '../a11y/focus-trap';
 
 const CATEGORIES = ['spam', 'violation', 'other'] as const;
 
 @Component({
   selector: 'app-report-dialog',
-  imports: [FormsModule],
+  imports: [FocusTrap, FormsModule],
   templateUrl: './report-dialog.html',
   styleUrl: './report-dialog.css',
 })

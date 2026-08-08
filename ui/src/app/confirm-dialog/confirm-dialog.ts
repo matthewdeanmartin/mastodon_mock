@@ -1,4 +1,5 @@
 import { Component, input, output } from '@angular/core';
+import { FocusTrap } from '../a11y/focus-trap';
 
 /**
  * A small yes/no confirmation modal. The host owns the open/closed state and
@@ -6,7 +7,7 @@ import { Component, input, output } from '@angular/core';
  */
 @Component({
   selector: 'app-confirm-dialog',
-  imports: [],
+  imports: [FocusTrap],
   templateUrl: './confirm-dialog.html',
   styleUrl: './confirm-dialog.css',
 })

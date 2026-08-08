@@ -1,6 +1,14 @@
-<div class="overlay" (click)="closed.emit()">
-  <div class="dialog" (click)="$event.stopPropagation()">
-    <h3>Edit history</h3>
+<div class="overlay" role="presentation" (click)="closed.emit()">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="history-title"
+    appFocusTrap
+    (dismissed)="closed.emit()"
+    (click)="$event.stopPropagation()"
+  >
+    <h3 id="history-title">Edit history</h3>
 
     @if (loading()) {
       <p class="muted small">Loading…</p>

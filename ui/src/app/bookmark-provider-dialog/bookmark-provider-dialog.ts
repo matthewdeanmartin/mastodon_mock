@@ -1,10 +1,12 @@
 import { Component, input, output } from '@angular/core';
+import { FocusTrap } from '../a11y/focus-trap';
 
 export type BookmarkChoice = 'mastodon' | 'raindrop-post' | 'raindrop-link';
 
 /** Chooses between native and Raindrop.io bookmark destinations. */
 @Component({
   selector: 'app-bookmark-provider-dialog',
+  imports: [FocusTrap],
   templateUrl: './bookmark-provider-dialog.html',
   styleUrl: './bookmark-provider-dialog.css',
 })

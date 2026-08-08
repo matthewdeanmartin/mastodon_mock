@@ -2,11 +2,12 @@ import { Component, inject, input, OnInit, output, signal } from '@angular/core'
 import { Api } from '../api';
 import { StatusEdit } from '../models';
 import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
+import { FocusTrap } from '../a11y/focus-trap';
 
 /** A modal showing the edit-history snapshots of a status. */
 @Component({
   selector: 'app-history-dialog',
-  imports: [],
+  imports: [FocusTrap],
   templateUrl: './history-dialog.html',
   styleUrl: './history-dialog.css',
 })

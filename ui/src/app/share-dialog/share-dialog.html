@@ -5,7 +5,14 @@
     aria-label="Close share dialog"
     (click)="closed.emit()"
   ></button>
-  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="share-heading">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="share-heading"
+    appFocusTrap
+    (dismissed)="closed.emit()"
+  >
     <div class="dialog-heading">
       <div>
         <h3 id="share-heading">Share post elsewhere</h3>

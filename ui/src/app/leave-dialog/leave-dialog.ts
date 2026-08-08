@@ -1,6 +1,7 @@
 import { Component, HostListener, computed, inject, input, output, signal } from '@angular/core';
 import { Auth } from '../auth';
 import { SessionTeardown } from '../session-teardown';
+import { FocusTrap } from '../a11y/focus-trap';
 
 /** What the user chose on the way out. */
 export type LeaveChoice = 'leave' | 'anonymous-data' | 'all-data';
@@ -28,6 +29,7 @@ export type LeaveChoice = 'leave' | 'anonymous-data' | 'all-data';
  */
 @Component({
   selector: 'app-leave-dialog',
+  imports: [FocusTrap],
   templateUrl: './leave-dialog.html',
   styleUrl: './leave-dialog.css',
 })

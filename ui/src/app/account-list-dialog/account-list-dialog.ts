@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { Api } from '../api';
 import { Account } from '../models';
 import { Terminology } from '../terminology';
+import { FocusTrap } from '../a11y/focus-trap';
 
 /** Which set of accounts to show for a status. */
 export type AccountListMode = 'favourited_by' | 'reblogged_by';
@@ -11,7 +12,7 @@ export type AccountListMode = 'favourited_by' | 'reblogged_by';
 /** A modal listing the accounts that favourited or boosted a status. */
 @Component({
   selector: 'app-account-list-dialog',
-  imports: [RouterLink],
+  imports: [FocusTrap, RouterLink],
   templateUrl: './account-list-dialog.html',
   styleUrl: './account-list-dialog.css',
 })

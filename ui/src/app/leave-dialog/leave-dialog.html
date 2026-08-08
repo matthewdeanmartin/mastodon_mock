@@ -1,5 +1,14 @@
 <button class="ld-backdrop" type="button" aria-label="Close" (click)="close()"></button>
-<section class="ld-dialog" role="dialog" aria-modal="true" aria-labelledby="ld-title">
+<!-- Escape is already handled by the component's own document keydown listener,
+     so the trap only manages focus here (appFocusTrapCloseOnEscape="false"). -->
+<section
+  class="ld-dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="ld-title"
+  appFocusTrap
+  [appFocusTrapCloseOnEscape]="false"
+>
   <div class="ld-head">
     <h2 id="ld-title">
       @if (isAnonymous()) {

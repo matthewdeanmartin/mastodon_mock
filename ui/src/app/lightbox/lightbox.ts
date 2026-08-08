@@ -1,4 +1,5 @@
 import { Component, HostListener, computed, input, output, signal } from '@angular/core';
+import { FocusTrap } from '../a11y/focus-trap';
 import { MediaAttachment } from '../models';
 
 /**
@@ -7,7 +8,7 @@ import { MediaAttachment } from '../models';
  */
 @Component({
   selector: 'app-lightbox',
-  imports: [],
+  imports: [FocusTrap],
   templateUrl: './lightbox.html',
   styleUrl: './lightbox.css',
 })

@@ -1,5 +1,5 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, computed, ElementRef, inject, OnInit, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NgOptimizedImage } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
@@ -89,8 +89,59 @@ export class Shell implements OnInit {
     { initialValue: isWideUrl(this.router.url) },
   );
 
+  /**
+   * The routed column, which takes focus after each navigation.
+   *
+   * Angular swaps the outlet's contents but leaves focus where it was —
+   * usually the nav link that was just activated. A screen reader user would
+   * hear nothing and stay parked in the navbar, so moving focus to the top of
+   * the new page is what actually makes the navigation perceivable. It also
+   * puts Tab back at the start of the content rather than mid-navbar.
+   */
+  private readonly mainColumn = viewChild<ElementRef<HTMLElement>>('mainColumn');
+
+  constructor() {
+    // Not in ngOnInit: that returns early for anonymous visitors, and route
+    // focus has to work for them too.
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        // The outlet renders during navigation, but the new component's own
+        // view may not be committed yet; wait a tick so focus lands on a
+        // <main> that already holds the new page.
+        setTimeout(() => this.focusMain());
+      });
+  }
+
   /** The leave/log-out confirmation, which also offers to erase browser data. */
   protected showLeave = signal(false);
+
+  /**
+   * Move focus into the routed column.
+   *
+   * Shared by the skip link and the post-navigation effect. `<main>` carries
+   * `tabindex="-1"` so it can accept focus programmatically without joining the
+   * tab order; `preventScroll` because the router's own scroll restoration has
+   * already decided where the page should sit.
+   */
+  protected focusMain(): void {
+    this.mainColumn()?.nativeElement.focus({ preventScroll: true });
+  }
+
+  /**
+   * Skip-link activation.
+   *
+   * The href stays `#main` so the control degrades to a real anchor and shows
+   * a sane target in the status bar, but the router would treat a bare
+   * fragment navigation as a route change, so move focus directly instead.
+   */
+  protected skipToMain(event: Event): void {
+    event.preventDefault();
+    this.focusMain();
+  }
 
   /** Transient, non-blocking message (e.g. a failed account switch). null = hidden. */
   protected toast = signal<string | null>(null);

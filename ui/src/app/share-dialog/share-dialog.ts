@@ -1,5 +1,6 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 import { Status } from '../models';
+import { FocusTrap } from '../a11y/focus-trap';
 
 export interface ShareContext {
   url: string;
@@ -109,6 +110,7 @@ export const SHARE_DESTINATIONS: ShareDestination[] = [
 
 @Component({
   selector: 'app-share-dialog',
+  imports: [FocusTrap],
   templateUrl: './share-dialog.html',
   styleUrl: './share-dialog.css',
 })

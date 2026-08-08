@@ -1,7 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { Title } from '@angular/platform-browser';
-import { environment } from '../environments/environment';
 import { AnalyticsTracker } from './analytics-tracker';
 import { ClientPrefs } from './client-prefs';
 import { FailWhale } from './fail-whale/fail-whale';
@@ -24,7 +22,6 @@ import { ConfigSync } from './config-sync';
   `,
 })
 export class App {
-  private readonly title = inject(Title);
   protected readonly health = inject(ServerHealth);
   /** Instantiated eagerly so theme/accent apply on every route, including login. */
   private readonly prefs = inject(ClientPrefs);
@@ -42,8 +39,6 @@ export class App {
     // The user's own copy of the same idea: per-route visits and time spent,
     // kept locally for the Observability page and never sent anywhere.
     this.routeLog.start();
-    // Set the tab title from the build flavor (mastodon_mock vs Mocking Bird).
-    this.title.setTitle(environment.brand);
     // Arm the deployment-recovery loop guard: if we got here after an
     // auto-reload, clear it once we've run cleanly for a bit.
     this.recovery.markApplicationStableAfterDelay();

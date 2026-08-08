@@ -10,6 +10,7 @@ import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
 import { AnonymousFollows } from '../providers/anonymous/anonymous-follows';
 import { AnonymousLists } from '../providers/anonymous/anonymous-lists';
 import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
+import { FocusTrap } from '../a11y/focus-trap';
 
 /** One line of the bulk add-by-name result. */
 interface BulkResult {
@@ -24,7 +25,7 @@ interface BulkResult {
  */
 @Component({
   selector: 'app-bulk-add-dialog',
-  imports: [FormsModule],
+  imports: [FocusTrap, FormsModule],
   templateUrl: './bulk-add-dialog.html',
   styleUrl: './bulk-add-dialog.css',
 })

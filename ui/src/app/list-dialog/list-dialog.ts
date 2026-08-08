@@ -13,6 +13,7 @@ import { AnonymousAccount } from '../providers/anonymous/anonymous-account';
 import { ClientLists, handleFor } from '../lists/client-lists';
 import { Server } from '../server';
 import { Account } from '../models';
+import { FocusTrap } from '../a11y/focus-trap';
 
 interface ListRow {
   list: UserList;
@@ -76,7 +77,7 @@ interface CollectionRow {
  */
 @Component({
   selector: 'app-list-dialog',
-  imports: [FormsModule],
+  imports: [FocusTrap, FormsModule],
   templateUrl: './list-dialog.html',
   styleUrl: './list-dialog.css',
 })
