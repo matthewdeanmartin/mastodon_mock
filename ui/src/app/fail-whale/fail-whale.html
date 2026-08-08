@@ -1,10 +1,11 @@
 <div class="fail-whale" role="alertdialog" aria-labelledby="fail-whale-title">
   <img
     class="whale-img"
-    src="insufficient_whale_640.png"
+    [src]="whale().src"
     alt=""
-    width="640"
-    height="480"
+    [width]="whale().width"
+    [height]="whale().height"
+    [style.--whale-ratio]="whale().width + ' / ' + whale().height"
     loading="eager"
     fetchpriority="high"
   />

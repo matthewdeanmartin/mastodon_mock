@@ -85,7 +85,8 @@ export class Shell implements OnInit {
   /** Canary deployments (/canary/ base href) show a distinct name, mark, accent. */
   protected isCanary = isCanaryBuild();
   protected brand = this.isCanary ? 'Canary' : environment.brand;
-  protected logoSrc = brandLogoSrc();
+  /** Recomputed so switching illustration sets repaints the mark without a reload. */
+  protected logoSrc = computed(() => brandLogoSrc(this.prefs.artStyle()));
 
   /** Whether the current account holds a staff role (drives the Admin nav link). */
   protected isStaff = computed(() => {

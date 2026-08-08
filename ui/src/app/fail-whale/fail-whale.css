@@ -18,13 +18,15 @@
 }
 
 .whale-img {
-  /* The whale is 640×480 (4:3). Lock the ratio and size it medium-big off the
-     width; height follows, so it never squishes. When vertical room is tight,
-     clamp by height with width:auto so the ratio still holds. */
+  /* Size it medium-big off the width; height follows, so it never squishes.
+     When vertical room is tight, clamp by height with width:auto so the ratio
+     still holds. The ratio itself is set inline from the chosen illustration —
+     the two whales are different shapes (4:3 generated, 640×451 hand-drawn) —
+     with 4/3 as the fallback if that binding is ever absent. */
   width: min(460px, 80vw);
   height: auto;
   max-height: 50vh;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--whale-ratio, 4 / 3);
   object-fit: contain;
   /* This is a flex *column*, so the main axis is vertical and the default
      flex-shrink:1 lets the box compress the image's height whenever the

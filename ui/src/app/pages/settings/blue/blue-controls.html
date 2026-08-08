@@ -1,7 +1,8 @@
 <div class="ssection">
-  <!-- Radios rather than a checkbox: a third option is planned (the generated
-       imagery swapped for hand-drawn illustrations), and this is a question with
-       several answers rather than a thing that is on or off. -->
+  <!-- Radios rather than a checkbox: this is a question with several answers
+       rather than a thing that is on or off. The illustration set that was once
+       planned as a third value here is its own row below — which pictures the
+       app draws turned out to be independent of whether the bots exist. -->
   <div class="srow">
     <span class="slabel">AI features</span>
     <div class="scontrol">
@@ -29,6 +30,37 @@
         Hides Eliza, the OpenRouter chat, AI translation and the search and hashtag suggestions.
         Nothing is deleted — your OpenRouter key and your conversations stay where they are, and
         turning this back on restores them.
+      </span>
+    </div>
+  </div>
+
+  <div class="srow">
+    <span class="slabel">Illustrations</span>
+    <div class="scontrol">
+      <label class="radioline">
+        <input
+          type="radio"
+          value="hand"
+          [ngModel]="prefs.artStyle()"
+          (ngModelChange)="prefs.setArtStyle($event)"
+          name="artStyle"
+        />
+        Hand-drawn
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="ai"
+          [ngModel]="prefs.artStyle()"
+          (ngModelChange)="prefs.setArtStyle($event)"
+          name="artStyle"
+        />
+        Generated
+      </label>
+      <span class="hint">
+        Which bird and which fail whale the app draws. The hand-drawn set is the default — they were
+        drawn for this app, by hand, on paper. The generated ones are the originals, kept for anyone
+        who prefers them.
       </span>
     </div>
   </div>

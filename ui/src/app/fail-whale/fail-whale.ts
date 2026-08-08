@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { failWhaleArt } from '../build-flavor';
 import { BuildInfo, BUILD_INFO } from '../build-info';
+import { ClientPrefs } from '../client-prefs';
 import { BugReportDialog } from '../bug-report-dialog/bug-report-dialog';
 import { InstanceStatus } from '../instance-status';
 import { ServerHealth } from '../server-health';
@@ -36,6 +38,9 @@ export class FailWhale {
   protected health = inject(ServerHealth);
   protected status = inject(InstanceStatus);
   private auth = inject(Auth);
+  private prefs = inject(ClientPrefs);
+  /** The whale drawing and its shape — see {@link failWhaleArt}. */
+  protected whale = computed(() => failWhaleArt(this.prefs.artStyle()));
   protected reporting = signal(false);
   /** Details box starts closed — it's for the curious, not the first thing read. */
   protected detailsOpen = signal(false);

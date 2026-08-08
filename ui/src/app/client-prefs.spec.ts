@@ -28,6 +28,25 @@ describe('ClientPrefs', () => {
     expect(prefs.verifiedMode()).toBe('fixed');
   });
 
+  it('defaults to the hand-drawn illustrations and round-trips the choice', () => {
+    const prefs = create();
+    expect(prefs.artStyle()).toBe('hand');
+
+    prefs.setArtStyle('ai');
+    TestBed.tick();
+    expect(document.documentElement.getAttribute('data-art')).toBe('ai');
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY)!).artStyle).toBe('ai');
+
+    // A stored choice must survive a reload, or the toggle looks broken.
+    TestBed.resetTestingModule();
+    expect(create().artStyle()).toBe('ai');
+  });
+
+  it('ignores a junk stored illustration set rather than drawing nothing', () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ artStyle: 'crayon' }));
+    expect(create().artStyle()).toBe('hand');
+  });
+
   it('applies data-theme and data-accent to the document root', () => {
     const prefs = create();
     prefs.setThemeMode('dark');

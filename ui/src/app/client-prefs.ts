@@ -125,18 +125,33 @@ const CHAT_AUDIENCES: readonly ChatAudience[] = ['all', 'mutuals', 'bots'];
 /**
  * How much of the AI machinery is present in the UI.
  *
- * Deliberately a named mode rather than a boolean. A third state is planned —
- * the generated header art swapped for hand-drawn illustrations — and it is not
- * "AI on" or "AI off", so a boolean would have to be renamed and migrated the
- * day it lands. Modes cost nothing now and make that a one-line addition.
- *
  * `off` hides every AI surface: Eliza, OpenRouter chat, AI translation, and the
  * query/hashtag suggestions. It does not delete anything — a stored OpenRouter
  * key survives, and turning AI back on restores the conversations intact.
+ *
+ * The long-planned third state — generated art swapped for hand-drawn
+ * illustrations — landed as {@link ArtStyle} instead of a value here. Which
+ * pictures the app shows turned out to be independent of whether the chat bots
+ * exist: someone can want the drawings and still want Eliza.
  */
 export type AiMode = 'on' | 'off';
 
 const AI_MODES: readonly AiMode[] = ['on', 'off'];
+
+/**
+ * Which set of brand illustrations the app draws: the bird mark and the fail
+ * whale.
+ *
+ * `hand` is the default and the real artwork — drawings made for this app by
+ * hand. `ai` keeps the generated originals for anyone who prefers them, so
+ * switching is a preference rather than a deprecation.
+ *
+ * Purely cosmetic and app-wide rather than per-account: it is a statement about
+ * what this browser should look like, like the theme, not about an identity.
+ */
+export type ArtStyle = 'hand' | 'ai';
+
+const ART_STYLES: readonly ArtStyle[] = ['hand', 'ai'];
 
 /**
  * How long a fetched RSS feed may be reused. `0` refetches every time.
@@ -235,6 +250,7 @@ interface StoredPrefs {
   hiddenProviders?: ProviderId[];
   chatAudience?: ChatAudience;
   aiMode?: AiMode;
+  artStyle?: ArtStyle;
   rssCacheTtlHours?: number;
   chatKind?: ChatKindFilter;
   feedMin?: number;
@@ -418,6 +434,13 @@ export class ClientPrefs {
    * this signal directly except that combined check.
    */
   readonly aiMode = signal<AiMode>('on');
+
+  /**
+   * Which brand illustrations to draw. See {@link ArtStyle}; the hand-drawn set
+   * is the default. Read through {@link brandLogoSrc} / {@link failWhaleSrc}
+   * rather than directly, so every surface picks the same file.
+   */
+  readonly artStyle = signal<ArtStyle>('hand');
 
   /**
    * How long a fetched RSS feed is reused before going back to the network.
@@ -747,6 +770,12 @@ export class ClientPrefs {
     }
   }
 
+  setArtStyle(style: ArtStyle): void {
+    if (ART_STYLES.includes(style)) {
+      this.artStyle.set(style);
+    }
+  }
+
   setRssCacheTtlHours(hours: number): void {
     if (RSS_CACHE_TTL_OPTIONS.some((option) => option.hours === hours)) {
       this.rssCacheTtlHours.set(hours);
@@ -1043,6 +1072,9 @@ export class ClientPrefs {
     if (stored.aiMode && AI_MODES.includes(stored.aiMode)) {
       this.aiMode.set(stored.aiMode);
     }
+    if (stored.artStyle && ART_STYLES.includes(stored.artStyle)) {
+      this.artStyle.set(stored.artStyle);
+    }
     if (
       typeof stored.rssCacheTtlHours === 'number' &&
       RSS_CACHE_TTL_OPTIONS.some((option) => option.hours === stored.rssCacheTtlHours)
@@ -1123,6 +1155,7 @@ export class ClientPrefs {
       showImages: this.showImages(),
       chatAudience: this.chatAudience(),
       aiMode: this.aiMode(),
+      artStyle: this.artStyle(),
       rssCacheTtlHours: this.rssCacheTtlHours(),
       chatKind: this.chatKind(),
       feedMin: this.feedMin(),
@@ -1266,6 +1299,7 @@ export class ClientPrefs {
     root.setAttribute('data-accent', this.accentId());
     root.setAttribute('data-feed-reader', this.feedReader() ? 'on' : 'off');
     root.setAttribute('data-images', this.showImages() ? 'on' : 'off');
+    root.setAttribute('data-art', this.artStyle());
     root.style.setProperty('--reader-font-family', FONT_STACKS[this.readerFontFamily()]);
     root.style.setProperty('--reader-font-size', `${this.readerFontSize()}px`);
     root.style.setProperty('--reader-font-weight', `${this.readerFontWeight()}`);

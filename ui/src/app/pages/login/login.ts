@@ -97,8 +97,12 @@ export class Login implements OnInit, OnDestroy {
   /** Build flavor: brand text and whether mock-only login tabs are shown. */
   protected brand = environment.brand;
   protected mockTooling = environment.mockTooling;
-  /** Canary deployments (/canary/ base href) show a distinct brand mark. */
-  protected logoSrc = brandLogoSrc();
+  /**
+   * Canary deployments (/canary/ base href) show a distinct brand mark, and the
+   * reader's illustration set picks which drawing of it. A computed so the
+   * toggle applies live — and so `prefs` need not be declared above this line.
+   */
+  protected logoSrc = computed(() => brandLogoSrc(this.prefs.artStyle()));
 
   protected serverPresets = SERVER_PRESETS;
   protected customServer = signal('');

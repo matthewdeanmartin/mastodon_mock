@@ -1,5 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { failWhaleArt } from '../../build-flavor';
+import { ClientPrefs } from '../../client-prefs';
 import { InstanceStatus } from '../../instance-status';
 
 /**
@@ -16,10 +18,10 @@ import { InstanceStatus } from '../../instance-status';
     <div class="whale-page center">
       <img
         class="whale-img"
-        src="insufficient_whale_640.png"
+        [src]="whale().src"
         alt="The fail whale"
-        width="640"
-        height="480"
+        [width]="whale().width"
+        [height]="whale().height"
         loading="eager"
         fetchpriority="high"
       />
@@ -73,4 +75,6 @@ import { InstanceStatus } from '../../instance-status';
 })
 export class FailWhaleDemo {
   protected status = inject(InstanceStatus);
+  private prefs = inject(ClientPrefs);
+  protected whale = computed(() => failWhaleArt(this.prefs.artStyle()));
 }
