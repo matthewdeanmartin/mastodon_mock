@@ -250,6 +250,14 @@ export const routes: Routes = [
                   ),
               },
               {
+                path: 'gist',
+                title: 'GitHub Gist',
+                loadComponent: () =>
+                  import('./pages/settings/connections/gist/connection-gist').then(
+                    (m) => m.ConnectionGist,
+                  ),
+              },
+              {
                 path: 'blogger',
                 title: 'Blogger',
                 loadComponent: () =>

@@ -1,4 +1,5 @@
 import { computed, inject, Injectable } from '@angular/core';
+import { GistProvider } from './gist-provider';
 import { FeedPasteProvider, PasteProvider } from './paste-provider';
 import { PastepileMineProvider } from './pastepile-mine-provider';
 import { PastepileProvider } from './pastepile-provider';
@@ -38,6 +39,7 @@ export class PasteProviderRegistry {
   private rentry = inject(RentryProvider);
   private tinyurl = inject(TinyurlProvider);
   private shortener = inject(ShortenerPasteProvider);
+  private gist = inject(GistProvider);
 
   /**
    * Every provider this build knows about, whether or not it can be used now.
@@ -51,18 +53,28 @@ export class PasteProviderRegistry {
     this.tinyurl,
     this.pastepile,
     this.shortener,
+    this.gist,
   ];
 
   /**
    * What the composer offers right now.
    *
-   * The shortener entry is the only conditional one: it needs a connected,
-   * usable service, and offering "Your link shortener" to someone who has not
-   * set one up is an option that can only fail. TinyURL covers that case with
-   * no setup at all, which is why it stays unconditional.
+   * Two conditional entries, for the same reason: the shortener needs a
+   * connected service and Gist needs a token, and offering either to someone
+   * who has not set one up is an option that can only fail. Rentry, TinyURL and
+   * Pastepile cover that case with no setup at all, which is why they stay
+   * unconditional.
    */
   readonly available = computed<readonly PasteProvider[]>(() =>
-    this.all.filter((provider) => provider !== this.shortener || this.shortener.available()),
+    this.all.filter((provider) => {
+      if (provider === this.shortener) {
+        return this.shortener.available();
+      }
+      if (provider === this.gist) {
+        return this.gist.available();
+      }
+      return true;
+    }),
   );
 
   /**

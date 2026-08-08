@@ -50,7 +50,8 @@ export type ConnectionId =
   | 'twitter'
   | 'mataroa'
   | 'blogger'
-  | 'hugo';
+  | 'hugo'
+  | 'gist';
 
 /**
  * Who a connection belongs to — which is a question users actually ask, and
@@ -118,6 +119,9 @@ export const CONNECTION_FLAGS: Record<ConnectionId, FeatureFlagId> = {
   openrouter: 'connector-openrouter',
   raindrop: 'connector-raindrop',
   github: 'connector-github',
+  // The `pastebin` flag, not a connector flag of its own: what this turns on is
+  // one more paste provider, and turning pastes off must take it with them.
+  gist: 'pastebin',
   dropbox: 'connector-dropbox',
   'link-shortener': 'connector-link-shortener',
   'cors-proxy': 'connector-cors-proxy',
@@ -255,6 +259,21 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
     pitch: 'Your GitHub account, read-only.',
     scope: 'account',
     enables: ['Find the people you follow on GitHub over here', 'Read your unread notifications'],
+  },
+  {
+    id: 'gist',
+    label: 'GitHub Gist',
+    emoji: '📝',
+    pitch: 'Publish pastes as gists on your GitHub account.',
+    // One account, one credential under the retention policy — a connection by
+    // the rule above, even though what it turns on is a *paste provider*. The
+    // provider list is not a connection; the account behind this one is.
+    scope: 'account',
+    enables: [
+      'A "GitHub Gist" option wherever you can post a paste',
+      'Gists you create appear in Drafts and in Write, like any other paste',
+      'Edit and delete them later — they belong to your account, not to this browser',
+    ],
   },
   {
     id: 'dropbox',

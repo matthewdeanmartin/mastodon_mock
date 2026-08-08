@@ -154,6 +154,20 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Fine-grained GitHub token with write access to the Hugo blog repository. Deliberately separate from mockingbird_github_credentials, which is read-only.',
   },
   {
+    base: 'mockingbird_gist_credentials',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'secret',
+    note: 'GitHub token with the gist scope, for publishing pastes as gists. Deliberately separate from mockingbird_github_credentials (read-only) and mockingbird_hugo_credentials (one repo): sharing one token would widen what a single leaked string reaches.',
+  },
+  {
+    base: 'mockingbird_gist_profile',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'The GitHub login the gist token belongs to, so the provider can name itself. Split out of mockingbird_gist_credentials so a settings export can say gists are on without carrying the token.',
+  },
+  {
     base: 'mockingbird_posse_queue',
     storage: 'local',
     suffix: 'account',

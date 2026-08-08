@@ -10,6 +10,7 @@ import { PastepileKey } from '../../../providers/paste/pastepile-key';
 import { ShortenerSettings } from '../../../providers/shortener/shortener-settings';
 import { TwitterSettings } from '../../../providers/twitter/twitter-settings';
 import { MataroaSettings } from '../../../providers/mataroa/mataroa-settings';
+import { GistSettings } from '../../../providers/paste/gist-settings';
 import { BloggerSession } from '../../../providers/blogger/blogger-session';
 import { HugoSettings } from '../../../providers/hugo/hugo-settings';
 import {
@@ -67,6 +68,7 @@ export class SettingsConnections implements OnInit {
   private shortener = inject(ShortenerSettings);
   private twitter = inject(TwitterSettings);
   private mataroa = inject(MataroaSettings);
+  private gist = inject(GistSettings);
   private blogger = inject(BloggerSession);
   private hugo = inject(HugoSettings);
   // Not a catalog entry — a paste service is a list, not a one-account
@@ -160,6 +162,8 @@ export class SettingsConnections implements OnInit {
           // Both halves: the repo can outlive the token, and in that state
           // nothing can be published.
           return { entry, connected: this.hugo.connected(), unavailableReason: null };
+        case 'gist':
+          return { entry, connected: this.gist.connected(), unavailableReason: null };
       }
     }
   }
@@ -183,6 +187,7 @@ export class SettingsConnections implements OnInit {
       this.twitter,
       this.mataroa,
       this.hugo,
+      this.gist,
       this.pastepileKey,
     ]);
     this.lifetimes.enforceAll();

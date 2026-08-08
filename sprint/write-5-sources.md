@@ -1,6 +1,7 @@
 # Write — Sprint 5: sources (Gist, and Mataroa both ways)
 
-Status: PLANNED (written 2026-08-08, after sprints 1–4 shipped)
+Status: **PARTIALLY COMPLETE** — S5.1/S5.2 (Gist) done 2026-08-08, **as a paste provider, not as a
+draft kind**. S5.3 (Mataroa both ways) and S5.4 not started.
 
 Read `write-0-overview.md`, then the **Delivered** and **Found while implementing** sections of
 sprints 1–4. The last sprint of this epic.
@@ -39,16 +40,56 @@ Two things, both of which turn a one-way street into a round trip:
   (`mataroa-api.spec.ts` shows the shape). **`api.github.com` is CORS-open for writes** and needs
   no proxy — that is a recorded finding, not a guess.
 
-### The shape a new draft kind has to fill
+### ~~The shape a new draft kind has to fill~~ — SUPERSEDED
 
-Adding `gist` means touching, in order: `DraftKind`, a `DraftSource` variant, a `gistDraftItem()`
-builder, a `toSnapshot()` case, `DraftSources` loading and error handling, the filter chips on
-`/drafts` and `/write`, and `removalCopy()` on `/drafts`. That list is the honest cost. Nothing in
-sprints 1–4 needs changing beyond it, which is the payoff for the union having been kept honest.
+> This section planned Gist as a **fifth draft kind**, listing the eight places that would need
+> touching. **The boss reversed it: a gist is a paste, and Gist is a paste provider.**
+>
+> That was the better call, and the reason is the one line that makes this whole epic cheaper:
+> **every paste provider is already a draft source.** `PasteHistory` feeds `pasteDraftItem`, which
+> feeds `DraftSources`, which feeds `/drafts`, the workspace draft list, and the kanban board. A
+> gist therefore appears in all of them with **zero** drafts-side code — against the eight files the
+> draft-kind plan would have touched.
+>
+> Implemented as `PasteProvider`, the cost was: two new provider files, one registry entry, one
+> catalog entry, one settings page, two storage-registry rows. Nothing in `pages/drafts/` or
+> `pages/write/` changed at all.
 
 ## Stories
 
-### S5.1 — Gist as a draft kind
+### S5.1 — Gist ~~as a draft kind~~ **as a paste provider** ✅ DONE
+
+> Rewritten to match what shipped. The original text planned a `gist-api.ts` and a conservative
+> "which gists count as drafts" predicate over the user's whole gist history. **That is not what was
+> built, and the difference matters:** modelled as a paste provider, Gist only ever surfaces gists
+> *this app created* (through `PasteHistory`), so the question "is this someone's config snippet or
+> their unpublished writing?" never arises. The privacy-shaped mistake the original was worried
+> about is designed out rather than guarded against.
+>
+> `recent()` does list the account's own gists — it is part of the `PasteProvider` contract — and
+> there the single-file rule applies: a multi-file gist is a project, not a note.
+
+**Delivered:**
+
+- `providers/paste/gist-provider.ts` — full `PasteProvider`: `create`, `update`, `delete`,
+  `recent`, `status`, plus `whoami()` for the connection page.
+- `providers/paste/gist-settings.ts` — its **own** token, deliberately not `GitHubSession`'s and
+  not Hugo's, following `HugoSettings`' recorded reasoning: one leaked string must not reach more
+  of the account than the feature it belongs to. Needs the `gist` scope and nothing else.
+- Registry entry, conditional on a connected token (the `ShortenerPasteProvider` precedent).
+- `/settings/connections/gist`, catalog entry, two `storage-registry.ts` rows.
+
+**Mappings decided:**
+
+| Paste concept | Gist reality |
+| --- | --- |
+| `unlisted` | a *secret* gist — unlisted, but readable by anyone with the link. Not private. |
+| `public` | a public gist, listed on the GitHub profile |
+| language | becomes the **filename extension**; GitHub has no language field |
+| expiry | `never` only. Gists have no TTL and no burn-after-reading. |
+| `editKey` | empty. The account token is the authority, as with the shortener provider. |
+
+### ~~S5.1 (original) — Gist as a draft kind~~
 
 `providers/github/gist-api.ts` — list, read, create, update. Scoped to the authenticated user's own
 gists; nothing about other people's.
@@ -64,7 +105,21 @@ would be the same class of mistake `isSelfDraft` was careful to avoid. Start wit
 Say the rule in the UI, because it will surprise someone. A "these are the gists I can see" count
 next to the filter chip does more good than a cleverer heuristic.
 
-### S5.2 — Editing a gist and writing back
+### S5.2 — Editing a gist and writing back ✅ **DONE, and simpler than planned**
+
+> The original text below worried that a writable source breaks the sprint-1/2 load rule ("local
+> continues in place, everything else copies") and proposed a `writable` flag on `DraftItem`.
+>
+> **Modelling Gist as a paste made that unnecessary.** `PasteProvider` already has `update()` and
+> `delete()`, and the Pastes page already knows which providers are `immutable`. A gist is simply a
+> mutable paste — the same category Rentry is in — so the existing machinery covers it and no new
+> concept was added.
+>
+> The boss's save-as-copy vs save-as-edit note still stands as unbuilt UI, and it now has a cleaner
+> home: it is a *paste* question ("does saving rewrite the paste or make a new one?"), not a draft
+> question. Sprint 6 material.
+
+### ~~S5.2 (original) — Editing a gist and writing back~~
 
 Opening a gist draft loads it into the editor. **Saving writes back to the gist** — this is the
 first draft kind where "the original" is somewhere editable, and it changes the load rule that
@@ -139,3 +194,60 @@ Every one hit for real in this epic:
 `npm run build:mockingbird` all pass. Append **Delivered** and **Found while implementing**
 sections. This closes the epic — the final entry should also update `write-0-overview.md` with an
 honest list of what the epic did *not* do.
+
+---
+
+## Delivered (Gist half, 2026-08-08)
+
+| File | What it is |
+| --- | --- |
+| `providers/paste/gist-provider.ts` (+spec) | `GistProvider` — a full `PasteProvider` over the GitHub Gist API. |
+| `providers/paste/gist-settings.ts` (+spec) | Its own `gist`-scoped token, split credential/profile. |
+| `pages/settings/connections/gist/connection-gist.{ts,html}` | Connect, prove, disconnect. |
+
+Changed: `paste-provider-registry.ts` (entry + conditional availability), `connection-catalog.ts`
+(`gist` id, entry, flag mapping), `settings-connections.ts` (connected state + lifetime governance),
+`storage-registry.ts` (two rows), `app.routes.ts` (child route).
+
+**Nothing under `pages/drafts/` or `pages/write/` was touched.** That is the headline.
+
+## Found while implementing
+
+**The paste-provider framing removed a whole design problem.** The draft-kind plan needed a
+predicate deciding which of someone's real gists count as "unpublished writing" — the same shape as
+`isSelfDraft`, and the same risk of misreading private material. As a paste provider, only gists
+this app created are ever treated as drafts, so the question never comes up.
+
+**The `pastebin` flag, not a new connector flag.** What Gist turns on is one more paste provider,
+so turning pastes off must take it along. `CONNECTION_FLAGS` maps `gist → 'pastebin'`.
+
+**Prove the token, then store it — in that order.** The first version stored the token and then
+called `recent()` to check it, disconnecting on failure. Cleaner not to write a bad credential at
+all: `whoami()` takes the token as an argument rather than reading settings, so `/user` both
+validates it and returns the login the provider names itself with.
+
+**The connections spec counts governed sessions and asserts by identity.** Adding Gist correctly
+failed `expect(governed).toHaveLength(10)` — the guard doing its job. Updated to 11 *and* added the
+identity assertion, since the file's own comment says a bare length check "passes just as happily
+when a connector is swapped for the wrong one."
+
+**A gist has no per-paste secret**, so `editKey` is stored empty — exactly what
+`ShortenerPasteProvider` does, and for the same reason: the account credential is the authority.
+
+## Verification
+
+- `npm run lint`, `npm run format:check` — pass.
+- `npm run test:ci` — **3682 tests pass, 0 fail** (29 added). Manifest updated.
+- `npm run build`, `npm run build:mockingbird` — pass.
+
+## Still to do in this sprint
+
+- **S5.3 — Mataroa both ways.** Unstarted. `listPosts()` still has one consumer
+  (`connection-mataroa.ts`), and `MataroaApi` still has **no update method** — confirm the endpoint
+  exists before promising "edit a published post".
+- **S5.4 — one connections story.** Gist has its page; Mataroa's needs the read-back copy once S5.3
+  lands.
+- **Not smoke-tested against a real GitHub account.** Every gist call is `HttpTestingController`
+  only. Unproven: whether `PATCH` with a renamed file behaves as assumed (renaming a gist's only
+  file while changing its content), and whether `per_page=30` is a sensible listing depth.
+- **Save-as-copy vs save-as-edit UI**, now correctly a paste-level question.

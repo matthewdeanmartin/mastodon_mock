@@ -90,7 +90,7 @@ Sprints do **not** run in parallel. Each is one Claude session; each ends green
 | 2 ✅ | Notes and to-dos (writing slice of PKM) | `write-2-pkm-notes-and-todos.md` | **COMPLETE.** `#NOTE`/`#TODO`/`#CAL` model, configurable tag words, the notes pane and tab, jot box, Save-as-to-do, publish warning |
 | 3 ✅ | Publish wizard | `write-3-publish-wizard.md` | **COMPLETE.** 4-step wizard: targets → preview/splits → quality checks → now/schedule; per-step config |
 | 4 ✅ | Kanban board | `write-4-kanban.md` | **COMPLETE.** Ideas / Writing / Editing / Scheduled over the existing sidecar; a pop-open panel, built to survive being moved to its own screen |
-| 5 | Sources | `write-5-sources.md` | **WRITTEN, ready to start.** GitHub Gist as a draft source; deeper Mataroa (list/edit existing posts) |
+| 5 ◐ | Sources | `write-5-sources.md` | **Gist DONE** — as a *paste provider*, so it reaches Drafts, Write and the board for free. Mataroa read-back still to do. |
 
 Sprints 3–5 are named here so nobody re-invents the sequence, but are **not yet written**. Write
 each one at the start of its own session, grounded in what sprints 1–2 actually shipped.
@@ -124,6 +124,12 @@ each one at the start of its own session, grounded in what sprints 1–2 actuall
 - **Split default is `---`.** Explicit, predictable, matches the Markdown mental model and blog
   front-matter. Autosplit and split-on-demand are opt-in per draft.
 - **Gist is sprint 5, not 1–2.** Sprints 1–2 are UI and model work over what already exists.
+- **A gist is a paste, not a fifth draft kind.** Decided by the boss during sprint 5, after that
+  sprint had been written the other way. The reason generalises and is worth keeping in mind for
+  anything similar: **every paste provider is already a draft source**, so a new `PasteProvider`
+  reaches `/drafts`, the workspace draft list and the kanban board with no code in any of them.
+  The draft-kind route would have touched eight files across `pages/drafts/`; the paste route
+  touched none. Prefer an existing extension point over a new axis.
 - **Two editors, on purpose. This is not duplication to be cleaned up later.** Confirmed by the
   boss after sprint 1. They answer to genuinely different constraints:
 
