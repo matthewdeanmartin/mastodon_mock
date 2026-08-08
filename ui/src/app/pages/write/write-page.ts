@@ -38,6 +38,7 @@ import {
   stepTitle,
 } from '../../publish-wizard';
 import { runQualityChecks } from './quality-checks';
+import { WriteBoard } from './board/write-board';
 import { WritingZen } from '../../writing-zen';
 import { PkmItem, PkmSource } from '../../pkm/pkm-source';
 import { PKM_KINDS, PkmKind, pkmLabel, pkmNoun, withPkmTag } from '../../pkm/pkm-tags';
@@ -101,7 +102,7 @@ interface PendingSwitch {
  */
 @Component({
   selector: 'app-write-page',
-  imports: [FocusTrap, FormsModule, HumanTimePipe, LowerCasePipe, RouterLink],
+  imports: [FocusTrap, FormsModule, HumanTimePipe, LowerCasePipe, RouterLink, WriteBoard],
   templateUrl: './write-page.html',
   styleUrl: './write-page.css',
 })
@@ -173,6 +174,31 @@ export class WritePage implements OnInit, OnDestroy {
    * a URL that breaks under it.
    */
   protected tab = signal<'write' | 'notes'>('write');
+
+  /**
+   * Whether the board panel is open.
+   *
+   * A panel rather than a third tab, deliberately: tabs are for surfaces you go
+   * to and stay in, and the board is one you glance at on the way back to
+   * writing. It overlays rather than displacing the panes, so the editor
+   * underneath is never torn down and an in-progress body always survives.
+   */
+  protected boardOpen = signal(false);
+
+  protected openBoard(): void {
+    this.boardOpen.set(true);
+  }
+
+  protected closeBoard(): void {
+    this.boardOpen.set(false);
+  }
+
+  /** Pick a card: load it in the editor and get out of the way. */
+  protected openFromBoard(item: DraftItem): void {
+    this.boardOpen.set(false);
+    this.tab.set('write');
+    this.open(item);
+  }
 
   /** A switch held up by unsaved work, released or discarded by the dialog. */
   protected pendingSwitch = signal<PendingSwitch | null>(null);

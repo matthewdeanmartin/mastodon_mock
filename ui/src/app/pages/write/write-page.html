@@ -58,6 +58,14 @@
         </button>
       </div>
       <div class="write-head-actions">
+        <button
+          class="btn btn-outline btn-sm"
+          type="button"
+          [attr.aria-expanded]="boardOpen()"
+          (click)="openBoard()"
+        >
+          ▦ Board
+        </button>
         @if (tab() === 'write') {
           <button
             class="btn btn-outline btn-sm pane-toggle"
@@ -623,6 +631,37 @@
           {{ wizardBusy() ? 'Scheduling…' : wizardForwardLabel() }}
         </button>
       </div>
+    </div>
+  </div>
+}
+
+<!-- The board, as a panel over the workspace. Overlaying rather than displacing
+     the panes means the editor underneath is never torn down, so an in-progress
+     body is exactly where it was when the panel closes. -->
+@if (boardOpen()) {
+  <div
+    class="overlay board-overlay"
+    role="presentation"
+    tabindex="-1"
+    (click)="closeBoard()"
+    (keyup.escape)="closeBoard()"
+  >
+    <div
+      class="dialog board-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Draft board"
+      appFocusTrap
+      (dismissed)="closeBoard()"
+      (click)="$event.stopPropagation()"
+      (keyup)="$event.stopPropagation()"
+    >
+      <app-write-board
+        [items]="sources.items()"
+        [currentKey]="editing()?.key ?? null"
+        (opened)="openFromBoard($event)"
+        (closed)="closeBoard()"
+      />
     </div>
   </div>
 }

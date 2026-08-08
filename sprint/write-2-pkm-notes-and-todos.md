@@ -241,6 +241,15 @@ needs a filterable surface rather than only a narrow pane.
 Build the list as a component the tab hosts, not as logic inside the workspace page, so the PKM
 epic can mount the same component at `/pkm` without unpicking it.
 
+> **NOT DONE AS SPECIFIED.** The notes list shipped as inline markup in `write-page.html`, reading
+> `PkmSource` directly, rather than as a standalone component. The *model* boundary held —
+> `pkm/pkm-tags.ts` and `pkm/pkm-source.ts` are clean, import nothing from `pages/write/`, and are
+> what the PKM epic actually needs — but the **view** was not extracted. Mounting this list at
+> `/pkm` today means lifting markup out of the workspace template first.
+>
+> Cost is small (one list, ~40 lines of template) and it is not urgent. Recorded rather than fixed
+> because pretending otherwise would mislead the epic that inherits it.
+
 ### S2.7 — The publish warning
 
 Publishing something that carries a PKM tag warns first: *"This is tagged `#TODO`. Publishing posts
@@ -365,3 +374,7 @@ are off" warning. It also had to be anonymous-capable, which the posting page (s
 - **The self-post variant of "Save as to-do" is not built.** The menu action is local-only; making
   a note that follows you between devices is still a manual `direct` post.
 - **The duplicated own-statuses scan**, above.
+- **The notes list view was never extracted into a component**, contrary to S2.6 — see the note
+  there. The `pkm/` model boundary is clean; the markup lives in `write-page.html`. Extracting it
+  is a prerequisite for mounting the list at `/pkm`, and worth doing alongside sprint 4's board,
+  which has the same requirement for the same reason.

@@ -31,17 +31,32 @@ function isWideUrl(url: string): boolean {
 `shell/shell.css:402` has `.layout-zen { grid-template-columns: minmax(0, var(--col-width)); }`.
 The two-box grid inside a wide page is the `/chat` pattern — copy its CSS approach, don't invent one.
 
-### The editor already exists — do not write a second composer
+### The editor — REVISED DURING IMPLEMENTATION
 
-`<app-compose>` is 2130 lines with eight mount sites. It has the inputs you need
-(`compose/compose.ts:350-391`): `initialText`, `initialDraft`, `initialVisibility`, `compact`,
-`gateable`. Its thread model is `text` + `thread[]` combined by
-`segments = computed(() => [this.text(), ...this.thread()])` (`compose.ts:524`), and
-`addThreadBox`/`setThreadText`/`removeThreadBox` (`compose.ts:1158`) are the manual split-on-demand
-path that already works.
+> **This section originally said "reuse `<app-compose>`, do not write a second composer." That was
+> reversed while building, and the reversal was confirmed by the boss.** It is left here, corrected,
+> because a later session reading the original would do the wrong thing.
 
-`/drafts` already mounts it save-only at the top of the page (`drafts-page.ts:161` `writing`
-signal). `/write`'s editor is that mount, given room.
+**The workspace editor is a plain `<textarea>`, not `<app-compose>`, and that is not duplication.**
+The two answer to different constraints:
+
+| | `<app-compose>` (the quick editor) | The workspace editor |
+| --- | --- | --- |
+| Lives in | cramped space — a card, a rail, a reply box | a full-width pane |
+| Workflow | write → publish, in one go | write → split → check → publish, over days |
+| Owns | targets, polls, media, visibility, the gate | splitting, quality gates, notes |
+
+A future picture-focused composer (Instagram-shaped posts) would be a *third*, for the same reason.
+**Do not "unify" these.**
+
+Publishing stays single-pathed regardless: the workspace hands text to the composer via
+`Drafts.handoff()`, exactly as `/drafts`' "Edit for post" does. One place posts, several places
+write.
+
+Still true and still worth reading: `<app-compose>`'s thread model is `text` + `thread[]` combined
+by `segments = computed(() => [this.text(), ...this.thread()])`, and its `addThreadBox` /
+`setThreadText` / `removeThreadBox` are the manual split path that inspired `split-modes.ts`'s
+`demand` mode.
 
 ### Length counting is already correct and is not yours to redo
 
@@ -301,6 +316,7 @@ mode for that reason, and it is the honest arrangement — an unsettled list mus
   for write-once targets (several pastebins cannot be edited) and wrong for a local draft you are
   revising. Today the page decides silently; the user should. Its own sprint — `Drafts.update()`
   is half the machinery it will need.
-- **The notes pane is a placeholder** with honest copy naming what lands next. Sprint 2 replaces it.
+- ~~**The notes pane is a placeholder** with honest copy naming what lands next.~~ **Done in
+  sprint 2** — it is the live PKM list.
 - **The kanban `column` field is written by nothing.** The shape exists in `WriteMeta` and is
   round-tripped and validated by the sidecar's spec, so sprint 4 adds a writer, not a migration.

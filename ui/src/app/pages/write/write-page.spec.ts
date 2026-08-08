@@ -37,6 +37,10 @@ interface PageInternals {
   jot(): void;
   openNote(item: PkmItem): void;
   setPkmFilter(kind: PkmKind | null): void;
+  boardOpen: WritableSignal<boolean>;
+  openBoard(): void;
+  closeBoard(): void;
+  openFromBoard(item: DraftItem): void;
   wizardStep: WritableSignal<WizardStep | null>;
   wizardError: WritableSignal<string | null>;
   wizardTargets: Signal<PostTarget[]>;
@@ -887,6 +891,76 @@ describe('WritePage', () => {
     expect(page.body()).toBe('refused, but not lost');
     // Still open, so the user can pick a nearer date.
     expect(page.wizardStep()).toBe('when');
+  });
+
+  // -------------------------------------------------------------- board panel
+
+  it('opens and closes the board without touching the editor body', () => {
+    // The property most likely to break here: an overlay panel must not tear
+    // down and recreate the editor underneath it.
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('half a paragraph, mid-thought');
+    fixture.detectChanges();
+
+    page.openBoard();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-write-board')).toBeTruthy();
+
+    page.closeBoard();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-write-board')).toBeNull();
+    expect(page.body()).toBe('half a paragraph, mid-thought');
+    expect(page.dirty()).toBe(true);
+  });
+
+  it('picking a card loads it and gets out of the way', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    saveLocal(['something to pick up again']);
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.openBoard();
+    fixture.detectChanges();
+
+    page.openFromBoard(page.sources.items()[0]);
+    fixture.detectChanges();
+
+    expect(page.body()).toBe('something to pick up again');
+    expect(page.boardOpen()).toBe(false);
+    expect(page.tab()).toBe('write');
+  });
+
+  it('picking a card from the notes tab returns to the editor', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    saveLocal(['a draft']);
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.tab.set('notes');
+    page.openBoard();
+
+    page.openFromBoard(page.sources.items()[0]);
+
+    expect(page.tab()).toBe('write');
+  });
+
+  it('the board is closed on arrival', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    expect(internals(fixture).boardOpen()).toBe(false);
+    expect(fixture.nativeElement.querySelector('app-write-board')).toBeNull();
+  });
+
+  it('works anonymously without issuing a request', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    saveLocal(['local only']);
+    const fixture = setUp();
+    internals(fixture).openBoard();
+    fixture.detectChanges();
+
+    httpMock.verify();
+    expect(fixture.nativeElement.querySelector('.card-text').textContent.trim()).toBe('local only');
   });
 
   it('remembers a split mode per draft across reopens', () => {

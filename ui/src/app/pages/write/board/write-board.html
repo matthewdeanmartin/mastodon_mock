@@ -1,0 +1,101 @@
+<div class="board">
+  <div class="board-head">
+    <h3>Board</h3>
+    <p class="muted small">
+      Everything unpublished, by how far along it is. Drag a card, or use its ⋯ menu.
+    </p>
+    <button class="btn btn-outline btn-sm" type="button" (click)="close()">Close board</button>
+  </div>
+
+  <!-- A move is a purely visual change; without this it is invisible to the
+       people most likely to be using the keyboard path. -->
+  <p class="sr-only" role="status">{{ announcement() }}</p>
+
+  <div class="board-columns">
+    @for (column of columns(); track column.id) {
+      <section
+        class="board-column"
+        [class.over]="dragOver() === column.id"
+        [class.derived]="derived(column.id)"
+        [attr.aria-label]="label(column.id) + ', ' + column.items.length + ' drafts'"
+        (dragover)="onDragOver(column.id, $event)"
+        (drop)="onDrop(column.id, $event)"
+      >
+        <header class="column-head">
+          <h4>{{ label(column.id) }}</h4>
+          <span class="chip-count">{{ column.items.length }}</span>
+        </header>
+
+        @if (column.items.length) {
+          <ul class="column-cards">
+            @for (item of column.items; track item.key) {
+              <li
+                class="card"
+                [class.current]="currentKey() === item.key"
+                [class.dragging]="dragging() === item.key"
+                [attr.draggable]="!derived(column.id)"
+                (dragstart)="onDragStart(item, $event)"
+                (dragend)="onDragEnd()"
+              >
+                <button class="card-open" type="button" (click)="open(item)">
+                  <span class="card-text">{{ item.preview }}</span>
+                  <span class="card-meta muted">
+                    @switch (item.kind) {
+                      @case ('local') {
+                        <span title="Saved in this browser only">💾</span>
+                      }
+                      @case ('scheduled') {
+                        <span title="Parked as a far-future scheduled post">⏳</span>
+                      }
+                      @case ('self') {
+                        <span title="A post visible only to you">🔒</span>
+                      }
+                      @case ('paste') {
+                        <span title="Published to a paste service">📋</span>
+                      }
+                    }
+                    <span>{{ item.at | humanTime }}</span>
+                  </span>
+                </button>
+
+                <!-- The keyboard path, and not an afterthought: a board you can
+                     only use with a mouse is one half the users cannot use. -->
+                @if (!derived(column.id)) {
+                  <div class="card-menu-wrap">
+                    <button
+                      class="card-menu-button"
+                      type="button"
+                      [attr.aria-expanded]="menuFor() === item.key"
+                      [attr.aria-label]="'Move ' + item.preview + ' to another column'"
+                      (click)="toggleMenu(item)"
+                    >
+                      <span aria-hidden="true">⋯</span>
+                    </button>
+                    @if (menuFor() === item.key) {
+                      <div class="card-menu">
+                        <p class="card-menu-title muted small">Move to</p>
+                        @for (target of moveTargets; track target) {
+                          <button
+                            type="button"
+                            [disabled]="target === column.id"
+                            (click)="move(item, target)"
+                          >
+                            {{ label(target) }}
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </li>
+            }
+          </ul>
+        } @else {
+          <!-- Keeps its heading and says what belongs here: an unexplained
+               empty column reads as broken rather than as available. -->
+          <p class="column-empty muted small">{{ hint(column.id) }}</p>
+        }
+      </section>
+    }
+  </div>
+</div>

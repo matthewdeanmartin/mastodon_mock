@@ -89,8 +89,8 @@ Sprints do **not** run in parallel. Each is one Claude session; each ends green
 | 1 ✅ | Workspace shell + zen | `write-1-workspace-and-zen.md` | **COMPLETE.** `/write` route, wide 3-pane layout, split-by-`---`, writing zen, the workspace sidecar, `Drafts.update()` |
 | 2 ✅ | Notes and to-dos (writing slice of PKM) | `write-2-pkm-notes-and-todos.md` | **COMPLETE.** `#NOTE`/`#TODO`/`#CAL` model, configurable tag words, the notes pane and tab, jot box, Save-as-to-do, publish warning |
 | 3 ✅ | Publish wizard | `write-3-publish-wizard.md` | **COMPLETE.** 4-step wizard: targets → preview/splits → quality checks → now/schedule; per-step config |
-| 4 | Kanban board | `write-4-kanban.md` | **WRITTEN, ready to start.** Ideas / Writing / Editing / Scheduled columns over the existing sidecar |
-| 5 | Sources | `write-5-sources.md` (unwritten) | GitHub Gist as a draft source; deeper Mataroa (list/edit existing posts) |
+| 4 ✅ | Kanban board | `write-4-kanban.md` | **COMPLETE.** Ideas / Writing / Editing / Scheduled over the existing sidecar; a pop-open panel, built to survive being moved to its own screen |
+| 5 | Sources | `write-5-sources.md` | **WRITTEN, ready to start.** GitHub Gist as a draft source; deeper Mataroa (list/edit existing posts) |
 
 Sprints 3–5 are named here so nobody re-invents the sequence, but are **not yet written**. Write
 each one at the start of its own session, grounded in what sprints 1–2 actually shipped.
