@@ -2,6 +2,7 @@ import { effect, Injectable, signal, WritableSignal } from '@angular/core';
 import { scopedKey } from './account-scope';
 import { isCanaryBuild } from './build-flavor';
 import { ProviderId } from './models';
+import { DEFAULT_PKM_VOCABULARY, PkmVocabulary, normalizeVocabulary } from './pkm/pkm-tags';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
 
@@ -20,6 +21,16 @@ const HIDDEN_PROVIDERS_KEY_BASE = 'mockingbird_hidden_providers';
  * key rather than a slot in the shared prefs blob.
  */
 const DEFAULT_VISIBILITY_KEY_BASE = 'mockingbird_default_visibility';
+
+/**
+ * The words that mean `#NOTE`, `#TODO` and `#CAL` for this account.
+ *
+ * Account-scoped for the same reason as the two above, plus one of its own:
+ * these are language-specific. Someone with an English account and a German one
+ * wants `#TODO` on the first and `#AUFGABE` on the second, and a global setting
+ * would make one of them wrong every time they switch.
+ */
+const PKM_VOCABULARY_KEY_BASE = 'mockingbird_pkm_vocabulary';
 
 const PROVIDER_IDS: ProviderId[] = [
   'mastodon',
@@ -236,6 +247,7 @@ interface StoredPrefs {
   analytics?: boolean;
   requireAltText?: boolean;
   thoughtfulPosting?: boolean;
+  warnOnPkmPublish?: boolean;
   customBg?: CustomColor;
   customLink?: CustomColor;
   customSidebar?: CustomColor;
@@ -465,6 +477,18 @@ export class ClientPrefs {
    * `gateable` input for which surfaces opt in.
    */
   readonly thoughtfulPosting = signal<boolean>(false);
+
+  /**
+   * The words that mark a post as a note, a to-do or a calendar item.
+   *
+   * Configurable because `#TODO` is English; see {@link PkmVocabulary}. An empty
+   * list for a kind means the user switched that kind off, and is preserved
+   * rather than being restored to the default.
+   */
+  readonly pkmVocabulary = signal<PkmVocabulary>(DEFAULT_PKM_VOCABULARY);
+
+  /** Whether to warn before publishing a post carrying a PKM tag. */
+  readonly warnOnPkmPublish = signal<boolean>(true);
 
   // Custom colors (null = keep the theme's own value).
   readonly customBg = signal<CustomColor>(null);
@@ -985,6 +1009,8 @@ export class ClientPrefs {
     }
     this.loadHiddenProviders(stored);
     this.loadDefaultVisibility();
+    this.loadPkmVocabulary();
+    this.loadBool(stored.warnOnPkmPublish, this.warnOnPkmPublish);
     // 'everyone' was this setting's name for 'all' before the Bots filter
     // arrived. Migrated rather than dropped: silently resetting someone's chat
     // filter is the kind of small betrayal nobody reports but everybody notices.
@@ -1089,6 +1115,7 @@ export class ClientPrefs {
       analytics: this.analytics(),
       requireAltText: this.requireAltText(),
       thoughtfulPosting: this.thoughtfulPosting(),
+      warnOnPkmPublish: this.warnOnPkmPublish(),
       customBg: this.customBg(),
       customLink: this.customLink(),
       customSidebar: this.customSidebar(),
@@ -1110,6 +1137,48 @@ export class ClientPrefs {
       JSON.stringify(this.hiddenProviders()),
     );
     localStorage.setItem(scopedKey(DEFAULT_VISIBILITY_KEY_BASE), this.defaultVisibility());
+    // Its own scoped key, not the shared blob: the vocabulary is per-account and
+    // language-specific, so it must not follow the user to another login.
+    localStorage.setItem(scopedKey(PKM_VOCABULARY_KEY_BASE), JSON.stringify(this.pkmVocabulary()));
+  }
+
+  /**
+   * Load this account's PKM vocabulary.
+   *
+   * A *missing* key means "never configured" and takes the default. A key that
+   * is present but has an empty list for a kind means the user switched that
+   * kind off, and is honoured exactly as stored — which is the whole reason
+   * this cannot be merged into the default on read.
+   */
+  private loadPkmVocabulary(): void {
+    let raw: string | null;
+    try {
+      raw = localStorage.getItem(scopedKey(PKM_VOCABULARY_KEY_BASE));
+    } catch {
+      return;
+    }
+    if (!raw) {
+      return;
+    }
+    try {
+      this.pkmVocabulary.set(normalizeVocabulary(JSON.parse(raw) as Partial<PkmVocabulary>));
+    } catch {
+      // Corrupt value: keep the default rather than leaving the user with no
+      // working tags at all.
+    }
+  }
+
+  /**
+   * Replace the PKM vocabulary, normalizing whatever the settings page
+   * collected. The constructor's effect persists it; no explicit write here.
+   */
+  setPkmVocabulary(vocab: Partial<PkmVocabulary>): void {
+    this.pkmVocabulary.set(normalizeVocabulary(vocab));
+  }
+
+  /** Restore the built-in words, for the settings page's reset affordance. */
+  resetPkmVocabulary(): void {
+    this.pkmVocabulary.set(DEFAULT_PKM_VOCABULARY);
   }
 
   /**

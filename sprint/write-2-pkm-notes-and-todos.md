@@ -1,6 +1,6 @@
 # Write — Sprint 2: notes and to-dos (the writing slice of PKM)
 
-Status: PLANNED
+Status: COMPLETE (implemented 2026-08-08; not yet smoke-tested against a live account)
 
 Read `write-0-overview.md` and `write-1-workspace-and-zen.md` first — including its **Delivered**
 and **Found while implementing** sections, which are this sprint's ground truth. **Sprint 1 is
@@ -284,3 +284,84 @@ purpose.
 `npm run lint`, `npm run format:check`, `npm run test:ci`, `npm run build`, and
 `npm run build:mockingbird` all pass. Append **Delivered** and **Found while implementing** sections
 to this file. Sprint 3 (the publish wizard) is written *after* this lands, grounded in what shipped.
+
+---
+
+## Delivered
+
+### New files
+
+| File | What it is |
+| --- | --- |
+| `pkm/pkm-tags.ts` (+spec) | The pure model. `pkmKinds`, `withPkmTag`, vocabulary parsing/normalizing. No Angular, no HTTP. |
+| `pkm/pkm-source.ts` (+spec) | `PkmSource` — local drafts + tagged self-posts, merged, with the anonymous fast path. |
+| `pages/settings/writing/settings-writing.{ts,html}` | The vocabulary editor and the publish-warning toggle. |
+
+### Changed
+
+- `client-prefs.ts` — `pkmVocabulary` (account-scoped, own key `mockingbird_pkm_vocabulary`) with
+  `setPkmVocabulary` / `resetPkmVocabulary`; `warnOnPkmPublish` (global blob, defaults **on**).
+- `pages/write/write-page.{ts,html,css}` — the notes pane replaces the placeholder; a **Notes &
+  to-dos** tab beside the editor; the jot box; `openNote()`.
+- `compose/compose.{ts,html}` — `pkmWarning` signal, `confirmPkmAndSend()`,
+  `dismissPkmWarning()`, and `submit()` split so `finishSubmit()` is the shared tail.
+- `status-card/status-card.{ts,html}` — **Save as to-do** in all three `⋯` menus, reusing the
+  existing `actionNotice`.
+- `app.routes.ts` + `settings-shell.ts` — `/settings/writing`, anonymous-capable, listed after
+  "Posting & Privacy".
+
+### Decisions taken while building
+
+- **The status-card action saves a local draft and posts nothing.** One click on a menu must never
+  publish, not even `direct` to an audience of one. The self-post variant stays a `/write` decision.
+- **A jotted note gets `demand` split mode.** A one-line note reopened under the `---` default
+  would let a stray dash split "a note --- with a dash" into two posts.
+- **The notes tab keeps the editor in the DOM** (`.hidden-tab { display: none }`) rather than
+  `@if`-ing it away, so switching tabs mid-paragraph cannot destroy an unsaved body.
+- **Kind counts count an item once per kind.** A post tagged `#NOTE #TODO` shows under both chips,
+  so the chip totals deliberately sum to more than the item count.
+- **`isSelfNote` drops the 30-day bound but keeps everything else** — including the rule that a
+  *missing* `mentions` array means "not a note". That is a privacy decision, and it was left intact.
+
+## Found while implementing
+
+**Splitting `submit()` was necessary, not tidying — and a bug in itself.** The language-mismatch
+dialog's "Post as X" called `send()` directly. Adding the PKM check to `submit()` would have meant
+a post that tripped *both* warnings silently skipped the second one. `submit()` now ends by calling
+`finishSubmit()`, and `confirmLanguageAndSend()` resumes there rather than at `send()`.
+
+**Two services now scan `/accounts/:id/statuses` on `/write`** — `DraftSources` looking for
+post-to-self *drafts*, `PkmSource` looking for tagged *notes*. They want different age windows (30
+vs 180 days) so merging them would have meant one of the two lying. The cost is one duplicated
+request on page entry; specs use a `flushStatusScans()` helper because `expectOne` is wrong here by
+construction. **Worth revisiting** if a third consumer appears — at that point a shared, cached
+own-statuses reader earns its keep.
+
+**An empty word list has to survive the round trip.** "Switched off" and "never configured" are
+different states, and normalizing on read would have collapsed them — a user who cleared `#CAL`
+would find it back the next morning. `loadPkmVocabulary` returns early only when the key is
+*absent*; a present-but-empty list is honoured, and the settings page says which kinds are off.
+
+**`ClientPrefs` persists via a constructor effect**, so the explicit `persist()` calls in the first
+draft of the vocabulary setters were both redundant and reaching into a private method. Removed.
+
+**A settings page was the right home, not `blue-controls.html`.** That cluster is a column of
+switches; this is three text fields, an explanation of the matching rules, and a live "these kinds
+are off" warning. It also had to be anonymous-capable, which the posting page (server-backed via
+`verifyCredentials`) is not.
+
+## Verification
+
+- `npm run lint`, `npm run format:check` — pass.
+- `npm run test:ci` — **3562 tests pass, 0 fail** (62 added this sprint). Manifest updated.
+- `npm run build`, `npm run build:mockingbird` — pass. Only the two pre-existing budget warnings.
+
+## Carried forward
+
+- **Not smoke-tested against a live account.** Two specific unknowns: whether a real
+  `/accounts/:id/statuses` history produces false positives for `isSelfNote`, and whether the
+  3-page scan is fast enough on a prolific account. Check `/observability` after a real run.
+- **`#CAL` is recognized and nothing more** — no date parsing, no calendar. As scoped.
+- **The self-post variant of "Save as to-do" is not built.** The menu action is local-only; making
+  a note that follows you between devices is still a manual `direct` post.
+- **The duplicated own-statuses scan**, above.

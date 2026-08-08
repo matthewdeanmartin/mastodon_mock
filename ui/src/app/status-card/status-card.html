@@ -637,6 +637,11 @@
                 <details class="danger-menu" (click)="$event.stopPropagation()">
                   <summary class="action" aria-label="More post actions">•••</summary>
                   <div class="danger-menu-panel">
+                    <!-- "Reply to this later." Parks a local draft; publishes
+                       nothing, so it works anonymously too. -->
+                    @if (todosEnabled()) {
+                      <button type="button" (click)="saveAsTodo($event)">Save as to-do</button>
+                    }
                     @if (display.url) {
                       <a
                         [href]="display.url"
@@ -666,6 +671,11 @@
               <details class="danger-menu" (click)="$event.stopPropagation()">
                 <summary class="action" aria-label="More post actions">•••</summary>
                 <div class="danger-menu-panel">
+                  <!-- "Reply to this later." Parks a local draft; publishes
+                       nothing, so it works anonymously too. -->
+                  @if (todosEnabled()) {
+                    <button type="button" (click)="saveAsTodo($event)">Save as to-do</button>
+                  }
                   @if (display.url) {
                     <a
                       [href]="display.url"
@@ -738,6 +748,11 @@
             <details class="danger-menu" (click)="$event.stopPropagation()">
               <summary class="action" aria-label="More post actions">•••</summary>
               <div class="danger-menu-panel">
+                <!-- "Reply to this later." Parks a local draft; publishes
+                       nothing, so it works anonymously too. -->
+                @if (todosEnabled()) {
+                  <button type="button" (click)="saveAsTodo($event)">Save as to-do</button>
+                }
                 @if (display.url) {
                   <a
                     [href]="display.url"

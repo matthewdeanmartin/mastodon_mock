@@ -75,6 +75,9 @@ interface ComposeInternals {
   langMismatch: WritableSignal<{ picked: string; detected: string } | null>;
   onLanguageChange(code: string): void;
   dismissLangMismatch(): void;
+  pkmWarning: WritableSignal<string[] | null>;
+  confirmPkmAndSend(): void;
+  dismissPkmWarning(): void;
   showReplyMentionHint: Signal<boolean>;
   shortenError: WritableSignal<string | null>;
   shortenerConsentPrompt: WritableSignal<{
@@ -364,6 +367,83 @@ describe('Compose', () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0].id).toBe('100');
+  });
+
+  // ------------------------------------------------------- PKM publish warning
+
+  it('warns instead of publishing when the post is tagged as a to-do', () => {
+    const f = setUp();
+    internals(f).text.set('answer this later #todo');
+    internals(f).submit();
+
+    // The absence of the request is the only thing that really proves it.
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).pkmWarning()).toEqual(['todo']);
+  });
+
+  it('names every kind the post carries', () => {
+    const f = setUp();
+    internals(f).text.set('#note and #todo');
+    internals(f).submit();
+
+    expect(internals(f).pkmWarning()).toEqual(['todo', 'note']);
+    httpMock.expectNone('/api/v1/statuses');
+  });
+
+  it('publishes when the warning is confirmed', () => {
+    const f = setUp();
+    internals(f).text.set('deliberately public #note');
+    internals(f).submit();
+    internals(f).confirmPkmAndSend();
+
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' } as Status);
+    expect(internals(f).pkmWarning()).toBeNull();
+  });
+
+  it('publishes nothing when the warning is dismissed', () => {
+    const f = setUp();
+    internals(f).text.set('not ready #todo');
+    internals(f).submit();
+    internals(f).dismissPkmWarning();
+
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).pkmWarning()).toBeNull();
+  });
+
+  it('does not warn about an untagged post', () => {
+    const f = setUp();
+    internals(f).text.set('an ordinary post');
+    internals(f).submit();
+
+    expect(internals(f).pkmWarning()).toBeNull();
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' } as Status);
+  });
+
+  it('does not warn when the user turned the warning off', () => {
+    TestBed.inject(ClientPrefs).warnOnPkmPublish.set(false);
+    const f = setUp();
+    internals(f).text.set('publishing notes on purpose #note');
+    internals(f).submit();
+
+    expect(internals(f).pkmWarning()).toBeNull();
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' } as Status);
+  });
+
+  it('respects a custom vocabulary in both directions', () => {
+    TestBed.inject(ClientPrefs).setPkmVocabulary({ note: [], todo: ['aufgabe'], cal: [] });
+    const f = setUp();
+
+    // The English word is no longer a to-do...
+    internals(f).text.set('#todo');
+    internals(f).submit();
+    expect(internals(f).pkmWarning()).toBeNull();
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' } as Status);
+
+    // ...and the configured one is.
+    internals(f).text.set('#aufgabe');
+    internals(f).submit();
+    expect(internals(f).pkmWarning()).toEqual(['todo']);
+    httpMock.expectNone('/api/v1/statuses');
   });
 
   it('submit() resets the composer after a successful post', () => {

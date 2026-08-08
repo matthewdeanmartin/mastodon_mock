@@ -1,0 +1,74 @@
+<div class="spage-head">
+  <h1>✍ Writing</h1>
+  <p>
+    Tag a draft or a private post <code>#NOTE</code> or <code>#TODO</code> and it becomes a
+    productivity object: it shows up beside the editor in <a routerLink="/write">Write</a>, instead
+    of you having to go looking for it.
+  </p>
+  <p class="muted">
+    A <strong>note</strong> is something you wrote down to keep. A <strong>to-do</strong> is
+    something you owe a reply to — "answer this later", "write about this later". Both live either
+    in this browser as drafts, or on the server as posts only you can see.
+  </p>
+</div>
+
+<div class="spage-body">
+  <h2>Your words</h2>
+  <p class="muted small">
+    <code>#TODO</code> is English, and this feature is useless if the word isn't yours. Set your own
+    — comma-separated, and any of them will match. Tags are matched whole and case-insensitively, so
+    <code>#TODO</code> and <code>#todo</code> are the same tag but <code>#todos</code> is not.
+  </p>
+
+  @for (kind of kinds; track kind) {
+    <label class="pkm-field">
+      <span class="pkm-field-label">Words that mean "{{ noun(kind) }}"</span>
+      <input
+        type="text"
+        [ngModel]="fields()[kind]"
+        (ngModelChange)="setField(kind, $event)"
+        [attr.placeholder]="defaultsFor(kind)"
+        [attr.name]="'pkm-' + kind"
+      />
+    </label>
+  }
+
+  @if (disabledKinds().length) {
+    <p class="muted small" role="status">
+      ⚠ Left empty, so switched off:
+      @for (kind of disabledKinds(); track kind) {
+        <strong>{{ noun(kind) }}</strong>
+        @if (!$last) {
+          ,
+        }
+      }
+      . Nothing will be filed under {{ disabledKinds().length === 1 ? 'it' : 'them' }} until you
+      give {{ disabledKinds().length === 1 ? 'it a word' : 'them words' }}.
+    </p>
+  }
+
+  <div class="pkm-actions">
+    <button class="btn" type="button" (click)="save()">Save words</button>
+    <button class="btn btn-outline" type="button" (click)="reset()">Restore defaults</button>
+    @if (saved()) {
+      <span class="muted small" role="status">✓ Saved</span>
+    }
+  </div>
+
+  <h2>Publishing</h2>
+  <label class="pkm-toggle">
+    <input
+      type="checkbox"
+      [ngModel]="prefs.warnOnPkmPublish()"
+      (ngModelChange)="toggleWarn($event)"
+      name="warnOnPkmPublish"
+    />
+    <span>
+      Warn me before publishing something tagged as a note or a to-do
+      <span class="muted small">
+        A note to yourself and a post to your followers look identical in the composer. This is the
+        one thing standing between them.
+      </span>
+    </span>
+  </label>
+</div>

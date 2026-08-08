@@ -6,6 +6,7 @@ import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
+import { Drafts } from '../drafts';
 import { Status, Translation } from '../models';
 import { StatusCard } from './status-card';
 import {
@@ -1252,6 +1253,54 @@ describe('StatusCard', () => {
 
       expect(redraftInternals(f).redrafting()).toBe(false);
       expect(deleted.map((s) => s.id)).toEqual(['1']);
+    });
+  });
+
+  // ------------------------------------------------------------- save as to-do
+
+  describe('save as to-do', () => {
+    interface TodoInternals {
+      saveAsTodo(event: Event): void;
+      todosEnabled(): boolean;
+      actionNotice: WritableSignal<string | null>;
+    }
+
+    function todoInternals(f: ComponentFixture<StatusCard>): TodoInternals {
+      return f.componentInstance as unknown as TodoInternals;
+    }
+
+    it('parks a local draft and publishes nothing at all', () => {
+      const f = setUp();
+      todoInternals(f).saveAsTodo(fakeEvent());
+
+      // One menu click must never post — not even to an audience of one.
+      expect(httpMock.match((r) => r.method === 'POST')).toHaveLength(0);
+      const drafts = TestBed.inject(Drafts).drafts();
+      expect(drafts).toHaveLength(1);
+      expect(drafts[0].segments[0]).toContain('#todo');
+      expect(drafts[0].quotedStatusId).toBe('1');
+    });
+
+    it('says what happened, and that nothing was posted', () => {
+      const f = setUp();
+      todoInternals(f).saveAsTodo(fakeEvent());
+
+      expect(todoInternals(f).actionNotice()).toContain('Nothing was posted');
+    });
+
+    it('uses the account own word for a to-do', () => {
+      TestBed.inject(ClientPrefs).setPkmVocabulary({ note: [], todo: ['aufgabe'], cal: [] });
+      const f = setUp();
+      todoInternals(f).saveAsTodo(fakeEvent());
+
+      expect(TestBed.inject(Drafts).drafts()[0].segments[0]).toContain('#aufgabe');
+    });
+
+    it('offers nothing when the user has switched to-dos off', () => {
+      TestBed.inject(ClientPrefs).setPkmVocabulary({ note: ['note'], todo: [], cal: [] });
+      const f = setUp();
+
+      expect(todoInternals(f).todosEnabled()).toBe(false);
     });
   });
 

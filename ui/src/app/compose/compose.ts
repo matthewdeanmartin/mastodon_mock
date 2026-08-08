@@ -23,6 +23,7 @@ import { AiAvailability } from '../ai-availability';
 import { TranslateDialog, TranslateResult } from './translate-dialog/translate-dialog';
 import { CustomEmojis } from '../custom-emojis';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
+import { PkmKind, pkmKinds, pkmLabel } from '../pkm/pkm-tags';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
 import { ComposeOptions, MediaAttachment, Status } from '../models';
 import { BlueskyApi } from '../providers/bluesky/bluesky-api';
@@ -510,6 +511,16 @@ export class Compose implements OnDestroy {
    * confirms and posts anyway.
    */
   protected langMismatch = signal<{ picked: string; detected: string } | null>(null);
+
+  /**
+   * The PKM kinds a post about to be published carries, while the "this is
+   * tagged as a note" warning is up. Null when there is no warning showing.
+   *
+   * A warning rather than a block: a public `#NOTE` post is a legitimate thing
+   * to want, and a hard block on a hashtag would be infuriating the first time
+   * it was wrong.
+   */
+  protected pkmWarning = signal<PkmKind[] | null>(null);
 
   /**
    * A mismatch the user explicitly dismissed ("keep editing"). While the picked
@@ -1277,10 +1288,15 @@ export class Compose implements OnDestroy {
     return top.lang;
   }
 
-  /** Post anyway despite the language mismatch (keeps the user's picked value). */
+  /**
+   * Post anyway despite the language mismatch (keeps the user's picked value).
+   *
+   * Resumes at {@link finishSubmit} rather than calling `send()`, so clearing
+   * one warning cannot skip the PKM one behind it.
+   */
   confirmLanguageAndSend(): void {
     this.langMismatch.set(null);
-    this.send();
+    this.finishSubmit();
   }
 
   /** Adopt the detected language into the picker and dismiss the warning. */
@@ -1291,6 +1307,26 @@ export class Compose implements OnDestroy {
     }
     this.langMismatch.set(null);
     this.dismissedMismatch.set(null);
+  }
+
+  /** Publish anyway, knowing it carries a note or to-do tag. */
+  confirmPkmAndSend(): void {
+    // Left set while `finishSubmit` re-runs, so the check reads "already warned"
+    // and falls through instead of raising the same dialog again.
+    this.finishSubmit();
+    this.pkmWarning.set(null);
+  }
+
+  /** Go back to editing — the usual outcome, and the default. */
+  dismissPkmWarning(): void {
+    this.pkmWarning.set(null);
+  }
+
+  /** How to name the kinds in the warning ("a to-do", "a note and a to-do"). */
+  protected pkmWarningLabel(): string {
+    const vocab = this.prefs.pkmVocabulary();
+    const kinds = this.pkmWarning() ?? [];
+    return kinds.map((kind) => pkmLabel(kind, vocab)).join(' and ');
   }
 
   /**
@@ -1648,6 +1684,27 @@ export class Compose implements OnDestroy {
         !alreadyDismissed
       ) {
         this.langMismatch.set({ picked: this.postLanguage(), detected });
+        return;
+      }
+    }
+    this.finishSubmit();
+  }
+
+  /**
+   * The tail of {@link submit}, after the language check.
+   *
+   * Split out because "post anyway despite the language warning" resumes here —
+   * if it called `send()` directly it would skip the PKM warning below, and a
+   * user who hit one warning would silently miss the other.
+   */
+  private finishSubmit(): void {
+    // A note to yourself and a post to your followers look identical in this
+    // box. Checked here rather than in the template for the same reason the
+    // gate above is: a hotkey or a future call site must not publish around it.
+    if (this.prefs.warnOnPkmPublish() && this.pkmWarning() === null) {
+      const kinds = pkmKinds(this.segments().join('\n'), this.prefs.pkmVocabulary());
+      if (kinds.length) {
+        this.pkmWarning.set(kinds);
         return;
       }
     }

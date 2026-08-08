@@ -21,6 +21,8 @@ import { hashtagNameFrom } from '../rendered-html-links';
 import { ClientPrefs } from '../client-prefs';
 import { Terminology } from '../terminology';
 import { Compose } from '../compose/compose';
+import { Drafts } from '../drafts';
+import { withPkmTag } from '../pkm/pkm-tags';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
@@ -152,6 +154,8 @@ export class StatusCard {
   private api = inject(Api);
   protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
+  /** For "Save as to-do", which parks a local draft rather than publishing. */
+  private drafts = inject(Drafts);
   private actions = inject(StatusActions);
   private router = inject(Router);
   private mutedPosts = inject(MutedPosts);
@@ -566,6 +570,43 @@ export class StatusCard {
       return;
     }
     this.api.deleteStatus(this.display.id).subscribe(() => this.deleted.emit(this.status()));
+  }
+
+  // --- save as to-do ---
+
+  /**
+   * Park this post as a to-do: "reply to this later", "write about this later".
+   *
+   * Saved as a **local draft** quoting the post, not as a published self-post.
+   * A `direct` post is a real post on a real server, and one click on a menu
+   * should never publish anything — not even to an audience of one. The
+   * self-post variant is reachable from /write, deliberately, because choosing
+   * "this should follow me between devices" deserves more than a menu item.
+   *
+   * Works anonymously for the same reason: a local draft needs no server.
+   */
+  saveAsTodo(event: Event): void {
+    event.stopPropagation();
+    const vocab = this.prefs.pkmVocabulary();
+    const handle = qualifiedHandle(this.display.account);
+    const url = this.display.url || '';
+    const body = withPkmTag(`Re: @${handle}${url ? ` ${url}` : ''}`, 'todo', vocab);
+    this.drafts.save({
+      segments: [body],
+      spoilerText: '',
+      sensitive: false,
+      visibility: this.prefs.defaultVisibility(),
+      poll: null,
+      quotedStatusId: this.display.id,
+      target: 'fedi',
+    });
+    this.actionNotice.set('Saved as a to-do in your drafts. Nothing was posted.');
+    setTimeout(() => this.actionNotice.set(null), 4000);
+  }
+
+  /** Whether the to-do kind has any configured word — an empty list means off. */
+  protected todosEnabled(): boolean {
+    return this.prefs.pkmVocabulary().todo.length > 0;
   }
 
   // --- delete & repost ---

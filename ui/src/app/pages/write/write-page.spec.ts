@@ -5,8 +5,11 @@ import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
+import { ClientPrefs } from '../../client-prefs';
 import { Drafts } from '../../drafts';
 import { Account, ScheduledStatus, Status } from '../../models';
+import { PkmItem } from '../../pkm/pkm-source';
+import { PkmKind } from '../../pkm/pkm-tags';
 import { PasteHistory } from '../../providers/paste/paste-history';
 import { WritingZen } from '../../writing-zen';
 import { DraftItem } from '../drafts/draft-items';
@@ -24,6 +27,13 @@ interface PageInternals {
   segments: Signal<Segment[]>;
   splitMode: Signal<SplitMode>;
   sources: DraftSources;
+  tab: WritableSignal<'write' | 'notes'>;
+  jotText: WritableSignal<string>;
+  jotKind: WritableSignal<PkmKind>;
+  pkmVisible: Signal<PkmItem[]>;
+  jot(): void;
+  openNote(item: PkmItem): void;
+  setPkmFilter(kind: PkmKind | null): void;
   newDraft(): void;
   open(item: DraftItem): void;
   save(): void;
@@ -44,7 +54,6 @@ function internals(fixture: ComponentFixture<WritePage>): PageInternals {
 
 const ACCOUNT_ID = 'me-1';
 const SCHEDULED_URL = '/api/v1/scheduled_statuses';
-const STATUSES_URL = `/api/v1/accounts/${ACCOUNT_ID}/statuses?limit=40`;
 
 function selfStatus(id: string, content: string): Status {
   return {
@@ -108,6 +117,19 @@ describe('WritePage', () => {
     return fixture;
   }
 
+  /**
+   * Answer every scan of the account's own statuses with the same rows.
+   *
+   * Two services read that endpoint on this page — `DraftSources` looking for
+   * post-to-self drafts, `PkmSource` looking for tagged notes — so `expectOne`
+   * is wrong here by construction.
+   */
+  function flushStatusScans(rows: Status[]): void {
+    for (const request of httpMock.match((r) => r.url.includes('/statuses'))) {
+      request.flush(rows);
+    }
+  }
+
   function saveLocal(segments: string[]): string {
     return TestBed.inject(Drafts).save({
       segments,
@@ -149,7 +171,8 @@ describe('WritePage', () => {
     signIn();
     const fixture = setUp();
     httpMock.expectOne(SCHEDULED_URL).flush([]);
-    httpMock.expectOne(STATUSES_URL).flush([selfStatus('s1', 'a private note')]);
+    // DraftSources and PkmSource both scan the account's own statuses.
+    flushStatusScans([selfStatus('s1', 'a private note')]);
     fixture.detectChanges();
 
     const page = internals(fixture);
@@ -169,7 +192,7 @@ describe('WritePage', () => {
     signIn();
     const fixture = setUp();
     httpMock.expectOne(SCHEDULED_URL).flush([parked('p1')]);
-    httpMock.expectOne(STATUSES_URL).flush([]);
+    flushStatusScans([]);
     fixture.detectChanges();
 
     const page = internals(fixture);
@@ -475,6 +498,129 @@ describe('WritePage', () => {
     expect(workspace.splitMode('local:long-gone')).toBe('rule');
     // The draft that still exists keeps its mode.
     expect(workspace.splitMode(`local:${id}`)).toBe('demand');
+  });
+
+  // -------------------------------------------------------------------- notes
+
+  it('jotting a note saves a new draft and leaves the open one alone', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const page = internals(setUp());
+    page.newDraft();
+    page.onBodyInput('the piece I am in the middle of');
+
+    page.jotText.set('remember the milk');
+    page.jot();
+
+    // The note was saved...
+    const drafts = TestBed.inject(Drafts).drafts();
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].segments[0]).toBe('remember the milk #note');
+    // ...and the editor is exactly where it was.
+    expect(page.body()).toBe('the piece I am in the middle of');
+    expect(page.pendingSwitch()).toBeNull();
+    expect(page.jotText()).toBe('');
+  });
+
+  it('a jotted note opens as one post, not split on a stray dash', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const page = internals(setUp());
+    page.jotText.set('a note --- with a dash');
+    page.jot();
+
+    const id = TestBed.inject(Drafts).drafts()[0].id;
+    expect(TestBed.inject(WriteWorkspace).splitMode(`local:${id}`)).toBe('demand');
+  });
+
+  it('jots the kind the user picked, in their own word', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    TestBed.inject(ClientPrefs).setPkmVocabulary({ note: ['notiz'], todo: ['aufgabe'], cal: [] });
+    const page = internals(setUp());
+
+    page.jotKind.set('todo');
+    page.jotText.set('etwas erledigen');
+    page.jot();
+
+    expect(TestBed.inject(Drafts).drafts()[0].segments[0]).toBe('etwas erledigen #aufgabe');
+  });
+
+  it('does not jot an empty note', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const page = internals(setUp());
+    page.jotText.set('   ');
+    page.jot();
+
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(0);
+  });
+
+  it('shows tagged drafts in the notes list and filters by kind', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    saveLocal(['a plain draft']);
+    saveLocal(['reply to this #todo']);
+    saveLocal(['keep this #note']);
+    const page = internals(setUp());
+
+    expect(page.pkmVisible()).toHaveLength(2);
+    page.setPkmFilter('todo');
+    expect(page.pkmVisible().map((i) => i.preview)).toEqual(['reply to this #todo']);
+  });
+
+  it('opening a local note continues it in place', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    saveLocal(['keep this #note']);
+    const page = internals(setUp());
+
+    page.openNote(page.pkmVisible()[0]);
+    page.onBodyInput('keep this, edited #note');
+    page.save();
+
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(1);
+  });
+
+  it('opening a self-post note takes a copy and leaves the post alone', () => {
+    signIn();
+    const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([selfStatus('s1', 'a tagged private note #note')]);
+    fixture.detectChanges();
+
+    const page = internals(fixture);
+    const note = page.pkmVisible().find((i) => i.source.kind === 'self')!;
+    page.openNote(note);
+    expect(page.body()).toBe('a tagged private note #note');
+    // A copy: nothing saved, and the original is still listed.
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(0);
+    expect(page.pkmVisible().some((i) => i.id === 's1')).toBe(true);
+  });
+
+  it('hides the notes pane in writing zen', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    saveLocal(['keep this #note']);
+    const fixture = setUp();
+    const page = internals(fixture);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.pane-right')).toBeTruthy();
+
+    page.enterZen();
+    fixture.detectChanges();
+
+    // The whole point of writing zen: your own notes are a distraction too.
+    expect(fixture.nativeElement.querySelector('.pane-right')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.jot')).toBeNull();
+  });
+
+  it('keeps the editor body when switching to the notes tab and back', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('half a paragraph');
+
+    page.tab.set('notes');
+    fixture.detectChanges();
+    page.tab.set('write');
+    fixture.detectChanges();
+
+    expect(page.body()).toBe('half a paragraph');
   });
 
   it('remembers a split mode per draft across reopens', () => {

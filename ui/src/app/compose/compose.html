@@ -629,6 +629,21 @@
       </div>
     </div>
   }
+  <!-- A note to yourself and a post to your followers look identical in the box
+       above. This is the one thing standing between them. "Keep editing" is
+       first and is the expected outcome. -->
+  @if (pkmWarning()) {
+    <div class="lang-mismatch" role="alert">
+      <p>
+        This is tagged <strong>{{ pkmWarningLabel() }}</strong
+        >. Publishing posts it to your followers.
+      </p>
+      <div class="lang-mismatch-actions">
+        <button class="btn" (click)="dismissPkmWarning()">Keep editing</button>
+        <button class="btn btn-outline" (click)="confirmPkmAndSend()">Publish anyway</button>
+      </div>
+    </div>
+  }
   @if (postError(); as err) {
     <div class="post-error" role="alert">
       <span class="post-error-label">Not posted</span>

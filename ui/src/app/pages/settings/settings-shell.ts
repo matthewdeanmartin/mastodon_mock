@@ -49,6 +49,7 @@ export class SettingsShell {
     // Many feeds rather than one account, so deliberately not a "connection".
     { label: 'RSS feeds', path: 'rss', exact: true, anonymous: true },
     { label: 'Posting & Privacy', path: 'privacy', exact: true },
+    { label: 'Writing', path: 'writing', exact: true, anonymous: true },
     // Appearance is client-side (theme/accent/undo-send in localStorage) and works
     // against any instance; the page hides its server-backed rows off-mock itself.
     { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },

@@ -338,6 +338,15 @@ export const routes: Routes = [
             redirectTo: 'privacy',
           },
           {
+            // Anonymous-capable: a note can be a browser-local draft, so the
+            // whole feature works without a server identity.
+            path: 'writing',
+            title: 'Writing',
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/writing/settings-writing').then((m) => m.SettingsWriting),
+          },
+          {
             path: 'notifications',
             title: 'Inbox',
             canActivate: [anonymousUnavailableGuard],

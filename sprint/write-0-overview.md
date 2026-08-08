@@ -87,8 +87,8 @@ Sprints do **not** run in parallel. Each is one Claude session; each ends green
 | # | Sprint | File | Delivers |
 | --- | --- | --- | --- |
 | 1 ✅ | Workspace shell + zen | `write-1-workspace-and-zen.md` | **COMPLETE.** `/write` route, wide 3-pane layout, split-by-`---`, writing zen, the workspace sidecar, `Drafts.update()` |
-| 2 | Notes and to-dos (writing slice of PKM) | `write-2-pkm-notes-and-todos.md` | `#NOTE`/`#TODO` model, configurable tag words, the notes pane, PKM tab, quote-to-self-with-`#TODO`, publish warning |
-| 3 | Publish wizard | `write-3-publish-wizard.md` (unwritten) | 4-step wizard: targets → preview/splits → quality checks → now/schedule; skip-steps config |
+| 2 ✅ | Notes and to-dos (writing slice of PKM) | `write-2-pkm-notes-and-todos.md` | **COMPLETE.** `#NOTE`/`#TODO`/`#CAL` model, configurable tag words, the notes pane and tab, jot box, Save-as-to-do, publish warning |
+| 3 | Publish wizard | `write-3-publish-wizard.md` | **WRITTEN, ready to start.** 4-step wizard: targets → preview/splits → quality checks → now/schedule; skip-steps config |
 | 4 | Kanban board | `write-4-kanban.md` (unwritten) | Ideas / Writing / Editing / Scheduled columns over a localStorage sidecar status map |
 | 5 | Sources | `write-5-sources.md` (unwritten) | GitHub Gist as a draft source; deeper Mataroa (list/edit existing posts) |
 
@@ -124,11 +124,18 @@ each one at the start of its own session, grounded in what sprints 1–2 actuall
 - **Split default is `---`.** Explicit, predictable, matches the Markdown mental model and blog
   front-matter. Autosplit and split-on-demand are opt-in per draft.
 - **Gist is sprint 5, not 1–2.** Sprints 1–2 are UI and model work over what already exists.
-- **The workspace editor is a plain textarea, not `<app-compose>`.** Decided during sprint 1 and
-  recorded here because the plan originally said otherwise. `<app-compose>` is 2130 lines built
-  around *publishing* — targets, polls, media, visibility, the thoughtful-posting gate — and the
-  workspace editor does none of that: it writes text, splits it, and saves a draft. Publishing is
-  reached by handing the text to the composer via `Drafts.handoff()`, exactly as `/drafts`' "Edit
-  for post" does, so there is still only one publish path in the app.
+- **Two editors, on purpose. This is not duplication to be cleaned up later.** Confirmed by the
+  boss after sprint 1. They answer to genuinely different constraints:
+
+  | | `<app-compose>` (the quick editor) | The workspace editor |
+  | --- | --- | --- |
+  | Lives in | cramped space — a card, a rail, a reply box | a full-width pane |
+  | Workflow | write → publish, in one go | write → split → check → publish, over days |
+  | Owns | targets, polls, media, visibility, the gate | splitting, quality gates, notes |
+
+  A future picture-focused composer (Instagram-shaped posts) would be a *third*, for the same
+  reason. Do not "unify" these. Publishing stays single-pathed regardless: the workspace hands text
+  to the composer via `Drafts.handoff()`, exactly as `/drafts`' "Edit for post" does, so there is
+  one place that posts even though there are several places that write.
 - **This epic does not build PKM**, only the writing slice of it. See the section above. `#CAL` is
   recognized as a tag but does nothing — no date parsing, no calendar, no scheduling.

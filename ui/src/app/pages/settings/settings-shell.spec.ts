@@ -48,6 +48,9 @@ describe('SettingsShell', () => {
       'Mockingbird Blue',
       'Connections',
       'RSS feeds',
+      // Anonymous-capable: a note can be a browser-local draft, so the PKM tag
+      // vocabulary is configurable without a server identity.
+      'Writing',
       'Appearance',
       'Internationalization',
       'Local storage',

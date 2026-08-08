@@ -17,7 +17,10 @@ import { ClientPrefs } from '../../client-prefs';
 import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { MAX_POST_CHARS } from '../../compose/compose';
+import { stripHtml } from '../../sentiment';
 import { WritingZen } from '../../writing-zen';
+import { PkmItem, PkmSource } from '../../pkm/pkm-source';
+import { PKM_KINDS, PkmKind, pkmLabel, pkmNoun, withPkmTag } from '../../pkm/pkm-tags';
 import { DraftItem, DraftKind, toSnapshot } from '../drafts/draft-items';
 import { DraftSources } from '../drafts/draft-sources';
 import {
@@ -84,11 +87,12 @@ interface PendingSwitch {
 })
 export class WritePage implements OnInit, OnDestroy {
   protected sources = inject(DraftSources);
+  protected pkm = inject(PkmSource);
   protected workspace = inject(WriteWorkspace);
   protected zen = inject(WritingZen);
   protected auth = inject(Auth);
   private drafts = inject(Drafts);
-  private prefs = inject(ClientPrefs);
+  protected prefs = inject(ClientPrefs);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -109,6 +113,22 @@ export class WritePage implements OnInit, OnDestroy {
   protected leftOpen = signal(false);
   protected rightOpen = signal(false);
 
+  /**
+   * Which surface the page is showing.
+   *
+   * The notes list gets a full-width tab as well as the narrow pane because the
+   * to-do list is a *feed*: to-dos are meant to be "read this later" and "write
+   * about this later", but somebody will absolutely put their shopping list in
+   * there. That is not our business — but it does mean the list has a feed's
+   * volume, and a 300px rail is not where you triage a feed.
+   *
+   * Deliberately a tab and not `/pkm`. That route is the front door of the
+   * wider PKM epic (workflow, calendar, bookmarks, links), and claiming it now
+   * with a thin version would mean either a shape that epic has to live with or
+   * a URL that breaks under it.
+   */
+  protected tab = signal<'write' | 'notes'>('write');
+
   /** A switch held up by unsaved work, released or discarded by the dialog. */
   protected pendingSwitch = signal<PendingSwitch | null>(null);
 
@@ -123,6 +143,94 @@ export class WritePage implements OnInit, OnDestroy {
   protected readonly splitModes = SPLIT_MODES;
   protected readonly modeLabel = splitModeLabel;
   protected readonly modeHint = splitModeHint;
+
+  // ----------------------------------------------------------------- the notes
+  //
+  // The virtuous distraction. A reading surface offers trending tags and people
+  // to follow; a writing surface offers the user their own material.
+
+  protected readonly pkmKindList = PKM_KINDS;
+  protected readonly pkmNoun = pkmNoun;
+  /** Null is the "All" chip. */
+  protected pkmFilter = signal<PkmKind | null>(null);
+  /** The one-line jot box at the top of the notes pane. */
+  protected jotText = signal('');
+  protected jotKind = signal<PkmKind>('note');
+
+  protected pkmVisible = computed(() => this.pkm.byKind(this.pkmFilter()));
+
+  /** The chip label, in the user's own configured word. */
+  protected pkmChipLabel(kind: PkmKind): string {
+    return pkmLabel(kind, this.prefs.pkmVocabulary());
+  }
+
+  /** A kind with no configured words is switched off and gets no chip. */
+  protected pkmKindEnabled(kind: PkmKind): boolean {
+    return this.prefs.pkmVocabulary()[kind].length > 0;
+  }
+
+  protected setPkmFilter(kind: PkmKind | null): void {
+    this.pkmFilter.set(kind);
+  }
+
+  protected pkmCount(kind: PkmKind | null): number {
+    return kind ? this.pkm.counts()[kind] : this.pkm.items().length;
+  }
+
+  /**
+   * Open a note in the editor, under exactly the rule the drafts pane follows:
+   * a local one continues in place, a self-post hands over a copy.
+   *
+   * Routed through the same `guard` and the same editing state rather than a
+   * parallel path, so there is one answer to "what happens to my unsaved work".
+   */
+  protected openNote(item: PkmItem): void {
+    this.guard(() => {
+      if (item.source.kind === 'local') {
+        this.openLocal(item.source.draft);
+        return;
+      }
+      this.body.set(stripHtml(item.source.status.content));
+      this.editing.set({
+        key: item.key,
+        localId: null,
+        origin: 'self',
+        title: 'Copy of a private note',
+        savedAt: null,
+      });
+      this.dirty.set(false);
+      this.focusEditor();
+    });
+  }
+
+  /**
+   * Jot a note without leaving the draft you are writing.
+   *
+   * Saves a *new* local draft and deliberately touches nothing else — not the
+   * body, not `editing()`, not the dirty flag. Writing down a stray thought
+   * must not cost you the piece you are in the middle of, and must not trip the
+   * unsaved-work guard on the way.
+   */
+  protected jot(): void {
+    const text = this.jotText().trim();
+    if (!text) {
+      return;
+    }
+    const kind = this.jotKind();
+    const id = this.drafts.save({
+      segments: [withPkmTag(text, kind, this.prefs.pkmVocabulary())],
+      spoilerText: '',
+      sensitive: false,
+      visibility: this.prefs.defaultVisibility(),
+      poll: null,
+      target: 'fedi',
+    });
+    // A jot is one line. Opening it later under the `---` default would invite
+    // a stray dash to split a two-word note into two posts.
+    this.workspace.setSplitMode(`local:${id}`, 'demand');
+    this.jotText.set('');
+    this.flash(`Saved a ${pkmNoun(kind)}.`);
+  }
 
   protected visible = computed(() => {
     const filter = this.filter();
@@ -158,6 +266,7 @@ export class WritePage implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.sources.load();
+    this.pkm.load();
     const draftId = this.route.snapshot.queryParamMap.get('draft');
     if (draftId) {
       const draft = this.drafts.get(draftId);

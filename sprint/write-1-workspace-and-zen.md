@@ -253,11 +253,16 @@ was: the workspace does not publish. It hands to the composer via `Drafts.handof
 `/drafts`' "Edit for post" does. A second publish call site would have needed its own copies of the
 visibility rules, target restoration and the thoughtful-posting gate, and would have drifted.
 
-**`Drafts.update()` was a real gap, not a workspace convenience.** `/drafts`' own save-only editor
-has always appended on resave — save a draft, reopen it, save again, and there are two rows with no
-way to tell which is current. The workspace made it obvious because you edit one draft for an hour.
-`/drafts` was **not** changed to use it: that is a live, well-tested page and the change belongs in
-its own sprint with its own specs.
+**`Drafts.update()` filled a gap, but "append on resave" is not simply a bug.** The workspace needed
+update-in-place because you edit one draft for an hour there, and forty copies is not a workspace.
+But `/drafts` appending is partly deliberate, and the boss confirmed it: **some draft targets cannot
+be edited at all** — several pastebins are write-once — so for those kinds a resave *has* to be a
+new copy. `/drafts` was therefore left alone, and correctly so.
+
+What is genuinely missing is not `update()`; it is **explicit save-as-copy vs save-as-edit
+semantics in the UI**, so the user chooses rather than the page guessing from the draft's kind.
+That is a real piece of design work and belongs in its own sprint. `Drafts.update()` is one half of
+the machinery it will need.
 
 **A11y lint caught two things worth keeping.** The zen Escape handler was on a wrapper `<div>` —
 unreachable for a keyboard user, since focus is in the textarea. It moved onto the textarea. The
@@ -292,8 +297,10 @@ mode for that reason, and it is the honest arrangement — an unsettled list mus
 - **Not smoke-tested against a live mastodon.social account.** Every server interaction here is
   inherited from `DraftSources`, which sprint 1 did not change, so the risk is low — but the
   three-pane page has never been opened against real data.
-- **`/drafts` still appends on resave.** `Drafts.update()` now exists; wiring the old editor to it
-  is a small, separate piece of work.
+- **Save-as-copy vs save-as-edit needs explicit UI.** `/drafts` appends on resave, which is right
+  for write-once targets (several pastebins cannot be edited) and wrong for a local draft you are
+  revising. Today the page decides silently; the user should. Its own sprint — `Drafts.update()`
+  is half the machinery it will need.
 - **The notes pane is a placeholder** with honest copy naming what lands next. Sprint 2 replaces it.
 - **The kanban `column` field is written by nothing.** The shape exists in `WriteMeta` and is
   round-tripped and validated by the sidecar's spec, so sprint 4 adds a writer, not a migration.
