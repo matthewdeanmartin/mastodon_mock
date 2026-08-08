@@ -681,11 +681,17 @@ export const routes: Routes = [
         pathMatch: 'full',
       },
       {
-        // `?handle=user@host` is optional and purely a recovery hint: account
-        // ids are per-server, so a URL carrying one is only valid on the server
-        // that issued it. With the handle along for the ride, a profile opened
-        // against a different server can re-resolve the person by lookup
-        // instead of dead-ending on a 404. See `Profile.recoverByHandle`.
+        // Two segments so the handle can ride in the path: `/accounts/123/@a@b`
+        // (Elk's shape). Account ids are per-server, and a short id from one
+        // server often resolves to a *different real account* on another —
+        // silently. The handle is what makes that recoverable, so it must
+        // survive truncation and hand-typed URLs, which a query param does not.
+        path: 'accounts/:id/:handle',
+        loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
+      },
+      {
+        // One segment: either a bare id (every existing link in the app) or a
+        // bare `@user@host`. See `parseAccountRoute`.
         path: 'accounts/:id',
         loadComponent: () => import('./pages/profile/profile').then((m) => m.Profile),
       },

@@ -5,7 +5,6 @@
     <a
       class="acct-avatar-link"
       [routerLink]="profileLink()"
-      [queryParams]="profileParams()"
       [attr.aria-label]="a.display_name || a.username"
     >
       <img
@@ -19,7 +18,7 @@
 
     <div class="acct-body">
       <div class="acct-headline">
-        <a class="acct-name" [routerLink]="profileLink()" [queryParams]="profileParams()">
+        <a class="acct-name" [routerLink]="profileLink()">
           <strong>{{ a.display_name || a.username }}</strong>
           <app-verified-badge [account]="a" />
         </a>

@@ -82,7 +82,15 @@
 </div>
 
 @if (feed.loading()) {
-  <p class="muted center">Gathering the good stuff…</p>
+  <!-- A build is a dozen-odd sequential requests. Without a number moving under
+       it, a first-time reader cannot tell this apart from a frozen page. -->
+  <p class="muted center">
+    Gathering the good stuff…
+    @if (feed.callsUsed()) {
+      <br />
+      <span class="small">{{ feed.callsUsed() }} of up to {{ maxCalls }} API calls</span>
+    }
+  </p>
 } @else if (feed.error()) {
   <p class="muted center">Couldn’t build your Algo feed. Try refreshing.</p>
 } @else if (!visible().length) {

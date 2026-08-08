@@ -28,6 +28,7 @@ import { SearchSyntaxHelp } from './search-syntax-help/search-syntax-help';
 import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../../ai-availability';
 import { qualifiedHandle } from '../../account-handle';
+import { accountRoutePath } from '../../account-route';
 import { AccountSearchStore } from './account-search-store';
 import {
   AccountFacet,
@@ -1847,27 +1848,9 @@ export class Search implements OnInit, OnDestroy {
             originalUrl: account.url || undefined,
           }),
         ]
-      : ['/accounts', account.id];
-  }
-
-  /**
-   * The `?handle=` recovery hint for a result's profile link.
-   *
-   * Search results are the strongest case for it: results routinely come from
-   * a search server that is not the server being browsed, so their ids can be
-   * meaningless the moment the profile page asks the browsing server about
-   * them. A fully-qualified handle survives that; a bare local username would
-   * resolve to the wrong person elsewhere, so those are left off.
-   *
-   * Anonymous links already encode their origin server in the route ref, so
-   * they need no hint.
-   */
-  accountLinkParams(account: Account): Record<string, string> {
-    if (this.capabilities.active) {
-      return {};
-    }
-    const handle = qualifiedHandle(account);
-    return handle ? { handle } : {};
+      : // Handle in the path: search results are the worst case for a bare id,
+        // since the search server is routinely not the browsing server.
+        accountRoutePath({ id: account.id, handle: qualifiedHandle(account) ?? undefined });
   }
 
   /** The instance whose namespace the current results' ids belong to. */

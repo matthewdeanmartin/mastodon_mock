@@ -598,7 +598,13 @@ describe('Profile — Eliza', () => {
 describe('Profile — copy account', () => {
   let httpMock: HttpTestingController;
 
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    // These blocks configure inside setUp(), after the previous describe has
+    // already instantiated a module. Reset first, or configureTestingModule
+    // throws and poisons every spec that follows.
+    TestBed.resetTestingModule();
+  });
   afterEach(() => httpMock.verify());
 
   function setUp(options: { anonymous: boolean; followingCount?: number }) {
@@ -1019,7 +1025,13 @@ describe('Profile Mataroa RSS inclusion', () => {
 describe('Profile cross-server recovery', () => {
   let httpMock: HttpTestingController;
 
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    // These blocks configure inside setUp(), after the previous describe has
+    // already instantiated a module. Reset first, or configureTestingModule
+    // throws and poisons every spec that follows.
+    TestBed.resetTestingModule();
+  });
   afterEach(() => httpMock.verify());
 
   interface ProfileInternals {
@@ -1093,9 +1105,10 @@ describe('Profile cross-server recovery', () => {
     fixture.detectChanges();
 
     // Navigating (not rendering in place) keeps the URL truthful: it ends up
-    // holding an id that actually works on this server.
+    // holding an id that actually works on this server — with the handle still
+    // in the path, so the next server change recovers the same way.
     expect(navigate).toHaveBeenCalledWith(
-      ['/accounts', '109656717715863645'],
+      ['/accounts', '109656717715863645', '@genxjamerican@hachyderm.io'],
       expect.objectContaining({ replaceUrl: true }),
     );
   });
@@ -1126,5 +1139,111 @@ describe('Profile cross-server recovery', () => {
     fixture.detectChanges();
 
     httpMock.expectNone((r) => r.url === '/api/v1/accounts/lookup');
+  });
+});
+
+/**
+ * The handle-in-path route (`/accounts/123/@alice@host`, Elk's shape).
+ *
+ * The failure this prevents is not a 404 — it is worse. Account ids are
+ * per-server and *short* ids frequently hit a real but different account on
+ * another server, so the page loads, the name is wrong, and nothing looks
+ * broken. The handle names exactly one person, so it outranks the id.
+ */
+describe('Profile handle-in-path route', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    localStorage.clear();
+    // These blocks configure inside setUp(), after the previous describe has
+    // already instantiated a module. Reset first, or configureTestingModule
+    // throws and poisons every spec that follows.
+    TestBed.resetTestingModule();
+  });
+  afterEach(() => httpMock.verify());
+
+  function setUp(id: string, handle: string) {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            paramMap: of(convertToParamMap({ id, handle })),
+            snapshot: { queryParamMap: convertToParamMap({}) },
+          },
+        },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function settleSiblings(id: string): void {
+    httpMock.match((r) => r.url === `/api/v1/accounts/${id}/statuses`).forEach((r) => r.flush([]));
+    httpMock.match((r) => r.url === '/api/v1/accounts/relationships').forEach((r) => r.flush([]));
+    httpMock
+      .match((r) => r.url === `/api/v1/accounts/${id}/endorsements`)
+      .forEach((r) => r.flush([]));
+    httpMock
+      .match((r) => r.url === `/api/v1/accounts/${id}/collections`)
+      .forEach((r) => r.flush({ collections: [] }));
+  }
+
+  it('keeps the id when it resolves to the person the handle names', () => {
+    const fixture = setUp('123', '@alice@example.social');
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const alice = {
+      id: '123',
+      username: 'alice',
+      acct: 'alice@example.social',
+      url: 'https://example.social/@alice',
+      fields: [],
+    } as unknown as Account;
+    // Two reads of the same id: the ordinary load, and the verification pass.
+    httpMock.match('/api/v1/accounts/123').forEach((r) => r.flush(alice));
+    settleSiblings('123');
+    fixture.detectChanges();
+
+    // Agreement means no lookup and no redirect — the id is the fast path.
+    httpMock.expectNone((r) => r.url === '/api/v1/accounts/lookup');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('re-resolves when the id belongs to a different account on this server', () => {
+    const fixture = setUp('123', '@alice@example.social');
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    // The id is valid here — it just belongs to someone else entirely. This is
+    // the silent-wrong-person case: without the handle it renders as normal.
+    const someoneElse = {
+      id: '123',
+      username: 'bob',
+      acct: 'bob',
+      url: 'https://other.example/@bob',
+      fields: [],
+    } as unknown as Account;
+    httpMock.match('/api/v1/accounts/123').forEach((r) => r.flush(someoneElse));
+    settleSiblings('123');
+
+    httpMock
+      .expectOne(
+        (r) =>
+          r.url === '/api/v1/accounts/lookup' && r.params.get('acct') === 'alice@example.social',
+      )
+      .flush({ id: '456', username: 'alice', acct: 'alice@example.social', fields: [] });
+    fixture.detectChanges();
+
+    expect(navigate).toHaveBeenCalledWith(
+      ['/accounts', '456', '@alice@example.social'],
+      expect.objectContaining({ replaceUrl: true }),
+    );
   });
 });

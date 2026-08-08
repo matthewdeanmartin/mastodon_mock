@@ -4,6 +4,8 @@ import { Location, NgOptimizedImage } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom, map, of, Subscription, switchMap, tap } from 'rxjs';
 import { Api } from '../../api';
+import { accountRoutePath, parseAccountRoute } from '../../account-route';
+import { qualifiedHandle } from '../../account-handle';
 import { Server } from '../../server';
 import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
@@ -380,13 +382,94 @@ export class Profile implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
-      if (id) {
-        // Read the handle before loading: `load` may need it the moment the
-        // id comes back 404, and the two params arrive together.
-        this.routeHandle.set(this.route.snapshot?.queryParamMap?.get('handle') ?? null);
-        this.load(id);
+      if (!id) {
+        return;
       }
+      // Both segments may carry either part, and readers reorder them by hand,
+      // so parse rather than assume positions. The legacy `?handle=` is still
+      // honoured for links minted before the path form existed.
+      const ref = parseAccountRoute([id, params.get('handle') ?? '']);
+      const handle =
+        ref?.handle ?? this.route.snapshot?.queryParamMap?.get('handle')?.replace(/^@/, '') ?? null;
+      this.routeHandle.set(handle);
+
+      // A qualified handle outranks the id. An id from another server does not
+      // reliably 404 — short ids frequently hit a real but *different* account,
+      // which renders as a normal profile with the wrong person on it. Silently
+      // wrong is worse than slow, so when both are present the handle decides
+      // and the id is only a hint that it agreed.
+      //
+      // Only for plain numeric ids: `bsky:`, `rss:`, `twitter:@`, `eliza:self`
+      // and the base64 anonymous refs are each owned by their own loader inside
+      // `load`, and none of them is a Mastodon account a lookup could resolve.
+      if (handle && (ref || !this.hasSyntheticPrefix(id))) {
+        this.loadByHandle(handle, ref?.id ?? null);
+        return;
+      }
+      this.load(id);
     });
+  }
+
+  /**
+   * Load a profile whose route carried a handle.
+   *
+   * Tries the id first when there is one — that is the fast path, one call, no
+   * lookup — but *verifies* the account it gets back is actually the person the
+   * handle names. On any mismatch, or no id at all, it resolves by handle
+   * instead. This is what stops a stale link quietly showing a stranger.
+   */
+  private loadByHandle(handle: string, id: string | null): void {
+    if (!id) {
+      this.resolveHandle(handle);
+      return;
+    }
+    // No second fetch to verify with: `load` already reads the account, and it
+    // checks `expectedHandle` against what comes back. A 404 is handled there
+    // too, recovering through the same handle.
+    this.expectedHandle = handle;
+    this.load(id);
+  }
+
+  /**
+   * The handle the route promised, checked against whatever the id resolves to.
+   * Cleared once `load` has consumed it.
+   */
+  private expectedHandle: string | null = null;
+
+  /** Ids belonging to a provider-specific loader rather than to Mastodon. */
+  private hasSyntheticPrefix(id: string): boolean {
+    return (
+      id.startsWith('rss:') ||
+      id.startsWith('bsky:') ||
+      id.startsWith('twitter:@') ||
+      id.startsWith('anonymous-account.') ||
+      isElizaId(id) ||
+      isOpenRouterId(id) ||
+      id === 'anonymous'
+    );
+  }
+
+  /** Resolve a handle to this server's id for that account, then load it. */
+  private resolveHandle(handle: string): void {
+    this.loading.set(true);
+    this.recovering.set(true);
+    this.routeLoadSub.add(
+      this.api.lookupAccount(handle).subscribe({
+        next: (account) => {
+          this.recovering.set(false);
+          void this.router.navigate(accountRoutePath({ id: account.id, handle }), {
+            replaceUrl: true,
+          });
+        },
+        error: (error: unknown) => {
+          this.diagnostics.error('Profile', 'recover:failed', error, { handle });
+          this.recovering.set(false);
+          this.recoveryFailed.set(true);
+          this.loading.set(false);
+          this.loadError.set(`${this.currentServerLabel()} doesn’t know @${handle}.`);
+        },
+      }),
+    );
   }
 
   ngOnDestroy(): void {
@@ -462,6 +545,21 @@ export class Profile implements OnInit, OnDestroy {
     this.routeLoadSub.add(
       this.api.getAccount(id).subscribe({
         next: (a) => {
+          // The id resolved — but to whom? A short id from another server often
+          // hits a real but *different* account here, which would render as a
+          // perfectly normal profile of the wrong person. When the route named
+          // a handle, it decides.
+          const expected = this.expectedHandle;
+          this.expectedHandle = null;
+          if (expected && qualifiedHandle(a)?.toLowerCase() !== expected.toLowerCase()) {
+            this.diagnostics.warn('Profile', 'route:id-handle-mismatch', {
+              id,
+              expected,
+              got: a.acct,
+            });
+            this.resolveHandle(expected);
+            return;
+          }
           this.account.set(a);
           if (this.auth.isAnonymous) {
             this.relationship.set(this.anonymousFollows.relationship(a, this.anonymous.server()));
@@ -475,7 +573,7 @@ export class Profile implements OnInit, OnDestroy {
           this.diagnostics.error('Profile', 'load:account-failed', error, { id });
           const status = (error as { status?: number })?.status;
           if (status === 404 && this.routeHandle()) {
-            this.recoverByHandle(this.routeHandle()!);
+            this.resolveHandle(this.routeHandle()!);
             return;
           }
           this.loading.set(false);
@@ -496,46 +594,6 @@ export class Profile implements OnInit, OnDestroy {
       );
     }
     this.loadFeatured(id);
-  }
-
-  /**
-   * Re-resolve a person by handle after their id 404'd, and navigate to the id
-   * *this* server issued for them.
-   *
-   * Ids are per-server; handles are not. `/accounts/lookup?acct=user@host`
-   * answers on any server that knows the account, including anonymously
-   * (verified against both mastodon.social and fosstodon, which return
-   * different ids for the same handle). Elk does this, and readers reasonably
-   * expect a profile link to survive a change of server.
-   *
-   * Navigating rather than rendering in place keeps the URL truthful: the
-   * address bar ends up holding an id that actually works here, so a reload or
-   * a shared link behaves the same way.
-   */
-  private recoverByHandle(handle: string): void {
-    this.recovering.set(true);
-    this.diagnostics.info('Profile', 'recover:lookup', { handle });
-    this.routeLoadSub.add(
-      this.api.lookupAccount(handle).subscribe({
-        next: (account) => {
-          this.recovering.set(false);
-          this.diagnostics.info('Profile', 'recover:resolved', { handle, id: account.id });
-          void this.router.navigate(['/accounts', account.id], {
-            queryParams: { handle },
-            replaceUrl: true,
-          });
-        },
-        error: (error: unknown) => {
-          // The current server has genuinely never federated this account —
-          // a real answer, and a different one from "the link was wrong".
-          this.diagnostics.error('Profile', 'recover:failed', error, { handle });
-          this.recovering.set(false);
-          this.recoveryFailed.set(true);
-          this.loading.set(false);
-          this.loadError.set(`${this.currentServerLabel()} doesn’t know @${handle}.`);
-        },
-      }),
-    );
   }
 
   /** Host of the server being browsed, for messages that name it. */

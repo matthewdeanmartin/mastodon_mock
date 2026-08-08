@@ -713,12 +713,18 @@
         </div>
       }
     } @else {
+      <!-- No handle in the URL, so there is nothing to look up and nothing to
+           search for: an account id is not a name. Offering "search" here would
+           be offering to search for a number. Say what went wrong and point at
+           the surfaces that can actually find a person. -->
       <p class="muted small">
-        This link carries an account id, which only means something on the server that issued it.
+        This link carries only an account id, and ids belong to the server that issued them — there
+        is no name in it to look up. Links made from here on include the handle, so they survive
+        switching servers.
       </p>
       <div class="profile-error-actions">
-        <a class="btn" routerLink="/search">Search for them here</a>
-        <button class="btn btn-outline" type="button" (click)="goBack()">← Back</button>
+        <button class="btn" type="button" (click)="goBack()">← Back</button>
+        <a class="btn btn-outline" routerLink="/home">Home feed</a>
       </div>
     }
   </div>

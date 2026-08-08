@@ -1039,7 +1039,10 @@ describe('StatusCard', () => {
 
     internals(f).onContentClick(event);
 
-    expect(navSpy).toHaveBeenCalledWith(['/accounts', '42']);
+    // Handle rides in the path beside the id: a mention's id is only valid on
+    // the server that wrote the post, and a short one can silently resolve to
+    // a different account elsewhere.
+    expect(navSpy).toHaveBeenCalledWith(['/accounts', '42', '@alice@remote.example']);
   });
 
   it('shortens a bare long URL label without changing its destination', () => {

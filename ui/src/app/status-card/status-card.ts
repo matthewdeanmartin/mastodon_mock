@@ -24,7 +24,17 @@ import { Compose } from '../compose/compose';
 import { HistoryDialog } from '../history-dialog/history-dialog';
 import { Lightbox } from '../lightbox/lightbox';
 import { applyMinimalMarkdown } from '../markdown';
-import { FilterContext, FilterResult, MediaAttachment, Poll, Status, Translation } from '../models';
+import {
+  Account,
+  FilterContext,
+  FilterResult,
+  MediaAttachment,
+  Poll,
+  Status,
+  Translation,
+} from '../models';
+import { qualifiedHandle } from '../account-handle';
+import { accountRoutePath } from '../account-route';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
 import { PosseKind, PosseQueue } from '../providers/hugo/posse-queue';
 import { canPosseOnly } from '../providers/provider';
@@ -667,7 +677,11 @@ export class StatusCard {
         return null;
       }
     }
-    return ['/accounts', mention.id];
+    // A mention carries acct + url, which is everything `qualifiedHandle` needs.
+    return accountRoutePath({
+      id: mention.id,
+      handle: qualifiedHandle(mention as unknown as Account) ?? undefined,
+    });
   }
 
   /** The status to render: unwrap a boost to the original. */
@@ -775,7 +789,10 @@ export class StatusCard {
   protected get accountLink(): (string | number)[] | null {
     const id = this.display.account.id;
     if (!this.foreign) {
-      return ['/accounts', id];
+      // Handle in the path alongside the id, so the link still finds the right
+      // person after a change of server — ids are per-server and a short one
+      // can silently resolve to a different account elsewhere.
+      return accountRoutePath({ id, handle: qualifiedHandle(this.display.account) ?? undefined });
     }
     // Eliza's posts (and the viewer's own local practice posts) link straight to
     // the author's profile by id — Eliza's synthetic profile, or the viewer's.

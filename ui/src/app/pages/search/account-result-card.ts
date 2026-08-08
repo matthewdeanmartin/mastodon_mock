@@ -34,13 +34,6 @@ export class AccountResultCard {
   readonly relationship = input<Relationship | null>(null);
   /** Router link to the full profile (parent builds it for the anon/auth split). */
   readonly profileLink = input.required<(string | number)[]>();
-  /**
-   * Query params to carry along, currently `?handle=` so a profile opened from
-   * results found on one server can re-resolve itself on another. Search
-   * results are the case that needs it most: the search server and the
-   * browsing server are frequently not the same machine.
-   */
-  readonly profileParams = input<Record<string, string>>({});
   /** True once the parent has opened this card's expand section. */
   readonly expanded = input(false);
   /** Whether a follow/unfollow request is in flight for this card. */

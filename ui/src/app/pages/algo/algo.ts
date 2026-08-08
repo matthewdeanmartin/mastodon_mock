@@ -1,5 +1,5 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
-import { AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
+import { ALGO_MAX_CALLS, AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
 import { isCalmHidden } from '../../sentiment';
 import { FeedLanguageFilter } from '../../trend-language-filter';
@@ -41,6 +41,8 @@ interface AlgoLink {
 })
 export class Algo implements OnInit {
   protected feed = inject(AlgoFeed);
+  /** Ceiling for the "n of up to N API calls" progress line. */
+  protected readonly maxCalls = ALGO_MAX_CALLS;
   protected prefs = inject(ClientPrefs);
   protected auth = inject(Auth);
   private feedLangFilter = inject(FeedLanguageFilter);

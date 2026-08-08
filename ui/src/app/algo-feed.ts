@@ -132,11 +132,17 @@ export class AlgoFeed {
     }
 
     let calls = 0;
+    // Published as it climbs, not just at the end: a build is a dozen-odd
+    // sequential requests behind one "Gathering the good stuff…", which looks
+    // identical to a hung page unless something visibly moves. Every fetch in
+    // the build funnels through here, so this is the one place that sees them.
+    this.callsUsed.set(0);
     const budget: BudgetFetch = (fallback, fetch) => {
       if (calls >= ALGO_MAX_CALLS) {
         return of(fallback);
       }
       calls++;
+      this.callsUsed.set(calls);
       return fetch().pipe(catchError(() => of(fallback)));
     };
 
