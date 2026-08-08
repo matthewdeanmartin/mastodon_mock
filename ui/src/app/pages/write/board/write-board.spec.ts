@@ -175,6 +175,55 @@ describe('WriteBoard', () => {
     expect(options).toEqual(['Ideas', 'Writing', 'Editing']);
   });
 
+  it('escapes the column scroll box rather than being clipped by it', () => {
+    // The bug: `.column-cards` scrolls, and a scroll container *clips* its
+    // absolutely-positioned descendants — no z-index escapes a clipping
+    // rectangle, so the menu rendered underneath the board, cut off after
+    // "Move to". Fixed positioning is what takes it out of the clip.
+    const fixture = mount([item('1')]);
+    (fixture.nativeElement.querySelector('.card-menu-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const menu = fixture.nativeElement.querySelector('.card-menu') as HTMLElement;
+    expect(getComputedStyle(menu).position).toBe('fixed');
+    // And it is placed, rather than defaulting to the top-left corner.
+    expect(menu.style.top).not.toBe('');
+    expect(menu.style.left).not.toBe('');
+  });
+
+  it('clicking the button again closes the menu', () => {
+    const fixture = mount([item('1')]);
+    const button = fixture.nativeElement.querySelector('.card-menu-button') as HTMLButtonElement;
+
+    button.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.card-menu')).toBeTruthy();
+
+    button.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.card-menu')).toBeNull();
+  });
+
+  it('closes the menu when anything scrolls', () => {
+    // A fixed menu does not travel with its card, so a scroll must dismiss it
+    // or it floats over unrelated rows.
+    const fixture = mount([item('1')]);
+    (fixture.nativeElement.querySelector('.card-menu-button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.card-menu')).toBeTruthy();
+
+    window.dispatchEvent(new Event('scroll'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.card-menu')).toBeNull();
+  });
+
+  it('stops listening for scrolls once destroyed', () => {
+    const fixture = mount([item('1')]);
+    const removed = vi.spyOn(window, 'removeEventListener');
+    fixture.destroy();
+    expect(removed).toHaveBeenCalledWith('scroll', expect.any(Function), true);
+  });
+
   it('gives a scheduled card no move menu at all', () => {
     const fixture = mount([item('p1', 'scheduled')]);
     expect(fixture.nativeElement.querySelector('.card-menu-button')).toBeNull();

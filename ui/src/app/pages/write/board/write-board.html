@@ -67,12 +67,16 @@
                       type="button"
                       [attr.aria-expanded]="menuFor() === item.key"
                       [attr.aria-label]="'Move ' + item.preview + ' to another column'"
-                      (click)="toggleMenu(item)"
+                      (click)="toggleMenu(item, $event)"
                     >
                       <span aria-hidden="true">⋯</span>
                     </button>
                     @if (menuFor() === item.key) {
-                      <div class="card-menu">
+                      <div
+                        class="card-menu"
+                        [style.top.px]="menuAt()?.top"
+                        [style.left.px]="menuAt()?.left"
+                      >
                         <p class="card-menu-title muted small">Move to</p>
                         @for (target of moveTargets; track target) {
                           <button

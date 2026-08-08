@@ -1,5 +1,5 @@
 {
-  "testCount": 3682,
+  "testCount": 3686,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -1868,9 +1868,12 @@
     "src/app/pages/write/board/board-columns.spec.ts :: isDerivedColumn and movableColumns only Scheduled is derived",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard a drop lands in the same place the menu would",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard announces a move, since the change is otherwise only visual",
+    "src/app/pages/write/board/write-board.spec.ts :: WriteBoard clicking the button again closes the menu",
+    "src/app/pages/write/board/write-board.spec.ts :: WriteBoard closes the menu when anything scrolls",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard counts the cards in each column heading",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard emits closed rather than knowing what closing means",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard emits the item to open rather than routing anywhere itself",
+    "src/app/pages/write/board/write-board.spec.ts :: WriteBoard escapes the column scroll box rather than being clipped by it",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard explains an empty column rather than leaving it blank",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard gives a scheduled card no move menu at all",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard highlights the draft the editor is holding",
@@ -1882,6 +1885,7 @@
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard refuses a move into Scheduled and says why",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard refuses to move a scheduled draft out of Scheduled",
     "src/app/pages/write/board/write-board.spec.ts :: WriteBoard renders standalone, with no host page",
+    "src/app/pages/write/board/write-board.spec.ts :: WriteBoard stops listening for scrolls once destroyed",
     "src/app/pages/write/quality-checks.spec.ts :: capsRuns catches a run of shouted words",
     "src/app/pages/write/quality-checks.spec.ts :: capsRuns leaves acronyms alone",
     "src/app/pages/write/quality-checks.spec.ts :: capsRuns leaves ordinary prose alone",

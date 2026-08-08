@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, OnDestroy, computed, inject, input, output, signal } from '@angular/core';
 import { HumanTimePipe } from '../../../human-time.pipe';
 import { DraftItem } from '../../drafts/draft-items';
 import { WriteColumn, WriteWorkspace } from '../write-workspace';
@@ -10,6 +10,17 @@ import {
   isDerivedColumn,
   movableColumns,
 } from './board-columns';
+
+/**
+ * Roughly how tall and wide the move menu renders.
+ *
+ * Used only to decide whether to flip it above the button and how far to pull
+ * it left — being a few pixels out shifts the menu slightly, it does not break
+ * anything, so measuring the rendered element (and forcing a layout to do it)
+ * would buy nothing.
+ */
+const MENU_HEIGHT = 150;
+const MENU_WIDTH = 150;
 
 /**
  * The kanban board: everything unpublished, by how far along it is.
@@ -35,8 +46,27 @@ import {
   templateUrl: './write-board.html',
   styleUrl: './write-board.css',
 })
-export class WriteBoard {
+export class WriteBoard implements OnDestroy {
   private workspace = inject(WriteWorkspace);
+
+  /**
+   * Close the move menu whenever anything scrolls, anywhere.
+   *
+   * On `window` in the capture phase because `scroll` does not bubble, and the
+   * containers that matter are not all inside this component — the column list
+   * is, but the panel hosting the board is not. A fixed-position menu does not
+   * travel with the card it belongs to, so a scroll must dismiss it or it ends
+   * up floating over unrelated rows.
+   */
+  private readonly onAnyScroll = (): void => this.onScrollAway();
+
+  constructor() {
+    window.addEventListener('scroll', this.onAnyScroll, true);
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('scroll', this.onAnyScroll, true);
+  }
 
   readonly items = input.required<readonly DraftItem[]>();
   /** Highlights whichever draft the editor currently holds. */
@@ -53,6 +83,15 @@ export class WriteBoard {
 
   /** Which card's "Move to…" menu is open, by key. */
   protected menuFor = signal<string | null>(null);
+  /**
+   * Where to draw the open menu, in viewport coordinates.
+   *
+   * The menu is `position: fixed` because the column it lives in scrolls, and a
+   * scroll container clips absolutely-positioned descendants no matter their
+   * z-index. Fixed positioning escapes the clip but not the need for
+   * coordinates, so they are measured from the button that opened it.
+   */
+  protected menuAt = signal<{ top: number; left: number } | null>(null);
   /** The last move, announced for screen readers. */
   protected announcement = signal('');
 
@@ -72,8 +111,46 @@ export class WriteBoard {
     this.closed.emit();
   }
 
-  protected toggleMenu(item: DraftItem): void {
-    this.menuFor.update((key) => (key === item.key ? null : item.key));
+  /**
+   * Open or close a card's move menu, anchoring it under its button.
+   *
+   * Flipped above the button when there is not room below, so a card near the
+   * bottom of a tall column does not open a menu off the edge of the screen.
+   */
+  protected toggleMenu(item: DraftItem, event: MouseEvent): void {
+    if (this.menuFor() === item.key) {
+      this.closeMenu();
+      return;
+    }
+    const button = event.currentTarget as HTMLElement | null;
+    const rect = button?.getBoundingClientRect();
+    if (rect) {
+      const below = window.innerHeight - rect.bottom;
+      this.menuAt.set({
+        top: below < MENU_HEIGHT ? rect.top - MENU_HEIGHT : rect.bottom + 4,
+        // Right-aligned to the button, which is itself at the card's right edge.
+        left: Math.max(8, rect.right - MENU_WIDTH),
+      });
+    }
+    this.menuFor.set(item.key);
+  }
+
+  protected closeMenu(): void {
+    this.menuFor.set(null);
+    this.menuAt.set(null);
+  }
+
+  /**
+   * Close the menu when anything moves under it.
+   *
+   * A fixed-position menu does not travel with the column it belongs to, so
+   * scrolling would otherwise leave it stranded over unrelated cards. Closing
+   * is both simpler and less surprising than tracking.
+   */
+  protected onScrollAway(): void {
+    if (this.menuFor()) {
+      this.closeMenu();
+    }
   }
 
   /**
@@ -88,7 +165,7 @@ export class WriteBoard {
    * cancel a publish it has not cancelled.
    */
   protected move(item: DraftItem, to: WriteColumn): void {
-    this.menuFor.set(null);
+    this.closeMenu();
     if (isDerivedColumn(to)) {
       this.announce(`${this.label(to)} is set by scheduling a post, not by moving it here.`);
       return;

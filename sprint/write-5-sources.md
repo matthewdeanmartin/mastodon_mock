@@ -144,10 +144,20 @@ making the decision silently — at minimum the editor says which one saving wil
 Consume `listPosts()` in the writing surfaces, so a published Mataroa post can be pulled into the
 editor.
 
-**`MataroaApi` has no update method.** Check the real API before designing the flow — if there is
-no update endpoint, "edit a published post" means create-and-delete, and that is a materially
-different promise with a different failure mode (a failed delete leaves two copies). Find out
-first; the story is not "add an update button" until the endpoint is confirmed.
+**`MataroaApi` has no update method** — but the *API* does. **Settled 2026-08-08** from the real
+docs, captured at `docs/reference/mataroa-api.md`:
+
+- **`PATCH /api/posts/<slug>/`** exists, taking any of `title`, `slug`, `body`, `published_at`. So
+  "edit a published post" is a genuine update, **not** the create-and-delete this story feared —
+  no two-copies-on-failure mode to design around.
+- **`GET /api/posts/` returns full bodies**, not just metadata. Pulling a post into the editor is
+  one request, with no per-post follow-up.
+- **`published_at: null` means draft.** Mataroa has real drafts, which makes it a plausible source
+  alongside the paste providers — worth considering, out of scope here.
+- Every path needs its **trailing slash**, and `published_at` is a date (`YYYY-MM-DD`), not a
+  timestamp. Sending it empty unpublishes.
+
+The story is now simply: add `updatePost()` and consume `listPosts()` in the writing surfaces.
 
 A published post is **not a draft** and must not land in the drafts list. Give it its own surface —
 the board's Scheduled column is the precedent for "shown, but not a thing you drag".
@@ -242,9 +252,9 @@ when a connector is swapped for the wrong one."
 
 ## Still to do in this sprint
 
-- **S5.3 — Mataroa both ways.** Unstarted. `listPosts()` still has one consumer
-  (`connection-mataroa.ts`), and `MataroaApi` still has **no update method** — confirm the endpoint
-  exists before promising "edit a published post".
+- **S5.3 — Mataroa both ways.** Unstarted, but no longer uncertain: the API reference is captured
+  at `docs/reference/mataroa-api.md`, and `PATCH /api/posts/<slug>/` exists. `MataroaApi` needs an
+  `updatePost()`, and `listPosts()` needs a consumer outside the settings page.
 - **S5.4 — one connections story.** Gist has its page; Mataroa's needs the read-back copy once S5.3
   lands.
 - **Not smoke-tested against a real GitHub account.** Every gist call is `HttpTestingController`

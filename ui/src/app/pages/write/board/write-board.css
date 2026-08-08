@@ -163,11 +163,15 @@
   opacity: 1;
 }
 
+/* Fixed, not absolute, and positioned from JS.
+   `.column-cards` scrolls (`overflow-y: auto`), and a scroll container *clips*
+   its absolutely-positioned descendants — no z-index escapes a clipping
+   rectangle, which is why the menu appeared to open behind the board. Taking it
+   out of flow entirely is the fix; anything else means giving up either the
+   column scroll or the menu. */
 .card-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  z-index: 5;
+  position: fixed;
+  z-index: 120;
   min-width: 9rem;
   border: 1px solid var(--border);
   border-radius: 8px;
