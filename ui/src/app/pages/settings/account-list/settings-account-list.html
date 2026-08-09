@@ -24,13 +24,24 @@
   >
     Block
   </button>
+  <button
+    class="tab"
+    type="button"
+    role="tab"
+    [class.active]="kind() === 'domains'"
+    [attr.aria-selected]="kind() === 'domains'"
+    (click)="show('domains')"
+  >
+    Domains
+  </button>
 </div>
 
 <!-- Amnesty: clear the whole list at once. Offered here as well as on the Bulk
-     actions tab, because this page is where wanting it occurs to people. -->
+     actions tab, because this page is where wanting it occurs to people.
+     Not on Domains — see canAmnesty. -->
 <div class="amnesty-bar">
   <app-bulk-progress />
-  @if (accounts().length || amnestyRunning()) {
+  @if (canAmnesty() && (accounts().length || amnestyRunning())) {
     <div class="amnesty-row">
       <p class="muted small">
         Done with this list? {{ amnestyLabel() }} at once — you’ll be shown exactly how many
@@ -56,7 +67,57 @@
   />
 }
 
-@if (loading()) {
+@if (isDomains()) {
+  <!-- Adding is the primary action here, unlike the account tabs where rows
+       arrive by blocking someone from their profile. -->
+  <form class="domain-add" (ngSubmit)="blockDomain()">
+    <label class="domain-label" for="domain-input">Block a domain</label>
+    <div class="domain-row">
+      <input
+        id="domain-input"
+        type="text"
+        inputmode="url"
+        autocomplete="off"
+        placeholder="example.social"
+        [ngModel]="domainInput()"
+        (ngModelChange)="domainInput.set($event)"
+        name="domain"
+      />
+      <button class="btn btn-sm danger" type="submit" [disabled]="!canBlockDomain()">Block</button>
+    </div>
+    <p class="muted small">
+      A handle or a link works too — <code>&#64;someone&#64;example.social</code> or a profile URL
+      will be reduced to the domain.
+    </p>
+    @if (domainError()) {
+      <p class="domain-error small" role="alert">{{ domainError() }}</p>
+    }
+  </form>
+
+  @if (loading()) {
+    <p class="muted center">Loading…</p>
+  } @else if (!domains().length) {
+    <p class="muted center">No blocked domains.</p>
+  } @else {
+    <ul class="account-list domain-list">
+      @for (d of domains(); track d) {
+        <li class="account-row">
+          <span class="domain-name">{{ d }}</span>
+          <div class="row-actions">
+            <button
+              class="btn btn-outline btn-sm"
+              type="button"
+              [disabled]="isDomainBusy(d)"
+              (click)="unblockDomain(d)"
+            >
+              Unblock
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+} @else if (loading()) {
   <p class="muted center">Loading…</p>
 } @else if (!accounts().length) {
   <p class="muted center">Nothing here.</p>
@@ -126,9 +187,13 @@
       </li>
     }
   </ul>
+}
 
-  <!-- Link-header pagination: no random access, so "Last" walks forward and
-       caches what it passes. Pages already seen come back without a request. -->
+<!-- Link-header pagination, shared by all three lists: no random access, so
+     "Last" walks forward and caches what it passes. Pages already seen come
+     back without a request. Hidden on a single-page list, which is the normal
+     case for domains. -->
+@if (showPager()) {
   <nav class="pager" aria-label="Pages">
     <button class="btn btn-outline btn-sm" [disabled]="!canPrev()" (click)="first()">
       « First

@@ -695,6 +695,58 @@ export class Api {
     );
   }
 
+  /**
+   * One page of the domains the user has blocked (`GET /api/v1/domain_blocks`).
+   *
+   * Returns bare strings, not entities — `AccountDomainBlock` ids are never
+   * exposed, so as with {@link accountListPage} the only cursor is the `Link`
+   * header. Mastodon defaults to 100 and caps at 200.
+   */
+  domainBlocksPage(
+    maxId?: string,
+    limit = 100,
+  ): Observable<{ domains: string[]; nextMaxId: string | null }> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
+    return this.http.get<string[]>('/api/v1/domain_blocks', { params, observe: 'response' }).pipe(
+      map((response) => ({
+        domains: response.body ?? [],
+        nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
+      })),
+    );
+  }
+
+  /**
+   * Block a domain: hides its public posts and notifications, drops its
+   * followers, and stops new follows from it.
+   *
+   * Sent as `FormData` rather than JSON because the documented parameter is
+   * form data, and our mock declares it as `Form()` — FormData is the one
+   * encoding both it and real Mastodon accept. Succeeds even when the domain is
+   * already blocked or doesn't exist; only a blank or malformed domain 422s.
+   */
+  blockDomain(domain: string): Observable<unknown> {
+    const form = new FormData();
+    form.append('domain', domain);
+    return this.http.post('/api/v1/domain_blocks', form);
+  }
+
+  /**
+   * Unblock a domain (`DELETE /api/v1/domain_blocks`).
+   *
+   * The parameter rides in the query string: `HttpClient.delete` has no body
+   * overload that survives every proxy, and the mock reads the query first for
+   * exactly this reason. Idempotent — unblocking something that was never
+   * blocked is a 200.
+   */
+  unblockDomain(domain: string): Observable<unknown> {
+    return this.http.delete('/api/v1/domain_blocks', {
+      params: new HttpParams().set('domain', domain),
+    });
+  }
+
   /** Mute an account, optionally auto-expiring after `duration` seconds. */
   muteAccount(id: string, duration?: number): Observable<Relationship> {
     return this.http.post<Relationship>(

@@ -117,3 +117,48 @@
   background: #e0245e;
   color: #fff;
 }
+
+/* --- Domains tab --- */
+
+/* Adding is the primary action on this tab (there is no "block domain" button
+   on a profile), so the form sits above the list rather than under it. */
+.domain-add {
+  margin-bottom: 16px;
+}
+
+.domain-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.domain-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.domain-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.domain-add p {
+  margin: 6px 0 0;
+}
+
+.domain-error {
+  color: #e0245e;
+}
+
+/* No avatar to align to, so the row is just the name and its action. */
+.domain-list .account-row {
+  align-items: center;
+}
+
+.domain-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

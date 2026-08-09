@@ -9,8 +9,17 @@ import { Account } from '../../../models';
 import { SettingsAccountList } from './settings-account-list';
 
 interface SettingsAccountListInternals {
-  kind: WritableSignal<'mutes' | 'blocks'>;
+  kind: WritableSignal<'mutes' | 'blocks' | 'domains'>;
   accounts: WritableSignal<Account[]>;
+  domains: WritableSignal<string[]>;
+  domainInput: WritableSignal<string>;
+  domainError: WritableSignal<string>;
+  canBlockDomain(): boolean;
+  blockDomain(): void;
+  unblockDomain(domain: string): void;
+  canAmnesty(): boolean;
+  isDomains(): boolean;
+  showPager(): boolean;
   undo(acc: Account): void;
   amnestyAction(): string;
   amnestyLabel(): string;
@@ -29,7 +38,7 @@ interface SettingsAccountListInternals {
   unfollow(acc: Account): void;
   alsoApply(acc: Account): void;
   convert(acc: Account): void;
-  show(kind: 'mutes' | 'blocks'): void;
+  show(kind: 'mutes' | 'blocks' | 'domains'): void;
 }
 
 function internals(fixture: ComponentFixture<SettingsAccountList>): SettingsAccountListInternals {
@@ -59,7 +68,7 @@ function makeAccount(id: string): Account {
 describe('SettingsAccountList', () => {
   let httpMock: HttpTestingController;
 
-  function configure(kind: 'mutes' | 'blocks'): void {
+  function configure(kind: 'mutes' | 'blocks' | 'domains'): void {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -122,7 +131,11 @@ describe('SettingsAccountList', () => {
     const tabs = fixture.nativeElement.querySelectorAll(
       '.restriction-tabs .tab',
     ) as NodeListOf<HTMLButtonElement>;
-    expect(Array.from(tabs, (tab) => tab.textContent?.trim())).toEqual(['Mute', 'Block']);
+    expect(Array.from(tabs, (tab) => tab.textContent?.trim())).toEqual([
+      'Mute',
+      'Block',
+      'Domains',
+    ]);
     internals(fixture).show('blocks');
     flushPage([makeAccount('2')]);
     expect(internals(fixture).kind()).toBe('blocks');
@@ -369,5 +382,162 @@ describe('SettingsAccountList', () => {
     // Nothing to add — only the mute needs lifting.
     httpMock.expectOne('/api/v1/accounts/7/unmute').flush({});
     expect(internals(fixture).accounts()).toEqual([]);
+  });
+});
+
+describe('SettingsAccountList domains tab', () => {
+  let httpMock: HttpTestingController;
+
+  function configure(): void {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { data: of({ kind: 'domains' }) } },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+  }
+
+  afterEach(() => httpMock.verify());
+
+  /** Settle the domain list read. Domains need no relationships lookup. */
+  function flushDomains(domains: string[], nextMaxId?: string): void {
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/domain_blocks');
+    req.flush(
+      domains,
+      nextMaxId
+        ? { headers: { Link: `</api/v1/domain_blocks?max_id=${nextMaxId}>; rel="next"` } }
+        : undefined,
+    );
+  }
+
+  function start(domains: string[] = ['nsfw.social']): ComponentFixture<SettingsAccountList> {
+    configure();
+    const fixture = TestBed.createComponent(SettingsAccountList);
+    fixture.detectChanges();
+    flushDomains(domains);
+    return fixture;
+  }
+
+  it('loads blocked domains from the route kind', () => {
+    const fixture = start(['nsfw.social', 'artalley.social']);
+    expect(internals(fixture).isDomains()).toBe(true);
+    expect(internals(fixture).domains()).toEqual(['nsfw.social', 'artalley.social']);
+  });
+
+  it('never asks the account endpoints while on domains', () => {
+    start();
+    // httpMock.verify() in afterEach fails on any unexpected /mutes or /blocks call.
+    expect(true).toBe(true);
+  });
+
+  it('blocks a domain as form data and reloads the list', () => {
+    const fixture = start([]);
+    internals(fixture).domainInput.set('nsfw.social');
+    internals(fixture).blockDomain();
+
+    const post = httpMock.expectOne(
+      (r) => r.method === 'POST' && r.url === '/api/v1/domain_blocks',
+    );
+    // FormData is the one encoding both the mock's Form() and real Mastodon take.
+    expect(post.request.body).toBeInstanceOf(FormData);
+    expect((post.request.body as FormData).get('domain')).toBe('nsfw.social');
+    post.flush({});
+
+    // A block can drop followers, so the list is re-read rather than patched.
+    flushDomains(['nsfw.social']);
+    expect(internals(fixture).domains()).toEqual(['nsfw.social']);
+    expect(internals(fixture).domainInput()).toBe('');
+  });
+
+  it('unblocks via the query string and drops the row', () => {
+    const fixture = start(['nsfw.social', 'artalley.social']);
+    internals(fixture).unblockDomain('nsfw.social');
+
+    const del = httpMock.expectOne(
+      (r) => r.method === 'DELETE' && r.url === '/api/v1/domain_blocks',
+    );
+    expect(del.request.params.get('domain')).toBe('nsfw.social');
+    del.flush({});
+
+    expect(internals(fixture).domains()).toEqual(['artalley.social']);
+  });
+
+  it('reduces a pasted handle to its domain', () => {
+    const fixture = start([]);
+    internals(fixture).domainInput.set('@someone@nsfw.social');
+    internals(fixture).blockDomain();
+
+    const post = httpMock.expectOne((r) => r.method === 'POST');
+    expect((post.request.body as FormData).get('domain')).toBe('nsfw.social');
+    post.flush({});
+    flushDomains(['nsfw.social']);
+  });
+
+  it('reduces a pasted profile URL to its domain', () => {
+    const fixture = start([]);
+    internals(fixture).domainInput.set('https://Nsfw.Social/@alice');
+    internals(fixture).blockDomain();
+
+    const post = httpMock.expectOne((r) => r.method === 'POST');
+    expect((post.request.body as FormData).get('domain')).toBe('nsfw.social');
+    post.flush({});
+    flushDomains(['nsfw.social']);
+  });
+
+  it('refuses to send something that is not a domain', () => {
+    const fixture = start([]);
+    for (const bad of ['', '   ', 'localhost', 'two words']) {
+      internals(fixture).domainInput.set(bad);
+      expect(internals(fixture).canBlockDomain()).toBe(false);
+    }
+    internals(fixture).domainInput.set('nsfw.social');
+    expect(internals(fixture).canBlockDomain()).toBe(true);
+  });
+
+  it('surfaces a rejected block rather than failing silently', () => {
+    const fixture = start([]);
+    internals(fixture).domainInput.set('nsfw.social');
+    internals(fixture).blockDomain();
+    httpMock
+      .expectOne((r) => r.method === 'POST')
+      .flush({ error: 'Validation failed' }, { status: 422, statusText: 'Unprocessable' });
+
+    expect(internals(fixture).domainError()).toContain('nsfw.social');
+    // The typed value survives so it can be corrected rather than retyped.
+    expect(internals(fixture).domainInput()).toBe('nsfw.social');
+  });
+
+  it('offers no amnesty on domains', () => {
+    const fixture = start();
+    expect(internals(fixture).canAmnesty()).toBe(false);
+  });
+
+  it('hides the pager for a single page of domains', () => {
+    const fixture = start(['nsfw.social']);
+    expect(internals(fixture).showPager()).toBe(false);
+  });
+
+  it('pages domains when the Link header offers more', () => {
+    configure();
+    const fixture = TestBed.createComponent(SettingsAccountList);
+    fixture.detectChanges();
+    flushDomains(['a.social'], '16194');
+
+    expect(internals(fixture).showPager()).toBe(true);
+    internals(fixture).next();
+    flushDomains(['b.social']);
+    expect(internals(fixture).domains()).toEqual(['b.social']);
+    expect(internals(fixture).page()).toBe(1);
+  });
+
+  it('switching away from domains loads the account list instead', () => {
+    const fixture = start();
+    internals(fixture).show('blocks');
+
+    httpMock.expectOne((r) => r.url === '/api/v1/blocks').flush([]);
+    expect(internals(fixture).domains()).toEqual([]);
   });
 });

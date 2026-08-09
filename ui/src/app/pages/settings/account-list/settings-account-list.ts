@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { Api } from '../../../api';
@@ -7,13 +8,30 @@ import { BulkActionsDialog } from '../../../bulk-actions-dialog/bulk-actions-dia
 import { BulkProgress } from '../../../bulk-progress/bulk-progress';
 import { Account } from '../../../models';
 
-type Kind = 'mutes' | 'blocks';
+/**
+ * Which list is on screen. The first two are accounts; `domains` is a different
+ * shape entirely (bare strings, its own endpoints) and takes its own code path
+ * rather than being forced through the account paging machinery.
+ */
+type Kind = 'mutes' | 'blocks' | 'domains';
+
+/** The two account-shaped lists, where {@link Kind} needs narrowing. */
+type AccountKind = 'mutes' | 'blocks';
 
 const PAGE_SIZE = 40;
 
+/** Domains per page. Mastodon defaults to 100 here and caps at 200. */
+const DOMAIN_PAGE_SIZE = 100;
+
 /**
- * Combined muted / blocked account management, initially chosen by route data
- * and switchable in place.
+ * Combined muted / blocked / domain-blocked management, initially chosen by
+ * route data and switchable in place.
+ *
+ * The Domains tab is the same page's third list but a different shape: the API
+ * returns bare strings rather than entities, adding is the primary action (you
+ * cannot block a domain from a profile the way you block a person), and there
+ * is no amnesty. It therefore runs on its own loader rather than being squeezed
+ * through the account paging machinery below — see {@link loadDomainPage}.
  *
  * Carries the matching amnesty action at the top, because looking at a list of
  * 200 blocks you no longer care about is exactly when you want to be rid of all
@@ -37,7 +55,7 @@ const PAGE_SIZE = 40;
  */
 @Component({
   selector: 'app-settings-account-list',
-  imports: [RouterLink, BulkActionsDialog, BulkProgress],
+  imports: [RouterLink, FormsModule, BulkActionsDialog, BulkProgress],
   templateUrl: './settings-account-list.html',
   styleUrl: './settings-account-list.css',
 })
@@ -49,6 +67,40 @@ export class SettingsAccountList implements OnInit {
   protected kind = signal<Kind>('mutes');
   protected accounts = signal<Account[]>([]);
   protected loading = signal(false);
+
+  /** True while the Domains tab is showing — the non-account code path. */
+  protected readonly isDomains = computed(() => this.kind() === 'domains');
+
+  /**
+   * The current kind narrowed to an account list.
+   *
+   * Every account-shaped read goes through this rather than `kind()` so a
+   * 'domains' value can never reach an endpoint that expects mutes or blocks.
+   * Falls back to 'blocks' because Domains sits under it conceptually — but the
+   * callers all guard on {@link isDomains} first, so the fallback is a
+   * type-safety belt rather than a behaviour anyone should hit.
+   */
+  private accountKind(): AccountKind {
+    const kind = this.kind();
+    return kind === 'domains' ? 'blocks' : kind;
+  }
+
+  // -------------------------------------------------------------- domains
+
+  /** Blocked domains on the current page. */
+  protected domains = signal<string[]>([]);
+
+  /** What the user has typed into "Block a domain". */
+  protected domainInput = signal('');
+
+  /** Set while a domain add/remove is in flight, keyed by domain. */
+  protected domainBusy = signal<ReadonlySet<string>>(new Set());
+
+  /** Shown when the server rejects an add — usually a malformed domain. */
+  protected domainError = signal('');
+
+  /** True once the domain list has no further `Link` cursor. */
+  private domainCursors: (string | undefined)[] = [undefined];
 
   // ---------------------------------------------------------------- paging
 
@@ -90,14 +142,31 @@ export class SettingsAccountList implements OnInit {
   );
 
   /**
+   * Whether the pager is worth showing.
+   *
+   * A single-page list gets no controls — five greyed-out buttons under six
+   * blocked domains is noise. It appears as soon as there is somewhere to go,
+   * or once we know there is more than one page.
+   */
+  protected readonly showPager = computed(() => {
+    if (this.loading()) {
+      return false;
+    }
+    const last = this.lastPage();
+    return this.page() > 0 || last === null || last > 0;
+  });
+
+  /**
    * Human range for the header, e.g. "41–80". Deliberately not "of 280": the
    * total is unknowable until the whole list has been walked, and claiming a
    * total we have not verified is the bug this page started with.
    */
   protected readonly rangeLabel = computed(() => {
-    const start = this.page() * PAGE_SIZE + 1;
-    const end = start + this.accounts().length - 1;
-    return this.accounts().length ? `${start}–${end}` : '';
+    const domains = this.isDomains();
+    const size = domains ? DOMAIN_PAGE_SIZE : PAGE_SIZE;
+    const count = domains ? this.domains().length : this.accounts().length;
+    const start = this.page() * size + 1;
+    return count ? `${start}–${start + count - 1}` : '';
   });
 
   // ------------------------------------------------------- the other list
@@ -137,6 +206,16 @@ export class SettingsAccountList implements OnInit {
   protected readonly amnestyLabel = computed(() =>
     this.kind() === 'mutes' ? 'Unmute everyone' : 'Unblock everyone',
   );
+
+  /**
+   * Whether to offer the bulk "clear this list" action at all.
+   *
+   * Not on Domains: there is no domain amnesty in {@link BulkActions}, and the
+   * blast radius is different in kind — unblocking every domain at once would
+   * re-admit whole servers someone blocked one at a time and deliberately. The
+   * per-row Unblock is the right granularity for a list this short.
+   */
+  protected readonly canAmnesty = computed(() => !this.isDomains());
 
   constructor() {
     // Reload once the job finishes so the list reflects what just happened
@@ -183,9 +262,14 @@ export class SettingsAccountList implements OnInit {
   protected readonly title = 'Muted & Blocked';
 
   protected get subtitle(): string {
-    return this.kind() === 'mutes'
-      ? "You won't see posts or notifications from these accounts. They can still follow you."
-      : "These accounts can't follow you, see your posts, or interact with you.";
+    switch (this.kind()) {
+      case 'mutes':
+        return "You won't see posts or notifications from these accounts. They can still follow you.";
+      case 'blocks':
+        return "These accounts can't follow you, see your posts, or interact with you.";
+      case 'domains':
+        return 'Blocking a domain hides every account on that server at once — their posts, their notifications, and any followers you have there.';
+    }
   }
 
   /** Label for the opposite list, used across the row buttons and badges. */
@@ -208,13 +292,48 @@ export class SettingsAccountList implements OnInit {
   /** Throw away every cached page and cursor, then load page 1. */
   private reset(): void {
     this.cursors = [undefined];
+    this.domainCursors = [undefined];
     this.pageCache.clear();
     this.otherCache.clear();
     this.followingCache.clear();
     this.lastPageKnown.set(false);
     this.lastPage.set(null);
     this.page.set(0);
+    this.domainError.set('');
+    if (this.isDomains()) {
+      this.accounts.set([]);
+      this.loadDomainPage(0);
+      return;
+    }
+    this.domains.set([]);
     this.loadPage(0);
+  }
+
+  /**
+   * Load one page of blocked domains.
+   *
+   * Deliberately simpler than the account pager: the payload is bare strings,
+   * the page size is 100, and nobody has 400 blocked domains — so there is no
+   * microcache and no forward walk, just cursors recorded as they arrive.
+   */
+  private loadDomainPage(index: number): void {
+    this.loading.set(true);
+    this.api.domainBlocksPage(this.domainCursors[index], DOMAIN_PAGE_SIZE).subscribe({
+      next: ({ domains, nextMaxId }) => {
+        this.page.set(index);
+        this.domains.set(domains);
+        if (nextMaxId && domains.length) {
+          if (this.domainCursors.length === index + 1) {
+            this.domainCursors.push(nextMaxId);
+          }
+        } else {
+          this.lastPageKnown.set(true);
+          this.lastPage.set(index);
+        }
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   /**
@@ -241,7 +360,7 @@ export class SettingsAccountList implements OnInit {
     }
 
     this.loading.set(true);
-    this.api.accountListPage(this.kind(), this.cursors[index], PAGE_SIZE).subscribe({
+    this.api.accountListPage(this.accountKind(), this.cursors[index], PAGE_SIZE).subscribe({
       next: ({ accounts, nextMaxId }) => {
         this.pageCache.set(index, accounts);
         this.page.set(index);
@@ -271,7 +390,7 @@ export class SettingsAccountList implements OnInit {
     }
 
     this.loading.set(true);
-    this.api.accountListPage(this.kind(), cursor, PAGE_SIZE).subscribe({
+    this.api.accountListPage(this.accountKind(), cursor, PAGE_SIZE).subscribe({
       next: ({ accounts, nextMaxId }) => {
         this.pageCache.set(next, accounts);
         this.recordCursor(next, accounts, nextMaxId);
@@ -305,21 +424,30 @@ export class SettingsAccountList implements OnInit {
     }
   }
 
+  /** Route a page request to whichever list is on screen. */
+  private goToPage(index: number): void {
+    if (this.isDomains()) {
+      this.loadDomainPage(index);
+    } else {
+      this.loadPage(index);
+    }
+  }
+
   protected first(): void {
     if (this.page() !== 0) {
-      this.loadPage(0);
+      this.goToPage(0);
     }
   }
 
   protected prev(): void {
     if (this.canPrev()) {
-      this.loadPage(this.page() - 1);
+      this.goToPage(this.page() - 1);
     }
   }
 
   protected next(): void {
     if (this.canNext()) {
-      this.loadPage(this.page() + 1);
+      this.goToPage(this.page() + 1);
     }
   }
 
@@ -329,10 +457,16 @@ export class SettingsAccountList implements OnInit {
     }
     const known = this.lastPage();
     if (known !== null) {
-      this.loadPage(known);
-    } else {
-      this.walkTo(Number.MAX_SAFE_INTEGER);
+      this.goToPage(known);
+      return;
     }
+    if (this.isDomains()) {
+      // No forward walk for domains: without a cached ladder the only way on is
+      // one page at a time, and Next already does that.
+      this.goToPage(this.page() + 1);
+      return;
+    }
+    this.walkTo(Number.MAX_SAFE_INTEGER);
   }
 
   /**
@@ -510,6 +644,104 @@ export class SettingsAccountList implements OnInit {
         });
       },
       error: () => this.setBusy(acc.id, false),
+    });
+  }
+
+  // ------------------------------------------------------- domain actions
+
+  protected isDomainBusy(domain: string): boolean {
+    return this.domainBusy().has(domain);
+  }
+
+  private setDomainBusy(domain: string, on: boolean): void {
+    this.domainBusy.update((set) => {
+      const copy = new Set(set);
+      if (on) {
+        copy.add(domain);
+      } else {
+        copy.delete(domain);
+      }
+      return copy;
+    });
+  }
+
+  /**
+   * Tidy what someone pasted into something the API will accept.
+   *
+   * People paste `https://mastodon.social/@alice` or `@bob@nsfw.social` far more
+   * often than they type a bare hostname, and the server's only answer to either
+   * is a 422 that says "not a valid domain name". Pulling the host out here is
+   * the difference between the field working and the field looking broken.
+   */
+  private normalizeDomain(raw: string): string {
+    let value = raw.trim().toLowerCase();
+    if (!value) {
+      return '';
+    }
+    // Scheme and path go first. Order matters: `https://nsfw.social/@alice` has
+    // an '@' in it, and handling that before stripping the path would return
+    // "alice" — the username — instead of the host.
+    value = value.replace(/^[a-z][a-z0-9+.-]*:\/\//, '');
+    value = value.split('/')[0];
+    // What's left may still be a handle (`@someone@nsfw.social` or
+    // `someone@nsfw.social`); the domain is whatever follows the last '@'.
+    if (value.includes('@')) {
+      value = value.slice(value.lastIndexOf('@') + 1);
+    }
+    // Strip a port and any stray trailing dot.
+    return value.split(':')[0].replace(/\.$/, '');
+  }
+
+  /** Whether the typed value looks like a domain we can send. */
+  protected readonly canBlockDomain = computed(() => {
+    const domain = this.normalizeDomain(this.domainInput());
+    // At least one dot and no whitespace — the two things the server rejects.
+    return domain.length > 2 && domain.includes('.') && !/\s/.test(domain);
+  });
+
+  /**
+   * Block whatever is in the input.
+   *
+   * The server treats blocking an already-blocked domain as a success, so the
+   * only real failure here is a malformed value — which the input guard already
+   * catches. On success the list is reloaded rather than patched: a domain block
+   * can drop followers, and re-reading is the honest way to show what changed.
+   */
+  protected blockDomain(): void {
+    const domain = this.normalizeDomain(this.domainInput());
+    if (!domain || this.isDomainBusy(domain)) {
+      return;
+    }
+    this.domainError.set('');
+    this.setDomainBusy(domain, true);
+    this.api.blockDomain(domain).subscribe({
+      next: () => {
+        this.domainInput.set('');
+        this.setDomainBusy(domain, false);
+        this.reset();
+      },
+      error: () => {
+        this.domainError.set(`Couldn't block ${domain}. Check it is a plain domain name.`);
+        this.setDomainBusy(domain, false);
+      },
+    });
+  }
+
+  /** Lift a domain block. Idempotent server-side, so no confirmation. */
+  protected unblockDomain(domain: string): void {
+    if (this.isDomainBusy(domain)) {
+      return;
+    }
+    this.setDomainBusy(domain, true);
+    this.api.unblockDomain(domain).subscribe({
+      next: () => {
+        this.domains.update((list) => list.filter((d) => d !== domain));
+        this.setDomainBusy(domain, false);
+      },
+      error: () => {
+        this.domainError.set(`Couldn't unblock ${domain}.`);
+        this.setDomainBusy(domain, false);
+      },
     });
   }
 }
