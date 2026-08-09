@@ -3,7 +3,7 @@ import { firstValueFrom, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ParsedFeed } from './rss-parser';
 import { RssFetch } from './rss-fetch';
-import { RssProvider } from './rss-provider';
+import { PER_FEED_ITEM_CAP, RssProvider } from './rss-provider';
 import { RssSubscriptions } from './rss-subscriptions';
 
 function feed(title: string, dates: string[]): ParsedFeed {
@@ -49,7 +49,7 @@ describe('RssProvider', () => {
     expect(provider.linked()).toBe(false);
   });
 
-  it('returns all items of all enabled feeds newest-first, then exhausts', async () => {
+  it('returns items of all enabled feeds newest-first, then exhausts', async () => {
     const provider = setUp((url) =>
       of(
         url.includes('a.example')
@@ -176,5 +176,70 @@ describe('RssProvider', () => {
     expect(comments.map((c) => c.account.display_name)).toEqual(['Ann', 'Bob']);
     expect(comments.every((c) => c.in_reply_to_id === parentId)).toBe(true);
     expect(comments[0].id).toBe(`${parentId}::comment::c1`);
+  });
+
+  /**
+   * The reported freeze, at its source.
+   *
+   * A Hugo blog with no `services.rss.limit` published its entire archive as one
+   * feed. Home accepted every entry, adapted each into a Status and rendered the
+   * lot — a frozen tab and unresponsive buttons. Feeds have no pagination, so
+   * the provider is the only thing standing between a publisher's choice and the
+   * reader's timeline.
+   */
+  describe('a feed that publishes its whole archive', () => {
+    /** Descending dates, so item 0 is newest — the shape a real feed has. */
+    function bigFeed(count: number): ParsedFeed {
+      const dates = Array.from({ length: count }, (_, i) =>
+        new Date(Date.UTC(2026, 6, 14, 0, 0, 0) - i * 60_000).toISOString(),
+      );
+      return feed('big', dates);
+    }
+
+    it('contributes at most PER_FEED_ITEM_CAP items to a round', async () => {
+      const provider = setUp(() => of(bigFeed(4052)));
+      TestBed.inject(RssSubscriptions).add('https://big.example/feed', 'Big');
+
+      provider.reset();
+      const page = await firstValueFrom(provider.fetchPage());
+
+      expect(page).toHaveLength(PER_FEED_ITEM_CAP);
+    });
+
+    it('keeps the newest items, not an arbitrary slice', async () => {
+      const provider = setUp(() => of(bigFeed(500)));
+      TestBed.inject(RssSubscriptions).add('https://big.example/feed', 'Big');
+
+      provider.reset();
+      const page = await firstValueFrom(provider.fetchPage());
+
+      // Newest first, and the oldest kept item is still newer than everything dropped.
+      const times = page.map((s) => Date.parse(s.created_at));
+      expect(times[0]).toBe(Date.UTC(2026, 6, 14, 0, 0, 0));
+      expect([...times].sort((a, b) => b - a)).toEqual(times);
+    });
+
+    /**
+     * The Feeds page says "4,052 items · newest 100 in Home", so the count it
+     * reads must be the feed's real size rather than what survived the cap.
+     */
+    it('records the feed’s true size, not the capped size', async () => {
+      const provider = setUp(() => of(bigFeed(4052)));
+      const subs = TestBed.inject(RssSubscriptions);
+      subs.add('https://big.example/feed', 'Big');
+
+      provider.reset();
+      await firstValueFrom(provider.fetchPage());
+
+      expect(subs.feeds().find((f) => f.url === 'https://big.example/feed')?.itemCount).toBe(4052);
+    });
+
+    it('leaves a normal feed untouched', async () => {
+      const provider = setUp(() => of(bigFeed(12)));
+      TestBed.inject(RssSubscriptions).add('https://small.example/feed', 'Small');
+
+      provider.reset();
+      expect(await firstValueFrom(provider.fetchPage())).toHaveLength(12);
+    });
   });
 });

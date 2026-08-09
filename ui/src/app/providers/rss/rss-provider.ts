@@ -18,10 +18,31 @@ export interface RssItemView {
 }
 
 /**
+ * How many items one feed may contribute to Home in a single round.
+ *
+ * Feeds have no pagination, so whatever the publisher puts in the file is what
+ * arrives — and a feed is allowed to be an archive. Observed in the field: a
+ * Hugo site with no `services.rss.limit` published a 10MB `index.xml` carrying
+ * 4,052 entries, its entire imported post history. Home accepted all of it,
+ * adapted every entry into a `Status`, and rendered the lot: a frozen tab,
+ * unresponsive buttons, and posts trickling into view long after loading
+ * "finished". The aggregator had done its job in 2.6 seconds; the cost was
+ * entirely in what came back.
+ *
+ * So a feed's *newest* items are taken and the rest are left on the floor. A
+ * timeline is a "what's new" view — nobody scrolls to entry 4,000 in a merged
+ * feed, and the feed's own page is one click away for anyone who wants the
+ * archive. 100 is comfortably more than a healthy feed publishes (Hugo's own
+ * default page size is 40) while being a fixed, small ceiling.
+ */
+export const PER_FEED_ITEM_CAP = 100;
+
+/**
  * RSS as a home-timeline source. Feeds have no pagination, so the first
  * `fetchPage()` after a `reset()` loads every enabled feed (tolerating
- * per-feed failures) and returns ALL items newest-first; the aggregator
- * buffers them and interleaves with Mastodon pages. Read-only by nature.
+ * per-feed failures) and returns their newest items — at most
+ * {@link PER_FEED_ITEM_CAP} each — newest-first; the aggregator buffers them
+ * and interleaves with Mastodon pages. Read-only by nature.
  */
 @Injectable({ providedIn: 'root' })
 export class RssProvider implements FeedProvider {
@@ -56,10 +77,17 @@ export class RssProvider implements FeedProvider {
       feeds.map((sub) =>
         this.fetch.fetchFeed(sub.url, { useProxy: sub.useProxy === true }).pipe(
           map((feed) => {
-            // Banks the title and item count for the Feeds page while we are
-            // here anyway; see RssSubscriptions.recordFetch.
+            // Banks the title and the feed's *true* item count for the Feeds
+            // page while we are here anyway; see RssSubscriptions.recordFetch.
+            // Recorded before the cap on purpose: the Feeds page is where "we
+            // are showing the newest 100 of 4,052" gets said honestly, and it
+            // cannot say it from a number that has already been trimmed.
             this.subs.recordFetch(sub.url, feed.title, feed.items.length);
-            return feedToStatuses(sub.url, feed, fetchedAt);
+            // Newest first, then capped — so the cap keeps the newest items
+            // rather than whatever order the publisher happened to emit.
+            return feedToStatuses(sub.url, feed, fetchedAt)
+              .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+              .slice(0, PER_FEED_ITEM_CAP);
           }),
           catchError((err: Error) => {
             failures.push(`${sub.title || sub.url}: ${err.message}`);

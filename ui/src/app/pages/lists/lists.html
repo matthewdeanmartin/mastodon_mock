@@ -341,6 +341,14 @@
             }
             @if (f.itemCount !== undefined) {
               · {{ f.itemCount }} item{{ f.itemCount === 1 ? '' : 's' }}
+              <!-- Said here rather than in the timeline: a feed that publishes
+                   its whole archive is normal, and Home quietly taking the
+                   newest slice is the right behaviour — but it should be
+                   discoverable somewhere, and this page is where feeds explain
+                   themselves. Clicking through shows the feed in full. -->
+              @if (f.itemCount > perFeedCap) {
+                · newest {{ perFeedCap }} in Home
+              }
             }
             @if (f.useProxy) {
               · via proxy

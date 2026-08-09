@@ -13,6 +13,7 @@ import { TagBundle, TagBundles } from '../../lists/tag-bundles';
 import { FeedCapability } from '../../feed-capability';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 import { RssCache } from '../../providers/rss/rss-cache';
+import { PER_FEED_ITEM_CAP } from '../../providers/rss/rss-provider';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { TwitterFollows } from '../../providers/twitter/twitter-follows';
 import { BlueskyFeedEntry, BlueskyFeeds } from '../../providers/bluesky/bluesky-feeds';
@@ -210,6 +211,8 @@ export class Lists implements OnInit {
    * unsubscribing anywhere updates this list with no reload.
    */
   protected rssFeeds = this.rssSubs.feeds;
+  /** How many items of one feed reach Home, so a big feed can say it is trimmed. */
+  protected readonly perFeedCap = PER_FEED_ITEM_CAP;
   /** Locally-followed Twitter accounts. Empty (and the section hidden) unless set up. */
   protected twitterFollows = this.twitterFollowStore.follows;
 

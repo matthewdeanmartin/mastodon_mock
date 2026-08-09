@@ -39,6 +39,30 @@ const SOURCE_PAGE_SIZE = 20;
  */
 const SOURCE_TIMEOUT_MS = 10_000;
 
+/**
+ * The most posts one source may contribute to a single round, whatever it says.
+ *
+ * `SOURCE_PAGE_SIZE` is a *quota* — "keep paging until you have at least this
+ * many" — and it stops the loop, but it cannot stop a source that answers the
+ * very first call with more than the loop ever intended to collect. Nothing
+ * downstream did either, so an oversized page went straight into the feed.
+ *
+ * Which is what happened: one RSS feed returned 15,291 items in a single page,
+ * Home stored 15,411 posts against a configured `feedMax` of 500, and rendering
+ * that many status cards froze the tab.
+ *
+ * This is the backstop rather than the fix — the RSS provider now caps its own
+ * output, which is the right place for a fix to live. But "no provider can flood
+ * Home" should be an invariant of the thing that merges providers, not a promise
+ * each provider is trusted to keep, because the next provider to break it will
+ * be a new one and Home will look broken again.
+ *
+ * Generous on purpose. It is not a paging parameter and must never bite a
+ * well-behaved source; it exists so a misbehaving one is truncated instead of
+ * fatal.
+ */
+const SOURCE_HARD_CAP = 500;
+
 interface ForeignSource {
   provider: FeedProvider;
   exhausted: boolean;
@@ -261,13 +285,28 @@ export class FeedAggregator {
         // decision for a real failure has already been made right here.
         return of<Status[] | null>(null);
       }),
-      switchMap((items) => {
-        if (items === null) {
+      switchMap((rawItems) => {
+        if (rawItems === null) {
           return of(collected);
         }
-        if (!items.length) {
+        if (!rawItems.length) {
           source.exhausted = true;
           return of(collected);
+        }
+        // Truncate before anything else looks at the page. A source that
+        // overruns this badly is not paging, it is dumping an archive, so there
+        // is nothing more to collect from it this round either.
+        let items = rawItems;
+        if (rawItems.length > SOURCE_HARD_CAP) {
+          this.diagnostics.warn('foreign:page-oversized', {
+            provider: source.provider.id,
+            returned: rawItems.length,
+            cap: SOURCE_HARD_CAP,
+            note: 'page truncated and source stopped for this round; the provider should cap its own output',
+          });
+          items = rawItems.slice(0, SOURCE_HARD_CAP);
+          source.exhausted = true;
+          return of([...collected, ...items.filter((item) => this.withinWindow(item))]);
         }
         // Same rule as Mastodon: a source that has gone past the cutoff has
         // nothing newer left to give, so stop paging it. Without this, a

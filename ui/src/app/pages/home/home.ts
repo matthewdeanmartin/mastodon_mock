@@ -686,15 +686,39 @@ export class Home implements OnInit, OnDestroy {
     });
   }
 
-  /** Later source rounds can overlap by date, so keep the accumulated feed merged. */
+  /**
+   * Later source rounds can overlap by date, so keep the accumulated feed merged
+   * — and enforce `feedMax` on what is actually held.
+   *
+   * `feedMax` used to be consulted only as "should I fetch another page?", which
+   * a single oversized page walks straight past: one RSS feed returned 15,291
+   * items at once, and Home stored 15,411 posts against a configured maximum of
+   * 500, then tried to render them all. Paging had already stopped, correctly and
+   * uselessly, *after* accepting them.
+   *
+   * A setting called "maximum feed size" should be a property of the feed, not a
+   * hint to the loader, so the trim happens here where the feed is assembled.
+   * Posts are sorted newest-first before the cut, so what survives is the newest
+   * — and the tail that gets dropped is what the reader was least likely to reach.
+   */
   private mergeStatuses(more: Status[]): void {
-    this.statuses.update((statuses) =>
-      this.auth.isAnonymous
+    this.statuses.update((statuses) => {
+      const merged = this.auth.isAnonymous
         ? this.dedupeAnonymous([...statuses, ...more])
         : [...statuses, ...more].sort(
             (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
-          ),
-    );
+          );
+      const max = this.prefs.feedMax();
+      if (merged.length <= max) {
+        return merged;
+      }
+      this.diagnostics.warn('feed:trimmed-to-max', {
+        held: merged.length,
+        feedMax: max,
+        dropped: merged.length - max,
+      });
+      return merged.slice(0, max);
+    });
   }
 
   private feedHasMore(): boolean {

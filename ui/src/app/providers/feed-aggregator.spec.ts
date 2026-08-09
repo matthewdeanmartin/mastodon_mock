@@ -376,6 +376,57 @@ describe('FeedAggregator', () => {
   });
 
   /**
+   * The backstop for a provider that dumps an archive instead of a page.
+   *
+   * One RSS feed returned 15,291 items in a single `fetchPage()`. `SOURCE_PAGE_SIZE`
+   * is a quota that stops the *paging loop*, and it did — after the oversized page
+   * was already in the feed. Nothing downstream capped it either, so Home stored
+   * 15,411 posts and froze rendering them.
+   */
+  describe('a source that returns far more than a page', () => {
+    it('truncates the page and stops that source for the round', async () => {
+      const aggregator = TestBed.inject(FeedAggregator);
+      fakeRss.linked.set(true);
+      homeTimeline.mockReturnValue(of([]));
+      const flood = Array.from({ length: 15_291 }, (_, i) =>
+        rssStatus(`r${i}`, new Date(Date.UTC(2026, 6, 14) - i * 1000).toISOString()),
+      );
+      fakeRss.fetchPage.mockReturnValue(of(flood));
+
+      aggregator.reset();
+      const page = await firstValueFrom(aggregator.nextPage());
+
+      // Truncated, not dropped: the reader still gets a feed.
+      expect(page.length).toBeLessThanOrEqual(500);
+      expect(page.length).toBeGreaterThan(0);
+      expect(diagnostics.warn).toHaveBeenCalledWith(
+        'foreign:page-oversized',
+        expect.objectContaining({ provider: 'rss', returned: 15_291 }),
+      );
+      // The source is spent for this round rather than being paged again.
+      expect(fakeRss.fetchPage).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves a normally-sized page alone', async () => {
+      const aggregator = TestBed.inject(FeedAggregator);
+      fakeRss.linked.set(true);
+      homeTimeline.mockReturnValue(of([]));
+      fakeRss.fetchPage
+        .mockReturnValueOnce(of([rssStatus('r1', '2026-07-14T10:58:00.000Z')]))
+        .mockReturnValue(of([]));
+
+      aggregator.reset();
+      const page = await firstValueFrom(aggregator.nextPage());
+
+      expect(page.map((s) => s.id)).toEqual(['r1']);
+      expect(diagnostics.warn).not.toHaveBeenCalledWith(
+        'foreign:page-oversized',
+        expect.anything(),
+      );
+    });
+  });
+
+  /**
    * The reported freeze. The round is a forkJoin, so before this the slowest
    * source set the time-to-first-post for every source: when the free CORS
    * proxies all started refusing, the Twitter provider's retry-with-backoff took
