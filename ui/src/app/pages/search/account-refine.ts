@@ -132,12 +132,29 @@ export interface AccountFacetValue {
   count: number;
 }
 
-export type AccountFacetKind = 'domain' | 'bot' | 'locked' | 'followers' | 'statuses';
+export type AccountFacetKind =
+  | 'domain'
+  | 'bot'
+  | 'locked'
+  | 'followers'
+  | 'statuses'
+  | 'activity';
 
 export interface AccountFacet {
   kind: AccountFacetKind;
   label: string;
   values: AccountFacetValue[];
+  /**
+   * How many values to show before truncating.
+   *
+   * The UI caps facet rows at 5 because an open-ended facet like `domain` can
+   * have dozens of values and the top few are the useful ones. That reasoning
+   * doesn't hold for a fixed ladder: the "Last active" bins are a bounded,
+   * ordered set where the stale end is the half people are usually hunting for,
+   * and truncating to 5 would silently hide "over 2 years ago". Facets that want
+   * all their rows say so here.
+   */
+  showAll?: boolean;
 }
 
 /** Count bucket for a follower/post total. Keys are stable; labels are shown. */
@@ -158,6 +175,103 @@ function bucketFor(n: number): Bucket {
   return COUNT_BUCKETS.find((b) => b.test(n)) ?? COUNT_BUCKETS[COUNT_BUCKETS.length - 1];
 }
 
+// ---------------------------------------------------------------------------
+// Last-activity bins
+// ---------------------------------------------------------------------------
+
+const DAY_MS = 86_400_000;
+
+/**
+ * One last-activity bin: everyone whose most recent post is younger than
+ * `withinDays`, and who didn't fit a finer bin above it.
+ *
+ * Deliberately a fixed ladder rather than a computed one. Quantile bins would
+ * adapt perfectly to any corpus and produce labels nobody can act on ("3–17
+ * days"), and the whole point of this facet is that "this month" and "over a
+ * year ago" are the units people actually think in. Adaptivity comes from
+ * dropping the empty bins instead (see {@link activityBins}), which handles the
+ * "everything is from this year" case without a binning algorithm to tune.
+ *
+ * `withinDays: Infinity` is the catch-all tail.
+ */
+interface ActivityBin {
+  key: string;
+  label: string;
+  withinDays: number;
+}
+
+/** The ladder, finest first. Boundaries are the ones humans name. */
+const ACTIVITY_BINS: readonly ActivityBin[] = [
+  { key: 'd1', label: 'Today', withinDays: 1 },
+  { key: 'd7', label: 'This week', withinDays: 7 },
+  { key: 'd30', label: 'This month', withinDays: 30 },
+  { key: 'd90', label: 'Last 3 months', withinDays: 90 },
+  { key: 'd180', label: 'Last 6 months', withinDays: 180 },
+  { key: 'd365', label: 'Last year', withinDays: 365 },
+  { key: 'd730', label: '1 – 2 years ago', withinDays: 730 },
+  { key: 'older', label: 'Over 2 years ago', withinDays: Infinity },
+];
+
+/**
+ * The bin for accounts whose last post date the server never supplied.
+ *
+ * A real bin rather than a silent exclusion: results merged in from thinner
+ * providers genuinely lack `last_status_at` (the page offers a "check activity"
+ * action for exactly this), and dropping them would make the facet counts
+ * quietly disagree with the result count. It sorts last, after the tail.
+ */
+const UNKNOWN_ACTIVITY: ActivityBin = { key: 'unknown', label: 'Not known', withinDays: Infinity };
+
+/**
+ * Days since this account last posted, or null when it can't be known.
+ *
+ * `last_status_at` is a plain date ("2026-08-07") on some servers and a full
+ * timestamp on others; `Date.parse` reads both. A null/absent value means the
+ * account has never posted *or* the server didn't say — indistinguishable here,
+ * so both land in {@link UNKNOWN_ACTIVITY}.
+ */
+function daysSinceActivity(account: Account, now: number): number | null {
+  const last = account.last_status_at;
+  if (!last) {
+    return null;
+  }
+  const parsed = Date.parse(last);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+  // Clamp: a server clock running ahead shouldn't push someone out of "Today".
+  return Math.max(0, (now - parsed) / DAY_MS);
+}
+
+/** Which bin an account falls in. Exported for {@link accountMatchesFacet}. */
+function activityBinFor(account: Account, now: number): ActivityBin {
+  const days = daysSinceActivity(account, now);
+  if (days === null) {
+    return UNKNOWN_ACTIVITY;
+  }
+  return ACTIVITY_BINS.find((b) => days < b.withinDays) ?? ACTIVITY_BINS[ACTIVITY_BINS.length - 1];
+}
+
+/**
+ * The occupied bins, in ladder order, with counts.
+ *
+ * Empty bins are dropped, which is what makes a fixed ladder behave well on a
+ * narrow corpus: a set of results that are all from the last fortnight shows
+ * "Today / This week / This month" and nothing else, rather than eight rows of
+ * which five read zero. A corpus spanning years shows the whole ladder. Either
+ * way the facet lands in the 3–9 row range without deciding anything at runtime.
+ */
+function activityBins(accounts: Account[], now: number): AccountFacetValue[] {
+  const counts = new Map<string, number>();
+  for (const a of accounts) {
+    const bin = activityBinFor(a, now);
+    counts.set(bin.key, (counts.get(bin.key) ?? 0) + 1);
+  }
+  return [...ACTIVITY_BINS, UNKNOWN_ACTIVITY]
+    .filter((b) => counts.has(b.key))
+    .map((b) => ({ value: b.key, label: b.label, count: counts.get(b.key)! }));
+}
+
 /**
  * Categorical/bucketed facets derived *only* from the loaded accounts. Counts
  * mean "loaded accounts matching this value" — never total server counts. Facets
@@ -165,7 +279,7 @@ function bucketFor(n: number): Bucket {
  * The numeric min/max inputs are the precise tool; these buckets are the quick
  * clickable one.
  */
-export function buildAccountFacets(accounts: Account[]): AccountFacet[] {
+export function buildAccountFacets(accounts: Account[], now: number = Date.now()): AccountFacet[] {
   if (!accounts.length) {
     return [];
   }
@@ -230,6 +344,13 @@ export function buildAccountFacets(accounts: Account[]): AccountFacet[] {
   bucketFacet('followers', 'Followers', (a) => a.followers_count);
   bucketFacet('statuses', 'Posts', (a) => a.statuses_count);
 
+  // Last activity keeps ladder order (recent → stale) rather than count order:
+  // the rows are a timeline, and sorting them by popularity would scramble it.
+  const activity = activityBins(accounts, now);
+  if (activity.length > 1) {
+    facets.push({ kind: 'activity', label: 'Last active', values: activity, showAll: true });
+  }
+
   return facets;
 }
 
@@ -262,8 +383,21 @@ export function filterByFollowState(
   });
 }
 
-/** Does an account match a chosen facet value? Mirrors `buildAccountFacets`. */
-export function accountMatchesFacet(a: Account, kind: AccountFacetKind, value: string): boolean {
+/**
+ * Does an account match a chosen facet value? Mirrors `buildAccountFacets`.
+ *
+ * `now` is passed through to the activity bins so a selection is evaluated
+ * against the same clock that produced the counts. It defaults to the current
+ * time; a filtering pass that straddles midnight could in principle move one
+ * account between "Today" and "This week", which is correct behaviour rather
+ * than a bug — the bin is relative to now by definition.
+ */
+export function accountMatchesFacet(
+  a: Account,
+  kind: AccountFacetKind,
+  value: string,
+  now: number = Date.now(),
+): boolean {
   switch (kind) {
     case 'domain':
       return (acctDomain(a.acct) || 'local') === value;
@@ -275,5 +409,7 @@ export function accountMatchesFacet(a: Account, kind: AccountFacetKind, value: s
       return bucketFor(a.followers_count).key === value;
     case 'statuses':
       return bucketFor(a.statuses_count).key === value;
+    case 'activity':
+      return activityBinFor(a, now).key === value;
   }
 }

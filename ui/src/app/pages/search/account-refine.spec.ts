@@ -278,3 +278,105 @@ describe('filterByFollowState', () => {
     expect(filterByFollowState(item, {}, 'following')).toHaveLength(0);
   });
 });
+
+describe('last-activity facet', () => {
+  const NOW = Date.parse('2026-08-09T12:00:00Z');
+  const DAY = 86_400_000;
+
+  /** An account whose last post was `days` ago. */
+  const activeDaysAgo = (days: number, over: Partial<Account> = {}) =>
+    makeAccount({ last_status_at: new Date(NOW - days * DAY).toISOString(), ...over });
+
+  /** Just the activity facet, or undefined when it wasn't built. */
+  const activityFacet = (accounts: Account[]) =>
+    buildAccountFacets(accounts, NOW).find((f) => f.kind === 'activity');
+
+  it('bins accounts onto the ladder, recent first', () => {
+    const facet = activityFacet([
+      activeDaysAgo(0),
+      activeDaysAgo(3),
+      activeDaysAgo(20),
+      activeDaysAgo(400),
+    ]);
+    expect(facet?.values.map((v) => v.label)).toEqual([
+      'Today',
+      'This week',
+      'This month',
+      '1 – 2 years ago',
+    ]);
+    expect(facet?.values.every((v) => v.count === 1)).toBe(true);
+  });
+
+  /**
+   * The "it's all in the same year" case: a fixed ladder would show eight rows
+   * of which five read zero. Dropping empties is what keeps it readable without
+   * a binning algorithm to tune.
+   */
+  it('drops empty bins so a narrow corpus stays short', () => {
+    const facet = activityFacet([activeDaysAgo(0), activeDaysAgo(1), activeDaysAgo(2)]);
+    expect(facet?.values.map((v) => v.label)).toEqual(['Today', 'This week']);
+  });
+
+  it('keeps ladder order rather than sorting by count', () => {
+    // One account today, five last year: count order would invert the timeline.
+    const facet = activityFacet([
+      activeDaysAgo(0),
+      ...Array.from({ length: 5 }, () => activeDaysAgo(300)),
+    ]);
+    expect(facet?.values.map((v) => v.label)).toEqual(['Today', 'Last year']);
+    expect(facet?.values.map((v) => v.count)).toEqual([1, 5]);
+  });
+
+  it('never exceeds the nine-bin ceiling', () => {
+    const facet = activityFacet([0, 3, 20, 60, 120, 300, 500, 2000].map((d) => activeDaysAgo(d)));
+    expect(facet!.values.length).toBeLessThanOrEqual(9);
+    expect(facet?.values.at(-1)?.label).toBe('Over 2 years ago');
+  });
+
+  it('bins accounts with no known last post separately, last', () => {
+    const facet = activityFacet([
+      activeDaysAgo(1),
+      makeAccount({ last_status_at: null }),
+      makeAccount({ last_status_at: undefined }),
+    ]);
+    expect(facet?.values.at(-1)).toMatchObject({ value: 'unknown', label: 'Not known', count: 2 });
+  });
+
+  it('treats an unreadable date as unknown rather than ancient', () => {
+    const facet = activityFacet([activeDaysAgo(1), makeAccount({ last_status_at: 'someday' })]);
+    expect(facet?.values.at(-1)).toMatchObject({ value: 'unknown', count: 1 });
+  });
+
+  /** A server clock running ahead must not push someone out of "Today". */
+  it('clamps a future last-post date into Today', () => {
+    const facet = activityFacet([activeDaysAgo(-2), activeDaysAgo(300)]);
+    expect(facet?.values[0]).toMatchObject({ value: 'd1', count: 1 });
+  });
+
+  it('is omitted when every account falls in one bin', () => {
+    // A single value discriminates nothing, matching the other facets' rule.
+    expect(activityFacet([activeDaysAgo(1), activeDaysAgo(2)])).toBeUndefined();
+  });
+
+  it('asks the UI to show every row', () => {
+    const facet = activityFacet([activeDaysAgo(0), activeDaysAgo(400)]);
+    expect(facet?.showAll).toBe(true);
+  });
+
+  it('selection agrees with the bin the counts used', () => {
+    const fresh = activeDaysAgo(0);
+    const stale = activeDaysAgo(400);
+    expect(accountMatchesFacet(fresh, 'activity', 'd1', NOW)).toBe(true);
+    expect(accountMatchesFacet(fresh, 'activity', 'd730', NOW)).toBe(false);
+    expect(accountMatchesFacet(stale, 'activity', 'd730', NOW)).toBe(true);
+    expect(accountMatchesFacet(makeAccount({ last_status_at: null }), 'activity', 'unknown', NOW)).toBe(
+      true,
+    );
+  });
+
+  it('puts each boundary on the inclusive side of the finer bin', () => {
+    // Exactly 7 days is "this week"'s upper edge: < 7 is the week, 7 is a month.
+    expect(accountMatchesFacet(activeDaysAgo(6.9), 'activity', 'd7', NOW)).toBe(true);
+    expect(accountMatchesFacet(activeDaysAgo(7.1), 'activity', 'd30', NOW)).toBe(true);
+  });
+});

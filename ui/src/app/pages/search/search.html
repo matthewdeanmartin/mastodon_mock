@@ -756,7 +756,9 @@
               @for (facet of accountFacets(); track facet.kind) {
                 <div class="facet">
                   <div class="facet-label muted small">{{ facet.label }}</div>
-                  @for (v of facet.values.slice(0, 5); track v.value) {
+                  <!-- `showAll` facets are bounded ordered ladders where the
+                       last row matters as much as the first — see AccountFacet. -->
+                  @for (v of facet.showAll ? facet.values : facet.values.slice(0, 5); track v.value) {
                     <label class="facet-value">
                       <input
                         type="checkbox"
