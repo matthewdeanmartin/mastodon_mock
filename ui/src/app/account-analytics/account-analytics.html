@@ -8,14 +8,14 @@
   } @else {
     <div class="sample-note muted">
       <span>
-        Based on the last {{ posts().length }} posts, boosts excluded.
+        Based on the last {{ posts().length }} {{ words().posts }}, boosts excluded.
         @if (oldestPostDate(); as oldest) {
           The sample goes back {{ oldest | humanTime }}.
         }
         Reach is estimated, not measured — a cheap peek.
       </span>
       @if (hasMore()) {
-        <span class="load-more" role="group" aria-label="Get more posts">
+        <span class="load-more" role="group" [aria-label]="'Get more ' + words().posts">
           @if (loadingMore()) {
             <span class="muted">Fetching more…</span>
           } @else {
@@ -57,7 +57,7 @@
         } @else {
           Last posted {{ liveliness().daysSinceLastPost }} days ago.
         }
-        {{ liveliness().postsLast30Days }} posts in the last 30 days,
+        {{ liveliness().postsLast30Days }} {{ words().posts }} in the last 30 days,
         {{ liveliness().postsLast90Days }} in the last 90.
       </span>
     </div>
@@ -167,11 +167,13 @@
 
         @if (showWeekly()) {
           <h3 class="chart-title muted">By week</h3>
-          <div class="bars" role="img" aria-label="Posts per week">
+          <div class="bars" role="img" [attr.aria-label]="words().Posts + ' per week'">
             @for (b of weekly(); track b.startIso) {
               <div
                 class="bar-col"
-                [title]="b.label + ': ' + b.posts + ' posts, ~' + fmt(b.reach) + ' reach'"
+                [title]="
+                  b.label + ': ' + b.posts + ' ' + words().posts + ', ~' + fmt(b.reach) + ' reach'
+                "
               >
                 <div class="bar" [style.height.%]="(b.posts / weeklyPeak()) * 100"></div>
               </div>
@@ -181,11 +183,13 @@
 
         @if (showMonthly()) {
           <h3 class="chart-title muted">By month</h3>
-          <div class="bars labelled" role="img" aria-label="Posts per month">
+          <div class="bars labelled" role="img" [attr.aria-label]="words().Posts + ' per month'">
             @for (b of monthly(); track b.startIso) {
               <div
                 class="bar-col"
-                [title]="b.label + ': ' + b.posts + ' posts, ~' + fmt(b.reach) + ' reach'"
+                [title]="
+                  b.label + ': ' + b.posts + ' ' + words().posts + ', ~' + fmt(b.reach) + ' reach'
+                "
               >
                 <div class="bar" [style.height.%]="(b.posts / monthlyPeak()) * 100"></div>
                 <span class="bar-label muted">{{ b.label }}</span>
@@ -195,9 +199,9 @@
         }
 
         <h3 class="chart-title muted">By day of week</h3>
-        <div class="bars labelled" role="img" aria-label="Posts per weekday">
+        <div class="bars labelled" role="img" [attr.aria-label]="words().Posts + ' per weekday'">
           @for (d of weekdays(); track d.label) {
-            <div class="bar-col" [title]="d.label + ': ' + d.posts + ' posts'">
+            <div class="bar-col" [title]="d.label + ': ' + d.posts + ' ' + words().posts">
               <div class="bar" [style.height.%]="(d.posts / weekdayPeak()) * 100"></div>
               <span class="bar-label muted">{{ d.label }}</span>
             </div>
@@ -301,7 +305,7 @@
             <span class="lawn-day" [class]="'heat-' + level"></span>
           }
           <span>More</span>
-          <span class="lawn-peak">Busiest day: {{ heatmap().peak }} posts</span>
+          <span class="lawn-peak">Busiest day: {{ heatmap().peak }} {{ words().posts }}</span>
         </div>
       </section>
     }

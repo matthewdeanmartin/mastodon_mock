@@ -23,6 +23,9 @@ interface ListsInternals {
   collectionToDelete: WritableSignal<Collection | null>;
   load(): void;
   create(): void;
+  tagQuery: WritableSignal<string>;
+  normalizedTagQuery(): string;
+  viewTag(): void;
   askDeleteList(list: UserList, event: Event): void;
   remove(list: UserList): void;
   createCollection(): void;
@@ -150,6 +153,22 @@ describe('Lists', () => {
     expect(internals(fixture).loading()).toBe(true);
     expect(internals(fixture).lists()).toEqual([]);
     httpMock.expectOne('/api/v1/lists').flush([]);
+  });
+
+  it('accepts a hashtag to preview, with or without the #', () => {
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+
+    internals(fixture).tagQuery.set('#mawkingbird');
+    expect(internals(fixture).normalizedTagQuery()).toBe('mawkingbird');
+
+    internals(fixture).tagQuery.set('  mawkingbird ');
+    expect(internals(fixture).normalizedTagQuery()).toBe('mawkingbird');
+
+    // Mastodon tags are one alphanumeric run, so a phrase is rejected rather
+    // than sent to a tag page that could only ever show nothing.
+    internals(fixture).tagQuery.set('cat pictures');
+    expect(internals(fixture).normalizedTagQuery()).toBe('');
   });
 
   it('keeps Twitter accounts off the tags-only route', () => {

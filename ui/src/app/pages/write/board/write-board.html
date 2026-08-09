@@ -45,10 +45,10 @@
                         <span title="Saved in this browser only">💾</span>
                       }
                       @case ('scheduled') {
-                        <span title="Parked as a far-future scheduled post">⏳</span>
+                        <span [title]="'Parked as a far-future scheduled ' + words().post">⏳</span>
                       }
                       @case ('self') {
-                        <span title="A post visible only to you">🔒</span>
+                        <span [title]="'A ' + words().post + ' visible only to you'">🔒</span>
                       }
                       @case ('paste') {
                         <span title="Published to a paste service">📋</span>

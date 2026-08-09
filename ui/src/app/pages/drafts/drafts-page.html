@@ -94,13 +94,17 @@
               <span>{{ item.at | humanTime }}</span>
             }
             @case ('scheduled') {
-              <span class="draft-kind" title="Parked on the server as a far-future scheduled post"
+              <span
+                class="draft-kind"
+                [title]="'Parked on the server as a far-future scheduled ' + words().post"
                 >⏳ parked</span
               >
               <span>until {{ parkedWhen(item) }}</span>
             }
             @case ('self') {
-              <span class="draft-kind" title="A private post to yourself, held on the server"
+              <span
+                class="draft-kind"
+                [title]="'A private ' + words().post + ' to yourself, held on the server'"
                 >🔒 self</span
               >
               <span>{{ item.at | humanTime }}</span>
@@ -197,7 +201,7 @@
           class="btn btn-outline btn-sm"
           type="button"
           (click)="pendingCancel.set(s)"
-          title="Cancel scheduled post"
+          [title]="'Cancel scheduled ' + words().post"
         >
           Cancel
         </button>
@@ -208,7 +212,7 @@
 
 @if (pendingCancel()) {
   <app-confirm-dialog
-    title="Cancel this scheduled post?"
+    [title]="'Cancel this scheduled ' + words().post + '?'"
     message="It will be deleted from the server and never published."
     confirmLabel="Cancel post"
     (confirmed)="confirmCancel()"

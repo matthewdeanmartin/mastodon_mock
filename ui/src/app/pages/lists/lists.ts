@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Collection, FeaturedTag, Tag, UserList } from '../../models';
@@ -18,6 +18,7 @@ import { TwitterFollows } from '../../providers/twitter/twitter-follows';
 import { BlueskyFeedEntry, BlueskyFeeds } from '../../providers/bluesky/bluesky-feeds';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { describeHttpError, PageDiagnostics } from '../../page-diagnostics';
+import { Terminology } from '../../terminology';
 
 /**
  * Which sections the Feeds page shows. `/feeds` shows everything; `/feeds/lists`
@@ -84,9 +85,13 @@ export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
   styleUrl: './lists.css',
 })
 export class Lists implements OnInit {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private api = inject(Api);
   protected auth = inject(Auth);
   private feedCaps = inject(FeedCapability);
+  private router = inject(Router);
   private anonymousLists = inject(AnonymousLists);
   private anonymousTags = inject(AnonymousTags);
   protected saved = inject(SavedSearches);
@@ -331,6 +336,40 @@ export class Lists implements OnInit {
       next: (tags) => this.featuredTags.set(tags),
       error: () => this.featuredTags.set([]),
     });
+  }
+
+  // -------------------------------------------- look at a hashtag, then follow
+
+  /** What's typed in the "look at a hashtag" box. */
+  protected tagQuery = signal('');
+
+  /**
+   * The box's contents as a usable tag name, or '' when it isn't one.
+   *
+   * Mastodon tags are a single alphanumeric run, so a leading `#` is stripped
+   * and anything with spaces or punctuation is rejected rather than sent to a
+   * tag page that would show nothing.
+   */
+  protected normalizedTagQuery = computed(() => {
+    const raw = this.tagQuery().trim().replace(/^#/, '');
+    return /^[\p{L}\p{N}_]+$/u.test(raw) ? raw : '';
+  });
+
+  /**
+   * Open the tag's own page, which is where its posts and its Follow button
+   * both are.
+   *
+   * Deliberately a *view* action rather than a follow one: following a tag
+   * pushes it into Home permanently, and a bare "type a tag to follow" box asks
+   * for that commitment before showing a single post.
+   */
+  protected viewTag(): void {
+    const tag = this.normalizedTagQuery();
+    if (!tag) {
+      return;
+    }
+    this.tagQuery.set('');
+    void this.router.navigate(['/tags', tag]);
   }
 
   /** The ✕ sits inside a routerLink; unfollow without navigating to the tag. */

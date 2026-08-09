@@ -2,7 +2,8 @@ import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Api } from './api';
 import { Auth } from './auth';
-import { Relationship } from './models';
+import { qualifiedHandle } from './account-handle';
+import { Account, Relationship } from './models';
 
 /**
  * Who the viewer follows, resolved in batches and shared across the app.
@@ -51,6 +52,9 @@ export class FollowState {
   private auth = inject(Auth);
 
   private known = signal<Record<string, Relationship>>({});
+  /** Foreign `user@host` → the local account record for them, or null if none. */
+  private foreign = new Map<string, Account | null>();
+  private foreignPending = new Map<string, Promise<Account | null>>();
   /** Ids with a write in flight, so the button can disable itself. */
   private busy = signal<ReadonlySet<string>>(new Set());
   private pending = new Map<string, Promise<void>>();
@@ -84,7 +88,9 @@ export class FollowState {
     const unique = [...new Set(ids)];
     // Anything already in flight is awaited rather than re-requested: two
     // components mounting against the same collection should cost one call.
-    const inFlight = unique.map((id) => this.pending.get(id)).filter((p): p is Promise<void> => !!p);
+    const inFlight = unique
+      .map((id) => this.pending.get(id))
+      .filter((p): p is Promise<void> => !!p);
     const wanted = unique.filter((id) => !this.known()[id] && !this.pending.has(id));
 
     const batches: Promise<void>[] = [];
@@ -134,12 +140,12 @@ export class FollowState {
     // Optimistic: assume the ordinary case (a public account follows straight
     // through). A locked account answers `requested`, and the real response
     // below replaces this guess either way.
-    this.write([{ ...(before ?? emptyRelationship(id)), following: !wasConnected, requested: false }]);
+    this.write([
+      { ...(before ?? emptyRelationship(id)), following: !wasConnected, requested: false },
+    ]);
 
     try {
-      const rel = await firstValueFrom(
-        wasConnected ? this.api.unfollow(id) : this.api.follow(id),
-      );
+      const rel = await firstValueFrom(wasConnected ? this.api.unfollow(id) : this.api.follow(id));
       // The server's answer wins — it is the one that knows about locked
       // accounts, and it is what turns an optimistic "Following" into the
       // honest "Requested".
@@ -168,11 +174,64 @@ export class FollowState {
     });
   }
 
+  /**
+   * The local account for a foreign one, so it can actually be followed.
+   *
+   * A shipped starter kit (and anything else assembled off-server) carries
+   * accounts as the *origin* server described them. Their ids are meaningless
+   * here: `POST /accounts/<their id>/follow` either 404s or, worse, follows
+   * whoever happens to hold that id on this server. That is why those rows
+   * originally shipped with no follow button at all.
+   *
+   * The fix is the flow Mastodon provides for exactly this: search the
+   * fully-qualified `user@host` handle with `resolve=true`, which webfingers the
+   * account and creates a *local* record for it, then act on that id. It is what
+   * `import-follows.ts` and `starter-kit-post.ts` already do; this is that logic
+   * in one place so a third and fourth copy don't appear.
+   *
+   * Returns null when the handle can't be built or the account can't be found —
+   * the caller shows no button rather than one that would fail.
+   */
+  async resolveForeign(account: Account): Promise<Account | null> {
+    if (this.auth.isAnonymous) {
+      return null;
+    }
+    const handle = qualifiedHandle(account);
+    if (!handle) {
+      return null;
+    }
+    const cached = this.foreign.get(handle);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const inFlight = this.foreignPending.get(handle);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const lookup = firstValueFrom(this.api.search(handle, 'accounts', { resolve: true, limit: 5 }))
+      .then((results) => {
+        const found = pickAccount(handle, results.accounts ?? []);
+        // Cached either way: a null is as worth remembering as a hit, since
+        // re-webfingering a handle that doesn't resolve costs the same as one
+        // that does and gets the same answer.
+        this.foreign.set(handle, found);
+        return found;
+      })
+      .catch(() => null)
+      .finally(() => this.foreignPending.delete(handle));
+
+    this.foreignPending.set(handle, lookup);
+    return lookup;
+  }
+
   /** Drop everything — used when the signed-in account changes. */
   reset(): void {
     this.known.set({});
     this.busy.set(new Set());
     this.pending.clear();
+    this.foreign.clear();
+    this.foreignPending.clear();
   }
 
   private forget(id: string): void {
@@ -194,6 +253,21 @@ export class FollowState {
       return next;
     });
   }
+}
+
+/**
+ * The best match for a handle among search results.
+ *
+ * Search returns look-alikes — the same username on a different host, a display
+ * name that happens to contain the text — so an exact `acct` match wins.
+ * Falling back to the first result is deliberate rather than lazy: with
+ * `resolve=true` the webfingered account is the first result, and refusing to
+ * act on it would leave the button dead for accounts that resolved perfectly
+ * well.
+ */
+function pickAccount(handle: string, accounts: Account[]): Account | null {
+  const wanted = handle.toLowerCase();
+  return accounts.find((a) => a.acct?.toLowerCase() === wanted) ?? accounts[0] ?? null;
 }
 
 /** A relationship placeholder for an account we are writing to before reading. */

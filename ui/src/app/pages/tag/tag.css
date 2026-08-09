@@ -55,3 +55,12 @@
   flex: 1;
   min-width: 0;
 }
+
+/* The "My posts" toggle and the line explaining what it actually searched. */
+.tag-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+}

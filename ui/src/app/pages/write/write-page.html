@@ -17,7 +17,7 @@
     ></textarea>
     <div class="zen-bar">
       <span class="zen-count muted">
-        {{ segments().length }} {{ segments().length === 1 ? 'post' : 'posts' }}
+        {{ segments().length }} {{ segments().length === 1 ? words().post : words().posts }}
         @if (overLimitCount()) {
           <span class="over">· {{ overLimitCount() }} too long</span>
         }
@@ -146,10 +146,12 @@
                       <span title="Saved in this browser only">💾 local</span>
                     }
                     @case ('scheduled') {
-                      <span title="Parked as a far-future scheduled post">⏳ parked</span>
+                      <span [title]="'Parked as a far-future scheduled ' + words().post"
+                        >⏳ parked</span
+                      >
                     }
                     @case ('self') {
-                      <span title="A post visible only to you">🔒 self</span>
+                      <span [title]="'A ' + words().post + ' visible only to you'">🔒 self</span>
                     }
                     @case ('paste') {
                       <span title="Published to a paste service">📋 paste</span>
@@ -247,7 +249,7 @@
           @if (segments().length) {
             <div class="segments" aria-label="Split preview">
               <div class="segments-head muted">
-                {{ segments().length }} {{ segments().length === 1 ? 'post' : 'posts' }}
+                {{ segments().length }} {{ segments().length === 1 ? words().post : words().posts }}
                 @if (overLimitCount()) {
                   <span class="over">· {{ overLimitCount() }} over the limit</span>
                 }
@@ -365,7 +367,7 @@
                   @if (item.source.kind === 'local') {
                     <span title="Saved in this browser only">💾</span>
                   } @else {
-                    <span title="A post visible only to you">🔒</span>
+                    <span [title]="'A ' + words().post + ' visible only to you'">🔒</span>
                   }
                   <span>{{ item.at | humanTime }}</span>
                 </span>
@@ -442,7 +444,9 @@
                 @if (item.source.kind === 'local') {
                   <span title="Saved in this browser only">💾 draft</span>
                 } @else {
-                  <span title="A post visible only to you">🔒 private post</span>
+                  <span [title]="'A ' + words().post + ' visible only to you'"
+                    >🔒 private post</span
+                  >
                 }
                 <span>{{ item.at | humanTime }}</span>
               </span>
@@ -542,8 +546,8 @@
 
           @case ('preview') {
             <p class="muted small">
-              {{ segments().length }} {{ segments().length === 1 ? 'post' : 'posts' }}, split by
-              {{ modeLabel(splitMode()) | lowercase }}.
+              {{ segments().length }} {{ segments().length === 1 ? words().post : words().posts }},
+              split by {{ modeLabel(splitMode()) | lowercase }}.
               @if (overLimitCount()) {
                 <span class="over"
                   >{{ overLimitCount() }} over the limit — the server will refuse

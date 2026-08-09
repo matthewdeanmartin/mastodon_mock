@@ -23,7 +23,7 @@
     class="anonymous-login-post"
     routerLink="/login"
     (click)="auth.exitAnonymous()"
-    aria-label="Login or create an account to post content, reply and more"
+    [aria-label]="'Login or create an account to ' + words().post + ' content, reply and more'"
   >
     <div class="anonymous-login-post-label muted">📌 Pinned</div>
     <div class="anonymous-login-post-body">
@@ -122,7 +122,13 @@
       [class.active]="prefs.algoCalm()"
       [attr.aria-pressed]="prefs.algoCalm()"
       (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
-      title="Calm mode: hide posts that read as inflammatory — heated wording, quote-dunks, and ratioed posts (all detected on-device)"
+      [title]="
+        'Calm mode: hide ' +
+        words().posts +
+        ' that read as inflammatory — heated wording, quote-dunks, and ratioed ' +
+        words().posts +
+        ' (all detected on-device)'
+      "
     >
       😌 Calm
     </button>

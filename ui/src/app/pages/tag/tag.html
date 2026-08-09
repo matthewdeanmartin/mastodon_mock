@@ -97,11 +97,40 @@
 } @else if (!statuses().length) {
   <p class="muted center">No statuses tagged #{{ tag() }}.</p>
 } @else {
-  @for (s of statuses(); track s.id; let i = $index) {
+  @if (canFilterMine()) {
+    <div class="tag-filter">
+      <button
+        class="btn btn-sm"
+        [class.btn-outline]="!mineOnly()"
+        type="button"
+        [attr.aria-pressed]="mineOnly()"
+        (click)="toggleMine()"
+      >
+        My {{ words().posts }}
+      </button>
+      @if (mineOnly()) {
+        <!-- Says what was actually searched. This filters the posts already
+             loaded, not the whole history of the tag, and implying otherwise
+             would make an empty result look like proof. -->
+        <span class="muted small">
+          {{ visibleStatuses().length }} of the {{ statuses().length }} loaded {{ words().posts }}.
+          Load more to search further back.
+        </span>
+      }
+    </div>
+  }
+
+  @if (mineOnly() && !visibleStatuses().length) {
+    <p class="muted center">
+      None of the {{ statuses().length }} loaded {{ words().posts }} are yours.
+    </p>
+  }
+
+  @for (s of visibleStatuses(); track s.id) {
     <app-status-card
       [status]="s"
       filterContext="public"
-      (changed)="onChanged(i, $event)"
+      (changed)="onChanged($event)"
       (deleted)="onDeleted($event)"
     />
   }

@@ -14,6 +14,7 @@ import { AnonymousProviderRef } from '../../providers/anonymous/anonymous-mastod
 import { Observable } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { TagBundles } from '../../lists/tag-bundles';
+import { Terminology } from '../../terminology';
 
 /** Posts per request when sampling the tag — Mastodon's cap. */
 const SAMPLE_PAGE_SIZE = 40;
@@ -31,6 +32,9 @@ export class Tag implements OnInit {
   private anonymousTags = inject(AnonymousTags);
   private anonymous = inject(AnonymousAccount);
   private anonymousPublic = inject(AnonymousPublicApi);
+
+  /** post/tweet/florp, per the Blue setting. */
+  protected words = inject(Terminology).words;
 
   protected tag = signal('');
   protected tagInfo = signal<TagEntity | null>(null);
@@ -95,6 +99,49 @@ export class Tag implements OnInit {
   setTab(tab: 'posts' | 'members' | 'analytics'): void {
     this.tab.set(tab);
   }
+
+  // ------------------------------------------------------------- "My posts"
+
+  /** Whether the feed is narrowed to the signed-in user's own posts. */
+  protected mineOnly = signal(false);
+
+  /**
+   * Offered only when there is a "me" to filter by.
+   *
+   * Anonymous sessions have no own-posts to find, so the control is hidden
+   * rather than shown returning nothing.
+   */
+  protected canFilterMine = computed(() => !this.auth.isAnonymous && !!this.auth.account());
+
+  protected toggleMine(): void {
+    this.mineOnly.update((on) => !on);
+  }
+
+  /**
+   * The posts to render: everything loaded, or only mine.
+   *
+   * Filtered client-side over what has been loaded rather than re-queried as
+   * `#tag from:me`. The search DSL does support `from:` — it is verified
+   * working on mastodon.social — but post search needs an index that most
+   * servers do not have and anonymous callers never get, so a search-backed
+   * version would work here and silently return nothing there. Filtering what
+   * we already hold works everywhere.
+   *
+   * The cost is that this searches the loaded window, not all of history, which
+   * is why the UI says so rather than implying completeness.
+   */
+  protected visibleStatuses = computed(() => {
+    if (!this.mineOnly()) {
+      return this.statuses();
+    }
+    const me = this.auth.account()?.id;
+    if (!me) {
+      return this.statuses();
+    }
+    // Compare against the *original* author for boosts: a post of mine that
+    // someone else boosted is still mine.
+    return this.statuses().filter((status) => (status.reblog ?? status).account?.id === me);
+  });
 
   load(tag: string): void {
     this.loading.set(true);
@@ -199,8 +246,15 @@ export class Tag implements OnInit {
     call.subscribe((updated) => this.tagInfo.set(updated));
   }
 
-  onChanged(index: number, updated: Status): void {
-    this.statuses.update((list) => list.map((s, i) => (i === index ? updated : s)));
+  /**
+   * Replace a post by id rather than by row index.
+   *
+   * The rendered list can be a *filtered* view ("My posts"), so a card's index
+   * on screen is not its index in `statuses()` — updating by position would
+   * write the change onto whichever unrelated post happened to sit there.
+   */
+  onChanged(updated: Status): void {
+    this.statuses.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
   }
 
   onDeleted(removed: Status): void {

@@ -26,6 +26,7 @@ import {
 } from '../account-metrics';
 import { LANG_NAMES, LangShare, detectLanguageMix, sharePct } from '../language-detect';
 import { stripHtml } from '../sentiment';
+import { Terminology } from '../terminology';
 
 /** How many of the account's most recent posts the component analyzes. */
 const SAMPLE_SIZE = 100;
@@ -51,6 +52,9 @@ const LOAD_MORE_CHOICES = [1, 3, 5, 10] as const;
   styleUrl: './account-analytics.css',
 })
 export class AccountAnalytics implements OnInit {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private api = inject(Api);
   private anonymousPublic = inject(AnonymousPublicApi);
 

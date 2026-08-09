@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { Auth } from '../auth';
 import { FollowState } from '../follow-state';
+import { Account } from '../models';
 
 /**
  * The follow control for one account, wherever a list of people is rendered.
@@ -66,24 +67,62 @@ export class FollowButton {
   /** For the accessible label — "Follow @alice" beats forty identical "Follow"s. */
   readonly handle = input('');
 
+  /**
+   * Set when this account came from somewhere other than the home server (a
+   * shipped starter kit), so its id is not one this server can act on.
+   *
+   * Given one, the button appears immediately as "Follow" and webfingers the
+   * account on click — see {@link FollowState.resolveForeign}. Without this,
+   * the row simply has no button, which is what shipped kits used to get.
+   */
+  readonly foreign = input<Account | null>(null);
+
+  /** The id to actually write to: the resolved local one when foreign. */
+  private readonly resolvedId = signal<string | null>(null);
+
+  /** Whichever id this button operates on, once it is known. */
+  protected readonly targetId = computed(() =>
+    this.foreign() ? this.resolvedId() : this.accountId(),
+  );
+
   /** Emitted after a successful write, so a page can re-count or re-sort. */
   readonly changed = output<void>();
 
   protected readonly error = signal('');
+  /** Webfingering a foreign account, before the follow itself. */
+  private readonly resolving = signal(false);
 
-  protected readonly status = computed(() => this.follows.status(this.accountId()));
-  protected readonly busy = computed(() => this.follows.busyWith(this.accountId()));
+  protected readonly status = computed(() => {
+    const id = this.targetId();
+    return id ? this.follows.status(id) : 'unknown';
+  });
+
+  protected readonly busy = computed(() => {
+    const id = this.targetId();
+    return this.resolving() || (!!id && this.follows.busyWith(id));
+  });
 
   /** Following or requested — either way, the next click withdraws it. */
   protected readonly connected = computed(
     () => this.status() === 'following' || this.status() === 'requested',
   );
 
+  /**
+   * A foreign account whose local record has not been looked up yet.
+   *
+   * Its button *is* shown, reading "Follow", and the webfinger happens on the
+   * click. Resolving all of them on mount would fire one search per row — 24
+   * requests to open a starter kit, most of them for people the visitor will
+   * never click — which is a worse deal than the one round-trip of latency the
+   * first click now costs.
+   */
+  protected readonly unresolvedForeign = computed(() => !!this.foreign() && !this.resolvedId());
+
   protected readonly visible = computed(
     () =>
       !this.auth.isAnonymous &&
-      this.accountId() !== this.auth.account()?.id &&
-      this.status() !== 'unknown',
+      this.targetId() !== this.auth.account()?.id &&
+      (this.status() !== 'unknown' || this.unresolvedForeign()),
   );
 
   protected readonly label = computed(() => {
@@ -102,7 +141,35 @@ export class FollowButton {
     event.stopPropagation();
     event.preventDefault();
     this.error.set('');
-    const ok = await this.follows.toggle(this.accountId());
+
+    // A foreign account is webfingered here rather than on mount, so the cost
+    // is paid by the row that was actually clicked.
+    let id = this.targetId();
+    if (!id) {
+      const account = this.foreign();
+      if (!account) {
+        return;
+      }
+      this.resolving.set(true);
+      const local = await this.follows.resolveForeign(account);
+      this.resolving.set(false);
+      if (!local) {
+        this.error.set("Couldn't find that account on this server.");
+        return;
+      }
+      this.resolvedId.set(local.id);
+      id = local.id;
+      // Now that they have a local id, find out whether we already follow them
+      // — the answer decides whether this click follows or unfollows.
+      await this.follows.resolve([id]);
+      if (this.status() !== 'not-following') {
+        // Already followed (or requested): this click has become a no-op that
+        // would otherwise undo a relationship the user never saw.
+        return;
+      }
+    }
+
+    const ok = await this.follows.toggle(id);
     if (!ok) {
       this.error.set("Couldn't do that — try again.");
       return;

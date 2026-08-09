@@ -54,6 +54,7 @@ import {
   splitText,
 } from './split-modes';
 import { WriteWorkspace } from './write-workspace';
+import { Terminology } from '../../terminology';
 
 type DraftFilter = 'all' | DraftKind;
 
@@ -107,6 +108,9 @@ interface PendingSwitch {
   styleUrl: './write-page.css',
 })
 export class WritePage implements OnInit, OnDestroy {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   protected sources = inject(DraftSources);
   protected pkm = inject(PkmSource);
   protected workspace = inject(WriteWorkspace);

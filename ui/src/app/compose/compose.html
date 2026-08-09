@@ -152,8 +152,8 @@
             class="btn btn-outline btn-sm"
             type="button"
             (click)="removeThreadBox(i)"
-            title="Remove this post from the thread"
-            aria-label="Remove this post from the thread"
+            [title]="'Remove this ' + words().post + ' from the thread'"
+            [aria-label]="'Remove this ' + words().post + ' from the thread'"
           >
             <span aria-hidden="true">✕</span>
           </button>
@@ -286,7 +286,7 @@
           class="target-select"
           [ngModel]="target()"
           (ngModelChange)="onTargetChange($event)"
-          title="Post to"
+          [title]="words().Post + ' to'"
         >
           <!-- Only Fedi needs a Mastodon token. Bluesky and the blog each carry
                their own credential and post straight to their own service, so an
@@ -409,7 +409,7 @@
           class="visibility-select"
           [ngModel]="postLanguage()"
           (ngModelChange)="onLanguageChange($event)"
-          title="Post language"
+          [title]="words().Post + ' language'"
         >
           <option value="">🌐 Not specified</option>
           @for (l of languageOptions(); track l.code) {
@@ -467,8 +467,8 @@
               class="tool-btn"
               [class.on]="scheduleOpen()"
               (click)="toggleSchedule()"
-              title="Schedule post"
-              aria-label="Schedule post"
+              [title]="'Schedule ' + words().post"
+              [aria-label]="'Schedule ' + words().post"
             >
               <span aria-hidden="true">🕒</span>
             </button>
@@ -520,7 +520,7 @@
             class="tool-btn"
             type="button"
             (click)="tagHelperOpen.set(true)"
-            title="Suggest hashtags for this post"
+            [title]="'Suggest hashtags for this ' + words().post"
           >
             🤖#️⃣
           </button>
@@ -531,8 +531,8 @@
             class="tool-btn"
             type="button"
             (click)="translateOpen.set(true)"
-            title="Translate this post into another language"
-            aria-label="Translate this post into another language"
+            [title]="'Translate this ' + words().post + ' into another language'"
+            [aria-label]="'Translate this ' + words().post + ' into another language'"
           >
             <span aria-hidden="true">🤖🌐</span>
           </button>
@@ -542,8 +542,8 @@
           <button
             class="tool-btn thread-btn"
             (click)="addThreadBox()"
-            title="Add another post (thread / tweet storm)"
-            aria-label="Add another post (thread / tweet storm)"
+            [title]="'Add another ' + words().post + ' (thread / tweet storm)'"
+            [aria-label]="'Add another ' + words().post + ' (thread / tweet storm)'"
           >
             <span aria-hidden="true">➕🧵</span>
           </button>

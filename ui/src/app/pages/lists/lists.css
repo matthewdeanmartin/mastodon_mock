@@ -72,3 +72,15 @@ p.muted.center.small {
   color: #e0245e;
   background: var(--bg);
 }
+
+/* "Look at a hashtag first" — a view action, not a follow one. */
+.tag-peek {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.tag-peek input {
+  flex: 1;
+  min-width: 0;
+}

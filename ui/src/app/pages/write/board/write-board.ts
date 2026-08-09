@@ -10,6 +10,7 @@ import {
   isDerivedColumn,
   movableColumns,
 } from './board-columns';
+import { Terminology } from '../../../terminology';
 
 /**
  * Roughly how tall and wide the move menu renders.
@@ -47,6 +48,9 @@ const MENU_WIDTH = 150;
   styleUrl: './write-board.css',
 })
 export class WriteBoard implements OnDestroy {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private workspace = inject(WriteWorkspace);
 
   /**

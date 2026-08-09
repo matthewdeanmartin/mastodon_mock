@@ -48,7 +48,7 @@
         readerMode()
           ? 'Exit reader'
           : chain().length > 1
-            ? 'Reader (' + chain().length + ' posts)'
+            ? 'Reader (' + chain().length + ' ' + words().posts + ')'
             : 'Reader'
       }}
     </button>
@@ -93,7 +93,7 @@
             <div class="muted">
               &#64;{{ author.acct }} · {{ chain()[0].created_at | humanTime }}
               @if (!isRss()) {
-                · {{ chain().length }} posts
+                · {{ chain().length }} {{ words().posts }}
               }
             </div>
           </div>

@@ -12,6 +12,7 @@ import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscri
 import { PasteHistory, PasteRecord } from '../../providers/paste/paste-history';
 import { FeedPasteProvider } from '../../providers/paste/paste-provider';
 import { PasteProviderRegistry } from '../../providers/paste/paste-provider-registry';
+import { Terminology } from '../../terminology';
 
 /** Which top-level section is showing. "My Pastes" is the default landing tab. */
 type PasteTab = 'mine' | 'feeds';
@@ -23,6 +24,9 @@ type PasteTab = 'mine' | 'feeds';
   styleUrl: './pastes-page.css',
 })
 export class PastesPage {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   protected history = inject(PasteHistory);
   protected providers = inject(PasteProviderRegistry);
   private feeds = inject(PasteFeedSubscriptions);

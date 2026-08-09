@@ -27,8 +27,8 @@
         <div class="sd-candidate">
           <strong>{{ server.domain }} allows anonymous search</strong>
           <span class="muted small">
-            Found {{ server.accounts }} accounts and {{ server.statuses }} posts for the test
-            queries.
+            Found {{ server.accounts }} accounts and {{ server.statuses }} {{ words().posts }} for
+            the test queries.
           </span>
           <span class="muted small">
             @if (server.category) {

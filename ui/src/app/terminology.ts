@@ -58,15 +58,47 @@ const TWEET_WORDS: Words = {
 };
 
 /**
- * Post/boost vocabulary, switchable to tweet/retweet from Settings → Mockingbird
- * Blue (next to stars vs hearts). Purely a client-side label swap — the English
- * UI strings only; server content is untouched.
+ * The third option, and the only one that is nobody else's word.
+ *
+ * Post is the fediverse's term and tweet is the one this app is nostalgic for;
+ * florp belongs to neither, which is the joke and also the point — a network
+ * where you can name the verb yourself is making a claim the other two aren't.
+ */
+const FLORP_WORDS: Words = {
+  post: 'florp',
+  posts: 'florps',
+  Post: 'Florp',
+  Posts: 'Florps',
+  PostAll: 'Florp all',
+  poster: 'florper',
+  posted: 'florped',
+  boost: 'reflorp',
+  boosts: 'reflorps',
+  Boost: 'Reflorp',
+  Boosts: 'Reflorps',
+  boosted: 'reflorped',
+  Boosted: 'Reflorped',
+  UndoBoost: 'Undo reflorp',
+  BoostedBy: 'Reflorped by',
+};
+
+/**
+ * Post/boost vocabulary, switchable to tweet/retweet or florp/reflorp from
+ * Settings → Mockingbird Blue (next to stars vs hearts). Purely a client-side
+ * label swap — the English UI strings only; server content is untouched.
  */
 @Injectable({ providedIn: 'root' })
 export class Terminology {
   private prefs = inject(ClientPrefs);
 
-  readonly words: Signal<Words> = computed(() =>
-    this.prefs.postNoun() === 'tweet' ? TWEET_WORDS : POST_WORDS,
-  );
+  readonly words: Signal<Words> = computed(() => {
+    switch (this.prefs.postNoun()) {
+      case 'tweet':
+        return TWEET_WORDS;
+      case 'florp':
+        return FLORP_WORDS;
+      default:
+        return POST_WORDS;
+    }
+  });
 }

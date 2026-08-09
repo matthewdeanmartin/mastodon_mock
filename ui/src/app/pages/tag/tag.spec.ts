@@ -16,13 +16,16 @@ interface TagInternals {
   tagInfo: WritableSignal<TagEntity | null>;
   statuses: WritableSignal<Status[]>;
   loading: WritableSignal<boolean>;
+  mineOnly: WritableSignal<boolean>;
+  canFilterMine(): boolean;
+  visibleStatuses(): Status[];
 }
 
 function internals(fixture: ComponentFixture<Tag>): TagInternals {
   return fixture.componentInstance as unknown as TagInternals;
 }
 
-function makeStatus(id: string): Status {
+function makeStatus(id: string, accountId = '1'): Status {
   return {
     id,
     created_at: '2026-01-01T00:00:00Z',
@@ -31,7 +34,7 @@ function makeStatus(id: string): Status {
     spoiler_text: '',
     visibility: 'public',
     url: null,
-    account: { id: '1', username: 'user', acct: 'user', display_name: 'User' } as never,
+    account: { id: accountId, username: 'user', acct: 'user', display_name: 'User' } as never,
     reblog: null,
     quote: null,
     in_reply_to_id: null,
@@ -203,20 +206,61 @@ describe('Tag (timeline)', () => {
     req.flush(makeTagEntity('art', { featuring: false }));
   });
 
+  // ------------------------------------------------------------------ My posts
+
+  it('"My posts" narrows the tag feed to the signed-in account', () => {
+    const fixture = setUpWithTag('cats', () =>
+      TestBed.inject(Auth).account.set({ id: 'me' } as never),
+    );
+    httpMock.expectOne('/api/v1/tags/cats').flush(makeTagEntity('cats'));
+    httpMock
+      .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/cats'))
+      .flush([makeStatus('1', 'me'), makeStatus('2', 'someone-else'), makeStatus('3', 'me')]);
+
+    expect(internals(fixture).canFilterMine()).toBe(true);
+    expect(internals(fixture).visibleStatuses()).toHaveLength(3);
+
+    internals(fixture).mineOnly.set(true);
+    expect(
+      internals(fixture)
+        .visibleStatuses()
+        .map((s) => s.id),
+    ).toEqual(['1', '3']);
+    // Filtering is a view concern: the loaded set is untouched, so turning it
+    // back off costs no request.
+    expect(internals(fixture).statuses()).toHaveLength(3);
+  });
+
+  it('does not offer "My posts" to anonymous viewers', () => {
+    const fixture = setUpWithTag('cats', () =>
+      TestBed.inject(Auth).enterAnonymous('https://home.example'),
+    );
+    httpMock.expectOne('https://home.example/api/v1/tags/cats').flush(makeTagEntity('cats'));
+    httpMock
+      .expectOne('https://home.example/api/v1/timelines/tag/cats?limit=20')
+      .flush([makeStatus('1')]);
+
+    // There is no "me" to filter by, so the control is hidden rather than
+    // offered and then returning nothing.
+    expect(internals(fixture).canFilterMine()).toBe(false);
+  });
+
   // ---------------------------------------------------------------- onChanged / onDeleted
 
-  it('onChanged: updates the status at the given index', () => {
+  it('onChanged: updates the status by id, not by row position', () => {
     const fixture = setUpWithTag('news');
     httpMock.expectOne('/api/v1/tags/news').flush(makeTagEntity('news'));
     httpMock
       .expectOne((r) => r.url.startsWith('/api/v1/timelines/tag/news'))
       .flush([makeStatus('1'), makeStatus('2')]);
 
-    const updated = { ...makeStatus('1'), favourited: true };
-    fixture.componentInstance.onChanged(0, updated);
+    // By id rather than index: the rendered list can be filtered ("My posts"),
+    // so a card's position on screen is not its position in `statuses()`.
+    const updated = { ...makeStatus('2'), favourited: true };
+    fixture.componentInstance.onChanged(updated);
 
-    expect(internals(fixture).statuses()[0].favourited).toBe(true);
-    expect(internals(fixture).statuses()[1].id).toBe('2');
+    expect(internals(fixture).statuses()[0].favourited).toBe(false);
+    expect(internals(fixture).statuses()[1].favourited).toBe(true);
   });
 
   it('onDeleted: removes the status by id', () => {

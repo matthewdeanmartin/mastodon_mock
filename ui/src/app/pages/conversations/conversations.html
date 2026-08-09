@@ -405,13 +405,16 @@
                       class="bubble-action"
                       [class.on]="m.reblogged"
                       (click)="toggleBoost(m)"
-                      title="Boost"
-                      aria-label="Boost"
+                      [title]="words().Boost"
+                      [attr.aria-label]="words().Boost"
                     >
                       <span aria-hidden="true">🔁</span>
                     </button>
                   }
-                  <a class="bubble-action" [routerLink]="['/statuses', m.id]" title="Open as post"
+                  <a
+                    class="bubble-action"
+                    [routerLink]="['/statuses', m.id]"
+                    [title]="'Open as ' + words().post"
                     >↗</a
                   >
                 </span>

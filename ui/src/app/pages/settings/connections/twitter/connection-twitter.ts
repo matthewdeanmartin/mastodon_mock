@@ -40,6 +40,7 @@ import {
 } from '../../../../providers/twitter/twitter-source';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
+import { Terminology } from '../../../../terminology';
 
 /**
  * Settings → Connections → Twitter.
@@ -75,6 +76,9 @@ import { expiryLabel } from '../expiry-label';
   styleUrls: ['../connection-page.css', './connection-twitter.css'],
 })
 export class ConnectionTwitter implements OnInit {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   protected settings = inject(TwitterSettings);
   protected consent = inject(ProxyConsent);
   protected follows = inject(TwitterFollows);

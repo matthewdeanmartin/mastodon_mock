@@ -1,6 +1,6 @@
 <div class="analytics">
   @if (loading()) {
-    <p class="muted center">Sampling the last {{ sampleSize() }} posts…</p>
+    <p class="muted center">Sampling the last {{ sampleSize() }} {{ words().posts }}…</p>
   } @else if (error()) {
     <p class="muted center">Couldn't sample this feed — try again later.</p>
   } @else if (!posts().length) {
@@ -9,14 +9,15 @@
     <div class="sample-note muted">
       <span>
         @if (paged()) {
-          Analytics for the <strong>{{ posts().length }} posts sampled</strong> from this
-          {{ report().meta.feedType }} feed ({{ report().meta.feedQuery }}) — not the whole feed.
-          Spans {{ sampleSpan() }}, collected {{ report().meta.collectedAt | humanTime }} in
+          Analytics for the <strong>{{ posts().length }} {{ words().posts }} sampled</strong> from
+          this {{ report().meta.feedType }} feed ({{ report().meta.feedQuery }}) — not the whole
+          feed. Spans {{ sampleSpan() }}, collected {{ report().meta.collectedAt | humanTime }} in
           {{ report().meta.apiCalls }} API {{ report().meta.apiCalls === 1 ? 'call' : 'calls' }}.
         } @else {
           <!-- A synthetic feed has no cursor that would reproduce the merge, so
                the sample is exactly what the page has already loaded. -->
-          Analytics for the <strong>{{ posts().length }} posts currently loaded</strong> in this
+          Analytics for the
+          <strong>{{ posts().length }} {{ words().posts }} currently loaded</strong> in this
           {{ report().meta.feedType }} feed ({{ report().meta.feedQuery }}) — not the whole feed.
           Spans {{ sampleSpan() }}. Load more posts in the feed to widen it.
         }
@@ -29,7 +30,7 @@
               type="button"
               class="load-more-btn"
               [class.active]="sampleSize() === n"
-              [title]="'Sample ' + n + ' posts'"
+              [title]="'Sample ' + n + ' ' + words().posts"
               (click)="setSampleSize(n)"
             >
               {{ n }}
@@ -110,7 +111,7 @@
       </p>
       <div class="share-list">
         @for (row of compositionRows(); track row.label) {
-          <div class="share-row" [title]="row.label + ': ' + row.count + ' posts'">
+          <div class="share-row" [title]="row.label + ': ' + row.count + ' ' + words().posts">
             <span class="share-name">{{ row.label }}</span>
             <span class="share-track">
               <span class="share-bar" [style.width.%]="pct(row.share)"></span>
@@ -163,7 +164,7 @@
         <span>Bots</span>
         <strong>
           {{ report().accounts.botAuthors }} of {{ report().accounts.uniqueAuthors }} authors,
-          {{ report().accounts.postsFromBots }} posts
+          {{ report().accounts.postsFromBots }} {{ words().posts }}
         </strong>
         @if (report().accounts.followedAuthors !== null) {
           <span>Followed by you</span>
@@ -174,7 +175,7 @@
         }
         @if (report().accounts.mutedOrFilteredPosts) {
           <span>Muted or filtered</span>
-          <strong>{{ report().accounts.mutedOrFilteredPosts }} posts</strong>
+          <strong>{{ report().accounts.mutedOrFilteredPosts }} {{ words().posts }}</strong>
         }
       </div>
 
@@ -217,7 +218,7 @@
               <span class="share-track">
                 <span class="share-bar" [style.width.%]="pct(row.share)"></span>
               </span>
-              <span class="share-value muted">{{ row.count }} boosts</span>
+              <span class="share-value muted">{{ row.count }} {{ words().boosts }}</span>
             </div>
           }
         </div>
@@ -438,7 +439,7 @@
       <h3 class="chart-title muted">Average engagement by post type</h3>
       <div class="share-list">
         @for (slice of report().engagement.slices; track slice.label) {
-          <div class="share-row" [title]="slice.posts + ' posts'">
+          <div class="share-row" [title]="slice.posts + ' ' + words().posts">
             <span class="share-name">{{ slice.label }}</span>
             <span class="share-track">
               <span
@@ -474,7 +475,9 @@
       <div class="stat-grid">
         <span>Replies</span>
         <strong>
-          {{ report().conversations.replies }} posts ({{ pct(report().conversations.replyShare) }}%)
+          {{ report().conversations.replies }} {{ words().posts }} ({{
+            pct(report().conversations.replyShare)
+          }}%)
         </strong>
         <span>Distinct conversations</span>
         <strong>{{ report().conversations.distinctConversations }}</strong>
@@ -510,9 +513,9 @@
       </p>
 
       <h3 class="chart-title muted">By hour of day</h3>
-      <div class="bars labelled" role="img" aria-label="Posts per hour of day">
+      <div class="bars labelled" role="img" [attr.aria-label]="words().Posts + ' per hour of day'">
         @for (count of report().recency.byHour; track $index) {
-          <div class="bar-col" [title]="$index + ':00 — ' + count + ' posts'">
+          <div class="bar-col" [title]="$index + ':00 — ' + count + ' ' + words().posts">
             <div class="bar" [style.height.%]="(count / hourPeak()) * 100"></div>
             <span class="bar-label muted">{{ $index % 3 === 0 ? $index : '' }}</span>
           </div>
@@ -521,9 +524,9 @@
 
       @if (report().recency.byDay.length) {
         <h3 class="chart-title muted">By day</h3>
-        <div class="bars labelled" role="img" aria-label="Posts per day">
+        <div class="bars labelled" role="img" [attr.aria-label]="words().Posts + ' per day'">
           @for (day of report().recency.byDay; track day.dayIso) {
-            <div class="bar-col" [title]="day.label + ': ' + day.posts + ' posts'">
+            <div class="bar-col" [title]="day.label + ': ' + day.posts + ' ' + words().posts">
               <div class="bar" [style.height.%]="(day.posts / dayPeak()) * 100"></div>
               <span class="bar-label muted">{{ day.label }}</span>
             </div>

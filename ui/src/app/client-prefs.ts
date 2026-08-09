@@ -177,7 +177,21 @@ export type AlgoAudience = 'all' | 'friends';
 export type FavStyle = 'star' | 'heart';
 
 /** What a post is called across the UI: fediverse "post" or bird-site "tweet". */
-export type PostNoun = 'post' | 'tweet';
+export type PostNoun = 'post' | 'tweet' | 'florp';
+
+/** Every accepted value, so validation and the settings picker agree. */
+export const POST_NOUNS: readonly PostNoun[] = ['post', 'tweet', 'florp'];
+
+/**
+ * Whether a stored value is a noun we still ship.
+ *
+ * Anything unrecognised falls back to 'post' rather than throwing: someone who
+ * tried florp and later loads a build without it should see posts, not a
+ * broken settings page.
+ */
+export function isPostNoun(value: unknown): value is PostNoun {
+  return POST_NOUNS.includes(value as PostNoun);
+}
 
 /** Custom color overrides; a `#rrggbb` string, or null for the theme default. */
 export type CustomColor = string | null;
@@ -826,7 +840,7 @@ export class ClientPrefs {
   }
 
   setPostNoun(noun: PostNoun): void {
-    if (noun === 'post' || noun === 'tweet') {
+    if (isPostNoun(noun)) {
       this.postNoun.set(noun);
     }
   }
@@ -1100,7 +1114,7 @@ export class ClientPrefs {
     if (stored.favStyle === 'star' || stored.favStyle === 'heart') {
       this.favStyle.set(stored.favStyle);
     }
-    if (stored.postNoun === 'post' || stored.postNoun === 'tweet') {
+    if (isPostNoun(stored.postNoun)) {
       this.postNoun.set(stored.postNoun);
     }
     this.loadBool(stored.zenMode, this.zenMode);

@@ -133,6 +133,25 @@
 
 @if (shows('tags') && showsSection('tags')) {
   <div class="section-head">Followed hashtags</div>
+
+  <!-- Deliberately "look at it", not "follow it". Following a tag folds it into
+       Home permanently, and this page said so about bundles below while
+       offering no way to see what a tag actually returns first. The tag page
+       has the posts and the Follow button; this is the way in. -->
+  <form class="tag-peek" (ngSubmit)="viewTag()">
+    <input
+      type="text"
+      [ngModel]="tagQuery()"
+      (ngModelChange)="tagQuery.set($event)"
+      name="tag-peek"
+      placeholder="Look at a hashtag first…"
+      aria-label="Hashtag to preview before following"
+    />
+    <button class="btn btn-outline btn-sm" type="submit" [disabled]="!normalizedTagQuery()">
+      View posts
+    </button>
+  </form>
+
   @if (!followedTags().length) {
     <p class="muted center small">You don't follow any hashtags yet.</p>
   } @else {
@@ -200,7 +219,7 @@
         <a class="list-row" [routerLink]="['/tags', t.name]">
           <span>
             #{{ t.name }}
-            <span class="muted small">· {{ t.statuses_count }} posts</span>
+            <span class="muted small">· {{ t.statuses_count }} {{ words().posts }}</span>
           </span>
         </a>
       }

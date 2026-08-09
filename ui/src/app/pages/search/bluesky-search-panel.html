@@ -231,7 +231,7 @@
           <select
             [ngModel]="statusSort()"
             (ngModelChange)="statusSort.set($event)"
-            aria-label="Sort posts"
+            [aria-label]="'Sort ' + words().posts"
           >
             @for (s of statusSorts; track s.value) {
               <option [value]="s.value">{{ s.label }}</option>

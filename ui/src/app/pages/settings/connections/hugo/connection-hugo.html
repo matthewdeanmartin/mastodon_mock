@@ -167,7 +167,11 @@
               <code>{{ row.slug }}.md</code>
               @if (row.source === 'filename') {
                 <span
-                  title="Read from the file name — this post's own title and date have not been loaded yet."
+                  [title]="
+                    'Read from the file name — this ' +
+                    words().post +
+                    ' own title and date have not been loaded yet.'
+                  "
                   >· from file name</span
                 >
               }

@@ -41,6 +41,7 @@ import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
 import { JustMyServer } from '../../just-my-server';
+import { Terminology } from '../../terminology';
 
 /** Below this many follows, nudge toward /find-friends (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -66,6 +67,9 @@ const BOOKMARK_TAIL_SIZE = 40;
   styleUrl: './home.css',
 })
 export class Home implements OnInit, OnDestroy {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private api = inject(Api);
   protected auth = inject(Auth);
   protected prefs = inject(ClientPrefs);

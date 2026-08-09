@@ -9,6 +9,7 @@ import { PageDiagnostics } from '../../page-diagnostics';
 import { StatusCard } from '../../status-card/status-card';
 import { StatusVisibility } from '../../status-visibility';
 import { Auth } from '../../auth';
+import { Terminology } from '../../terminology';
 
 const SOURCE_LABELS: Record<AlgoSource, string> = {
   mutual: 'Top post from a mutual',
@@ -40,6 +41,9 @@ interface AlgoLink {
   styleUrl: './algo.css',
 })
 export class Algo implements OnInit {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   protected feed = inject(AlgoFeed);
   /** Ceiling for the "n of up to N API calls" progress line. */
   protected readonly maxCalls = ALGO_MAX_CALLS;
@@ -133,7 +137,8 @@ export class Algo implements OnInit {
     if (!this.prefs.algoCalm()) {
       return 0;
     }
-    return this.feed.posts().filter((p) => this.passesChips(p) && this.calm.hidden(p.status)).length;
+    return this.feed.posts().filter((p) => this.passesChips(p) && this.calm.hidden(p.status))
+      .length;
   });
 
   ngOnInit(): void {

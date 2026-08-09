@@ -70,7 +70,7 @@
       <button
         class="btn btn-outline"
         type="button"
-        title="What you can type in a post search"
+        [title]="'What you can type in a ' + words().post + ' search'"
         aria-label="Search syntax help"
         (click)="syntaxHelpOpen.set(true)"
       >
@@ -224,7 +224,7 @@
           } @else {
             <p class="ok small">
               ✓ Anonymous search works — the test queries matched {{ searchServerHits() }} accounts
-              and {{ searchServerPostHits() }} posts.
+              and {{ searchServerPostHits() }} {{ words().posts }}.
             </p>
           }
         }
@@ -471,7 +471,7 @@
                     placeholder="min"
                     [ngModel]="statusesMin()"
                     (ngModelChange)="statusesMin.set($event)"
-                    aria-label="Minimum posts"
+                    [aria-label]="'Minimum ' + words().posts"
                   />
                   <span class="muted">–</span>
                   <input
@@ -480,7 +480,7 @@
                     placeholder="max"
                     [ngModel]="statusesMax()"
                     (ngModelChange)="statusesMax.set($event)"
-                    aria-label="Maximum posts"
+                    [aria-label]="'Maximum ' + words().posts"
                   />
                 </div>
               </div>
@@ -559,7 +559,7 @@
                 <select
                   [ngModel]="statusSort()"
                   (ngModelChange)="statusSort.set($event)"
-                  aria-label="Sort posts"
+                  [aria-label]="'Sort ' + words().posts"
                 >
                   @for (s of statusSorts; track s.value) {
                     <option [value]="s.value">{{ s.label }}</option>
@@ -896,8 +896,8 @@
                 </button>
               } @else {
                 <p class="muted small center">
-                  Loaded {{ loadedCount() }} posts in {{ callsUsed() }} API calls. Facet counts and
-                  filters apply only to these posts.
+                  Loaded {{ loadedCount() }} {{ words().posts }} in {{ callsUsed() }} API calls.
+                  Facet counts and filters apply only to these posts.
                 </p>
               }
             </div>
@@ -905,6 +905,28 @@
 
           @if (type() !== 'accounts' && !r.hashtags.length && !r.statuses.length) {
             <p class="muted center">No results.</p>
+
+            <!-- A tag with no posts is still a tag worth following: you follow
+                 #mawkingbird precisely to catch the first post. The claim is
+                 hedged unless post search actually works here — otherwise
+                 "nobody has posted this" would be a confident lie about a
+                 server that simply has no index. -->
+            @if (canFollowSearchedTag() && tagCandidate(); as tag) {
+              <div class="tag-offer center">
+                <p class="muted small">
+                  @if (searchSawEverything()) {
+                    Nobody has posted <strong>#{{ tag }}</strong> yet.
+                  } @else {
+                    No posts for <strong>#{{ tag }}</strong> came back — and this server can't
+                    search posts, so there may be some we can't see.
+                  }
+                  Following it puts new posts in your home timeline as they appear.
+                </p>
+                <a class="btn btn-outline" [routerLink]="['/tags', tag]">
+                  View and follow #{{ tag }}
+                </a>
+              </div>
+            }
             <!-- Three different things produce an empty result set and only one of
                them is "nobody posted about this". Say which one this was. -->
             @if (emptyExplanation(); as why) {

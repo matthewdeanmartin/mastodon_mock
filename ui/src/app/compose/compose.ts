@@ -865,9 +865,7 @@ export class Compose implements OnDestroy {
    * Only worth saying for `both`, where the number is smaller than the Mastodon
    * limit the user is looking at a Mastodon composer expecting.
    */
-  protected readonly limitSource = computed(() =>
-    this.target() === 'both' ? 'Bluesky' : '',
-  );
+  protected readonly limitSource = computed(() => (this.target() === 'both' ? 'Bluesky' : ''));
 
   protected readonly maxChars = MAX_POST_CHARS;
 

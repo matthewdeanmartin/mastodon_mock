@@ -7,6 +7,7 @@ import {
   SearchServerProbe,
 } from '../search-server-probe';
 import { rejectReason, SearchServerRejects } from '../search-server-rejects';
+import { Terminology } from '../terminology';
 
 type DiscoveryState = 'idle' | 'searching' | 'found' | 'exhausted';
 
@@ -51,6 +52,9 @@ const VISIBLE_ATTEMPTS = 6;
   styleUrl: './search-server-discovery.css',
 })
 export class SearchServerDiscovery implements OnDestroy {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private readonly directory = inject(MastodonServers);
   private readonly rejects = inject(SearchServerRejects);
 

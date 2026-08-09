@@ -51,7 +51,7 @@
       }
 
       <div class="acct-stats muted small">
-        <span title="Posts"
+        <span [title]="words().Posts"
           ><strong>{{ a.statuses_count | humanCount }}</strong> posts</span
         >
         <span title="Following"
@@ -68,7 +68,9 @@
             >{{ last.text }}</span
           >
         } @else if (activityUnknown()) {
-          <span class="acct-activity unknown" title="This result arrived without a last-post date"
+          <span
+            class="acct-activity unknown"
+            [title]="'This result arrived without a last-' + words().post + ' date'"
             >activity unknown</span
           >
         }

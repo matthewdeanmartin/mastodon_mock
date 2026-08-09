@@ -21,6 +21,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\"",
     "servers:snapshot": "node scripts/update-server-snapshot.mjs",
     "check:storage": "node scripts/check-storage-registry.mjs",
+    "check:terminology": "node scripts/check-terminology.mjs",
     "gen:api-docs": "node scripts/gen-api-docs.mjs",
     "starter-kits:update": "node scripts/update-bundled-starter-kits.mjs",
     "starter-kits:check": "node scripts/update-bundled-starter-kits.mjs --check"

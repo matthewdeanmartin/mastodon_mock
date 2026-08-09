@@ -66,7 +66,7 @@
           >
         }
         @if (display.visibility === 'private') {
-          <span class="badge" title="Followers-only post"
+          <span class="badge" [title]="'Followers-only ' + words().post"
             ><span aria-hidden="true">🔒</span
             ><span class="sr-only">Followers-only post</span></span
           >
@@ -362,12 +362,13 @@
               (click)="showShare.set(true); $event.stopPropagation()"
             >
               <span aria-hidden="true">🔁</span>
-              <span>{{ display.reblogs_count }}</span> <span class="sr-only">reposts</span>
+              <span>{{ display.reblogs_count }}</span>
+              <span class="sr-only">{{ words().boosts }}</span>
             </button>
           } @else {
-            <span class="action" title="Reposts"
+            <span class="action" [title]="words().Boosts"
               ><span aria-hidden="true">🔁</span> <span>{{ display.reblogs_count }}</span>
-              <span class="sr-only">reposts</span></span
+              <span class="sr-only">{{ words().boosts }}</span></span
             >
           }
         } @else if (!foreign && capabilities.canCompose) {
@@ -391,7 +392,7 @@
             </button>
           } @else {
             <span class="action"
-              >{{ display.reblogs_count }} <span class="sr-only">reposts</span></span
+              >{{ display.reblogs_count }} <span class="sr-only">{{ words().boosts }}</span></span
             >
           }
         } @else if (!caps.reblog && readOnlyStats) {
@@ -399,9 +400,9 @@
                attach them to. When `caps.reblog` already rendered a button above,
                this fallback would be a second 🔁 on the same row — the case a
                signed-in viewer hits on every Bluesky post. -->
-          <span class="action" title="Reposts"
+          <span class="action" [title]="words().Boosts"
             ><span aria-hidden="true">🔁</span> {{ display.reblogs_count }}
-            <span class="sr-only">reposts</span></span
+            <span class="sr-only">{{ words().boosts }}</span></span
           >
         }
         @if (caps.favourite) {
@@ -628,14 +629,16 @@
               <button
                 class="action"
                 (click)="deleteAndRedraft($event)"
-                title="Delete &amp; repost"
-                aria-label="Delete &amp; repost"
+                [title]="'Delete &amp; ' + words().boost"
+                [aria-label]="'Delete &amp; ' + words().boost"
               >
                 <span aria-hidden="true">♻️</span>
               </button>
               @if (display.url || display.account.url) {
                 <details class="danger-menu" (click)="$event.stopPropagation()">
-                  <summary class="action" aria-label="More post actions">•••</summary>
+                  <summary class="action" [aria-label]="'More ' + words().post + ' actions'">
+                    •••
+                  </summary>
                   <div class="danger-menu-panel">
                     <!-- "Reply to this later." Parks a local draft; publishes
                        nothing, so it works anonymously too. -->
@@ -669,7 +672,9 @@
               <span class="action reported" title="Reported">🚩 reported</span>
             } @else {
               <details class="danger-menu" (click)="$event.stopPropagation()">
-                <summary class="action" aria-label="More post actions">•••</summary>
+                <summary class="action" [aria-label]="'More ' + words().post + ' actions'">
+                  •••
+                </summary>
                 <div class="danger-menu-panel">
                   <!-- "Reply to this later." Parks a local draft; publishes
                        nothing, so it works anonymously too. -->
@@ -699,7 +704,7 @@
                   <button
                     type="button"
                     (click)="mutePost($event)"
-                    title="Hide this post for 30 days"
+                    [title]="'Hide this ' + words().post + ' for 30 days'"
                   >
                     Mute this post
                   </button>
@@ -746,7 +751,9 @@
               </button>
             }
             <details class="danger-menu" (click)="$event.stopPropagation()">
-              <summary class="action" aria-label="More post actions">•••</summary>
+              <summary class="action" [aria-label]="'More ' + words().post + ' actions'">
+                •••
+              </summary>
               <div class="danger-menu-panel">
                 <!-- "Reply to this later." Parks a local draft; publishes
                        nothing, so it works anonymously too. -->
@@ -773,7 +780,11 @@
                     Open profile on original site ↗
                   </a>
                 }
-                <button type="button" (click)="mutePost($event)" title="Hide this post for 30 days">
+                <button
+                  type="button"
+                  (click)="mutePost($event)"
+                  [title]="'Hide this ' + words().post + ' for 30 days'"
+                >
                   Mute this post
                 </button>
                 @if (authorBlockedLocally() || authorMutedLocally()) {

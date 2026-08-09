@@ -203,7 +203,7 @@
                 type="button"
                 [class.active]="sharing() === paste.slug"
                 (click)="toggleShare(paste)"
-                title="Post a link to this paste on Mastodon or Bluesky"
+                [title]="words().Post + ' a link to this paste on Mastodon or Bluesky'"
               >
                 {{ sharing() === paste.slug ? 'Close share' : 'Share ↗' }}
               </button>
@@ -211,7 +211,11 @@
                 class="btn btn-outline btn-sm"
                 type="button"
                 (click)="editForPost(paste)"
-                title="Open in the composer with a live Post button — this paste stays put"
+                [title]="
+                  'Open in the composer with a live ' +
+                  words().Post +
+                  ' button — this paste stays put'
+                "
               >
                 Edit for post
               </button>

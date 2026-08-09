@@ -123,13 +123,26 @@ export class CollectionPage implements OnInit {
   /**
    * Whether this page can offer follow buttons at all.
    *
-   * A *shipped* starter kit lists accounts on other instances, whose ids mean
-   * nothing to the home server — `POST /accounts/<their id>/follow` would
-   * either 404 or, worse, follow whoever happens to hold that id here. Those
-   * members route through an anonymous ref for exactly this reason, and the
-   * only honest affordance for them is the profile link they already have.
+   * Signed-in only — an anonymous session has no relationships and no token to
+   * write one with.
+   *
+   * Shipped starter kits are included, but by a different route. Their members
+   * are accounts on other instances, so the ids they carry are meaningless
+   * here; the button resolves each one to its local record first (webfinger via
+   * `search?resolve=true`) and acts on that. See {@link foreignMember}.
    */
-  protected canFollow = computed(() => !this.shipped() && !this.auth.isAnonymous);
+  protected canFollow = computed(() => !this.auth.isAnonymous);
+
+  /**
+   * The account to resolve before following, or null when its id is already
+   * one this server can act on.
+   *
+   * Only shipped kits need it: a real server-side collection's members are
+   * local records by definition.
+   */
+  protected foreignMember(account: Account): Account | null {
+    return this.shipped() ? account : null;
+  }
 
   /**
    * Resolve follow state for every member, in batches.
@@ -139,7 +152,10 @@ export class CollectionPage implements OnInit {
    * follow?* — only by making you open each one in a new tab.
    */
   private resolveFollows(): void {
-    if (!this.canFollow()) {
+    // Shipped kits are deliberately excluded: their ids are foreign, so asking
+    // for relationships on them would answer about whoever holds those ids
+    // locally. Each row resolves itself instead, one webfinger at a time.
+    if (!this.canFollow() || this.shipped()) {
       return;
     }
     void this.follows.resolve(this.members().map((m) => m.account.id));

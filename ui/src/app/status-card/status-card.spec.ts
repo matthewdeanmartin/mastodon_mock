@@ -139,7 +139,10 @@ describe('StatusCard', () => {
     expect(el.textContent).toContain('2');
     expect(el.textContent).toContain('3');
     expect(el.querySelector('[title="Replies"]')?.textContent).toContain('0');
-    expect(el.querySelector('[title="Reposts"]')?.textContent).toContain('2');
+    // The boost counter's title follows the reader's vocabulary setting now
+    // (posts/tweets/florps), so it is selected by the default label rather than
+    // the hardcoded "Reposts" it used to carry.
+    expect(el.querySelector('[title="Boosts"]')?.textContent).toContain('2');
     expect(el.querySelector('[title="Favourites"]')?.textContent).toContain('3');
   });
 

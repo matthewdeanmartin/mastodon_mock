@@ -9,8 +9,8 @@
     <span>
       <!-- Emergent membership, not a roster: say so plainly. -->
       The {{ authors().length }} {{ authors().length === 1 ? 'account' : 'accounts' }} that wrote
-      the {{ posts().length }} posts sampled from this feed. There's no membership list for a feed
-      like this — these are just the people posting in it right now.
+      the {{ posts().length }} {{ words().posts }} sampled from this feed. There's no membership
+      list for a feed like this — these are just the people posting in it right now.
     </span>
     @if (paged()) {
       <span class="sample-controls" role="group" aria-label="Sample size">
@@ -20,7 +20,7 @@
             type="button"
             class="sample-btn"
             [class.active]="sampleSize() === n"
-            [title]="'Sample ' + n + ' posts'"
+            [title]="'Sample ' + n + ' ' + words().posts"
             (click)="setSampleSize(n)"
           >
             {{ n }}
@@ -60,7 +60,7 @@
         </span>
       </a>
       <span class="share muted" [title]="pct(row.share) + '% of the sampled posts'">
-        {{ row.count }} {{ row.count === 1 ? 'post' : 'posts' }}
+        {{ row.count }} {{ row.count === 1 ? words().post : words().posts }}
         <small>{{ pct(row.share) }}%</small>
       </span>
       <!-- This list used to resolve follow state and then do nothing with it

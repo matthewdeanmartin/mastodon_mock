@@ -19,6 +19,7 @@ import { PageDiagnostics } from '../../page-diagnostics';
 import { ShortenerRegistry } from '../../providers/shortener/shortener-registry';
 import { ShortenerSettings } from '../../providers/shortener/shortener-settings';
 import { Server } from '../../server';
+import { Terminology } from '../../terminology';
 
 type InviteMode = 'simple' | 'advanced';
 type PromotionTarget = 'join-mastodon' | 'home-server';
@@ -40,6 +41,9 @@ interface InviteCard {
   styleUrl: './invites.css',
 })
 export class Invites implements OnInit {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private readonly auth = inject(Auth);
   private readonly server = inject(Server);
   private readonly diagnostics = inject(PageDiagnostics);

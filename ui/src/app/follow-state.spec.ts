@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from './auth';
 import { FollowState, RELATIONSHIP_BATCH } from './follow-state';
-import { Relationship } from './models';
+import { Account, Relationship } from './models';
 
 function relationship(id: string, overrides: Partial<Relationship> = {}): Relationship {
   return {
@@ -114,9 +114,7 @@ describe('FollowState', () => {
 
   it('unfollows an account it currently follows', async () => {
     const resolved = follows.resolve(['3']);
-    http
-      .expectOne((r) => r.url === RELATIONSHIPS)
-      .flush([relationship('3', { following: true })]);
+    http.expectOne((r) => r.url === RELATIONSHIPS).flush([relationship('3', { following: true })]);
     await resolved;
 
     const toggled = follows.toggle('3');
@@ -125,11 +123,68 @@ describe('FollowState', () => {
     expect(follows.status('3')).toBe('not-following');
   });
 
+  // ------------------------------------------------- foreign (shipped kits)
+
+  /** An account as a *foreign* server described it: bare acct, remote url. */
+  function foreignAccount(): Account {
+    return {
+      id: 'REMOTE-77',
+      acct: 'alice',
+      username: 'alice',
+      display_name: 'Alice',
+      url: 'https://other.social/@alice',
+    } as Account;
+  }
+
+  it('resolves a foreign account to its local record before following', async () => {
+    const lookup = follows.resolveForeign(foreignAccount());
+
+    // The bare `acct` is meaningless off its origin server, so the qualified
+    // handle is what gets searched — with resolve, which webfingers it.
+    const req = http.expectOne((r) => r.url.includes('/api/v2/search'));
+    expect(req.request.params.get('q')).toBe('alice@other.social');
+    expect(req.request.params.get('resolve')).toBe('true');
+    req.flush({ accounts: [{ id: 'LOCAL-1', acct: 'alice@other.social' }] });
+
+    const resolved = await lookup;
+    // The local id is the one this server can act on; the foreign one would
+    // have followed whoever happens to hold id 77 here.
+    expect(resolved?.id).toBe('LOCAL-1');
+  });
+
+  it('prefers the exact handle over a look-alike in the results', async () => {
+    const lookup = follows.resolveForeign(foreignAccount());
+    http
+      .expectOne((r) => r.url.includes('/api/v2/search'))
+      .flush({
+        accounts: [
+          { id: 'DECOY', acct: 'alice@elsewhere.example' },
+          { id: 'LOCAL-1', acct: 'alice@other.social' },
+        ],
+      });
+    expect((await lookup)?.id).toBe('LOCAL-1');
+  });
+
+  it('caches the resolution, including a miss', async () => {
+    const first = follows.resolveForeign(foreignAccount());
+    http.expectOne((r) => r.url.includes('/api/v2/search')).flush({ accounts: [] });
+    expect(await first).toBeNull();
+
+    // A handle that doesn't resolve costs the same to ask again and gets the
+    // same answer, so the null is worth remembering too.
+    expect(await follows.resolveForeign(foreignAccount())).toBeNull();
+    http.expectNone((r) => r.url.includes('/api/v2/search'));
+  });
+
+  it('does not resolve a foreign account with no derivable handle', async () => {
+    const noUrl = { id: 'X', acct: 'bob', username: 'bob' } as Account;
+    expect(await follows.resolveForeign(noUrl)).toBeNull();
+    http.expectNone((r) => r.url.includes('/api/v2/search'));
+  });
+
   it('forgets everything on reset', async () => {
     const resolved = follows.resolve(['1']);
-    http
-      .expectOne((r) => r.url === RELATIONSHIPS)
-      .flush([relationship('1', { following: true })]);
+    http.expectOne((r) => r.url === RELATIONSHIPS).flush([relationship('1', { following: true })]);
     await resolved;
 
     follows.reset();

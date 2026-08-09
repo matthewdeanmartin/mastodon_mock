@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { InstanceInfo, Status, Tag } from '../../models';
+import { Terminology } from '../../terminology';
 
 type ExploreTab = 'posts' | 'hashtags';
 
@@ -18,6 +19,9 @@ type ExploreTab = 'posts' | 'hashtags';
   styleUrl: './explore.css',
 })
 export class Explore implements OnInit {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private api = inject(Api);
   protected auth = inject(Auth);
 

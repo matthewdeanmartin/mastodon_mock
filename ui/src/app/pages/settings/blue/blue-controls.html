@@ -222,7 +222,19 @@
         />
         Tweets &amp; retweets (like the bird site)
       </label>
-      <span class="hint">Sick of new words per platform? Bring the old ones back.</span>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="florp"
+          [ngModel]="prefs.postNoun()"
+          (ngModelChange)="prefs.setPostNoun($event)"
+          name="post_noun"
+        />
+        Florps &amp; reflorps (nobody else's word)
+      </label>
+      <span class="hint"
+        >Sick of new words per platform? Bring the old ones back — or make one up.</span
+      >
     </div>
   </div>
 
@@ -466,7 +478,7 @@
       </label>
 
       <label class="inline-field">
-        Minimum feed size ({{ prefs.feedMin() }} posts)
+        Minimum feed size ({{ prefs.feedMin() }} {{ words().posts }})
         <input
           type="number"
           min="5"
@@ -482,7 +494,7 @@
       </span>
 
       <label class="inline-field">
-        Maximum feed size ({{ prefs.feedMax() }} posts)
+        Maximum feed size ({{ prefs.feedMax() }} {{ words().posts }})
         <input
           type="number"
           min="5"

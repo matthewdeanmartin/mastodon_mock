@@ -36,6 +36,7 @@ import {
   BskyConvoView,
   BskyMessageView,
 } from '../../providers/bluesky/bluesky-types';
+import { Terminology } from '../../terminology';
 
 /** localStorage map of chat key → ISO timestamp of the newest message seen there. */
 const READ_KEY = 'mockingbird_chat_read';
@@ -127,6 +128,9 @@ export function stripLeadingMentions(html: string): string {
   styleUrl: './conversations.css',
 })
 export class Conversations implements OnInit, OnDestroy {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private api = inject(Api);
   private auth = inject(Auth);
   private streaming = inject(Streaming);

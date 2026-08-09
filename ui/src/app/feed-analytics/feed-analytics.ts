@@ -8,6 +8,7 @@ import { StatusCard } from '../status-card/status-card';
 import { FeedReport, analyzeFeed, pct } from '../feed-metrics';
 import { FeedSource, isSupplied, sampleFeed } from '../feed-sample';
 import { LANG_NAMES } from '../language-detect';
+import { Terminology } from '../terminology';
 
 export type { FeedSource } from '../feed-sample';
 
@@ -36,6 +37,9 @@ const PREVIEW_ROWS = 8;
   styleUrl: './feed-analytics.css',
 })
 export class FeedAnalytics {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private api = inject(Api);
   private auth = inject(Auth);
 

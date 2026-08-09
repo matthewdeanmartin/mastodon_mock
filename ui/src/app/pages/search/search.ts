@@ -89,6 +89,7 @@ import { BlueskySearchPanel } from './bluesky-search-panel';
 import { Server } from '../../server';
 import { isTagsOnly, probeSearchServer, SearchServerStatus } from '../../search-server-probe';
 import { normalizeHostUrl } from '../../host-url';
+import { Terminology } from '../../terminology';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
@@ -123,6 +124,9 @@ const LOAD_MORE_HARD_CAP = 30;
   styleUrl: './search.css',
 })
 export class Search implements OnInit, OnDestroy {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   protected capabilities = inject(AnonymousCapabilities);
   private api = inject(Api);
   private accountStore = inject(AccountSearchStore);
@@ -199,6 +203,40 @@ export class Search implements OnInit, OnDestroy {
    * been probed — the message must never appear before we have grounds for it.
    * Recomputes on its own when a probe lands: `peek` reads the service's signal.
    */
+  // ------------------------------------------ following a tag with no posts
+
+  /**
+   * The query read as a hashtag, if it can be — `#mawkingbird`, `mawkingbird`.
+   *
+   * Null for anything with whitespace or punctuation, because Mastodon tags are
+   * a single alphanumeric run and offering to follow "cat pictures" as a tag
+   * would create a follow that never matches anything.
+   */
+  protected tagCandidate = computed<string | null>(() => {
+    const raw = this.query().trim().replace(/^#/, '');
+    return /^[\p{L}\p{N}_]+$/u.test(raw) ? raw : null;
+  });
+
+  /**
+   * Whether to offer following the tag the user just searched for.
+   *
+   * Following a tag nobody has used yet is legitimate and, for a name you are
+   * launching, the entire point — you want to catch the first post. So the
+   * offer stands even at zero results. What must not happen is implying the tag
+   * is *dead* when the truth is that this server has no post index: that case
+   * is `tags-only` / `empty`, and {@link emptyExplanation} already says so
+   * above this button.
+   */
+  protected canFollowSearchedTag = computed(
+    () => !!this.tagCandidate() && this.type() !== 'accounts',
+  );
+
+  /** Whether the zero-result copy may claim nobody has posted. */
+  protected searchSawEverything = computed(() => {
+    const ability = this.searchCapability.peek(this.capabilityHost()).statuses;
+    return ability === 'works';
+  });
+
   protected emptyExplanation = computed<string | null>(() => {
     const host = this.capabilityHost();
     const ability = this.searchCapability.peek(host);

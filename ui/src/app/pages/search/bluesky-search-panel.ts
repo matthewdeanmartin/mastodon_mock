@@ -30,6 +30,7 @@ import {
   BlueskyAccountSearch,
 } from '../../providers/bluesky/bluesky-account-search';
 import { BlueskyGraph } from '../../providers/bluesky/bluesky-graph';
+import { Terminology } from '../../terminology';
 
 /** Which Bluesky index the panel is querying. */
 export type BlueskySearchTarget = 'posts' | 'accounts';
@@ -51,6 +52,9 @@ export type BlueskySearchTarget = 'posts' | 'accounts';
   styleUrl: './bluesky-search-panel.css',
 })
 export class BlueskySearchPanel {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private search = inject(BlueskySearch);
   private accountSearch = inject(BlueskyAccountSearch);
   private graph = inject(BlueskyGraph);

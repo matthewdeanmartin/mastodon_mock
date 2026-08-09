@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, input, output, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Account, Relationship, Status } from '../../models';
 import { HumanCountPipe } from '../../human-count.pipe';
@@ -6,6 +6,7 @@ import { VerifiedBadge } from '../../verified-badge/verified-badge';
 import { StatusCard } from '../../status-card/status-card';
 import { AccountWithMatches } from './account-refine';
 import { RenderedHtmlLinks } from '../../rendered-html-links';
+import { Terminology } from '../../terminology';
 
 /**
  * One account in the search results, built for discovery rather than lookup: the
@@ -28,6 +29,9 @@ import { RenderedHtmlLinks } from '../../rendered-html-links';
   styleUrl: './account-result-card.css',
 })
 export class AccountResultCard {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   /** The account plus any posts that made it surface (empty in bio-only mode). */
   readonly item = input.required<AccountWithMatches>();
   /** The viewer's relationship to this account, once the parent has fetched it. */

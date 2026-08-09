@@ -38,7 +38,10 @@
       <!-- The obvious thing to want from a curated set of people, and until now
            the one thing the page would not do. Counts first: the dialog says
            how many are new before anything is written. -->
-      @if (canFollow() && members().length) {
+      <!-- Not offered for shipped kits: the bulk runner follows by id, and a
+           kit's ids are foreign. Those rows follow one at a time, each
+           resolving itself first. -->
+      @if (canFollow() && !shipped() && members().length) {
         <button class="btn btn-outline" [disabled]="bulk.running()" (click)="askFollowAll()">
           {{ bulk.running() ? 'Working…' : 'Follow everyone in this collection' }}
         </button>
@@ -198,7 +201,11 @@
                shipped kits, whose members live on other instances and whose ids
                the home server cannot act on. -->
           @if (canFollow()) {
-            <app-follow-button [accountId]="m.account.id" [handle]="'@' + m.account.acct" />
+            <app-follow-button
+              [accountId]="m.account.id"
+              [foreign]="foreignMember(m.account)"
+              [handle]="'@' + m.account.acct"
+            />
           }
           @if (isOwner()) {
             <button

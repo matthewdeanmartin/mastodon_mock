@@ -18,6 +18,7 @@ import {
 import { HugoValidate } from '../../../../providers/hugo/hugo-validate';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
+import { Terminology } from '../../../../terminology';
 
 /** Settings → Connections → Blog (Hugo). */
 @Component({
@@ -27,6 +28,9 @@ import { expiryLabel } from '../expiry-label';
   styleUrls: ['../connection-page.css', './connection-hugo.css'],
 })
 export class ConnectionHugo implements OnInit {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   protected readonly settings = inject(HugoSettings);
   protected readonly posts = inject(HugoPosts);
   private readonly validate = inject(HugoValidate);

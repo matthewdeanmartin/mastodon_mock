@@ -348,7 +348,7 @@
             <span class="muted">&#64;{{ lookupResult()!.username }}</span>
             <span class="muted small">
               {{ lookupResult()!.followers_count | number }} followers ·
-              {{ lookupResult()!.statuses_count | number }} posts
+              {{ lookupResult()!.statuses_count | number }} {{ words().posts }}
             </span>
             <a [href]="lookupResult()!.url" target="_blank" rel="noopener noreferrer" class="small">
               View on Twitter ↗

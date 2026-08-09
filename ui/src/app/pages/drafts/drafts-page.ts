@@ -16,6 +16,7 @@ import { PasteExpiry } from '../../providers/paste/paste-provider';
 import { PasteProviderRegistry } from '../../providers/paste/paste-provider-registry';
 import { DraftItem, DraftKind, toSnapshot } from './draft-items';
 import { DraftSources } from './draft-sources';
+import { Terminology } from '../../terminology';
 
 /** Filter chips above the merged list; 'all' is the default. */
 type DraftFilter = 'all' | DraftKind;
@@ -116,6 +117,9 @@ function kindNoun(kind: DraftKind): string {
   styleUrl: './drafts-page.css',
 })
 export class DraftsPage implements OnInit {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   protected sources = inject(DraftSources);
   private api = inject(Api);
   private router = inject(Router);

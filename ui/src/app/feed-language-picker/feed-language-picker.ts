@@ -2,6 +2,7 @@ import { Component, computed, ElementRef, HostListener, inject, signal } from '@
 import { ClientPrefs, MAX_FEED_LANGUAGES } from '../client-prefs';
 import { LANG_NAMES, LangCode } from '../language-detect';
 import { KnownLanguages } from '../trend-language-filter';
+import { Terminology } from '../terminology';
 
 /**
  * The feed's language control: "All languages", or a chosen handful.
@@ -28,6 +29,9 @@ import { KnownLanguages } from '../trend-language-filter';
   styleUrl: './feed-language-picker.css',
 })
 export class FeedLanguagePicker {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private prefs = inject(ClientPrefs);
   private known = inject(KnownLanguages);
   private host = inject(ElementRef<HTMLElement>);

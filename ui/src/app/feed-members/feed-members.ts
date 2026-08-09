@@ -7,6 +7,7 @@ import { FeedSource, isSupplied, sampleFeed } from '../feed-sample';
 import { FollowButton } from '../follow-button/follow-button';
 import { FollowState, RELATIONSHIP_BATCH } from '../follow-state';
 import { Status } from '../models';
+import { Terminology } from '../terminology';
 
 /** Sample sizes the user can pick between on a paged feed. */
 export const SAMPLE_CHOICES = [50, 100, 200] as const;
@@ -39,6 +40,9 @@ const MAX_RESOLVED_AUTHORS = 80;
   styleUrl: './feed-members.css',
 })
 export class FeedMembers {
+  /** post/tweet/florp vocabulary, per the Blue setting. */
+  protected words = inject(Terminology).words;
+
   private api = inject(Api);
   private auth = inject(Auth);
   protected follows = inject(FollowState);
