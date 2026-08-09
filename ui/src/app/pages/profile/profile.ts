@@ -10,6 +10,7 @@ import { Server } from '../../server';
 import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
 import { LocalModeration } from '../../local-moderation';
+import { TrustedAccounts } from '../../trusted-accounts';
 import { Account, Collection, Relationship, Status } from '../../models';
 import { homeServerLink } from '../../home-server-link';
 import { StatusCard } from '../../status-card/status-card';
@@ -85,6 +86,7 @@ export class Profile implements OnInit, OnDestroy {
   protected words = inject(Terminology).words;
   protected auth = inject(Auth);
   private localMod = inject(LocalModeration);
+  private trusted = inject(TrustedAccounts);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymous = inject(AnonymousAccount);
   private anonymousPublic = inject(AnonymousPublicApi);
@@ -1403,6 +1405,33 @@ export class Profile implements OnInit, OnDestroy {
     const acc = this.account();
     return !!acc && this.localMod.isMuted(acc);
   });
+
+  /**
+   * Whether this account is trusted — the flipside of block and mute.
+   *
+   * Lives beside them in the ••• menu because it is the same kind of decision
+   * ("how should this person's posts reach me?"), just in the opposite
+   * direction, and works the same way for anonymous browsing.
+   */
+  protected isTrusted = computed(() => {
+    this.trusted.entries();
+    const acc = this.account();
+    return !!acc && this.trusted.isTrusted(acc);
+  });
+
+  /**
+   * Flip trust for this account.
+   *
+   * No toast: the menu item and the note under it both re-read {@link isTrusted}
+   * and flip immediately, and the posts behind the menu visibly un-blur. A
+   * transient message would be saying what the page already shows.
+   */
+  protected toggleTrust(): void {
+    const acc = this.account();
+    if (acc) {
+      this.trusted.toggle(acc);
+    }
+  }
 
   /**
    * Server-side moderation on Bluesky, where the account lives.

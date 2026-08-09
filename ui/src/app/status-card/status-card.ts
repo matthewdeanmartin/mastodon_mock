@@ -48,6 +48,7 @@ import { ENGINE_LABELS, TranslationEngine, TranslationUsage } from '../translati
 import { AutoTranslateEligibility } from '../trend-language-filter';
 import { MutedPosts } from '../muted-posts';
 import { LocalModeration } from '../local-moderation';
+import { TrustedAccounts } from '../trusted-accounts';
 import { StatusVisibility } from '../status-visibility';
 import { serverKnowsStatus, ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
@@ -154,6 +155,8 @@ export class StatusCard {
   private api = inject(Api);
   protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
+  /** Accounts whose CWs and sensitive flags this viewer has opted out of. */
+  private trusted = inject(TrustedAccounts);
   /** For "Save as to-do", which parks a local draft rather than publishing. */
   private drafts = inject(Drafts);
   private actions = inject(StatusActions);
@@ -268,11 +271,28 @@ export class StatusCard {
   );
 
   /**
+   * True when the CW should start open because of who wrote it.
+   *
+   * `display.account` rather than the booster: trust is about whose judgement
+   * you're relaxing, and a boost carries someone else's content. Reads the
+   * service's signal so trusting someone re-renders their cards immediately.
+   */
+  protected authorTrustedForCw = computed(() => {
+    this.trusted.entries();
+    return this.trusted.cwExpanded(this.display.account);
+  });
+
+  /**
    * True while the body (text, media, poll, quote) hides behind the CW.
-   * Reader mode means "I want to read it": CWs render pre-expanded.
+   * Reader mode means "I want to read it": CWs render pre-expanded, and so do
+   * the CWs of a trusted author.
    */
   protected cwCollapsed = computed(
-    () => !!this.spoilerText() && !this.cwOpen() && !this.prefs.feedReader(),
+    () =>
+      !!this.spoilerText() &&
+      !this.cwOpen() &&
+      !this.prefs.feedReader() &&
+      !this.authorTrustedForCw(),
   );
 
   toggleCw(event: Event): void {
@@ -286,13 +306,24 @@ export class StatusCard {
   /** Viewer clicked through the sensitive-media blur; resets per status. */
   private sensitiveRevealed = linkedSignal({ source: this.status, computation: () => false });
 
+  /** True when this author's sensitive media should render unblurred. */
+  protected authorTrustedForSensitive = computed(() => {
+    this.trusted.entries();
+    return this.trusted.sensitiveShown(this.display.account);
+  });
+
   /**
    * True while media should sit behind a "sensitive content" blur. A CW already
    * gates the whole body, so we only blur when the post is flagged sensitive but
-   * carries no spoiler text — and only until the viewer reveals it.
+   * carries no spoiler text — and only until the viewer reveals it, or unless
+   * the author is trusted.
    */
   protected mediaBlurred = computed(
-    () => this.display.sensitive && !this.spoilerText() && !this.sensitiveRevealed(),
+    () =>
+      this.display.sensitive &&
+      !this.spoilerText() &&
+      !this.sensitiveRevealed() &&
+      !this.authorTrustedForSensitive(),
   );
 
   revealSensitive(event: Event): void {

@@ -158,6 +158,97 @@
       </div>
     </div>
 
+    <!-- The one expensive thing on this page. Everything above is computed from
+         the post sample already in memory; this walks the follower and friend
+         lists, so it is opt-in behind a dialog that states the cost first. -->
+    <section class="section audience-section">
+      <h2>Effective friends &amp; followers</h2>
+      @if (audienceResults(); as results) {
+        <p class="muted small">
+          How much of the audience is still posting. Counts marked ~ are estimated from a partial
+          scan.
+        </p>
+        @if (results.following; as r) {
+          <h3 class="chart-title muted">Friends</h3>
+          <div class="tiles">
+            <div class="tile">
+              <span class="tile-label muted">Effective friends</span>
+              <span class="tile-value"
+                >{{ r.complete ? '' : '~' }}{{ fmt(r.effective)
+                }}<small class="tile-sub muted">{{ r.effectiveRatePct }}% of {{ fmt(r.total) }}</small></span
+              >
+            </div>
+            <div class="tile">
+              <span class="tile-label muted">Zombie friends</span>
+              <span class="tile-value"
+                >{{ r.complete ? '' : '~' }}{{ fmt(r.estimatedZombies)
+                }}<small class="tile-sub muted">{{ r.zombieRatePct }}% zombie rate</small></span
+              >
+            </div>
+            <div class="tile">
+              <span class="tile-label muted">Dormant</span>
+              <span class="tile-value"
+                >{{ fmt(r.dormant) }}<small class="tile-sub muted"
+                  >of {{ fmt(r.scanned) }} read</small
+                ></span
+              >
+            </div>
+            <div class="tile">
+              <span class="tile-label muted">Low-cadence</span>
+              <span class="tile-value"
+                >{{ fmt(r.lowCadence) }}<small class="tile-sub muted">drizzlers</small></span
+              >
+            </div>
+          </div>
+        }
+        @if (results.followers; as r) {
+          <h3 class="chart-title muted">Followers</h3>
+          <div class="tiles">
+            <div class="tile">
+              <span class="tile-label muted">Effective followers</span>
+              <span class="tile-value"
+                >{{ r.complete ? '' : '~' }}{{ fmt(r.effective)
+                }}<small class="tile-sub muted">{{ r.effectiveRatePct }}% of {{ fmt(r.total) }}</small></span
+              >
+            </div>
+            <div class="tile">
+              <span class="tile-label muted">Zombie followers</span>
+              <span class="tile-value"
+                >{{ r.complete ? '' : '~' }}{{ fmt(r.estimatedZombies)
+                }}<small class="tile-sub muted">{{ r.zombieRatePct }}% zombie rate</small></span
+              >
+            </div>
+            <div class="tile">
+              <span class="tile-label muted">Dormant</span>
+              <span class="tile-value"
+                >{{ fmt(r.dormant) }}<small class="tile-sub muted"
+                  >of {{ fmt(r.scanned) }} read</small
+                ></span
+              >
+            </div>
+            <div class="tile">
+              <span class="tile-label muted">Low-cadence</span>
+              <span class="tile-value"
+                >{{ fmt(r.lowCadence) }}<small class="tile-sub muted">drizzlers</small></span
+              >
+            </div>
+          </div>
+        }
+        <button type="button" class="btn btn-outline btn-sm" (click)="openAudienceDialog()">
+          Scan again
+        </button>
+      } @else {
+        <p class="muted small">
+          A follower count includes everyone who ever clicked follow. This walks the list and works
+          out how many are still posting — the only thing on this page that costs more than a few
+          requests, so it asks first.
+        </p>
+        <button type="button" class="btn btn-outline" (click)="openAudienceDialog()">
+          Get effective friends/followers
+        </button>
+      }
+    </section>
+
     @if (showWeekly() || showMonthly()) {
       <section class="section">
         <h2>When they post</h2>
@@ -250,6 +341,62 @@
       </section>
     }
 
+    @if (topPartners().length) {
+      <section class="section">
+        <h2>Talks to most</h2>
+        <p class="muted small">
+          Who they reply to most often in the sample — replies to themselves don't count.
+        </p>
+        <ol class="counted">
+          @for (p of topPartners(); track p.key) {
+            <li class="counted-row">
+              <a class="counted-label" [routerLink]="['/accounts', p.key]">{{ p.label }}</a>
+              <span class="counted-count muted"
+                >{{ p.count }} {{ p.count === 1 ? 'reply' : 'replies' }}</span
+              >
+            </li>
+          }
+        </ol>
+      </section>
+    }
+
+    @if (hasTopicData()) {
+      <section class="section">
+        <h2>What they post about</h2>
+        <p class="muted small">
+          Hashtags and link destinations across the sample, counted once per {{ words().post }}.
+        </p>
+        <div class="topic-cols">
+          @if (topTags().length) {
+            <div class="topic-col">
+              <h3 class="chart-title muted">Top hashtags</h3>
+              <ol class="counted">
+                @for (t of topTags(); track t.key) {
+                  <li class="counted-row">
+                    <a class="counted-label" [routerLink]="['/tags', t.key]">{{ t.label }}</a>
+                    <span class="counted-count muted">{{ t.count }}</span>
+                  </li>
+                }
+              </ol>
+            </div>
+          }
+          @if (topDomains().length) {
+            <div class="topic-col">
+              <h3 class="chart-title muted">Top link domains</h3>
+              <ol class="counted">
+                @for (d of topDomains(); track d.key) {
+                  <li class="counted-row">
+                    <span class="counted-label">{{ d.label }}</span>
+                    <span class="counted-count muted">{{ d.count }}</span>
+                  </li>
+                }
+              </ol>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
     <section class="section">
       <h2>Top posts</h2>
       @if (!topPosts().length) {
@@ -309,5 +456,16 @@
         </div>
       </section>
     }
+  }
+
+  <!-- Outside the loading/error branches above: the scan is independent of the
+       post sample, and a dialog that vanished because the posts reloaded would
+       abandon a scan in progress. -->
+  @if (audienceDialogOpen()) {
+    <app-effective-audience-dialog
+      [account]="account()"
+      [publicRef]="publicRef()"
+      (closed)="closeAudienceDialog()"
+    />
   }
 </div>

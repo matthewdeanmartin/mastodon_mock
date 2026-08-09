@@ -1,0 +1,92 @@
+<div class="spage-head">
+  <h1>🙈 Content warnings &amp; sensitive media</h1>
+  <p>
+    A content warning is the author's judgement about their audience, not about you. For people you
+    read all the time, clicking through the same warning every day is friction without safety — so
+    you can switch it off, either for everyone or for specific people.
+  </p>
+  <p class="muted">
+    This is the flipside of <a routerLink="/settings/moderation">Muted &amp; Blocked</a>: that page
+    is for accounts you want less of, this one is for accounts you want without a doorway in front
+    of them.
+  </p>
+</div>
+
+<div class="spage-body">
+  <h2>Everyone</h2>
+  <p class="muted small">
+    Applies to every post from every account, on this Mastodon account only. Stored in this browser
+    — it is a reading preference, not something the server knows about.
+  </p>
+
+  <div class="scontrol">
+    <label class="checkline">
+      <input
+        type="checkbox"
+        [checked]="trusted.expandAllCw()"
+        (change)="toggleCw()"
+        name="expand_all_cw"
+      />
+      Auto-expand content warnings
+    </label>
+    <p class="muted small checkline-note">
+      Posts with a content warning render already open. The warning text is still shown above the
+      post, so you always know one was set.
+    </p>
+
+    <label class="checkline">
+      <input
+        type="checkbox"
+        [checked]="trusted.showAllSensitive()"
+        (change)="toggleSensitive()"
+        name="show_all_sensitive"
+      />
+      Auto-show sensitive media
+    </label>
+    <p class="muted small checkline-note">
+      Images and video flagged sensitive render without the blur.
+    </p>
+  </div>
+
+  <!-- There is a same-named server preference on the Appearance page. It is
+       written to Mastodon but nothing in this client reads it back, so saying
+       nothing here would leave two switches that look like they disagree. -->
+  <p class="muted small">
+    Note: Appearance has an "Always expand posts marked with content warnings" box. That one is a
+    server-side preference saved to your Mastodon account for other apps to honour — this one is
+    what Mockingbird itself obeys.
+  </p>
+
+  <h2>Trusted accounts</h2>
+  <p class="muted small">
+    People whose warnings and sensitive flags are ignored, whatever the switches above are set to.
+    Add someone from the <strong>•••</strong> menu on their profile.
+  </p>
+
+  @if (!trusted.list().length) {
+    <p class="muted">
+      Nobody yet. Trusting an account is useful for someone whose posts are routinely warned but
+      never something you need warning about.
+    </p>
+  } @else {
+    <ul class="trust-list">
+      @for (row of trusted.list(); track row.key) {
+        <li class="trust-row">
+          <span class="trust-acct">{{ row.acct }}</span>
+          <button type="button" class="btn btn-outline btn-sm" (click)="untrust(row.key)">
+            Stop trusting
+          </button>
+        </li>
+      }
+    </ul>
+    <button type="button" class="btn btn-outline btn-sm" (click)="clearAll()">
+      Stop trusting everyone ({{ trusted.count() }})
+    </button>
+  }
+
+  <p class="muted small footnote">
+    Trust never overrides a filter. A word filter you set, or a post your server chose to hide,
+    stays hidden — those are your rules and the server's, and one person being trusted is not a
+    reason to break them.
+  </p>
+</div>

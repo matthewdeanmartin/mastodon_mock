@@ -17,6 +17,9 @@ import {
   repliesGiven,
   replyRatio,
   sampleSpanDays,
+  topConversationPartners,
+  topHashtags,
+  topLinkDomains,
   weekdayHistogram,
   weeklyActivity,
 } from './account-metrics';
@@ -350,5 +353,118 @@ describe('postLengthRange', () => {
   it('has nothing to report when no post in the sample has text', () => {
     expect(postLengthRange([])).toBeNull();
     expect(postLengthRange([makeStatus({ content: '' })])).toBeNull();
+  });
+});
+
+describe('topConversationPartners', () => {
+  const mention = (id: string, acct: string) => ({ id, acct, username: acct, url: '' });
+
+  it('ranks the accounts replied to most, naming them from mentions', () => {
+    const posts = [
+      makeStatus({ in_reply_to_account_id: 'b', mentions: [mention('b', 'bob')] }),
+      makeStatus({ in_reply_to_account_id: 'b', mentions: [mention('b', 'bob')] }),
+      makeStatus({ in_reply_to_account_id: 'c', mentions: [mention('c', 'cara')] }),
+    ];
+    const top = topConversationPartners(posts, 'me');
+    expect(top).toHaveLength(2);
+    expect(top[0]).toMatchObject({ key: 'b', label: '@bob', count: 2 });
+    expect(top[1]).toMatchObject({ key: 'c', label: '@cara', count: 1 });
+  });
+
+  /** A thread is not a conversation — otherwise every long-form poster tops their own list. */
+  it('ignores self-replies', () => {
+    const posts = [
+      makeStatus({ in_reply_to_account_id: 'me' }),
+      makeStatus({ in_reply_to_account_id: 'me' }),
+    ];
+    expect(topConversationPartners(posts, 'me')).toEqual([]);
+  });
+
+  it('ignores non-replies and boosts', () => {
+    const posts = [
+      makeStatus({ in_reply_to_account_id: null }),
+      makeStatus({ in_reply_to_account_id: 'b', reblog: makeStatus() }),
+    ];
+    expect(topConversationPartners(posts, 'me')).toEqual([]);
+  });
+
+  it('falls back to the id when no mention names the partner', () => {
+    const posts = [makeStatus({ in_reply_to_account_id: 'ghost', mentions: [] })];
+    expect(topConversationPartners(posts, 'me')[0]).toMatchObject({ key: 'ghost', label: 'ghost' });
+  });
+
+  it('prefers a handle seen on any post over a bare id', () => {
+    const posts = [
+      makeStatus({ in_reply_to_account_id: 'b', mentions: [] }),
+      makeStatus({ in_reply_to_account_id: 'b', mentions: [mention('b', 'bob')] }),
+    ];
+    expect(topConversationPartners(posts, 'me')[0]).toMatchObject({ label: '@bob', count: 2 });
+  });
+
+  it('caps the list at the requested size', () => {
+    const posts = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
+      makeStatus({ in_reply_to_account_id: id }),
+    );
+    expect(topConversationPartners(posts, 'me')).toHaveLength(5);
+    expect(topConversationPartners(posts, 'me', 2)).toHaveLength(2);
+  });
+});
+
+describe('topHashtags', () => {
+  const tag = (name: string) => ({ name, url: `https://x/tags/${name}` });
+
+  it('counts tags across posts, most-used first', () => {
+    const posts = [
+      makeStatus({ tags: [tag('rust'), tag('gamedev')] }),
+      makeStatus({ tags: [tag('rust')] }),
+    ];
+    const top = topHashtags(posts);
+    expect(top[0]).toMatchObject({ label: '#rust', count: 2 });
+    expect(top[1]).toMatchObject({ label: '#gamedev', count: 1 });
+  });
+
+  /** One post about Rust is one post, however many times it says so. */
+  it('counts a repeated tag once per post', () => {
+    const posts = [makeStatus({ tags: [tag('rust'), tag('rust'), tag('Rust')] })];
+    expect(topHashtags(posts)[0]).toMatchObject({ count: 1 });
+  });
+
+  it('groups case-insensitively but shows the first casing seen', () => {
+    const posts = [makeStatus({ tags: [tag('Rust')] }), makeStatus({ tags: [tag('rust')] })];
+    const top = topHashtags(posts);
+    expect(top).toHaveLength(1);
+    expect(top[0]).toMatchObject({ label: '#Rust', count: 2 });
+  });
+
+  it('is empty when the provider sends no tags', () => {
+    expect(topHashtags([makeStatus({ tags: undefined })])).toEqual([]);
+  });
+});
+
+describe('topLinkDomains', () => {
+  const card = (url: string) => ({ url }) as NonNullable<Status['card']>;
+
+  it('counts preview-card domains, most-linked first', () => {
+    const posts = [
+      makeStatus({ card: card('https://bbc.co.uk/news/1') }),
+      makeStatus({ card: card('https://bbc.co.uk/news/2') }),
+      makeStatus({ card: card('https://example.org/a') }),
+    ];
+    const top = topLinkDomains(posts);
+    expect(top[0]).toMatchObject({ label: 'bbc.co.uk', count: 2 });
+    expect(top[1]).toMatchObject({ label: 'example.org', count: 1 });
+  });
+
+  it('folds www. into the bare domain', () => {
+    const posts = [
+      makeStatus({ card: card('https://www.bbc.co.uk/a') }),
+      makeStatus({ card: card('https://bbc.co.uk/b') }),
+    ];
+    expect(topLinkDomains(posts)).toEqual([{ key: 'bbc.co.uk', label: 'bbc.co.uk', count: 2 }]);
+  });
+
+  it('skips posts with no card and unparseable urls', () => {
+    const posts = [makeStatus({ card: null }), makeStatus({ card: card('not a url') })];
+    expect(topLinkDomains(posts)).toEqual([]);
   });
 });

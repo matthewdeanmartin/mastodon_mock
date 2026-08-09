@@ -366,3 +366,61 @@
 .lawn-peak {
   margin-left: auto;
 }
+
+/* --- Counted top-N lists (partners, hashtags, link domains) --- */
+
+/* Numbered semantically (an <ol> — these are ranked) but the markers are
+   suppressed: the counts on the right already carry the ordering, and digits
+   plus counts on one row reads as two competing numbers. */
+.counted {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.counted-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.counted-row:last-child {
+  border-bottom: none;
+}
+
+.counted-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.counted-label {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a.counted-label:hover {
+  text-decoration: underline;
+}
+
+.counted-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Tags and domains side by side on desktop, stacked once that would squeeze
+   the labels into ellipses. */
+.topic-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 560px) {
+  .topic-cols {
+    grid-template-columns: 1fr;
+  }
+}

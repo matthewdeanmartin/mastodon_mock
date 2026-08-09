@@ -52,6 +52,14 @@ export interface Account {
   following_count: number;
   statuses_count: number;
   last_status_at?: string | null;
+  /**
+   * When the account joined, ISO. Mastodon sends this on every account entity,
+   * including the ones in `/followers` and `/following` pages — which is what
+   * makes tenure-adjusted cadence (posts per day since joining) free to compute
+   * in {@link ../effective-audience}. Optional because thin account objects
+   * synthesised by the non-Mastodon providers don't carry it.
+   */
+  created_at?: string;
   bot: boolean;
   locked: boolean;
   discoverable?: boolean | null;
@@ -139,6 +147,13 @@ export interface Status {
   reblog: Status | null;
   quote: Quote | null;
   in_reply_to_id: string | null;
+  /**
+   * Who this post replies to. Mastodon sends it alongside `in_reply_to_id`, and
+   * it is the only way to know *whom* a reply was to without fetching the parent
+   * — which is what makes "top conversation partner" free over a post sample.
+   * Optional: foreign providers don't supply it.
+   */
+  in_reply_to_account_id?: string | null;
   replies_count: number;
   reblogs_count: number;
   favourites_count: number;
@@ -159,6 +174,12 @@ export interface Status {
   application?: { name: string; website?: string | null } | null;
   /** Optional: not every provider supplies it, but Mastodon (and the mock) do. */
   mentions?: Mention[];
+  /**
+   * Hashtags in the post, as `{ name, url }`. Mastodon and the mock both send
+   * them, which is why a tag profile costs no extra requests; foreign providers
+   * generally don't, so treat absence as "unknown", not "none".
+   */
+  tags?: { name: string; url: string }[];
   /**
    * The viewer's content filters this status matched, computed by the server
    * (Mastodon 4.0+). Clients must apply them: `warn` collapses the post,

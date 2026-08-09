@@ -240,6 +240,12 @@
   color: #e0245e;
 }
 
+/* Trust is the opposite of the red items below it: green, so the menu reads as
+   "let more of this person through" vs "let less". */
+.account-danger-panel .menu-trust {
+  color: #00ba7c;
+}
+
 /* Separates what a reader is keeping (open, copy, tune) from what makes someone
    disappear (mute, block, report). A real <hr> so it is announced as a
    separator rather than being a div only sighted users can see. */

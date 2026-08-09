@@ -99,6 +99,17 @@
                   <a [href]="a.url" target="_blank" rel="noopener noreferrer">Open on bsky.app</a>
                   <hr class="menu-rule" />
                 }
+                <button class="menu-trust" type="button" (click)="toggleTrust()">
+                  {{ isTrusted() ? 'Stop trusting account' : 'Trust this account' }}
+                </button>
+                <div class="menu-note muted small">
+                  {{
+                    isTrusted()
+                      ? 'Their CWs open by default and their sensitive media is shown.'
+                      : 'Show their CWs and sensitive media without clicking through.'
+                  }}
+                </div>
+                <hr class="menu-rule" />
                 @if (relationship()?.muting || localMuted()) {
                   <button class="menu-danger" type="button" (click)="unmute()">
                     Unmute account
@@ -180,6 +191,19 @@
                   </button>
                 }
               }
+              <hr class="menu-rule" />
+              <!-- The flipside of the two below: block and mute hide someone,
+                   trust stops their own warnings from hiding them from you. -->
+              <button class="menu-trust" type="button" (click)="toggleTrust()">
+                {{ isTrusted() ? 'Stop trusting account' : 'Trust this account' }}
+              </button>
+              <div class="menu-note muted small">
+                {{
+                  isTrusted()
+                    ? 'Their CWs open by default and their sensitive media is shown.'
+                    : 'Show their CWs and sensitive media without clicking through.'
+                }}
+              </div>
               <hr class="menu-rule" />
               @if (useLocalModeration ? localMuted() : relationship()?.muting) {
                 <button class="menu-danger" type="button" (click)="unmute()">Unmute account</button>

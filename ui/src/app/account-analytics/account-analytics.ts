@@ -9,6 +9,7 @@ import { Account, Status } from '../models';
 import { StatusCard } from '../status-card/status-card';
 import {
   ActivityBucket,
+  CountedItem,
   Heatmap,
   Liveliness,
   computeLiveliness,
@@ -21,12 +22,17 @@ import {
   postLengthRange,
   repliesGiven,
   replyRatio,
+  topConversationPartners,
+  topHashtags,
+  topLinkDomains,
   weekdayHistogram,
   weeklyActivity,
 } from '../account-metrics';
 import { LANG_NAMES, LangShare, detectLanguageMix, sharePct } from '../language-detect';
 import { stripHtml } from '../sentiment';
 import { Terminology } from '../terminology';
+import { AudienceScan } from '../audience-scan';
+import { EffectiveAudienceDialog } from '../effective-audience-dialog/effective-audience-dialog';
 
 /** How many of the account's most recent posts the component analyzes. */
 const SAMPLE_SIZE = 100;
@@ -47,7 +53,7 @@ const LOAD_MORE_CHOICES = [1, 3, 5, 10] as const;
  */
 @Component({
   selector: 'app-account-analytics',
-  imports: [RouterLink, StatusCard, HumanTimePipe],
+  imports: [RouterLink, StatusCard, HumanTimePipe, EffectiveAudienceDialog],
   templateUrl: './account-analytics.html',
   styleUrl: './account-analytics.css',
 })
@@ -173,6 +179,45 @@ export class AccountAnalytics implements OnInit {
       },
       error: () => this.loadingMore.set(false),
     });
+  }
+
+  // --- Effective audience (opt-in; the only expensive thing on this page) ---
+
+  /**
+   * Live scan state, read straight off the service.
+   *
+   * The scan outlives this component deliberately — it is a root service, so
+   * closing the dialog or leaving the tab doesn't discard minutes of paging, and
+   * the tiles below light up from whatever the last scan produced.
+   */
+  protected audience = inject(AudienceScan);
+
+  /** Whether the opt-in dialog is open. */
+  protected audienceDialogOpen = signal(false);
+
+  /**
+   * The effective-audience tiles appear only after a scan has produced numbers.
+   *
+   * Everything else on this page is free, computed from a sample already in
+   * memory. These four are the exception: they cost one request per 80 accounts,
+   * so they are never fetched on mount — the button is the consent.
+   */
+  protected audienceResults = computed(() => {
+    const state = this.audience.state();
+    if (!state) {
+      return null;
+    }
+    const followers = state.results.followers ?? null;
+    const following = state.results.following ?? null;
+    return followers || following ? { followers, following } : null;
+  });
+
+  protected openAudienceDialog(): void {
+    this.audienceDialogOpen.set(true);
+  }
+
+  protected closeAudienceDialog(): void {
+    this.audienceDialogOpen.set(false);
   }
 
   // --- KPI tiles ---
@@ -314,6 +359,25 @@ export class AccountAnalytics implements OnInit {
       .slice(0, 3)
       .filter((s) => this.engagement(s) > 0),
   );
+
+  /**
+   * Who this account replies to most, from the sample.
+   *
+   * Sits under "Top follower" because the two answer adjacent questions — who
+   * listens to them, and who they actually talk back to.
+   */
+  protected topPartners = computed<CountedItem[]>(() =>
+    topConversationPartners(this.posts(), this.publicRef()?.id ?? this.account().id),
+  );
+
+  /** Most-used hashtags in the sample. */
+  protected topTags = computed<CountedItem[]>(() => topHashtags(this.posts()));
+
+  /** Most-linked domains in the sample. */
+  protected topDomains = computed<CountedItem[]>(() => topLinkDomains(this.posts()));
+
+  /** True when there is anything at all to show in the "what they post about" box. */
+  protected hasTopicData = computed(() => this.topTags().length > 0 || this.topDomains().length > 0);
 
   /** The follower with the biggest audience of their own. */
   protected topFollower = computed<Account | null>(() => {

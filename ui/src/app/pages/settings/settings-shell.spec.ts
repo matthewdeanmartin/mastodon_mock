@@ -56,6 +56,9 @@ describe('SettingsShell', () => {
       'Local storage',
       'Ads',
       'Signed-in accounts',
+      // Trusted accounts and the CW/sensitive switches are client-side, so they
+      // work anonymously even though 'Muted & Blocked' beside them does not.
+      'Content warnings',
       'Import/Export Config',
       'Feature flags',
     ]);

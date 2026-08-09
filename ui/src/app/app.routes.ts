@@ -387,6 +387,16 @@ export const routes: Routes = [
               ),
           },
           {
+            // No anonymous guard, unlike 'moderation' above: trusted accounts
+            // and the two CW/sensitive switches are entirely client-side, so
+            // they work while browsing anonymously.
+            path: 'content',
+            title: 'Content warnings',
+            data: { preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/content/settings-content').then((m) => m.SettingsContent),
+          },
+          {
             // Legacy deep links keep their selected list while the sidebar now
             // exposes a single combined destination.
             path: 'mutes',

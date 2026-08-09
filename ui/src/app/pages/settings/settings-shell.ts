@@ -61,6 +61,9 @@ export class SettingsShell {
     { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
     { label: 'Approve follow requests', path: 'follows', exact: true },
     { label: 'Muted & Blocked', path: 'moderation', exact: true },
+    // The flipside of the line above — accounts you want *without* a doorway in
+    // front of them — so it sits next to it. Client-side, hence anonymous: true.
+    { label: 'Content warnings', path: 'content', exact: true, anonymous: true },
     // Sits under the two lists it can empty, and next to the follow-wide
     // retweet switches, because that is what all four of them operate on.
     { label: 'Bulk actions', path: 'bulk-actions', exact: true },

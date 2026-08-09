@@ -385,6 +385,139 @@ export function hourHistogram(posts: Status[]): { hour: number; posts: number }[
 }
 
 // ---------------------------------------------------------------------------
+// Who they talk to, and what about
+// ---------------------------------------------------------------------------
+
+/** How many entries the "top N" lists below return. */
+export const TOP_N = 5;
+
+/** One counted thing (a partner, a tag, a domain) with its rank. */
+export interface CountedItem {
+  /** The value itself: an account id, a tag name, a domain. */
+  key: string;
+  /** What to show — the handle, `#tag`, the bare domain. */
+  label: string;
+  count: number;
+}
+
+/** Sort by count (desc), breaking ties alphabetically so the order is stable. */
+function topBy(counts: Map<string, { label: string; count: number }>, limit: number): CountedItem[] {
+  return [...counts.entries()]
+    .map(([key, { label, count }]) => ({ key, label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, limit);
+}
+
+/**
+ * The accounts this one replies to most, across the sample.
+ *
+ * Free: `in_reply_to_account_id` rides along on every status, so "who do they
+ * actually talk to" costs nothing beyond the posts already fetched — no parent
+ * lookups. The handle comes from the post's own `mentions`, since a reply
+ * mentions the account it answers; when it isn't there the id is shown rather
+ * than dropping the row, because a frequent partner we can't name is still a
+ * fact worth reporting.
+ *
+ * Self-replies are excluded: a thread is someone talking to themselves, and
+ * counting it would put every long-form poster at the top of their own list.
+ */
+export function topConversationPartners(
+  posts: Status[],
+  selfId: string,
+  limit = TOP_N,
+): CountedItem[] {
+  const counts = new Map<string, { label: string; count: number }>();
+  for (const post of posts) {
+    if (post.reblog) {
+      continue;
+    }
+    const target = post.in_reply_to_account_id;
+    if (!target || target === selfId) {
+      continue;
+    }
+    const mentioned = post.mentions?.find((m) => m.id === target);
+    const label = mentioned ? `@${mentioned.acct}` : target;
+    const seen = counts.get(target);
+    // Keep the best label we've seen: an earlier post may have lacked mentions.
+    counts.set(target, {
+      label: seen && seen.label.startsWith('@') ? seen.label : label,
+      count: (seen?.count ?? 0) + 1,
+    });
+  }
+  return topBy(counts, limit);
+}
+
+/**
+ * The hashtags this account uses most.
+ *
+ * Counts each tag once per post — a post that says #rust three times is one
+ * post about Rust, not three — and lowercases for grouping, since Mastodon
+ * treats `#Rust` and `#rust` as the same tag while preserving each post's
+ * casing. The first-seen casing is what gets displayed.
+ */
+export function topHashtags(posts: Status[], limit = TOP_N): CountedItem[] {
+  const counts = new Map<string, { label: string; count: number }>();
+  for (const post of posts) {
+    if (post.reblog) {
+      continue;
+    }
+    const seenHere = new Set<string>();
+    for (const tag of post.tags ?? []) {
+      const key = tag.name.toLowerCase();
+      if (seenHere.has(key)) {
+        continue;
+      }
+      seenHere.add(key);
+      const seen = counts.get(key);
+      counts.set(key, { label: seen?.label ?? `#${tag.name}`, count: (seen?.count ?? 0) + 1 });
+    }
+  }
+  return topBy(counts, limit);
+}
+
+/**
+ * Hosts stripped of a leading `www.`, so `www.bbc.co.uk` and `bbc.co.uk` are one
+ * domain rather than two rows that mean the same thing.
+ */
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The domains this account links to most.
+ *
+ * Read from the post's preview `card`, which is the link Mastodon itself
+ * resolved — more reliable than scraping anchors out of the HTML content, and
+ * already on the object. One domain per post for the same reason as tags.
+ *
+ * A post linking only to the account's own server is still counted: self-linking
+ * is exactly the pattern this metric exists to make visible.
+ */
+export function topLinkDomains(posts: Status[], limit = TOP_N): CountedItem[] {
+  const counts = new Map<string, { label: string; count: number }>();
+  for (const post of posts) {
+    if (post.reblog) {
+      continue;
+    }
+    const url = post.card?.url;
+    if (!url) {
+      continue;
+    }
+    const host = hostOf(url);
+    if (!host) {
+      continue;
+    }
+    const seen = counts.get(host);
+    counts.set(host, { label: host, count: (seen?.count ?? 0) + 1 });
+  }
+  return topBy(counts, limit);
+}
+
+// ---------------------------------------------------------------------------
 // Contribution heatmap ("the lawn")
 // ---------------------------------------------------------------------------
 
