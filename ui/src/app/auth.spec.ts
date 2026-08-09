@@ -93,6 +93,70 @@ describe('Auth + Server linkage', () => {
     expect(auth.sessions().map((session) => session.token)).toEqual(['art-token']);
   });
 
+  /**
+   * The reported bug, at its source.
+   *
+   * "Log out" offered a dialog promising not to delete anything, and then called
+   * `logout()`, which forgets the active account by design. Worse, it auto-switched
+   * into the next saved account, so the app looked like it had merely changed
+   * identity — the deletion was only noticed after it had happened twice and both
+   * accounts were gone.
+   */
+  it('leaveActive signs out without forgetting any saved account', () => {
+    server.setBaseUrl('https://mastodon.art');
+    auth.setToken('art-token');
+    server.setBaseUrl('https://mastodon.social');
+    auth.setToken('social-token');
+    auth.switchTo('art-token');
+
+    auth.leaveActive();
+
+    // Both accounts survive, in order.
+    expect(auth.sessions().map((session) => session.token)).toEqual(['art-token', 'social-token']);
+    // ...and no identity was silently activated in place of the one left.
+    expect(auth.isAuthenticated).toBe(false);
+    expect(auth.token()).toBeNull();
+    expect(localStorage.getItem('mastodon_mock_token')).toBeNull();
+  });
+
+  it('leaveActive survives being used twice, which is how both accounts were lost', () => {
+    server.setBaseUrl('https://mastodon.art');
+    auth.setToken('art-token');
+    server.setBaseUrl('https://mastodon.social');
+    auth.setToken('social-token');
+
+    auth.leaveActive();
+    auth.switchTo('social-token');
+    auth.leaveActive();
+
+    expect(auth.sessions()).toHaveLength(2);
+  });
+
+  it('leaveActive from Anonymous leaves the stable alone too', () => {
+    server.setBaseUrl('https://mastodon.art');
+    auth.setToken('art-token');
+    auth.enterAnonymous('https://ohai.social');
+
+    auth.leaveActive();
+
+    expect(auth.sessions().map((session) => session.token)).toEqual(['art-token']);
+    expect(auth.isAnonymous).toBe(false);
+    expect(auth.isAuthenticated).toBe(false);
+  });
+
+  /** The narrower promise still has to work: removing an account must remove it. */
+  it('logout still forgets the active account, for callers that mean it', () => {
+    server.setBaseUrl('https://mastodon.art');
+    auth.setToken('art-token');
+    server.setBaseUrl('https://mastodon.social');
+    auth.setToken('social-token');
+    auth.switchTo('art-token');
+
+    auth.logout();
+
+    expect(auth.sessions().map((session) => session.token)).toEqual(['social-token']);
+  });
+
   it('always offers Anonymous in the switcher and restores a saved login', () => {
     server.setBaseUrl('https://mastodon.art');
     auth.setToken('art-token');

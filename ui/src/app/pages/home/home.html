@@ -181,10 +181,17 @@
       </a>
     </aside>
   }
-  @if (twitterProvider.errors().length) {
+  <!-- One line, not one per account. When the free CORS proxies refuse together
+       every followed account reports the same failure, and printing all of them
+       buried the feed under identical text. -->
+  @if (twitterProvider.errorSummary(); as summary) {
     <aside class="muted" role="status">
-      @for (warning of twitterProvider.errors(); track warning) {
-        <div>{{ warning }}</div>
+      <div>{{ summary }}</div>
+      @if (twitterProvider.paused()) {
+        <div>
+          Paused for a few minutes so it stops retrying. Saved tweets are still shown.
+          <button type="button" class="linklike" (click)="retryTwitter()">Try again now</button>
+        </div>
       }
     </aside>
   }

@@ -373,11 +373,14 @@ export class Shell implements OnInit {
       location.assign('login');
       return;
     }
-    this.auth.logout();
-    if (choice === 'leave' && this.auth.isAuthenticated) {
-      location.reload();
-    } else {
-      location.assign('login');
-    }
+    // `leaveActive`, never `logout`: the dialog promised not to delete anything,
+    // and `logout` forgets the active account. This used to call `logout`, which
+    // deleted the account the user was leaving and then silently signed them in
+    // as the next one in the stable — so the app looked like it had switched
+    // rather than destroyed, and the loss was only noticed after it had happened
+    // twice. Saved accounts survive both remaining choices; `anonymous-data`
+    // erases the Anonymous session's own keys and nothing else.
+    this.auth.leaveActive();
+    location.assign('login');
   }
 }

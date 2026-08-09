@@ -1,5 +1,16 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { catchError, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
+import {
+  catchError,
+  forkJoin,
+  map,
+  Observable,
+  of,
+  switchMap,
+  tap,
+  throwError,
+  timeout,
+  TimeoutError,
+} from 'rxjs';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { ClientPrefs, homeWindowMs } from '../client-prefs';
@@ -10,6 +21,23 @@ import { ProviderRegistry } from './provider-registry';
 
 /** Each active source earns at least this many posts in one loading round. */
 const SOURCE_PAGE_SIZE = 20;
+
+/**
+ * How long one foreign source may hold up the whole round.
+ *
+ * The round is a `forkJoin`, so Home renders nothing until every source settles
+ * — which means the slowest source sets the time-to-first-post for all of them.
+ * That was fine while "slow" meant a sluggish RSS host. It stopped being fine
+ * when the free CORS proxies this app depends on started refusing in bulk:
+ * a provider that retries with backoff behind a dead proxy can legitimately take
+ * a minute to fail, and for that minute Home looked frozen with a spinner.
+ *
+ * Ten seconds is past any healthy response and well short of the retry budget
+ * that caused the freeze. A source that misses it is dropped **from this round
+ * only** — it is not marked exhausted, because a timeout is not evidence the
+ * source is empty, and its own cache may well answer instantly next round.
+ */
+const SOURCE_TIMEOUT_MS = 10_000;
 
 interface ForeignSource {
   provider: FeedProvider;
@@ -106,11 +134,16 @@ export class FeedAggregator {
   /** Fetch one quota-sized round from every active source and merge it by date. */
   nextPage(): Observable<Status[]> {
     const sourcePages: Observable<Status[]>[] = [];
+    // The round is a forkJoin: nothing renders until the slowest source settles,
+    // so pairing this with `round-success`'s elapsedMs and the per-source timeout
+    // warnings is what names the culprit behind a Home feed that felt frozen.
+    const roundStartedAt = Date.now();
     this.diagnostics.info('aggregator:round-start', {
       mastodonEnabled: !this.mastodonExhausted,
       foreignProviders: this.foreign
         .filter((source) => !source.exhausted)
         .map((source) => source.provider.id),
+      sourceTimeoutMs: SOURCE_TIMEOUT_MS,
     });
 
     if (!this.mastodonExhausted) {
@@ -158,6 +191,7 @@ export class FeedAggregator {
       tap((items) =>
         this.diagnostics.info('aggregator:round-success', {
           posts: items.length,
+          elapsedMs: Date.now() - roundStartedAt,
           providerCounts: this.providerCounts(items),
           hasMore: this.hasMore(),
         }),
@@ -165,21 +199,72 @@ export class FeedAggregator {
     );
   }
 
-  /** Keep paging one foreign source until its round reaches the quota or exhausts. */
-  private fetchForeignPage(source: ForeignSource, collected: Status[] = []): Observable<Status[]> {
+  /**
+   * Keep paging one foreign source until its round reaches the quota or exhausts.
+   *
+   * `deadline` is shared across the recursion so the *source* gets
+   * {@link SOURCE_TIMEOUT_MS} in total, not that much per page. Applying the
+   * timeout to each call individually would let a source that pages five times
+   * hold the round for fifty seconds while never once tripping the limit.
+   */
+  private fetchForeignPage(
+    source: ForeignSource,
+    collected: Status[] = [],
+    deadline = Date.now() + SOURCE_TIMEOUT_MS,
+  ): Observable<Status[]> {
     if (source.exhausted || collected.length >= SOURCE_PAGE_SIZE) {
       return of(collected);
     }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      this.diagnostics.warn('foreign:round-deadline', {
+        provider: source.provider.id,
+        collected: collected.length,
+        budgetMs: SOURCE_TIMEOUT_MS,
+      });
+      return of(collected);
+    }
+    const startedAt = Date.now();
     return source.provider.fetchPage().pipe(
+      // A source that has stopped answering must not hold Home hostage. It keeps
+      // whatever it already collected and is left *unexhausted*: a timeout says
+      // "not now", not "nothing left", and next round its cache may answer at once.
+      timeout({
+        each: remaining,
+        with: () => throwError(() => new TimeoutError()),
+      }),
       // A browser-only source can fail for reasons outside our control (most
       // commonly an RSS server without CORS headers). One unavailable source
       // must never reject forkJoin and discard every healthy Home source.
       catchError((error: unknown) => {
-        source.exhausted = true;
-        this.diagnostics.error('foreign:page-error', error, { provider: source.provider.id });
-        return of<Status[]>([]);
+        const timedOut = error instanceof TimeoutError;
+        // Only a real failure exhausts the source. Marking a timed-out source
+        // exhausted would drop it for the rest of the session over one slow round.
+        source.exhausted = !timedOut;
+        if (timedOut) {
+          this.diagnostics.warn('foreign:page-timeout', {
+            provider: source.provider.id,
+            waitedMs: Date.now() - startedAt,
+            budgetMs: SOURCE_TIMEOUT_MS,
+            collected: collected.length,
+            note: 'dropped from this round only; source stays eligible',
+          });
+        } else {
+          this.diagnostics.error('foreign:page-error', error, {
+            provider: source.provider.id,
+            waitedMs: Date.now() - startedAt,
+            collected: collected.length,
+          });
+        }
+        // `null`, not `[]`: an empty page below means "this source is spent" and
+        // exhausts it. A timeout must not be read that way, and the exhaustion
+        // decision for a real failure has already been made right here.
+        return of<Status[] | null>(null);
       }),
       switchMap((items) => {
+        if (items === null) {
+          return of(collected);
+        }
         if (!items.length) {
           source.exhausted = true;
           return of(collected);
@@ -194,7 +279,7 @@ export class FeedAggregator {
           this.droppedByWindow.update((n) => n + (items.length - fresh.length));
           source.exhausted = true;
         }
-        return this.fetchForeignPage(source, [...collected, ...fresh]);
+        return this.fetchForeignPage(source, [...collected, ...fresh], deadline);
       }),
     );
   }

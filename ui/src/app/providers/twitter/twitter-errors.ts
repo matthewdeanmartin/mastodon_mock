@@ -359,6 +359,35 @@ export function toTwitterApiError(
   }
 }
 
+/**
+ * Whether the CORS proxy refused on its own behalf, rather than relaying the
+ * data service's refusal.
+ *
+ * The evidence is the one this file already relies on when it words a 429: the
+ * data service explains itself in the response body, so a refusal carrying a
+ * `providerMessage` came *from the service*, and a bare 403/429 with a proxy in
+ * the path came from the proxy. Nothing else in the response distinguishes them —
+ * a proxy returns its own error page under its own status.
+ *
+ * Used by the retry policy. Retrying a proxy's own refusal is close to pointless:
+ * the free tiers this app runs on limit by origin over minutes, not the seconds a
+ * retry waits, and the retries were spending that time inside the Home feed's
+ * round — which is what made the whole page look frozen when the proxies went
+ * down together. The service's own throttling is still retried; it does clear.
+ *
+ * `Retry-After` overrides this, because a proxy that says when to come back is
+ * answering the question rather than leaving it to be inferred.
+ */
+export function isProxyOriginRefusal(error: TwitterApiError): boolean {
+  if (error.retryAfterMs !== undefined) {
+    return false;
+  }
+  if (error.providerMessage) {
+    return false;
+  }
+  return (error.httpStatus === 429 || error.httpStatus === 403) && error.code === 'RATE_LIMITED';
+}
+
 /** `Retry-After` in milliseconds, when the service sent a usable one. */
 function retryAfterMs(error: HttpErrorResponse): number | undefined {
   const header = error.headers?.get('Retry-After');

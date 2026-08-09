@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, of, throwError } from 'rxjs';
+import { delay, firstValueFrom, NEVER, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from '../api';
 import { ClientPrefs } from '../client-prefs';
@@ -283,9 +283,13 @@ describe('FeedAggregator', () => {
 
     expect(page.map((status) => status.id)).toEqual(['healthy']);
     expect(aggregator.hasMore()).toBe(false);
-    expect(diagnostics.error).toHaveBeenCalledWith('foreign:page-error', expect.any(Error), {
-      provider: 'rss',
-    });
+    // objectContaining, so adding a field to the diagnostic payload (waitedMs and
+    // friends, which is how a slow source gets attributed) is not a test failure.
+    expect(diagnostics.error).toHaveBeenCalledWith(
+      'foreign:page-error',
+      expect.any(Error),
+      expect.objectContaining({ provider: 'rss' }),
+    );
   });
   // ------------------------------------------------------- loading window
 
@@ -368,6 +372,93 @@ describe('FeedAggregator', () => {
       );
       const page = await firstValueFrom(withWindow('today').nextPage());
       expect(page.map((s) => s.id)).toContain('undated');
+    });
+  });
+
+  /**
+   * The reported freeze. The round is a forkJoin, so before this the slowest
+   * source set the time-to-first-post for every source: when the free CORS
+   * proxies all started refusing, the Twitter provider's retry-with-backoff took
+   * the better part of a minute to fail and Home showed a spinner the whole time.
+   */
+  describe('a source that stops answering', () => {
+    it('does not hold up the rest of the round', async () => {
+      vi.useFakeTimers();
+      try {
+        const aggregator = TestBed.inject(FeedAggregator);
+        fakeRss.linked.set(true);
+        homeTimeline.mockReturnValueOnce(of([makeStatus('m1', '2026-07-14T10:59:00.000Z')]));
+        // A source that never emits at all — the shape a dead proxy produces.
+        fakeRss.fetchPage.mockReturnValue(NEVER);
+
+        aggregator.reset();
+        const pagePromise = firstValueFrom(aggregator.nextPage());
+        await vi.advanceTimersByTimeAsync(11_000);
+        const page = await pagePromise;
+
+        // The healthy source's posts arrive rather than being discarded.
+        expect(page.map((s) => s.id)).toEqual(['m1']);
+        expect(diagnostics.warn).toHaveBeenCalledWith(
+          'foreign:page-timeout',
+          expect.objectContaining({ provider: 'rss' }),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stays eligible next round, because a timeout is not an empty source', async () => {
+      vi.useFakeTimers();
+      try {
+        const aggregator = TestBed.inject(FeedAggregator);
+        fakeRss.linked.set(true);
+        homeTimeline.mockReturnValue(of([]));
+        fakeRss.fetchPage.mockReturnValueOnce(NEVER);
+
+        aggregator.reset();
+        const first = firstValueFrom(aggregator.nextPage());
+        await vi.advanceTimersByTimeAsync(11_000);
+        await first;
+
+        // Second round: the source answers from cache, as it would after a blip.
+        // One page then empty, so it exhausts rather than paging the same post
+        // until it reaches the round quota.
+        fakeRss.fetchPage
+          .mockReturnValueOnce(of([rssStatus('r1', '2026-07-14T10:58:00.000Z')]))
+          .mockReturnValue(of([]));
+        const second = firstValueFrom(aggregator.nextPage());
+        await vi.advanceTimersByTimeAsync(11_000);
+
+        expect((await second).map((s) => s.id)).toEqual(['r1']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('bounds a slow source across its own paging, not per page', async () => {
+      vi.useFakeTimers();
+      try {
+        const aggregator = TestBed.inject(FeedAggregator);
+        fakeRss.linked.set(true);
+        homeTimeline.mockReturnValue(of([]));
+        // Each page takes 6s and never fills the 20-post quota, so without a
+        // shared deadline this pages forever at 6s a time.
+        let n = 0;
+        fakeRss.fetchPage.mockImplementation(() => {
+          n += 1;
+          return of([rssStatus(`r${n}`, '2026-07-14T10:58:00.000Z')]).pipe(delay(6_000));
+        });
+
+        aggregator.reset();
+        const pagePromise = firstValueFrom(aggregator.nextPage());
+        await vi.advanceTimersByTimeAsync(60_000);
+        await pagePromise;
+
+        // Two pages fit in the 10s budget; the third is refused by the deadline.
+        expect(fakeRss.fetchPage.mock.calls.length).toBeLessThanOrEqual(2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

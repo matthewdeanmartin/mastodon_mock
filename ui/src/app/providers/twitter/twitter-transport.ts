@@ -6,7 +6,12 @@ import { PageDiagnostics } from '../../page-diagnostics';
 import { CorsProxy, CorsProxyRefusal } from '../cors-proxy/cors-proxy';
 import { externalFetch } from '../external-fetch';
 import { ProxyConsent } from '../proxy-consent-store';
-import { providerErrorInBody, toTwitterApiError, TwitterApiError } from './twitter-errors';
+import {
+  isProxyOriginRefusal,
+  providerErrorInBody,
+  toTwitterApiError,
+  TwitterApiError,
+} from './twitter-errors';
 import { TwitterConfig, TwitterSettings } from './twitter-settings';
 import { TwitterSourceId } from './twitter-source';
 import { TwitterUsage } from './twitter-usage';
@@ -265,8 +270,38 @@ export class TwitterTransport {
             proxyLabel,
           });
           if (!normalized.transient) {
+            this.diagnostics.info('Twitter', 'retry:declined', {
+              attempt,
+              code: normalized.code,
+              httpStatus: normalized.httpStatus,
+              reason: 'not transient',
+            });
             return throwError(() => error);
           }
+          // A refusal the *proxy* issued on its own behalf is not worth the
+          // retry budget. The free proxies this app relies on rate-limit by
+          // origin and refuse in bulk for minutes at a time, so retrying buys
+          // nothing but delay — and that delay is what made Home look frozen,
+          // because the aggregator waits for every source. The data service's
+          // own throttling still retries: it carries a provider message in the
+          // body, and it does clear in seconds.
+          if (isProxyOriginRefusal(normalized)) {
+            this.diagnostics.warn('Twitter', 'retry:declined-proxy-refusal', {
+              attempt,
+              code: normalized.code,
+              httpStatus: normalized.httpStatus,
+              proxy: proxyLabel,
+              reason: 'the proxy refused on its own behalf; retrying only adds delay',
+            });
+            return throwError(() => error);
+          }
+          this.diagnostics.warn('Twitter', 'retry:scheduled', {
+            attempt,
+            of: MAX_RETRIES,
+            code: normalized.code,
+            httpStatus: normalized.httpStatus,
+            retryAfterMs: normalized.retryAfterMs ?? null,
+          });
           // A retry is another billable request. Counting it keeps the total
           // honest, and — because `record` is what the hard limit reads — stops
           // a backoff loop from spending past the limit that was checked once

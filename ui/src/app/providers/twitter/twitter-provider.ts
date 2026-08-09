@@ -8,9 +8,11 @@ import {
   Observable,
   of,
   switchMap,
+  tap,
   toArray,
 } from 'rxjs';
 import { Status } from '../../models';
+import { PageDiagnostics } from '../../page-diagnostics';
 import { FeedProvider } from '../provider';
 import { TwitterFeed } from './twitter-feed';
 import { TwitterFollows } from './twitter-follows';
@@ -61,11 +63,34 @@ import { TwitterSettings } from './twitter-settings';
  */
 export const COLD_START_BUDGET = 3;
 
+/**
+ * Consecutive cold-start failures before Home stops trying for a while.
+ *
+ * Two, because one failure is a bad handle and two in a row is the network. The
+ * case this exists for is every free CORS proxy refusing at once, which does
+ * happen: without it, each Home round re-attempts the same doomed fetches, and
+ * `fillToMinimum()` starts a fresh round after every page — so a dead proxy is
+ * retried continuously for as long as the reader stays on the page.
+ */
+export const FAILURE_THRESHOLD = 2;
+
+/**
+ * How long Home leaves the network alone after tripping the breaker.
+ *
+ * Long enough for a rate-limited free proxy to forgive us, short enough that a
+ * reader who leaves Home open gets their tweets back without a reload. Cached
+ * posts are unaffected throughout — the breaker only stops *fetching*, and
+ * everything already on disk keeps rendering, which is the whole bargain this
+ * connector makes anyway.
+ */
+export const COOLDOWN_MS = 5 * 60 * 1000;
+
 @Injectable({ providedIn: 'root' })
 export class TwitterProvider implements FeedProvider {
   private feed = inject(TwitterFeed);
   private follows = inject(TwitterFollows);
   private settings = inject(TwitterSettings);
+  private diagnostics = inject(PageDiagnostics);
 
   readonly id = 'twitter' as const;
   readonly label = 'Twitter';
@@ -83,16 +108,83 @@ export class TwitterProvider implements FeedProvider {
   readonly errors = signal<string[]>([]);
 
   /**
+   * The failures as one line, because the list was worse than useless.
+   *
+   * When every free CORS proxy refuses at once — which is the common case, they
+   * share rate limits and go down together — the old per-account list printed the
+   * same sentence once per followed account, pushing the actual feed off the
+   * screen behind a wall of identical text. It read as the app being broken in
+   * many ways rather than unavailable in one.
+   *
+   * So: how many, and the reason once. Null when there is nothing to say.
+   */
+  readonly errorSummary = computed<string | null>(() => {
+    const failures = this.errors();
+    if (!failures.length) {
+      return null;
+    }
+    const count = failures.length;
+    const subject = count === 1 ? '1 Twitter account' : `${count} Twitter accounts`;
+    // Every message is usually the same underlying failure; naming it once is
+    // the useful part. Only claim they match when they actually do.
+    const reasons = new Set(failures.map((line) => line.replace(/^@[^:]+:\s*/, '')));
+    const reason = reasons.size === 1 ? [...reasons][0] : 'Several accounts failed to load.';
+    return `Couldn't load ${subject}. ${reason}`;
+  });
+
+  /**
    * How many followed accounts have nothing to show, so Home can offer to load
    * them rather than silently omitting them.
    */
   readonly unloaded = signal(0);
 
+  /**
+   * When the breaker is open, the moment it closes again — otherwise null.
+   *
+   * Exposed so Home can say "Twitter is resting until 14:32" rather than quietly
+   * omitting the section, which would look identical to having no follows.
+   */
+  readonly pausedUntil = signal<number | null>(null);
+
+  /** True while the breaker is open. Cached posts still render; only fetching stops. */
+  readonly paused = computed(() => {
+    const until = this.pausedUntil();
+    return until !== null && until > Date.now();
+  });
+
   private exhausted = false;
+  /** Consecutive cold-start failures. Reset by any success. */
+  private consecutiveFailures = 0;
 
   reset(): void {
     this.exhausted = false;
     this.errors.set([]);
+  }
+
+  /**
+   * Try the network again now, at the user's request.
+   *
+   * The breaker protects against an app that retries on its own forever; a person
+   * who presses "Retry" has new information (they reconnected, they switched
+   * proxy) and is entitled to override it.
+   */
+  resume(): void {
+    this.pausedUntil.set(null);
+    this.consecutiveFailures = 0;
+    this.errors.set([]);
+    this.diagnostics.info('Twitter', 'breaker:reset', { reason: 'user asked to retry' });
+  }
+
+  private trip(): void {
+    const until = Date.now() + COOLDOWN_MS;
+    this.pausedUntil.set(until);
+    this.diagnostics.warn('Twitter', 'breaker:open', {
+      consecutiveFailures: this.consecutiveFailures,
+      threshold: FAILURE_THRESHOLD,
+      cooldownMs: COOLDOWN_MS,
+      until: new Date(until).toISOString(),
+      note: 'Home will keep showing cached tweets; only fetching is paused',
+    });
   }
 
   fetchPage(): Observable<Status[]> {
@@ -118,8 +210,19 @@ export class TwitterProvider implements FeedProvider {
     const cold = follows.filter((follow) => !this.feed.hasAnything(follow.username));
     // Everything already on disk costs nothing, so it is always included.
     const warm = follows.filter((follow) => this.feed.hasAnything(follow.username));
-    const toFetch = cold.slice(0, COLD_START_BUDGET);
+    // With the breaker open, fetch nothing and show what is on disk. The cold
+    // accounts are still counted as unloaded so Home can explain the gap.
+    const open = this.paused();
+    const toFetch = open ? [] : cold.slice(0, COLD_START_BUDGET);
     this.unloaded.set(cold.length - toFetch.length);
+    if (open) {
+      this.diagnostics.info('Twitter', 'page:skipped-cold-start', {
+        reason: 'breaker open',
+        pausedUntil: new Date(this.pausedUntil() ?? 0).toISOString(),
+        warm: warm.length,
+        cold: cold.length,
+      });
+    }
 
     // Cached reads are free and can all resolve together; the cold-start
     // fetches go one at a time. Parallel requests through a free CORS proxy is
@@ -132,17 +235,34 @@ export class TwitterProvider implements FeedProvider {
     const fetchedPages = toFetch.length
       ? from(toFetch).pipe(
           concatMap((follow) =>
-            this.feed.timeline(follow).pipe(
-              // One dead handle must not cost the reader the whole Home feed.
-              // The aggregator reads a thrown error as "this provider is
-              // finished", which would drop every other account too.
-              catchError((error: unknown) => {
-                const message =
-                  error instanceof Error ? error.message : 'Could not load an account.';
-                this.errors.update((all) => [...all, `@${follow.username}: ${message}`]);
-                return of<Status[]>([]);
-              }),
-            ),
+            // Once the breaker trips mid-batch, abandon the rest of the cold
+            // starts: they are queued behind the same dead proxy and would each
+            // pay the full failure latency before reporting the same thing.
+            this.paused()
+              ? of<Status[]>([])
+              : this.feed.timeline(follow).pipe(
+                  tap(() => {
+                    this.consecutiveFailures = 0;
+                  }),
+                  // One dead handle must not cost the reader the whole Home feed.
+                  // The aggregator reads a thrown error as "this provider is
+                  // finished", which would drop every other account too.
+                  catchError((error: unknown) => {
+                    const message =
+                      error instanceof Error ? error.message : 'Could not load an account.';
+                    this.errors.update((all) => [...all, `@${follow.username}: ${message}`]);
+                    this.consecutiveFailures += 1;
+                    this.diagnostics.error('Twitter', 'page:account-error', error, {
+                      handle: follow.username,
+                      consecutiveFailures: this.consecutiveFailures,
+                      threshold: FAILURE_THRESHOLD,
+                    });
+                    if (this.consecutiveFailures >= FAILURE_THRESHOLD) {
+                      this.trip();
+                    }
+                    return of<Status[]>([]);
+                  }),
+                ),
           ),
           toArray(),
         )

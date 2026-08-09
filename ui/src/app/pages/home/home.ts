@@ -421,6 +421,21 @@ export class Home implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Close the Twitter circuit breaker and reload.
+   *
+   * The breaker exists so the app stops hammering a dead CORS proxy on its own.
+   * A person pressing this has information the app does not — they reconnected,
+   * or switched proxy — so their asking outranks the cooldown.
+   */
+  retryTwitter(): void {
+    this.diagnostics.info('user:twitter-retry', {
+      pausedUntil: this.twitterProvider.pausedUntil(),
+    });
+    this.twitterProvider.resume();
+    this.load(true);
+  }
+
   load(forceRefresh = false): void {
     this.pageSub?.unsubscribe();
     this.autoLoading.set(false);

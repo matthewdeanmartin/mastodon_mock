@@ -275,3 +275,19 @@ a.eliza-invite:hover {
 .feed-window-end p {
   margin: 0;
 }
+
+/* A button that reads as a link, for the inline "Try again now" on the Twitter
+   unavailable notice. Same shape as the one in status-card.css; component
+   styles are scoped, so it does not carry across. */
+.linklike {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.linklike:hover {
+  text-decoration: underline;
+}
