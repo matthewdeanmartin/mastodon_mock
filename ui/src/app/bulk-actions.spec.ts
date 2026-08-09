@@ -317,6 +317,60 @@ describe('BulkActions', () => {
     ]);
   });
 
+  // -------------------------------------------------------- planning progress
+
+  it('reports counting progress while the plan is being read', async () => {
+    // The count is the slow half — hundreds of requests on a big account — and
+    // it used to be invisible outside the browser's network tab.
+    const seen: { stage: string; accounts: number; apiCalls: number }[] = [];
+    api.accountFollowing.mockReturnValueOnce(of([account('1'), account('2')]));
+    api.relationships.mockImplementationOnce(() => {
+      // Sampled mid-read: the follow page has landed, the relationship check
+      // has not, which is exactly the state the dialog needs to describe.
+      const progress = bulk.planning();
+      if (progress) {
+        seen.push({ ...progress });
+      }
+      return of([relationship('1', false), relationship('2', true)]);
+    });
+
+    await bulk.preview('reblogs-on');
+
+    expect(seen[0]).toMatchObject({ stage: 'checking', accounts: 2, apiCalls: 1 });
+    // Cleared when the pass ends, so the dialog stops claiming to be busy.
+    expect(bulk.planning()).toBeNull();
+  });
+
+  it('stopping the count produces no plan rather than a partial one', async () => {
+    api.accountFollowing.mockImplementationOnce(() => {
+      // The user hits "Stop counting" while the first page is in flight.
+      bulk.cancelPlanning();
+      return of([account('1'), account('2')]);
+    });
+
+    const preview = await bulk.preview('reblogs-on');
+
+    // A partial count presented as the plan would be the worst outcome: a
+    // confident total that is really just where the read stopped.
+    expect(preview).toMatchObject({ cancelled: true, targets: 0 });
+    expect(bulk.planning()).toBeNull();
+  });
+
+  it('a cancelled count does not poison the next one', async () => {
+    api.accountFollowing.mockImplementationOnce(() => {
+      bulk.cancelPlanning();
+      return of([account('1')]);
+    });
+    await bulk.preview('reblogs-on');
+
+    api.accountFollowing.mockReturnValueOnce(of([account('1')]));
+    api.relationships.mockReturnValueOnce(of([relationship('1', false)]));
+    const second = await bulk.preview('reblogs-on');
+
+    expect(second.cancelled).toBeUndefined();
+    expect(second.targets).toBe(1);
+  });
+
   // ----------------------------------------------------------- collections
 
   it('reads a collection whole instead of paging it, and skips pending members', async () => {

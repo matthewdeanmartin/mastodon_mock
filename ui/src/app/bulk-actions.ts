@@ -230,6 +230,21 @@ export interface BulkJob {
   error?: string;
 }
 
+/**
+ * Live progress of the planning pass, for the dialog to show while it counts.
+ *
+ * Deliberately separate from {@link BulkJob}: nothing has been written yet, and
+ * showing this in the job panel would imply something had.
+ */
+export interface BulkPlanProgress {
+  /** Which stage the read is in, so the wording can say what it is doing. */
+  stage: 'reading' | 'checking';
+  /** Accounts read so far. */
+  accounts: number;
+  /** Requests issued so far — the number that keeps moving on a slow read. */
+  apiCalls: number;
+}
+
 /** What the confirmation dialog needs to state the real consequences. */
 export interface BulkPreview {
   action: BulkActionId;
@@ -239,6 +254,11 @@ export interface BulkPreview {
   alreadyCorrect: number;
   /** True when `targets` is a floor rather than the exact number. */
   approximate: boolean;
+  /**
+   * The user stopped the count. No plan was produced and the numbers here mean
+   * nothing — the dialog offers to start over rather than showing a total.
+   */
+  cancelled?: boolean;
   /** Set when the preview itself failed; the dialog shows it and offers retry. */
   error?: string;
 }
@@ -278,6 +298,21 @@ export class BulkActions {
 
   /** The current or most recent job; null before anything has been run. */
   readonly job = signal<BulkJob | null>(null);
+
+  /**
+   * What the planning pass is doing right now, or null when none is running.
+   *
+   * The count is minutes of work on a large account — paging a 50,000-follow
+   * list is hundreds of requests — and it used to happen behind a single static
+   * "Checking how many accounts this affects…", with no numbers, no way to tell
+   * it apart from a hang, and no button to stop it. The only place the activity
+   * was visible at all was the browser's network tab.
+   *
+   * `accounts` is the honest headline (it is what the user thinks in), with
+   * `apiCalls` alongside it because for the amnesty reads the account count
+   * arrives in bursts and a request counter is the thing that keeps moving.
+   */
+  readonly planning = signal<BulkPlanProgress | null>(null);
 
   /** Spacing between writes. Tests set this to 0. */
   delayMs = 250;
@@ -341,7 +376,37 @@ export class BulkActions {
    */
   async preview(action: BulkActionId, target?: BulkTarget): Promise<BulkPreview> {
     this.plan = null;
+    // A previous cancel must not kill this pass before it starts — the reads
+    // below all check this flag, and it survives the dialog being reopened.
+    this.cancelRequested = false;
+    this.planning.set({ stage: 'reading', accounts: 0, apiCalls: 0 });
     try {
+      const result = await this.plannedPreview(action, target);
+      // Every read loop breaks on cancel, which means a cancelled pass returns
+      // a *partial* count. Presenting that as the plan would be the worst
+      // outcome here: the user stops the count and is then shown a confident
+      // "this will change 84 accounts" that is simply the point they stopped at.
+      if (this.cancelRequested) {
+        this.plan = null;
+        return { action, targets: 0, alreadyCorrect: 0, approximate: false, cancelled: true };
+      }
+      return result;
+    } catch (error) {
+      return {
+        action,
+        targets: 0,
+        alreadyCorrect: 0,
+        approximate: false,
+        error: describeError(error),
+      };
+    } finally {
+      this.planning.set(null);
+    }
+  }
+
+  /** The read itself. Wrapped by {@link preview}, which owns cancel and errors. */
+  private async plannedPreview(action: BulkActionId, target?: BulkTarget): Promise<BulkPreview> {
+    {
       if (needsList(action)) {
         if (!target) {
           throw new Error('No list chosen.');
@@ -375,15 +440,37 @@ export class BulkActions {
         alreadyCorrect,
         approximate: false,
       };
-    } catch (error) {
-      return {
-        action,
-        targets: 0,
-        alreadyCorrect: 0,
-        approximate: false,
-        error: describeError(error),
-      };
     }
+  }
+
+  /**
+   * Stop the planning pass.
+   *
+   * Distinct from {@link cancel}, which stops a running job: nothing has been
+   * written yet, so this is free to abandon. It exists because the count itself
+   * is the long part on a large account, and "wait however long this takes"
+   * was not a choice the user was being offered.
+   */
+  cancelPlanning(): void {
+    this.cancelRequested = true;
+  }
+
+  /** Note progress during a planning read. No-op once the pass has ended. */
+  private notePlan(changes: Partial<BulkPlanProgress>): void {
+    this.planning.update((current) => (current ? { ...current, ...changes } : current));
+  }
+
+  /** One more request issued during planning. */
+  private countPlanCall(accountsRead = 0): void {
+    this.planning.update((current) =>
+      current
+        ? {
+            ...current,
+            apiCalls: current.apiCalls + 1,
+            accounts: current.accounts + accountsRead,
+          }
+        : current,
+    );
   }
 
   // ------------------------------------------------------------------- runner
@@ -636,6 +723,7 @@ export class BulkActions {
         this.api.accountListPage(kind, maxId, LIST_PAGE),
       );
       all.push(...accounts);
+      this.countPlanCall(accounts.length);
       if (!nextMaxId || !accounts.length) {
         return { accounts: all, truncated: false };
       }
@@ -697,6 +785,7 @@ export class BulkActions {
         this.api.listAccountsPage(listId, maxId, LIST_PAGE),
       );
       all.push(...accounts);
+      this.countPlanCall(accounts.length);
       if (!nextMaxId || !accounts.length) {
         break;
       }
@@ -718,12 +807,14 @@ export class BulkActions {
   ): Promise<Account[]> {
     const byId = new Map(accounts.map((a) => [a.id, a]));
     const targets: Account[] = [];
+    this.notePlan({ stage: 'checking' });
     for (let i = 0; i < accounts.length; i += RELATIONSHIP_BATCH) {
       if (this.cancelRequested) {
         break;
       }
       const slice = accounts.slice(i, i + RELATIONSHIP_BATCH);
       const rels = await firstValueFrom(this.api.relationships(slice.map((a) => a.id)));
+      this.countPlanCall();
       for (const rel of rels) {
         const account = byId.get(rel.id);
         const connected = rel.following || rel.requested;
@@ -749,6 +840,7 @@ export class BulkActions {
       }
       const batch = await firstValueFrom(this.api.accountFollowing(me.id, maxId, FOLLOWING_PAGE));
       all.push(...batch);
+      this.countPlanCall(batch.length);
       if (batch.length < FOLLOWING_PAGE) {
         break;
       }
@@ -771,12 +863,14 @@ export class BulkActions {
   private async needingReblogChange(following: Account[], wanted: boolean): Promise<Account[]> {
     const byId = new Map(following.map((a) => [a.id, a]));
     const targets: Account[] = [];
+    this.notePlan({ stage: 'checking' });
     for (let i = 0; i < following.length; i += RELATIONSHIP_BATCH) {
       if (this.cancelRequested) {
         break;
       }
       const slice = following.slice(i, i + RELATIONSHIP_BATCH);
       const rels = await firstValueFrom(this.api.relationships(slice.map((a) => a.id)));
+      this.countPlanCall();
       for (const rel of rels) {
         const account = byId.get(rel.id);
         if (account && (rel.showing_reblogs ?? true) !== wanted) {

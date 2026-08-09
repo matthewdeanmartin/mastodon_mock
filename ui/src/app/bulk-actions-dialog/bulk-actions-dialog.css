@@ -87,3 +87,10 @@ h3 {
 .btn.btn-danger:hover:not(:disabled) {
   background: #c31e51;
 }
+
+/* Live counters during the planning pass. Tabular figures so the numbers
+   climbing don't shift the line's width under the reader. */
+.plan-progress {
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}

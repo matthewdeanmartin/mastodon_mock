@@ -27,7 +27,34 @@
     }
 
     @if (loading()) {
-      <p class="muted">Checking how many accounts this affects…</p>
+      <!-- Counting can take minutes and hundreds of requests. Show the numbers
+           moving: a static "checking…" is indistinguishable from a hang, and
+           the only place this work was visible used to be the network tab. -->
+      <p class="muted">
+        @if (planning(); as progress) {
+          {{
+            progress.stage === 'reading'
+              ? 'Reading your accounts…'
+              : 'Checking which ones need changing…'
+          }}
+        } @else {
+          Checking how many accounts this affects…
+        }
+      </p>
+      @if (planning(); as progress) {
+        <p class="plan-progress small muted" role="status" aria-live="polite">
+          {{ progress.accounts.toLocaleString() }}
+          {{ progress.accounts === 1 ? 'account' : 'accounts' }} read ·
+          {{ progress.apiCalls.toLocaleString() }}
+          {{ progress.apiCalls === 1 ? 'request' : 'requests' }}
+        </p>
+      }
+    } @else if (planCancelled()) {
+      <p class="bulk-summary">Stopped counting. Nothing has been changed.</p>
+      <p class="muted small">
+        No accounts were touched — this only ever read your list. Count again to see what this
+        action would do.
+      </p>
     } @else if (preview()?.error; as error) {
       <p class="bulk-error">Couldn’t check what this would do: {{ error }}</p>
       <p class="muted small">Nothing has been changed.</p>
@@ -70,7 +97,17 @@
     }
 
     <div class="confirm-actions">
-      @if (noWork() || preview()?.error) {
+      @if (loading()) {
+        <!-- The counting pass had no controls at all: no way out short of
+             reloading the page, which is a poor answer for someone with 50,000
+             friends who has changed their mind. -->
+        <button class="btn btn-outline" type="button" (click)="stopCounting()">
+          Stop counting
+        </button>
+      } @else if (planCancelled()) {
+        <button class="btn btn-outline" type="button" (click)="cancelled.emit()">Close</button>
+        <button class="btn" type="button" (click)="load()">Count again</button>
+      } @else if (noWork() || preview()?.error) {
         <button class="btn" type="button" (click)="cancelled.emit()">Close</button>
         @if (preview()?.error) {
           <button class="btn btn-outline" type="button" (click)="load()">Try again</button>

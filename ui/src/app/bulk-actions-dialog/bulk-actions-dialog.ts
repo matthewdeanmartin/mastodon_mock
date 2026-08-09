@@ -47,6 +47,29 @@ export class BulkActionsDialog implements OnInit {
   protected readonly backupError = signal('');
 
   /**
+   * Live progress of the counting pass.
+   *
+   * The count is the slow half on a large account — paging a 50,000-follow list
+   * is hundreds of requests — and it used to run behind one static line with no
+   * numbers and no way to stop it. Read straight off the service so the dialog
+   * has no second copy of the state to keep in sync.
+   */
+  protected readonly planning = this.bulk.planning;
+
+  /**
+   * Whether the user stopped the count, so nothing was measured.
+   *
+   * Named apart from the `cancelled` output above, which means "the user
+   * dismissed the dialog" — a different event with a different consequence.
+   */
+  protected readonly planCancelled = computed(() => !!this.preview()?.cancelled);
+
+  /** Stop counting. Nothing has been written, so this needs no confirmation. */
+  protected stopCounting(): void {
+    this.bulk.cancelPlanning();
+  }
+
+  /**
    * Counting starts here rather than in the constructor: `action` is a required
    * input, and reading one before Angular has set it throws — which left the
    * dialog stuck on "Checking…" forever.

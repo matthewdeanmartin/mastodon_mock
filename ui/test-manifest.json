@@ -1,5 +1,5 @@
 {
-  "testCount": 3728,
+  "testCount": 3731,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -243,6 +243,7 @@
     "src/app/build-flavor.spec.ts :: build-flavor picks the canary logo only on canary",
     "src/app/build-flavor.spec.ts :: build-flavor picks the hand-drawn mark by default, on both flavors",
     "src/app/build-flavor.spec.ts :: build-flavor treats production and sub-paths that merely contain \"canary\" correctly",
+    "src/app/bulk-actions.spec.ts :: BulkActions a cancelled count does not poison the next one",
     "src/app/bulk-actions.spec.ts :: BulkActions builds a Mastodon-compatible CSV backup from the whole list",
     "src/app/bulk-actions.spec.ts :: BulkActions does no work when everyone is already correct",
     "src/app/bulk-actions.spec.ts :: BulkActions does not reuse a plan built for a different list",
@@ -258,8 +259,10 @@
     "src/app/bulk-actions.spec.ts :: BulkActions refuses a list action with no list rather than acting on the wrong one",
     "src/app/bulk-actions.spec.ts :: BulkActions refuses to start a second job while one is running",
     "src/app/bulk-actions.spec.ts :: BulkActions reports a preview failure instead of pretending there is nothing to do",
+    "src/app/bulk-actions.spec.ts :: BulkActions reports counting progress while the plan is being read",
     "src/app/bulk-actions.spec.ts :: BulkActions reports no percentage until the total is known",
     "src/app/bulk-actions.spec.ts :: BulkActions scopes the retweet actions to your follows even when a list is passed",
+    "src/app/bulk-actions.spec.ts :: BulkActions stopping the count produces no plan rather than a partial one",
     "src/app/bulk-actions.spec.ts :: BulkActions stops after the in-flight write when cancelled",
     "src/app/bulk-actions.spec.ts :: BulkActions stops instead of looping when a pass changes nothing",
     "src/app/bulk-actions.spec.ts :: BulkActions treats a pending follow request as followed, so it is not re-sent",
