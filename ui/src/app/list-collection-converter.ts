@@ -22,6 +22,16 @@ export interface ConversionResult {
   added: number;
   existing: number;
   failed: number;
+  /**
+   * True when at least one add failed *because the account is not followed*.
+   *
+   * Mastodon only keeps accounts you follow in a list, so converting a
+   * collection of strangers adds nobody — and every failure used to be
+   * flattened into an anonymous "skipped" count, which is why this reliably
+   * looked broken. Knowing this specifically is what lets the page say "follow
+   * them first" instead of shrugging.
+   */
+  needsFollow: boolean;
 }
 
 /** Idempotently copies the first 25 memberships between private lists and public collections. */
@@ -106,16 +116,20 @@ export class ListCollectionConverter {
     return from(missing).pipe(
       concatMap((id) =>
         add(targetId, id).pipe(
-          map(() => true),
-          catchError(() => of(false)),
+          map(() => 'ok' as const),
+          // The status is kept rather than collapsed to a boolean: 422 here
+          // means "you don't follow them", which is the difference between a
+          // mystery and an instruction.
+          catchError((error: unknown) => of(notFollowedError(error) ? 'unfollowed' : 'failed')),
         ),
       ),
       toArray(),
       map((results) => ({
         targetId,
-        added: results.filter(Boolean).length,
+        added: results.filter((result) => result === 'ok').length,
         existing: sourceIds.length - missing.length,
-        failed: results.filter((result) => !result).length,
+        failed: results.filter((result) => result !== 'ok').length,
+        needsFollow: results.some((result) => result === 'unfollowed'),
       })),
     );
   }
@@ -123,4 +137,15 @@ export class ListCollectionConverter {
 
 function unique(ids: string[]): string[] {
   return [...new Set(ids)];
+}
+
+/**
+ * Did adding this account fail because we don't follow them?
+ *
+ * Mastodon answers 422 for that, which it also uses for other validation
+ * failures — so this is a strong hint rather than a certainty, and the copy it
+ * drives is phrased as one ("most servers only keep accounts you follow").
+ */
+function notFollowedError(error: unknown): boolean {
+  return (error as { status?: unknown } | null)?.status === 422;
 }

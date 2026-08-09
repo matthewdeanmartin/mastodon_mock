@@ -38,6 +38,12 @@ function fakeApi() {
     listAccountsPage: vi.fn((_id: string, _maxId?: string, _limit?: number) =>
       of({ accounts: [] as Account[], nextMaxId: null as string | null }),
     ),
+    getCollection: vi.fn((_id: string) =>
+      of({
+        collection: { id: _id, items: [] as { id: string; state: string; account_id: string }[] },
+        accounts: [] as Account[],
+      }),
+    ),
     unfollow: vi.fn((_id: string) => of({} as Relationship)),
     unmuteAccount: vi.fn((_id: string) => of({} as Relationship)),
     unblockAccount: vi.fn((_id: string) => of({} as Relationship)),
@@ -309,6 +315,37 @@ describe('BulkActions', () => {
       'bob@a.test,true',
       'eve@b.test,true',
     ]);
+  });
+
+  // ----------------------------------------------------------- collections
+
+  it('reads a collection whole instead of paging it, and skips pending members', async () => {
+    // A collection comes back from one GET with no cursor, and carries members
+    // who have not accepted being listed — following those would act on an
+    // invitation they have not answered.
+    api.getCollection.mockReturnValueOnce(
+      of({
+        collection: {
+          id: 'C1',
+          items: [
+            { id: 'i1', state: 'accepted', account_id: '1' },
+            { id: 'i2', state: 'accepted', account_id: '2' },
+            { id: 'i3', state: 'pending', account_id: '3' },
+          ],
+        },
+        accounts: [account('1'), account('2'), account('3')],
+      }),
+    );
+    api.relationships.mockReturnValueOnce(of([follows('1', false), follows('2', true)]));
+
+    const preview = await bulk.preview('list-follow', {
+      listId: 'C1',
+      listTitle: 'Good people',
+      kind: 'collection',
+    });
+
+    expect(preview).toMatchObject({ targets: 1, alreadyCorrect: 1 });
+    expect(api.listAccountsPage).not.toHaveBeenCalled();
   });
 
   // ---------------------------------------------------------------- lists

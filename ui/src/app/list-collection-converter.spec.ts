@@ -71,7 +71,9 @@ describe('ListCollectionConverter', () => {
     expect(add.request.body).toEqual({ account_id: '3' });
     add.flush({ collection_item: item('3') });
 
-    expect(result).toEqual({ targetId: 'C1', added: 1, existing: 1, failed: 1 });
+    // The failed add above was a 422, which is how Mastodon says 'you do not
+    // follow them' — the flag the page uses to offer the fix.
+    expect(result).toEqual({ targetId: 'C1', added: 1, existing: 1, failed: 1, needsFollow: true });
   });
 
   it('creates a same-name collection when one does not exist', () => {
@@ -89,7 +91,7 @@ describe('ListCollectionConverter', () => {
     create.flush({ collection: collection('C9', 'New people') });
     http.expectOne('/api/v1/collections/C9/items').flush({ collection_item: item('9') });
 
-    expect(result).toEqual({ targetId: 'C9', added: 1, existing: 0, failed: 0 });
+    expect(result).toEqual({ targetId: 'C9', added: 1, existing: 0, failed: 0, needsFollow: false });
   });
 
   it('reuses a same-name list and caps collection conversion at the first 25 users', () => {
@@ -110,7 +112,7 @@ describe('ListCollectionConverter', () => {
     }
     http.expectNone((request) => request.body?.account_ids?.includes('26'));
 
-    expect(result).toEqual({ targetId: 'L9', added: 24, existing: 1, failed: 0 });
+    expect(result).toEqual({ targetId: 'L9', added: 24, existing: 1, failed: 0, needsFollow: false });
   });
 
   it('creates a same-name list when one does not exist', () => {
@@ -127,6 +129,6 @@ describe('ListCollectionConverter', () => {
     create.flush({ id: 'L3', title: 'Fresh' });
     http.expectOne('/api/v1/lists/L3/accounts').flush([]);
 
-    expect(result).toEqual({ targetId: 'L3', added: 0, existing: 0, failed: 0 });
+    expect(result).toEqual({ targetId: 'L3', added: 0, existing: 0, failed: 0, needsFollow: false });
   });
 });

@@ -71,6 +71,24 @@ export class BulkActionsDialog implements OnInit {
     }
   }
 
+  /**
+   * What to call the thing being followed: a list, or a collection.
+   *
+   * The two actions are one job with different reads, so the copy is shared and
+   * only the noun moves. Saying "this list" over a collection is a small lie,
+   * but it is the kind that makes a confirmation dialog untrustworthy.
+   */
+  protected readonly sourceNoun = computed(() =>
+    this.target()?.kind === 'collection' ? 'collection' : 'list',
+  );
+
+  /** The dialog heading, with the same noun swap as the summary. */
+  protected readonly title = computed(() =>
+    this.sourceNoun() === 'collection'
+      ? this.spec().title.replace('this list', 'this collection')
+      : this.spec().title,
+  );
+
   /** Nothing to do — used to turn Confirm into a plain "Close". */
   protected readonly noWork = computed(() => {
     const preview = this.preview();
@@ -114,32 +132,32 @@ export class BulkActionsDialog implements OnInit {
       case 'list-follow': {
         const members = preview.targets + preview.alreadyCorrect;
         if (!members) {
-          return 'Nothing to do — this list has no members.';
+          return `Nothing to do — this ${this.sourceNoun()} has no members.`;
         }
         if (!preview.targets) {
           return `Nothing to do — you already follow all ${members.toLocaleString()} ${
             members === 1 ? 'member' : 'members'
-          } of this list.`;
+          } of this ${this.sourceNoun()}.`;
         }
         return preview.alreadyCorrect === 0
           ? `This will follow all ${about}${count} ${
               preview.targets === 1 ? 'member' : 'members'
-            } of this list.`
-          : `This will follow ${about}${count} of the ${members.toLocaleString()} members of this list. You already follow the other ${preview.alreadyCorrect.toLocaleString()}.`;
+            } of this ${this.sourceNoun()}.`
+          : `This will follow ${about}${count} of the ${members.toLocaleString()} members of this ${this.sourceNoun()}. You already follow the other ${preview.alreadyCorrect.toLocaleString()}.`;
       }
       case 'list-unfollow': {
         const members = preview.targets + preview.alreadyCorrect;
         if (!members) {
-          return 'Nothing to do — this list has no members.';
+          return `Nothing to do — this ${this.sourceNoun()} has no members.`;
         }
         if (!preview.targets) {
-          return 'Nothing to do — you do not follow anyone on this list.';
+          return `Nothing to do — you do not follow anyone in this ${this.sourceNoun()}.`;
         }
         return preview.alreadyCorrect === 0
           ? `This will unfollow all ${about}${count} ${
               preview.targets === 1 ? 'member' : 'members'
-            } of this list.`
-          : `This will unfollow ${about}${count} of the ${members.toLocaleString()} members of this list. You already do not follow the other ${preview.alreadyCorrect.toLocaleString()}.`;
+            } of this ${this.sourceNoun()}.`
+          : `This will unfollow ${about}${count} of the ${members.toLocaleString()} members of this ${this.sourceNoun()}. You already do not follow the other ${preview.alreadyCorrect.toLocaleString()}.`;
       }
     }
   });

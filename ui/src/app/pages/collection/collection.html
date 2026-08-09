@@ -35,6 +35,14 @@
       </a>
     }
     <div class="coll-actions">
+      <!-- The obvious thing to want from a curated set of people, and until now
+           the one thing the page would not do. Counts first: the dialog says
+           how many are new before anything is written. -->
+      @if (canFollow() && members().length) {
+        <button class="btn btn-outline" [disabled]="bulk.running()" (click)="askFollowAll()">
+          {{ bulk.running() ? 'Working…' : 'Follow everyone in this collection' }}
+        </button>
+      }
       @if (isOwner()) {
         <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
         <button class="btn btn-outline danger" (click)="showDeleteConfirm.set(true)">
@@ -185,6 +193,13 @@
           @if (m.state === 'pending') {
             <span class="muted small">pending</span>
           }
+          <!-- The point of a collection is that these are people worth
+               following, so the follow control belongs on the row. Absent for
+               shipped kits, whose members live on other instances and whose ids
+               the home server cannot act on. -->
+          @if (canFollow()) {
+            <app-follow-button [accountId]="m.account.id" [handle]="'@' + m.account.acct" />
+          }
           @if (isOwner()) {
             <button
               class="del"
@@ -198,6 +213,19 @@
         </div>
       }
     }
+  }
+
+  <!-- Shared with the Settings bulk tab, so a follow-everyone job survives
+       navigating away from this page and reports itself wherever you land. -->
+  <app-bulk-progress />
+
+  @if (followAllOpen()) {
+    <app-bulk-actions-dialog
+      action="list-follow"
+      [target]="followAllTarget()"
+      (confirmed)="confirmFollowAll()"
+      (cancelled)="followAllOpen.set(false)"
+    />
   }
 
   @if (showBulk() && isOwner()) {

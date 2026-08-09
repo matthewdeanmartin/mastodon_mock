@@ -77,6 +77,9 @@ describe('FeedMembers', () => {
             get isAnonymous() {
               return anonymous;
             },
+            // The follow button on each row asks who "me" is, so it can decline
+            // to offer following yourself.
+            account: () => (anonymous ? null : { id: 'me' }),
           },
         },
       ],
@@ -166,16 +169,26 @@ describe('FeedMembers', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Nobody has posted here');
   });
 
-  it('marks accounts the signed-in viewer already follows', () => {
+  it('offers Follow per row, reflecting who the viewer already follows', async () => {
     anonymous = false;
     const fixture = mount(supplied([makeStatus('1', 'alice'), makeStatus('2', 'bob')]));
 
     const req = http.expectOne((r) => r.url.includes('/api/v1/accounts/relationships'));
     expect(req.request.params.getAll('id[]')).toEqual(['acct-alice', 'acct-bob']);
-    req.flush([{ id: 'acct-alice', following: true }]);
+    req.flush([
+      { id: 'acct-alice', following: true },
+      { id: 'acct-bob', following: false },
+    ]);
+    // The resolve is promise-based, so let it settle before reading the DOM.
+    await fixture.whenStable();
     fixture.detectChanges();
 
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('following');
+    // This list used to print the word "following" and stop there. Each row now
+    // carries the button, so the answer is actionable rather than trivia.
+    const labels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.follow-btn'),
+    ).map((button) => button.textContent?.trim());
+    expect(labels).toEqual(['Following', 'Follow']);
   });
 
   it('makes no relationships call for anonymous viewers', () => {

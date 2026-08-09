@@ -64,6 +64,15 @@ export type BulkActionId =
 export interface BulkTarget {
   listId: string;
   listTitle: string;
+  /**
+   * Where the members come from.
+   *
+   * A collection is the same job with a different read: a curated set of
+   * accounts, followed or unfollowed in bulk. Only {@link fetchListMembers}
+   * cares which, so this rides along rather than doubling the action list.
+   * Defaults to `list` so every existing caller is unchanged.
+   */
+  kind?: 'list' | 'collection';
 }
 
 /** True for the actions that require a {@link BulkTarget}. */
@@ -337,7 +346,7 @@ export class BulkActions {
         if (!target) {
           throw new Error('No list chosen.');
         }
-        const members = await this.fetchListMembers(target.listId);
+        const members = await this.fetchMembers(target);
         const wantFollowing = action === 'list-follow';
         const targets = await this.needingFollowChange(members, wantFollowing);
         const alreadyCorrect = members.length - targets.length;
@@ -473,7 +482,7 @@ export class BulkActions {
     let targets = planned?.accounts ?? null;
     let alreadyCorrect = planned?.alreadyCorrect ?? 0;
     if (!targets) {
-      const members = await this.fetchListMembers(target.listId);
+      const members = await this.fetchMembers(target);
       targets = await this.needingFollowChange(members, wantFollowing);
       alreadyCorrect = members.length - targets.length;
     }
@@ -654,6 +663,26 @@ export class BulkActions {
       action === 'mute-amnesty' ? `${csvCell(a.acct)},true` : csvCell(a.acct),
     );
     return { csv: [header, ...rows].join('\n'), count: accounts.length };
+  }
+
+  /**
+   * Every member of one list or collection.
+   *
+   * A collection comes back whole from a single GET — it has no cursor and no
+   * page endpoint — so it is read and returned rather than walked.
+   */
+  private async fetchMembers(target: BulkTarget): Promise<Account[]> {
+    if (target.kind === 'collection') {
+      const data = await firstValueFrom(this.api.getCollection(target.listId));
+      const ids = new Set(
+        data.collection.items
+          .filter((item) => item.state === 'accepted')
+          .map((item) => item.account_id)
+          .filter((id): id is string => !!id),
+      );
+      return data.accounts.filter((account) => ids.has(account.id));
+    }
+    return this.fetchListMembers(target.listId);
   }
 
   /** Every member of one list, following `Link` cursors to the end. */

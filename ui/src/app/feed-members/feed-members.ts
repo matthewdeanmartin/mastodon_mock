@@ -4,14 +4,20 @@ import { Api } from '../api';
 import { Auth } from '../auth';
 import { AuthorRow, feedAuthors, pct } from '../feed-metrics';
 import { FeedSource, isSupplied, sampleFeed } from '../feed-sample';
+import { FollowButton } from '../follow-button/follow-button';
+import { FollowState, RELATIONSHIP_BATCH } from '../follow-state';
 import { Status } from '../models';
 
 /** Sample sizes the user can pick between on a paged feed. */
 export const SAMPLE_CHOICES = [50, 100, 200] as const;
 /** Default sample: 100 posts, three requests at Mastodon's 40-post page cap. */
 export const DEFAULT_SAMPLE = 100;
-/** Authors resolved per relationships call — Mastodon accepts them batched. */
-const RELATIONSHIP_BATCH = 80;
+/**
+ * How many of the sampled authors to resolve follow state for. The list is
+ * sorted most-prolific-first, so this is the top of it; resolving hundreds of
+ * one-post authors would spend requests on rows nobody scrolls to.
+ */
+const MAX_RESOLVED_AUTHORS = 80;
 
 /**
  * "Who is in this feed", for feeds that have no membership list of their own.
@@ -28,13 +34,14 @@ const RELATIONSHIP_BATCH = 80;
  */
 @Component({
   selector: 'app-feed-members',
-  imports: [RouterLink],
+  imports: [RouterLink, FollowButton],
   templateUrl: './feed-members.html',
   styleUrl: './feed-members.css',
 })
 export class FeedMembers {
   private api = inject(Api);
   private auth = inject(Auth);
+  protected follows = inject(FollowState);
 
   /** The feed whose authors to list. Changing it restarts collection. */
   readonly source = input.required<FeedSource>();
@@ -46,8 +53,8 @@ export class FeedMembers {
   protected error = signal(false);
   protected posts = signal<Status[]>([]);
   protected apiCalls = signal(0);
-  /** Account ids the viewer follows; null until (or unless) resolved. */
-  protected followingIds = signal<ReadonlySet<string> | null>(null);
+  /** True once the batched relationships call has come back. */
+  protected followsResolved = signal(false);
 
   constructor() {
     effect(() => {
@@ -62,7 +69,7 @@ export class FeedMembers {
     this.error.set(false);
     this.posts.set([]);
     this.apiCalls.set(0);
-    this.followingIds.set(null);
+    this.followsResolved.set(false);
     sampleFeed(source, size).subscribe((sample) => {
       this.posts.set(sample.posts);
       this.apiCalls.set(sample.apiCalls);
@@ -72,20 +79,27 @@ export class FeedMembers {
     });
   }
 
-  /** One batched request, signed-in only, so each row can offer Follow. */
+  /**
+   * Resolve follow state for the sampled authors, so each row can offer Follow.
+   *
+   * Delegated to {@link FollowState} rather than kept here: a follow made from
+   * this list, from a collection page, or from a profile is the same fact, and
+   * three components caching it separately meant a button that had just been
+   * clicked elsewhere still said "Follow". The shared service also fixed the
+   * batch size — this file asked for 80 ids, over Mastodon's documented cap of
+   * 40, and everything past the cap came back missing and read as "not
+   * followed".
+   */
   private resolveFollows(posts: Status[]): void {
     if (this.auth.isAnonymous || !posts.length) {
       return;
     }
     const ids = this.authors()
-      .slice(0, RELATIONSHIP_BATCH)
+      .slice(0, MAX_RESOLVED_AUTHORS)
       .map((row) => row.account.id);
-    this.api.relationships(ids).subscribe({
-      next: (rels) => {
-        this.apiCalls.update((n) => n + 1);
-        this.followingIds.set(new Set(rels.filter((r) => r.following).map((r) => r.id)));
-      },
-      error: () => this.followingIds.set(null),
+    void this.follows.resolve(ids).then(() => {
+      this.apiCalls.update((n) => n + Math.ceil(ids.length / RELATIONSHIP_BATCH));
+      this.followsResolved.set(true);
     });
   }
 
@@ -97,11 +111,11 @@ export class FeedMembers {
 
   /** True once relationships resolved and this account is followed. */
   isFollowed(row: AuthorRow): boolean {
-    return this.followingIds()?.has(row.account.id) ?? false;
+    return this.follows.status(row.account.id) === 'following';
   }
 
   /** Whether follow state is known at all (it never is for anonymous viewers). */
-  protected knowsFollows = computed(() => this.followingIds() !== null);
+  protected knowsFollows = computed(() => this.followsResolved());
 
   setSampleSize(size: number): void {
     if (size !== this.sampleSize()) {

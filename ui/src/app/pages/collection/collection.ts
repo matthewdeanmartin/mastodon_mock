@@ -8,7 +8,12 @@ import { Auth } from '../../auth';
 import { Account, CollectionWithAccounts, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { BulkAddDialog } from '../../bulk-add-dialog/bulk-add-dialog';
+import { BulkActions, BulkTarget } from '../../bulk-actions';
+import { BulkActionsDialog } from '../../bulk-actions-dialog/bulk-actions-dialog';
+import { BulkProgress } from '../../bulk-progress/bulk-progress';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
+import { FollowButton } from '../../follow-button/follow-button';
+import { FollowState } from '../../follow-state';
 import { ListCollectionConverter } from '../../list-collection-converter';
 import { ListFeedResolver } from '../../lists/list-feed-resolver';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
@@ -52,7 +57,17 @@ interface Member {
  */
 @Component({
   selector: 'app-collection',
-  imports: [FormsModule, RouterLink, NgTemplateOutlet, StatusCard, BulkAddDialog, ConfirmDialog],
+  imports: [
+    FormsModule,
+    RouterLink,
+    NgTemplateOutlet,
+    StatusCard,
+    BulkAddDialog,
+    ConfirmDialog,
+    FollowButton,
+    BulkActionsDialog,
+    BulkProgress,
+  ],
   templateUrl: './collection.html',
   styleUrl: './collection.css',
 })
@@ -62,6 +77,8 @@ export class CollectionPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private converter = inject(ListCollectionConverter);
+  protected follows = inject(FollowState);
+  protected bulk = inject(BulkActions);
   private feedResolver = inject(ListFeedResolver);
   private anonymousApi = inject(AnonymousPublicApi);
 
@@ -102,6 +119,70 @@ export class CollectionPage implements OnInit {
     }
     return out;
   });
+
+  /**
+   * Whether this page can offer follow buttons at all.
+   *
+   * A *shipped* starter kit lists accounts on other instances, whose ids mean
+   * nothing to the home server — `POST /accounts/<their id>/follow` would
+   * either 404 or, worse, follow whoever happens to hold that id here. Those
+   * members route through an anonymous ref for exactly this reason, and the
+   * only honest affordance for them is the profile link they already have.
+   */
+  protected canFollow = computed(() => !this.shipped() && !this.auth.isAnonymous);
+
+  /**
+   * Resolve follow state for every member, in batches.
+   *
+   * The collection page's whole job is "here are people worth following", and
+   * it used to answer the obvious follow-up — *which of them do I already
+   * follow?* — only by making you open each one in a new tab.
+   */
+  private resolveFollows(): void {
+    if (!this.canFollow()) {
+      return;
+    }
+    void this.follows.resolve(this.members().map((m) => m.account.id));
+  }
+
+  /** Whether the follow-everyone confirmation is open. */
+  protected followAllOpen = signal(false);
+
+  /**
+   * This collection, as the bulk runner wants it.
+   *
+   * `list-follow` is reused rather than given a collection-specific twin: the
+   * job is identical — read members, skip the ones already followed, write the
+   * rest with pacing and rate-limit pauses — and the only difference is the
+   * read, which {@link BulkTarget.kind} selects.
+   */
+  protected followAllTarget = computed<BulkTarget | undefined>(() => {
+    const d = this.data();
+    return d
+      ? { listId: d.collection.id, listTitle: d.collection.name, kind: 'collection' }
+      : undefined;
+  });
+
+  protected askFollowAll(): void {
+    if (!this.bulk.running() && this.followAllTarget()) {
+      this.followAllOpen.set(true);
+    }
+  }
+
+  protected confirmFollowAll(): void {
+    this.followAllOpen.set(false);
+    const target = this.followAllTarget();
+    if (!target) {
+      return;
+    }
+    // Not awaited: the progress panel reports it, and the user is free to leave.
+    void this.bulk.start('list-follow', target).then(() => {
+      // Re-read relationships so the per-row buttons agree with what just
+      // happened, rather than showing "Follow" for people we just followed.
+      this.follows.reset();
+      this.resolveFollows();
+    });
+  }
 
   /**
    * Route to a member's profile, keeping them inside Mawkingbird.
@@ -175,6 +256,7 @@ export class CollectionPage implements OnInit {
       next: (d) => {
         this.data.set(d);
         this.loading.set(false);
+        this.resolveFollows();
         if (this.tab() === 'feed') {
           this.loadFeed();
         }
@@ -374,7 +456,14 @@ export class CollectionPage implements OnInit {
         const parts = [`${result.added} added`];
         if (result.existing) parts.push(`${result.existing} already present`);
         if (result.failed) parts.push(`${result.failed} skipped`);
-        this.conversionMessage.set(`Converted to list: ${parts.join(', ')}.`);
+        // The common failure, and the one that made this look broken: most
+        // servers only keep accounts you follow in a list, so a collection of
+        // strangers converts to an empty one. Name the cause and the fix — the
+        // button that does it is directly above this message.
+        const hint = result.needsFollow
+          ? ' Most servers only keep accounts you follow in a list — use “Follow everyone in this collection” first, then convert again.'
+          : '';
+        this.conversionMessage.set(`Converted to list: ${parts.join(', ')}.${hint}`);
       },
       error: () => {
         this.converting.set(false);

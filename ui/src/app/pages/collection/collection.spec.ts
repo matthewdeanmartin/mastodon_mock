@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
+import { FollowState } from '../../follow-state';
 import { Account, CollectionItem, CollectionWithAccounts, Status } from '../../models';
 import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 import { CollectionPage } from './collection';
@@ -121,9 +122,18 @@ describe('CollectionPage', () => {
   });
 
   afterEach(() => {
+    // Loading a collection now also resolves follow state for its members, so
+    // each row can offer Follow and say who you already follow. No test here
+    // asserts on that, so settle it rather than repeating a flush everywhere.
+    httpMock
+      .match((req) => req.url.includes('/api/v1/accounts/relationships'))
+      .forEach((req) => req.flush([]));
     httpMock.verify();
     // Reset the root Auth signal so cross-test owner state doesn't leak.
     TestBed.inject(Auth).account.set(null);
+    // The follow cache is a root service; a verdict from one test must not
+    // decide what the next test's buttons say.
+    TestBed.inject(FollowState).reset();
   });
 
   /** Create the component (route id 'C1', overridden in beforeEach). */

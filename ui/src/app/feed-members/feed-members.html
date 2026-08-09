@@ -55,9 +55,6 @@
             @if (row.account.bot) {
               <span class="bot-tag" title="This account is marked as automated">bot</span>
             }
-            @if (knowsFollows() && isFollowed(row)) {
-              <span class="follow-tag" title="You follow this account">following</span>
-            }
           </span>
           <span class="acct muted">&#64;{{ row.account.acct }}</span>
         </span>
@@ -66,6 +63,10 @@
         {{ row.count }} {{ row.count === 1 ? 'post' : 'posts' }}
         <small>{{ pct(row.share) }}%</small>
       </span>
+      <!-- This list used to resolve follow state and then do nothing with it
+           but print the word "following". Seeing who is in a feed and being
+           unable to follow them is the wrong half of the feature. -->
+      <app-follow-button [accountId]="row.account.id" [handle]="'@' + row.account.acct" />
     </div>
   }
 }

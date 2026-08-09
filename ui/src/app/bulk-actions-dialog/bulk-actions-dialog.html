@@ -15,12 +15,14 @@
     (click)="$event.stopPropagation()"
     (keyup)="$event.stopPropagation()"
   >
-    <h3 id="bulk-dialog-title">{{ spec().title }}</h3>
-    <!-- Which list, named. The job can be started from the list page or from
-         Settings, so "this list" alone is not enough to act on. -->
+    <h3 id="bulk-dialog-title">{{ title() }}</h3>
+    <!-- Which list or collection, named. The job can be started from the list
+         page, a collection page, or Settings, so "this list" alone is not
+         enough to act on. -->
     @if (target(); as t) {
       <p class="bulk-target">
-        List: <strong>{{ t.listTitle }}</strong>
+        {{ sourceNoun() === 'collection' ? 'Collection' : 'List' }}:
+        <strong>{{ t.listTitle }}</strong>
       </p>
     }
 
