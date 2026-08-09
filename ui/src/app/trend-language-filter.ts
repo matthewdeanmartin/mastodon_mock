@@ -133,6 +133,38 @@ export class FeedLanguageFilter {
   private known = inject(KnownLanguages);
 
   /**
+   * Detected language per status id — the expensive half of {@link hideReason},
+   * remembered so a feed recompute does not re-run it.
+   *
+   * ## Why this is needed
+   *
+   * `Home.visible()` reads a `now()` signal that a 30-second interval writes to,
+   * so the whole loaded feed is re-filtered twice a minute for as long as the tab
+   * is open. Before this, every one of those passes re-ran `stripHtml` plus the
+   * full lexical detector — a per-character script loop, diacritic regexes and a
+   * stop-word tokenizer — for every post. Measured at ~75ms per pass over 400
+   * posts, paid forever, to recompute an answer that cannot have changed.
+   *
+   * ## Why only the detection is cached
+   *
+   * `hideReason` mixes a pure function of the post's text with live policy: the
+   * `hideForeignLangPosts` toggle, `isLearning`, and the allowed-language set.
+   * Those are prefs the user changes and expects to see take effect immediately,
+   * so caching the *verdict* would leave the feed showing a stale answer until
+   * reload. Caching the detection alone is safe because a post's text is fixed
+   * for a given id: same input, same output, forever.
+   *
+   * `null` is a real cached value ("looked, and could not tell confidently"), so
+   * presence is tested with `has` rather than a truthiness check — otherwise the
+   * undetectable posts, which are the ones that ran the detector for nothing,
+   * would be exactly the ones that never get cached.
+   *
+   * In memory only, like {@link CalmVerdicts}: a persisted verdict would outlive
+   * the post text that justified it, and an edited post must be re-read.
+   */
+  private detected = new Map<string, string | null>();
+
+  /**
    * The languages a post is allowed to be in: the explicit narrowed set when
    * one is chosen, otherwise everything the user knows.
    *
@@ -163,6 +195,38 @@ export class FeedLanguageFilter {
   }
 
   /**
+   * {@link confidentTextLanguage} for a post, answered from {@link detected}
+   * after the first look.
+   *
+   * Keyed on the *target* status — the reblogged post when there is one — because
+   * that is whose text was detected. Keying on the boosting wrapper would give
+   * the same original post a different answer depending on who boosted it, and
+   * would miss the cache every time.
+   */
+  private detectedLanguageFor(target: Status): string | null {
+    // `has`, not a truthiness test: `null` is a real answer meaning "looked and
+    // could not tell", and it is the answer for the posts that ran the detector
+    // for nothing — precisely the ones most worth not repeating.
+    if (this.detected.has(target.id)) {
+      return this.detected.get(target.id) ?? null;
+    }
+    const language = this.confidentTextLanguage(stripHtml(target.content));
+    this.detected.set(target.id, language);
+    return language;
+  }
+
+  /**
+   * Forget every detection, so the next read re-runs it.
+   *
+   * Call on a real feed reload, for the same reason {@link CalmVerdicts.reset}
+   * exists: an edited post is new text under an old id, and the cache would
+   * otherwise answer for the version that is gone.
+   */
+  reset(): void {
+    this.detected.clear();
+  }
+
+  /**
    * Why this post should be hidden, or null to keep it. Exposed (rather than a
    * bare boolean) so callers can log the reason and tests can assert it.
    */
@@ -172,7 +236,7 @@ export class FeedLanguageFilter {
     }
     const target = status.reblog ?? status;
     const declared = target.language?.toLowerCase().split(/[-_]/)[0] || null;
-    const detected = this.confidentTextLanguage(stripHtml(target.content));
+    const detected = this.detectedLanguageFor(target);
 
     // A language you are *learning* is never hidden, whatever the toggle says.
     //
@@ -231,7 +295,9 @@ export class FeedLanguageFilter {
   effectiveLanguage(status: Status): string | null {
     const target = status.reblog ?? status;
     const declared = target.language?.toLowerCase().split(/[-_]/)[0] || null;
-    return declared ?? this.confidentTextLanguage(stripHtml(target.content));
+    // Shares `hideReason`'s cache, which is the point: these two must agree on
+    // what language a post is in, and now they cannot even disagree by accident.
+    return declared ?? this.detectedLanguageFor(target);
   }
 }
 

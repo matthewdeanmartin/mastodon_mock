@@ -247,13 +247,9 @@ bandit:
 
 audit:
 	@echo "=== uv audit ==="
-	@$(UV) audit \
-		--ignore-until-fixed PYSEC-2026-597 \
-		--ignore PYSEC-2026-2078
+	@$(UV) audit
 	@echo "=== pip-audit ==="
-	@$(UV) tool run pip-audit \
-		--ignore-vuln PYSEC-2026-597 \
-		--ignore-vuln PYSEC-2026-2078
+	@$(UV) run pip-audit
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 

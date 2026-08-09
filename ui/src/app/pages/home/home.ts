@@ -441,8 +441,11 @@ export class Home implements OnInit, OnDestroy {
     this.autoLoading.set(false);
     this.loading.set(true);
     // A real reload is the one moment Calm should re-judge: a post whose ratio
-    // genuinely moved gets recategorised here, and nowhere else.
+    // genuinely moved gets recategorised here, and nowhere else. Language
+    // detection is cached for the same reason and cleared at the same moment —
+    // an edited post is new text under an old id.
     this.calm.reset();
+    this.feedLangFilter.reset();
     this.maxHitAt.set(null);
     this.bookmarkTail.set([]);
     if (this.waitingForServerList()) {
