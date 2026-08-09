@@ -110,7 +110,7 @@ const RECONNECT_BLOG_MESSAGE: Record<BlogTarget, string> = {
 export type PostTarget = 'fedi' | 'bsky' | 'both' | 'paste' | 'blog' | 'blogger' | 'hugo';
 
 /** Bluesky's post limit, in graphemes (not characters). */
-const BSKY_MAX_GRAPHEMES = 300;
+export const BSKY_MAX_GRAPHEMES = 300;
 const MAX_PASTE_BYTES = 2 * 1024 * 1024;
 
 /**
@@ -822,7 +822,11 @@ export class Compose implements OnDestroy {
   protected pasteLanguage = signal('plaintext');
   protected pasteExpiry = signal<PasteExpiry>('1w');
   protected pasteBytes = computed(() => new TextEncoder().encode(this.text()).byteLength);
-  /** Graphemes left under Bluesky's 300 limit (only meaningful when posting there). */
+  /**
+   * Graphemes left under Bluesky's 300 limit for the *first* box (only
+   * meaningful when posting there). Thread boxes are checked by
+   * {@link overLimit}, which measures every segment.
+   */
   protected bskyRemaining = computed(() => BSKY_MAX_GRAPHEMES - graphemeLength(this.text()));
   /** The Bluesky leg of a cross-post failed after the Fedi post went out. */
   protected crossPostError = signal<string | null>(null);
@@ -840,6 +844,31 @@ export class Compose implements OnDestroy {
   protected countdown = signal<number | null>(null);
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * The limit that actually applies to the box in front of the user.
+   *
+   * Mastodon allows 500 characters (counting every URL as 23 — see
+   * {@link postLength}); Bluesky allows 300 *graphemes*. The composer used to
+   * measure everything against 500 regardless of where it was going, so a
+   * 400-character Bluesky post showed a comfortable "100 left" and was then
+   * refused by the network.
+   *
+   * For `both` the lower limit binds, because one body goes to both services:
+   * accepting 400 here would guarantee half the cross-post fails.
+   */
+  protected readonly effectiveMax = computed(() =>
+    this.targetIncludesBsky() ? BSKY_MAX_GRAPHEMES : MAX_POST_CHARS,
+  );
+
+  /**
+   * Which service's rule the current limit comes from, for the counter to name.
+   * Only worth saying for `both`, where the number is smaller than the Mastodon
+   * limit the user is looking at a Mastodon composer expecting.
+   */
+  protected readonly limitSource = computed(() =>
+    this.target() === 'both' ? 'Bluesky' : '',
+  );
+
   protected readonly maxChars = MAX_POST_CHARS;
 
   /**
@@ -852,20 +881,23 @@ export class Compose implements OnDestroy {
    * accepted without comment.
    */
   protected countOf(text: string): number {
-    return postLength(text);
+    return this.targetIncludesBsky() ? graphemeLength(text) : postLength(text);
   }
 
   /** The visible counter for the main box. */
-  protected charCount = computed(() => postLength(this.text()));
+  protected charCount = computed(() => this.countOf(this.text()));
 
   /** Any box over the limit blocks posting (no more silent auto-splitting). */
-  protected overLimit = computed(() =>
-    this.targetIncludesPaste()
-      ? this.pasteBytes() > MAX_PASTE_BYTES
-      : this.targetIncludesBlog()
-        ? false
-        : this.segments().some((s) => postLength(s) > MAX_POST_CHARS),
-  );
+  protected overLimit = computed(() => {
+    if (this.targetIncludesPaste()) {
+      return this.pasteBytes() > MAX_PASTE_BYTES;
+    }
+    if (this.targetIncludesBlog()) {
+      return false;
+    }
+    const max = this.effectiveMax();
+    return this.segments().some((s) => this.countOf(s) > max);
+  });
 
   /**
    * URLs long enough that shortening would visibly improve the post.
@@ -940,11 +972,10 @@ export class Compose implements OnDestroy {
       }
     }
     if (this.targetIncludesBsky()) {
-      // Bluesky legs are text-only, single-post, capped at 300 graphemes.
-      if (!this.text().trim() || this.bskyRemaining() < 0) {
-        return false;
-      }
-      if (this.thread().some((t) => t.trim())) {
+      // Bluesky legs are text-only. Threads *are* supported (posted as a chain
+      // of replies), so the only text rule is that the first box has something
+      // in it; per-box length is already covered by `overLimit` above.
+      if (!this.text().trim()) {
         return false;
       }
       if (this.target() === 'bsky' && (this.media().length > 0 || this.pollOpen())) {
@@ -1769,14 +1800,18 @@ export class Compose implements OnDestroy {
     }
 
     if (this.targetIncludesBsky()) {
-      const text = this.text().trim();
+      // Every non-empty box, so a thread crosses as a thread rather than being
+      // silently truncated to its first post.
+      const parts = this.segments()
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (this.target() === 'bsky') {
-        this.sendToBluesky(text, true);
+        this.sendToBluesky(parts, true);
         return;
       }
       // 'both': Fedi is primary (emits the posted status); the Bluesky leg is
       // fired alongside and reports failure without retracting the Fedi post.
-      this.sendToBluesky(text, false);
+      this.sendToBluesky(parts, false);
     }
 
     const options: ComposeOptions = {
@@ -2074,42 +2109,88 @@ export class Compose implements OnDestroy {
   }
 
   /**
-   * Publish the text (link/mention facets attached) as a top-level Bluesky
-   * post. When `primary`, this IS the post: it resets the composer and emits
-   * a locally-built Status; otherwise it's the secondary leg of "both" and
-   * only surfaces errors.
+   * Publish `parts` (link/mention facets attached) to Bluesky — the first as a
+   * top-level post, each subsequent one as a reply to the one before it, which
+   * is how Bluesky represents a thread. When `primary`, this IS the post: it
+   * resets the composer and emits a locally-built Status for the root;
+   * otherwise it's the secondary leg of "both" and only surfaces errors.
+   *
+   * Threads used to be refused outright here, and refused *silently* — the
+   * composer's submit button simply went dead the moment a second box had text
+   * in it, with nothing on screen to say why. Bluesky has always supported
+   * threads; only this client didn't.
    */
-  private sendToBluesky(text: string, primary: boolean): void {
+  private sendToBluesky(parts: string[], primary: boolean): void {
+    if (!parts.length) {
+      return;
+    }
+    this.postBskyPart(parts, 0, null, null, primary);
+  }
+
+  /**
+   * One post of a Bluesky thread, then the next.
+   *
+   * Sequential rather than parallel because each reply needs the *previous*
+   * post's uri/cid, which only exists once that post is created. `root` is
+   * threaded through unchanged: Bluesky wants every reply to name the thread
+   * root as well as its immediate parent.
+   */
+  private postBskyPart(
+    parts: string[],
+    index: number,
+    root: { uri: string; cid: string } | null,
+    parent: { uri: string; cid: string } | null,
+    primary: boolean,
+  ): void {
+    const text = parts[index];
     let sentFacets: BskyFacet[] = [];
     detectFacets(text, (handle) => this.bskyApi.resolveHandle(handle))
       .pipe(
         switchMap((facets) => {
           sentFacets = facets;
-          return this.bskyApi.post({ text, facets: facets.length ? facets : undefined });
+          return this.bskyApi.post({
+            text,
+            facets: facets.length ? facets : undefined,
+            reply: root && parent ? { root, parent } : undefined,
+          });
         }),
       )
       .subscribe({
         next: (created) => {
+          const ref = { uri: created.uri, cid: created.cid };
+          const threadRoot = root ?? ref;
+          const last = index === parts.length - 1;
+          if (!last) {
+            this.postBskyPart(parts, index + 1, threadRoot, ref, primary);
+            return;
+          }
           if (primary) {
             this.reset();
             this.posted.emit(
               buildLocalBskyStatus(
                 this.bskySession.session()!,
-                created.uri,
-                created.cid,
-                text,
-                sentFacets,
+                threadRoot.uri,
+                threadRoot.cid,
+                parts[0],
+                index === 0 ? sentFacets : [],
               ),
             );
           }
         },
         error: () => {
+          // Mid-thread, earlier posts are already public — so this is never a
+          // plain "try again": re-sending would duplicate what landed. Say how
+          // far it got, in both the primary and cross-post cases.
+          const posted = index;
+          const partial = posted
+            ? ` The first ${posted === 1 ? 'post' : `${posted} posts`} of the thread went out.`
+            : '';
           if (primary) {
             this.submitting.set(false);
-            this.crossPostError.set("Couldn't post to Bluesky — try again.");
+            this.crossPostError.set(`Couldn't post to Bluesky — try again.${partial}`);
           } else {
             this.crossPostError.set(
-              'Posted to Fedi, but the Bluesky copy failed — post it there manually.',
+              `Posted to Fedi, but the Bluesky copy failed — post it there manually.${partial}`,
             );
           }
         },

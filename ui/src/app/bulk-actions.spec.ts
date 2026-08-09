@@ -126,6 +126,20 @@ describe('BulkActions', () => {
     expect(bulk.job()).toMatchObject({ phase: 'done', done: 2, changed: 2, skipped: 1, failed: 0 });
   });
 
+  it('scopes the retweet actions to your follows even when a list is passed', async () => {
+    // The settings page hands the dialog its list picker's selection, and used
+    // to do so for these account-wide actions too — which made the dialog read
+    // as list-scoped. It never was, and must not become so.
+    api.accountFollowing.mockReturnValueOnce(of([account('1')]));
+    api.relationships.mockReturnValueOnce(of([relationship('1', true)]));
+
+    const preview = await bulk.preview('reblogs-off', { listId: 'L1', listTitle: 'Friends' });
+
+    expect(preview.targets).toBe(1);
+    expect(api.accountFollowing).toHaveBeenCalled();
+    expect(api.listAccountsPage).not.toHaveBeenCalled();
+  });
+
   it('treats an absent showing_reblogs as "on", matching Mastodon default', async () => {
     api.accountFollowing.mockReturnValueOnce(of([account('1')]));
     api.relationships.mockReturnValueOnce(of([relationship('1', undefined)]));

@@ -1,3 +1,4 @@
+import { FeedKind } from '../feed-capability';
 import { ServerFeedKind } from './list-source';
 
 /** What kind of content a server feed renders. */
@@ -13,12 +14,14 @@ export interface ServerFeedDef {
    *  anonymously — see the mastodon.social anonymous endpoints note). */
   authRequired: boolean;
   /**
-   * Whether to probe the endpoint before offering the row. mastodon.social has
-   * disabled the public/federated timelines, but other instances keep them, so
-   * we ask once and hide the row if nothing comes back rather than let people
-   * click into an empty feed.
+   * Which capability decides whether to offer the row, if any.
+   *
+   * Every server feed is now probed — the trending endpoints included, since
+   * some instances serve no trending links at all and the row led straight to
+   * an error page there. Answers are cached per host by {@link FeedCapability},
+   * so this costs one request a day rather than one per visit.
    */
-  probe: boolean;
+  capability: FeedKind;
 }
 
 export const SERVER_FEEDS: ServerFeedDef[] = [
@@ -28,7 +31,7 @@ export const SERVER_FEEDS: ServerFeedDef[] = [
     blurb: 'Public posts from across the federated network.',
     content: 'posts',
     authRequired: true,
-    probe: true,
+    capability: 'public-federated',
   },
   {
     feed: 'local',
@@ -36,7 +39,7 @@ export const SERVER_FEEDS: ServerFeedDef[] = [
     blurb: "Public posts from this server's own members.",
     content: 'posts',
     authRequired: true,
-    probe: true,
+    capability: 'public-local',
   },
   {
     feed: 'trending',
@@ -44,7 +47,7 @@ export const SERVER_FEEDS: ServerFeedDef[] = [
     blurb: 'Posts getting attention right now.',
     content: 'posts',
     authRequired: false,
-    probe: false,
+    capability: 'trending-statuses',
   },
   {
     feed: 'news',
@@ -52,7 +55,7 @@ export const SERVER_FEEDS: ServerFeedDef[] = [
     blurb: 'Links trending across the fediverse.',
     content: 'links',
     authRequired: false,
-    probe: false,
+    capability: 'trending-links',
   },
 ];
 

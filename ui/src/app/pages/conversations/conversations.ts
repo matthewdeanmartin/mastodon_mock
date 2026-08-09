@@ -185,6 +185,22 @@ export class Conversations implements OnInit, OnDestroy {
   private publicAccounts = signal<Map<string, Account[]>>(new Map());
 
   protected selectedKey = signal<string | null>(null);
+
+  /**
+   * Whether the chat list is showing on a narrow screen.
+   *
+   * The mobile layout used to stack a 40vh peer list above the transcript, on
+   * top of the header, composer, site footer and bottom nav — which left the
+   * actual conversation with a minority of the screen. It is a drawer instead:
+   * open it to switch chats, and it closes itself once you have.
+   *
+   * Ignored entirely above the breakpoint, where both panes fit side by side.
+   */
+  protected listOpen = signal(false);
+
+  protected toggleList(): void {
+    this.listOpen.update((open) => !open);
+  }
   protected messages = signal<Status[]>([]);
   protected threadLoading = signal(false);
   protected reportTarget = signal<Account | null>(null);
@@ -699,6 +715,10 @@ export class Conversations implements OnInit, OnDestroy {
 
   select(chat: Chat): void {
     this.selectedKey.set(chat.key);
+    // Narrow screens show the chat list as a drawer over the transcript; once a
+    // chat is chosen the list has done its job and the conversation should have
+    // the screen. Harmless on desktop, where the drawer state is unused.
+    this.listOpen.set(false);
     if (chat.kind === 'bot') {
       // Open the most recent conversation, or an empty new one. Nothing is
       // fetched and nothing is marked read: this correspondent lives here.

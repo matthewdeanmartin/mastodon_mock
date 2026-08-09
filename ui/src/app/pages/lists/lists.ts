@@ -10,6 +10,7 @@ import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 import { SavedSearches } from '../search/saved-searches';
 import { ClientList, ClientLists } from '../../lists/client-lists';
 import { TagBundle, TagBundles } from '../../lists/tag-bundles';
+import { FeedCapability } from '../../feed-capability';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 import { RssCache } from '../../providers/rss/rss-cache';
 import { RssFeedSub, RssSubscriptions } from '../../providers/rss/rss-subscriptions';
@@ -85,6 +86,7 @@ export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
 export class Lists implements OnInit {
   private api = inject(Api);
   protected auth = inject(Auth);
+  private feedCaps = inject(FeedCapability);
   private anonymousLists = inject(AnonymousLists);
   private anonymousTags = inject(AnonymousTags);
   protected saved = inject(SavedSearches);
@@ -350,28 +352,37 @@ export class Lists implements OnInit {
   }
 
   /**
-   * Decide which server-feed rows to show. Non-probed, session-eligible feeds
-   * appear immediately; probed feeds (Fediverse/Local) are appended only after
-   * a HEAD-of-timeline fetch confirms the instance actually serves them.
+   * Decide which server-feed rows to show.
+   *
+   * Every eligible row is shown up front and removed only once the server has
+   * actually refused it. That ordering matters: the answers are cached per host
+   * for a day, so on the common repeat visit nothing moves at all, and on a
+   * first visit a row that turns out to be unavailable disappears rather than
+   * the whole list appearing late.
+   *
+   * This replaced a per-visit probe that treated an *empty* timeline as a
+   * missing one — which hid the local timeline on any server having a quiet
+   * morning. {@link FeedCapability} distinguishes "answered with nothing" from
+   * "refused", and only the second hides the row.
    */
   private resolveServerFeeds(): void {
     const eligible = SERVER_FEEDS.filter((f) => !f.authRequired || !this.auth.isAnonymous);
-    this.serverFeeds.set(eligible.filter((f) => !f.probe));
+    this.serverFeeds.set(eligible.filter((f) => this.feedCaps.shows(f.capability)));
 
-    for (const def of eligible.filter((f) => f.probe)) {
-      const probe =
-        def.feed === 'local' ? this.api.publicTimeline(true) : this.api.publicTimeline(false);
-      probe.subscribe({
-        next: (statuses) => {
-          if (statuses.length) {
-            this.addServerFeed(def);
-          }
-        },
-        error: () => {
-          // Endpoint disabled/unauthorized on this instance — leave it hidden.
-        },
+    for (const def of eligible) {
+      void this.feedCaps.ensure(def.capability).then((ability) => {
+        if (ability === 'refused') {
+          this.removeServerFeed(def);
+          return;
+        }
+        this.addServerFeed(def);
       });
     }
+  }
+
+  /** Drop a row the server has told us it does not serve. */
+  private removeServerFeed(def: ServerFeedDef): void {
+    this.serverFeeds.update((current) => current.filter((f) => f.feed !== def.feed));
   }
 
   /**

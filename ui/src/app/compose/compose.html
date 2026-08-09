@@ -84,10 +84,17 @@
   @if (
     !targetIncludesPaste() &&
     !targetIncludesBlog() &&
-    (thread().length || charCount() > maxChars - 50)
+    (thread().length || charCount() > effectiveMax() - 50)
   ) {
-    <div class="seg-count muted" [class.over-limit]="charCount() > maxChars">
-      {{ charCount() }}/{{ maxChars }}
+    <!-- The limit follows the target: 500 on Fedi, 300 graphemes on Bluesky, and
+         the lower of the two for "both", where one body goes to each. Naming the
+         source explains a number that would otherwise look wrong to someone
+         looking at a Mastodon composer. -->
+    <div class="seg-count muted" [class.over-limit]="charCount() > effectiveMax()">
+      {{ charCount() }}/{{ effectiveMax() }}
+      @if (limitSource(); as who) {
+        <span class="limit-source">({{ who }})</span>
+      }
     </div>
   }
 
@@ -138,8 +145,8 @@
           (paste)="onPaste($event)"
         ></textarea>
         <div class="thread-box-meta">
-          <span class="muted" [class.over-limit]="countOf(t) > maxChars"
-            >{{ countOf(t) }}/{{ maxChars }}</span
+          <span class="muted" [class.over-limit]="countOf(t) > effectiveMax()"
+            >{{ countOf(t) }}/{{ effectiveMax() }}</span
           >
           <button
             class="btn btn-outline btn-sm"
@@ -725,7 +732,9 @@
     <div class="thread-hint muted">Media, polls and CWs go to Fedi only.</div>
   }
   @if (targetIncludesBsky() && thread().length) {
-    <div class="thread-hint muted">Threads post to Fedi only — Bluesky gets nothing.</div>
+    <div class="thread-hint muted">
+      Threads post to Bluesky as a chain of replies, one box per post.
+    </div>
   }
   @if (
     targetIncludesPaste() && (media().length || pollOpen() || thread().length || scheduleActive())

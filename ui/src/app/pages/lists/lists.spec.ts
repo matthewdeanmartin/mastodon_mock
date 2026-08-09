@@ -96,12 +96,20 @@ describe('Lists', () => {
   });
 
   /**
-   * Server-feed probing (Fediverse/Local) fires two timelines/public GETs in
-   * ngOnInit. Tests don't assert on the resulting rows, so we just settle them
-   * as empty (which hides both probed feeds).
+   * Server-feed capability probing fires in ngOnInit: two timelines/public GETs
+   * plus the two trends endpoints, now that every server-feed row is probed
+   * rather than only Fediverse/Local. Tests don't assert on the resulting rows,
+   * so we just settle them all as empty.
    */
   function flushServerFeedProbes(): void {
-    httpMock.match((r) => r.url === '/api/v1/timelines/public').forEach((req) => req.flush([]));
+    httpMock
+      .match(
+        (r) =>
+          r.url === '/api/v1/timelines/public' ||
+          r.url === '/api/v1/trends/statuses' ||
+          r.url === '/api/v1/trends/links',
+      )
+      .forEach((req) => req.flush([]));
   }
 
   /**

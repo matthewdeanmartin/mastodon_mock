@@ -9,6 +9,7 @@ import { ServerPicker } from '../../../server-picker/server-picker';
 import { probeServerAvailability } from '../../../server-availability';
 import { SearchServerDiscovery } from '../../../search-server-discovery/search-server-discovery';
 import { SearchServer } from '../../../search-server';
+import { FeedCapability } from '../../../feed-capability';
 import { SearchCapability } from '../../../search-capability';
 import { SearchServerRejects, rejectReason } from '../../../search-server-rejects';
 
@@ -27,6 +28,7 @@ export class SettingsServer implements OnInit {
   protected readonly anonymousPreferences = inject(AnonymousPreferences);
   private readonly directory = inject(MastodonServers);
   private readonly searchCapability = inject(SearchCapability);
+  private readonly feedCaps = inject(FeedCapability);
   protected readonly searchServer = inject(SearchServer);
   protected readonly rejects = inject(SearchServerRejects);
   protected readonly rejectReason = rejectReason;
@@ -60,6 +62,11 @@ export class SettingsServer implements OnInit {
 
   protected async checkCurrent(): Promise<void> {
     this.connectionStatus.set('checking');
+    // Which feeds this server serves is cached for a day, so "check connection"
+    // is also the button that re-asks: someone whose admin just turned the
+    // local timeline back on has one obvious place to go, and it is this one.
+    this.feedCaps.reset();
+    this.feedCaps.ensureAll();
     try {
       const result = await probeServerAvailability(this.currentUrl());
       this.connectionStatus.set(result.status);

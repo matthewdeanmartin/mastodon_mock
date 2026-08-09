@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, OnInit, signal } from '@angular/co
 import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
+import { FeedCapability } from '../../feed-capability';
 import { HouseAdStore } from '../../house-ad-store';
 import { InstanceInfo } from '../../models';
 import { SearchServer } from '../../search-server';
@@ -24,6 +25,8 @@ import { JustMyServer } from '../../just-my-server';
 export class RightRail implements OnInit {
   private api = inject(Api);
   protected auth = inject(Auth);
+  /** Template-facing: the rail hides trend rows this server doesn't serve. */
+  protected feedCaps = inject(FeedCapability);
   private server = inject(Server);
   protected searchServer = inject(SearchServer);
   protected justMyServer = inject(JustMyServer);
@@ -126,6 +129,11 @@ export class RightRail implements OnInit {
     if (this.justMyServer.enabled()) {
       this.justMyServer.checkList();
     }
+    // The rail is on nearly every page, so it is the natural place to warm the
+    // per-host feed answers. Cached for a day, so this is one request a day per
+    // endpoint, not one per navigation.
+    void this.feedCaps.ensure('trending-links');
+    void this.feedCaps.ensure('trending-statuses');
   }
 
   private fetchInstance(): void {

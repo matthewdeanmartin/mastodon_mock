@@ -565,6 +565,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Cached instance /about payloads.',
   },
   {
+    base: 'mockingbird_feed_capability_v1',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'cache',
+    note: 'Which feeds (local/federated timelines, the three trends endpoints) each host actually serves, so we stop linking to feeds that answer 404 or 422 there. Keyed by host and by whether we held a token, because those answers genuinely differ. Refetchable, 24h TTL, records no content.',
+  },
+  {
     base: 'mockingbird_cors_proxy_usage',
     storage: 'local',
     suffix: 'none',

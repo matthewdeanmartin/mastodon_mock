@@ -34,6 +34,9 @@ export class SettingsBulkActions implements OnInit {
   private readonly bulk = inject(BulkActions);
   private readonly api = inject(Api);
 
+  /** Template-side, so the dialog is only handed a target it will actually use. */
+  protected readonly needsList = needsList;
+
   protected readonly accountActions = BULK_ACTIONS.filter((a) => !needsList(a.id));
   protected readonly listActions = BULK_ACTIONS.filter((a) => needsList(a.id));
   protected readonly running = this.bulk.running;

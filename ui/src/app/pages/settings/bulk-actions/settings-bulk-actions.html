@@ -91,9 +91,13 @@
 </div>
 
 @if (pending(); as id) {
+  <!-- The target is passed only to the actions that consume one. The
+       account-wide actions ("retweets for all friends") operate on your follow
+       list, and handing them the list picker's selection made the dialog look
+       list-scoped when it never was. -->
   <app-bulk-actions-dialog
     [action]="id"
-    [target]="target()"
+    [target]="needsList(id) ? target() : undefined"
     (confirmed)="confirm()"
     (cancelled)="cancel()"
   />

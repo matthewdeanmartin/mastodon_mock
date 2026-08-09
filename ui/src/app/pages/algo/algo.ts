@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { ALGO_MAX_CALLS, AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
-import { isCalmHidden } from '../../sentiment';
+import { CalmVerdicts } from '../../calm-verdicts';
 import { FeedLanguageFilter } from '../../trend-language-filter';
 import { FeedLanguagePicker } from '../../feed-language-picker/feed-language-picker';
 import { PreviewCard, Status } from '../../models';
@@ -46,6 +46,7 @@ export class Algo implements OnInit {
   protected prefs = inject(ClientPrefs);
   protected auth = inject(Auth);
   private feedLangFilter = inject(FeedLanguageFilter);
+  private calm = inject(CalmVerdicts);
   private visibility = inject(StatusVisibility);
   private diagnostics = inject(PageDiagnostics);
   protected linksView = signal(false);
@@ -72,7 +73,7 @@ export class Algo implements OnInit {
       .filter(
         (p) =>
           this.passesChips(p) &&
-          !(this.prefs.algoCalm() && isCalmHidden(p.status)) &&
+          !(this.prefs.algoCalm() && this.calm.hidden(p.status)) &&
           this.feedLangFilter.shouldShow(p.status) &&
           !this.visibility.rendersNothing(p.status),
       ),
@@ -132,7 +133,7 @@ export class Algo implements OnInit {
     if (!this.prefs.algoCalm()) {
       return 0;
     }
-    return this.feed.posts().filter((p) => this.passesChips(p) && isCalmHidden(p.status)).length;
+    return this.feed.posts().filter((p) => this.passesChips(p) && this.calm.hidden(p.status)).length;
   });
 
   ngOnInit(): void {

@@ -87,19 +87,26 @@
 <section class="card">
   <h2 class="card-title">Fediverse</h2>
 
-  <a class="rail-link" routerLink="/feeds/news">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="m15.5 8.5-2 5-5 2 2-5z" />
-    </svg>
-    <span>News</span>
-  </a>
-  <a class="rail-link" routerLink="/feeds/trending">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 17l6-6 4 4 7-7M14 8h6v6" />
-    </svg>
-    <span>Trending posts</span>
-  </a>
+  <!-- Trends are not universal: some instances serve no trending links at all,
+       and a rail row leading to an error page reads as our bug. Hidden only
+       once the server has actually refused the endpoint. -->
+  @if (feedCaps.shows('trending-links')) {
+    <a class="rail-link" routerLink="/feeds/news">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="m15.5 8.5-2 5-5 2 2-5z" />
+      </svg>
+      <span>News</span>
+    </a>
+  }
+  @if (feedCaps.shows('trending-statuses')) {
+    <a class="rail-link" routerLink="/feeds/trending">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 17l6-6 4 4 7-7M14 8h6v6" />
+      </svg>
+      <span>Trending posts</span>
+    </a>
+  }
   <a class="rail-link" routerLink="/feeds">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />

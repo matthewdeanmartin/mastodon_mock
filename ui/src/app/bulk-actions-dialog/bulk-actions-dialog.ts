@@ -1,5 +1,12 @@
 import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
-import { BulkActionId, BulkActions, BulkPreview, BulkTarget, bulkAction } from '../bulk-actions';
+import {
+  BulkActionId,
+  BulkActions,
+  BulkPreview,
+  BulkTarget,
+  bulkAction,
+  needsList,
+} from '../bulk-actions';
 import { FocusTrap } from '../a11y/focus-trap';
 
 /**
@@ -52,7 +59,11 @@ export class BulkActionsDialog implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.preview.set(await this.bulk.preview(this.action(), this.target()));
+      // Explicitly dropped for the account-wide actions rather than passed
+      // through: those operate on your follow / mute / block lists, and a list
+      // arriving here only ever meant the caller was confused about scope.
+      const target = needsList(this.action()) ? this.target() : undefined;
+      this.preview.set(await this.bulk.preview(this.action(), target));
     } finally {
       // Never leave the dialog claiming to be busy; a stuck spinner in front of
       // a destructive action is worse than an error message.

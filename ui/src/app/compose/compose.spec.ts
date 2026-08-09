@@ -1301,6 +1301,68 @@ describe('Compose', () => {
     expect(internals(f).canSubmit()).toBe(true);
   });
 
+  it('measures thread boxes against the Bluesky limit, not the Fedi one', () => {
+    // 400 characters is fine on Fedi and over on Bluesky. The composer used to
+    // measure every box against 500 whatever the target, so this was invisible
+    // until the network refused it.
+    linkBsky();
+    const f = setUp();
+    internals(f).target.set('bsky');
+    internals(f).text.set('root post');
+    internals(f).addThreadBox();
+    internals(f).setThreadText(0, 'x'.repeat(400));
+    expect(internals(f).overLimit()).toBe(true);
+
+    internals(f).target.set('fedi');
+    expect(internals(f).overLimit()).toBe(false);
+  });
+
+  it('posts a Bluesky thread as a chain of replies', () => {
+    linkBsky();
+    const f = setUp();
+    internals(f).target.set('bsky');
+    internals(f).text.set('first');
+    internals(f).addThreadBox();
+    internals(f).setThreadText(0, 'second');
+
+    // The whole point: a filled second box no longer kills the button.
+    expect(internals(f).canSubmit()).toBe(true);
+    internals(f).submit();
+
+    const root = httpMock.expectOne(CREATE_RECORD);
+    expect(root.request.body.record.text).toBe('first');
+    expect(root.request.body.record.reply).toBeUndefined();
+    root.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/one', cid: 'cid1' });
+
+    const reply = httpMock.expectOne(CREATE_RECORD);
+    expect(reply.request.body.record.text).toBe('second');
+    // Bluesky wants both refs; for a two-post thread the root *is* the parent.
+    expect(reply.request.body.record.reply).toEqual({
+      root: { uri: 'at://did:plc:me/app.bsky.feed.post/one', cid: 'cid1' },
+      parent: { uri: 'at://did:plc:me/app.bsky.feed.post/one', cid: 'cid1' },
+    });
+    reply.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/two', cid: 'cid2' });
+  });
+
+  it('a thread that fails midway says how much of it went out', () => {
+    linkBsky();
+    const f = setUp();
+    internals(f).target.set('bsky');
+    internals(f).text.set('first');
+    internals(f).addThreadBox();
+    internals(f).setThreadText(0, 'second');
+    internals(f).submit();
+
+    httpMock
+      .expectOne(CREATE_RECORD)
+      .flush({ uri: 'at://did:plc:me/app.bsky.feed.post/one', cid: 'cid1' });
+    httpMock.expectOne(CREATE_RECORD).flush('nope', { status: 500, statusText: 'Server Error' });
+
+    // Re-sending would duplicate the post that landed, so the message has to
+    // say what happened rather than offering a plain retry.
+    expect(internals(f).crossPostError()).toContain('first post');
+  });
+
   it('blocks a bsky-only post that has media attached', () => {
     linkBsky();
     const f = setUp();

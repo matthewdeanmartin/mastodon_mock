@@ -6,7 +6,17 @@
   max-width: 1100px;
   margin: 0 auto;
   padding: 16px 4px;
+  /* `dvh` tracks the viewport as mobile browsers retract the URL bar; `vh` is
+     the largest it ever gets, so a fixed subtraction from it permanently spends
+     space the page does not have. The vh line is the fallback for browsers
+     without dvh, and must come first. */
   height: calc(100vh - 100px);
+  height: calc(100dvh - 100px);
+}
+
+/* Desktop shows both panes, so there is nothing to toggle. */
+.chat-list-toggle {
+  display: none;
 }
 
 .chat-list {
@@ -450,13 +460,44 @@
 }
 
 @media (max-width: 800px) {
+  /* One column, and the transcript gets all of it. The list used to sit above
+     the thread at 40vh, which — stacked with the header, composer, footer and
+     bottom nav — left the conversation itself a minority of the screen. */
   .chat-page {
     grid-template-columns: minmax(0, 1fr);
-    height: auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: calc(100vh - 60px);
+    height: calc(100dvh - 60px);
   }
 
+  .chat-list-toggle {
+    display: block;
+    justify-self: start;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--col-bg);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  /* Collapsed by default: the transcript is what you came for. */
   .chat-list {
-    max-height: 40vh;
+    display: none;
+  }
+
+  .chat-page.list-open .chat-list {
+    display: block;
+    /* Nearly the whole screen while open, because picking from a list is the
+       only thing you are doing at that moment. */
+    max-height: calc(100dvh - 160px);
+  }
+
+  /* Only one pane at a time on mobile — a half-covered transcript behind an
+     open list reads as a rendering bug. */
+  .chat-page.list-open .chat-pane {
+    display: none;
   }
 }
 

@@ -1,5 +1,17 @@
-<div class="chat-page">
-  <aside class="chat-list">
+<div class="chat-page" [class.list-open]="listOpen()">
+  <!-- Narrow screens only: the chat list is a drawer, so the transcript keeps
+       the screen. Hidden above the breakpoint, where both panes fit. -->
+  <button
+    class="chat-list-toggle"
+    type="button"
+    [attr.aria-expanded]="listOpen()"
+    aria-controls="chat-list"
+    (click)="toggleList()"
+  >
+    {{ listOpen() ? 'Close' : 'Chats' }}
+  </button>
+
+  <aside class="chat-list" id="chat-list">
     <div class="chat-list-head">Chat</div>
     <div class="chat-filters">
       <!-- "All" means all *people*. Bots are the odd one out — a chat with Eliza

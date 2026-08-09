@@ -7,7 +7,7 @@ import { Auth } from '../../auth';
 import { Drafts } from '../../drafts';
 import { ClientPrefs, FEED_MAX_COOLDOWN_MS, HomeWindow } from '../../client-prefs';
 import { Status } from '../../models';
-import { isCalmHidden } from '../../sentiment';
+import { CalmVerdicts } from '../../calm-verdicts';
 import { FeedLanguageFilter } from '../../trend-language-filter';
 import { CommandBar, FeedView } from '../../command-bar/command-bar';
 import { FeedAnalytics } from '../../feed-analytics/feed-analytics';
@@ -70,6 +70,7 @@ export class Home implements OnInit, OnDestroy {
   protected auth = inject(Auth);
   protected prefs = inject(ClientPrefs);
   private feedLangFilter = inject(FeedLanguageFilter);
+  private calm = inject(CalmVerdicts);
   private visibility = inject(StatusVisibility);
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);
@@ -254,7 +255,8 @@ export class Home implements OnInit, OnDestroy {
         return false;
       }
       return (
-        !(this.prefs.algoCalm() && isCalmHidden(status)) && this.feedLangFilter.shouldShow(status)
+        !(this.prefs.algoCalm() && this.calm.hidden(status)) &&
+        this.feedLangFilter.shouldShow(status)
       );
     }).length;
   });
@@ -279,12 +281,19 @@ export class Home implements OnInit, OnDestroy {
     this.prefs.setShowImages(false);
   }
 
+  /**
+   * The chip/Calm/language filters, applied to a feed.
+   *
+   * Calm goes through {@link CalmVerdicts} rather than calling `isCalmHidden`
+   * directly: its predicate reads engagement counts, so liking a post used to
+   * be able to move it in or out of the feed — and everything below it with it.
+   */
   private applyTimelineFilters(statuses: Status[]): Status[] {
     return statuses.filter(
       (status) =>
         (this.showBoosts() || status.reblog === null) &&
         (this.showReplies() || status.in_reply_to_id === null) &&
-        !(this.prefs.algoCalm() && isCalmHidden(status)) &&
+        !(this.prefs.algoCalm() && this.calm.hidden(status)) &&
         this.feedLangFilter.shouldShow(status),
     );
   }
@@ -412,6 +421,9 @@ export class Home implements OnInit, OnDestroy {
     this.pageSub?.unsubscribe();
     this.autoLoading.set(false);
     this.loading.set(true);
+    // A real reload is the one moment Calm should re-judge: a post whose ratio
+    // genuinely moved gets recategorised here, and nowhere else.
+    this.calm.reset();
     this.maxHitAt.set(null);
     this.bookmarkTail.set([]);
     if (this.waitingForServerList()) {
