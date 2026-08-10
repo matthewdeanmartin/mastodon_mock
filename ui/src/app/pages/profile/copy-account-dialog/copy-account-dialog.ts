@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Account } from '../../../models';
@@ -22,12 +23,14 @@ import { AnonymousPublicRef } from '../../../providers/anonymous/anonymous-route
 import {
   CLONE_MAX_PAGES,
   CLONE_PAGE_SIZE,
+  CLONE_TARGET,
   CloneSelection,
   describeSelection,
   followsAreHidden,
   homeServerFor,
   selectCloneCandidates,
 } from '../clone-friends';
+import { DEFAULT_THRESHOLDS, thresholdSignals } from '../../../follow-quality';
 import {
   CollectionPlan,
   describeCollectionPlan,
@@ -60,7 +63,7 @@ type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error' | 'hidden';
  */
 @Component({
   selector: 'app-copy-account-dialog',
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule],
   templateUrl: './copy-account-dialog.html',
   styleUrl: './copy-account-dialog.css',
 })
@@ -123,6 +126,121 @@ export class CopyAccountDialog implements OnInit {
   protected readonly maxPages = CLONE_MAX_PAGES;
   protected readonly followLimit = ANONYMOUS_FOLLOW_LIMIT;
 
+  // --- tunable parameters ---------------------------------------------------
+  //
+  // The gate used to be four constants with no way to argue with them, and on
+  // some follow lists it skipped most of the list — "18 of 240" reads as broken
+  // even when every rejection was defensible. These are the same defaults,
+  // exposed.
+
+  /** How many accounts to adopt. */
+  protected target = signal<number>(CLONE_TARGET);
+  /** Silent longer than this many days is skipped. 0 turns the check off. */
+  protected dormantAfterDays = signal<number>(DEFAULT_THRESHOLDS.dormantAfterDays);
+  /** Fewer posts than this is skipped. 0 turns the check off. */
+  protected minPosts = signal<number>(DEFAULT_THRESHOLDS.minPosts);
+  /** How many pages of the follow list to read. */
+  protected pageBudget = signal<number>(CLONE_MAX_PAGES);
+
+  /** Everything fetched so far, kept so re-filtering costs no requests. */
+  private candidates = signal<Account[]>([]);
+
+  /** True while a read is in flight — see {@link settingsLocked}. */
+  protected reading = signal(false);
+
+  /**
+   * Whether the controls are disabled.
+   *
+   * Parameters must not change under a fetch that is already running: the pages
+   * arriving were requested under the old settings, and re-deciding halfway
+   * through produces a selection that matches neither. So the controls lock for
+   * the duration of a read and the recompute happens against a settled corpus.
+   */
+  protected settingsLocked = computed(
+    () => this.reading() || this.phase() === 'following' || this.phase() === 'done',
+  );
+
+  /** The quality bar as the pure selector wants it. */
+  private signals = computed(() =>
+    thresholdSignals({
+      dormantAfterDays: this.dormantAfterDays(),
+      minPosts: this.minPosts(),
+    }),
+  );
+
+  /** True when both quality checks are off, so nothing is skipped for quality. */
+  protected gateOff = computed(() => this.dormantAfterDays() === 0 && this.minPosts() === 0);
+
+  /**
+   * Re-run the selection over the pages already held.
+   *
+   * Free — no requests — which is what makes the controls safe to fiddle with.
+   * Refuses while a read is in flight, per {@link settingsLocked}.
+   */
+  protected recompute(): void {
+    if (this.reading()) {
+      return;
+    }
+    const ref = this.source();
+    if (!ref) {
+      return;
+    }
+    this.selection.set(
+      selectCloneCandidates({
+        candidates: this.candidates(),
+        pagesFetched: this.pages(),
+        // Already-read pages: this only decides whether *more* would help, and
+        // `readAnotherPage` is the button that acts on it.
+        lastPageFull: this.lastPageFull,
+        isFollowing: (account) => this.follows.isFollowing(account, ref.server),
+        remainingSlots: this.remainingSlots(),
+        viewerId: this.auth.account()?.id,
+        target: this.target(),
+        signals: this.signals(),
+        maxPages: this.pageBudget(),
+      }),
+    );
+  }
+
+  /** Whether reading further pages could still add anyone. */
+  protected canReadMore = computed(
+    () =>
+      !this.settingsLocked() &&
+      this.lastPageFull &&
+      this.pages() < this.pageBudget() &&
+      this.phase() === 'confirm',
+  );
+
+  /** Whether the last page came back full, i.e. there is probably more. */
+  private lastPageFull = false;
+
+  /**
+   * Fetch one more page on demand.
+   *
+   * Explicit rather than automatic: loosening a threshold should not silently
+   * spend requests, and the user asked for parameters they control, not
+   * parameters that spend on their behalf.
+   */
+  protected async readAnotherPage(): Promise<void> {
+    const ref = this.source();
+    if (!ref || this.reading() || !this.canReadMore()) {
+      return;
+    }
+    this.reading.set(true);
+    try {
+      const batch = await this.fetchPage(ref, this.candidates().at(-1)?.id);
+      this.candidates.update((all) => [...all, ...batch]);
+      this.lastPageFull = batch.length >= CLONE_PAGE_SIZE;
+      this.pages.update((n) => n + 1);
+    } catch {
+      // A failed extra page is not a failed dialog — keep what we have.
+      this.lastPageFull = false;
+    } finally {
+      this.reading.set(false);
+    }
+    this.recompute();
+  }
+
   protected handle = computed(() => `@${this.account().acct || this.account().username}`);
 
   protected remainingSlots = computed(() =>
@@ -153,24 +271,31 @@ export class CopyAccountDialog implements OnInit {
   private async load(): Promise<void> {
     const target = this.account();
     const candidates: Account[] = [];
+    this.reading.set(true);
     try {
       const source = await this.resolveSource(target);
       this.source.set(source.ref);
       this.sourceHost.set(source.host);
       this.partial.set(source.partial);
 
-      for (let page = 0; page < CLONE_MAX_PAGES; page += 1) {
+      for (let page = 0; page < this.pageBudget(); page += 1) {
         const batch = await this.fetchPage(source.ref, candidates.at(-1)?.id);
         candidates.push(...batch);
         this.pages.set(page + 1);
+        this.lastPageFull = batch.length >= CLONE_PAGE_SIZE;
+        // Kept so the controls can re-filter without re-fetching.
+        this.candidates.set([...candidates]);
 
         const selection = selectCloneCandidates({
           candidates,
           pagesFetched: page + 1,
-          lastPageFull: batch.length >= CLONE_PAGE_SIZE,
+          lastPageFull: this.lastPageFull,
           isFollowing: (account) => this.follows.isFollowing(account, source.ref.server),
           remainingSlots: this.remainingSlots(),
           viewerId: this.auth.account()?.id,
+          target: this.target(),
+          signals: this.signals(),
+          maxPages: this.pageBudget(),
         });
         this.selection.set(selection);
         if (!selection.wantsAnotherPage) {
@@ -194,6 +319,10 @@ export class CopyAccountDialog implements OnInit {
     } catch {
       this.error.set(`Couldn't load the accounts ${this.handle()} follows.`);
       this.phase.set('error');
+    } finally {
+      // Unlocks the parameter controls; never leave them disabled after a
+      // failure, or the dialog is stuck with no way to retune and retry.
+      this.reading.set(false);
     }
   }
 

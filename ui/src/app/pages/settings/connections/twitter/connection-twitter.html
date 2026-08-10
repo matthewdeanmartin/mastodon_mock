@@ -433,13 +433,18 @@
       <ul class="follow-list">
         @for (f of follows.follows(); track f.username) {
           <li class="follow-row">
-            @if (f.avatar) {
-              <img class="follow-avatar" [src]="f.avatar" alt="" width="32" height="32" />
-            }
-            <span class="follow-text">
-              <strong>{{ f.displayName }}</strong>
-              <span class="muted small">&#64;{{ f.username }}</span>
-            </span>
+            <!-- The whole identity is the link. The profile page already reads
+                 `twitter:@handle` ids, so this row was the only place in the app
+                 where a followed account couldn't be opened. -->
+            <a class="follow-link" [routerLink]="['/accounts', 'twitter:@' + f.username]">
+              @if (f.avatar) {
+                <img class="follow-avatar" [src]="f.avatar" alt="" width="32" height="32" />
+              }
+              <span class="follow-text">
+                <strong>{{ f.displayName }}</strong>
+                <span class="muted small">&#64;{{ f.username }}</span>
+              </span>
+            </a>
             <label class="follow-toggle small">
               <input
                 type="checkbox"

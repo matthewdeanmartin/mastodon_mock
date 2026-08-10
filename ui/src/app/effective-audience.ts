@@ -69,6 +69,21 @@ export const LOW_CADENCE_POSTS_PER_DAY = 0.1;
  */
 export const MIN_AGE_DAYS_FOR_CADENCE = 14;
 
+/**
+ * How far past the server's stated total a scan may read before it is treated
+ * as a fault rather than a stale counter.
+ *
+ * 10% is far above the handful of entries a cached `followers_count` typically
+ * lags by, and far below the 2-3× a non-advancing cursor produces.
+ */
+export const OVER_READ_TOLERANCE = 0.1;
+
+/**
+ * Absolute slack below which an over-read is never reported, so a small account
+ * doesn't trip the proportional test on one or two stale entries.
+ */
+export const OVER_READ_FLOOR = 10;
+
 /** What one account was judged to be. */
 export interface AudienceVerdict {
   /** Posted within {@link DORMANT_AFTER_DAYS}. */
@@ -221,13 +236,28 @@ export interface AudienceEstimate extends AudienceTally {
   /** True when the scan read the entire list, so nothing is extrapolated. */
   complete: boolean;
   /**
-   * We read more accounts than the server said existed.
+   * What the server originally claimed, before {@link total} was raised to fit
+   * what was actually read.
    *
-   * Normally impossible, and when it happens it means the walk was re-reading
-   * pages — the symptom of a cursor that isn't advancing. Surfaced rather than
-   * clamped away, because "9,040 of 3,109" is the only visible evidence of that
-   * bug and hiding it cost a release. Also legitimately true for a list that
-   * grew mid-scan, which is why it is a note and not an error.
+   * Kept so the two numbers can be *named* in a warning. Reporting `total`
+   * against itself produced "read more than there were (2,914 vs 2,914)", which
+   * is nonsense on its face.
+   */
+  statedTotal: number;
+
+  /**
+   * We read materially more accounts than the server said existed.
+   *
+   * A small disagreement is ordinary and is the *server* contradicting itself:
+   * `followers_count` / `following_count` are cached counters that drift from
+   * the list they describe — suspended, deleted and moved accounts leave the
+   * list before the counter catches up. A handful either way means nothing and
+   * must not be reported as a fault.
+   *
+   * What this exists to catch is the pathological case: a cursor that is not
+   * advancing, which shows up as reading some *multiple* of the real list
+   * ("9,040 of 3,109"). Hence the proportional test rather than
+   * `scanned > total`.
    */
   overRead: boolean;
   /** Estimated accounts that would see a post: active, scaled to `total`. */
@@ -278,9 +308,16 @@ export function estimateAudience(tally: AudienceTally, total: number): AudienceE
   return {
     ...tally,
     total: effectiveTotal,
+    statedTotal: total,
     coverage,
     complete,
-    overRead: total > 0 && tally.scanned > total,
+    // Proportional, not absolute: 2 extra on 2,912 is a stale counter, 6,000
+    // extra on 3,109 is a broken cursor. The floor keeps tiny accounts quiet,
+    // where a couple of stale entries is a large percentage.
+    overRead:
+      total > 0 &&
+      tally.scanned > total + OVER_READ_FLOOR &&
+      tally.scanned > total * (1 + OVER_READ_TOLERANCE),
     effective: scale(tally.active),
     estimatedZombies: scale(tally.zombies),
     zombieRatePct: pct(tally.zombies),

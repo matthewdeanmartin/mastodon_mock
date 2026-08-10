@@ -196,6 +196,22 @@
   border-block-start: 1px solid var(--border);
 }
 
+/* The clickable identity: avatar + names. Takes the row's free space so the
+   toggle and Unfollow stay pinned right, exactly as before it became a link. */
+.follow-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.follow-link:hover .follow-text strong {
+  text-decoration: underline;
+}
+
 .follow-text {
   display: flex;
   flex-direction: column;

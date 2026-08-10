@@ -8,6 +8,7 @@ import {
   homeServerFor,
   selectCloneCandidates,
 } from './clone-friends';
+import { thresholdSignals } from '../../follow-quality';
 
 const NOW = Date.parse('2026-07-29T00:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
@@ -287,5 +288,86 @@ describe('followsAreHidden', () => {
 
   it('claims nothing before a page has actually been fetched', () => {
     expect(followsAreHidden(good('1', { following_count: 800 }), 0, 0)).toBe(false);
+  });
+});
+
+describe('tunable quality gate', () => {
+  const base = {
+    pagesFetched: 1,
+    lastPageFull: false,
+    isFollowing: () => false,
+    remainingSlots: 50,
+  };
+
+  it('adopts everyone when both thresholds are off', () => {
+    // The complaint: "it skips over low value accounts" with no way to say no.
+    const candidates = [good('1'), dormant('2'), good('3')];
+    const gated = selectCloneCandidates({ ...base, candidates, now: NOW });
+    const open = selectCloneCandidates({
+      ...base,
+      candidates,
+      now: NOW,
+      signals: thresholdSignals({ dormantAfterDays: 0, minPosts: 0 }),
+    });
+
+    expect(gated.adopt).toHaveLength(2);
+    expect(gated.skipped).toHaveLength(1);
+    expect(open.adopt).toHaveLength(3);
+    expect(open.skipped).toEqual([]);
+  });
+
+  it('honours a stricter dormancy threshold', () => {
+    // Posted 60 days ago: fine by default (120), skipped at 30.
+    const recent = good('1', { last_status_at: new Date(NOW - 60 * DAY).toISOString() });
+    const strict = selectCloneCandidates({
+      ...base,
+      candidates: [recent],
+      now: NOW,
+      signals: thresholdSignals({ dormantAfterDays: 30, minPosts: 0 }),
+    });
+    expect(strict.adopt).toEqual([]);
+    expect(strict.skipped[0].reason).toContain("hasn't posted");
+  });
+
+  it('honours a looser post-count threshold', () => {
+    const sparse = good('1', { statuses_count: 5 });
+    const strict = selectCloneCandidates({ ...base, candidates: [sparse], now: NOW });
+    const loose = selectCloneCandidates({
+      ...base,
+      candidates: [sparse],
+      now: NOW,
+      signals: thresholdSignals({ dormantAfterDays: 120, minPosts: 3 }),
+    });
+    expect(strict.adopt).toEqual([]);
+    expect(loose.adopt).toHaveLength(1);
+  });
+
+  it('respects a raised adopt target', () => {
+    const candidates = Array.from({ length: 30 }, (_, i) => good(String(i)));
+    expect(selectCloneCandidates({ ...base, candidates, now: NOW }).adopt).toHaveLength(20);
+    expect(
+      selectCloneCandidates({ ...base, candidates, now: NOW, target: 30 }).adopt,
+    ).toHaveLength(30);
+  });
+
+  it('respects a raised page budget when deciding to keep reading', () => {
+    const candidates = [good('1')];
+    const atCeiling = selectCloneCandidates({
+      ...base,
+      candidates,
+      pagesFetched: 3,
+      lastPageFull: true,
+      now: NOW,
+    });
+    const raised = selectCloneCandidates({
+      ...base,
+      candidates,
+      pagesFetched: 3,
+      lastPageFull: true,
+      now: NOW,
+      maxPages: 6,
+    });
+    expect(atCeiling.wantsAnotherPage).toBe(false);
+    expect(raised.wantsAnotherPage).toBe(true);
   });
 });

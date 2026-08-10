@@ -193,6 +193,35 @@ describe('estimateAudience', () => {
     expect(estimate.effective).toBe(20);
   });
 
+  /**
+   * `followers_count` is a cached counter and drifts from the list it describes
+   * — suspended and moved accounts leave the list before it catches up. Two
+   * extra on 2,912 is the server disagreeing with itself, not a fault, and
+   * warning about it produced "read more than there were (2,914 vs 2,914)".
+   */
+  it('does not cry over-read when the server counter is slightly stale', () => {
+    const tally = { scanned: 2_914, active: 1_257, dormant: 1_657, lowCadence: 1_127, zombies: 999 };
+    const estimate = estimateAudience(tally, 2_912);
+    expect(estimate.overRead).toBe(false);
+    // The original figure survives so a warning could name both numbers.
+    expect(estimate.statedTotal).toBe(2_912);
+    expect(estimate.total).toBe(2_914);
+  });
+
+  it('still flags a runaway walk that read a multiple of the list', () => {
+    // The 9,040-of-3,109 bug: a cursor that never advanced.
+    const tally = { scanned: 9_040, active: 5_537, dormant: 3_503, lowCadence: 3_616, zombies: 2_825 };
+    const estimate = estimateAudience(tally, 3_109);
+    expect(estimate.overRead).toBe(true);
+    expect(estimate.statedTotal).toBe(3_109);
+  });
+
+  it('keeps quiet on a tiny account where a couple extra is a big percentage', () => {
+    // 4 read vs 3 stated is 33% over, but it is one stale entry.
+    const tally = { scanned: 4, active: 2, dormant: 2, lowCadence: 1, zombies: 1 };
+    expect(estimateAudience(tally, 3).overRead).toBe(false);
+  });
+
   it('reports zeroes rather than dividing by zero on an empty scan', () => {
     const estimate = estimateAudience(
       { scanned: 0, active: 0, dormant: 0, lowCadence: 0, zombies: 0 },

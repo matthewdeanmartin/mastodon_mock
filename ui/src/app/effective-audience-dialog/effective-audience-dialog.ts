@@ -193,8 +193,18 @@ export class EffectiveAudienceDialog {
     this.scan.dismiss();
   }
 
-  /** "1,240 of 5,000 (25%)" — the phrase every result line needs. */
+  /**
+   * How much of the audience the numbers rest on.
+   *
+   * A partial scan says "1,240 of 5,000 (25%)". A complete one just says
+   * "2,914 scanned": once everything has been read, "2,914 of 2,914 (100%)" is
+   * three ways of saying one number, and when the server's counter disagrees
+   * slightly it actively misleads by implying an exact match we never checked.
+   */
   protected coverageLabel(result: AudienceEstimate): string {
+    if (result.complete) {
+      return `${result.scanned.toLocaleString()} scanned`;
+    }
     const pct = Math.round(result.coverage * 100);
     return `${result.scanned.toLocaleString()} of ${result.total.toLocaleString()} (${pct}%)`;
   }

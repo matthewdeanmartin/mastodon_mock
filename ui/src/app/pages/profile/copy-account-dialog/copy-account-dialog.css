@@ -135,3 +135,52 @@
   margin: 0 0 4px;
   font-weight: 600;
 }
+
+/* --- Tunable gate ---------------------------------------------------------
+   The thresholds that decide who gets skipped, as controls. Disabled while a
+   read is in flight, so a page fetched under one setting is never judged by
+   another. */
+.cf-settings {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem 0.75rem;
+  margin: 0 0 0.75rem;
+}
+
+.cf-settings legend {
+  padding: 0 0.35rem;
+}
+
+.cf-settings:disabled {
+  opacity: 0.55;
+}
+
+.cf-setting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+/* Fixed width so the three rows' inputs line up into a column. */
+.cf-setting > span:first-child {
+  flex: none;
+  min-width: 10.5rem;
+}
+
+.cf-setting input {
+  width: 5rem;
+  flex: none;
+}
+
+.cf-gate-off {
+  margin: 0.5rem 0 0;
+}
+
+.cf-more {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.75rem;
+}

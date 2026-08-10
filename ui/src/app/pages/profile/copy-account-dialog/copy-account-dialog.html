@@ -64,6 +64,67 @@
           <p class="muted small">Read from {{ sourceHost() }}, where the full list lives.</p>
         }
 
+        <!-- The gate, as controls rather than as four constants nobody can argue
+             with. Changing any of these re-filters the pages already read, so it
+             costs nothing; they lock while a read is in flight because a page
+             requested under the old settings must not be judged by the new ones. -->
+        <fieldset class="cf-settings" [disabled]="settingsLocked()">
+          <legend class="muted small">What to copy</legend>
+          <label class="cf-setting">
+            <span>Adopt up to</span>
+            <input
+              type="number"
+              min="1"
+              [max]="followLimit"
+              [ngModel]="target()"
+              (ngModelChange)="target.set($event); recompute()"
+              name="cf-target"
+            />
+            <span class="muted small">accounts</span>
+          </label>
+          <label class="cf-setting">
+            <span>Skip if silent over</span>
+            <input
+              type="number"
+              min="0"
+              [ngModel]="dormantAfterDays()"
+              (ngModelChange)="dormantAfterDays.set($event); recompute()"
+              name="cf-dormant"
+            />
+            <span class="muted small">days (0 = don't skip)</span>
+          </label>
+          <label class="cf-setting">
+            <span>Skip if fewer than</span>
+            <input
+              type="number"
+              min="0"
+              [ngModel]="minPosts()"
+              (ngModelChange)="minPosts.set($event); recompute()"
+              name="cf-minposts"
+            />
+            <span class="muted small">posts (0 = don't skip)</span>
+          </label>
+          @if (gateOff()) {
+            <p class="muted small cf-gate-off">
+              No quality filtering — everyone they follow is a candidate, oldest accounts included.
+            </p>
+          }
+        </fieldset>
+
+        @if (reading()) {
+          <p class="muted small" role="status">Reading another page…</p>
+        } @else if (canReadMore()) {
+          <p class="cf-more">
+            <span class="muted small">
+              Read {{ pages() }} {{ pages() === 1 ? 'page' : 'pages' }} so far. There are more to
+              read if this isn't enough people.
+            </span>
+            <button type="button" class="btn btn-outline btn-sm" (click)="readAnotherPage()">
+              Read another page
+            </button>
+          </p>
+        }
+
         @if (sel.limitedBySlots && sel.adopt.length) {
           <p class="cf-note">
             You have {{ remainingSlots() }} of {{ followLimit }} follow slots left, so only

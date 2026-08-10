@@ -83,8 +83,17 @@
             <div class="side-progress-head">
               <span class="side-name">{{ side === 'followers' ? 'Followers' : 'Friends' }}</span>
               <span class="muted small" role="status" aria-live="polite">
-                {{ p.scanned.toLocaleString() }} of {{ fmt(p.total) }} read ·
-                {{ p.apiCalls.toLocaleString() }}
+                <!-- While running, "n of total" frames progress against the
+                     server's count. Once finished, that count is just a stale
+                     counter to compare against and `scanned` is the fact — so
+                     "2,914 of 2,912 read" stops being shown as if it were an
+                     overshoot. -->
+                @if (p.done) {
+                  {{ p.scanned.toLocaleString() }} read
+                } @else {
+                  {{ p.scanned.toLocaleString() }} of {{ fmt(p.total) }} read
+                }
+                · {{ p.apiCalls.toLocaleString() }}
                 {{ p.apiCalls === 1 ? 'request' : 'requests' }}
                 @if (p.done) {
                   · done
@@ -162,9 +171,9 @@
 
               @if (r.overRead) {
                 <p class="muted small bias">
-                  Read more accounts than the server said there were ({{ r.scanned.toLocaleString() }}
-                  vs {{ r.total.toLocaleString() }}). Duplicates were only counted once, but the
-                  list may have changed while it was being read.
+                  Read {{ r.scanned.toLocaleString() }} accounts, but the server's count says
+                  {{ r.statedTotal.toLocaleString() }}. Each account was counted once, so the
+                  figures below are based on what was actually read.
                 </p>
               }
               @if (!r.complete) {

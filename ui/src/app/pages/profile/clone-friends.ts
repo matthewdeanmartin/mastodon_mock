@@ -1,5 +1,5 @@
 import { Account } from '../../models';
-import { rejectionReason } from '../../follow-quality';
+import { QualitySignal, rejectionReason } from '../../follow-quality';
 
 /**
  * Which of an account's follows are worth adopting?
@@ -114,6 +114,14 @@ export interface CloneOptions {
   viewerId?: string;
   /** How many to adopt. Defaults to {@link CLONE_TARGET}. */
   target?: number;
+  /**
+   * The quality bar. Defaults to the shipped {@link QUALITY_SIGNALS}; the copy
+   * dialog passes tuned signals so the user can decide how much gets skipped.
+   * An empty array adopts everyone who isn't already followed.
+   */
+  signals?: readonly QualitySignal[];
+  /** Page ceiling. Defaults to {@link CLONE_MAX_PAGES}. */
+  maxPages?: number;
   /** Injected for testable date boundaries in the quality signals. */
   now?: number;
 }
@@ -152,7 +160,7 @@ export function selectCloneCandidates(options: CloneOptions): CloneSelection {
     }
     // Quality is judged before the cap so `skipped` is a complete account of what
     // was rejected and why, not just of the part we happened to reach.
-    const reason = rejectionReason(account, now);
+    const reason = rejectionReason(account, now, options.signals);
     if (reason) {
       skipped.push({ account, reason });
       continue;
@@ -163,11 +171,12 @@ export function selectCloneCandidates(options: CloneOptions): CloneSelection {
   }
 
   const wantsMore = adopt.length < allowed;
+  const maxPages = options.maxPages ?? CLONE_MAX_PAGES;
   return {
     adopt,
     skipped,
     alreadyFollowing,
-    wantsAnotherPage: wantsMore && options.lastPageFull && options.pagesFetched < CLONE_MAX_PAGES,
+    wantsAnotherPage: wantsMore && options.lastPageFull && options.pagesFetched < maxPages,
     limitedBySlots: options.remainingSlots < target,
   };
 }

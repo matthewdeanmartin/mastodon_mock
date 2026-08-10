@@ -98,6 +98,67 @@ export const QUALITY_SIGNALS: readonly QualitySignal[] = [
   },
 ];
 
+/** User-adjustable thresholds behind the two shipped signals. */
+export interface QualityThresholds {
+  /** Silent longer than this many days is dormant. 0 disables the check. */
+  dormantAfterDays: number;
+  /** Fewer posts than this is too quiet. 0 disables the check. */
+  minPosts: number;
+}
+
+/** What {@link QUALITY_SIGNALS} enforces, as data the UI can start from. */
+export const DEFAULT_THRESHOLDS: QualityThresholds = {
+  dormantAfterDays: DORMANT_AFTER_DAYS,
+  minPosts: MIN_POSTS,
+};
+
+/**
+ * Build the signal list for a given pair of thresholds.
+ *
+ * The shipped constants are the *defaults*, not the law: "Copy account" skipped
+ * so much of some follow lists that the result looked broken, and the honest fix
+ * is to let the person doing the copying decide where the bar sits. A threshold
+ * of 0 removes that check entirely, which is how "adopt everyone" is expressed.
+ *
+ * Wording is kept identical to {@link QUALITY_SIGNALS} so the skipped list reads
+ * the same whatever the bar is set to.
+ */
+export function thresholdSignals(thresholds: QualityThresholds): readonly QualitySignal[] {
+  const signals: QualitySignal[] = [];
+  if (thresholds.dormantAfterDays > 0) {
+    signals.push({
+      id: 'dormant',
+      reject: (account, now) => {
+        const last = account.last_status_at;
+        if (!last) {
+          return 'has never posted';
+        }
+        const parsed = Date.parse(last);
+        if (Number.isNaN(parsed)) {
+          return 'has no readable last-post date';
+        }
+        const days = (now - parsed) / DAY_MS;
+        return days > thresholds.dormantAfterDays ? `hasn't posted in ${describeAge(days)}` : null;
+      },
+    });
+  }
+  if (thresholds.minPosts > 0) {
+    signals.push({
+      id: 'too-quiet',
+      reject: (account) => {
+        const posts = account.statuses_count;
+        if (typeof posts !== 'number' || !Number.isFinite(posts)) {
+          return null;
+        }
+        return posts < thresholds.minPosts
+          ? `has only ${posts} post${posts === 1 ? '' : 's'}`
+          : null;
+      },
+    });
+  }
+  return signals;
+}
+
 /**
  * The first reason to skip this account, or null when it is worth following.
  *
