@@ -157,6 +157,103 @@ export function statusMatchesFacet(s: Status, kind: FacetKind, value: string): b
   }
 }
 
+// ---------------------------------------------------------------------------
+// Flood control: excluding authors, and collapsing repeated posts
+// ---------------------------------------------------------------------------
+
+/**
+ * Keyword searches are routinely dominated by two or three accounts posting the
+ * same thing over and over. It isn't spam exactly — it's flooding — and it
+ * makes a search useless because every real result is buried.
+ *
+ * Mastodon's search has no `-from:` operator, so a "minus" query can't fix this
+ * server-side: the exclusion has to happen over the results we already hold.
+ * That is what the two tools here do, from opposite directions:
+ *
+ *  - {@link excludeAuthors} removes a person, when the account is the problem.
+ *  - {@link collapseRepeats} removes the *repetition*, when the behaviour is —
+ *    keeping one copy of each thing said, so a flooder still appears once and
+ *    an account posting genuinely different things is untouched.
+ *
+ * Both are pure filters over loaded statuses. Neither is persisted: see the
+ * search page's `excludedAuthors` for why exclusion is scoped to one query.
+ */
+
+/** Drop every status whose author is in `acct` set. Empty set = no-op. */
+export function excludeAuthors(statuses: Status[], excluded: ReadonlySet<string>): Status[] {
+  if (!excluded.size) {
+    return statuses;
+  }
+  return statuses.filter((s) => !excluded.has(s.account.acct));
+}
+
+/**
+ * A normalised fingerprint of what a post actually says.
+ *
+ * Flooders rarely post *byte*-identical text: they rotate a hashtag, add an
+ * emoji, bump a link's tracking parameter. Comparing raw content would catch
+ * almost none of it. So this strips markup, drops URLs, hashtags, mentions and
+ * punctuation, collapses whitespace, and lowercases — leaving the words. Two
+ * posts advertising the same thing with a different tag land on the same key.
+ *
+ * A post whose text is *only* links and tags fingerprints to an empty string;
+ * {@link collapseRepeats} treats those as unique rather than folding every
+ * image-only post in the corpus into one row.
+ */
+export function contentFingerprint(status: Status): string {
+  return plainText(status.content ?? '')
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/[@#]\S+/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** A kept status plus however many near-identical ones it stands in for. */
+export interface CollapsedStatus {
+  status: Status;
+  /** Near-identical posts by the same author that this row hides. 0 = normal. */
+  duplicates: Status[];
+}
+
+/**
+ * Collapse runs of near-identical posts *by the same author* down to one row.
+ *
+ * Scoped per author on purpose: two different people saying the same short
+ * thing ("congrats!") is a coincidence and both are real results, while one
+ * person saying it thirty times is the flood. The first occurrence in the
+ * incoming order is the one kept, so an already-sorted list keeps its ordering
+ * and the survivor is whichever the sort ranked highest.
+ */
+export function collapseRepeats(statuses: Status[]): CollapsedStatus[] {
+  const byKey = new Map<string, CollapsedStatus>();
+  const out: CollapsedStatus[] = [];
+  for (const status of statuses) {
+    const print = contentFingerprint(status);
+    // Nothing quotable left (link- or image-only): never fold these together.
+    if (!print) {
+      out.push({ status, duplicates: [] });
+      continue;
+    }
+    const key = `${status.account.acct}\u0000${print}`;
+    const seen = byKey.get(key);
+    if (seen) {
+      seen.duplicates.push(status);
+    } else {
+      const entry: CollapsedStatus = { status, duplicates: [] };
+      byKey.set(key, entry);
+      out.push(entry);
+    }
+  }
+  return out;
+}
+
+/** How many posts `collapseRepeats` folded away — for the "N hidden" line. */
+export function collapsedCount(rows: CollapsedStatus[]): number {
+  return rows.reduce((sum, row) => sum + row.duplicates.length, 0);
+}
+
 export interface StatusGroup {
   key: string;
   label: string;

@@ -45,6 +45,12 @@ import {
 } from './account-refine';
 import {
   buildFacets,
+  CollapsedStatus,
+  // Aliased: the component exposes a `collapseRepeats` *signal* of its own, and
+  // the template reads that one.
+  collapseRepeats as collapseRepeatRuns,
+  collapsedCount,
+  excludeAuthors,
   Facet,
   FacetKind,
   filterLoaded,
@@ -90,6 +96,7 @@ import { Server } from '../../server';
 import { isTagsOnly, probeSearchServer, SearchServerStatus } from '../../search-server-probe';
 import { normalizeHostUrl } from '../../host-url';
 import { Terminology } from '../../terminology';
+import { LocalModeration } from '../../local-moderation';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
@@ -106,6 +113,11 @@ const DEFAULT_BUDGET_SIMPLE = 2;
 const DEFAULT_BUDGET_ADVANCED = 3;
 /** Manual "Load more" can page past the budget, but stops here so it never runs away. */
 const LOAD_MORE_HARD_CAP = 30;
+/**
+ * Below this many visible posts, excluding an author is assumed to have gutted
+ * the results rather than cleaned them, and the page offers to fetch more.
+ */
+const THIN_RESULTS = 10;
 
 @Component({
   selector: 'app-search',
@@ -137,6 +149,8 @@ export class Search implements OnInit, OnDestroy {
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
   private diagnostics = inject(PageDiagnostics);
+  /** For the "mute everywhere" escalation on an excluded author. */
+  private localMod = inject(LocalModeration);
   protected saved = inject(SavedSearches);
   protected searchServer = inject(SearchServer);
   private activeSearch: Subscription | null = null;
@@ -682,8 +696,31 @@ export class Search implements OnInit, OnDestroy {
   protected refineOpen = signal(true);
   protected selectedFacets = signal<FacetSelection[]>([]);
 
-  /** Statuses from the current results, after facet + text filtering. */
-  protected visibleStatuses = computed<Status[]>(() => {
+  // --- flood control ---
+
+  /**
+   * Authors excluded from this search's results, by `acct`.
+   *
+   * Deliberately **not** persisted and cleared by {@link resetRefinements} on
+   * every new query. An account that floods "rust" is often a perfectly good
+   * result for "gardening", and a hidden, remembered blocklist silently
+   * distorting future searches is exactly the kind of state someone arms once
+   * and then spends a year confused by. Making someone disappear for good is
+   * what mute is for, and the row offers it.
+   */
+  protected excludedAuthors = signal<ReadonlySet<string>>(new Set());
+
+  /** Fold near-identical posts by the same author into one row. */
+  protected collapseRepeats = signal(false);
+
+  /** Collapsed rows the user has clicked "show" on, keyed by the kept status id. */
+  protected expandedRepeats = signal<ReadonlySet<string>>(new Set());
+
+  /**
+   * Statuses after facets, exclusions and the text filter — but *before*
+   * repeat-collapsing, which produces rows rather than statuses.
+   */
+  private refinedStatuses = computed<Status[]>(() => {
     const all = this.results()?.statuses ?? [];
     const facets = this.selectedFacets();
     // Facets of different kinds AND together; values within a kind OR together.
@@ -696,13 +733,165 @@ export class Search implements OnInit, OnDestroy {
         values.some((v) => statusMatchesFacet(s, kind, v)),
       ),
     );
+    // Exclusion before the text filter: both are cheap, but this keeps the
+    // "hidden by exclusion" count meaning what it says.
+    const kept = excludeAuthors(faceted, this.excludedAuthors());
     // Sort last, so it reorders exactly the posts that survive facet + text
     // filtering (grouping then buckets this sorted list).
-    return sortStatuses(filterLoaded(faceted, this.loadedFilter()), this.statusSort());
+    return sortStatuses(filterLoaded(kept, this.loadedFilter()), this.statusSort());
   });
+
+  /**
+   * The rows the list renders: one per surviving status, each carrying any
+   * near-identical siblings it stands in for.
+   *
+   * Collapsing runs after sorting so the surviving copy is whichever the sort
+   * ranked highest, not an arbitrary one.
+   */
+  protected statusRows = computed<CollapsedStatus[]>(() =>
+    this.collapseRepeats()
+      ? collapseRepeatRuns(this.refinedStatuses())
+      : this.refinedStatuses().map((status) => ({ status, duplicates: [] })),
+  );
+
+  /** Statuses actually on screen — what grouping and the counters work from. */
+  protected visibleStatuses = computed<Status[]>(() =>
+    this.statusRows().map((row) => row.status),
+  );
+
+  /**
+   * Hidden near-identical posts, keyed by the id of the row that stands in for
+   * them.
+   *
+   * A lookup rather than threading {@link CollapsedStatus} through
+   * {@link groupResults}: grouping buckets statuses, and rewriting it to carry
+   * rows would complicate the one thing on this page that is currently simple.
+   */
+  private duplicatesById = computed(() => {
+    const map = new Map<string, Status[]>();
+    for (const row of this.statusRows()) {
+      if (row.duplicates.length) {
+        map.set(row.status.id, row.duplicates);
+      }
+    }
+    return map;
+  });
+
+  /** Near-identical posts this row is standing in for. Empty when none. */
+  protected duplicatesOf(id: string): Status[] {
+    return this.duplicatesById().get(id) ?? [];
+  }
+
+  /** How many posts the exclusions removed from the loaded set. */
+  protected excludedCount = computed(() => {
+    const excluded = this.excludedAuthors();
+    if (!excluded.size) {
+      return 0;
+    }
+    return (this.results()?.statuses ?? []).filter((s) => excluded.has(s.account.acct)).length;
+  });
+
+  /** How many near-identical posts the collapse toggle folded away. */
+  protected repeatsHidden = computed(() =>
+    this.collapseRepeats() ? collapsedCount(this.statusRows()) : 0,
+  );
+
+  protected isAuthorExcluded(acct: string): boolean {
+    return this.excludedAuthors().has(acct);
+  }
+
+  /** Exclude or restore one author for this search. */
+  protected toggleExcludedAuthor(acct: string): void {
+    this.excludedAuthors.update((set) => {
+      const next = new Set(set);
+      if (next.has(acct)) {
+        next.delete(acct);
+      } else {
+        next.add(acct);
+      }
+      return next;
+    });
+    this.diagnostics.info('Search', 'user:toggle-author-exclusion', {
+      excluded: this.isAuthorExcluded(acct),
+      total: this.excludedAuthors().size,
+    });
+  }
+
+  protected clearExcludedAuthors(): void {
+    this.excludedAuthors.set(new Set());
+  }
+
+  /**
+   * Mute an author everywhere, not just in this search — the escalation for
+   * "this account is a problem", as opposed to "this account is noise here".
+   *
+   * Goes through {@link LocalModeration} rather than the server so it works
+   * anonymously and against any instance, matching how block/mute already
+   * behave elsewhere in the app. The author is also excluded from the current
+   * results, because otherwise muting them would leave them on screen until
+   * the next search.
+   */
+  protected muteAuthorEverywhere(acct: string): void {
+    const account = (this.results()?.statuses ?? []).find((s) => s.account.acct === acct)?.account;
+    if (!account) {
+      return;
+    }
+    this.localMod.mute(account, null);
+    this.excludedAuthors.update((set) => new Set(set).add(acct));
+    this.diagnostics.info('Search', 'user:mute-from-search', { from: 'flood-control' });
+  }
+
+  /** True once an author has been muted app-wide, so the row can say so. */
+  protected isAuthorMuted(acct: string): boolean {
+    this.localMod.entries();
+    const account = (this.results()?.statuses ?? []).find((s) => s.account.acct === acct)?.account;
+    return !!account && this.localMod.isMuted(account);
+  }
+
+  protected isRepeatExpanded(id: string): boolean {
+    return this.expandedRepeats().has(id);
+  }
+
+  protected toggleRepeat(id: string): void {
+    this.expandedRepeats.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Whether to nudge the user to load more.
+   *
+   * Excluding a flooder from an 80-post corpus can leave a handful of results,
+   * because the flooder *was* the corpus. Rather than silently spending API
+   * calls to refill (a click shouldn't cost requests the user didn't ask for),
+   * the page says what happened and offers the button.
+   */
+  protected suggestMoreAfterExclusion = computed(
+    () =>
+      this.excludedCount() > 0 &&
+      this.visibleStatuses().length < THIN_RESULTS &&
+      this.canLoadMore(),
+  );
 
   /** Facets computed from all loaded statuses (counts reflect the full load). */
   protected facets = computed<Facet[]>(() => buildFacets(this.results()?.statuses ?? []));
+
+  /**
+   * The author facet, reused by the exclusion list.
+   *
+   * Counts come from the *unfiltered* load, so an excluded author keeps showing
+   * the number of posts they are contributing — which is what justifies keeping
+   * them excluded, and what lets you undo it knowingly.
+   */
+  protected authorFacet = computed<Facet | null>(
+    () => this.facets().find((f) => f.kind === 'author') ?? null,
+  );
 
   /** Loaded statuses reshaped by the current grouping selection. */
   protected groups = computed(() => groupResults(this.visibleStatuses(), this.grouping()));
@@ -1235,6 +1424,9 @@ export class Search implements OnInit, OnDestroy {
   clearRefinements(): void {
     this.selectedFacets.set([]);
     this.loadedFilter.set('');
+    // Exclusions are a filter like any other — "Clear filters" must undo them
+    // too, or the count stays mysteriously low with nothing visibly ticked.
+    this.excludedAuthors.set(new Set());
   }
 
   /** Change the budget. If a search already ran and the budget went up, top up
@@ -1254,6 +1446,10 @@ export class Search implements OnInit, OnDestroy {
     this.loadedFilter.set('');
     this.grouping.set('none');
     this.statusSort.set('relevance');
+    // Exclusions are scoped to one query on purpose — see `excludedAuthors`.
+    this.excludedAuthors.set(new Set());
+    this.collapseRepeats.set(false);
+    this.expandedRepeats.set(new Set());
   }
 
   private fetch(q: string, type: SearchType): void {

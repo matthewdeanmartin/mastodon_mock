@@ -211,6 +211,16 @@ export class AudienceScan {
     const now = Date.now();
     let tally: AudienceTally = { scanned: 0, active: 0, dormant: 0, lowCadence: 0, zombies: 0 };
     let maxId: string | undefined;
+    /**
+     * Ids already counted.
+     *
+     * A belt to the Link-header braces: any cursor bug — ours, or a server
+     * echoing the same page — shows up as re-reading accounts, and counting
+     * them twice produces the nonsense this guard exists to prevent ("9,040 of
+     * 3,109 read"). Also correct on its own terms: a list that shifts under a
+     * long walk can legitimately repeat an account across pages.
+     */
+    const seen = new Set<string>();
 
     this.setProgress(side, { side, scanned: 0, total, apiCalls: 0, done: false });
 
@@ -218,46 +228,62 @@ export class AudienceScan {
       if (this.cancelRequested) {
         break;
       }
-      const batch = await this.fetchPage(side, request, maxId);
-      tally = mergeTally(tally, tallyAudience(batch, now));
-      this.bumpProgress(side, batch.length);
+      const { accounts, nextMaxId } = await this.fetchPage(side, request, maxId);
+      const fresh = accounts.filter((a) => !seen.has(a.id));
+      for (const account of fresh) {
+        seen.add(account.id);
+      }
+      tally = mergeTally(tally, tallyAudience(fresh, now));
+      this.bumpProgress(side, fresh.length);
 
-      // A short page means the list is exhausted — the standard Mastodon signal,
-      // and the same one `fetchAllFollowing` in bulk-actions relies on.
-      if (batch.length < PAGE_SIZE) {
+      // Nothing new on a full page means the cursor is not advancing; stop
+      // rather than spend the rest of MAX_PAGES re-reading the same accounts.
+      if (!fresh.length) {
         break;
       }
-      maxId = batch[batch.length - 1]?.id;
-      if (!maxId) {
+      // No `rel="next"` is the end of the list. A short page means the same on
+      // every server we have seen, and is the fallback when a server (our mock
+      // included) answers without a Link header at all.
+      if (!nextMaxId || accounts.length < PAGE_SIZE) {
         break;
       }
+      maxId = nextMaxId;
     }
 
     this.setProgressPatch(side, { done: true });
     return tally;
   }
 
-  private fetchPage(
+  /**
+   * One page, with the server's own next cursor.
+   *
+   * The cursor must come from the `Link` header: `/followers` and `/following`
+   * paginate by an internal relationship id that is absent from the account
+   * objects, so `max_id = last account's id` silently re-reads page one.
+   */
+  private async fetchPage(
     side: AudienceSide,
     request: AudienceScanRequest,
     maxId: string | undefined,
-  ): Promise<Account[]> {
+  ): Promise<{ accounts: Account[]; nextMaxId: string | null }> {
     const ref = request.publicRef;
     const id = ref?.id ?? request.accountId;
     if (ref) {
-      // No page-size argument: the anonymous helper already pins `limit=80`,
-      // which is both Mastodon's cap and our {@link PAGE_SIZE}. Passing one
-      // would imply a control that isn't there.
-      return firstValueFrom(
+      // The anonymous helper returns a bare array and pins `limit=80` itself, so
+      // there is no header to read. The walk falls back to its short-page test
+      // and the dedupe guard, which together terminate correctly — one wasted
+      // request at the end at worst.
+      const accounts = await firstValueFrom(
         side === 'followers'
           ? this.anonymous.getAccountFollowers({ ...ref, id }, maxId)
           : this.anonymous.getAccountFollowing({ ...ref, id }, maxId),
       );
+      return { accounts, nextMaxId: accounts.length ? (accounts.at(-1)?.id ?? null) : null };
     }
     return firstValueFrom(
       side === 'followers'
-        ? this.api.accountFollowers(id, maxId, PAGE_SIZE)
-        : this.api.accountFollowing(id, maxId, PAGE_SIZE),
+        ? this.api.accountFollowersPage(id, maxId, PAGE_SIZE)
+        : this.api.accountFollowingPage(id, maxId, PAGE_SIZE),
     );
   }
 

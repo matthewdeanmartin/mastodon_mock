@@ -647,3 +647,86 @@
   gap: 8px;
   margin: 12px 0;
 }
+
+/* --- Flood control (author exclusion + repeat collapsing) --- */
+
+.flood-control {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.exclude-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exclude-row .facet-value {
+  flex: 1;
+  min-width: 0;
+}
+
+/* An excluded author stays listed (with their count) so the exclusion can be
+   undone knowingly — dimmed, not removed. */
+.exclude-row.excluded .facet-value span:not(.facet-count) {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.muted-flag {
+  flex: none;
+  font-style: italic;
+}
+
+/* A button that reads as a link: used for low-weight inline actions next to
+   real controls, where a second .btn would compete with the primary one. */
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent, #1d9bf0);
+  cursor: pointer;
+  white-space: nowrap;
+  flex: none;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.collapse-note {
+  margin: 2px 0 0 26px;
+}
+
+/* Sits under the post it stands in for, indented so the pair reads as one row. */
+.repeat-note {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0 8px 16px;
+  border-left: 2px solid var(--border);
+  margin-left: 8px;
+}
+
+.repeat-list {
+  margin-left: 8px;
+  border-left: 2px solid var(--border);
+}
+
+/* The "you excluded so much there's nothing left" nudge. */
+.thin-results {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 8px 0;
+}
+
+.thin-results p {
+  margin: 0;
+}

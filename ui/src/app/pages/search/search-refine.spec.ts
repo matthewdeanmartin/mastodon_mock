@@ -3,6 +3,10 @@ import { Status } from '../../models';
 import {
   acctDomain,
   buildFacets,
+  collapseRepeats,
+  collapsedCount,
+  contentFingerprint,
+  excludeAuthors,
   filterLoaded,
   groupResults,
   plainText,
@@ -184,5 +188,109 @@ describe('groupResults', () => {
     const groups = groupResults(statuses, 'date', now);
     expect(groups.map((g) => g.label)).toEqual(['Today', 'Yesterday', 'Earlier']);
     expect(groups[2].statuses[0].id).toBe('old');
+  });
+});
+
+describe('flood control', () => {
+  /** A post by `acct` with `content` as its HTML body. */
+  const post = (acct: string, content: string, over: Partial<Status> = {}) =>
+    makeStatus({
+      content,
+      account: { id: acct, username: acct, acct, display_name: acct } as Status['account'],
+      ...over,
+    });
+
+  describe('excludeAuthors', () => {
+    it('drops every post by an excluded author', () => {
+      const posts = [post('flooder', '<p>a</p>'), post('alice', '<p>b</p>')];
+      const kept = excludeAuthors(posts, new Set(['flooder']));
+      expect(kept.map((s) => s.account.acct)).toEqual(['alice']);
+    });
+
+    it('is a no-op with nothing excluded', () => {
+      const posts = [post('alice', '<p>a</p>')];
+      expect(excludeAuthors(posts, new Set())).toBe(posts);
+    });
+
+    it('excludes several authors at once', () => {
+      const posts = [post('a', '<p>1</p>'), post('b', '<p>2</p>'), post('c', '<p>3</p>')];
+      expect(excludeAuthors(posts, new Set(['a', 'c'])).map((s) => s.account.acct)).toEqual(['b']);
+    });
+  });
+
+  describe('contentFingerprint', () => {
+    it('ignores markup, case and punctuation', () => {
+      const a = contentFingerprint(post('x', '<p>Buy My Thing!!!</p>'));
+      const b = contentFingerprint(post('x', '<p>buy my thing</p>'));
+      expect(a).toBe(b);
+    });
+
+    /** The rotating-hashtag trick is the whole reason this isn't a string compare. */
+    it('ignores hashtags, mentions and links', () => {
+      const a = contentFingerprint(post('x', '<p>buy my thing #rust https://a.example/1</p>'));
+      const b = contentFingerprint(post('x', '<p>buy my thing #golang https://a.example/2</p>'));
+      expect(a).toBe(b);
+      expect(a).toBe('buy my thing');
+    });
+
+    it('keeps genuinely different text apart', () => {
+      expect(contentFingerprint(post('x', '<p>question about rust</p>'))).not.toBe(
+        contentFingerprint(post('x', '<p>answer about rust</p>')),
+      );
+    });
+
+    it('is empty for a post that is only a link or tags', () => {
+      expect(contentFingerprint(post('x', '<p>#rust https://a.example/1</p>'))).toBe('');
+    });
+  });
+
+  describe('collapseRepeats', () => {
+    it('folds an author repeating themselves into one row', () => {
+      const posts = [
+        post('flooder', '<p>buy my thing #a</p>'),
+        post('flooder', '<p>buy my thing #b</p>'),
+        post('flooder', '<p>buy my thing #c</p>'),
+        post('alice', '<p>a real question</p>'),
+      ];
+      const rows = collapseRepeats(posts);
+      expect(rows).toHaveLength(2);
+      expect(rows[0].duplicates).toHaveLength(2);
+      expect(rows[1].duplicates).toHaveLength(0);
+      expect(collapsedCount(rows)).toBe(2);
+    });
+
+    /** Two people saying the same short thing is a coincidence, not a flood. */
+    it('does not fold identical text from different authors', () => {
+      const posts = [post('alice', '<p>congrats</p>'), post('bob', '<p>congrats</p>')];
+      expect(collapseRepeats(posts)).toHaveLength(2);
+    });
+
+    it('keeps the first occurrence, so a sorted list keeps its best copy', () => {
+      const first = post('flooder', '<p>same thing</p>', { id: 'best' });
+      const later = post('flooder', '<p>same thing</p>', { id: 'worse' });
+      const rows = collapseRepeats([first, later]);
+      expect(rows[0].status.id).toBe('best');
+      expect(rows[0].duplicates[0].id).toBe('worse');
+    });
+
+    it('leaves an author posting different things alone', () => {
+      const posts = [post('alice', '<p>one</p>'), post('alice', '<p>two</p>')];
+      expect(collapseRepeats(posts)).toHaveLength(2);
+      expect(collapsedCount(collapseRepeats(posts))).toBe(0);
+    });
+
+    /** Otherwise every image-only post in the corpus folds into a single row. */
+    it('never folds posts with no quotable text', () => {
+      const posts = [
+        post('alice', '<p>#rust https://a.example/1</p>'),
+        post('alice', '<p>#rust https://a.example/2</p>'),
+      ];
+      expect(collapseRepeats(posts)).toHaveLength(2);
+    });
+
+    it('handles an empty list', () => {
+      expect(collapseRepeats([])).toEqual([]);
+      expect(collapsedCount([])).toBe(0);
+    });
   });
 });

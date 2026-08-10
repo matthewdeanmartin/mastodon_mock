@@ -158,6 +158,34 @@ export class Api {
   }
 
   /**
+   * One followers page with Mastodon's opaque next cursor from the Link header.
+   *
+   * The followers counterpart of {@link accountFollowingPage}, and required for
+   * the same reason: `/followers` paginates by an internal *relationship* id
+   * that appears nowhere in the account objects it returns. Walking it with the
+   * last account's `id` re-reads page one forever — a 3,000-follower account
+   * happily yields 9,000 "accounts" that way.
+   */
+  accountFollowersPage(
+    id: string,
+    maxId?: string,
+    limit = 80,
+  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
+    return this.http
+      .get<Account[]>(`/api/v1/accounts/${id}/followers`, { params, observe: 'response' })
+      .pipe(
+        map((response) => ({
+          accounts: response.body ?? [],
+          nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
+        })),
+      );
+  }
+
+  /**
    * One following page with Mastodon's opaque next cursor from the Link header.
    * Account ids are not pagination cursors on every server, so bulk walkers must
    * use this instead of guessing `max_id` from the last account in the body.

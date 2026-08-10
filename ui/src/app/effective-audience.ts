@@ -220,6 +220,16 @@ export interface AudienceEstimate extends AudienceTally {
   coverage: number;
   /** True when the scan read the entire list, so nothing is extrapolated. */
   complete: boolean;
+  /**
+   * We read more accounts than the server said existed.
+   *
+   * Normally impossible, and when it happens it means the walk was re-reading
+   * pages — the symptom of a cursor that isn't advancing. Surfaced rather than
+   * clamped away, because "9,040 of 3,109" is the only visible evidence of that
+   * bug and hiding it cost a release. Also legitimately true for a list that
+   * grew mid-scan, which is why it is a note and not an error.
+   */
+  overRead: boolean;
   /** Estimated accounts that would see a post: active, scaled to `total`. */
   effective: number;
   /** Estimated zombies across the whole audience. */
@@ -270,6 +280,7 @@ export function estimateAudience(tally: AudienceTally, total: number): AudienceE
     total: effectiveTotal,
     coverage,
     complete,
+    overRead: total > 0 && tally.scanned > total,
     effective: scale(tally.active),
     estimatedZombies: scale(tally.zombies),
     zombieRatePct: pct(tally.zombies),

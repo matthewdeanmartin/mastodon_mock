@@ -160,6 +160,13 @@
                 </div>
               </div>
 
+              @if (r.overRead) {
+                <p class="muted small bias">
+                  Read more accounts than the server said there were ({{ r.scanned.toLocaleString() }}
+                  vs {{ r.total.toLocaleString() }}). Duplicates were only counted once, but the
+                  list may have changed while it was being read.
+                </p>
+              }
               @if (!r.complete) {
                 <!-- Sampling bias, said out loud. Mastodon returns followers
                      newest-first, and recent followers skew active, so a partial

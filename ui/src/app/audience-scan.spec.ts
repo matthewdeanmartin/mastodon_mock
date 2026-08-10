@@ -41,13 +41,18 @@ function page(start: number, count: number): Account[] {
   );
 }
 
+/** A page plus its Link-header cursor, as the *Page api methods return it. */
+function pageOf(accounts: Account[], nextMaxId: string | null = null) {
+  return of({ accounts, nextMaxId });
+}
+
 function fakeApi() {
   return {
-    accountFollowers: vi.fn((_id: string, _maxId?: string, _limit?: number) =>
-      of([] as Account[]),
+    accountFollowersPage: vi.fn((_id: string, _maxId?: string, _limit?: number) =>
+      pageOf([] as Account[]),
     ),
-    accountFollowing: vi.fn((_id: string, _maxId?: string, _limit?: number) =>
-      of([] as Account[]),
+    accountFollowingPage: vi.fn((_id: string, _maxId?: string, _limit?: number) =>
+      pageOf([] as Account[]),
     ),
   };
 }
@@ -81,7 +86,7 @@ describe('AudienceScan', () => {
   });
 
   it('stops paging when a short page says the list is exhausted', async () => {
-    api.accountFollowers.mockReturnValueOnce(of(page(0, 30)));
+    api.accountFollowersPage.mockReturnValueOnce(pageOf(page(0, 30)));
 
     await scan.start({
       accountId: '1',
@@ -90,17 +95,17 @@ describe('AudienceScan', () => {
       sides: ['followers'],
     });
 
-    expect(api.accountFollowers).toHaveBeenCalledTimes(1);
+    expect(api.accountFollowersPage).toHaveBeenCalledTimes(1);
     const result = scan.state()?.results.followers;
     expect(result?.scanned).toBe(30);
     expect(result?.complete).toBe(true);
   });
 
-  it('follows the cursor across full pages', async () => {
-    api.accountFollowers
-      .mockReturnValueOnce(of(page(0, 80)))
-      .mockReturnValueOnce(of(page(80, 80)))
-      .mockReturnValueOnce(of(page(160, 10)));
+  it('follows the Link cursor across full pages', async () => {
+    api.accountFollowersPage
+      .mockReturnValueOnce(pageOf(page(0, 80), 'rel-1'))
+      .mockReturnValueOnce(pageOf(page(80, 80), 'rel-2'))
+      .mockReturnValueOnce(pageOf(page(160, 10)));
 
     await scan.start({
       accountId: '1',
@@ -109,15 +114,61 @@ describe('AudienceScan', () => {
       sides: ['followers'],
     });
 
-    expect(api.accountFollowers).toHaveBeenCalledTimes(3);
-    // Second call must carry the last id of the first page as the cursor.
-    expect(api.accountFollowers.mock.calls[1][1]).toBe('79');
+    expect(api.accountFollowersPage).toHaveBeenCalledTimes(3);
+    // The cursor must be the server's opaque relationship id from the Link
+    // header — NOT the last account's id, which paginates nothing.
+    expect(api.accountFollowersPage.mock.calls[1][1]).toBe('rel-1');
+    expect(api.accountFollowersPage.mock.calls[2][1]).toBe('rel-2');
     expect(scan.state()?.results.followers?.scanned).toBe(170);
+  });
+
+  /**
+   * The "9,040 of 3,109 read" bug, pinned.
+   *
+   * Walking `/following` with `max_id = last account's id` re-read page one
+   * forever: the endpoint paginates by an internal relationship id. 113
+   * requests × 80 accounts reported three times more friends than existed.
+   */
+  it('stops instead of re-counting when the cursor does not advance', async () => {
+    // A server (or a bug) that keeps handing back the same full page.
+    api.accountFollowersPage.mockReturnValue(pageOf(page(0, 80), 'stuck'));
+
+    await scan.start({
+      accountId: '1',
+      followersTotal: 3_109,
+      followingTotal: 0,
+      sides: ['followers'],
+    });
+
+    const result = scan.state()?.results.followers;
+    // Second page is all duplicates, so the walk stops there.
+    expect(api.accountFollowersPage).toHaveBeenCalledTimes(2);
+    expect(result?.scanned).toBe(80);
+    // Never more than the server said existed.
+    expect(result!.scanned).toBeLessThanOrEqual(3_109);
+    expect(result?.overRead).toBe(false);
+  });
+
+  it('counts an account appearing on two pages only once', async () => {
+    // A list that shifts mid-walk can legitimately repeat an account.
+    api.accountFollowersPage
+      .mockReturnValueOnce(pageOf(page(0, 80), 'rel-1'))
+      .mockReturnValueOnce(pageOf([...page(70, 10), ...page(80, 10)]));
+
+    await scan.start({
+      accountId: '1',
+      followersTotal: 90,
+      followingTotal: 0,
+      sides: ['followers'],
+    });
+
+    // 80 + 10 genuinely new; the 10 repeats are not double-counted.
+    expect(scan.state()?.results.followers?.scanned).toBe(90);
   });
 
   it('scores active and zombie accounts as it pages', async () => {
     // 40 accounts, alternating — 20 live, 20 zombie.
-    api.accountFollowers.mockReturnValueOnce(of(page(0, 40)));
+    api.accountFollowersPage.mockReturnValueOnce(pageOf(page(0, 40)));
 
     await scan.start({
       accountId: '1',
@@ -134,8 +185,8 @@ describe('AudienceScan', () => {
   });
 
   it('scans both sides when both are requested', async () => {
-    api.accountFollowing.mockReturnValueOnce(of(page(0, 10)));
-    api.accountFollowers.mockReturnValueOnce(of(page(0, 20)));
+    api.accountFollowingPage.mockReturnValueOnce(pageOf(page(0, 10)));
+    api.accountFollowersPage.mockReturnValueOnce(pageOf(page(0, 20)));
 
     await scan.start({
       accountId: '1',
@@ -154,10 +205,10 @@ describe('AudienceScan', () => {
    * sample. Discarding it would throw away a perfectly good estimate.
    */
   it('keeps a partial tally when cancelled, and extrapolates it', async () => {
-    api.accountFollowers.mockImplementation((_id, _maxId) => {
+    api.accountFollowersPage.mockImplementation((_id, _maxId) => {
       // Cancel after the first page lands, so the walk stops with 80 of 400 read.
       scan.cancel();
-      return of(page(0, 80));
+      return pageOf(page(0, 80));
     });
 
     await scan.start({
@@ -177,9 +228,9 @@ describe('AudienceScan', () => {
   });
 
   it('does not start the second side after a cancel', async () => {
-    api.accountFollowing.mockImplementation(() => {
+    api.accountFollowingPage.mockImplementation(() => {
       scan.cancel();
-      return of(page(0, 10));
+      return pageOf(page(0, 10));
     });
 
     await scan.start({
@@ -189,13 +240,13 @@ describe('AudienceScan', () => {
       sides: ['following', 'followers'],
     });
 
-    expect(api.accountFollowers).not.toHaveBeenCalled();
+    expect(api.accountFollowersPage).not.toHaveBeenCalled();
     expect(scan.state()?.results.following).toBeDefined();
     expect(scan.state()?.results.followers).toBeUndefined();
   });
 
   it('reports a failure without claiming numbers', async () => {
-    api.accountFollowers.mockReturnValueOnce(throwError(() => new Error('boom')));
+    api.accountFollowersPage.mockReturnValueOnce(throwError(() => new Error('boom')));
 
     await scan.start({
       accountId: '1',
@@ -210,6 +261,7 @@ describe('AudienceScan', () => {
   });
 
   it('routes through the anonymous API for a public profile', async () => {
+    // The anonymous helper returns a bare array, not a {accounts, nextMaxId}.
     anonymous.getAccountFollowers.mockReturnValueOnce(of(page(0, 5)));
 
     await scan.start({
@@ -221,13 +273,13 @@ describe('AudienceScan', () => {
     });
 
     expect(anonymous.getAccountFollowers).toHaveBeenCalled();
-    expect(api.accountFollowers).not.toHaveBeenCalled();
+    expect(api.accountFollowersPage).not.toHaveBeenCalled();
     // The ref's id wins over the local account id — they are different namespaces.
     expect(anonymous.getAccountFollowers.mock.calls[0][0]).toMatchObject({ id: 'remote-9' });
   });
 
   it('refuses to start a second scan while one is running', async () => {
-    api.accountFollowers.mockReturnValue(of(page(0, 10)));
+    api.accountFollowersPage.mockReturnValue(pageOf(page(0, 10)));
     const first = scan.start({
       accountId: '1',
       followersTotal: 10,
@@ -242,11 +294,11 @@ describe('AudienceScan', () => {
     });
     await first;
 
-    expect(api.accountFollowers).toHaveBeenCalledTimes(1);
+    expect(api.accountFollowersPage).toHaveBeenCalledTimes(1);
   });
 
   it('tracks per-side progress and request counts', async () => {
-    api.accountFollowers.mockReturnValueOnce(of(page(0, 40)));
+    api.accountFollowersPage.mockReturnValueOnce(pageOf(page(0, 40)));
 
     await scan.start({
       accountId: '1',
