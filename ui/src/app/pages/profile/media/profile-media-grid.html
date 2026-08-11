@@ -1,0 +1,58 @@
+@if (error()) {
+  <p class="muted center media-note">{{ error() }}</p>
+}
+
+@if (loading() && !visible().length) {
+  <p class="muted center">Loading pictures…</p>
+} @else if (!visible().length) {
+  <p class="muted center media-empty">
+    @if (error()) {
+      Nothing to show here.
+    } @else {
+      No pictures yet.
+    }
+  </p>
+} @else {
+  <div class="media-grid" role="list">
+    @for (item of visible(); track item.key) {
+      <button
+        type="button"
+        class="media-tile"
+        role="listitem"
+        [class.blurred]="blurred(item)"
+        [attr.aria-label]="
+          blurred(item)
+            ? 'Sensitive image, click to reveal'
+            : item.description || 'Open picture'
+        "
+        (click)="blurred(item) ? reveal($event, item) : open(item)"
+      >
+        <img
+          class="media-thumb"
+          [src]="item.previewUrl"
+          [alt]="item.description || ''"
+          loading="lazy"
+          decoding="async"
+          (load)="onLoaded($event, item)"
+          (error)="onError(item)"
+        />
+        @if (item.type !== 'image') {
+          <span class="media-badge play" aria-hidden="true">▶</span>
+        }
+        @if (blurred(item)) {
+          <span class="media-sensitive">Sensitive</span>
+        }
+      </button>
+    }
+  </div>
+
+  <!-- Explicitly a button, never scroll-triggered: the reader decides each time
+       whether to keep going further back through someone's pictures. -->
+  @if (!exhausted()) {
+    <div class="media-more">
+      <button type="button" class="btn btn-outline" [disabled]="loadingMore()" (click)="more.emit()">
+        {{ loadingMore() ? 'Loading…' : 'More' }}
+      </button>
+    </div>
+  }
+}

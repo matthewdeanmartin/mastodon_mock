@@ -109,6 +109,7 @@ export class AnonymousPublicApi {
     if (opts.excludeReplies) params = params.set('exclude_replies', 'true');
     if (opts.excludeReblogs) params = params.set('exclude_reblogs', 'true');
     if (opts.pinned) params = params.set('pinned', 'true');
+    if (opts.onlyMedia) params = params.set('only_media', 'true');
     if (opts.maxId) params = params.set('max_id', opts.maxId);
     if (opts.limit) params = params.set('limit', String(opts.limit));
     return this.http

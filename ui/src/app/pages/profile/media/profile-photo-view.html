@@ -1,0 +1,146 @@
+@if (current(); as item) {
+  <div
+    class="photo-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Picture viewer"
+    tabindex="-1"
+    appFocusTrap
+    [appFocusTrapCloseOnEscape]="false"
+    (click)="onOverlayClick($event)"
+    (keydown.escape)="close()"
+  >
+    <button type="button" class="photo-close" (click)="close()" aria-label="Close viewer">✕</button>
+
+    <div class="photo-layout">
+      <!-- The picture is the point: it gets the room, and the conversation
+           sits beside it rather than under it. -->
+      <div class="photo-stage">
+        @if (hasPrev()) {
+          <button
+            type="button"
+            class="photo-arrow prev"
+            (click)="go(-1)"
+            aria-label="Previous picture"
+          >
+            ‹
+          </button>
+        }
+
+        <figure class="photo-figure">
+          @if (blurred()) {
+            <button type="button" class="photo-sensitive" (click)="reveal()">
+              <span class="photo-sensitive-label">Sensitive image</span>
+              <span class="muted">Click to view</span>
+            </button>
+          } @else if (item.type === 'image') {
+            <img class="photo-image" [src]="item.url" [alt]="item.description || ''" />
+          } @else {
+            <!-- Video support across the app is thin; a native player with
+                 controls is the honest amount of support to claim here. -->
+            <video class="photo-image" [src]="item.url" controls playsinline preload="metadata">
+              Your browser cannot play this video.
+            </video>
+          }
+          @if (item.description && !blurred()) {
+            <figcaption class="photo-alt muted">{{ item.description }}</figcaption>
+          }
+        </figure>
+
+        @if (hasNext()) {
+          <button type="button" class="photo-arrow next" (click)="go(1)" aria-label="Next picture">
+            ›
+          </button>
+        }
+
+        <div class="photo-counter muted">
+          {{ position() }} of {{ total() }}
+          <span class="photo-hint">← → picture · ↑ ↓ post · Esc close</span>
+        </div>
+      </div>
+
+      <!-- The comment column: caption on top, thread in the middle, reply at
+           the bottom where a reader expects to type. -->
+      <aside class="photo-side">
+        <header class="photo-author">
+          <a class="photo-author-link" [routerLink]="authorLink()" (click)="close()">
+            <img
+              class="photo-avatar"
+              [src]="item.status.account.avatar_static || item.status.account.avatar"
+              [alt]="item.status.account.username"
+              width="40"
+              height="40"
+            />
+            <span class="photo-names">
+              <strong>{{
+                item.status.account.display_name || item.status.account.username
+              }}</strong>
+              <span class="acct muted">&#64;{{ item.status.account.acct }}</span>
+            </span>
+          </a>
+          <time class="muted photo-time" [attr.datetime]="item.status.created_at">
+            {{ item.status.created_at | humanTime }}
+          </time>
+        </header>
+
+        @if (item.status.spoiler_text) {
+          <p class="photo-cw"><strong>CW:</strong> {{ item.status.spoiler_text }}</p>
+        }
+
+        <!-- Server-sanitized HTML, same as the timeline renders. -->
+        <div class="photo-caption" appRenderedHtmlLinks [innerHTML]="item.status.content"></div>
+
+        <div class="photo-thread">
+          @if (repliesLoading()) {
+            <p class="muted">Loading comments…</p>
+          } @else if (repliesError()) {
+            <p class="muted">{{ repliesError() }}</p>
+          } @else if (!replies().length) {
+            <p class="muted photo-nocomments">No comments yet.</p>
+          } @else {
+            @for (reply of replies(); track reply.id) {
+              <article class="photo-comment">
+                <a class="photo-comment-author" [routerLink]="authorLink()" (click)="close()">
+                  <img
+                    class="photo-comment-avatar"
+                    [src]="reply.account.avatar_static || reply.account.avatar"
+                    [alt]="reply.account.username"
+                    width="24"
+                    height="24"
+                  />
+                </a>
+                <div class="photo-comment-body">
+                  <span class="photo-comment-name">
+                    <strong>{{ reply.account.display_name || reply.account.username }}</strong>
+                    <time class="muted" [attr.datetime]="reply.created_at">{{
+                      reply.created_at | humanTime
+                    }}</time>
+                  </span>
+                  <div
+                    class="photo-comment-text"
+                    appRenderedHtmlLinks
+                    [innerHTML]="reply.content"
+                  ></div>
+                </div>
+              </article>
+            }
+          }
+        </div>
+
+        <div class="photo-reply">
+          @if (canReply()) {
+            <app-compose
+              [inReplyToId]="item.status.id"
+              [replyToHandle]="replyToHandle()"
+              [compact]="true"
+              placeholder="Add a comment…"
+              (posted)="onReplied($event)"
+            />
+          } @else {
+            <p class="muted photo-noreply">{{ replyUnavailableReason() }}</p>
+          }
+        </div>
+      </aside>
+    </div>
+  </div>
+}

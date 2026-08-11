@@ -401,6 +401,30 @@
        (following, followers, collections, analytics) reads a Mastodon endpoint
        with an account id this server has never issued. The posts feed is the
        whole profile for now; the people browser arrives with its own sprint. -->
+  <!-- RSS and Twitter have no follow graph, collections or analytics, so they
+       get a two-entry row rather than the full one: their pictures are still
+       worth a wall, and scraping is how they get there. -->
+  @if ((isRss() || isTwitter()) && canShowMedia()) {
+    <div class="profile-tabs" role="group" aria-label="Profile sections">
+      <button
+        type="button"
+        class="ptab"
+        [class.active]="tab() === 'posts'"
+        (click)="setTab('posts')"
+      >
+        {{ isRss() ? 'Items' : words().Posts }}
+      </button>
+      <button
+        type="button"
+        class="ptab"
+        [class.active]="tab() === 'media'"
+        (click)="setTab('media')"
+      >
+        Media
+      </button>
+    </div>
+  }
+
   @if (!isRss() && !isTwitter()) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
       <button class="ptab ptab-back" type="button" (click)="goBack()" title="Back">← Back</button>
@@ -412,6 +436,16 @@
       >
         {{ words().Posts }}
       </button>
+      @if (canShowMedia()) {
+        <button
+          type="button"
+          class="ptab"
+          [class.active]="tab() === 'media'"
+          (click)="setTab('media')"
+        >
+          Media
+        </button>
+      }
       <button
         type="button"
         class="ptab"
@@ -505,6 +539,31 @@
 
   @if (!isRss() && !isTwitter() && !isBluesky() && tab() === 'analytics') {
     <app-account-analytics [account]="a" [publicRef]="publicRef" />
+  }
+
+  @if (tab() === 'media' && canShowMedia()) {
+    <app-profile-media-grid
+      [items]="mediaItems()"
+      [loading]="mediaLoading() || (statusesLoading() && !mediaItems().length)"
+      [loadingMore]="mediaLoadingMore()"
+      [exhausted]="mediaExhausted()"
+      [error]="mediaError()"
+      (opened)="openPhotoItem($event)"
+      (more)="loadMoreMedia()"
+    />
+  }
+
+  <!-- Outside the tab check: the viewer is driven by `?photo=`, and it should
+       survive anything that changes the tab underneath it. -->
+  @if (openPhoto(); as photoKey) {
+    <app-profile-photo-view
+      [items]="mediaItems()"
+      [activeKey]="photoKey"
+      [publicRef]="publicRef"
+      (closed)="closePhoto()"
+      (navigated)="navigatePhoto($event)"
+      (wantMore)="loadMoreMedia()"
+    />
   }
 
   @if (tab() === 'posts') {

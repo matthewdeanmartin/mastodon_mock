@@ -52,6 +52,9 @@ import { OpenRouterModelChoice } from '../../providers/openrouter/openrouter-mod
 import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
 import { isOpenRouterId, openRouterAccount } from '../../providers/openrouter/openrouter-identity';
 import { CopyAccountDialog } from './copy-account-dialog/copy-account-dialog';
+import { ProfileMediaGrid } from './media/profile-media-grid';
+import { ProfilePhotoView } from './media/profile-photo-view';
+import { buildMediaItems, ProfileMediaItem } from './media/profile-media-item';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { RenderedHtmlLinks } from '../../rendered-html-links';
 import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
@@ -59,7 +62,7 @@ import { HugoSettings } from '../../providers/hugo/hugo-settings';
 import { BloggerSession } from '../../providers/blogger/blogger-session';
 
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
-type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analytics';
+type ProfileTab = 'posts' | 'media' | 'following' | 'followers' | 'collections' | 'analytics';
 
 @Component({
   selector: 'app-profile',
@@ -75,6 +78,8 @@ type ProfileTab = 'posts' | 'following' | 'followers' | 'collections' | 'analyti
     NgOptimizedImage,
     CopyAccountDialog,
     RenderedHtmlLinks,
+    ProfileMediaGrid,
+    ProfilePhotoView,
   ],
   templateUrl: './profile.html',
   styleUrl: './profile.css',
@@ -266,6 +271,232 @@ export class Profile implements OnInit, OnDestroy {
 
   setTab(tab: ProfileTab): void {
     this.tab.set(tab);
+    // The media tab is linkable, so it lives in the URL. Everything else stays
+    // page-local state: those tabs were never shareable and making them so now
+    // would rewrite history entries readers did not ask for.
+    this.syncMediaUrl(tab === 'media' ? { tab: 'media' } : { tab: null, photo: null });
+    if (tab === 'media' && !this.mediaStatuses().length && !this.mediaLoading()) {
+      this.loadMedia();
+    }
+  }
+
+  // --- media tab ---
+
+  /** Posts backing the photo wall — media-only, fetched separately from `statuses`. */
+  private mediaStatuses = signal<Status[]>([]);
+  protected mediaLoading = signal(false);
+  protected mediaLoadingMore = signal(false);
+  protected mediaExhausted = signal(false);
+  protected mediaError = signal<string | null>(null);
+  /** The `?photo=` key of the open picture, or null when the wall is showing. */
+  protected openPhoto = signal<string | null>(null);
+  private mediaSeq = 0;
+  private mediaSub = new Subscription();
+  /**
+   * A deep link asked for the wall before the account id existed.
+   *
+   * `?tab=media` is read during `load`, which is also where the id is still
+   * being fetched. The flag defers the media request to {@link maybeLoadPendingMedia},
+   * called once an id is actually available.
+   */
+  private pendingMediaLoad = false;
+
+  /** Run a deferred deep-link media load, now that there is an id to load for. */
+  private maybeLoadPendingMedia(id: string): void {
+    if (!this.pendingMediaLoad) {
+      return;
+    }
+    this.pendingMediaLoad = false;
+    this.loadMedia(id);
+  }
+
+  /**
+   * The flattened wall: one entry per image, in timeline order.
+   *
+   * Two sources, because only Mastodon has a media-only endpoint. Mastodon fills
+   * {@link mediaStatuses} from its own `only_media` request; the scraped
+   * providers have no such filter, so their wall is derived from whatever the
+   * posts tab has already loaded — read live rather than copied, so pictures
+   * appear as those posts arrive instead of only if the reader happened to open
+   * the tab late.
+   */
+  protected mediaItems = computed<ProfileMediaItem[]>(() =>
+    buildMediaItems(this.supportsOnlyMedia() ? this.mediaStatuses() : this.statuses()),
+  );
+
+  /**
+   * Whether this profile can have a media tab at all.
+   *
+   * Every provider here can carry pictures one way or another — Mastodon and
+   * Bluesky through attachments, RSS and Twitter through scraped bodies — so the
+   * tab shows for all of them and says "No pictures yet" when there are none.
+   * Only the synthetic correspondents (Eliza, OpenRouter) are excluded: they are
+   * conversation partners with no media at all, and a permanently empty tab on
+   * their profile would be a dead end by construction.
+   */
+  protected canShowMedia = computed(() => !this.isEliza() && !this.isOpenRouter());
+
+  /**
+   * How many media posts to pull per page.
+   *
+   * 40 images is roughly a screenful and a half of a 3-column wall. Media posts
+   * usually carry one image each, so this lands near the target without the
+   * fetch-until-full loop the posts tab needs.
+   */
+  private static readonly MEDIA_PAGE = 40;
+
+  /**
+   * Fill the photo wall.
+   *
+   * Mastodon does the work server-side with `only_media`, so one request
+   * returns 40 posts that definitely have pictures. The other providers have no
+   * such filter and no separate media endpoint, so they reuse the posts this
+   * page already loaded and scrape them — which is why their wall is bounded by
+   * the timeline rather than by its own paging.
+   */
+  private loadMedia(accountId?: string): void {
+    // The caller may hold an id the account signal does not have yet — a deep
+    // link starts loading the wall while the profile itself is still in flight.
+    const id = accountId ?? this.publicProfileRef?.id ?? this.account()?.id;
+    if (!id) {
+      return;
+    }
+    this.mediaError.set(null);
+
+    if (!this.supportsOnlyMedia()) {
+      // Scraped providers need no fetch of their own: `mediaItems` reads the
+      // posts tab's statuses directly. "More" there means loading more posts,
+      // which is the posts tab's own button.
+      this.mediaExhausted.set(true);
+      this.mediaLoading.set(false);
+      return;
+    }
+
+    const seq = ++this.mediaSeq;
+    this.mediaSub.unsubscribe();
+    this.mediaSub = new Subscription();
+    this.mediaLoading.set(true);
+    this.mediaExhausted.set(false);
+    this.mediaSub.add(
+      this.getAccountStatuses(id, {
+        onlyMedia: true,
+        excludeReblogs: true,
+        limit: Profile.MEDIA_PAGE,
+      }).subscribe({
+        next: (batch) => {
+          if (seq !== this.mediaSeq) {
+            return;
+          }
+          this.mediaStatuses.set(batch);
+          this.mediaExhausted.set(batch.length < Profile.MEDIA_PAGE);
+          this.mediaLoading.set(false);
+        },
+        error: (error: unknown) => {
+          if (seq !== this.mediaSeq) {
+            return;
+          }
+          this.diagnostics.error('Profile', 'media:load-failed', error, { id });
+          this.mediaLoading.set(false);
+          this.mediaExhausted.set(true);
+          this.mediaError.set('Could not load pictures for this account.');
+        },
+      }),
+    );
+  }
+
+  /** Only Mastodon-shaped sources answer `only_media`. */
+  private supportsOnlyMedia(): boolean {
+    return !this.isRss() && !this.isTwitter() && !this.isBluesky();
+  }
+
+  /**
+   * One more page of pictures, and only on request.
+   *
+   * Reached from the wall's "More" button and from arrowing off the end of the
+   * viewer. Never scroll-triggered: the reader decides each time whether to keep
+   * going further back.
+   */
+  protected loadMoreMedia(): void {
+    const id = this.publicProfileRef?.id ?? this.account()?.id;
+    const last = this.mediaStatuses().at(-1);
+    if (
+      !id ||
+      !last ||
+      this.mediaLoadingMore() ||
+      this.mediaExhausted() ||
+      !this.supportsOnlyMedia()
+    ) {
+      return;
+    }
+    const seq = this.mediaSeq;
+    this.mediaLoadingMore.set(true);
+    this.mediaSub.add(
+      this.getAccountStatuses(id, {
+        onlyMedia: true,
+        excludeReblogs: true,
+        limit: Profile.MEDIA_PAGE,
+        maxId: this.nativeStatusId(last),
+      }).subscribe({
+        next: (batch) => {
+          this.mediaLoadingMore.set(false);
+          if (seq !== this.mediaSeq) {
+            return;
+          }
+          if (!batch.length) {
+            this.mediaExhausted.set(true);
+            return;
+          }
+          const seen = new Set(this.mediaStatuses().map((s) => s.id));
+          this.mediaStatuses.update((list) => [
+            ...list,
+            ...batch.filter((s) => !seen.has(s.id)),
+          ]);
+          this.mediaExhausted.set(batch.length < Profile.MEDIA_PAGE);
+        },
+        error: () => this.mediaLoadingMore.set(false),
+      }),
+    );
+  }
+
+  protected openPhotoItem(item: ProfileMediaItem): void {
+    this.openPhoto.set(item.key);
+    this.syncMediaUrl({ tab: 'media', photo: item.key });
+  }
+
+  protected closePhoto(): void {
+    this.openPhoto.set(null);
+    this.syncMediaUrl({ tab: 'media', photo: null });
+  }
+
+  /**
+   * Move the viewer to another picture.
+   *
+   * `replaceUrl` so arrowing through a wall of forty photos leaves one history
+   * entry rather than forty — Back should return to the grid, not replay every
+   * picture the reader glanced at.
+   */
+  protected navigatePhoto(item: ProfileMediaItem): void {
+    this.openPhoto.set(item.key);
+    this.syncMediaUrl({ tab: 'media', photo: item.key }, true);
+  }
+
+  /**
+   * Push the media tab's state into the query string.
+   *
+   * A query param rather than a child route: the profile stays mounted, so
+   * closing the viewer costs nothing and the wall is still behind it. Back
+   * closes the photo because opening one pushed a history entry.
+   */
+  private syncMediaUrl(
+    params: { tab?: string | null; photo?: string | null },
+    replaceUrl = false,
+  ): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: params,
+      queryParamsHandling: 'merge',
+      replaceUrl,
+    });
   }
 
   /** The anonymous public-profile ref, for children that need read-only API access. */
@@ -410,6 +641,25 @@ export class Profile implements OnInit, OnDestroy {
       }
       this.load(id);
     });
+
+    // The media tab and the open picture live in the URL, so the browser's Back
+    // button drives them: Back from a photo closes it, Back from the wall
+    // returns to the posts tab. Reading the params here rather than only in the
+    // click handlers is also what makes a pasted link open the right picture.
+    this.route.queryParamMap?.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const wantsMedia = params.get('tab') === 'media';
+      if (wantsMedia && this.canShowMedia()) {
+        if (this.tab() !== 'media') {
+          this.tab.set('media');
+        }
+        if (!this.mediaStatuses().length && !this.mediaLoading()) {
+          this.loadMedia();
+        }
+      } else if (this.tab() === 'media') {
+        this.tab.set('posts');
+      }
+      this.openPhoto.set(wantsMedia ? params.get('photo') : null);
+    });
   }
 
   /**
@@ -477,6 +727,7 @@ export class Profile implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.routeLoadSub.unsubscribe();
     this.statusLoadSub.unsubscribe();
+    this.mediaSub.unsubscribe();
   }
 
   load(id: string): void {
@@ -505,7 +756,30 @@ export class Profile implements OnInit, OnDestroy {
     this.bskyError.set(null);
     this.bskyFollowBusy.set(false);
     this.bskyCursor = null;
-    this.tab.set('posts');
+    // A new profile means a new wall; without this the previous account's
+    // pictures would still be on screen while the new one loads.
+    this.mediaSub.unsubscribe();
+    this.mediaSub = new Subscription();
+    this.mediaSeq++;
+    this.mediaStatuses.set([]);
+    this.mediaLoading.set(false);
+    this.mediaLoadingMore.set(false);
+    this.mediaExhausted.set(false);
+    this.mediaError.set(null);
+    this.openPhoto.set(null);
+    // Honour a deep link to the wall. `load` resets the tab on every profile
+    // change, so reading the snapshot here is what stops it stomping on a
+    // pasted `?tab=media&photo=…` URL before the query-param subscription runs.
+    const deepLinkedToMedia =
+      this.route.snapshot?.queryParamMap?.get('tab') === 'media';
+    this.tab.set(deepLinkedToMedia ? 'media' : 'posts');
+    // Deep links must also *fetch* the wall. The query-param subscription fires
+    // before the account is resolved, so it has no id to load with and bails;
+    // by the time it could work it sees `tab() === 'media'` already set and
+    // assumes somebody else did the work. Loading here is what closes that gap.
+    if (deepLinkedToMedia) {
+      this.pendingMediaLoad = true;
+    }
     if (id.startsWith('rss:')) {
       this.loadRss(id);
       return;
@@ -590,6 +864,7 @@ export class Profile implements OnInit, OnDestroy {
     this.loadStatuses(id);
     this.loadPinned(id);
     this.loadCollections(id);
+    this.maybeLoadPendingMedia(id);
     if (this.capabilities.canManageRelationships) {
       this.routeLoadSub.add(
         this.api.relationships([id]).subscribe((rels) => this.relationship.set(rels[0] ?? null)),
@@ -621,6 +896,7 @@ export class Profile implements OnInit, OnDestroy {
     this.loadStatuses(ref.id);
     this.loadPinned(ref.id);
     this.loadCollections(ref.id);
+    this.maybeLoadPendingMedia(ref.id);
   }
 
   /**

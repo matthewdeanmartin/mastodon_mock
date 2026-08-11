@@ -50,6 +50,15 @@ export interface AccountStatusesOptions {
   excludeReplies?: boolean;
   excludeReblogs?: boolean;
   pinned?: boolean;
+  /**
+   * Only posts carrying attachments (`only_media=true`).
+   *
+   * Server-side, so the profile's media wall fills from one or two requests
+   * instead of paging through a text-heavy account hunting for pictures. The
+   * non-Mastodon providers have no equivalent and scrape their own bodies
+   * instead — see `pages/profile/media/profile-media-item.ts`.
+   */
+  onlyMedia?: boolean;
   maxId?: string;
   limit?: number;
 }
@@ -93,6 +102,9 @@ export class Api {
     }
     if (opts.pinned) {
       params = params.set('pinned', 'true');
+    }
+    if (opts.onlyMedia) {
+      params = params.set('only_media', 'true');
     }
     if (opts.maxId) {
       params = params.set('max_id', opts.maxId);
