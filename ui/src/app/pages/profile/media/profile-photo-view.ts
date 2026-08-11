@@ -15,8 +15,13 @@ import { Auth } from '../../../auth';
 import { FocusTrap } from '../../../a11y/focus-trap';
 import { Compose } from '../../../compose/compose';
 import { HumanTimePipe } from '../../../human-time.pipe';
+import { HumanCountPipe } from '../../../human-count.pipe';
 import { RenderedHtmlLinks } from '../../../rendered-html-links';
 import { TrustedAccounts } from '../../../trusted-accounts';
+import { LocalModeration } from '../../../local-moderation';
+import { StatusActions } from '../../../providers/status-actions';
+import { AnonymousCapabilities } from '../../../providers/anonymous/anonymous-capabilities';
+import { ProviderCapabilities } from '../../../providers/provider';
 import { AnonymousPublicApi } from '../../../providers/anonymous/anonymous-public-api';
 import { AnonymousPublicRef } from '../../../providers/anonymous/anonymous-route-ref';
 import { accountRoutePath } from '../../../account-route';
@@ -39,7 +44,7 @@ import { ProfileMediaItem } from './profile-media-item';
  */
 @Component({
   selector: 'app-profile-photo-view',
-  imports: [FocusTrap, RouterLink, HumanTimePipe, RenderedHtmlLinks, Compose],
+  imports: [FocusTrap, RouterLink, HumanTimePipe, HumanCountPipe, RenderedHtmlLinks, Compose],
   templateUrl: './profile-photo-view.html',
   styleUrl: './profile-photo-view.css',
 })
@@ -47,6 +52,9 @@ export class ProfilePhotoView {
   private api = inject(Api);
   private anonymousPublic = inject(AnonymousPublicApi);
   private trusted = inject(TrustedAccounts);
+  private localMod = inject(LocalModeration);
+  private actions = inject(StatusActions);
+  private capabilities = inject(AnonymousCapabilities);
   private router = inject(Router);
   protected auth = inject(Auth);
 
@@ -144,8 +152,16 @@ export class ProfilePhotoView {
     }
   });
 
-  /** The handle a reply should mention so the author is actually notified. */
-  protected replyToHandle = computed(() => this.current()?.status.account.acct ?? '');
+  /**
+   * The handle a reply should mention so the person is actually notified.
+   *
+   * Follows the *target* of the open composer rather than the picture's author:
+   * replying to a commenter should ping that commenter. Mastodon only notifies
+   * when the handle is in the body, so this seeds it.
+   */
+  protected replyToHandle = computed(
+    () => this.replyingTo()?.account.acct ?? this.current()?.status.account.acct ?? '',
+  );
 
   constructor() {
     // Re-read the thread whenever the open picture moves to a different *post*.
@@ -171,6 +187,12 @@ export class ProfilePhotoView {
     this.contextSub = new Subscription();
     this.replies.set([]);
     this.repliesError.set(null);
+    // Transient UI belongs to the post that was open, not the one arriving: a
+    // half-typed reply or an open menu must not carry across to another picture.
+    this.replyingTo.set(null);
+    this.menuOpen.set(false);
+    this.captionExpanded.set(false);
+    this.actionError.set(null);
 
     // Only Mastodon has a context endpoint. Everything else shows its caption
     // alone, which is the honest rendering of "this source has no thread".
@@ -192,8 +214,19 @@ export class ProfilePhotoView {
           this.replies.set(context.descendants ?? []);
           this.repliesLoading.set(false);
         },
-        error: () => {
+        error: (error: unknown) => {
           this.repliesLoading.set(false);
+          // A 404 is not a failure worth reporting: it means this server has no
+          // thread under that id, which is the ordinary answer for a post that
+          // simply has no replies, and for the blog/RSS items folded onto a
+          // profile whose ids the server never issued. Saying "could not load"
+          // there tells the reader something is broken when nothing is — the
+          // empty state below already says the true thing.
+          const status = (error as { status?: number })?.status;
+          if (status === 404 || status === 410) {
+            this.replies.set([]);
+            return;
+          }
           this.repliesError.set('Could not load the comments.');
         },
       }),
@@ -209,6 +242,274 @@ export class ProfilePhotoView {
   /** A posted reply lands at the bottom of the thread without a refetch. */
   protected onReplied(reply: Status): void {
     this.replies.update((list) => [...list, reply]);
+    this.replyingTo.set(null);
+  }
+
+  // --- actions on the picture's post ---
+
+  /**
+   * The post as the viewer currently sees it.
+   *
+   * Held separately from `current().status` because liking or boosting returns
+   * an updated status that the parent's media list does not know about. Without
+   * this the heart would fill and then revert on the next re-render.
+   */
+  private patched = signal<Map<string, Status>>(new Map());
+
+  /** The open picture's post, with any local like/boost applied. */
+  protected post = computed<Status | null>(() => {
+    const status = this.current()?.status ?? null;
+    if (!status) {
+      return null;
+    }
+    return this.patched().get(status.id) ?? status;
+  });
+
+  /** What this post's network actually supports; buttons hide rather than fail. */
+  protected caps = computed<ProviderCapabilities>(() =>
+    this.capabilities.statusCaps(this.post()?.provider ?? 'mastodon'),
+  );
+
+  protected actionBusy = signal(false);
+  protected actionError = signal<string | null>(null);
+  protected menuOpen = signal(false);
+  protected notice = signal<string | null>(null);
+
+  /**
+   * Whether the caption is showing in full.
+   *
+   * Clamped by default: some servers allow very long posts, and an unclamped
+   * caption pushed the comments off the bottom of the column entirely.
+   */
+  protected captionExpanded = signal(false);
+
+  protected toggleCaption(): void {
+    this.captionExpanded.update((v) => !v);
+  }
+
+  private applyPatch(updated: Status): void {
+    const original = this.current()?.status;
+    if (!original) {
+      return;
+    }
+    this.patched.update((map) => new Map(map).set(original.id, updated));
+  }
+
+  protected toggleFavourite(): void {
+    const target = this.post();
+    if (!target || !this.caps().favourite || this.actionBusy()) {
+      return;
+    }
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    this.actions.toggleFavourite(target).subscribe({
+      next: (updated) => {
+        this.actionBusy.set(false);
+        this.applyPatch(updated);
+      },
+      error: () => {
+        this.actionBusy.set(false);
+        this.actionError.set('Could not like this post.');
+      },
+    });
+  }
+
+  protected toggleReblog(): void {
+    const target = this.post();
+    if (!target || !this.caps().reblog || this.actionBusy()) {
+      return;
+    }
+    this.actionBusy.set(true);
+    this.actionError.set(null);
+    this.actions.toggleReblog(target).subscribe({
+      next: (updated) => {
+        this.actionBusy.set(false);
+        // A boost returns the wrapper; the inner status is the one whose counts
+        // the bar is showing.
+        this.applyPatch(updated.reblog ?? updated);
+      },
+      error: () => {
+        this.actionBusy.set(false);
+        this.actionError.set('Could not boost this post.');
+      },
+    });
+  }
+
+  protected toggleBookmark(): void {
+    const target = this.post();
+    if (!target || this.auth.isAnonymous) {
+      return;
+    }
+    this.menuOpen.set(false);
+    const call = target.bookmarked
+      ? this.api.unbookmark(target.id)
+      : this.api.bookmark(target.id);
+    call.subscribe({
+      next: (updated) => this.applyPatch(updated),
+      error: () => this.actionError.set('Could not bookmark this post.'),
+    });
+  }
+
+  /** Where the ··· menu's "Open thread" goes: the app's normal thread page. */
+  protected threadLink = computed<(string | number)[] | null>(() => {
+    const status = this.post();
+    if (!status) {
+      return null;
+    }
+    const provider = status.provider;
+    if (provider && provider !== 'mastodon' && provider !== 'anonymous-mastodon') {
+      // Foreign posts have no thread page here; the ··· menu hides the entry.
+      return null;
+    }
+    return ['/statuses', this.nativeId(status)];
+  });
+
+  protected openThread(): void {
+    const link = this.threadLink();
+    if (!link) {
+      return;
+    }
+    // Close first: the viewer is a fixed overlay, and leaving it up over the
+    // thread page would trap the reader behind a picture they navigated away from.
+    this.closed.emit();
+    void this.router.navigate(link);
+  }
+
+  protected copyPostLink(): void {
+    const url = this.post()?.url;
+    this.menuOpen.set(false);
+    if (url) {
+      void this.copy(url, 'Link copied.');
+    }
+  }
+
+  protected copyImageAddress(): void {
+    const url = this.current()?.url;
+    this.menuOpen.set(false);
+    if (url) {
+      void this.copy(url, 'Image address copied.');
+    }
+  }
+
+  protected openImageInNewTab(): void {
+    const url = this.current()?.url;
+    this.menuOpen.set(false);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  private async copy(text: string, message: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.flash(message);
+    } catch {
+      this.actionError.set('Could not copy to the clipboard.');
+    }
+  }
+
+  private noticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private flash(message: string): void {
+    this.notice.set(message);
+    if (this.noticeTimer) {
+      clearTimeout(this.noticeTimer);
+    }
+    this.noticeTimer = setTimeout(() => this.notice.set(null), 2500);
+  }
+
+  // --- moderation, mirroring the status card's ··· menu ---
+
+  /** True when block/mute happen in this browser rather than on a server. */
+  protected useLocalModeration = computed(
+    () => this.auth.isAnonymous || !this.capabilities.canManageRelationships,
+  );
+
+  protected isOwnPost = computed(() => this.post()?.account.id === this.auth.account()?.id);
+
+  protected blockAuthor(): void {
+    const account = this.post()?.account;
+    this.menuOpen.set(false);
+    if (!account) {
+      return;
+    }
+    if (this.useLocalModeration()) {
+      this.localMod.block(account);
+      this.flash(`Blocked @${account.acct} in this browser.`);
+      return;
+    }
+    this.api.block(account.id).subscribe({
+      next: () => this.flash(`Blocked @${account.acct}.`),
+      error: () => this.actionError.set('Could not block this account.'),
+    });
+  }
+
+  protected muteAuthor(): void {
+    const account = this.post()?.account;
+    this.menuOpen.set(false);
+    if (!account) {
+      return;
+    }
+    if (this.useLocalModeration()) {
+      this.localMod.mute(account, null);
+      this.flash(`Muted @${account.acct} in this browser.`);
+      return;
+    }
+    this.api.muteAccount(account.id).subscribe({
+      next: () => this.flash(`Muted @${account.acct}.`),
+      error: () => this.actionError.set('Could not mute this account.'),
+    });
+  }
+
+  /** Reporting needs the full dialog, which lives on the thread page. */
+  protected reportPost(): void {
+    this.openThread();
+  }
+
+  protected deletePost(): void {
+    const status = this.post();
+    this.menuOpen.set(false);
+    if (!status || !this.isOwnPost()) {
+      return;
+    }
+    this.api.deleteStatus(status.id).subscribe({
+      next: () => {
+        this.deleted.emit(status);
+        this.closed.emit();
+      },
+      error: () => this.actionError.set('Could not delete this post.'),
+    });
+  }
+
+  /** The picture's post was deleted, so the parent must drop it from the wall. */
+  readonly deleted = output<Status>();
+
+  // --- replying, home-feed style ---
+
+  /**
+   * Which post the open composer is aimed at, or null when it is closed.
+   *
+   * The composer is opened by a reply icon rather than living at the bottom of
+   * the column, because a Mastodon caption can be very long and the composer is
+   * tall — together they left almost no room for the comments in between. On a
+   * phone that was the entire panel. Opening on demand, next to the thing being
+   * replied to, is also how the home feed already behaves.
+   */
+  protected replyingTo = signal<Status | null>(null);
+
+  protected startReply(status: Status): void {
+    if (!this.canReply()) {
+      return;
+    }
+    this.replyingTo.set(status);
+  }
+
+  protected cancelReply(): void {
+    this.replyingTo.set(null);
+  }
+
+  protected isReplyingTo(status: Status): boolean {
+    return this.replyingTo()?.id === status.id;
   }
 
   // --- navigation ---
@@ -279,6 +580,24 @@ export class ProfilePhotoView {
     return account ? accountRoutePath({ id: account.id, handle: account.acct }) : ['/'];
   });
 
+  /**
+   * Close the ··· menu when the next click lands anywhere else.
+   *
+   * Registered on the host rather than the document so it does not fight the
+   * menu's own buttons: those stop at their handlers, which close it themselves.
+   */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.menuOpen()) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('.photo-menu-wrap')) {
+      return;
+    }
+    this.menuOpen.set(false);
+  }
+
   @HostListener('document:keydown', ['$event'])
   onKey(event: KeyboardEvent): void {
     // Never steal keys from the reply box: arrowing through a draft must move
@@ -292,7 +611,15 @@ export class ProfilePhotoView {
     }
     switch (event.key) {
       case 'Escape':
-        this.close();
+        // Escape unwinds one layer at a time: an open menu or composer first,
+        // the viewer only once nothing is layered over it.
+        if (this.menuOpen()) {
+          this.menuOpen.set(false);
+        } else if (this.replyingTo()) {
+          this.replyingTo.set(null);
+        } else {
+          this.close();
+        }
         break;
       case 'ArrowRight':
         event.preventDefault();

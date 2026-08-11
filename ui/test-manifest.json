@@ -1,5 +1,5 @@
 {
-  "testCount": 3863,
+  "testCount": 3867,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -1486,6 +1486,10 @@
     "src/app/pages/profile/media/profile-media-item.spec.ts :: looksLikePhoto rejects non-images and inline data URIs",
     "src/app/pages/profile/media/profile-media-item.spec.ts :: looksLikePhoto rejects renditions the URL admits are tiny",
     "src/app/pages/profile/media/profile-media-item.spec.ts :: looksLikePhoto rejects the junk RSS bodies are full of",
+    "src/app/pages/profile/media/profile-photo-view.spec.ts :: ProfilePhotoView comments does not call the context endpoint for a feed item that has no thread",
+    "src/app/pages/profile/media/profile-photo-view.spec.ts :: ProfilePhotoView comments says there are no comments when the server has no thread (404)",
+    "src/app/pages/profile/media/profile-photo-view.spec.ts :: ProfilePhotoView comments shows the replies the context returns",
+    "src/app/pages/profile/media/profile-photo-view.spec.ts :: ProfilePhotoView comments still reports a genuine failure",
     "src/app/pages/profile/profile.spec.ts :: Profile Mataroa RSS inclusion leaves the blog off the profile until it is opted in",
     "src/app/pages/profile/profile.spec.ts :: Profile Mataroa RSS inclusion merges Mataroa and Blogger at once, both through the proxy",
     "src/app/pages/profile/profile.spec.ts :: Profile Mataroa RSS inclusion merges the connected blog into only the signed-in account's post feed",

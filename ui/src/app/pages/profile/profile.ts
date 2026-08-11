@@ -458,6 +458,17 @@ export class Profile implements OnInit, OnDestroy {
     );
   }
 
+  /**
+   * A picture's post was deleted from the viewer, so it leaves the wall too.
+   *
+   * Also dropped from the posts tab: the same status is on both, and leaving it
+   * on one would look like the delete half-failed.
+   */
+  protected onMediaDeleted(removed: Status): void {
+    this.mediaStatuses.update((list) => list.filter((s) => s.id !== removed.id));
+    this.onDeleted(removed);
+  }
+
   protected openPhotoItem(item: ProfileMediaItem): void {
     this.openPhoto.set(item.key);
     this.syncMediaUrl({ tab: 'media', photo: item.key });

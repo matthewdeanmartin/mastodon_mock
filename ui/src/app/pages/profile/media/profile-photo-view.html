@@ -87,8 +87,145 @@
           <p class="photo-cw"><strong>CW:</strong> {{ item.status.spoiler_text }}</p>
         }
 
-        <!-- Server-sanitized HTML, same as the timeline renders. -->
-        <div class="photo-caption" appRenderedHtmlLinks [innerHTML]="item.status.content"></div>
+        <!-- Server-sanitized HTML, same as the timeline renders. Clamped because
+             a caption can run to thousands of characters, and on a phone that
+             would push the comments entirely off the panel. -->
+        <div class="photo-caption-wrap">
+          <div
+            class="photo-caption"
+            [class.clamped]="!captionExpanded()"
+            appRenderedHtmlLinks
+            [innerHTML]="item.status.content"
+          ></div>
+          @if (item.status.content && item.status.content.length > 220) {
+            <button type="button" class="photo-more-text" (click)="toggleCaption()">
+              {{ captionExpanded() ? 'Show less' : 'Show more' }}
+            </button>
+          }
+        </div>
+
+        @if (post(); as p) {
+          <div class="photo-actions">
+            @if (caps().favourite) {
+              <button
+                type="button"
+                class="photo-action"
+                [class.on]="p.favourited"
+                [disabled]="actionBusy()"
+                (click)="toggleFavourite()"
+                [attr.aria-pressed]="p.favourited"
+                [title]="p.favourited ? 'Undo like' : 'Like'"
+              >
+                {{ p.favourited ? '♥' : '♡' }}
+                @if (p.favourites_count) {
+                  <span class="photo-count">{{ p.favourites_count | humanCount }}</span>
+                }
+              </button>
+            }
+            @if (caps().reblog) {
+              <button
+                type="button"
+                class="photo-action"
+                [class.on]="p.reblogged"
+                [disabled]="actionBusy()"
+                (click)="toggleReblog()"
+                [attr.aria-pressed]="p.reblogged"
+                [title]="p.reblogged ? 'Undo boost' : 'Boost'"
+              >
+                ↺
+                @if (p.reblogs_count) {
+                  <span class="photo-count">{{ p.reblogs_count | humanCount }}</span>
+                }
+              </button>
+            }
+            @if (canReply()) {
+              <button
+                type="button"
+                class="photo-action"
+                (click)="startReply(p)"
+                title="Reply to this post"
+              >
+                ↩
+                @if (p.replies_count) {
+                  <span class="photo-count">{{ p.replies_count | humanCount }}</span>
+                }
+              </button>
+            }
+
+            <div class="photo-menu-wrap">
+              <button
+                type="button"
+                class="photo-action"
+                (click)="menuOpen.set(!menuOpen())"
+                [attr.aria-expanded]="menuOpen()"
+                aria-haspopup="menu"
+                title="More actions"
+              >
+                ···
+              </button>
+              @if (menuOpen()) {
+                <div class="photo-menu" role="menu">
+                  @if (threadLink()) {
+                    <button type="button" role="menuitem" (click)="openThread()">
+                      Open thread
+                    </button>
+                  }
+                  @if (!auth.isAnonymous) {
+                    <button type="button" role="menuitem" (click)="toggleBookmark()">
+                      {{ p.bookmarked ? 'Remove bookmark' : 'Bookmark' }}
+                    </button>
+                  }
+                  @if (p.url) {
+                    <button type="button" role="menuitem" (click)="copyPostLink()">
+                      Copy link to post
+                    </button>
+                  }
+                  <button type="button" role="menuitem" (click)="copyImageAddress()">
+                    Copy image address
+                  </button>
+                  <button type="button" role="menuitem" (click)="openImageInNewTab()">
+                    Open image in new tab
+                  </button>
+                  @if (isOwnPost()) {
+                    <button type="button" role="menuitem" class="danger" (click)="deletePost()">
+                      Delete post
+                    </button>
+                  } @else {
+                    <button type="button" role="menuitem" (click)="reportPost()">Report…</button>
+                    <button type="button" role="menuitem" (click)="muteAuthor()">
+                      Mute &#64;{{ p.account.username }}
+                    </button>
+                    <button type="button" role="menuitem" class="danger" (click)="blockAuthor()">
+                      Block &#64;{{ p.account.username }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (actionError()) {
+            <p class="photo-action-error">{{ actionError() }}</p>
+          }
+          @if (notice()) {
+            <p class="photo-notice muted">{{ notice() }}</p>
+          }
+
+          <!-- Replying to the picture itself: the composer opens here, above the
+               thread, rather than living permanently at the bottom. -->
+          @if (isReplyingTo(p)) {
+            <div class="photo-inline-compose">
+              <app-compose
+                [inReplyToId]="p.id"
+                [replyToHandle]="replyToHandle()"
+                [compact]="true"
+                placeholder="Add a comment…"
+                (posted)="onReplied($event)"
+              />
+              <button type="button" class="photo-cancel" (click)="cancelReply()">Cancel</button>
+            </div>
+          }
+        }
 
         <div class="photo-thread">
           @if (repliesLoading()) {
@@ -115,28 +252,45 @@
                     <time class="muted" [attr.datetime]="reply.created_at">{{
                       reply.created_at | humanTime
                     }}</time>
+                    @if (canReply()) {
+                      <!-- Replies to a comment thread under that comment, the
+                           same as the home feed does. -->
+                      <button
+                        type="button"
+                        class="photo-comment-reply"
+                        (click)="startReply(reply)"
+                        [title]="'Reply to @' + reply.account.username"
+                      >
+                        ↩
+                      </button>
+                    }
                   </span>
                   <div
                     class="photo-comment-text"
                     appRenderedHtmlLinks
                     [innerHTML]="reply.content"
                   ></div>
+
+                  @if (isReplyingTo(reply)) {
+                    <div class="photo-inline-compose">
+                      <app-compose
+                        [inReplyToId]="reply.id"
+                        [replyToHandle]="replyToHandle()"
+                        [compact]="true"
+                        placeholder="Add a comment…"
+                        (posted)="onReplied($event)"
+                      />
+                      <button type="button" class="photo-cancel" (click)="cancelReply()">
+                        Cancel
+                      </button>
+                    </div>
+                  }
                 </div>
               </article>
             }
           }
-        </div>
 
-        <div class="photo-reply">
-          @if (canReply()) {
-            <app-compose
-              [inReplyToId]="item.status.id"
-              [replyToHandle]="replyToHandle()"
-              [compact]="true"
-              placeholder="Add a comment…"
-              (posted)="onReplied($event)"
-            />
-          } @else {
+          @if (!canReply()) {
             <p class="muted photo-noreply">{{ replyUnavailableReason() }}</p>
           }
         </div>

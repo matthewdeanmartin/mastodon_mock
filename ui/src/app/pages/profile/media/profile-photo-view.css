@@ -195,14 +195,181 @@
   font-size: 0.85rem;
 }
 
+.photo-caption-wrap {
+  flex: none;
+  padding: 12px 14px 8px;
+}
+
 .photo-caption {
-  padding: 12px 14px;
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
 
 .photo-caption:empty {
   display: none;
+}
+
+/* A caption can be thousands of characters on servers with a high limit. Left
+   unclamped it pushed the comments off the panel entirely — which is the whole
+   reason the composer moved out of the footer too. */
+.photo-caption.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.photo-more-text {
+  margin-top: 4px;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.photo-more-text:hover {
+  text-decoration: underline;
+}
+
+/* --- action bar --- */
+
+.photo-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.photo-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 9px;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.photo-action:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--hover);
+}
+
+.photo-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.photo-action.on {
+  color: var(--accent);
+}
+
+.photo-count {
+  font-size: 0.78rem;
+}
+
+/* The ··· menu is pushed to the far end, away from the frequent actions. */
+.photo-menu-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+/* Opens downward: the action bar sits near the *top* of the column (under the
+   caption), so a menu anchored upward rendered off the top of the viewport and
+   could not be clicked at all. */
+.photo-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 3;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--col-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.photo-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.photo-menu button:hover {
+  background: var(--hover);
+}
+
+.photo-menu button.danger {
+  color: #d9534f;
+}
+
+.photo-action-error,
+.photo-notice {
+  flex: none;
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+}
+
+.photo-action-error {
+  color: #d9534f;
+}
+
+/* An inline composer, opened by a reply icon rather than parked in the footer. */
+.photo-inline-compose {
+  padding: 8px 0 4px;
+}
+
+/* A composer nested under a comment is otherwise squeezed into the indented
+   body column, which wraps its toolbar into a ragged stack. Pull it back to the
+   full width of the panel so it stays usable at this size. */
+.photo-comment .photo-inline-compose {
+  margin-left: -32px;
+}
+
+.photo-cancel {
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.photo-comment-reply {
+  padding: 2px 6px;
+  margin-left: auto;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.photo-comment-reply:hover {
+  color: var(--accent);
+  background: var(--hover);
 }
 
 /* The thread is the only part that scrolls, so the author stays pinned above
@@ -238,7 +405,7 @@
 .photo-comment-name {
   display: flex;
   gap: 6px;
-  align-items: baseline;
+  align-items: center;
   font-size: 0.82rem;
 }
 
@@ -251,14 +418,9 @@
   overflow-wrap: anywhere;
 }
 
-.photo-reply {
-  flex: none;
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
-}
-
 .photo-noreply {
   margin: 0;
+  padding: 10px 0;
   font-size: 0.82rem;
 }
 
@@ -267,6 +429,25 @@
   .photo-layout {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 55vh) minmax(0, 45vh);
+  }
+
+  /* With the composer open there is not enough height for both a big picture
+     and a readable thread, so the picture yields. Without this the comments
+     collapse to a sliver on a phone. */
+  .photo-layout:has(.photo-inline-compose) {
+    grid-template-rows: minmax(0, 32vh) minmax(0, 68vh);
+  }
+
+  /* Room for the counter strip underneath, which otherwise prints on top of
+     the picture once the stage gets short. */
+  .photo-layout:has(.photo-inline-compose) .photo-image {
+    max-height: calc(32vh - 52px);
+  }
+
+  /* The visible alt line collides with the counter at this height. It stays on
+     the <img> itself, so screen readers keep it either way. */
+  .photo-layout:has(.photo-inline-compose) .photo-alt {
+    display: none;
   }
 
   .photo-side {
@@ -280,5 +461,11 @@
 
   .photo-image {
     max-height: calc(55vh - 40px);
+  }
+
+  /* Less room here than anywhere, so the caption gives up more of it. */
+  .photo-caption.clamped {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 }
