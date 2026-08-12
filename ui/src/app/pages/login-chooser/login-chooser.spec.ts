@@ -42,8 +42,44 @@ describe('LoginChooser', () => {
     const fixture = TestBed.createComponent(LoginChooser);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('input')).toBeNull();
+    // Asserted against text-entry inputs specifically: the page does carry one
+    // checkbox (the analytics opt-out), and a blanket "no inputs" check would
+    // fail on it while proving nothing about server selection.
+    expect(fixture.nativeElement.querySelector('input[type="text"], input[type="url"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('app-server-discovery')).toBeNull();
+  });
+
+  /**
+   * The way out has to *be* a way out. `/` re-seeds the first-run preview and
+   * asks "log in or continue?" — which is the question this visitor is
+   * answering by clicking the link, so sending them there loops them straight
+   * back into it. `/anonymous` enters directly, no modal.
+   */
+  it('sends the anonymous escape hatch somewhere that will not ask again', () => {
+    withQuery({});
+    const fixture = TestBed.createComponent(LoginChooser);
+    fixture.detectChanges();
+
+    const hrefs = Array.from(
+      fixture.nativeElement.querySelectorAll('a[href]') as NodeListOf<HTMLAnchorElement>,
+    ).map((a) => a.getAttribute('href'));
+
+    expect(hrefs).toContain('/anonymous');
+    expect(hrefs).not.toContain('/');
+  });
+
+  /**
+   * The opt-out has now moved twice (login page → front page → here) and the
+   * reason has survived both moves: the person most likely to want it is the one
+   * who has not signed in, and they should not have to create an account to find
+   * the switch. This pins it to whichever page is the signed-out one.
+   */
+  it('carries the analytics opt-out, reachable without an account', () => {
+    withQuery({});
+    const fixture = TestBed.createComponent(LoginChooser);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('input[name="analytics"]')).not.toBeNull();
   });
 
   /**

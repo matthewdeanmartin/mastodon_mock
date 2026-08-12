@@ -21,8 +21,10 @@ export class AnonymousEntry implements OnInit {
     const server = normalizeHostUrl(sharedHost) || 'https://mastodon.social';
     const result = await probeServerAvailability(server);
     if (result.status !== 'available') {
-      // The front page, not a login form: the shared server was unreachable, and
-      // `/` offers both a different way in and an explanation of what this is.
+      // The shared server was unreachable, so hand off to `/`, which probes the
+      // fallback chain and enters anonymously against whichever server answers.
+      // Better than a login form, and better than failing: the visitor asked to
+      // read without an account, and they still get to.
       await this.router.navigateByUrl('/', { replaceUrl: true });
       return;
     }

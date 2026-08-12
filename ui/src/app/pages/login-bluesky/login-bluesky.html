@@ -80,7 +80,10 @@
 
     <p class="bsky-out small">
       <a routerLink="/login">Use a different network</a> ·
-      <a routerLink="/">Look around without an account</a>
+      <!-- `/anonymous`, not `/`: this visitor has already been asked whether they
+           want to sign in and is answering "no" right now. `/` would seed the
+           preview and ask them the same question over again. -->
+      <a routerLink="/anonymous">Look around without an account</a>
     </p>
   </div>
 </div>

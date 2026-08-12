@@ -4,9 +4,9 @@ import { routes } from './app.routes';
 
 /**
  * The guarded shell — the `''` route that has children, as distinct from the
- * public front page, which also sits at `''` but is `pathMatch: 'full'` and has
- * none. Matching on `children` rather than on the path is what keeps this
- * helper pointed at the shell now that two routes share the empty path.
+ * public entry dispatcher, which also sits at `''` but is `pathMatch: 'full'`
+ * and has none. Matching on `children` rather than on the path is what keeps
+ * this helper pointed at the shell now that two routes share the empty path.
  */
 function shellRoute(): Route | undefined {
   return routes.find((route) => route.path === '' && !!route.children);
@@ -22,7 +22,7 @@ describe('application routes', () => {
   });
 
   /**
-   * The front door. Two routes share the empty path — the public pitch page and
+   * The front door. Two routes share the empty path — the entry dispatcher and
    * the guarded shell — and the order plus `pathMatch: 'full'` is the only thing
    * keeping them apart. Get it wrong and either strangers hit the auth guard
    * again or every in-app route stops resolving.
@@ -31,11 +31,20 @@ describe('application routes', () => {
     const frontRoute = (): Route | undefined =>
       routes.find((route) => route.path === '' && !route.children);
 
-    it('serves an unguarded front page at the root', () => {
+    it('serves an unguarded dispatcher at the root', () => {
       const front = frontRoute();
 
       expect(front?.loadComponent).toBeDefined();
       expect(front?.canActivate).toBeUndefined();
+    });
+
+    /**
+     * `/` decides where to send people; it never renders a destination itself.
+     * A title would appear in the tab and in history for a route nobody stays
+     * on — which is what the standalone pitch page it replaced got wrong.
+     */
+    it('carries no title, because nothing is displayed there', () => {
+      expect(frontRoute()?.title).toBeUndefined();
     });
 
     it('matches the root exactly, so it cannot swallow every in-app route', () => {
@@ -51,11 +60,12 @@ describe('application routes', () => {
     });
 
     /**
-     * `/` is the pitch page now, so an unknown URL must not land there: a
-     * signed-in user who fat-fingers a path would read it as a logout. The auth
-     * guard forwards a visitor with no account on to `/` from `/home` anyway.
+     * `**` goes to Home, not `/`. Harmless either way today — the dispatcher
+     * would forward a signed-in user straight back — but it keeps a mistyped
+     * URL from bouncing through the front door, and it is one less path along
+     * which a future change to `/` could reach an already-signed-in user.
      */
-    it('sends unknown URLs to Home rather than to the pitch page', () => {
+    it('sends unknown URLs to Home rather than through the front door', () => {
       expect(routes.find((route) => route.path === '**')?.redirectTo).toBe('home');
     });
   });

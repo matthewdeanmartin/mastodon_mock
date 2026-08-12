@@ -1,6 +1,8 @@
 import { Component, inject, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Auth } from '../../auth';
+import { ClientPrefs } from '../../client-prefs';
 
 /**
  * "Which network are you on?" — the two-door chooser at `/login`.
@@ -24,12 +26,14 @@ import { Auth } from '../../auth';
  */
 @Component({
   selector: 'app-login-chooser',
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule],
   templateUrl: './login-chooser.html',
   styleUrl: './login-chooser.css',
 })
 export class LoginChooser implements OnInit {
   private auth = inject(Auth);
+  /** For the analytics opt-out, which lives on the signed-out page by design. */
+  protected prefs = inject(ClientPrefs);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 

@@ -19,6 +19,8 @@ import { FeatureFlags } from '../feature-flags';
 import { PosseQueue } from '../providers/hugo/posse-queue';
 import { LeaveChoice, LeaveDialog } from '../leave-dialog/leave-dialog';
 import { WritingZen } from '../writing-zen';
+import { FirstRunChoice, FirstRunModal } from '../first-run/first-run-modal';
+import { PreviewSeed } from '../first-run/preview-seed';
 
 function isWideUrl(url: string): boolean {
   // /search goes rails-off wide so facets have room to live beside results.
@@ -44,6 +46,7 @@ function isWideUrl(url: string): boolean {
     ShortcutHelp,
     NgOptimizedImage,
     LeaveDialog,
+    FirstRunModal,
   ],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
@@ -51,6 +54,7 @@ function isWideUrl(url: string): boolean {
 export class Shell implements OnInit {
   protected auth = inject(Auth);
   private bots = inject(BotPeers);
+  private preview = inject(PreviewSeed);
 
   /**
    * Whether an anonymous visitor has anyone to chat with.
@@ -132,6 +136,43 @@ export class Shell implements OnInit {
 
   /** The leave/log-out confirmation, which also offers to erase browser data. */
   protected showLeave = signal(false);
+
+  /**
+   * Whether the first-run modal is up.
+   *
+   * Read once at construction rather than as a live signal: the preview flag is
+   * plain `localStorage`, and re-reading it mid-session would let an unrelated
+   * write re-open a modal the visitor has already answered.
+   */
+  private firstRunActive = signal(this.preview.active);
+  protected firstRun = this.firstRunActive.asReadonly();
+
+  /**
+   * The visitor answered. Clear the seed, then go where they asked.
+   *
+   * The seed is cleared on **every** path, not just "continue" — someone who
+   * signs in with Mastodon must not discover an anonymous account carrying
+   * three follows they never chose. `clear()` skips any of the three they
+   * genuinely followed while the preview was up.
+   *
+   * The login paths use `location.assign` for the same reason account switching
+   * does: services cache storage-backed state in signals at construction, so a
+   * soft navigation would leave `AnonymousFollows` serving follows that are no
+   * longer in storage.
+   */
+  protected answerFirstRun(choice: FirstRunChoice): void {
+    this.preview.clear();
+    this.firstRunActive.set(false);
+    if (choice === 'anonymous') {
+      // Safe now: the app is theirs to navigate. `start()` is idempotent.
+      this.hotkeys.start();
+      return;
+    }
+    // Leave Anonymous so the login page opens signed-out, exactly as the
+    // header's own Log in button does.
+    this.auth.exitAnonymous();
+    location.assign(choice === 'bluesky' ? 'login/bluesky' : 'login/mastodon');
+  }
 
   /**
    * Move focus into the routed column.
@@ -250,7 +291,13 @@ export class Shell implements OnInit {
   }
 
   ngOnInit(): void {
-    this.hotkeys.start();
+    // Not while the first-run modal is blocking. The shortcuts are global and
+    // navigational — "g" then "h" would move the app *behind* a modal the
+    // visitor cannot dismiss, leaving them looking at a question about a page
+    // that is no longer there. Started in `answerFirstRun` instead.
+    if (!this.firstRunActive()) {
+      this.hotkeys.start();
+    }
     // Bluesky-primary excluded alongside Anonymous: this gates a Mastodon
     // `verify_credentials` call, and such an account has no Mastodon token to
     // verify. Reaching the call below without one fails, and the error branch

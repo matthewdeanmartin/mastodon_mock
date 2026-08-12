@@ -113,7 +113,8 @@ sites, and Sprint 1 makes that explicit rather than leaving it implicit.
 | # | Theme | Demo at the end |
 |---|---|---|
 | 1 | [Account kinds](bsky-first-1-account-kinds.md) | Nothing visibly changes — but `Auth` speaks kinds, and a bsky-primary account can exist in storage |
-| 2 | [The front door](bsky-first-2-front-door.md) | A stranger opens the app and **sees what it is** before being asked for anything; login becomes a chooser |
+| 2b | [The front door, actually](bsky-first-2b-app-first-front-door.md) | A stranger opens the app and **is in it** — shell, rails, real posts — with the login question as a modal on top. **Blocks everything below.** |
+| 2 | [The front door](bsky-first-2-front-door.md) — ~~COMPLETE~~ **re-opened, superseded by 2b** | Shipped a landing page instead of the app; see 2b |
 | 3 | [Log in with Bluesky](bsky-first-3-bsky-login.md) | Fresh browser → bsky handle + app password → working app, no Mastodon anything |
 | 4 | [Anonymous Mastodon underneath](bsky-first-4-mastodon-under-bsky.md) | That same session gets Explore, trends, tag timelines — and can attach a real Mastodon account later |
 | 5 | [Search parity](bsky-first-5-search-parity.md) | Bluesky search has facets, refine, saved searches — and looks like Mastodon search |

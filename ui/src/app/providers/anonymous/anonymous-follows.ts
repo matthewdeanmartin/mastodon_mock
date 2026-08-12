@@ -223,6 +223,26 @@ export class AnonymousFollows {
     return { ok: true, relationship: relationship(account.id, true) };
   }
 
+  /**
+   * Replace the stored copy of an account already followed.
+   *
+   * Follows cache the whole `Account` because the timeline renders author cards
+   * from it, which means an avatar or display name captured at follow time can
+   * go stale and never recover — {@link follow} returns early for an account
+   * already followed, so it cannot be used to refresh one. Does nothing if the
+   * account is not followed: this refreshes, it never adds.
+   */
+  refreshAccount(account: Account, fallbackServer: string): void {
+    const key = keyFor(account, fallbackServer);
+    if (!this.follows().some((follow) => follow.key === key)) {
+      return;
+    }
+    this.updateFollow(key, (follow) => ({
+      ...follow,
+      account: { ...account, acct: follow.account.acct },
+    }));
+  }
+
   unfollow(account: Account, fallbackServer: string): Relationship {
     const key = keyFor(account, fallbackServer);
     if (this.follows().some((follow) => follow.key === key)) this.homeFeedCache.invalidate();

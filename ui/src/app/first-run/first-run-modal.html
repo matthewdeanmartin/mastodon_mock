@@ -1,0 +1,46 @@
+<!--
+  No backdrop click handler and no escape binding, deliberately: the visitor
+  answers with one of the buttons or not at all. See first-run-modal.ts.
+-->
+<div class="first-run-backdrop">
+  <div class="first-run-panel">
+    @if (step() === 'welcome') {
+      <h2 id="first-run-title">Welcome to Mawkingbird</h2>
+      <p class="first-run-pitch">A social media client for Mastodon, Bluesky and more.</p>
+      <!--
+        Says out loud that the timeline behind the modal is a sample. Without
+        this, three seeded follows read as "this app decided who I follow".
+      -->
+      <p class="first-run-note">
+        The posts behind this box are a small sample, so you can see what the app looks like before
+        you decide anything.
+      </p>
+      <div class="first-run-actions">
+        <button type="button" class="first-run-primary" (click)="toNetwork()">Log in</button>
+        <button type="button" class="first-run-secondary" (click)="pick('anonymous')">
+          Continue without logging in
+        </button>
+      </div>
+    } @else {
+      <h2 id="first-run-title">Which account do you have?</h2>
+      <p class="first-run-pitch">Pick the network you already use.</p>
+      <div class="first-run-actions">
+        <button type="button" class="first-run-network" (click)="pick('bluesky')">
+          <span class="first-run-emoji" aria-hidden="true">🦋</span>
+          <span class="first-run-network-text">
+            <strong>Bluesky</strong>
+            <small>Sign in with your handle and an app password.</small>
+          </span>
+        </button>
+        <button type="button" class="first-run-network" (click)="pick('mastodon')">
+          <span class="first-run-emoji" aria-hidden="true">🐘</span>
+          <span class="first-run-network-text">
+            <strong>Mastodon</strong>
+            <small>Sign in on your own server.</small>
+          </span>
+        </button>
+      </div>
+      <button type="button" class="first-run-back" (click)="back()">Back</button>
+    }
+  </div>
+</div>

@@ -1,3 +1,18 @@
+/* Below the doors and visually quieter than them: available to anyone who wants
+   it, without competing with the reason they came to this page. */
+.chooser-privacy {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+
+.chooser-privacy .checkline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .chooser-wrap {
   min-height: 100vh;
   display: flex;

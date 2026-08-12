@@ -2,9 +2,12 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../auth';
+import { Hotkeys } from '../hotkeys';
 import { ClientPrefs } from '../client-prefs';
+import { PreviewSeed } from '../first-run/preview-seed';
+import { stubLocation } from '../testing/stub-location';
 import { Server } from '../server';
 import { serverInterceptor } from '../server.interceptor';
 import { WritingZen } from '../writing-zen';
@@ -314,5 +317,147 @@ describe('Shell zen modes', () => {
       leftRail: true,
       rightRail: true,
     });
+  });
+});
+
+/**
+ * The first-run modal, and the requirement it exists to satisfy: the visitor is
+ * looking at the *app* — rails, header, footer and a real timeline — while
+ * being asked whether to sign in. Its predecessor was a standalone page with
+ * none of those things, which is the whole reason for sprint 2b.
+ */
+describe('Shell first-run modal', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([serverInterceptor])),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    TestBed.inject(Auth).mode.set('anonymous');
+  });
+
+  afterEach(() => {
+    httpMock.match(() => true);
+    httpMock.verify();
+  });
+
+  function render() {
+    const fixture = TestBed.createComponent(Shell);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('stays out of the way when no preview is running', () => {
+    const host = render().nativeElement as HTMLElement;
+
+    expect(host.querySelector('app-first-run-modal')).toBeNull();
+  });
+
+  /**
+   * The shortcuts are global and navigational, so "g" then "h" would move the
+   * app *behind* a modal that cannot be dismissed — leaving the visitor staring
+   * at a question about a page that is no longer underneath it.
+   */
+  it('holds the keyboard shortcuts back until the modal is answered', () => {
+    TestBed.inject(PreviewSeed).markEmpty('https://mastodon.social');
+    const hotkeys = TestBed.inject(Hotkeys);
+    const start = vi.spyOn(hotkeys, 'start');
+    const fixture = render();
+
+    expect(start).not.toHaveBeenCalled();
+
+    fixture.componentInstance['answerFirstRun']('anonymous');
+
+    expect(start).toHaveBeenCalled();
+  });
+
+  it('starts the shortcuts normally when there is no modal', () => {
+    const start = vi.spyOn(TestBed.inject(Hotkeys), 'start');
+    render();
+
+    expect(start).toHaveBeenCalled();
+  });
+
+  /** Exit criterion 2: the modal appears *over the app*, not instead of it. */
+  it('shows the modal over the full three-column chrome', () => {
+    TestBed.inject(PreviewSeed).markEmpty('https://mastodon.social');
+    const host = render().nativeElement as HTMLElement;
+
+    expect(host.querySelector('app-first-run-modal')).not.toBeNull();
+    expect(host.querySelector('.topbar')).not.toBeNull();
+    expect(host.querySelector('.rail-left')).not.toBeNull();
+    expect(host.querySelector('.rail-right')).not.toBeNull();
+    expect(host.querySelector('app-app-footer')).not.toBeNull();
+  });
+
+  /**
+   * Exit criterion 4, and the thing that makes "continue without logging in"
+   * safe to treat as durable: having declined once, the visitor is never asked
+   * again, so the header button is their only way in later. If this disappears,
+   * anonymous becomes a dead end.
+   */
+  it('leaves a visible Log in button after the visitor continues anonymously', () => {
+    TestBed.inject(PreviewSeed).markEmpty('https://mastodon.social');
+    const fixture = render();
+
+    fixture.componentInstance['answerFirstRun']('anonymous');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.login-nav')).not.toBeNull();
+    expect(host.querySelector('app-first-run-modal')).toBeNull();
+  });
+
+  it('clears the seed and dismisses when the visitor continues anonymously', () => {
+    const preview = TestBed.inject(PreviewSeed);
+    preview.markEmpty('https://mastodon.social');
+    const fixture = render();
+
+    fixture.componentInstance['answerFirstRun']('anonymous');
+    fixture.detectChanges();
+
+    expect(preview.active).toBe(false);
+    expect(TestBed.inject(Auth).isAnonymous).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-first-run-modal')).toBeNull();
+  });
+
+  /**
+   * The seed is temporary on *every* path. Someone who signs in must not find
+   * an anonymous account in their switcher carrying three follows they never
+   * chose — which is what made "clear it only on continue" the wrong rule.
+   */
+  it.each(['mastodon', 'bluesky'] as const)(
+    'clears the seed before leaving for the %s login',
+    (network) => {
+      const preview = TestBed.inject(PreviewSeed);
+      preview.markEmpty('https://mastodon.social');
+      const fixture = render();
+      // jsdom will not navigate and will not let `location.assign` be spied in
+      // place; `stubLocation` swaps the whole object and test-setup restores it.
+      const assigned: string[] = [];
+      stubLocation({ onAssign: (url) => assigned.push(url) });
+
+      fixture.componentInstance['answerFirstRun'](network);
+
+      expect(preview.active).toBe(false);
+      expect(assigned).toEqual([`login/${network}`]);
+    },
+  );
+
+  /** Anonymous has to be left behind, or the login page bounces them home. */
+  it('leaves the anonymous account when heading for a login page', () => {
+    TestBed.inject(PreviewSeed).markEmpty('https://mastodon.social');
+    const fixture = render();
+    stubLocation();
+
+    fixture.componentInstance['answerFirstRun']('mastodon');
+
+    expect(TestBed.inject(Auth).isAuthenticated).toBe(false);
   });
 });

@@ -1,8 +1,27 @@
 # Bluesky-first — Sprint 2: the front door
 
-Status: **COMPLETE** (2026-08-12)
+Status: **INCOMPLETE — superseded** (re-opened 2026-08-12)
 
-## Outcome
+> This sprint was marked COMPLETE and then re-opened by the user, who reports
+> that it **misunderstood the ask by about 95%**.
+>
+> "Show the app first" meant *the running app* — shell, both rails, header,
+> footer, and real posts in the middle column — with the login question asked as
+> a modal on top of it. What shipped is a standalone marketing page with none of
+> those things, which is still a wall between a stranger and the product.
+>
+> **[bsky-first-2b-app-first-front-door.md](bsky-first-2b-app-first-front-door.md)
+> supersedes this document and must ship first.** It keeps the parts of this
+> sprint that were right — the `/login` callback constraint, `/login/mastodon`,
+> the `/login/bluesky` route, the `authGuard` redirect — and replaces `/` with a
+> headless dispatcher, deleting `pages/front/`.
+>
+> The rest of the bsky-first roadmap is blocked until 2b lands.
+>
+> Everything below is the original record, kept for its findings — the OAuth
+> `redirect_uri` discovery in particular is load-bearing and still true.
+
+## Outcome (as originally written)
 
 Shipped. `npm run test:ci` green (3920 tests, 56 added, manifest clean), build
 clean, and all ten exit criteria verified in a real browser against the mock

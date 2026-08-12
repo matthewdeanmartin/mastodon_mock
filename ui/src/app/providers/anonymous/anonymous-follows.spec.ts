@@ -48,6 +48,48 @@ describe('AnonymousFollows', () => {
     expect(TestBed.inject(AnonymousFollows).count()).toBe(1);
   });
 
+  /**
+   * A follow caches the whole `Account` because the timeline renders author
+   * cards from it — and before `refreshAccount` there was no way to ever update
+   * that copy, since `follow` returns early for an account already followed. A
+   * display name or avatar captured at follow time was stale forever.
+   */
+  describe('refreshAccount', () => {
+    it('replaces the stored copy of an account already followed', () => {
+      const follows = TestBed.inject(AnonymousFollows);
+      const target = account('Alice', 'social.example');
+      follows.follow(target, 'https://mastodon.social');
+
+      follows.refreshAccount(
+        { ...target, display_name: 'Alice Renamed', avatar: 'https://cdn.example/new.png' },
+        'https://mastodon.social',
+      );
+
+      expect(follows.follows()[0].account.display_name).toBe('Alice Renamed');
+      expect(follows.follows()[0].account.avatar).toBe('https://cdn.example/new.png');
+    });
+
+    /** The federated handle is computed at follow time; a refresh must not undo it. */
+    it('keeps the federated acct it normalized at follow time', () => {
+      const follows = TestBed.inject(AnonymousFollows);
+      const target = account('Alice', 'social.example');
+      follows.follow(target, 'https://mastodon.social');
+      const acct = follows.follows()[0].account.acct;
+
+      follows.refreshAccount({ ...target, acct: 'Alice' }, 'https://mastodon.social');
+
+      expect(follows.follows()[0].account.acct).toBe(acct);
+    });
+
+    it('refreshes, never adds', () => {
+      const follows = TestBed.inject(AnonymousFollows);
+
+      follows.refreshAccount(account('Nobody', 'social.example'), 'https://mastodon.social');
+
+      expect(follows.count()).toBe(0);
+    });
+  });
+
   it('deduplicates different account ids for the same federated identity', () => {
     const follows = TestBed.inject(AnonymousFollows);
     follows.follow(account('alice'), 'https://mastodon.social');

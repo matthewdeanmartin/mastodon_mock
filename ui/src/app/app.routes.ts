@@ -13,14 +13,14 @@ import { justMyServerUpdateCanDeactivate, justMyServerUpdateGuard } from './just
 import { mockOnlyChildren } from './mock-routes';
 
 export const routes: Routes = [
-  // The public front door. Unguarded and matched `full`, so a stranger sees what
-  // the app *is* before being asked for anything; the guarded shell keeps its own
-  // '' child below, which is where a signed-in visitor is sent instead.
+  // The front door: a dispatcher that renders nothing. It sends a signed-in or
+  // already-decided visitor to /home, and a first-time one into the seeded
+  // preview — the app itself, with the login question as a modal on top.
+  // Unguarded and matched `full`; the guarded shell keeps its own '' child below.
   {
     path: '',
     pathMatch: 'full',
-    title: 'Welcome',
-    loadComponent: () => import('./pages/front/front').then((m) => m.FrontPage),
+    loadComponent: () => import('./pages/entry/entry').then((m) => m.EntryPage),
   },
   {
     path: 'anonymous',

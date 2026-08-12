@@ -35,7 +35,33 @@
 
     <!-- For anyone who took the wrong door. Quiet, but a real way out. -->
     <p class="chooser-out small">
-      Not sure yet? <a routerLink="/">Look around without an account</a> instead.
+      <!-- `/anonymous`, not `/`: someone declining the login question here has
+           already been asked it. `/` would seed a preview and ask again. -->
+      Not sure yet? <a routerLink="/anonymous">Look around without an account</a> instead.
     </p>
+
+    <!--
+      Analytics opt-out. Keeps its original reasoning through two moves (login
+      page → front page → here): a visitor who has not signed in is exactly the
+      person most likely to want it, and they should not have to create an
+      account to find the switch. This is the signed-out page in the current
+      flow, so this is where it belongs.
+    -->
+    <div class="chooser-privacy">
+      <label class="checkline">
+        <input
+          type="checkbox"
+          name="analytics"
+          [ngModel]="prefs.analytics()"
+          (ngModelChange)="prefs.setAnalytics($event)"
+        />
+        Count my page views
+      </label>
+      <p class="muted small">
+        Anonymous page counts only — which kinds of page get used, never which account, post or tag
+        you looked at. Unchecking this means the analytics script is never loaded: nothing is
+        fetched, counted or sent. You can change it later in Settings.
+      </p>
+    </div>
   </div>
 </div>
