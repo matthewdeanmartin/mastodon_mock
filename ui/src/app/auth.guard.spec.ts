@@ -31,7 +31,12 @@ describe('authGuard', () => {
     expect(result).toBe(true);
   });
 
-  it('returns a UrlTree for /login when not authenticated', () => {
+  /**
+   * The front page, not the login page. A visitor with no account is a stranger
+   * who has not yet been told what this app is, and the old destination opened
+   * on a server picker and an OAuth scope group. `/` offers both doors.
+   */
+  it('sends an unauthenticated visitor to the front page, not a login form', () => {
     // Ensure no token is set (localStorage cleared in beforeEach)
     const auth = TestBed.inject(Auth);
     auth.logoutAll();
@@ -39,6 +44,6 @@ describe('authGuard', () => {
     const result = TestBed.runInInjectionContext(() => authGuard({} as any, {} as any));
 
     expect(result).toBeInstanceOf(UrlTree);
-    expect((result as UrlTree).toString()).toBe('/login');
+    expect((result as UrlTree).toString()).toBe('/');
   });
 });

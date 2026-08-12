@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from './auth';
 import { Server } from './server';
-import { seedSessions } from './testing/seed-storage';
+import { bskyIdentityStored, seedBskyIdentity, seedSessions } from './testing/seed-storage';
 
 /**
  * Auth session/server linkage. The core account-switching bug was that a token's instance
@@ -170,5 +170,238 @@ describe('Auth + Server linkage', () => {
     expect(auth.isAnonymous).toBe(false);
     expect(auth.token()).toBe('art-token');
     expect(server.baseUrl()).toBe('https://mastodon.art');
+  });
+});
+
+/**
+ * The Bluesky-primary account kind.
+ *
+ * These are all written against the risk that made this a sprint of its own:
+ * widening the identity model is exactly how the reported account-loss bug
+ * comes back. Every exit path is asserted to leave the *other* accounts alone.
+ */
+describe('Auth account kinds', () => {
+  let auth: Auth;
+  let server: Server;
+
+  /** Rebuild Auth so it re-reads storage, as it does on a page load. */
+  function rebuild(): void {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [Auth, Server] });
+    server = TestBed.inject(Server);
+    auth = TestBed.inject(Auth);
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    rebuild();
+  });
+
+  describe('the overloaded-predicate split', () => {
+    it('answers the triple correctly for a Mastodon account', () => {
+      auth.setToken('t');
+      expect(auth.kind()).toBe('mastodon');
+      expect(auth.lacksMastodonToken).toBe(false);
+      expect(auth.isAnonymousIdentity).toBe(false);
+      expect(auth.isBlueskyPrimary).toBe(false);
+    });
+
+    it('answers the triple correctly for Anonymous', () => {
+      auth.enterAnonymous();
+      expect(auth.kind()).toBe('anonymous');
+      expect(auth.lacksMastodonToken).toBe(true);
+      expect(auth.isAnonymousIdentity).toBe(true);
+      expect(auth.isBlueskyPrimary).toBe(false);
+    });
+
+    /**
+     * The case the split exists for: no Mastodon token (so authenticated
+     * Mastodon calls must be skipped) but *not* the local Anonymous identity
+     * (so the anonymous stores must not be touched).
+     */
+    it('answers the triple correctly for Bluesky-primary', () => {
+      seedBskyIdentity({ did: 'did:plc:abc123', handle: 'me.bsky.social' });
+      expect(auth.enterBluesky()).toBe(true);
+
+      expect(auth.kind()).toBe('bluesky');
+      expect(auth.lacksMastodonToken).toBe(true);
+      expect(auth.isAnonymousIdentity).toBe(false);
+      expect(auth.isBlueskyPrimary).toBe(true);
+      // The legacy predicate must stay false, or every anonymous-store branch
+      // in the app would fire for a Bluesky account.
+      expect(auth.isAnonymous).toBe(false);
+    });
+
+    it('answers the triple correctly when signed out', () => {
+      expect(auth.kind()).toBeNull();
+      expect(auth.lacksMastodonToken).toBe(true);
+      expect(auth.isAnonymousIdentity).toBe(false);
+      expect(auth.isBlueskyPrimary).toBe(false);
+    });
+  });
+
+  it('counts a Bluesky-primary account as authenticated, so the guard admits it', () => {
+    seedBskyIdentity({ did: 'did:plc:abc123', handle: 'me.bsky.social' });
+    auth.enterBluesky();
+    expect(auth.isAuthenticated).toBe(true);
+  });
+
+  it('surfaces the Bluesky identity as the active account', () => {
+    seedBskyIdentity({
+      did: 'did:plc:abc123',
+      handle: 'me.bsky.social',
+      displayName: 'Me',
+    });
+    auth.enterBluesky();
+
+    expect(auth.account()?.display_name).toBe('Me');
+    expect(auth.account()?.acct).toBe('me.bsky.social');
+    // Namespaced, so it can never collide with a real Mastodon account id.
+    expect(auth.account()?.id).toBe('bsky:did:plc:abc123');
+  });
+
+  it('survives a reload', () => {
+    seedBskyIdentity({ did: 'did:plc:abc123', handle: 'me.bsky.social' });
+    auth.enterBluesky();
+
+    rebuild();
+
+    expect(auth.kind()).toBe('bluesky');
+    expect(auth.account()?.acct).toBe('me.bsky.social');
+  });
+
+  /**
+   * A stale `bluesky` mode key with no identity behind it must not strand the
+   * app in an account that cannot make a single request. This is the state a
+   * settings import leaves behind: it carries the profile, never the JWTs.
+   */
+  it('refuses to activate a Bluesky kind with no identity in storage', () => {
+    localStorage.setItem('mastodon_mock_account_mode', 'bluesky');
+    rebuild();
+
+    expect(auth.kind()).toBeNull();
+    expect(auth.isAuthenticated).toBe(false);
+  });
+
+  it('refuses enterBluesky when there is no identity to enter', () => {
+    expect(auth.enterBluesky()).toBe(false);
+    expect(auth.kind()).toBeNull();
+  });
+
+  describe('switching', () => {
+    it('round-trips Bluesky → Mastodon → Bluesky with both accounts intact', () => {
+      server.setBaseUrl('https://mastodon.art');
+      auth.setToken('art-token');
+      seedBskyIdentity({ did: 'did:plc:abc123', handle: 'me.bsky.social' });
+
+      expect(auth.enterBluesky()).toBe(true);
+      expect(auth.token()).toBeNull();
+      // The Mastodon session survives being switched away from.
+      expect(auth.sessions().map((s) => s.token)).toEqual(['art-token']);
+
+      const mastodon = auth.otherSessions().find((c) => c.kind === 'mastodon')!;
+      expect(auth.switchAccount(mastodon)).toBe(true);
+      expect(auth.kind()).toBe('mastodon');
+      expect(auth.token()).toBe('art-token');
+      expect(server.baseUrl()).toBe('https://mastodon.art');
+
+      const bluesky = auth.otherSessions().find((c) => c.kind === 'bluesky')!;
+      expect(auth.switchAccount(bluesky)).toBe(true);
+      expect(auth.kind()).toBe('bluesky');
+      expect(auth.token()).toBeNull();
+      expect(auth.sessions().map((s) => s.token)).toEqual(['art-token']);
+    });
+
+    it('offers the Bluesky identity in the switcher only when it is not active', () => {
+      seedBskyIdentity({ did: 'did:plc:abc123', handle: 'me.bsky.social' });
+      auth.setToken('art-token');
+
+      expect(auth.otherSessions().some((c) => c.kind === 'bluesky')).toBe(true);
+
+      auth.enterBluesky();
+      expect(auth.otherSessions().some((c) => c.kind === 'bluesky')).toBe(false);
+    });
+
+    it('does not offer a Bluesky row when no identity exists', () => {
+      auth.setToken('art-token');
+      expect(auth.otherSessions().some((c) => c.kind === 'bluesky')).toBe(false);
+    });
+
+    it('switches Anonymous → Bluesky without disturbing either', () => {
+      seedBskyIdentity({ did: 'did:plc:abc123', handle: 'me.bsky.social' });
+      auth.enterAnonymous();
+
+      const bluesky = auth.otherSessions().find((c) => c.kind === 'bluesky')!;
+      expect(auth.switchAccount(bluesky)).toBe(true);
+
+      expect(auth.isBlueskyPrimary).toBe(true);
+      expect(auth.isAnonymous).toBe(false);
+      // Anonymous is permanent and is still offered to switch back to.
+      expect(auth.otherSessions().some((c) => c.kind === 'anonymous')).toBe(true);
+    });
+  });
+
+  /**
+   * The account-loss suite. `leaveActive` exists because signing out once
+   * deleted a saved account and silently activated another; a new account kind
+   * is the obvious way to reintroduce that, so every exit is pinned here.
+   */
+  describe('leaving, without losing anything', () => {
+    beforeEach(() => {
+      server.setBaseUrl('https://mastodon.art');
+      auth.setToken('art-token');
+      seedBskyIdentity({ did: 'did:plc:abc123', handle: 'me.bsky.social' });
+      auth.enterBluesky();
+    });
+
+    it('leaveActive keeps both the Mastodon stable and the Bluesky identity', () => {
+      auth.leaveActive();
+
+      expect(auth.isAuthenticated).toBe(false);
+      expect(auth.sessions().map((s) => s.token)).toEqual(['art-token']);
+      expect(bskyIdentityStored()).toBe(true);
+      // Still switchable back to, which is the whole promise of leaveActive.
+      rebuild();
+      expect(auth.otherSessions().some((c) => c.kind === 'bluesky')).toBe(true);
+    });
+
+    /**
+     * The specific hazard: without a Bluesky branch, `logout()` filters the
+     * stable by a null token (removing nothing) and then auto-switches into a
+     * saved Mastodon account — so the app looks like it *changed* accounts
+     * rather than signing out. That is precisely how the original bug hid.
+     */
+    it('logout forgets the Bluesky identity and does NOT silently activate Mastodon', () => {
+      auth.logout();
+
+      expect(bskyIdentityStored()).toBe(false);
+      expect(auth.isAuthenticated).toBe(false);
+      expect(auth.kind()).toBeNull();
+      // The Mastodon account is neither activated nor destroyed.
+      expect(auth.token()).toBeNull();
+      expect(auth.sessions().map((s) => s.token)).toEqual(['art-token']);
+    });
+
+    it('removeSession cannot touch the Bluesky identity', () => {
+      auth.removeSession('art-token');
+
+      expect(auth.sessions()).toHaveLength(0);
+      expect(bskyIdentityStored()).toBe(true);
+    });
+
+    it('logoutAll takes everything, including the Bluesky identity', () => {
+      auth.logoutAll();
+
+      expect(auth.sessions()).toHaveLength(0);
+      expect(bskyIdentityStored()).toBe(false);
+      expect(auth.isAuthenticated).toBe(false);
+    });
+
+    it('exitAnonymous does nothing to a Bluesky-primary account', () => {
+      auth.exitAnonymous();
+
+      expect(auth.isBlueskyPrimary).toBe(true);
+      expect(bskyIdentityStored()).toBe(true);
+    });
   });
 });

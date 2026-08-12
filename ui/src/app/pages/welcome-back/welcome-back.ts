@@ -40,8 +40,12 @@ export class WelcomeBack {
   /** Whether this browser can add bookmarks with a keystroke hint (Ctrl/⌘+D everywhere). */
   protected bookmarkHint = /Mac/i.test(navigator.platform) ? '⌘ + D' : 'Ctrl + D';
 
-  /** Head to the login page, which will start OAuth against the already-chosen instance. */
+  /**
+   * Head to the Mastodon login page, which will start OAuth against the
+   * already-chosen instance. Skips the network chooser deliberately: this whole
+   * page is about picking and signing up to a Mastodon server.
+   */
   goSignIn(): void {
-    void this.router.navigate(['/login']);
+    void this.router.navigate(['/login/mastodon']);
   }
 }

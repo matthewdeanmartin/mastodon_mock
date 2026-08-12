@@ -8,5 +8,8 @@ export const authGuard: CanActivateFn = () => {
   if (auth.isAuthenticated) {
     return true;
   }
-  return router.parseUrl('/login');
+  // The front page, not the login page: a stranger who has just arrived should
+  // see what this app is before being asked to choose a server and grant scopes.
+  // `/` offers both "log in" and "continue without logging in".
+  return router.parseUrl('/');
 };

@@ -218,7 +218,9 @@ export class Shell implements OnInit {
     // Re-point at the dead session's instance without activating its token, so
     // the login page offers the host the account actually belongs to.
     this.auth.prepareReauth(session.token);
-    location.assign('login?add=1');
+    // Straight to the Mastodon page, past the network chooser: the account being
+    // re-authenticated is a Mastodon one, so there is nothing to choose.
+    location.assign('login/mastodon?add=1');
   }
 
   /** Give up on the stuck account and drop it from the switcher. */
@@ -249,7 +251,12 @@ export class Shell implements OnInit {
 
   ngOnInit(): void {
     this.hotkeys.start();
-    if (this.auth.isAnonymous) {
+    // Bluesky-primary excluded alongside Anonymous: this gates a Mastodon
+    // `verify_credentials` call, and such an account has no Mastodon token to
+    // verify. Reaching the call below without one fails, and the error branch
+    // calls `exitToLoggedOut()` — so before this, a Bluesky-primary session
+    // signed itself out on every single boot.
+    if (this.auth.isAnonymous || this.auth.isBlueskyPrimary) {
       return;
     }
     if (!this.auth.account()) {
@@ -301,13 +308,24 @@ export class Shell implements OnInit {
             server: target.server ?? '',
             account: target.account,
           };
-    if (session.kind === 'anonymous') {
-      this.auth.switchAccount(session);
-      location.reload();
+    // Anonymous and Bluesky-primary are both tokenless identities: there is no
+    // `verify_credentials` to run, so the switch is committed immediately and the
+    // reload rebuilds everything account-scoped (including `BlueskySession`,
+    // which picks the identity or connector keys at construction). Without this,
+    // a Bluesky choice fell through to the token comparison below, matched
+    // null === null, and returned having done nothing at all.
+    if (session.kind === 'anonymous' || session.kind === 'bluesky') {
+      if (this.auth.switchAccount(session)) {
+        location.reload();
+      }
       return;
     }
     const previous = this.auth.token();
     const previousWasAnonymous = this.auth.isAnonymous;
+    // Remembered for the revert path below: a failed switch away from a
+    // tokenless identity has no token to restore, and `exitToLoggedOut()` would
+    // strand the user signed out of an account that was working a moment ago.
+    const previousWasBluesky = this.auth.isBlueskyPrimary;
     if (session.token === previous) {
       return;
     }
@@ -329,6 +347,8 @@ export class Shell implements OnInit {
         // account) can never reach it, and retrying the switch just fails again.
         if (previousWasAnonymous) {
           this.auth.enterAnonymous();
+        } else if (previousWasBluesky) {
+          this.auth.enterBluesky();
         } else if (previous) {
           this.auth.switchTo(previous);
         } else {
@@ -343,7 +363,10 @@ export class Shell implements OnInit {
 
   addAccount(): void {
     // ?add=1 tells the login page not to bounce an already-signed-in user back home.
-    location.assign('login?add=1');
+    // Goes to the Mastodon page rather than the chooser: this button lives in the
+    // Mastodon account switcher. Adding a Bluesky identity is Sprint 3's job and
+    // will get its own entry point.
+    location.assign('login/mastodon?add=1');
   }
 
   /**
@@ -370,7 +393,10 @@ export class Shell implements OnInit {
     this.showLeave.set(false);
     if (choice === 'all-data') {
       // Every session is gone by definition; there is nothing to fall back to.
-      location.assign('login');
+      // The front page rather than a login form: this browser is now indistinguishable
+      // from a first-time visitor's, which is precisely who `/` is written for.
+      // Resolved against <base href> so it works under /_ui/ and /canary/ alike.
+      location.assign(document.baseURI);
       return;
     }
     // `leaveActive`, never `logout`: the dialog promised not to delete anything,
@@ -381,6 +407,8 @@ export class Shell implements OnInit {
     // twice. Saved accounts survive both remaining choices; `anonymous-data`
     // erases the Anonymous session's own keys and nothing else.
     this.auth.leaveActive();
-    location.assign('login');
+    // Also the front page: `leaveActive` kept every saved account, and `/` offers
+    // both doors plus the anonymous path, where a bare login form offers one.
+    location.assign(document.baseURI);
   }
 }

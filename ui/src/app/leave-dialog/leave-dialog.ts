@@ -44,10 +44,24 @@ export class LeaveDialog {
   /** Overridden in tests; real callers let it read `Auth`. */
   readonly anonymous = input<boolean | null>(null);
 
+  /** Overridden in tests; real callers let it read `Auth`. */
+  readonly bluesky = input<boolean | null>(null);
+
   protected exported = signal(false);
   protected exportError = signal<string | null>(null);
 
   protected isAnonymous = computed(() => this.anonymous() ?? this.auth.isAnonymous);
+
+  /**
+   * A Bluesky-primary identity is the third variant.
+   *
+   * It needs its own copy for one specific reason: the middle option erases the
+   * *anonymous* session's keys and nothing else, so offering "delete anonymous
+   * data" to someone signed in with Bluesky describes data they do not have,
+   * next to a button that sounds like it deletes theirs. Their real choices are
+   * leave (identity kept, per `leaveActive`) or remove everything.
+   */
+  protected isBluesky = computed(() => this.bluesky() ?? this.auth.isBlueskyPrimary);
 
   protected who = computed(() => {
     if (this.isAnonymous()) {

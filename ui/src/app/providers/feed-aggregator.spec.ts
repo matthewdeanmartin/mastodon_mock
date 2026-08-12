@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { delay, firstValueFrom, NEVER, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from '../api';
+import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { HomeDiagnostics } from '../home-diagnostics';
 import { Status } from '../models';
@@ -268,6 +269,55 @@ describe('FeedAggregator', () => {
     expect(fakeRss.fetchPage).not.toHaveBeenCalled();
     expect(fakeBluesky.fetchPage).not.toHaveBeenCalled();
     expect(diagnostics.warn).toHaveBeenCalledWith('aggregator:all-sources-hidden-fallback');
+  });
+
+  /**
+   * The bug that made a Bluesky-primary home feed empty.
+   *
+   * Such an account has no Mastodon token until a Mastodon connector is attached,
+   * so `/api/v1/timelines/home` returns 401. The round is a `forkJoin`, so that
+   * one failure took the *whole* round down — discarding the Bluesky posts that
+   * had already loaded perfectly well, and reporting the feed as failed.
+   */
+  it('does not query the Mastodon timeline for a Bluesky-primary account', async () => {
+    const auth = TestBed.inject(Auth);
+    localStorage.setItem('mockingbird_bsky_identity_profile', JSON.stringify({ did: 'did:plc:me', handle: 'me.bsky.social' }));
+    localStorage.setItem(
+      'mockingbird_bsky_identity_credentials',
+      JSON.stringify({ accessJwt: 'a', refreshJwt: 'r', connectedAt: Date.now() }),
+    );
+    auth.enterBluesky();
+    const aggregator = TestBed.inject(FeedAggregator);
+    fakeBluesky.linked.set(true);
+    fakeBluesky.pages = [[blueskyStatus('b1', '2026-07-14T10:00:00.000Z')]];
+
+    aggregator.reset();
+    const page = await firstValueFrom(aggregator.nextPage());
+
+    expect(homeTimeline).not.toHaveBeenCalled();
+    expect(page.map((status) => status.id)).toEqual(['b1']);
+  });
+
+  /**
+   * The safety net that re-enables Mastodon when every source is hidden must not
+   * fire for a Bluesky-primary account: it would reinstate the 401 above, and
+   * "every source is hidden" is not the situation they are in.
+   */
+  it('does not re-enable Mastodon for a Bluesky-primary account with no other source', async () => {
+    const auth = TestBed.inject(Auth);
+    localStorage.setItem('mockingbird_bsky_identity_profile', JSON.stringify({ did: 'did:plc:me', handle: 'me.bsky.social' }));
+    localStorage.setItem(
+      'mockingbird_bsky_identity_credentials',
+      JSON.stringify({ accessJwt: 'a', refreshJwt: 'r', connectedAt: Date.now() }),
+    );
+    auth.enterBluesky();
+    const aggregator = TestBed.inject(FeedAggregator);
+    // Nothing linked at all — the state that trips the fallback.
+    aggregator.reset();
+    await firstValueFrom(aggregator.nextPage());
+
+    expect(homeTimeline).not.toHaveBeenCalled();
+    expect(diagnostics.warn).not.toHaveBeenCalledWith('aggregator:all-sources-hidden-fallback');
   });
 
   it('keeps healthy sources when a browser-only provider fails', async () => {

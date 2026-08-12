@@ -193,10 +193,10 @@ export class Login implements OnInit, OnDestroy {
   protected prefs = inject(ClientPrefs);
 
   ngOnInit(): void {
-    // Already signed in? Landing on /login (bookmark, stale tab, back button) shouldn't
-    // demand a fresh login cycle — verify the stored token and go straight home. An OAuth
-    // callback (?code=) and the explicit add-account flow (?add=1) still show the page;
-    // a dead token just leaves the user here.
+    // Already signed in? Landing on /login/mastodon (bookmark, stale tab, back button)
+    // shouldn't demand a fresh login cycle — verify the stored token and go straight home.
+    // An OAuth callback (?code=) and the explicit add-account flow (?add=1) still show the
+    // page; a dead token just leaves the user here.
     const params = this.route.snapshot.queryParamMap;
     if (!params.get('code') && !params.get('add') && this.auth.isAuthenticated) {
       if (this.auth.isAnonymous) {

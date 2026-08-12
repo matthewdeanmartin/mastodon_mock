@@ -210,14 +210,29 @@ export class FeedCapability {
   }
 
   /**
-   * Cache key: the host, plus whether we hold a token.
+   * Cache key: the host, plus which kind of session asked.
    *
    * See the class comment — anonymous and signed-in answers differ, and sharing
    * one entry between them would hide feeds from whichever asked second.
+   *
+   * A Bluesky-primary session needs a third value rather than folding into either.
+   * It probes a Mastodon host *anonymously* (it holds no Mastodon token), so
+   * filing its answers under `auth` would be wrong — but filing them under `anon`
+   * would let a real anonymous session inherit them, and vice versa, which is the
+   * same cross-contamination the two-value key was introduced to prevent. Sprint
+   * 4 attaches a real Mastodon account to some of these sessions, at which point
+   * the two genuinely diverge.
    */
   private key(): string {
     const host = this.server.baseUrl() || 'same-origin';
-    return `${host}|${this.auth.isAnonymous ? 'anon' : 'auth'}`;
+    return `${host}|${this.sessionKind()}`;
+  }
+
+  private sessionKind(): 'anon' | 'bsky' | 'auth' {
+    if (this.auth.isAnonymous) {
+      return 'anon';
+    }
+    return this.auth.isBlueskyPrimary ? 'bsky' : 'auth';
   }
 
   private write(host: string, kind: FeedKind, ability: FeedAbility): void {

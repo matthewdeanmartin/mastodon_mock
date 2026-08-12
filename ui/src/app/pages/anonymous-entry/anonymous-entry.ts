@@ -21,7 +21,9 @@ export class AnonymousEntry implements OnInit {
     const server = normalizeHostUrl(sharedHost) || 'https://mastodon.social';
     const result = await probeServerAvailability(server);
     if (result.status !== 'available') {
-      await this.router.navigateByUrl('/login', { replaceUrl: true });
+      // The front page, not a login form: the shared server was unreachable, and
+      // `/` offers both a different way in and an explanation of what this is.
+      await this.router.navigateByUrl('/', { replaceUrl: true });
       return;
     }
     this.auth.enterAnonymous(server);

@@ -1,3 +1,5 @@
+import { blueskyIdentityDid } from './providers/bluesky/bluesky-identity-store';
+
 const TOKEN_KEY = 'mastodon_mock_token';
 const ACCOUNT_MODE_KEY = 'mastodon_mock_account_mode';
 
@@ -13,13 +15,32 @@ const ACCOUNT_MODE_KEY = 'mastodon_mock_account_mode';
  *
  * Authenticated scopes derive from the active token — but a raw bearer token
  * must never appear in a storage key, so we fold it into a short non-reversible
- * hash. The one local Anonymous account uses a fixed `_anonymous` suffix. With
- * neither account mode active there is no suffix.
+ * hash. The one local Anonymous account uses a fixed `_anonymous` suffix. A
+ * Bluesky-primary account uses `_bsky_` plus a hash of its DID. With no account
+ * mode active there is no suffix.
+ *
+ * ## Do not "tidy" the existing branches
+ *
+ * The `_anonymous` and `_<hash(token)>` suffixes are load-bearing: every scoped
+ * key in the app is derived from them, so changing one by a single character
+ * silently repoints a user's RSS feeds, saved searches, lists and linked
+ * accounts at a namespace that has never been written. There is no migration
+ * and no error — the data simply appears to be gone. `account-scope.spec.ts`
+ * pins both against hardcoded literals for exactly this reason.
  */
 export function accountScopeSuffix(): string {
   try {
-    if (localStorage.getItem(ACCOUNT_MODE_KEY) === 'anonymous') {
+    const mode = localStorage.getItem(ACCOUNT_MODE_KEY);
+    if (mode === 'anonymous') {
       return '_anonymous';
+    }
+    if (mode === 'bluesky') {
+      const did = blueskyIdentityDid();
+      // A `bluesky` mode with no identity behind it is a stale key, not an
+      // account. Falling through to the logged-out namespace matches what Auth
+      // does with the same inconsistency, so the two cannot disagree about
+      // which account is active.
+      return did ? scopeSuffixForDid(did) : '';
     }
   } catch {
     // Fall through to the logged-out namespace when storage is unavailable.
@@ -45,8 +66,31 @@ export function scopeSuffixForToken(token: string): string {
   return token ? `_${hash(token)}` : '';
 }
 
+/**
+ * The suffix a *given* Bluesky-primary account's data is stored under, without
+ * making it active. The sibling of {@link scopeSuffixForToken}, and needed for
+ * the same reason: to find (and delete) the local data of an account other than
+ * the one currently signed in.
+ *
+ * The DID is hashed for consistency with the token branch and to keep the
+ * suffix short — not for secrecy. A DID is public, and unlike a bearer token
+ * there would be no harm in it appearing here.
+ */
+export function scopeSuffixForDid(did: string): string {
+  return did ? `${BLUESKY_SCOPE_PREFIX}${hash(did)}` : '';
+}
+
 /** The suffix the one browser-local Anonymous account stores its data under. */
 export const ANONYMOUS_SCOPE_SUFFIX = '_anonymous';
+
+/**
+ * What every Bluesky-primary scope suffix starts with.
+ *
+ * Exported so callers enumerating storage can tell a Bluesky-primary namespace
+ * apart from a Mastodon one, which is otherwise impossible: both are `_` plus
+ * an opaque hash.
+ */
+export const BLUESKY_SCOPE_PREFIX = '_bsky_';
 
 /** Build a per-account storage key from a base key. */
 export function scopedKey(baseKey: string): string {

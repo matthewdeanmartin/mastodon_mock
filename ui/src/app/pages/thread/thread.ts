@@ -126,9 +126,31 @@ export class Thread implements OnInit {
     if (this.isMessageStatus()) {
       return true;
     }
-    const caps = capabilitiesFor(post.provider, !this.auth.isAnonymous);
+    const caps = capabilitiesFor(post.provider, this.canActOn(post.provider));
     return !caps.reply && !caps.favourite && !caps.reblog;
   });
+
+  /**
+   * Whether this session holds credentials for the network a post came from.
+   *
+   * Not one flag but a pairing, because "am I signed in?" stopped being a single
+   * question once Bluesky could be the identity. A Bluesky-primary account can
+   * act on a `bluesky` post and not on a `mastodon` one; a Mastodon account is
+   * the mirror image; Anonymous can act on neither. Asking `!isAnonymous` gave a
+   * Bluesky-primary reader Reply and Favourite buttons on Mastodon posts, wired
+   * to an API it has no token for.
+   */
+  private canActOn(provider: Status['provider']): boolean {
+    if (this.auth.isAnonymous) {
+      return false;
+    }
+    if (this.auth.isBlueskyPrimary) {
+      return provider === 'bluesky';
+    }
+    // Mastodon-primary: Bluesky posts are writable when the connector is linked,
+    // which is what the capability table already assumes for a linked provider.
+    return true;
+  }
 
   /** Everything in the thread that is not part of the author chain: the comments. */
   protected comments = computed<Status[]>(() => {

@@ -25,7 +25,7 @@ describe('AnonymousEntry', () => {
     expect(navigate).toHaveBeenCalledWith('/home', { replaceUrl: true });
   });
 
-  it('sends a fresh browser to login when the default server is blocked', async () => {
+  it('sends a fresh browser to the front page when the default server is blocked', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('blocked')));
     const auth = TestBed.inject(Auth);
     const router = TestBed.inject(Router);
@@ -33,7 +33,7 @@ describe('AnonymousEntry', () => {
 
     TestBed.createComponent(AnonymousEntry).detectChanges();
 
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/login', { replaceUrl: true }));
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true }));
     expect(auth.isAuthenticated).toBe(false);
   });
 

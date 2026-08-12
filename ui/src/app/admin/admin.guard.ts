@@ -24,6 +24,8 @@ export const adminGuard: CanActivateFn = () => {
       auth.setAccount(acc);
       return isStaff(acc.role) ? true : router.parseUrl('/home');
     }),
-    catchError(() => of(router.parseUrl('/login'))),
+    // The Mastodon page, not the chooser: reaching here means an existing
+    // Mastodon token failed verification, so the fix is to re-authenticate it.
+    catchError(() => of(router.parseUrl('/login/mastodon'))),
   );
 };

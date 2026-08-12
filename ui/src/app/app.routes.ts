@@ -13,16 +13,40 @@ import { justMyServerUpdateCanDeactivate, justMyServerUpdateGuard } from './just
 import { mockOnlyChildren } from './mock-routes';
 
 export const routes: Routes = [
+  // The public front door. Unguarded and matched `full`, so a stranger sees what
+  // the app *is* before being asked for anything; the guarded shell keeps its own
+  // '' child below, which is where a signed-in visitor is sent instead.
+  {
+    path: '',
+    pathMatch: 'full',
+    title: 'Welcome',
+    loadComponent: () => import('./pages/front/front').then((m) => m.FrontPage),
+  },
   {
     path: 'anonymous',
     title: 'Browse anonymously',
     loadComponent: () =>
       import('./pages/anonymous-entry/anonymous-entry').then((m) => m.AnonymousEntry),
   },
+  // `/login` is the two-door chooser AND the Mastodon OAuth callback address —
+  // instances have `<base href>login` registered as the redirect_uri, so it
+  // cannot move. The chooser forwards `?code=`/`?add=` to `/login/mastodon`.
   {
     path: 'login',
+    pathMatch: 'full',
     title: 'Sign in',
+    loadComponent: () =>
+      import('./pages/login-chooser/login-chooser').then((m) => m.LoginChooser),
+  },
+  {
+    path: 'login/mastodon',
+    title: 'Sign in with Mastodon',
     loadComponent: () => import('./pages/login/login').then((m) => m.Login),
+  },
+  {
+    path: 'login/bluesky',
+    title: 'Sign in with Bluesky',
+    loadComponent: () => import('./pages/login-bluesky/login-bluesky').then((m) => m.LoginBluesky),
   },
   // New-user landing: bookmark this, sign up on your instance, come back and sign in.
   {
@@ -94,6 +118,9 @@ export const routes: Routes = [
     canDeactivate: [justMyServerUpdateCanDeactivate],
     loadComponent: () => import('./shell/shell').then((m) => m.Shell),
     children: [
+      // Unreachable via `/` now that the public front page claims that path with
+      // `pathMatch: 'full'` — kept because it is what `redirectTo: ''` inside the
+      // shell resolves against, and removing it would turn those into dead ends.
       { path: '', pathMatch: 'full', redirectTo: 'home' },
       {
         path: 'home',
@@ -907,5 +934,8 @@ export const routes: Routes = [
       },
     ],
   },
-  { path: '**', redirectTo: '' },
+  // Unknown URL → `/home`, not `/`: `/` is now the public pitch page, and showing
+  // it to a signed-in user who merely fat-fingered a path reads as a logout. The
+  // auth guard sends a visitor with no account on to `/` from here anyway.
+  { path: '**', redirectTo: 'home' },
 ];

@@ -331,10 +331,19 @@ export class Home implements OnInit, OnDestroy {
 
   protected followingCount = computed(() => this.auth.account()?.following_count ?? 0);
 
+  /**
+   * Also excludes Bluesky-primary, not just Anonymous: the count behind this
+   * nudge is `account().following_count`, a *Mastodon* figure. The Bluesky
+   * identity adapter zeroes its counts on purpose (it does not invent numbers it
+   * has not fetched), so a Bluesky-primary account following hundreds of people
+   * would be told it follows nobody — and pointed at a Mastodon follow importer
+   * it cannot use.
+   */
   protected showFollowNudge = computed(
     () =>
       !this.nudgeDismissed() &&
       !this.auth.isAnonymous &&
+      !this.auth.isBlueskyPrimary &&
       this.auth.account() !== null &&
       this.followingCount() < FOLLOW_NUDGE_THRESHOLD,
   );
@@ -395,8 +404,13 @@ export class Home implements OnInit, OnDestroy {
    * token and have no stream to open, so they stay off whatever the pref says.
    */
   private syncLive(): void {
+    // Bluesky-primary excluded too: this opens a *Mastodon* streaming
+    // connection, which such an account has no token to authenticate.
     const wanted =
-      this.prefs.autoRefreshTimeline() && !this.auth.isAnonymous && !this.justMyServer.enabled();
+      this.prefs.autoRefreshTimeline() &&
+      !this.auth.isAnonymous &&
+      !this.auth.isBlueskyPrimary &&
+      !this.justMyServer.enabled();
     if (wanted === this.live()) {
       return;
     }

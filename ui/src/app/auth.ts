@@ -2,6 +2,12 @@ import { Injectable, computed, inject, linkedSignal, signal } from '@angular/cor
 import { ClientPrefs } from './client-prefs';
 import { Account } from './models';
 import { AnonymousAccount } from './providers/anonymous/anonymous-account';
+import {
+  BSKY_IDENTITY_PROFILE_KEY,
+  blueskyIdentityDid,
+  blueskyIdentityPresent,
+  clearBlueskyIdentity,
+} from './providers/bluesky/bluesky-identity-store';
 import { Server } from './server';
 import { SessionDiagnostics } from './session-diagnostics';
 
@@ -19,7 +25,56 @@ const SESSIONS_KEY = 'mastodon_mock_sessions';
 const SESSION_TOKENS_KEY = 'mastodon_mock_session_tokens';
 export const ACCOUNT_MODE_KEY = 'mastodon_mock_account_mode';
 
-export type AccountMode = 'mastodon' | 'anonymous';
+/**
+ * Which network an account is *primary* on.
+ *
+ * An account has a kind, and the kind decides which network owns the identity;
+ * every other network attaches to it as a connector. `mastodon` was the only
+ * real kind for most of this app's life, which is why so much of it assumes a
+ * bearer token exists.
+ *
+ * `anonymous` predates this type and was bolted onto an enum whose name said
+ * Mastodon — it was always a poor fit for a Mastodon-primary identity model.
+ * Generalising to kinds makes it a first-class citizen, as a side effect of
+ * making `bluesky` one.
+ */
+export type AccountKind = 'mastodon' | 'bluesky' | 'anonymous';
+
+/**
+ * @deprecated Use {@link AccountKind}. Kept so existing imports keep compiling;
+ * the two are the same type.
+ */
+export type AccountMode = AccountKind;
+
+/** Read the persisted kind, ignoring anything this build does not recognise. */
+function storedKind(): AccountKind | null {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(ACCOUNT_MODE_KEY);
+  } catch {
+    return null;
+  }
+  if (raw === 'anonymous') {
+    return 'anonymous';
+  }
+  if (raw === 'bluesky') {
+    // A `bluesky` kind is only honoured when the identity it names is actually
+    // in storage. Otherwise a stale mode key — left by a settings import that
+    // carried the profile but not the JWTs, or by a half-finished unlink —
+    // would strand the app in an account that cannot make a single request.
+    return blueskyIdentityPresent() ? 'bluesky' : null;
+  }
+  if (raw === 'mastodon') {
+    return 'mastodon';
+  }
+  // No mode key at all: the pre-modes layout, where the presence of a token was
+  // itself the signal. Still the state after `setToken` on an old build.
+  try {
+    return localStorage.getItem(TOKEN_KEY) ? 'mastodon' : null;
+  } catch {
+    return null;
+  }
+}
 
 /** A saved login: a token plus a snapshot of the account it belongs to. */
 export interface Session {
@@ -81,6 +136,69 @@ function newSessionId(): string {
 }
 
 /**
+ * Where a Bluesky-primary account "lives", for the switcher's server column.
+ *
+ * Bluesky has no per-user instance the way Mastodon does, so there is nothing
+ * to restore on a switch. The constant keeps `AccountChoice.server` a string
+ * rather than making it nullable for one kind.
+ */
+const BSKY_PRIMARY_SERVER = 'https://bsky.app';
+
+/**
+ * The Bluesky-primary identity as a Mastodon-shaped {@link Account}, for the
+ * switcher and the rail.
+ *
+ * This is the same adaptation the Bluesky provider does for posts and profiles,
+ * applied to the one account the app is *signed in as*. Doing it here keeps the
+ * rule that nothing outside `providers/` learns another protocol exists: the
+ * switcher gets an `Account`, exactly as it does for Mastodon and Anonymous.
+ *
+ * Only the fields a switcher row can show are populated. Counts are zero rather
+ * than invented — the real figures need a `getProfile` call, and four zeroes
+ * that look like a tally would be worse than the rail's existing behaviour of
+ * omitting the stats row until they arrive.
+ */
+function blueskyIdentityAccount(): { did: string; account: Account } | null {
+  if (!blueskyIdentityPresent()) {
+    return null;
+  }
+  let profile: { did?: string; handle?: string; displayName?: string; avatar?: string };
+  try {
+    profile = JSON.parse(localStorage.getItem(BSKY_IDENTITY_PROFILE_KEY) ?? 'null') ?? {};
+  } catch {
+    return null;
+  }
+  const did = profile.did;
+  const handle = profile.handle;
+  if (!did || !handle) {
+    return null;
+  }
+  return {
+    did,
+    account: {
+      // Namespaced, per the standing rule that foreign ids can never collide
+      // with real Mastodon ids in an id-keyed timeline or cache.
+      id: `bsky:${did}`,
+      username: handle,
+      acct: handle,
+      display_name: profile.displayName || handle,
+      note: '',
+      url: `https://bsky.app/profile/${handle}`,
+      avatar: profile.avatar ?? '',
+      avatar_static: profile.avatar ?? '',
+      header: '',
+      header_static: '',
+      followers_count: 0,
+      following_count: 0,
+      statuses_count: 0,
+      bot: false,
+      locked: false,
+      fields: [],
+    },
+  };
+}
+
+/**
  * Holds the active access token plus a Twitter-style stable of saved sessions so a
  * tester can switch accounts without re-pasting tokens. The active token is mirrored
  * to ``TOKEN_KEY`` for the interceptor and back-compat.
@@ -92,21 +210,34 @@ export class Auth {
   private prefs = inject(ClientPrefs);
   private diagnostics = inject(SessionDiagnostics);
 
-  readonly mode = signal<AccountMode | null>(
-    localStorage.getItem(ACCOUNT_MODE_KEY) === 'anonymous'
-      ? 'anonymous'
-      : localStorage.getItem(TOKEN_KEY)
-        ? 'mastodon'
-        : null,
-  );
+  /** The active account's kind. Null when signed out. */
+  readonly kind = signal<AccountKind | null>(storedKind());
+
+  /**
+   * @deprecated Use {@link kind}. An alias, so the ~250 existing readers of
+   * `mode()` keep working unchanged.
+   */
+  readonly mode = this.kind;
 
   readonly token = signal<string | null>(
-    this.mode() === 'mastodon' ? localStorage.getItem(TOKEN_KEY) : null,
+    this.kind() === 'mastodon' ? localStorage.getItem(TOKEN_KEY) : null,
   );
   private mastodonAccount = signal<Account | null>(null);
-  readonly account = linkedSignal(() =>
-    this.mode() === 'anonymous' ? this.anonymous.account() : this.mastodonAccount(),
+  /** The Bluesky-primary account's DID, when that is the active kind. */
+  private blueskyDid = signal<string | null>(
+    this.kind() === 'bluesky' ? blueskyIdentityDid() : null,
   );
+  readonly account = linkedSignal(() => {
+    if (this.kind() === 'anonymous') {
+      return this.anonymous.account();
+    }
+    if (this.kind() === 'bluesky') {
+      // Read through blueskyDid so this recomputes on a switch; the DID itself
+      // is only the trigger, the profile behind it is the payload.
+      return this.blueskyDid() ? (blueskyIdentityAccount()?.account ?? null) : null;
+    }
+    return this.mastodonAccount();
+  });
 
   /** Every account the tester has logged into and not removed. */
   readonly sessions = signal<Session[]>(loadSessions());
@@ -114,7 +245,7 @@ export class Auth {
   /** Saved sessions other than the active one (for the "switch to" menu). */
   readonly otherSessions = computed<AccountChoice[]>(() => {
     const choices: AccountChoice[] = this.sessions()
-      .filter((s) => this.mode() !== 'mastodon' || s.token !== this.token())
+      .filter((s) => this.kind() !== 'mastodon' || s.token !== this.token())
       .map((s) => ({
         key: `mastodon:${s.id}`,
         kind: 'mastodon' as const,
@@ -122,7 +253,22 @@ export class Auth {
         server: s.server ?? '',
         account: s.account,
       }));
-    if (this.mode() !== 'anonymous') {
+    // The Bluesky-primary identity, when one exists and isn't already active.
+    // Unlike Anonymous this is not permanent — it appears only once someone has
+    // signed in with Bluesky.
+    if (this.kind() !== 'bluesky') {
+      const identity = blueskyIdentityAccount();
+      if (identity) {
+        choices.push({
+          key: `bluesky:${identity.did}`,
+          kind: 'bluesky',
+          token: null,
+          server: BSKY_PRIMARY_SERVER,
+          account: identity.account,
+        });
+      }
+    }
+    if (this.kind() !== 'anonymous') {
       choices.push({
         key: 'anonymous',
         kind: 'anonymous',
@@ -135,11 +281,63 @@ export class Auth {
   });
 
   get isAuthenticated(): boolean {
-    return this.mode() !== null;
+    return this.kind() !== null;
   }
 
+  /**
+   * The browser-local Anonymous identity is active.
+   *
+   * ## Read this before using it in new code
+   *
+   * This predicate is **overloaded**, and the two meanings it carries diverge
+   * for a Bluesky-primary account. Across the app it is used to mean both:
+   *
+   *   A. "there is no Mastodon token, so don't make authenticated calls"
+   *      — streaming, `verify_credentials`, the follow nudge;
+   *   B. "read and write the browser-local anonymous stores"
+   *      — the anonymous home feed, its cache, its merge behaviour.
+   *
+   * A Bluesky-primary account needs **A true and B false**: it has no Mastodon
+   * token, but its timeline comes from Bluesky, not from the local corpus. One
+   * boolean cannot answer both, so new code must pick the one it means:
+   * {@link lacksMastodonToken} for A, {@link isAnonymousIdentity} for B.
+   *
+   * This is left returning exactly what it always has — `kind() === 'anonymous'`
+   * — so that every existing call site keeps its current behaviour. Migrating
+   * them happens per page, alongside the work that teaches each page about
+   * Bluesky-primary accounts, so each change is reviewable against a page that
+   * actually exercises it.
+   */
   get isAnonymous(): boolean {
-    return this.mode() === 'anonymous';
+    return this.kind() === 'anonymous';
+  }
+
+  /**
+   * Meaning B: the browser-local Anonymous identity, and nothing else.
+   *
+   * Use this to decide whether to touch the anonymous follows / bookmarks /
+   * tags / feed-corpus stores. Currently identical to {@link isAnonymous}; it
+   * exists so that a call site's *intent* is recorded, and so the two can be
+   * told apart when `isAnonymous` is eventually retired.
+   */
+  get isAnonymousIdentity(): boolean {
+    return this.kind() === 'anonymous';
+  }
+
+  /**
+   * Meaning A: no Mastodon bearer token is available for API calls.
+   *
+   * True for Anonymous, for Bluesky-primary, and when signed out. Gate
+   * authenticated Mastodon work on this — streaming, `verify_credentials`, the
+   * home timeline, anything that would 401 without a token.
+   */
+  get lacksMastodonToken(): boolean {
+    return this.kind() !== 'mastodon';
+  }
+
+  /** Bluesky owns this account's identity; Mastodon is a connector, if present. */
+  get isBlueskyPrimary(): boolean {
+    return this.kind() === 'bluesky';
   }
 
   /** Whether Anonymous is the only account available in this browser. */
@@ -154,8 +352,9 @@ export class Auth {
   setToken(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(ACCOUNT_MODE_KEY, 'mastodon');
-    this.mode.set('mastodon');
+    this.kind.set('mastodon');
     this.token.set(token);
+    this.blueskyDid.set(null);
     const server = this.server.baseUrl();
     const existing = this.sessions().find((s) => s.token === token);
     if (!existing) {
@@ -175,6 +374,13 @@ export class Auth {
       if (account) {
         this.anonymous.updateAccount(account);
       }
+      return;
+    }
+    if (this.isBlueskyPrimary) {
+      // The Bluesky-primary identity is rendered from its own stored profile,
+      // not from a verified Mastodon account. Writing here would put a Mastodon
+      // snapshot behind a Bluesky identity and, worse, `persistSessions` below
+      // would rewrite the stable using a null token.
       return;
     }
     this.mastodonAccount.set(account);
@@ -210,8 +416,9 @@ export class Auth {
     }
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(ACCOUNT_MODE_KEY, 'mastodon');
-    this.mode.set('mastodon');
+    this.kind.set('mastodon');
     this.token.set(token);
+    this.blueskyDid.set(null);
     this.mastodonAccount.set(session.account);
     return true;
   }
@@ -225,7 +432,8 @@ export class Auth {
     localStorage.setItem(ACCOUNT_MODE_KEY, 'anonymous');
     this.token.set(null);
     this.mastodonAccount.set(null);
-    this.mode.set('anonymous');
+    this.blueskyDid.set(null);
+    this.kind.set('anonymous');
     // Entering Anonymous never touches the stable. Logged with the count anyway:
     // this is the step users reported their accounts disappearing *at*, and the
     // evidence that it did not is worth having in the console.
@@ -234,11 +442,48 @@ export class Auth {
     });
   }
 
-  /** Switch either to the virtual account or to a saved Mastodon token. */
+  /**
+   * Activate the Bluesky-primary identity already present in storage.
+   *
+   * Deliberately does **not** create one — signing in with Bluesky is the login
+   * page's job (and does not exist yet). This only makes an existing identity
+   * the active account, which is what the switcher needs.
+   *
+   * Leaves the Mastodon stable completely alone, exactly as `enterAnonymous`
+   * does. Returns false when there is no usable identity to enter, rather than
+   * activating a kind the app cannot serve.
+   */
+  enterBluesky(): boolean {
+    const identity = blueskyIdentityAccount();
+    if (!identity) {
+      this.diagnostics.warn('enter-bluesky-without-identity', {
+        saved: this.sessions().length,
+      });
+      return false;
+    }
+    const saved = this.sessions().length;
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.setItem(ACCOUNT_MODE_KEY, 'bluesky');
+    this.token.set(null);
+    this.mastodonAccount.set(null);
+    this.blueskyDid.set(identity.did);
+    this.kind.set('bluesky');
+    // Same reasoning as enter-anonymous: this must never cost a saved account,
+    // and the console is the only place that can prove it did not.
+    this.diagnostics.transition('enter-bluesky', saved, this.sessions().length, {
+      handle: identity.account.username,
+    });
+    return true;
+  }
+
+  /** Switch to the virtual account, the Bluesky identity, or a saved Mastodon token. */
   switchAccount(choice: AccountChoice): boolean {
     if (choice.kind === 'anonymous') {
       this.enterAnonymous();
       return true;
+    }
+    if (choice.kind === 'bluesky') {
+      return this.enterBluesky();
     }
     return choice.token !== null && this.switchTo(choice.token);
   }
@@ -259,8 +504,9 @@ export class Auth {
     }
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACCOUNT_MODE_KEY);
-    this.mode.set(null);
+    this.kind.set(null);
     this.token.set(null);
+    this.blueskyDid.set(null);
     this.mastodonAccount.set(null);
   }
 
@@ -272,8 +518,9 @@ export class Auth {
   exitToLoggedOut(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACCOUNT_MODE_KEY);
-    this.mode.set(null);
+    this.kind.set(null);
     this.token.set(null);
+    this.blueskyDid.set(null);
     this.mastodonAccount.set(null);
   }
 
@@ -316,9 +563,13 @@ export class Auth {
     const saved = this.sessions().length;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACCOUNT_MODE_KEY);
-    this.mode.set(null);
+    this.kind.set(null);
     this.token.set(null);
+    this.blueskyDid.set(null);
     this.mastodonAccount.set(null);
+    // Note what is *not* here: the Bluesky-primary identity is left in storage,
+    // for the same reason the Mastodon stable is. Leaving to the login screen
+    // must never cost an account, whichever kind was active.
     this.diagnostics.transition('leave-active', saved, saved, {
       reason: 'user left to the login screen; stable deliberately untouched',
     });
@@ -343,10 +594,30 @@ export class Auth {
         return;
       }
       localStorage.removeItem(ACCOUNT_MODE_KEY);
-      this.mode.set(null);
+      this.kind.set(null);
       this.token.set(null);
       this.mastodonAccount.set(null);
       this.diagnostics.transition('logout-anonymous', saved, saved);
+      return;
+    }
+    if (this.isBlueskyPrimary) {
+      // "Remove this account" for a Bluesky-primary identity means forgetting
+      // the Bluesky identity — not filtering the Mastodon stable by a token
+      // that is null. Without this branch the Mastodon path below removes
+      // nothing (no session matches a null token) and then silently activates
+      // a saved Mastodon account: the app would look like it had *switched*
+      // rather than signed out, which is the exact surprise that made the
+      // reported account-loss bug so hard to notice. See leaveActive().
+      clearBlueskyIdentity();
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(ACCOUNT_MODE_KEY);
+      this.kind.set(null);
+      this.token.set(null);
+      this.blueskyDid.set(null);
+      this.mastodonAccount.set(null);
+      this.diagnostics.transition('logout-bluesky-identity', saved, this.sessions().length, {
+        reason: 'forgot the Bluesky-primary identity; Mastodon stable untouched',
+      });
       return;
     }
     const remaining = this.sessions().filter((s) => s.token !== this.token());
@@ -361,7 +632,7 @@ export class Auth {
     }
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACCOUNT_MODE_KEY);
-    this.mode.set(null);
+    this.kind.set(null);
     this.token.set(null);
     this.mastodonAccount.set(null);
     this.diagnostics.transition('logout-forget-active', saved, remaining.length, {
@@ -377,20 +648,29 @@ export class Auth {
     this.diagnostics.transition('exit-anonymous', this.sessions().length, this.sessions().length);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACCOUNT_MODE_KEY);
-    this.mode.set(null);
+    this.kind.set(null);
     this.token.set(null);
     this.mastodonAccount.set(null);
   }
 
-  /** Forget every saved session and sign out entirely. */
+  /**
+   * Forget every saved session and sign out entirely.
+   *
+   * "Every" now includes the Bluesky-primary identity. Leaving it behind would
+   * make this the one exit that promises to take everything and quietly does
+   * not — and the account would reappear in the switcher afterwards, which
+   * reads as the wipe having failed.
+   */
   logoutAll(): void {
     const saved = this.sessions().length;
     this.persistSessions([]);
+    clearBlueskyIdentity();
     this.diagnostics.transition('logout-all', saved, 0);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACCOUNT_MODE_KEY);
-    this.mode.set(null);
+    this.kind.set(null);
     this.token.set(null);
+    this.blueskyDid.set(null);
     this.mastodonAccount.set(null);
   }
 

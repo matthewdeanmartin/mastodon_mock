@@ -39,6 +39,23 @@ export class RailProfiles {
   private blueskyProfile = signal<BskyProfile | null>(null);
   private loaded = false;
 
+  /**
+   * Stats for a Bluesky-primary active card, once `getProfile` has answered.
+   * Empty until then — the card renders without a stats row rather than showing
+   * zeroes that read as a real tally.
+   */
+  private blueskyStats(): { label: string; value: number }[] {
+    const profile = this.blueskyProfile();
+    if (!profile) {
+      return [];
+    }
+    return [
+      { label: this.words().Posts, value: profile.postsCount ?? 0 },
+      { label: 'Following', value: profile.followsCount ?? 0 },
+      { label: 'Followers', value: profile.followersCount ?? 0 },
+    ];
+  }
+
   /** Follows for the active identity; the server's figure, or the local one. */
   readonly followingCount = computed(() =>
     this.auth.isAnonymous
@@ -56,31 +73,52 @@ export class RailProfiles {
     const active = this.auth.account();
     if (active) {
       const anonymousActive = this.auth.isAnonymous;
+      // The active card names the network the app is signed in *to*. Before
+      // Bluesky could be an identity this was a two-way choice, and anything
+      // that was not Anonymous was Mastodon by definition — which labelled a
+      // Bluesky-primary account "🐘 Mastodon" under its own bsky.social handle.
+      const blueskyActive = this.auth.isBlueskyPrimary;
       cards.push({
-        key: anonymousActive ? 'anonymous' : `mastodon:${active.id}`,
-        badge: anonymousActive ? MOCKINGBIRD_BADGE : '🐘',
-        network: anonymousActive ? 'Local' : 'Mastodon',
+        key: anonymousActive
+          ? 'anonymous'
+          : blueskyActive
+            ? `bluesky:${active.id}`
+            : `mastodon:${active.id}`,
+        badge: anonymousActive ? MOCKINGBIRD_BADGE : blueskyActive ? '🦋' : '🐘',
+        network: anonymousActive ? 'Local' : blueskyActive ? 'Bluesky' : 'Mastodon',
         displayName: active.display_name || active.username,
         handle: active.username,
         avatar: active.avatar_static || active.avatar,
         header: active.header_static || active.header,
         bioHtml: active.note || undefined,
-        stats: [
-          {
-            label: this.words().Posts,
-            value: active.statuses_count,
-            link: ['/accounts', active.id],
-          },
-          { label: 'Following', value: this.followingCount(), link: ['/accounts', active.id] },
-          { label: 'Followers', value: active.followers_count, link: ['/accounts', active.id] },
-          { label: 'Hashtags', value: this.hashtagCount(), link: ['/feeds/tags'] },
-        ],
+        // A Bluesky-primary account's stats come from `getProfile`, not from the
+        // active `Account`: the identity adapter zeroes its counts rather than
+        // inventing them (four zeroes that look like a tally are worse than
+        // none), and `load()` has already fetched the real figures for the card.
+        // No Hashtags row — followed hashtags are a Mastodon concept this
+        // account does not have until Sprint 4 attaches one.
+        stats: blueskyActive
+          ? this.blueskyStats()
+          : [
+              {
+                label: this.words().Posts,
+                value: active.statuses_count,
+                link: ['/accounts', active.id],
+              },
+              { label: 'Following', value: this.followingCount(), link: ['/accounts', active.id] },
+              { label: 'Followers', value: active.followers_count, link: ['/accounts', active.id] },
+              { label: 'Hashtags', value: this.hashtagCount(), link: ['/feeds/tags'] },
+            ],
         link: ['/accounts', active.id],
         account: active,
         active: true,
       });
     }
-    const bsky = this.blueskySession.session();
+    // The connector card. Skipped when Bluesky *is* the active identity: the
+    // session behind it is the same account already shown above, so rendering it
+    // again would stack the user's own account on top of itself — once correctly
+    // labelled and once as a connector they never linked.
+    const bsky = this.auth.isBlueskyPrimary ? null : this.blueskySession.session();
     if (bsky) {
       const profile = this.blueskyProfile();
       cards.push({
@@ -140,6 +178,11 @@ export class RailProfiles {
     this.loaded = true;
     if (this.auth.isAnonymous) {
       this.hashtagCount.set(this.anonymousTags.count());
+    } else if (this.auth.isBlueskyPrimary) {
+      // `followedTags()` is an authenticated Mastodon call and would 401 here.
+      // Followed hashtags are a Mastodon concept this account does not have until
+      // Sprint 4 attaches one.
+      this.hashtagCount.set(0);
     } else {
       this.api.followedTags().subscribe({
         next: (tags) => this.hashtagCount.set(tags.length),

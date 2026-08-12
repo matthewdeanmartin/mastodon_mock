@@ -37,6 +37,38 @@ export function storedBskyProfile(scopeSuffix = ''): Record<string, unknown> | n
   return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
 }
 
+/**
+ * Seed a **Bluesky-primary** identity — the account the app is signed in *as*,
+ * not a connector link. Unscoped, and split into its two halves, matching
+ * `bluesky-identity-store.ts`.
+ */
+export function seedBskyIdentity(
+  identity: { did: string; handle: string; displayName?: string; avatar?: string },
+  credentials: { accessJwt?: string; refreshJwt?: string; connectedAt?: number } = {},
+): void {
+  const { did, handle, displayName, avatar } = identity;
+  localStorage.setItem(
+    'mockingbird_bsky_identity_profile',
+    JSON.stringify({ did, handle, displayName, avatar, service: 'https://bsky.social' }),
+  );
+  localStorage.setItem(
+    'mockingbird_bsky_identity_credentials',
+    JSON.stringify({
+      accessJwt: credentials.accessJwt ?? 'access-jwt',
+      refreshJwt: credentials.refreshJwt ?? 'refresh-jwt',
+      connectedAt: credentials.connectedAt ?? Date.now(),
+    }),
+  );
+}
+
+/** True when a Bluesky-primary identity is present in storage (either half). */
+export function bskyIdentityStored(): boolean {
+  return (
+    localStorage.getItem('mockingbird_bsky_identity_profile') !== null ||
+    localStorage.getItem('mockingbird_bsky_identity_credentials') !== null
+  );
+}
+
 /** Seed a connected GitHub account, writing the profile and PAT to their own keys. */
 export function seedGitHubConnection(
   accessToken: string,

@@ -1,0 +1,41 @@
+<div class="chooser-wrap">
+  <div class="chooser-card">
+    <h1 class="chooser-title">Where's your account?</h1>
+    <!--
+      Copy has to work for someone who has never heard the word "fediverse", so
+      each door describes what the user recognises — the name of the thing they
+      signed up for — rather than the protocol underneath it.
+    -->
+    <p class="chooser-sub muted">
+      Pick the network your account is on. You can connect the other one later, and read both in
+      the same timeline.
+    </p>
+
+    <div class="doors">
+      <a class="door" routerLink="/login/mastodon">
+        <span class="door-badge" aria-hidden="true">🐘</span>
+        <span class="door-body">
+          <span class="door-name">Mastodon</span>
+          <span class="door-hint muted small">
+            Also Fosstodon, mastodon.social, Hachyderm, or any other server that runs Mastodon.
+          </span>
+        </span>
+      </a>
+
+      <a class="door" routerLink="/login/bluesky">
+        <span class="door-badge" aria-hidden="true">🦋</span>
+        <span class="door-body">
+          <span class="door-name">Bluesky</span>
+          <span class="door-hint muted small">
+            A handle like yourname.bsky.social, or your own domain.
+          </span>
+        </span>
+      </a>
+    </div>
+
+    <!-- For anyone who took the wrong door. Quiet, but a real way out. -->
+    <p class="chooser-out small">
+      Not sure yet? <a routerLink="/">Look around without an account</a> instead.
+    </p>
+  </div>
+</div>

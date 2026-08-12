@@ -234,6 +234,9 @@
                   + Add an account
                 </button>
               }
+              <!-- "Log out" is right for a Bluesky-primary identity: it is a real
+                   account with real credentials, not the browser-local session
+                   "Exit anonymous" describes. -->
               <button type="button" class="menu-action danger" (click)="logout()">
                 {{ auth.isAnonymous ? 'Exit anonymous' : 'Log out' }}
               </button>

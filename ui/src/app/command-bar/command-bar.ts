@@ -57,7 +57,11 @@ export type FeedView = 'feed' | 'members' | 'analytics';
              may wrap, but Fedi / Bluesky / Twitter never end up stranded on
              separate rows. -->
         <span class="command-group provider-group" role="group" aria-label="Feed sources">
-          @if (!auth.isAnonymous) {
+          <!-- No Fedi chip for a Bluesky-primary account: it holds no Mastodon
+               token, so the aggregator never queries that source and a filter
+               for it would toggle nothing. Sprint 4 attaches Mastodon underneath,
+               and the chip becomes meaningful again then. -->
+          @if (!auth.isAnonymous && !auth.isBlueskyPrimary) {
             <button
               class="btn command-item"
               [class.active]="prefs.isProviderVisible('mastodon')"

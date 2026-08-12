@@ -125,7 +125,21 @@ export class FeedAggregator {
     this.cutoff = windowMs === null ? null : Date.now() - windowMs;
     this.droppedByWindow.set(0);
     this.mastodonMaxId = undefined;
-    this.mastodonExhausted = this.auth.isAnonymous || !this.prefs.isProviderVisible('mastodon');
+    // Anonymous *or* Bluesky-primary: neither can call /api/v1/timelines/home.
+    // A Bluesky-primary account has no Mastodon token until Sprint 4 attaches
+    // one, and querying anyway returns 401 — which, because the round is a
+    // forkJoin, took the *whole* round down and discarded the Bluesky posts that
+    // had loaded perfectly well. A Bluesky-primary home feed was empty for
+    // exactly this reason.
+    //
+    // Deliberately not `lacksMastodonToken`, which is also true when signed out:
+    // a signed-out session never reaches Home in the real app (the auth guard
+    // redirects), so treating it as Mastodon-capable is both harmless and what
+    // the aggregator's own specs assume.
+    this.mastodonExhausted =
+      this.auth.isAnonymous ||
+      this.auth.isBlueskyPrimary ||
+      !this.prefs.isProviderVisible('mastodon');
     this.foreign = this.registry
       .linked()
       .filter((provider) => this.prefs.isProviderVisible(provider.id))
@@ -138,7 +152,16 @@ export class FeedAggregator {
     // localStorage prefs blob) would otherwise get a permanently empty home
     // feed with no visible chip to recover — Mastodon is their primary network,
     // so keep it enabled rather than honour a filter that shows nothing.
-    if (!this.auth.isAnonymous && this.mastodonExhausted && !this.foreign.length) {
+    //
+    // Not for anonymous or Bluesky-primary readers: re-enabling Mastodon for
+    // them would reinstate the 401 above, and "every source is hidden" is not the
+    // situation they are in anyway.
+    if (
+      !this.auth.isAnonymous &&
+      !this.auth.isBlueskyPrimary &&
+      this.mastodonExhausted &&
+      !this.foreign.length
+    ) {
       this.mastodonExhausted = false;
       this.diagnostics.warn('aggregator:all-sources-hidden-fallback');
     }

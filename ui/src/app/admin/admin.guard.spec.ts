@@ -109,7 +109,9 @@ describe('adminGuard', () => {
     expect((result as UrlTree).toString()).toBe('/home');
   });
 
-  it('redirects to /login on HTTP error during verify_credentials', async () => {
+  // Straight to the Mastodon page, past the network chooser: getting here means an
+  // existing Mastodon token failed verification, so there is nothing to choose.
+  it('redirects to /login/mastodon on HTTP error during verify_credentials', async () => {
     auth.setToken('stale-token');
     expect(auth.account()).toBeNull();
 
@@ -122,6 +124,6 @@ describe('adminGuard', () => {
 
     const result = await guardPromise;
     expect(result).toBeInstanceOf(UrlTree);
-    expect((result as UrlTree).toString()).toBe('/login');
+    expect((result as UrlTree).toString()).toBe('/login/mastodon');
   });
 });

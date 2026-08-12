@@ -1,0 +1,86 @@
+<div class="bsky-wrap">
+  <div class="bsky-card">
+    <span class="bsky-badge" aria-hidden="true">🦋</span>
+    <h1 class="bsky-title">Sign in with Bluesky</h1>
+    <p class="bsky-body muted">
+      Your Bluesky timeline becomes your home timeline in {{ brand }}. You can reply, like and
+      repost from here.
+    </p>
+
+    <!--
+      The app-password explanation is not fine print. Asking a stranger for a
+      password is the single scariest thing this app does, and the honest answer —
+      it is a revocable, purpose-made credential, not your real password — is the
+      thing that makes it reasonable. So it sits above the form, not below it.
+    -->
+    <div class="bsky-appword">
+      <p>
+        Use an <strong>app password</strong>, not your real Bluesky password. Make one at
+        <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noopener noreferrer"
+          >bsky.app → Settings → Privacy and security → App Passwords</a
+        >.
+      </p>
+      <p class="muted small">
+        App passwords are revocable at any time from that page, and this one never leaves your
+        browser except to sign in to Bluesky itself. Tick
+        <em>"Allow access to your direct messages"</em> when creating it if you want your Bluesky
+        DMs in Chat.
+      </p>
+    </div>
+
+    <form class="bsky-form" (ngSubmit)="submit()">
+      <label class="bsky-field">
+        <span class="bsky-label">Handle</span>
+        <input
+          type="text"
+          name="bskyHandle"
+          placeholder="you.bsky.social"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+          [ngModel]="handle()"
+          (ngModelChange)="handle.set($event)"
+          [disabled]="working()"
+        />
+      </label>
+
+      <label class="bsky-field">
+        <span class="bsky-label">App password</span>
+        <input
+          type="password"
+          name="bskyAppPassword"
+          placeholder="xxxx-xxxx-xxxx-xxxx"
+          autocomplete="off"
+          [ngModel]="appPassword()"
+          (ngModelChange)="appPassword.set($event)"
+          [disabled]="working()"
+        />
+      </label>
+
+      <button
+        class="bsky-btn bsky-btn-primary bsky-submit"
+        type="submit"
+        [disabled]="!handle().trim() || !appPassword() || working()"
+      >
+        {{ working() ? 'Signing in…' : 'Sign in' }}
+      </button>
+    </form>
+
+    @if (error(); as msg) {
+      <p class="bsky-error" role="alert">{{ msg }}</p>
+    }
+    @if (selfHostedHint()) {
+      <!-- The one failure that looks like a wrong password but isn't: bsky.social
+           is an entryway and cannot authenticate an account on someone else's PDS. -->
+      <p class="bsky-hint muted small">
+        If you host your own PDS rather than using Bluesky's, signing in that way isn't supported
+        yet — this form authenticates against bsky.social.
+      </p>
+    }
+
+    <p class="bsky-out small">
+      <a routerLink="/login">Use a different network</a> ·
+      <a routerLink="/">Look around without an account</a>
+    </p>
+  </div>
+</div>

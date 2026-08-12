@@ -126,6 +126,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Bluesky access + refresh JWTs. Split out of mockingbird_bsky_profile.',
   },
   {
+    base: 'mockingbird_bsky_identity_credentials',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: 'JWTs for a Bluesky-PRIMARY account — the one the app is signed in as, not a connector. Unscoped, unlike mockingbird_bsky_credentials: scoping it by the active account would be circular, since the scope suffix is derived from this account’s own DID. Same reasoning (and same treatment) as mastodon_mock_session_tokens.',
+  },
+  {
     base: 'mockingbird_github_credentials',
     storage: 'local',
     suffix: 'account',
@@ -231,6 +238,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'account',
     sensitivity: 'private',
     note: 'Linked Bluesky handle, DID, display name, avatar, resolved PDS.',
+  },
+  {
+    base: 'mockingbird_bsky_identity_profile',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'Who a Bluesky-PRIMARY account is: handle, DID, display name, avatar. Identity, not credentials — the JWTs live in mockingbird_bsky_identity_credentials, exactly as mastodon_mock_sessions splits from its tokens. Exportable so a personal backup can record which account was primary; the export cannot authenticate as it.',
   },
   {
     base: 'mockingbird_github_user',
@@ -546,7 +560,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'setting',
-    note: 'Whether the last session was a Mastodon account or Anonymous.',
+    note: 'Which kind of account was last active: mastodon, bluesky or anonymous.',
   },
 
   // ---- cache: refetchable, never exported ----
