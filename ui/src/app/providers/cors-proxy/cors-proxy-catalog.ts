@@ -79,7 +79,9 @@ export type CorsProxyRoute =
   | 'webmention-send'
   | 'twitterapi'
   | 'getxapi'
-  | 'mataroa';
+  | 'mataroa'
+  | 'shortener'
+  | 'paste';
 
 /** How a proxy wants the target URL spliced into its own. */
 export interface CorsProxyTemplate {
@@ -186,7 +188,7 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
     id: 'mawkingbird',
     label: 'Mawkingbird proxy',
     pitch:
-      "Run by this app, for this app. No signup, no key, and nobody else's rate limit to share.",
+      "Run by this app, for this app. No signup, no key. Please see ToS below.",
     template: {
       // `{route}` names the policy the proxy should apply; `{url}` is the
       // target. Both are substituted by `buildProxiedUrl`.
@@ -203,7 +205,10 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
       'Feeds: 60 requests per minute, 2 MB per response, cached 5 minutes. Webmentions and the ' +
       'API connectors are tighter. Only the destinations this app actually uses are reachable, ' +
       'and video and audio are refused outright — it is not a general-purpose proxy.',
-    homepage: 'https://github.com/nanomartinlabs/mawkingbird_cors_proxy',
+    // The service's own terms page, not the source repository — the repo is
+    // private, so linking it would send users to a 404 and imply the service is
+    // open source when it is not.
+    homepage: 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/',
   },
   {
     id: 'allorigins',

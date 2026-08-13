@@ -58,7 +58,11 @@ export class PasteFeedFetch {
     let headers = extraHeaders ? new HttpHeaders(extraHeaders) : undefined;
     if (useProxy) {
       try {
-        const proxied = this.corsProxy.proxyRequest(url);
+        // The `paste` route rather than `feeds`: these are the paste hosts
+        // specifically, and that route is the one permitted to carry the
+        // `X-API-Key` that `extraHeaders` may hold. `feeds` forwards no headers
+        // at all, so a keyed subscription would silently read as unauthenticated.
+        const proxied = this.corsProxy.proxyRequest(url, 'paste');
         requestUrl = proxied.url;
         // The proxy's headers win on collision, and the feed's ride along. Many
         // proxies drop unknown request headers, so a key sent this way may not

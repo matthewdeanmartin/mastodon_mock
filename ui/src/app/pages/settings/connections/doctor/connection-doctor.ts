@@ -154,7 +154,15 @@ export class ConnectionDoctor {
       return { proxy: 'none', proxyMs: null };
     }
 
-    const proxiedUrl = buildProxiedUrl(config, target.probeUrl);
+    // A destination-restricting proxy can only be asked about hosts it has a
+    // route for. Sending one of the others would get a correct 403 from our own
+    // allowlist, which this page would then report as the *target* refusing the
+    // proxy — blaming a third party for our policy.
+    if (config.entry.template.routed && !target.proxyRoute) {
+      return { proxy: 'not-routable', proxyMs: null };
+    }
+
+    const proxiedUrl = buildProxiedUrl(config, target.probeUrl, target.proxyRoute);
     const started = performance.now();
     try {
       // `cors` mode, deliberately: the entire point of a proxy is that its

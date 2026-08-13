@@ -219,8 +219,8 @@ export class ShortenerTransport {
     let proxied: { url: string; headers: HttpHeaders };
     try {
       proxied = carriesCredential
-        ? this.proxy.proxyCredentialedRequest(spec.url, true)
-        : this.proxy.proxyRequest(spec.url);
+        ? this.proxy.proxyCredentialedRequest(spec.url, true, 'shortener')
+        : this.proxy.proxyRequest(spec.url, 'shortener');
     } catch (error: unknown) {
       // A refusal here is a genuine safety stop (mixed content, userinfo), not
       // a missing consent — surface it as the error it is.

@@ -42,6 +42,8 @@
  * the other answers can express.
  */
 
+import { CorsProxyRoute } from '../../../../providers/cors-proxy/cors-proxy-catalog';
+
 /** Groups the probe list so a blocked *category* is visible at a glance. */
 export type ProbeCategory = 'core' | 'connector' | 'proxy' | 'shortener' | 'control';
 
@@ -59,6 +61,21 @@ export interface ProbeTarget {
    * response is unreadable, so this only ever proves the host answered.
    */
   probeUrl: string;
+  /**
+   * Which proxy route reaches this host, for proxies that restrict destinations.
+   *
+   * Only the Mawkingbird proxy reads it; the third-party proxies fetch whatever
+   * they are given and ignore it. `undefined` means *no route reaches this
+   * host* — the honest answer for the hosts the app talks to directly, such as
+   * Bluesky, GitHub, OpenRouter and Dropbox, which are CORS-open and never need
+   * a relay.
+   *
+   * The distinction matters to this page specifically: without it every such
+   * probe sends `route=feeds`, our proxy correctly answers 403, and the doctor
+   * reports "the target refused the proxy" — blaming the target for our own
+   * policy. See {@link ConnectionDoctor.probeViaProxy}.
+   */
+  proxyRoute?: CorsProxyRoute;
   /**
    * Where "Open in a tab" sends the user. Deliberately a *human* page rather
    * than {@link probeUrl}: an API endpoint renders as raw JSON or a 404, which
@@ -199,6 +216,7 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     label: 'Twitter data service',
     category: 'connector',
     probeUrl: 'https://api.twitterapi.io/',
+    proxyRoute: 'twitterapi',
     openUrl: 'https://twitterapi.io',
     matters: 'Reading public tweets. Also needs a CORS proxy.',
     // Also reports upstream X/Twitter impact, which is the usual cause here.
@@ -314,6 +332,7 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     label: 'Dub (shortener)',
     category: 'shortener',
     probeUrl: 'https://api.dub.co/',
+    proxyRoute: 'shortener',
     openUrl: 'https://dub.co',
     matters: 'Shortening links with Dub.',
     // Separates App, API and Link Redirects; the API component is this row.
@@ -329,6 +348,7 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     label: 'Short.io',
     category: 'shortener',
     probeUrl: 'https://api.short.io/',
+    proxyRoute: 'shortener',
     openUrl: 'https://short.io',
     matters: 'Shortening links with Short.io.',
     status: {
@@ -343,6 +363,7 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     label: 'T.LY (shortener)',
     category: 'shortener',
     probeUrl: 'https://api.t.ly/',
+    proxyRoute: 'shortener',
     openUrl: 'https://t.ly',
     matters: 'Shortening links with T.LY.',
     // No official page found, so this is an aggregator — supporting evidence,
@@ -375,6 +396,9 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     // one fails, the network or the browser is the problem and no individual
     // verdict below it means anything.
     probeUrl: 'https://example.com/',
+    // An ordinary public page, so the open `feeds` route reaches it. This is
+    // also the only probe that meaningfully exercises our own proxy end to end.
+    proxyRoute: 'feeds',
     openUrl: 'https://example.com',
     matters: 'Nothing — this one is only here to prove the test itself works.',
     // Not applicable: a control host is only ever asked whether the test itself
@@ -433,11 +457,17 @@ export type CorsReadable = 'unknown' | 'readable' | 'blocked';
  * - `none` — no proxy configured, so there was nothing to test.
  * - `not-needed` — the host is directly readable; a proxy would add latency
  *   and a middleman for no benefit.
+ * - `not-routable` — the configured proxy restricts destinations and has no
+ *   route to this host. A policy decision, not a failure: the Mawkingbird proxy
+ *   deliberately cannot reach the credential-bearing hosts. Distinguished from
+ *   `target-refused` because reporting our own allowlist as the *target*
+ *   refusing us would send the user off debugging someone else's service.
  */
 export type ProxyVerdict =
   | 'unknown'
   | 'none'
   | 'not-needed'
+  | 'not-routable'
   | 'works'
   | 'proxy-unreachable'
   | 'target-refused';
@@ -641,6 +671,8 @@ export function proxyHint(result: ProbeResult, proxyLabel: string | null): strin
       return `${via} could not be reached at all, so this host could not be tested through it. Fix the proxy first — the row above is about the proxy, not about this service.`;
     case 'none':
       return 'This host needs a CORS proxy and none is configured, so it cannot work yet. Setting one up is what makes it reachable.';
+    case 'not-routable':
+      return `${via} only reaches the specific services it was built for, and this is not one of them — it was not tried. That is deliberate: a proxy sees everything it relays, so the ones carrying your accounts and keys are kept off it. Choose a general-purpose proxy if you need this host proxied.`;
     case 'not-needed':
     case 'unknown':
       return null;
