@@ -159,7 +159,7 @@
   <button
     class="btn btn-outline"
     type="button"
-    [disabled]="!settings.usable() || test().status === 'running'"
+    [disabled]="!settings.usable() || pendingSelection() || test().status === 'running'"
     (click)="runTest()"
   >
     {{ test().status === 'running' ? 'Testing…' : 'Test proxy' }}
@@ -168,6 +168,14 @@
     <button class="btn btn-outline" type="button" (click)="disconnect()">Stop using a proxy</button>
   }
 </div>
+
+@if (pendingSelection()) {
+  <p class="muted small" role="status">
+    Save {{ selected()?.label }} before testing it. Until you do,
+    {{ settings.chosen()?.label ?? 'no proxy' }} is still the one feeds use — so a test now would
+    tell you about the wrong service.
+  </p>
+}
 
 @if (test(); as result) {
   @switch (result.status) {

@@ -78,6 +78,20 @@ export class ConnectionCorsProxy implements OnInit {
 
   protected readonly isCustom = computed(() => this.selectedId() === 'custom');
 
+  /**
+   * True when the proxy on screen is not the one a test would actually use.
+   *
+   * {@link choose} commits most selections immediately, so this is only ever
+   * reachable for the two that cannot be committed on selection alone: custom
+   * before its template is saved, and a key-required proxy before its key is
+   * pasted. Those are exactly the states where a Test result would describe the
+   * wrong service, so the button is disabled and the reason is on screen.
+   */
+  protected readonly pendingSelection = computed(() => {
+    const id = this.selectedId();
+    return id !== null && id !== this.settings.currentId();
+  });
+
   /** Whether the chosen proxy has anywhere to put a key. */
   protected readonly takesKey = computed(() => {
     const entry = this.selected();
@@ -118,11 +132,41 @@ export class ConnectionCorsProxy implements OnInit {
     }
   }
 
+  /**
+   * Switch proxies, and commit the switch straight away when it is complete.
+   *
+   * The Test button tests what is *saved*, which is right — feeds use the saved
+   * configuration, so testing unsaved form state would be a lie. But combined
+   * with a selection that only took effect on Save, it produced the worst
+   * possible reading: pick CORS.SH, press Test, watch a request go to the proxy
+   * you just moved away from. Nothing on screen said the old one was still the
+   * live one, so the picker looked broken and sticky.
+   *
+   * The link-shortener page does not have this problem, because choosing a
+   * provider that needs nothing further activates it. Same rule here: for a
+   * catalog proxy with no key to type, the radio button *is* the configuration,
+   * so selecting it saves it. Custom still waits for Save — it is not
+   * configured until a template exists — and so does a key-required proxy with
+   * no key yet, since committing it would leave the app with a proxy it cannot
+   * resolve.
+   */
   choose(id: CorsProxyId): void {
     this.selectedId.set(id);
     this.test.set({ status: 'idle' });
     this.notice.set(null);
     this.error.set(null);
+
+    const entry = this.selected();
+    if (!entry || entry.id === 'custom') {
+      return;
+    }
+    if (entry.keyRequired && !this.settings.hasKey()) {
+      // Selecting it is not enough to make it work; leave the previous
+      // selection in place rather than saving a proxy that resolves to null.
+      return;
+    }
+    this.settings.select(entry.id);
+    this.notice.set(`${entry.label} is now the active proxy.`);
   }
 
   save(): void {

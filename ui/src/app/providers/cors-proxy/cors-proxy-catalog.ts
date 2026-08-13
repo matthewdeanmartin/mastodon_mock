@@ -51,7 +51,13 @@
  */
 
 /** Route-free identity of a proxy, and the value persisted in settings. */
-export type CorsProxyId = 'allorigins' | 'corssh' | 'corsfix' | 'corsproxy-io' | 'custom';
+export type CorsProxyId =
+  | 'allorigins'
+  | 'corssh'
+  | 'corsfix'
+  | 'corslol'
+  | 'corsproxy-io'
+  | 'custom';
 
 /** How a proxy wants the target URL spliced into its own. */
 export interface CorsProxyTemplate {
@@ -210,6 +216,28 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
     homepage: 'https://corsfix.com/',
   },
   {
+    id: 'corslol',
+    label: 'cors.lol',
+    pitch: 'Free and no signup, when it is not rate-limited. Worth a try when the others are down.',
+    template: {
+      pattern: 'https://api.cors.lol/?url={url}',
+      encodeTarget: true,
+    },
+    // Deliberately `undefined` rather than a measured value. The 2026-07-31 pass
+    // could not establish it: the service 429'd before a header-carrying request
+    // ever got through. Unproven is the honest state, and the Test button is what
+    // settles it.
+    forwardsCustomHeaders: undefined,
+    // No keyHeader: the free tier authenticates nothing, so there is no header
+    // to put a key in and the UI correctly shows no key field.
+    limits:
+      'Rate-limited on the free tier, with no published numbers, and a one-off paid plan that ' +
+      'lifts the limit. In testing it answered HTTP 429 on nearly every request, including the ' +
+      'first of a session — but free proxies run on a shared quota that resets, so it is worth ' +
+      'retrying on another day rather than assuming it is broken for good.',
+    homepage: 'https://cors.lol/',
+  },
+  {
     id: 'corsproxy-io',
     label: 'CorsProxy.io',
     pitch: 'Edge-hosted and quick, but the free tier only answers development origins.',
@@ -231,12 +259,14 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
   //   service's own marketing homepage as HTML for every target, including
   //   `https://example.com`. Not a header problem — it no longer proxies at all.
   //
-  // - **cors.lol**. Answered HTTP 429 "Rate limit exceeded" on essentially every
-  //   request from a residential IP, including the very first of a session and a
-  //   trivial `example.com` target. It briefly served `example.com` once and
-  //   then 429'd everything after, so its header-forwarding could not even be
-  //   established. A proxy that rate-limits below one request per session cannot
-  //   be offered to users.
+  // (**cors.lol** was on this list after the same pass and has since been
+  //   re-added above. The 429s were real, but the conclusion drawn from them —
+  //   "permanently unusable" — did not survive contact with how these services
+  //   actually work: a free proxy is one shared quota on somebody's small paid
+  //   plan, so a day of blanket 429s is an exhausted bucket, not a property of
+  //   the service. The listed proxies fail this way too, often. Offering it
+  //   with honest copy costs nothing and gives the user another door to try
+  //   when today's first choice is down.)
   //
   // - **CORS Anywhere** (cors-anywhere.herokuapp.com). HTTP 403 "See /corsdemo
   //   for more info": the public demo requires a human to click through an

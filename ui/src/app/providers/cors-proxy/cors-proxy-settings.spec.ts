@@ -204,6 +204,17 @@ describe('catalog facts measured against live proxies', () => {
     expect(corsProxyEntry('allorigins')!.forwardsCustomHeaders).toBe(false);
   });
 
+  it('offers cors.lol without claiming to know whether it forwards headers', () => {
+    // It 429'd before a header-carrying request ever landed, so `undefined` is
+    // the honest value — the Test button is what settles it. Re-added after
+    // being struck off, because a day of blanket 429s is an exhausted shared
+    // quota rather than a permanent property of the service.
+    const corslol = corsProxyEntry('corslol')!;
+    expect(corslol.forwardsCustomHeaders).toBeUndefined();
+    expect(corslol.keyRequired).toBeUndefined();
+    expect(availableCorsProxies('mockingbird.example.com').map((e) => e.id)).toContain('corslol');
+  });
+
   it('records Corsfix as allowlist-based rather than localhost-only', () => {
     const corsfix = corsProxyEntry('corsfix')!;
     expect(corsfix.devOnly).toBeUndefined();
