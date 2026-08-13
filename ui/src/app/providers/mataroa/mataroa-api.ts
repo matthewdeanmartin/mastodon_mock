@@ -67,7 +67,7 @@ export class MataroaApi {
 
     let proxied: { url: string; headers: HttpHeaders };
     try {
-      proxied = this.proxy.proxyCredentialedRequest(url, true);
+      proxied = this.proxy.proxyCredentialedRequest(url, true, 'mataroa');
     } catch (error: unknown) {
       return throwError(() =>
         error instanceof CorsProxyRefusal

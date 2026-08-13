@@ -52,12 +52,34 @@
 
 /** Route-free identity of a proxy, and the value persisted in settings. */
 export type CorsProxyId =
+  | 'mawkingbird'
   | 'allorigins'
   | 'corssh'
   | 'corsfix'
   | 'corslol'
   | 'corsproxy-io'
   | 'custom';
+
+/**
+ * Which policy a proxied request is asking for.
+ *
+ * Only the Mawkingbird proxy reads this; every other proxy ignores it, because
+ * every other proxy is a general-purpose one that will fetch whatever it is
+ * given. It exists because a proxy that restricts destinations has to be told
+ * *which* restriction applies, and inferring that from the URL would mean a
+ * newly added host silently picking up whichever policy happened to match it.
+ *
+ * The values are the route ids in the proxy's own `config.ts`. They are a wire
+ * contract with a separately deployed service, so renaming one here without
+ * deploying the Worker breaks the feature — see `mawkingbird_cors_proxy`.
+ */
+export type CorsProxyRoute =
+  | 'feeds'
+  | 'webmention-discover'
+  | 'webmention-send'
+  | 'twitterapi'
+  | 'getxapi'
+  | 'mataroa';
 
 /** How a proxy wants the target URL spliced into its own. */
 export interface CorsProxyTemplate {
@@ -76,6 +98,14 @@ export interface CorsProxyTemplate {
    * takes the target as a path suffix needs it raw.
    */
   encodeTarget: boolean;
+  /**
+   * Whether the pattern also carries a `{route}` placeholder.
+   *
+   * True only for the Mawkingbird proxy. A pattern with `{route}` and no
+   * substitution would send the literal string `{route}` and be rejected, so
+   * this is what tells the builder the placeholder is expected.
+   */
+  routed?: boolean;
 }
 
 export interface CorsProxyEntry {
@@ -152,6 +182,29 @@ export interface CorsProxyEntry {
  * serious toward.
  */
 export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
+  {
+    id: 'mawkingbird',
+    label: 'Mawkingbird proxy',
+    pitch:
+      "Run by this app, for this app. No signup, no key, and nobody else's rate limit to share.",
+    template: {
+      // `{route}` names the policy the proxy should apply; `{url}` is the
+      // target. Both are substituted by `buildProxiedUrl`.
+      pattern:
+        'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/?route={route}&url={url}',
+      encodeTarget: true,
+      routed: true,
+    },
+    // It forwards exactly the headers each route declares — `x-api-key` for the
+    // Twitter sources, `authorization` for Mataroa — and drops everything else.
+    // That is more than AllOrigins can do and is the point of running our own.
+    forwardsCustomHeaders: true,
+    limits:
+      'Feeds: 60 requests per minute, 2 MB per response, cached 5 minutes. Webmentions and the ' +
+      'API connectors are tighter. Only the destinations this app actually uses are reachable, ' +
+      'and video and audio are refused outright — it is not a general-purpose proxy.',
+    homepage: 'https://github.com/nanomartinlabs/mawkingbird_cors_proxy',
+  },
   {
     id: 'allorigins',
     label: 'AllOrigins',

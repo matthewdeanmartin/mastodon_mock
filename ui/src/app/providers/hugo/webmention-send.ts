@@ -114,7 +114,7 @@ export class WebmentionSend {
     }
     // Throws CorsProxyRefusal when nothing is configured, which `send` maps to
     // `unsupported` rather than swallowing.
-    const proxied = this.proxy.proxyRequest(targetUrl);
+    const proxied = this.proxy.proxyRequest(targetUrl, 'webmention-discover');
     const response = await fetch(proxied.url, {
       headers: toHeaderRecord(proxied.headers),
     });
@@ -151,7 +151,7 @@ export class WebmentionSend {
   ): Promise<DeliveryResult> {
     let proxied: { url: string; headers: unknown };
     try {
-      proxied = this.proxy.proxyRequest(endpoint);
+      proxied = this.proxy.proxyRequest(endpoint, 'webmention-send');
     } catch {
       return {
         state: 'unsupported',

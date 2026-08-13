@@ -133,7 +133,13 @@ export class TwitterTransport {
       // Credentialed: the key rides through the proxy, which is exactly what the
       // consent above was for. Every other guard (mixed content, userinfo, the
       // user's own instance) still applies.
-      proxied = this.proxy.proxyCredentialedRequest(targetUrl, true);
+      // The route name tracks the source, because the Mawkingbird proxy has a
+      // separate allowlist entry per data service.
+      proxied = this.proxy.proxyCredentialedRequest(
+        targetUrl,
+        true,
+        config.entry.id === 'getxapi' ? 'getxapi' : 'twitterapi',
+      );
     } catch (error: unknown) {
       const message =
         error instanceof CorsProxyRefusal ? error.message : 'This request cannot be proxied.';

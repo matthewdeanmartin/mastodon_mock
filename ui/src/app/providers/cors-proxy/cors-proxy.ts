@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpHeaders } from '@angular/common/http';
 import { Server } from '../../server';
-import { CorsProxyEntry } from './cors-proxy-catalog';
+import { CorsProxyEntry, CorsProxyRoute } from './cors-proxy-catalog';
 import { CorsProxyConfig, CorsProxySettings } from './cors-proxy-settings';
 
 /**
@@ -116,14 +116,14 @@ export class CorsProxy {
    * @throws CorsProxyRefusal when no proxy is configured, or when routing this
    * target through one would disclose a secret.
    */
-  proxyRequest(targetUrl: string): ProxiedRequest {
+  proxyRequest(targetUrl: string, route: CorsProxyRoute = 'feeds'): ProxiedRequest {
     const config = this.settings.resolve();
     if (!config) {
       throw new CorsProxyRefusal('No CORS proxy is configured.');
     }
     assertProxyable(targetUrl, this.server.baseUrl());
     return {
-      url: buildProxiedUrl(config, targetUrl),
+      url: buildProxiedUrl(config, targetUrl, route),
       headers: proxyHeaders(config),
     };
   }
@@ -161,7 +161,11 @@ export class CorsProxy {
    * @throws CorsProxyRefusal when no proxy is configured, when consent was not
    * given, or when the target is refused for any of the ordinary reasons.
    */
-  proxyCredentialedRequest(targetUrl: string, consented: boolean): ProxiedRequest {
+  proxyCredentialedRequest(
+    targetUrl: string,
+    consented: boolean,
+    route: CorsProxyRoute = 'feeds',
+  ): ProxiedRequest {
     if (!consented) {
       throw new CorsProxyRefusal(
         'Refusing to send an API key through a CORS proxy without your explicit consent.',
@@ -177,7 +181,7 @@ export class CorsProxy {
     // the user's own instance.
     assertProxyableIgnoringCredentialHosts(targetUrl, this.server.baseUrl());
     return {
-      url: buildProxiedUrl(config, targetUrl),
+      url: buildProxiedUrl(config, targetUrl, route),
       headers: proxyHeaders(config),
     };
   }
@@ -200,9 +204,17 @@ export class CorsProxy {
  * user the exact URL their configuration produces — the fastest way to spot a
  * template with the placeholder in the wrong place.
  */
-export function buildProxiedUrl(config: CorsProxyConfig, targetUrl: string): string {
+export function buildProxiedUrl(
+  config: CorsProxyConfig,
+  targetUrl: string,
+  route: CorsProxyRoute = 'feeds',
+): string {
   const target = config.encodeTarget ? encodeURIComponent(targetUrl) : targetUrl;
-  return config.pattern.replace('{url}', target);
+  // `{route}` is substituted unconditionally rather than only for routed
+  // proxies: a pattern without the placeholder is unaffected, and a custom
+  // template that happens to include one then works too, which is the friendly
+  // behaviour for someone who deploys their own copy of our Worker.
+  return config.pattern.replace('{route}', route).replace('{url}', target);
 }
 
 /** The headers a proxied request carries: the proxy's key, and nothing else. */
