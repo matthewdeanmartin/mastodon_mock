@@ -245,6 +245,14 @@ export const routes: Routes = [
                   ),
               },
               {
+                path: 'mastodon',
+                title: 'Mastodon',
+                loadComponent: () =>
+                  import('./pages/settings/connections/mastodon/connection-mastodon').then(
+                    (m) => m.ConnectionMastodon,
+                  ),
+              },
+              {
                 path: 'cors-proxy',
                 title: 'CORS proxy',
                 loadComponent: () =>

@@ -133,6 +133,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'JWTs for a Bluesky-PRIMARY account — the one the app is signed in as, not a connector. Unscoped, unlike mockingbird_bsky_credentials: scoping it by the active account would be circular, since the scope suffix is derived from this account’s own DID. Same reasoning (and same treatment) as mastodon_mock_session_tokens.',
   },
   {
+    base: 'mockingbird_mastodon_connector_token',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'secret',
+    note: 'Bearer token for a Mastodon CONNECTOR — Mastodon attached to a Bluesky-primary account, not the identity itself. Split out of mockingbird_mastodon_connector so the server can be exported and the credential cannot. Account-scoped, unlike mastodon_mock_session_tokens: a connector hangs off one identity.',
+  },
+  {
     base: 'mockingbird_github_credentials',
     storage: 'local',
     suffix: 'account',
@@ -245,6 +252,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'none',
     sensitivity: 'private',
     note: 'Who a Bluesky-PRIMARY account is: handle, DID, display name, avatar. Identity, not credentials — the JWTs live in mockingbird_bsky_identity_credentials, exactly as mastodon_mock_sessions splits from its tokens. Exportable so a personal backup can record which account was primary; the export cannot authenticate as it.',
+  },
+  {
+    base: 'mockingbird_mastodon_connector',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Which Mastodon server a Bluesky-primary account opted into reading, and whether it has credentials there. The token lives in mockingbird_mastodon_connector_token. Private rather than setting: naming the instance you read is a disclosure, same reasoning as mastodon_mock_server.',
   },
   {
     base: 'mockingbird_github_user',

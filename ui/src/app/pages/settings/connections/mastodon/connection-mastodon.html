@@ -1,0 +1,118 @@
+<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+
+<div class="spage-head">
+  <h1>🐘 Mastodon</h1>
+  <p>
+    Read Mastodon alongside Bluesky — Explore, trending posts and hashtag timelines. You can do that
+    without a Mastodon account, or sign in to one you already have.
+  </p>
+  <p class="muted small">{{ scopeDetail }}</p>
+</div>
+
+@if (!applicable()) {
+  <!-- Reachable by deep link even though the catalog greys the card. Say which
+       situation the reader is in rather than just refusing. -->
+  <p class="muted">
+    @if (auth.isAnonymous) {
+      You're browsing anonymously, which already reads a Mastodon server — change it in
+      <a [routerLink]="['/settings/anonymous']">Settings → Anonymous</a>.
+    } @else {
+      You're signed in to Mastodon already, so it's your account here rather than a connector. This
+      page is for accounts whose identity lives on Bluesky.
+    }
+  </p>
+} @else if (state() === 'absent') {
+  <p class="muted">
+    Nothing is connected, so Mawkingbird isn't calling Mastodon at all and no Mastodon widgets take
+    up space in your sidebar. Turning it on adds Explore, trends and hashtag timelines.
+  </p>
+  <p>
+    <button class="btn" (click)="enableAnonymous()">
+      Read {{ defaultServer.replace('https://', '') }} without an account
+    </button>
+  </p>
+  <p class="muted small">
+    No account, no token, nothing to sign up for — it reads what that server shows the public. You
+    can point it at a different server, or sign in, afterwards.
+  </p>
+} @else {
+  <div class="conn-state">
+    <p>
+      @if (state() === 'signed-in') {
+        Signed in to <strong>{{ serverLabel() }}</strong
+        >.
+      } @else {
+        Reading <strong>{{ serverLabel() }}</strong> anonymously.
+      }
+    </p>
+    @if (state() === 'anonymous') {
+      <p class="muted small">
+        Anonymous reading covers Explore, trends and hashtags. Your home timeline stays Bluesky-only:
+        an anonymous connection has no follows, so its "home" is a public firehose of strangers.
+        Signing in merges Mastodon into home.
+      </p>
+    } @else {
+      <p class="muted small">Mastodon posts from the people you follow are merged into your home timeline.</p>
+    }
+  </div>
+
+  @if (state() === 'anonymous') {
+    <h2>Sign in</h2>
+    <p class="muted">
+      Paste an access token for <strong>{{ serverLabel() }}</strong
+      >. On Mastodon you can make one at Preferences → Development → New application.
+    </p>
+    <form class="conn-form" (ngSubmit)="signIn()">
+      <input
+        type="password"
+        name="mastodonToken"
+        placeholder="access token"
+        autocomplete="off"
+        [ngModel]="token()"
+        (ngModelChange)="token.set($event)"
+        [disabled]="signingIn()"
+      />
+      <button class="btn" type="submit" [disabled]="!token().trim() || signingIn()">
+        {{ signingIn() ? 'Checking…' : 'Sign in' }}
+      </button>
+    </form>
+    @if (error(); as msg) {
+      <p class="feed-error">{{ msg }}</p>
+    }
+  } @else {
+    <p>
+      <button class="btn btn-outline btn-sm" (click)="signOut()">Sign out</button>
+    </p>
+    <p class="muted small">
+      Signing out keeps reading {{ serverLabel() }} anonymously — it drops the token, not the
+      connection.
+    </p>
+  }
+
+  <h2>Server</h2>
+  @if (changingServer()) {
+    <app-server-discovery
+      [currentServer]="connector.server() ?? ''"
+      startLabel="Find a server"
+      (selected)="chooseServer($event)"
+    />
+    <p>
+      <button class="btn btn-outline btn-sm" (click)="changingServer.set(false)">Cancel</button>
+    </p>
+  } @else {
+    <p>
+      <button class="btn btn-outline btn-sm" (click)="changingServer.set(true)">Change server</button>
+    </p>
+    <p class="muted small">
+      Changing servers signs you out of this one — a token only works on the server that issued it.
+    </p>
+  }
+
+  <h2>Turn it off</h2>
+  <p>
+    <button class="btn btn-outline btn-sm" (click)="disable()">Disconnect Mastodon</button>
+  </p>
+  <p class="muted small">
+    Forgets the server and any token, and takes the Mastodon widgets back out of your sidebar.
+  </p>
+}

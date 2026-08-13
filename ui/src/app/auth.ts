@@ -8,6 +8,10 @@ import {
   blueskyIdentityPresent,
   clearBlueskyIdentity,
 } from './providers/bluesky/bluesky-identity-store';
+import {
+  clearMastodonConnectorToken,
+  mastodonConnectorToken,
+} from './providers/mastodon/mastodon-connector';
 import { Server } from './server';
 import { SessionDiagnostics } from './session-diagnostics';
 
@@ -219,8 +223,22 @@ export class Auth {
    */
   readonly mode = this.kind;
 
+  /**
+   * The bearer token for Mastodon API calls, whoever it belongs to.
+   *
+   * Two different things arrive here, and the interceptor cannot tell them
+   * apart — which is the point. For a mastodon-primary account this is the
+   * *identity's* token, restored from `TOKEN_KEY`. For a Bluesky-primary account
+   * it is the **connector's** token, restored from the connector's own scoped
+   * storage. Both authenticate the same requests; only one of them says who the
+   * user is. See {@link connectMastodon}.
+   */
   readonly token = signal<string | null>(
-    this.kind() === 'mastodon' ? localStorage.getItem(TOKEN_KEY) : null,
+    this.kind() === 'mastodon'
+      ? localStorage.getItem(TOKEN_KEY)
+      : this.kind() === 'bluesky'
+        ? mastodonConnectorToken()
+        : null,
   );
   private mastodonAccount = signal<Account | null>(null);
   /** The Bluesky-primary account's DID, when that is the active kind. */
@@ -368,6 +386,75 @@ export class Auth {
     }
   }
 
+  /**
+   * Attach a Mastodon token **as a connector**, leaving the identity alone.
+   *
+   * This is the seam that makes "Mastodon under Bluesky" possible, and its whole
+   * value is in what it does *not* do. Compare {@link setToken}, which is the
+   * mastodon-primary login: that one writes `ACCOUNT_MODE_KEY`, sets `kind` to
+   * `'mastodon'`, clears `blueskyDid` and adds a row to the session stable. Run
+   * it under a Bluesky-primary account and the account silently changes kind —
+   * the user signs in to a Mastodon server and is quietly ejected from their own
+   * Bluesky identity.
+   *
+   * So this path writes exactly one thing: the token, into the signal
+   * `auth.interceptor.ts` reads. Every existing Mastodon call site then
+   * authenticates with no change at all, because the interceptor was always
+   * asking `Auth.token()` and never asking what kind of account was behind it.
+   *
+   * Specifically **not** written, each for a reason:
+   *
+   * - `ACCOUNT_MODE_KEY` / `kind` — the identity is Bluesky and stays Bluesky.
+   * - `blueskyDid` — clearing it would drop the identity this connector hangs off.
+   * - the session stable — a connector is not a login. A row here would put a
+   *   phantom account in the switcher, which is precisely the *other* thing the
+   *   user might have meant ("keep it separate"), and the two must stay
+   *   distinguishable.
+   * - `TOKEN_KEY` — see below.
+   *
+   * ## Why the token is not mirrored to `TOKEN_KEY`
+   *
+   * `setToken` mirrors there for the interceptor and for back-compat. Doing the
+   * same here would create a genuine account-corruption path. `storedKind()`
+   * falls back to "a token exists, therefore mastodon-primary" when the mode key
+   * is missing, and a `bluesky` mode key is discarded as stale when the identity
+   * behind it is gone (a settings import that carried the profile but not the
+   * JWTs, a half-finished unlink). Combine the two and a bsky-primary user with a
+   * connector reloads as **mastodon-primary, signed in as the connector's
+   * account** — a different person, silently. The token lives in the connector's
+   * own storage instead, and is restored into this signal on load.
+   *
+   * The connector's own account snapshot is **not** stored here either — it
+   * belongs to `MastodonConnector`, alongside the server it was verified
+   * against. Writing it to `mastodonAccount` would leak a Mastodon profile into
+   * the signal that renders the *identity* (see {@link setAccount}, which
+   * refuses the same write for the same reason).
+   */
+  connectMastodon(token: string, account: Account | null = null): void {
+    this.token.set(token);
+    this.diagnostics.info('connect-mastodon-connector', {
+      kind: this.kind() ?? 'unauthenticated',
+      handle: account?.username ?? null,
+      saved: this.sessions().length,
+    });
+  }
+
+  /**
+   * Drop a connector token, leaving the identity untouched.
+   *
+   * The counterpart to {@link connectMastodon}, and deliberately not
+   * {@link logout}: there is no account to forget here, only a credential to
+   * stop using.
+   */
+  disconnectMastodon(): void {
+    if (this.kind() === 'mastodon') {
+      // Not a connector — this is the identity's own token, and removing it here
+      // would sign the user out through a door that promises not to.
+      return;
+    }
+    this.token.set(null);
+  }
+
   /** Record the verified account for the active token (updates the switcher snapshot). */
   setAccount(account: Account | null): void {
     if (this.isAnonymous) {
@@ -464,10 +551,14 @@ export class Auth {
     const saved = this.sessions().length;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.setItem(ACCOUNT_MODE_KEY, 'bluesky');
-    this.token.set(null);
     this.mastodonAccount.set(null);
     this.blueskyDid.set(identity.did);
     this.kind.set('bluesky');
+    // Restore this account's Mastodon connector, if it has one. Order matters:
+    // the connector is stored under a scope suffix derived from the DID, so the
+    // mode key above must already be written or this reads the wrong namespace
+    // (or none) and the connector appears to have been forgotten by a switch.
+    this.token.set(mastodonConnectorToken());
     // Same reasoning as enter-anonymous: this must never cost a saved account,
     // and the console is the only place that can prove it did not.
     this.diagnostics.transition('enter-bluesky', saved, this.sessions().length, {
@@ -609,6 +700,11 @@ export class Auth {
       // rather than signed out, which is the exact surprise that made the
       // reported account-loss bug so hard to notice. See leaveActive().
       clearBlueskyIdentity();
+      // The Mastodon connector hung off this identity and must not outlive it.
+      // An orphaned connector token is worse than untidy: `storedKind()` reads a
+      // bare token as a mastodon-primary account, so leaving one behind lets it
+      // promote itself into the identity on the next reload.
+      clearMastodonConnectorToken();
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(ACCOUNT_MODE_KEY);
       this.kind.set(null);
@@ -665,6 +761,10 @@ export class Auth {
     const saved = this.sessions().length;
     this.persistSessions([]);
     clearBlueskyIdentity();
+    // "Every saved session" includes the connector hanging off the Bluesky
+    // identity — the one exit that promises to take everything must not leave a
+    // credential behind. See the same call in logout().
+    clearMastodonConnectorToken();
     this.diagnostics.transition('logout-all', saved, 0);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACCOUNT_MODE_KEY);

@@ -9,6 +9,7 @@ export type FeatureFlagId =
   | 'pastebin'
   | 'links'
   | 'write'
+  | 'connector-mastodon'
   | 'connector-bluesky'
   | 'connector-twitter'
   | 'connector-mataroa'
@@ -71,6 +72,14 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
       'The writing workspace at /write — drafts, editor and notes side by side, plus zen mode.',
     defaultState: 'production',
     group: 'features',
+  },
+  {
+    id: 'connector-mastodon',
+    label: 'Mastodon',
+    description:
+      'Mastodon attached to a Bluesky-primary account: Explore, trends and tag timelines, read anonymously or signed in.',
+    defaultState: 'production',
+    group: 'connectors',
   },
   {
     id: 'connector-bluesky',

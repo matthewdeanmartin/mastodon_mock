@@ -9,7 +9,9 @@ import { HomeDiagnostics } from '../home-diagnostics';
 import { Status } from '../models';
 import { FeedAggregator } from './feed-aggregator';
 import { BlueskyProvider } from './bluesky/bluesky-provider';
+import { MastodonConnector } from './mastodon/mastodon-connector';
 import { RssProvider } from './rss/rss-provider';
+import { seedBskyIdentity } from '../testing/seed-storage';
 
 function makeStatus(id: string, createdAt: string, overrides: Partial<Status> = {}): Status {
   return {
@@ -318,6 +320,60 @@ describe('FeedAggregator', () => {
 
     expect(homeTimeline).not.toHaveBeenCalled();
     expect(diagnostics.warn).not.toHaveBeenCalledWith('aggregator:all-sources-hidden-fallback');
+  });
+
+  /**
+   * Decision 4 of the Mastodon-connector sprint, and the reason the connector
+   * has three states rather than a boolean.
+   *
+   * An **anonymous** connector has no follows, so `/timelines/home` is a public
+   * firehose: strangers mixed into a timeline that otherwise contains only
+   * people the user chose. Explore, trends and tag timelines still work — they
+   * never went through the aggregator. Merging Home is the payoff for signing
+   * in, which is what makes the upgrade worth making.
+   */
+  it('keeps Home Bluesky-only while the Mastodon connector is anonymous', async () => {
+    const auth = TestBed.inject(Auth);
+    seedBskyIdentity({ did: 'did:plc:me', handle: 'me.bsky.social' });
+    localStorage.setItem('mastodon_mock_account_mode', 'bluesky');
+    auth.enterBluesky();
+    TestBed.inject(MastodonConnector).enableAnonymous();
+
+    const aggregator = TestBed.inject(FeedAggregator);
+    fakeBluesky.linked.set(true);
+    fakeBluesky.pages = [[blueskyStatus('b1', '2026-07-14T10:00:00.000Z')]];
+
+    aggregator.reset();
+    const page = await firstValueFrom(aggregator.nextPage());
+
+    expect(homeTimeline).not.toHaveBeenCalled();
+    expect(page.map((status) => status.id)).toEqual(['b1']);
+  });
+
+  it('merges Mastodon into Home once the connector is signed in', async () => {
+    const auth = TestBed.inject(Auth);
+    seedBskyIdentity({ did: 'did:plc:me', handle: 'me.bsky.social' });
+    localStorage.setItem('mastodon_mock_account_mode', 'bluesky');
+    auth.enterBluesky();
+    const connector = TestBed.inject(MastodonConnector);
+    connector.enableAnonymous();
+    connector.signIn('tok-123', 'https://mastodon.social', null);
+
+    const aggregator = TestBed.inject(FeedAggregator);
+    fakeBluesky.linked.set(true);
+    fakeBluesky.pages = [[blueskyStatus('b1', '2026-07-14T10:00:00.000Z')]];
+    homeTimeline
+      .mockReturnValueOnce(of([makeStatus('m1', '2026-07-14T11:00:00.000Z')]))
+      .mockReturnValue(of([]));
+
+    aggregator.reset();
+    const page = await firstValueFrom(aggregator.nextPage());
+
+    // The payoff for upgrading: a signed-in connector has real follows, so its
+    // home timeline is people the user chose — and the identity is still Bluesky.
+    expect(homeTimeline).toHaveBeenCalled();
+    expect(page.map((status) => status.id)).toEqual(['m1', 'b1']);
+    expect(auth.kind()).toBe('bluesky');
   });
 
   it('keeps healthy sources when a browser-only provider fails', async () => {

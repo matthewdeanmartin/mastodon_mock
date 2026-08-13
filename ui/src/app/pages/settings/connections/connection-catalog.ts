@@ -40,6 +40,7 @@ import { FeatureFlagId } from '../../../feature-flags';
 
 /** Route segment under `/settings/connections`, and the entry's identity. */
 export type ConnectionId =
+  | 'mastodon'
   | 'github'
   | 'dropbox'
   | 'raindrop'
@@ -111,6 +112,7 @@ export const CONNECTION_SCOPE_COPY: Record<ConnectionScope, ConnectionScopeCopy>
  * {@link FeatureFlags.disabledReason}.
  */
 export const CONNECTION_FLAGS: Record<ConnectionId, FeatureFlagId> = {
+  mastodon: 'connector-mastodon',
   bluesky: 'connector-bluesky',
   twitter: 'connector-twitter',
   mataroa: 'connector-mataroa',
@@ -155,6 +157,25 @@ export interface ConnectionCatalogEntry {
  * closer to curiosities.
  */
 export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
+  {
+    id: 'mastodon',
+    label: 'Mastodon',
+    emoji: '🐘',
+    pitch: 'Read Mastodon too — with or without a Mastodon account.',
+    // The mirror image of the Bluesky entry, and the only connector that is
+    // *not applicable* to some accounts rather than merely unconfigured: under a
+    // Mastodon-primary account, Mastodon is the identity and there is nothing to
+    // connect. The catalog says so via `unavailableReason`.
+    //
+    // Account-scoped for the same reason Bluesky is: it asserts which Mastodon
+    // server this particular persona reads, and an alt gets its own or none.
+    scope: 'account',
+    enables: [
+      'Explore, trending posts and hashtag timelines from a Mastodon server',
+      'No Mastodon account needed — reading anonymously is a real option',
+      'Sign in later to merge Mastodon into your home timeline',
+    ],
+  },
   {
     id: 'bluesky',
     label: 'Bluesky',

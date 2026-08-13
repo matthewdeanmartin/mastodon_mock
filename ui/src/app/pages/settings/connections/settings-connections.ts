@@ -1,6 +1,8 @@
 import { Component, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Auth } from '../../../auth';
 import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
+import { MastodonConnector } from '../../../providers/mastodon/mastodon-connector';
 import { DropboxSession } from '../../../providers/dropbox/dropbox-session';
 import { RaindropSession } from '../../../providers/raindrop/raindrop-session';
 import { GitHubSession } from '../../../providers/github/github-session';
@@ -59,7 +61,9 @@ export interface ConnectionCatalogRow {
   styleUrl: './settings-connections.css',
 })
 export class SettingsConnections implements OnInit {
+  private auth = inject(Auth);
   private bsky = inject(BlueskySession);
+  private mastodon = inject(MastodonConnector);
   private dropbox = inject(DropboxSession);
   private raindrop = inject(RaindropSession);
   private github = inject(GitHubSession);
@@ -105,6 +109,23 @@ export class SettingsConnections implements OnInit {
   private liveRow(entry: ConnectionCatalogEntry): Omit<ConnectionCatalogRow, 'flagged'> {
     {
       switch (entry.id) {
+        case 'mastodon':
+          // The only connector that can be *not applicable* rather than merely
+          // unconfigured. Under a Mastodon-primary account Mastodon is the
+          // identity — there is no slot to fill — and under Anonymous the
+          // browser-local persona already reads a Mastodon server of its own.
+          // Both render greyed with the reason rather than vanishing, per the
+          // note on `unavailableReason`.
+          if (!this.auth.isBlueskyPrimary) {
+            return {
+              entry,
+              connected: false,
+              unavailableReason: this.auth.isAnonymous
+                ? 'Anonymous browsing already reads a Mastodon server — change it in Settings → Anonymous.'
+                : 'You are signed in to Mastodon already — it is your account here, not a connector.',
+            };
+          }
+          return { entry, connected: this.mastodon.optedIn(), unavailableReason: null };
         case 'bluesky':
           // Available to every account including Anonymous: the app password is
           // its own credential and needs no Mastodon token.

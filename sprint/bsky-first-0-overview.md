@@ -116,7 +116,8 @@ sites, and Sprint 1 makes that explicit rather than leaving it implicit.
 | 2b | [The front door, actually](bsky-first-2b-app-first-front-door.md) | A stranger opens the app and **is in it** — shell, rails, real posts — with the login question as a modal on top. **Blocks everything below.** |
 | 2 | [The front door](bsky-first-2-front-door.md) — ~~COMPLETE~~ **re-opened, superseded by 2b** | Shipped a landing page instead of the app; see 2b |
 | 3 | [Log in with Bluesky](bsky-first-3-bsky-login.md) | Fresh browser → bsky handle + app password → working app, no Mastodon anything |
-| 4 | [Anonymous Mastodon underneath](bsky-first-4-mastodon-under-bsky.md) | That same session gets Explore, trends, tag timelines — and can attach a real Mastodon account later |
+| 4 | [The Mastodon connector](bsky-first-4-mastodon-under-bsky.md) — **COMPLETE** | That same session can *opt into* Explore, trends and tag timelines — and attach a real Mastodon account later |
+| 4b | [The rails speak Bluesky](bsky-first-4b-bsky-rails.md) | A bsky-primary account's rails show **Bluesky** widgets — trends, server/service card, feeds — instead of Mastodon ones it cannot use |
 | 5 | [Search parity](bsky-first-5-search-parity.md) | Bluesky search has facets, refine, saved searches — and looks like Mastodon search |
 | 6 | [Anonymous Bluesky](bsky-first-6-anonymous-bsky.md) | Browse Bluesky with no login at all, via `public.api.bsky.app` |
 | 7 | [Find your people](bsky-first-7-bridge-finder.md) | "Who that I follow on Mastodon is also on Bluesky?" — with match kinds, not just scores |
@@ -139,12 +140,54 @@ purpose. If it is not invisible, it is wrong.
 
 ## Product decisions (user, 2026-08-11)
 
-- **Bsky-primary login assumes anonymous mastodon.social.** Silently — no nag,
-  no opt-in card. The user gets Explore/trends/tags working out of the box.
+- ~~**Bsky-primary login assumes anonymous mastodon.social.** Silently — no nag,
+  no opt-in card.~~ **REVERSED 2026-08-12 — see below.**
 - **But they must be able to attach a real Mastodon account later.** So the
   "Mastodon under Bluesky" slot is a real connector from day one, with anonymous
   as its default occupant, not a hardcoded anonymous special case. Sprint 3 owns
   this distinction and it is the reason Sprint 3 exists separately from Sprint 2.
+
+### Reversal: the Mastodon connector is opt-in (user, 2026-08-12)
+
+The 2026-08-11 decision above was "silently assume anonymous mastodon.social, no
+opt-in card". The user has reversed it, and the reasoning is worth keeping
+because it is not a preference — it is a cost argument:
+
+> "Providing a bsky user with an automatically available anonymous mastodon
+> experience creates costs (screen clutter) that the user didn't opt into."
+
+That is right, and Sprint 2b is the evidence. A silent Mastodon connector does
+not cost nothing; it costs **rail space, nav entries and a search default**, all
+spent on a network the user did not ask for. The original decision was made
+while thinking only about the *feed* — where an anonymous Mastodon source is
+genuinely free and invisible. It is not free in the chrome.
+
+So the connector becomes: **present but empty, and offered.**
+
+```
+Mastodon connector
+├─ absent (default for bsky-primary)   ← nothing in the rails, nothing in search
+├─ anonymous @ <server>                ← opted in, no credentials
+└─ signed in @ <server>                ← opted in, with credentials
+```
+
+The offer is what Sprint 4 has to get right: *"Mawkingbird can search and read
+Mastodon too — with or without a Mastodon account"*, surfaced where it is
+relevant (an empty Explore, a search with no Mastodon results) rather than as a
+launch nag. **Two credential levels, both opt-in**, per the user: without
+credentials is a real, useful state and not merely a degraded one.
+
+This changes Sprint 4's decisions 3 and 4 and its exit criterion 2; those are
+annotated in that file.
+
+**Built this way (2026-08-12).** The reversal landed before any code was written,
+so `absent` is a real state in `MastodonConnector` rather than a flag bolted onto
+a live connector — an untouched connector writes nothing to storage at all. Two
+follow-on decisions were taken at build time: opting in **without credentials
+lands on `mastodon.social` immediately** (one click to a working Explore, change
+server afterwards), and **Settings is the only opt-in surface this sprint** — the
+contextual offers get their predicate but no UI. See Sprint 4's "What the next
+sprint inherits".
 - **Search: parity of *features*, not of *code*.**
 
   > "I don't mind if we have to reimplement all the faceting and so on because

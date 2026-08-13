@@ -16,6 +16,7 @@ import { Auth } from '../auth';
 import { ClientPrefs, homeWindowMs } from '../client-prefs';
 import { HomeDiagnostics } from '../home-diagnostics';
 import { Status } from '../models';
+import { MastodonConnector } from './mastodon/mastodon-connector';
 import { FeedProvider } from './provider';
 import { ProviderRegistry } from './provider-registry';
 
@@ -87,6 +88,7 @@ export class FeedAggregator {
   private auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private registry = inject(ProviderRegistry);
+  private connector = inject(MastodonConnector);
   private diagnostics = inject(HomeDiagnostics);
 
   private mastodonMaxId: string | undefined;
@@ -136,9 +138,22 @@ export class FeedAggregator {
     // a signed-out session never reaches Home in the real app (the auth guard
     // redirects), so treating it as Mastodon-capable is both harmless and what
     // the aggregator's own specs assume.
+    // A Bluesky-primary account reaches Mastodon's home timeline only through a
+    // **signed-in** connector. The other two connector states are both excluded,
+    // for different reasons:
+    //
+    //   absent    — the user never opted into Mastodon. Calling anyway spends
+    //               their bandwidth on a network they declined.
+    //   anonymous — no follows exist, so /timelines/home is a public firehose:
+    //               strangers mixed into a timeline that otherwise contains only
+    //               people the user chose. Explore, trends and tags still work —
+    //               they never went through the aggregator. Merging Home is the
+    //               payoff for signing the connector in, and is what makes the
+    //               upgrade mean something.
+    const connectorFeedsHome = this.auth.isBlueskyPrimary && this.connector.signedIn();
     this.mastodonExhausted =
       this.auth.isAnonymous ||
-      this.auth.isBlueskyPrimary ||
+      (this.auth.isBlueskyPrimary && !connectorFeedsHome) ||
       !this.prefs.isProviderVisible('mastodon');
     this.foreign = this.registry
       .linked()
@@ -153,12 +168,14 @@ export class FeedAggregator {
     // feed with no visible chip to recover — Mastodon is their primary network,
     // so keep it enabled rather than honour a filter that shows nothing.
     //
-    // Not for anonymous or Bluesky-primary readers: re-enabling Mastodon for
-    // them would reinstate the 401 above, and "every source is hidden" is not the
-    // situation they are in anyway.
+    // Not for anonymous readers, nor for a Bluesky-primary reader without a
+    // signed-in connector: re-enabling Mastodon for them would reinstate the 401
+    // above, and "every source is hidden" is not the situation they are in
+    // anyway. A Bluesky-primary reader *with* a signed-in connector does have a
+    // usable Mastodon token, so the net catches them like anyone else.
     if (
       !this.auth.isAnonymous &&
-      !this.auth.isBlueskyPrimary &&
+      (!this.auth.isBlueskyPrimary || connectorFeedsHome) &&
       this.mastodonExhausted &&
       !this.foreign.length
     ) {
@@ -169,6 +186,7 @@ export class FeedAggregator {
       mode: this.auth.mode() ?? 'unauthenticated',
       mastodonVisible: this.prefs.isProviderVisible('mastodon'),
       mastodonEnabled: !this.mastodonExhausted,
+      mastodonConnector: this.connector.current().state,
       linkedProviders: this.registry.linked().map((provider) => provider.id),
       enabledForeignProviders: this.foreign.map((source) => source.provider.id),
     });
