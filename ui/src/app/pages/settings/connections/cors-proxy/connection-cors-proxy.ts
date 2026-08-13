@@ -18,12 +18,30 @@ import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 /**
  * A small, stable, genuinely public feed to prove a proxy works.
  *
- * The W3C's news feed is a deliberate choice: it is public, it is not going
- * anywhere, it is small enough that a failed test costs nothing, and it belongs
- * to nobody involved here — testing against the user's own feeds would leak
- * which ones they read to a proxy they may be about to reject.
+ * Public, long-lived, small enough that a failed test costs nothing, and
+ * belonging to nobody involved here — testing against the user's own feeds would
+ * leak which ones they read to a proxy they may be about to reject.
+ *
+ * Two properties make xkcd the right pick, and both were measured rather than
+ * assumed (2026-08-13):
+ *
+ * 1. **It sends no `Access-Control-Allow-Origin`.** That makes this a real test:
+ *    a feed that a browser could already read direct would pass even against a
+ *    proxy that did nothing, which is the one result this button must never
+ *    produce.
+ * 2. **It answers datacentre IP ranges.** This replaces `www.w3.org/blog/news/feed`,
+ *    which does not: w3.org sits behind a Cloudflare bot rule that serves
+ *    "Sorry, you have been blocked" — an HTTP **403** — to requests coming from
+ *    a proxy. Every proxy in the catalogue is hosted in a datacentre, so the old
+ *    URL made a perfectly healthy proxy report `The proxy rejected the request
+ *    (403). It needs a key, or the key is wrong or out of quota.` — three
+ *    diagnoses, all wrong, for a fault that was never the proxy's.
+ *
+ * Verified 200 through both the Mawkingbird proxy and AllOrigins. Anything
+ * replacing it should be checked the same way; `hnrss.org` is a near miss that
+ * AllOrigins answers with 522.
  */
-const TEST_FEED_URL = 'https://www.w3.org/blog/news/feed';
+const TEST_FEED_URL = 'https://xkcd.com/rss.xml';
 
 /** How long to wait before calling a proxy too slow to be useful. */
 const TEST_TIMEOUT_MS = 15_000;
@@ -105,6 +123,9 @@ export class ConnectionCorsProxy implements OnInit {
    * The exact URL the current form would produce, so a misplaced `{url}` is
    * visible before it costs the user a confusing failure.
    */
+  /** The feed the Test button fetches, so the template names it rather than a stale literal. */
+  protected readonly testFeedUrl = TEST_FEED_URL;
+
   protected readonly preview = computed(() => {
     const entry = this.selected();
     if (!entry) {
@@ -115,10 +136,12 @@ export class ConnectionCorsProxy implements OnInit {
       return null;
     }
     const encodeTarget = entry.id === 'custom' ? this.customEncode() : entry.template.encodeTarget;
-    return buildProxiedUrl(
-      { entry, pattern, encodeTarget, header: null },
-      'https://example.com/feed.xml',
-    );
+    // The *real* test URL, not an illustrative one. These two used to differ —
+    // the preview showed `example.com/feed.xml` while the button fetched
+    // w3.org — so a user reading a failure message was told about a request
+    // that had never been made. Showing exactly what Test will send is the
+    // whole point of a preview.
+    return buildProxiedUrl({ entry, pattern, encodeTarget, header: null }, TEST_FEED_URL);
   });
 
   ngOnInit(): void {
@@ -244,7 +267,9 @@ export class ConnectionCorsProxy implements OnInit {
 
     const startedAt = Date.now();
     this.http
-      .get(buildProxiedUrl(config, TEST_FEED_URL), {
+      // 'feeds' explicitly: this is a feed fetch, and naming it keeps the tested
+      // path identical to the one RSS actually uses on a routed proxy.
+      .get(buildProxiedUrl(config, TEST_FEED_URL, 'feeds'), {
         responseType: 'text',
         context: externalFetch(),
         headers: proxyHeaders(config),
@@ -288,8 +313,22 @@ function describeTestFailure(err: unknown): string {
     if (err.status === 0) {
       return "Couldn't reach the proxy at all. It may be down, blocking this origin, or the URL may be wrong.";
     }
-    if (err.status === 401 || err.status === 403) {
-      return `The proxy rejected the request (${err.status}). It needs a key, or the key is wrong or out of quota.`;
+    if (err.status === 401) {
+      return 'The proxy rejected the request (401). It needs a key, or the key is wrong.';
+    }
+    if (err.status === 403) {
+      // Deliberately two possibilities rather than one confident wrong answer.
+      // A 403 here is ambiguous by construction: the proxy relays the target's
+      // status as its own, so a target that blocks datacentre IP ranges — which
+      // many do, and every proxy is hosted in one — is indistinguishable from
+      // the proxy itself refusing us. Naming only the key sent people to check a
+      // key that was never the problem.
+      return (
+        'A 403 came back. Either the proxy refused this request — a missing, wrong, or ' +
+        'out-of-quota key, or an origin it has not been told to allow — or the test feed ' +
+        'refused the proxy, which some sites do to any request from a datacentre. ' +
+        'If your feeds still load, the proxy is fine.'
+      );
     }
     if (err.status === 429) {
       return 'The proxy is rate-limiting this browser right now.';
