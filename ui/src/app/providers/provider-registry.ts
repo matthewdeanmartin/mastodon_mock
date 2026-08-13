@@ -2,6 +2,7 @@ import { computed, inject, Injectable } from '@angular/core';
 import { BlueskyProvider } from './bluesky/bluesky-provider';
 import { FeedProvider } from './provider';
 import { RssProvider } from './rss/rss-provider';
+import { AnonymousBlueskyProvider } from './anonymous/anonymous-bluesky-provider';
 import { AnonymousMastodonProvider } from './anonymous/anonymous-mastodon-provider';
 import { PasteFeedProvider } from './paste/paste-feed-provider';
 import { TwitterProvider } from './twitter/twitter-provider';
@@ -35,12 +36,17 @@ export class ProviderRegistry {
   private bluesky = inject(BlueskyProvider);
   private rss = inject(RssProvider);
   private anonymousMastodon = inject(AnonymousMastodonProvider);
+  private anonymousBluesky = inject(AnonymousBlueskyProvider);
   private paste = inject(PasteFeedProvider);
   private twitter = inject(TwitterProvider);
   private featureFlags = inject(FeatureFlags);
 
   readonly all: FeedProvider[] = [
     this.anonymousMastodon,
+    // The Bluesky half of the anonymous experience. Mutually exclusive with
+    // `bluesky` below by construction: this one requires an anonymous identity,
+    // that one requires a linked session.
+    this.anonymousBluesky,
     this.bluesky,
     this.rss,
     this.twitter,

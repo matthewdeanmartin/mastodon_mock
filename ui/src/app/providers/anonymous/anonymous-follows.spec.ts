@@ -171,4 +171,99 @@ describe('AnonymousFollows', () => {
     follows.clearBackoff(key);
     expect(follows.hasBackoff(follows.follows()[0])).toBe(false);
   });
+  /**
+   * One follow list, two networks.
+   *
+   * The alternative was a parallel Bluesky store, which produces two lists, two
+   * counts, and a dozen consumers that each show half. Anonymous mode is meant
+   * to be *one* experience with both networks in it — someone who will not log
+   * into either service can still follow people on both.
+   */
+  describe('Bluesky follows', () => {
+    function bskyAccount(handle: string, did: string): Account {
+      return {
+        ...account(handle, 'bsky.app'),
+        // Namespaced at the provider edge, which is what `networkForAccount`
+        // reads to tell the two networks apart.
+        id: `bsky:${did}`,
+        acct: handle,
+        url: `https://bsky.app/profile/${handle}`,
+      };
+    }
+
+    it('stores a Bluesky follow keyed by DID, with no instance', () => {
+      const follows = TestBed.inject(AnonymousFollows);
+      follows.follow(bskyAccount('alice.bsky.social', 'did:plc:alice'), '');
+
+      const stored = follows.follows()[0];
+      expect(stored.network).toBe('bluesky');
+      // The DID is the durable identity — handles are rentable and change.
+      expect(stored.key).toBe('bsky:did:plc:alice');
+      expect(stored.readRef.accountId).toBe('did:plc:alice');
+      expect(stored.server).toBe('');
+    });
+
+    it('keeps both networks in one list', () => {
+      const follows = TestBed.inject(AnonymousFollows);
+      follows.follow(account('bob'), 'https://mastodon.social');
+      follows.follow(bskyAccount('alice.bsky.social', 'did:plc:alice'), '');
+
+      expect(follows.count()).toBe(2);
+      expect(follows.follows().map((f) => f.network).sort()).toEqual(['bluesky', 'mastodon']);
+    });
+
+    it('survives a reload — a Bluesky row is not discarded for having no origin', () => {
+      TestBed.inject(AnonymousFollows).follow(
+        bskyAccount('alice.bsky.social', 'did:plc:alice'),
+        '',
+      );
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+
+      // The validator requires a readable instance origin for Mastodon rows.
+      // Applying that rule to Bluesky would silently empty the list on reload.
+      const reloaded = TestBed.inject(AnonymousFollows).follows();
+      expect(reloaded).toHaveLength(1);
+      expect(reloaded[0].network).toBe('bluesky');
+    });
+
+    it('reports following state for a Bluesky account', () => {
+      const follows = TestBed.inject(AnonymousFollows);
+      const alice = bskyAccount('alice.bsky.social', 'did:plc:alice');
+
+      expect(follows.isFollowing(alice, '')).toBe(false);
+      follows.follow(alice, '');
+      expect(follows.isFollowing(alice, '')).toBe(true);
+      follows.unfollow(alice, '');
+      expect(follows.isFollowing(alice, '')).toBe(false);
+    });
+
+    it('migrates v2 rows to mastodon rather than discarding them', () => {
+      // What a browser that followed accounts before this sprint has on disk.
+      localStorage.setItem(
+        'mockingbird_anonymous_follows',
+        JSON.stringify({
+          version: 2,
+          follows: [
+            {
+              key: 'alice@example.social',
+              handle: 'alice@example.social',
+              server: 'https://example.social',
+              profileUrl: 'https://example.social/@alice',
+              account: account('alice'),
+              followedAt: new Date().toISOString(),
+              readRef: { server: 'https://example.social', accountId: 'example.social:alice' },
+              routeRetryAfter: { 'read-api': null, 'canonical-api': null, rss: null },
+            },
+          ],
+        }),
+      );
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+
+      const rows = TestBed.inject(AnonymousFollows).follows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].network).toBe('mastodon');
+    });
+  });
 });

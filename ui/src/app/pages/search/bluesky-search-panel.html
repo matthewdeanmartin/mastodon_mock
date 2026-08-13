@@ -57,6 +57,24 @@
     </button>
     , which works without one.
   </p>
+  <!-- The third option, and the one that needs no account anywhere: Bluesky
+       posts are public web pages on bsky.app, so a `site:` search on a real
+       engine finds them. Same hand-off the Mastodon panel offers, pointed at a
+       different host. -->
+  <p class="muted center bsky-unlinked">
+    Or search the public web for Bluesky posts:
+    @for (engine of webEngines; track engine.id) {
+      <button
+        type="button"
+        class="linklike"
+        [disabled]="!criteria().text.trim()"
+        (click)="searchTheWeb(engine.id)"
+      >
+        {{ engine.label }}
+      </button>
+    }
+    <span class="muted small">— finds posts on bsky.app, no account needed.</span>
+  </p>
 } @else {
   @if (advancedOpen() && target() === 'posts') {
     <div class="bsky-advanced">
@@ -167,12 +185,20 @@
         </label>
       </div>
 
-      @if (!session.linked()) {
-        <!-- An anonymous search gets no viewer block, so follow state is
-             genuinely unknown rather than "not following". Say so instead of
-             showing a Follow button that might duplicate an existing follow. -->
+      @if (followUnavailable()) {
+        <!-- No session and no local store to write to: the server sends no
+             viewer block, so follow state is genuinely unknown rather than
+             "not following". Say so instead of showing a Follow button that
+             might duplicate an existing follow. -->
         <p class="muted small bsky-anon-note">
           Searching without a linked account: follow state is not available.
+        </p>
+      } @else if (!session.linked()) {
+        <!-- Anonymous, though: following works and is exact. It is stored in
+             this browser and feeds the anonymous Home timeline — no account on
+             Bluesky required. -->
+        <p class="muted small bsky-anon-note">
+          Following saves to this browser and feeds your Home timeline — no Bluesky account needed.
         </p>
       }
 
@@ -182,7 +208,7 @@
           [relationship]="relationshipFor(result)"
           [profileLink]="profileLink(result.account)"
           [followBusy]="isFollowBusy(result.account)"
-          [anonymous]="!session.linked()"
+          [anonymous]="followUnavailable()"
           (follow)="toggleFollow($event, false)"
           (unfollow)="toggleFollow($event, true)"
         />

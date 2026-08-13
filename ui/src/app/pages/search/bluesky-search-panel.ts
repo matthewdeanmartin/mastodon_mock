@@ -15,6 +15,12 @@ import {
 } from '../../providers/bluesky/bluesky-post-search';
 import { filterLoaded, buildFacets, statusMatchesFacet, FacetKind } from './search-refine';
 import {
+  serializeWebQuery,
+  webSearchUrl,
+  WEB_ENGINES,
+  WebEngine,
+} from './web-query-serializer';
+import {
   sortAccounts,
   sortStatuses,
   ACCOUNT_SORTS,
@@ -30,6 +36,8 @@ import {
   BlueskyAccountSearch,
 } from '../../providers/bluesky/bluesky-account-search';
 import { BlueskyGraph } from '../../providers/bluesky/bluesky-graph';
+import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
+import { Auth } from '../../auth';
 import { Terminology } from '../../terminology';
 
 /** Which Bluesky index the panel is querying. */
@@ -87,11 +95,43 @@ export class BlueskySearchPanel {
     this.saveRequested.emit(structuredClone(this.criteria()));
   }
 
+  protected readonly webEngines = WEB_ENGINES;
+
+  /**
+   * Hand the query to a web engine, scoped to `bsky.app`.
+   *
+   * The escape hatch for the one thing anonymous visitors genuinely cannot do:
+   * `app.bsky.feed.searchPosts` refuses unauthenticated callers at both hosts —
+   * and refuses them with a Cloudflare-style HTML block page rather than an API
+   * error, so there is nothing to degrade gracefully *into*.
+   *
+   * But Bluesky posts are public web pages, so `site:bsky.app` on a real engine
+   * finds them without any account anywhere. Same hand-off the Mastodon panel
+   * already offers, pointed at a different host.
+   *
+   * Only the free-text half is translated. Bluesky's structured filters (author,
+   * tags, language, date bounds) have no `site:`-style equivalent, and the
+   * serializer reports what it dropped — but this button is offered *instead of*
+   * a search that cannot run at all, so the honest framing is "here is a way to
+   * find something", not "here is your search, minus bits".
+   */
+  protected searchTheWeb(engine: WebEngine): void {
+    const text = this.criteria().text.trim();
+    if (!text) {
+      return;
+    }
+    const { query } = serializeWebQuery({ words: text }, 'bsky.app');
+    this.diagnostics.info('Search', 'bsky:web-handoff', { engine });
+    window.open(webSearchUrl(engine, query), '_blank', 'noopener');
+  }
+
   private search = inject(BlueskySearch);
   private accountSearch = inject(BlueskyAccountSearch);
   private graph = inject(BlueskyGraph);
   private diagnostics = inject(PageDiagnostics);
   protected session = inject(BlueskySession);
+  private auth = inject(Auth);
+  private anonymousFollows = inject(AnonymousFollows);
 
   /**
    * Posts or accounts.
@@ -160,6 +200,23 @@ export class BlueskySearchPanel {
    * relationship is known and the card shows no follow button.
    */
   protected toggleFollow(account: Account, following: boolean): void {
+    // Anonymous: the follow is browser-local and instant — there is no account
+    // on Bluesky to write it to, and `AnonymousBlueskyProvider` reads this same
+    // store to build the home feed. This is the "follow people client-side"
+    // half of the anonymous experience.
+    if (!this.session.linked() && this.auth.isAnonymousIdentity) {
+      if (following) {
+        this.anonymousFollows.unfollow(account, '');
+      } else {
+        const result = this.anonymousFollows.follow(account, '');
+        if (!result.ok) {
+          this.error.set(result.error);
+        }
+      }
+      // Re-read: the cards render from `accounts()`, and nothing else changed.
+      this.accounts.update((list) => [...list]);
+      return;
+    }
     const did = account.id.replace(/^bsky:/, '');
     this.followBusy.update((busy) => new Set(busy).add(account.id));
     const call = following ? this.graph.unfollow(did) : this.graph.follow(did);
@@ -192,7 +249,34 @@ export class BlueskySearchPanel {
     });
   }
 
+  /**
+   * Whether following is unavailable for this result set.
+   *
+   * **Not** simply "no linked account". An anonymous visitor follows *locally* —
+   * the follow lives in `AnonymousFollows` and drives the anonymous Bluesky feed
+   * provider — so for them the button works and follow state is known exactly.
+   * The genuinely unusable case is a signed-out or Mastodon-primary reader with
+   * no Bluesky link: no local store to write to and no session to write with.
+   */
+  protected followUnavailable = computed(
+    () => !this.session.linked() && !this.auth.isAnonymousIdentity,
+  );
+
   protected relationshipFor(result: BlueskyAccountResult): Relationship | null {
+    // Anonymous: the server sends no `viewer`, but the browser-local store knows
+    // the answer for certain, so read it from there rather than reporting
+    // unknown.
+    if (!this.session.linked() && this.auth.isAnonymousIdentity) {
+      const following = this.anonymousFollows.isFollowing(result.account, '');
+      return {
+        id: result.account.id,
+        following,
+        followed_by: false,
+        requested: false,
+        blocking: false,
+        muting: false,
+      } as Relationship;
+    }
     return result.relationship;
   }
 

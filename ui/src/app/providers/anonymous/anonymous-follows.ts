@@ -3,7 +3,12 @@ import { Account, Relationship } from '../../models';
 import { AnonymousHomeFeedCache } from './anonymous-home-feed-cache';
 
 const STORAGE_KEY = 'mockingbird_anonymous_follows';
-const STATE_VERSION = 2;
+/**
+ * 3 — added {@link AnonymousFollow.network}, so an anonymous visitor can follow
+ * Bluesky accounts in the same list as Mastodon ones. v2 rows migrate to
+ * `'mastodon'`; see {@link loadState}.
+ */
+const STATE_VERSION = 3;
 // Large enough for the shipped starter collection, while still bounding browser-local work.
 export const ANONYMOUS_FOLLOW_LIMIT = 50;
 
@@ -16,13 +21,37 @@ export interface AnonymousReadRef {
 
 type RouteRetryAfter = Record<AnonymousReadRoute, string | null>;
 
+/**
+ * Which network an anonymous follow points at.
+ *
+ * **One follow list, two networks — deliberately.** The alternative was a
+ * parallel `AnonymousBskyFollows` store, which is smaller but produces two
+ * follow lists, two counts, and a dozen consumers (the hover card, algo-feed,
+ * bulk-add, import-follows, the directory, feed-doctor, client-lists) that each
+ * either merge them or silently show half. That is the road to two separate
+ * anonymous experiences, and the whole point of anonymous mode is that it is
+ * *one* experience with both networks in it: someone who will not log into
+ * either service can still follow people on both and get a real feed.
+ */
+export type AnonymousFollowNetwork = 'mastodon' | 'bluesky';
+
 export interface AnonymousFollow {
   key: string;
   handle: string;
+  /**
+   * Origin of the Mastodon instance this account lives on. Empty string for a
+   * Bluesky follow — Bluesky has no per-user instance, and the DID in
+   * {@link readRef} is what identifies the account instead.
+   */
   server: string;
   profileUrl: string;
   account: Account;
   followedAt: string;
+  /**
+   * Which network to read this account from. Absent in v2 blobs, where every
+   * anonymous follow was Mastodon by construction — {@link loadState} fills it in.
+   */
+  network: AnonymousFollowNetwork;
   readRef: AnonymousReadRef;
   routeRetryAfter: RouteRetryAfter;
 }
@@ -88,7 +117,24 @@ function validRetryState(value: unknown): value is RouteRetryAfter {
   );
 }
 
+/**
+ * Which network an account belongs to, from its id alone.
+ *
+ * Ids are namespaced at the provider edge (`bsky:<did>`), which is the standing
+ * rule for foreign ids — so no extra parameter has to be threaded through the
+ * dozen call sites that already pass an `Account` around.
+ */
+export function networkForAccount(account: Account): AnonymousFollowNetwork {
+  return typeof account.id === 'string' && account.id.startsWith('bsky:') ? 'bluesky' : 'mastodon';
+}
+
 function keyFor(account: Account, fallbackServer: string): string {
+  // A Bluesky account is keyed by its DID, which is the durable identity —
+  // handles are rentable and change. Already namespaced (`bsky:<did>`), so it
+  // can never collide with a Mastodon `user@host` key in the same list.
+  if (networkForAccount(account) === 'bluesky') {
+    return account.id;
+  }
   const username = typeof account.username === 'string' ? account.username : '';
   return `${username.toLowerCase()}@${hostFromAccount(account, fallbackServer)}`;
 }
@@ -109,20 +155,38 @@ function loadState(): AnonymousFollowState {
     const parsed = JSON.parse(
       localStorage.getItem(STORAGE_KEY) ?? 'null',
     ) as Partial<AnonymousFollowState> | null;
-    if (parsed?.version !== STATE_VERSION || !Array.isArray(parsed.follows)) {
+    // v2 and v3 share a row shape apart from `network`, so v2 is migrated
+    // rather than dropped — losing these would silently empty a user's Home.
+    if (
+      (parsed?.version !== STATE_VERSION && parsed?.version !== 2) ||
+      !Array.isArray(parsed.follows)
+    ) {
       return { version: STATE_VERSION, follows: [] };
     }
-    const follows = parsed.follows.filter(
-      (item): item is AnonymousFollow =>
-        typeof item?.key === 'string' &&
-        typeof item.server === 'string' &&
-        typeof item.profileUrl === 'string' &&
-        typeof item.readRef?.server === 'string' &&
-        typeof item.readRef?.accountId === 'string' &&
-        !!origin(item.readRef.server) &&
-        validRetryState(item.routeRetryAfter) &&
-        typeof item.account?.username === 'string',
-    );
+    const follows = parsed.follows
+      .map((item) => ({
+        ...item,
+        // Every follow predating this field was Mastodon by construction:
+        // Bluesky ones could not be stored at all.
+        network: item?.network === 'bluesky' ? ('bluesky' as const) : ('mastodon' as const),
+      }))
+      .filter(
+        (item): item is AnonymousFollow =>
+          typeof item?.key === 'string' &&
+          typeof item.server === 'string' &&
+          typeof item.profileUrl === 'string' &&
+          typeof item.readRef?.accountId === 'string' &&
+          validRetryState(item.routeRetryAfter) &&
+          typeof item.account?.username === 'string' &&
+          // The one genuinely per-network rule. A Mastodon row is unreadable
+          // without an instance origin to fetch from; a Bluesky row has no
+          // instance at all and is identified by the DID in `readRef.accountId`,
+          // so requiring an origin there would discard every Bluesky follow on
+          // the next load.
+          (item.network === 'bluesky'
+            ? item.readRef.accountId.startsWith('did:')
+            : typeof item.readRef.server === 'string' && !!origin(item.readRef.server)),
+      );
     return { version: STATE_VERSION, follows: follows.slice(0, ANONYMOUS_FOLLOW_LIMIT) };
   } catch {
     return { version: STATE_VERSION, follows: [] };
@@ -202,8 +266,28 @@ export class AnonymousFollows {
       return {
         ok: false,
         relationship: relationship(account.id, false),
-        error: `Anonymous accounts can follow up to ${ANONYMOUS_FOLLOW_LIMIT} Mastodon accounts.`,
+        error: `Anonymous accounts can follow up to ${ANONYMOUS_FOLLOW_LIMIT} accounts.`,
       };
+    }
+    // Bluesky: no instance, no RSS fallback, no route backoff to negotiate —
+    // the public AppView answers an author feed directly. The DID is stored as
+    // the read ref, which is what `loadState` validates these rows on.
+    if (networkForAccount(account) === 'bluesky') {
+      const did = account.id.replace(/^bsky:/, '');
+      const bskyFollow: AnonymousFollow = {
+        key,
+        handle: account.acct || account.username,
+        server: '',
+        profileUrl: account.url || `https://bsky.app/profile/${account.acct || did}`,
+        account,
+        followedAt: new Date().toISOString(),
+        network: 'bluesky',
+        readRef: { server: '', accountId: did },
+        routeRetryAfter: emptyRetryState(),
+      };
+      this.homeFeedCache.invalidate();
+      this.persist([...this.follows(), bskyFollow]);
+      return { ok: true, relationship: relationship(account.id, true) };
     }
     const host = hostFromAccount(account, fallbackServer);
     const server = serverFor(host, account);
@@ -215,6 +299,7 @@ export class AnonymousFollows {
       profileUrl: account.url || `${server}/@${account.username}`,
       account: { ...account, acct: `${account.username}@${host}` },
       followedAt: new Date().toISOString(),
+      network: 'mastodon',
       readRef: { server: readServer, accountId: account.id },
       routeRetryAfter: emptyRetryState(),
     };

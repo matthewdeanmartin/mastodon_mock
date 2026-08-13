@@ -95,7 +95,11 @@ export class BlueskyApi {
     if (cursor) {
       params = params.set('cursor', cursor);
     }
-    return this.get<BskyTimeline>('app.bsky.feed.getAuthorFeed', params);
+    // `publicGet`, so this also works with no account at all: the public AppView
+    // answers an unauthenticated author feed 200 (measured 2026-08-13). That is
+    // what lets an anonymous visitor follow a handful of Bluesky accounts and
+    // get a real Home feed out of it, with no login on either network.
+    return this.publicGet<BskyTimeline>('app.bsky.feed.getAuthorFeed', params);
   }
 
   /**
@@ -387,12 +391,17 @@ export class BlueskyApi {
   getProfile(actor?: string): Observable<BskyProfile> {
     const target = actor ?? this.session.session()?.did ?? '';
     const params = new HttpParams().set('actor', target);
-    return this.get<BskyProfile>('app.bsky.actor.getProfile', params);
+    // Anonymous-capable (measured 2026-08-13). The response then carries no
+    // `viewer` block, so follow state comes back unknown rather than false —
+    // callers must not read a missing viewer as "not following".
+    return this.publicGet<BskyProfile>('app.bsky.actor.getProfile', params);
   }
 
   resolveHandle(handle: string): Observable<{ did: string }> {
     const params = new HttpParams().set('handle', handle);
-    return this.get<{ did: string }>('com.atproto.identity.resolveHandle', params);
+    // Needed anonymously too: a bare handle has to become a DID before an
+    // anonymous follow can be stored against a stable id.
+    return this.publicGet<{ did: string }>('com.atproto.identity.resolveHandle', params);
   }
 
   private createRecord(

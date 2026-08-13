@@ -119,7 +119,7 @@ sites, and Sprint 1 makes that explicit rather than leaving it implicit.
 | 4 | [The Mastodon connector](bsky-first-4-mastodon-under-bsky.md) — **COMPLETE** | That same session can *opt into* Explore, trends and tag timelines — and attach a real Mastodon account later |
 | 4b | [The rails speak Bluesky](bsky-first-4b-bsky-rails.md) — **COMPLETE** | A bsky-primary account's rails show **Bluesky** widgets — trends and a service card — instead of Mastodon ones it cannot use; popular feeds land on Lists, for everyone |
 | 5 | [Search parity](bsky-first-5-search-parity.md) — **COMPLETE** | Search defaults to the account's own network, the Bluesky panel is linkable, and Bluesky searches can be saved |
-| 6 | [Anonymous Bluesky](bsky-first-6-anonymous-bsky.md) | Browse Bluesky with no login at all, via `public.api.bsky.app` |
+| 6 | [Anonymous Bluesky](bsky-first-6-anonymous-bsky.md) — **COMPLETE** | **One** anonymous experience with both networks in it: search, follow and read Bluesky with no login anywhere |
 | 7 | [Find your people](bsky-first-7-bridge-finder.md) | "Who that I follow on Mastodon is also on Bluesky?" — with match kinds, not just scores |
 
 Ordering rationale: 1 is pure plumbing and unblocks everything. 2 is the biggest
@@ -188,6 +188,26 @@ lands on `mastodon.social` immediately** (one click to a working Explore, change
 server afterwards), and **Settings is the only opt-in surface this sprint** — the
 contextual offers get their predicate but no UI. See Sprint 4's "What the next
 sprint inherits".
+### Anonymous is ONE experience with both networks in it (user, 2026-08-13)
+
+Raised while scoping Sprint 6, and it is a standing principle rather than a
+sprint decision:
+
+> "I think it is more single experience because if someone is too lazy to log
+> into either mastodon or bsky, they can get both chips on the home page for both
+> services and they should be able to search and follow people client side… So
+> quite a bit of functionality should just work, ignoring the chore of having to
+> follow a few people to get a feed going."
+
+Anonymous mode is **not** a degraded Mastodon session, and it is not about to
+become a Mastodon-flavoured one plus a Bluesky-flavoured one. It is a single
+browser-local identity that can read and follow across every network the app
+speaks. The concrete test: one follow list, one count, both chips on Home.
+
+This is why Sprint 6 put Bluesky follows in `AnonymousFollows` alongside Mastodon
+ones rather than in a parallel store — a second store would have produced two
+counts and a dozen consumers each showing half.
+
 - **Search: parity of *features*, not of *code*.**
 
   > "I don't mind if we have to reimplement all the faceting and so on because
