@@ -56,25 +56,32 @@
 }
 
 /*
- * A real two-column grid, and the label column has a *maximum* rather than a
- * fixed width.
+ * Two fixed halves. Neither column's width is negotiable, and that is the point.
  *
- * The old rule was `display: flex` with `flex: 0 0 30%` on the label. Two things
- * went wrong together. The label could not wrap, so a long one ("Fediverse
- * instance I also post from") pushed its own column wider than its 30% share;
- * that squeezed the value column toward zero width, and `overflow-wrap: anywhere`
- * on the value did exactly what it was asked to — broke the URL at whatever
- * character fit. The result was a one-character-per-line column a thousand
- * lines tall for a thousand-character URL.
+ * These cells hold arbitrary user-authored text. The field is nominally for a
+ * `rel="me"` verification link, but people put anything there — a sentence, a
+ * fediverse handle, an emoji, a 900-character URL — and the label beside it is
+ * just as unpredictable. Any track sizing that lets content influence width
+ * (`max-content`, `auto`, `fit-content`) therefore hands layout control to
+ * whichever cell has the most aggressive content, and one of the two columns
+ * gets crushed. Both failure modes have now been seen in this exact row:
  *
- * `minmax(0, …)` on both tracks is the fix that matters: it lets each column
- * shrink below the intrinsic width of its content, so neither can bully the
- * other. The label then wraps inside its own cell (it is ordinary text, not a
- * fixed-width plinth) and the value wraps inside its cell, at a sane width.
+ *  - `flex: 0 0 30%` on a non-wrapping label: a long label overran its share
+ *    and starved the value, which then broke one character per line — a
+ *    thousand-line-tall URL.
+ *  - `minmax(0, max-content)`: the mirror image. An unbreakable value took the
+ *    space and squeezed the *label* to a few characters per line, and it did not
+ *    take a long URL to do it.
+ *
+ * `1fr 1fr` cannot do either. Each column is exactly half the row regardless of
+ * what is in it, both cells wrap inside their own half, and a pathological value
+ * can only ever make its own cell taller. `minmax(0, 1fr)` rather than bare
+ * `1fr` because the default `auto` minimum would still let unbreakable content
+ * push a track wider than its share.
  */
 .profile-field {
   display: grid;
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: baseline;
   gap: 4px 10px;
   padding: 8px 12px;
@@ -101,32 +108,24 @@
 }
 
 /*
- * `max-width` rather than a fixed basis: the label takes what it needs up to a
- * third of the row and wraps inside that, instead of setting the column width
- * for everyone else. Ordinary `overflow-wrap` (not `anywhere`) because a label
- * is words — it should break at spaces, and a single unbroken word is better
- * overflowing its cell than shredded.
+ * No width of its own: the grid track above owns that, and a `max-width` here
+ * would only shrink the label inside its own half while the other half stayed
+ * put. `anywhere`, not `break-word`, because a label is as likely to be a
+ * pasted URL as a word — this field is user-authored on both sides — and a
+ * single unbreakable token must break rather than overflow into the value.
  */
 .field-name {
-  max-width: 33%;
   font-weight: 700;
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.03em;
-  overflow-wrap: break-word;
-}
-
-@media (max-width: 420px) {
-  .field-name {
-    max-width: none;
-  }
+  overflow-wrap: anywhere;
 }
 
 /*
- * `anywhere` is right here and wrong on the label: a URL has no spaces to break
- * at, so the choice is breaking mid-string or a horizontal scrollbar. It only
- * became pathological when the column was starved of width, which the grid
- * above now prevents.
+ * A URL has no spaces to break at, so the choice is breaking mid-string or a
+ * horizontal scrollbar. Breaking is right — it only looked pathological when the
+ * column was starved of width, which a fixed half-width track prevents.
  */
 .field-value {
   min-width: 0;
