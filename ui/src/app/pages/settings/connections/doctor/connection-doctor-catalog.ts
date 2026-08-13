@@ -272,6 +272,29 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     },
   },
   {
+    id: 'mawkingbird-proxy',
+    host: 'mawkingbird-cors-proxy.matthewdeanmartin.workers.dev',
+    label: 'Mawkingbird proxy',
+    category: 'proxy',
+    // `/health` rather than a real proxied fetch: it is the one endpoint that
+    // needs no Origin, no route and no target, so it answers "is this service
+    // up and reachable from here?" without spending an upstream request or
+    // consuming the rate limit. A proxied probe would conflate the proxy being
+    // down with the *target* refusing it, which is the exact confusion the
+    // separate proxy leg of this page exists to resolve.
+    probeUrl: 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/health',
+    // Deliberately no `proxyRoute`. This host is the proxy itself; routing a
+    // probe of it *through* it would be a loop, and the reachability check above
+    // already answers the only question worth asking.
+    openUrl: 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/',
+    matters:
+      'The proxy this app runs itself: RSS feeds, pastes, link shorteners and the Twitter data services.',
+    // No status page, and honestly so: it is one Cloudflare Worker run by one
+    // person. The probe above is the only signal, which is why it points at an
+    // endpoint that cannot fail for a reason other than the service being down.
+    status: null,
+  },
+  {
     id: 'allorigins',
     host: 'api.allorigins.win',
     label: 'AllOrigins proxy',
