@@ -1,5 +1,5 @@
 {
-  "testCount": 4075,
+  "testCount": 4080,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -1593,6 +1593,11 @@
     "src/app/pages/profile/profile.spec.ts :: Profile block/unblock requires confirmation before unfollowing",
     "src/app/pages/profile/profile.spec.ts :: Profile block/unblock shows Requested after a locked account accepts a pending follow request",
     "src/app/pages/profile/profile.spec.ts :: Profile block/unblock stops paging when the account runs out of statuses",
+    "src/app/pages/profile/profile.spec.ts :: Profile block/unblock the follow button and the follows-you badge keeps the badge when they follow you and you do not follow back",
+    "src/app/pages/profile/profile.spec.ts :: Profile block/unblock the follow button and the follows-you badge says Following when you follow someone who does not follow back",
+    "src/app/pages/profile/profile.spec.ts :: Profile block/unblock the follow button and the follows-you badge says Mutuals on the button and drops the badge when the follow runs both ways",
+    "src/app/pages/profile/profile.spec.ts :: Profile block/unblock the follow button and the follows-you badge shortens the list button so the row fits a phone",
+    "src/app/pages/profile/profile.spec.ts :: Profile block/unblock the follow button and the follows-you badge still unfollows when the button is showing Mutuals",
     "src/app/pages/profile/profile.spec.ts :: Profile block/unblock toggles boosts in the overflow menu and uses retweet terminology when configured",
     "src/app/pages/profile/profile.spec.ts :: Profile block/unblock toggling boosts off refetches with exclude_reblogs",
     "src/app/pages/profile/profile.spec.ts :: Profile block/unblock unblocks a blocked account via POST /unblock",

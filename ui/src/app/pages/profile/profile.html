@@ -149,8 +149,12 @@
       } @else if (!isSelf()) {
         <div class="profile-buttons">
           @if (capabilities.canManageLists) {
+            <!-- "Lists", not "Lists & collections": this sits in a row that
+                 already competes for width with •••, the relationship badge and
+                 Follow, and the longer label was the one pushing that row into a
+                 second line on a phone. The dialog itself still covers both. -->
             <button class="btn btn-outline" (click)="showLists.set(true)">
-              {{ auth.isAnonymous ? 'Local lists' : 'Lists & collections' }}
+              {{ auth.isAnonymous ? 'Local lists' : 'Lists' }}
             </button>
           }
           <details class="account-danger-menu">
@@ -239,30 +243,39 @@
           </details>
           <!-- Which way the relationship runs. "Following" only says what *you*
                did; without this there is no way to tell a mutual from someone who
-               has never heard of you. -->
-          @if (!isSelf() && relationship()?.followed_by) {
-            <span
-              class="badge follows-you"
-              [title]="
-                relationship()?.following ? 'You follow each other' : 'This account follows you'
-              "
-            >
-              {{ relationship()?.following ? 'Mutuals' : 'Follows you' }}
-            </span>
+               has never heard of you.
+
+               The badge is only shown when it says something the button cannot.
+               "Follows you" is such a case — you are not following back, so the
+               button reads "Follow" and the badge carries the other direction.
+               "Mutuals" is not: it duplicates a button that would sit right
+               beside it saying "Following", so the button says "Mutuals" instead
+               and the badge stands down. See mutualsLabel below. -->
+          @if (!isSelf() && relationship()?.followed_by && !isMutual()) {
+            <span class="badge follows-you" title="This account follows you">Follows you</span>
           }
           @if (capabilities.canFollow) {
             <button
               class="btn"
               [class.btn-outline]="relationship()?.following || relationship()?.requested"
               [disabled]="relationship()?.requested"
+              [title]="
+                isMutual()
+                  ? 'You follow each other. Click to unfollow.'
+                  : relationship()?.following
+                    ? 'Click to unfollow.'
+                    : ''
+              "
               (click)="relationship()?.following ? requestUnfollow() : toggleFollow()"
             >
               {{
-                relationship()?.following
-                  ? 'Following'
-                  : relationship()?.requested
-                    ? 'Requested'
-                    : 'Follow'
+                isMutual()
+                  ? 'Mutuals'
+                  : relationship()?.following
+                    ? 'Following'
+                    : relationship()?.requested
+                      ? 'Requested'
+                      : 'Follow'
               }}
             </button>
           }
@@ -310,12 +323,19 @@
     @if (a.fields.length) {
       <div class="profile-fields">
         @for (f of a.fields; track f.name) {
+          <!-- The tick sits *inside* the value cell, not beside it as a third
+               child. The row is a two-column grid, so a third child would be
+               laid out into a phantom third column and wrap onto its own line
+               under the label. It also belongs there on the merits: it verifies
+               this link, so it should ride along at the end of it. -->
           <div class="profile-field" [class.verified]="f.verified_at">
             <span class="field-name muted">{{ f.name }}</span>
-            <span class="field-value" [innerHTML]="f.value"></span>
-            @if (f.verified_at) {
-              <span class="field-check" title="Link ownership verified">✓</span>
-            }
+            <span class="field-value">
+              <span [innerHTML]="f.value"></span>
+              @if (f.verified_at) {
+                <span class="field-check" title="Link ownership verified">✓</span>
+              }
+            </span>
           </div>
         }
       </div>
@@ -408,42 +428,58 @@
     <div class="profile-tabs" role="group" aria-label="Profile sections">
       <button
         type="button"
-        class="ptab"
+        class="ptab ptab-labelled"
         [class.active]="tab() === 'posts'"
         (click)="setTab('posts')"
       >
-        {{ isRss() ? 'Items' : words().Posts }}
+        <span class="ptab-glyph" aria-hidden="true">📜</span>
+        <span class="ptab-word">{{ isRss() ? 'Items' : words().Posts }}</span>
       </button>
       <button
         type="button"
-        class="ptab"
+        class="ptab ptab-labelled"
         [class.active]="tab() === 'media'"
         (click)="setTab('media')"
       >
-        Media
+        <span class="ptab-glyph" aria-hidden="true">🖼️</span>
+        <span class="ptab-word">Media</span>
       </button>
     </div>
   }
 
   @if (!isRss() && !isTwitter()) {
     <div class="profile-tabs" role="group" aria-label="Profile sections">
-      <button class="ptab ptab-back" type="button" (click)="goBack()" title="Back">← Back</button>
+      <!-- aria-label rather than relying on the visible text: the word is
+           display:none on a phone, and a button whose only remaining content is
+           an arrow glyph would otherwise announce as "left arrow". -->
+      <button
+        class="ptab ptab-back"
+        type="button"
+        (click)="goBack()"
+        title="Back"
+        aria-label="Back"
+      >
+        <span aria-hidden="true">←</span>
+        <span class="ptab-word">Back</span>
+      </button>
       <button
         type="button"
-        class="ptab"
+        class="ptab ptab-labelled"
         [class.active]="tab() === 'posts'"
         (click)="setTab('posts')"
       >
-        {{ words().Posts }}
+        <span class="ptab-glyph" aria-hidden="true">📜</span>
+        <span class="ptab-word">{{ words().Posts }}</span>
       </button>
       @if (canShowMedia()) {
         <button
           type="button"
-          class="ptab"
+          class="ptab ptab-labelled"
           [class.active]="tab() === 'media'"
           (click)="setTab('media')"
         >
-          Media
+          <span class="ptab-glyph" aria-hidden="true">🖼️</span>
+          <span class="ptab-word">Media</span>
         </button>
       }
       <button

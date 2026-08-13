@@ -41,7 +41,7 @@
  * token is `secret` and never leaves the browser.
  */
 
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import { Account } from '../../models';
 import { scopedKey } from '../../account-scope';
 

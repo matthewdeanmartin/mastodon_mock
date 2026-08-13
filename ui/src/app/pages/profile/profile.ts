@@ -544,6 +544,19 @@ export class Profile implements OnInit, OnDestroy {
   protected followError = signal<string | null>(null);
 
   protected isSelf = computed(() => this.account()?.id === this.auth.account()?.id);
+  /**
+   * Whether the follow runs both ways.
+   *
+   * Exists so one fact drives both the button's label and whether the
+   * "Follows you" badge appears. They used to be decided independently, which
+   * is how a mutual ended up with a "Mutuals" badge sitting next to a
+   * "Following" button — two controls saying the same thing, and the state
+   * everyone actually wants to spot was the one rendered twice.
+   */
+  protected isMutual = computed(() => {
+    const relationship = this.relationship();
+    return !!relationship?.following && !!relationship.followed_by;
+  });
   /** True when this profile is Eliza's — unlocks her local "Message" button. */
   protected isEliza = computed(() => isElizaId(this.account()?.id));
   protected isOpenRouter = computed(() => isOpenRouterId(this.account()?.id));

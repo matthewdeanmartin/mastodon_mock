@@ -55,12 +55,41 @@
   overflow: hidden;
 }
 
+/*
+ * A real two-column grid, and the label column has a *maximum* rather than a
+ * fixed width.
+ *
+ * The old rule was `display: flex` with `flex: 0 0 30%` on the label. Two things
+ * went wrong together. The label could not wrap, so a long one ("Fediverse
+ * instance I also post from") pushed its own column wider than its 30% share;
+ * that squeezed the value column toward zero width, and `overflow-wrap: anywhere`
+ * on the value did exactly what it was asked to — broke the URL at whatever
+ * character fit. The result was a one-character-per-line column a thousand
+ * lines tall for a thousand-character URL.
+ *
+ * `minmax(0, …)` on both tracks is the fix that matters: it lets each column
+ * shrink below the intrinsic width of its content, so neither can bully the
+ * other. The label then wraps inside its own cell (it is ordinary text, not a
+ * fixed-width plinth) and the value wraps inside its cell, at a sane width.
+ */
 .profile-field {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
   align-items: baseline;
-  gap: 10px;
+  gap: 4px 10px;
   padding: 8px 12px;
   font-size: 14px;
+}
+
+/*
+ * Below this the two columns have nothing useful to share, so stack them: a
+ * wrapped three-word label beside a wrapped URL is two ragged columns and is
+ * harder to read than one thing above the other.
+ */
+@media (max-width: 420px) {
+  .profile-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .profile-field + .profile-field {
@@ -71,16 +100,35 @@
   background: color-mix(in srgb, #00ba7c 12%, transparent);
 }
 
+/*
+ * `max-width` rather than a fixed basis: the label takes what it needs up to a
+ * third of the row and wraps inside that, instead of setting the column width
+ * for everyone else. Ordinary `overflow-wrap` (not `anywhere`) because a label
+ * is words — it should break at spaces, and a single unbroken word is better
+ * overflowing its cell than shredded.
+ */
 .field-name {
-  flex: 0 0 30%;
+  max-width: 33%;
   font-weight: 700;
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.03em;
+  overflow-wrap: break-word;
 }
 
+@media (max-width: 420px) {
+  .field-name {
+    max-width: none;
+  }
+}
+
+/*
+ * `anywhere` is right here and wrong on the label: a URL has no spaces to break
+ * at, so the choice is breaking mid-string or a horizontal scrollbar. It only
+ * became pathological when the column was starved of width, which the grid
+ * above now prevents.
+ */
 .field-value {
-  flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -352,12 +400,31 @@ h2 {
   color: var(--text);
 }
 
-/* Posts / Following / Followers tab bar. */
+/*
+ * Posts / Following / Followers tab bar.
+ *
+ * Scrollable rather than wrapping. Measured at a 390px viewport, the row ran to
+ * 414px and pushed the whole *page* into a horizontal scroll — the profile
+ * fields and every post scrolled sideways to accommodate one clipped
+ * "Analytics" tab. `overflow-x: auto` confines that to the row that actually
+ * needs it, and `flex-shrink: 0` on the tabs stops the browser "solving" the
+ * overflow by squeezing every label into two-line stacks instead.
+ */
 .profile-tabs {
   display: flex;
   gap: 4px;
   padding: 0 16px;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.profile-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.profile-tabs > * {
+  flex: 0 0 auto;
 }
 
 .ptab {
@@ -389,6 +456,63 @@ h2 {
 .ptab.active {
   color: var(--text);
   border-bottom-color: var(--accent);
+}
+
+/*
+ * Narrow screens: the word tabs become glyphs.
+ *
+ * Both labels are always in the DOM and CSS picks one, rather than the
+ * component swapping strings at a JS breakpoint. That keeps the accessible name
+ * a *word* at every width — the glyph span is `aria-hidden`, the word span is
+ * only visually hidden — so a screen reader still hears "Posts" and never
+ * "scroll emoji". It also means no resize listener and no layout thrash.
+ *
+ * `.ptab-word` is not `display: none`: that would take it out of the
+ * accessibility tree along with the layout. The clip-rect idiom hides it from
+ * sight while leaving it readable to assistive tech.
+ */
+.ptab-glyph {
+  display: none;
+  font-size: 17px;
+  line-height: 1;
+}
+
+@media (max-width: 520px) {
+  .profile-tabs {
+    gap: 0;
+    padding: 0 8px;
+  }
+
+  .ptab {
+    padding: 12px 10px;
+  }
+
+  .ptab-glyph {
+    display: inline-block;
+  }
+
+  /* Back keeps its arrow and drops the word. It is the one control here whose
+     glyph is genuinely unambiguous, and reclaiming its label is what lets the
+     actual section tabs fit without the row scrolling at all. */
+  .ptab-back {
+    padding-right: 8px;
+    margin-right: 4px;
+  }
+
+  .ptab-back .ptab-word {
+    display: none;
+  }
+
+  .ptab-labelled .ptab-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .confirm-overlay {

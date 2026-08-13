@@ -99,6 +99,87 @@ describe('Profile block/unblock', () => {
     expect(cmp.relationship().blocking).toBe(true);
   });
 
+  /**
+   * The relationship reads out of exactly one control.
+   *
+   * A mutual used to render twice: a "Mutuals" badge next to a "Following"
+   * button, saying the same thing in two places and spending the width of the
+   * button row to do it. The button now carries the mutual state and the badge
+   * stands down — but only for that case, because "Follows you" is genuinely
+   * something the button cannot say.
+   */
+  describe('the follow button and the follows-you badge', () => {
+    const labelsIn = (fixture: ReturnType<typeof setUp>) =>
+      [...(fixture.nativeElement as HTMLElement).querySelectorAll('.profile-buttons button')].map(
+        (button) => button.textContent?.trim(),
+      );
+
+    const badgeText = (fixture: ReturnType<typeof setUp>) =>
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('.badge.follows-you')
+        ?.textContent?.trim() ?? null;
+
+    it('says Mutuals on the button and drops the badge when the follow runs both ways', () => {
+      const fixture = setUp();
+      const cmp = fixture.componentInstance as any;
+      cmp.relationship.set({ id: '900', following: true, followed_by: true } as Relationship);
+      fixture.detectChanges();
+
+      expect(labelsIn(fixture)).toContain('Mutuals');
+      expect(labelsIn(fixture)).not.toContain('Following');
+      // The duplicate. Its absence is the whole point of the change.
+      expect(badgeText(fixture)).toBeNull();
+    });
+
+    it('keeps the badge when they follow you and you do not follow back', () => {
+      const fixture = setUp();
+      const cmp = fixture.componentInstance as any;
+      cmp.relationship.set({ id: '900', following: false, followed_by: true } as Relationship);
+      fixture.detectChanges();
+
+      // Here the badge earns its place: the button says "Follow", so without it
+      // there is nothing to distinguish a follower from a stranger.
+      expect(badgeText(fixture)).toBe('Follows you');
+      expect(labelsIn(fixture)).toContain('Follow');
+    });
+
+    it('says Following when you follow someone who does not follow back', () => {
+      const fixture = setUp();
+      const cmp = fixture.componentInstance as any;
+      cmp.relationship.set({ id: '900', following: true, followed_by: false } as Relationship);
+      fixture.detectChanges();
+
+      expect(labelsIn(fixture)).toContain('Following');
+      expect(labelsIn(fixture)).not.toContain('Mutuals');
+      expect(badgeText(fixture)).toBeNull();
+    });
+
+    it('still unfollows when the button is showing Mutuals', () => {
+      // The label changed; the action behind it must not have.
+      const fixture = setUp();
+      const cmp = fixture.componentInstance as any;
+      cmp.relationship.set({ id: '900', following: true, followed_by: true } as Relationship);
+      fixture.detectChanges();
+
+      cmp.requestUnfollow();
+      expect(cmp.showUnfollowConfirm()).toBe(true);
+      cmp.confirmUnfollow();
+      httpMock
+        .expectOne('/api/v1/accounts/900/unfollow')
+        .flush({ id: '900', following: false, followed_by: true } as Relationship);
+
+      // No longer mutual, so the badge comes back to carry the other direction.
+      fixture.detectChanges();
+      expect(badgeText(fixture)).toBe('Follows you');
+    });
+
+    it('shortens the list button so the row fits a phone', () => {
+      const fixture = setUp();
+      fixture.detectChanges();
+      expect(labelsIn(fixture)).not.toContain('Lists & collections');
+    });
+  });
+
   it('requires confirmation before unfollowing', () => {
     const fixture = setUp();
     const cmp = fixture.componentInstance as any;
