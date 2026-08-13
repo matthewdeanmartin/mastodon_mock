@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConnectionDoctor } from './connection-doctor';
+import { classifyProxyStatus, ConnectionDoctor } from './connection-doctor';
 import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import {
   corsHint,
@@ -318,6 +318,25 @@ describe('status pages', () => {
     }
   });
 
+  it('probes a real endpoint on the API connectors, not a bare host root', () => {
+    // The bug this pins. `api.raindrop.io/` answers 301 and `api.dropboxapi.com/`
+    // answers 404 — neither carries `Access-Control-Allow-Origin`, because a
+    // redirect and a generic 404 have no reason to. Probing those made the
+    // doctor report "this host needs a CORS proxy" for two APIs the app talks to
+    // directly and successfully, which is the single most confusing thing this
+    // page can say: it contradicts a connector the user can see working.
+    //
+    // A path is the fix. It does not have to succeed — a readable 401 answers
+    // the question perfectly — it only has to be a URL the API actually serves.
+    const needPaths = ['raindrop', 'dropbox', 'tly'];
+    for (const id of needPaths) {
+      const target = PROBE_TARGETS.find((t) => t.id === id);
+      expect(target, id).toBeDefined();
+      const path = new URL(target!.probeUrl).pathname;
+      expect(path, `${id} probes a bare root`).not.toBe('/');
+    }
+  });
+
   it('every target states a status page or explicitly states it has none', () => {
     // `status` is required, so a new connector cannot quietly ship without
     // someone having looked for its status page.
@@ -328,6 +347,42 @@ describe('status pages', () => {
         expect(target.status.label.length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('classifyProxyStatus', () => {
+  // The reported bug: probing api.twitterapi.io through a working proxy returned
+  // a readable `{"error":"Unauthorized","message":"Missing API key..."}` and the
+  // page announced "this service refused the request coming from it. Proxies run
+  // in datacentres..." — sending the user to hunt for a different proxy over a
+  // reply that proved the proxy was working perfectly.
+  it('reads an auth failure as proof the round trip worked', () => {
+    expect(classifyProxyStatus(401)).toBe('works');
+    expect(classifyProxyStatus(403)).toBe('works');
+    expect(classifyProxyStatus(402)).toBe('works');
+  });
+
+  it('reads a 2xx or 3xx as working', () => {
+    expect(classifyProxyStatus(200)).toBe('works');
+    expect(classifyProxyStatus(204)).toBe('works');
+    expect(classifyProxyStatus(302)).toBe('works');
+  });
+
+  it('reads a wrong-path or wrong-method reply as working', () => {
+    // Several probes are endpoints that want POST, or roots with no handler.
+    // The target parsed the request well enough to say so, which is the point.
+    expect(classifyProxyStatus(404)).toBe('works');
+    expect(classifyProxyStatus(405)).toBe('works');
+  });
+
+  it('reads rate limiting as working, since we were plainly received', () => {
+    expect(classifyProxyStatus(429)).toBe('works');
+  });
+
+  it('still reports a server-side failure as the target refusing', () => {
+    expect(classifyProxyStatus(500)).toBe('target-refused');
+    expect(classifyProxyStatus(502)).toBe('target-refused');
+    expect(classifyProxyStatus(522)).toBe('target-refused');
   });
 });
 
@@ -376,10 +431,20 @@ describe('timingHint', () => {
 describe('corsHint', () => {
   it('explains that a blocked read is the host’s decision, not a local setting', () => {
     const hint = corsHint(result('reachable', 'blocked', 300))!;
-    expect(hint).toContain('their policy');
+    expect(hint).toMatch(/host's policy/);
     // The load-bearing claim: nothing installed on this side changes it, which
     // is why the extension advice is wrong.
-    expect(hint).toContain('not something a browser setting can grant you');
+    expect(hint).toContain('no browser setting can grant it');
+  });
+
+  it('admits a blocked verdict describes one URL, not the whole API', () => {
+    // An API can answer differently per path — `api.raindrop.io/` redirects
+    // without CORS headers while `/rest/v1/collections` answers with them. A
+    // row that contradicts a connector the user can see working needs to say
+    // which of the two to believe.
+    const hint = corsHint(result('reachable', 'blocked', 300))!;
+    expect(hint).toMatch(/single URL|one URL/);
+    expect(hint).toMatch(/believe the connector/);
   });
 
   it('says a readable host needs no proxy', () => {

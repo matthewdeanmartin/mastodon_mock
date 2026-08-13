@@ -231,7 +231,13 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     host: 'api.raindrop.io',
     label: 'Raindrop.io',
     category: 'connector',
-    probeUrl: 'https://api.raindrop.io/',
+    // A real endpoint, not the bare API root. `api.raindrop.io/` answers 301,
+    // and a redirect carries no `Access-Control-Allow-Origin` — so probing it
+    // reported "this host needs a CORS proxy" about a service that is entirely
+    // CORS-open on every path the app actually calls. Measured 2026-08-13:
+    // `/rest/v1/collections` answers 401 *with* an ACAO echoing our origin, and
+    // its preflight explicitly allows `Authorization`.
+    probeUrl: 'https://api.raindrop.io/rest/v1/collections',
     openUrl: 'https://raindrop.io',
     matters: 'Saving bookmarks to Raindrop.',
     // Has an explicit API component, separate from the website and apps.
@@ -262,7 +268,15 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     host: 'api.dropboxapi.com',
     label: 'Dropbox',
     category: 'connector',
-    probeUrl: 'https://api.dropboxapi.com/',
+    // A real endpoint rather than the bare root, for the same reason as
+    // Raindrop: `api.dropboxapi.com/` answers 404 with no CORS headers, so
+    // probing it reported "needs a proxy" about an API the app talks to
+    // directly and successfully. Measured 2026-08-13: a GET here answers 400
+    // (the endpoint wants POST) *with* an ACAO echoing our origin — and a
+    // readable 400 is exactly what this probe is asking about, since the
+    // question is whether the browser may see the reply, not whether the reply
+    // is a success.
+    probeUrl: 'https://api.dropboxapi.com/2/users/get_current_account',
     openUrl: 'https://www.dropbox.com',
     matters: 'Browsing your Dropbox app folder.',
     status: {
@@ -385,7 +399,10 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     host: 'api.t.ly',
     label: 'T.LY (shortener)',
     category: 'shortener',
-    probeUrl: 'https://api.t.ly/',
+    // Not the bare root: `api.t.ly/` answers 301 to `t.ly/docs`, and a redirect
+    // carries no CORS headers. This endpoint answers 401 with an ACAO, which is
+    // the readable "you are unauthenticated" this probe wants.
+    probeUrl: 'https://api.t.ly/api/v1/link/list',
     proxyRoute: 'shortener',
     openUrl: 'https://t.ly',
     matters: 'Shortening links with T.LY.',
@@ -666,7 +683,13 @@ export function corsHint(result: ProbeResult): string | null {
     return 'This app can read its replies directly — no proxy needed.';
   }
   if (result.cors === 'blocked') {
-    return 'Reachable, but it refuses to let this app read the reply: the host does not send the header that would permit it. That is their policy, not a fault on your network, and not something a browser setting can grant you. Mawkingbird routes these through a CORS proxy instead.';
+    return (
+      'Reachable, but this one URL did not let the app read its reply — no ' +
+      '`Access-Control-Allow-Origin` came back. That is the host\'s policy, not a fault on your ' +
+      'network, and no browser setting can grant it. Mawkingbird routes these through a CORS ' +
+      'proxy instead. One caveat worth knowing: this tests a single URL, and an API can answer ' +
+      'differently per path — if the connector itself works, believe the connector, not this row.'
+    );
   }
   return null;
 }

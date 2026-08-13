@@ -75,8 +75,9 @@ describe('ConnectionCorsProxy', () => {
     // button fetched `w3.org`. A user reading a failure was being told about a
     // request that had never been made.
     it('previews exactly the URL it will request', () => {
-      settings.select('allorigins');
-      fixture.detectChanges();
+      // `choose`, not `settings.select`: the preview renders from the on-screen
+      // selection, which is what the user is reading when the test runs.
+      choose('allorigins');
 
       const preview = fixture.componentInstance['preview']();
       fixture.componentInstance.runTest();
@@ -89,7 +90,7 @@ describe('ConnectionCorsProxy', () => {
       // `example.com/feed.xml` does not exist. Testing a proxy by fetching a
       // page that is absent proves nothing and reports the absence as a proxy
       // fault.
-      settings.select('allorigins');
+      choose('allorigins');
       fixture.componentInstance.runTest();
       const request = httpMock.expectOne(() => true);
       expect(request.request.url).not.toContain('example.com');
@@ -97,8 +98,7 @@ describe('ConnectionCorsProxy', () => {
     });
 
     it('names its route on a routed proxy, so the request is not refused', () => {
-      settings.select('mawkingbird');
-      fixture.detectChanges();
+      choose('mawkingbird');
 
       fixture.componentInstance.runTest();
       const request = httpMock.expectOne((req) => req.url.includes('workers.dev'));
@@ -111,7 +111,7 @@ describe('ConnectionCorsProxy', () => {
       // A 403 may be the proxy refusing us or the target refusing the proxy —
       // many sites block datacentre ranges. Asserting only the first sent people
       // to check a key that was never the problem.
-      settings.select('allorigins');
+      choose('allorigins');
       fixture.componentInstance.runTest();
       httpMock.expectOne(() => true).flush('no', { status: 403, statusText: 'Forbidden' });
       fixture.detectChanges();

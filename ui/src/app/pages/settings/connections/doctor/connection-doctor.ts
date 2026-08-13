@@ -178,10 +178,7 @@ export class ConnectionDoctor {
         signal: AbortSignal.timeout(timeoutMs),
       });
       const proxyMs = Math.round(performance.now() - started);
-      // A proxy that answers with the target's error is still a working proxy;
-      // but a 4xx/5xx here usually means the proxy itself is reporting that it
-      // could not fetch the target, so it is read as the target refusing.
-      return { proxy: response.ok ? 'works' : 'target-refused', proxyMs };
+      return { proxy: classifyProxyStatus(response.status), proxyMs };
     } catch {
       const proxyMs = Math.round(performance.now() - started);
       return { proxy: await this.classifyProxyFailure(proxiedUrl, timeoutMs), proxyMs };
@@ -230,4 +227,56 @@ export class ConnectionDoctor {
       return 'blocked';
     }
   }
+}
+
+/**
+ * What an HTTP status from the *proxied* leg actually proves.
+ *
+ * The subtlety worth naming: **a status only exists at all if the round trip
+ * worked.** For the browser to read `401`, the proxy had to accept the request,
+ * reach the target, get an answer, and relay it with CORS headers the browser
+ * honoured. Every one of those is the thing this leg is testing.
+ *
+ * The earlier code was `response.ok ? 'works' : 'target-refused'`, which read
+ * every non-2xx as a refusal — and so reported a perfectly working proxy as
+ * "this service refused the request coming from it", telling the user to go
+ * find a different proxy for a problem that did not exist.
+ *
+ * These probes are **unauthenticated by construction**: the doctor exists to be
+ * run before you have any keys. So on an API host, `401` and `403` are the
+ * *expected* replies and are evidence of success. A genuine datacentre-range
+ * block looks different — it is usually a network failure or an HTML block page
+ * under 5xx, not a JSON "missing API key".
+ *
+ * Exported for testing: the mapping is the whole behaviour, and it is worth
+ * pinning per status rather than through a fixture.
+ */
+export function classifyProxyStatus(status: number): ProxyVerdict {
+  // The target replied and the browser read it. That is a working proxy,
+  // whatever the target thought of the request.
+  if (status < 400) {
+    return 'works';
+  }
+
+  // Authentication and authorization failures prove the request arrived and was
+  // understood. An unauthenticated probe *should* get these.
+  if (status === 401 || status === 403 || status === 402) {
+    return 'works';
+  }
+
+  // 404 and 405 likewise: the target parsed the request well enough to say the
+  // path or method was wrong. Several probe URLs are bare API roots that have no
+  // handler, so this is routine.
+  if (status === 404 || status === 405 || status === 410) {
+    return 'works';
+  }
+
+  // 429 is the target rate-limiting us, which again means it received us.
+  if (status === 429) {
+    return 'works';
+  }
+
+  // What is left is a proxy-shaped failure: 5xx, or the proxy's own error
+  // envelope reporting it could not complete the fetch.
+  return 'target-refused';
 }
