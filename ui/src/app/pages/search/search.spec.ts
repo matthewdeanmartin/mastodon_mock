@@ -20,6 +20,7 @@ import { SearchServer } from '../../search-server';
 interface SearchInternals {
   query: WritableSignal<string>;
   type: WritableSignal<'accounts' | 'statuses' | 'hashtags'>;
+  blueskyMode: WritableSignal<boolean>;
   results: WritableSignal<SearchResults | null>;
   searching: WritableSignal<boolean>;
   trendingTags: WritableSignal<Tag[]>;
@@ -863,6 +864,81 @@ describe('Search', () => {
 
       expect(internals(fixture).webDropped()).toEqual([]);
       expect(internals(fixture).type()).toBe('accounts');
+    });
+  });
+  /**
+   * Which engine the page opens on.
+   *
+   * A Bluesky-primary account searching Mastodon by default is searching a
+   * connector that, after the Sprint 4 opt-in reversal, may not exist at all —
+   * so the landing panel has to follow the identity. And `blueskyMode` was not
+   * in the URL at all before this sprint, which made the Bluesky panel
+   * unlinkable and lost it on back-navigation.
+   */
+  describe('landing panel by account kind', () => {
+    function seedBlueskyPrimary(): void {
+      localStorage.setItem('mastodon_mock_account_mode', 'bluesky');
+      localStorage.setItem(
+        'mockingbird_bsky_identity_profile',
+        JSON.stringify({ did: 'did:plc:me', handle: 'me.bsky.social' }),
+      );
+      localStorage.setItem(
+        'mockingbird_bsky_identity_credentials',
+        JSON.stringify({ accessJwt: 'a', refreshJwt: 'r', connectedAt: Date.now() }),
+      );
+    }
+
+    it('opens the Bluesky panel for a Bluesky-primary account', () => {
+      seedBlueskyPrimary();
+      const fixture = setUp();
+
+      expect(internals(fixture).blueskyMode()).toBe(true);
+    });
+
+    it('opens Accounts for a mastodon-primary account, as before', () => {
+      TestBed.inject(Auth).setToken('tok');
+      const fixture = setUp();
+
+      expect(internals(fixture).blueskyMode()).toBe(false);
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('opens Accounts when signed out or anonymous, as before', () => {
+      const fixture = setUp();
+
+      expect(internals(fixture).blueskyMode()).toBe(false);
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('lets an explicit ?type= beat the kind default', () => {
+      seedBlueskyPrimary();
+      queryParams$.next(convertToParamMap({ type: 'statuses' }));
+      const fixture = setUp();
+
+      // A shared Mastodon link must show the recipient what the sender saw,
+      // whatever network the recipient happens to be on.
+      expect(internals(fixture).blueskyMode()).toBe(false);
+      expect(internals(fixture).type()).toBe('statuses');
+    });
+
+    it('restores the Bluesky panel from the URL', () => {
+      queryParams$.next(convertToParamMap({ type: 'bluesky-posts' }));
+      const fixture = setUp();
+
+      // The round-trip that makes the panel linkable and back-navigable. Note
+      // this works for a mastodon-primary reader too — it is the URL asking,
+      // not the account kind.
+      expect(internals(fixture).blueskyMode()).toBe(true);
+    });
+
+    it('does not widen SearchType when the URL carries the Bluesky value', () => {
+      queryParams$.next(convertToParamMap({ type: 'bluesky-posts' }));
+      const fixture = setUp();
+
+      // `bluesky-posts` is a wire value translated at the URL boundary, never a
+      // fourth SearchType — widening it would put a "…or bluesky" case in the
+      // query serializers, saved searches and the explain panel.
+      expect(['accounts', 'statuses', 'hashtags']).toContain(internals(fixture).type());
     });
   });
 });

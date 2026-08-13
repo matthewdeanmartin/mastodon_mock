@@ -87,39 +87,64 @@
         </button>
       }
 
-      <!-- Saved searches: a dropdown of stored definitions to re-run. -->
-      <details class="saved-menu" [open]="savedMenuOpen()">
-        <summary class="btn btn-outline" (click)="savedMenuOpen.set(!savedMenuOpen())">
-          Saved ({{ saved.count() }}) ▾
-        </summary>
-        <div class="saved-panel">
-          @if (!saved.count()) {
-            <p class="muted small saved-empty">No saved searches yet.</p>
-          }
-          @for (item of saved.all(); track item.id) {
-            <div class="saved-row">
-              <button class="saved-run" (click)="runSaved(item.id)" [title]="item.name">
-                {{ item.name }}
-                @if (!item.authenticated) {
-                  <span class="muted small">· anon</span>
-                }
-              </button>
-              <button
-                class="saved-del"
-                (click)="saved.delete(item.id)"
-                aria-label="Delete saved search"
-                title="Delete"
-              >
-                ✕
-              </button>
-            </div>
-          }
-        </div>
-      </details>
+    }
 
+    <!-- Saved searches sit OUTSIDE the blueskyMode guard: the list is shared by
+         both engines, and each row re-runs against the network it was saved
+         against (see `runSaved`). Keeping it inside meant a Bluesky-primary
+         reader — who now lands on this panel by default — could not save or
+         re-run a single search. -->
+    <!-- Saved searches: a dropdown of stored definitions to re-run. -->
+    <details class="saved-menu" [open]="savedMenuOpen()">
+      <summary class="btn btn-outline" (click)="savedMenuOpen.set(!savedMenuOpen())">
+        Saved ({{ saved.count() }}) ▾
+      </summary>
+      <div class="saved-panel">
+        @if (!saved.count()) {
+          <p class="muted small saved-empty">No saved searches yet.</p>
+        }
+        @for (item of saved.all(); track item.id) {
+          <div class="saved-row">
+            <button class="saved-run" (click)="runSaved(item.id)" [title]="item.name">
+              {{ item.name }}
+              @if (item.network === 'bluesky') {
+                <span class="muted small">· 🦋</span>
+              }
+              @if (!item.authenticated) {
+                <span class="muted small">· anon</span>
+              }
+            </button>
+            <button
+              class="saved-del"
+              (click)="saved.delete(item.id)"
+              aria-label="Delete saved search"
+              title="Delete"
+            >
+              ✕
+            </button>
+          </div>
+        }
+      </div>
+    </details>
+
+    <!-- Save works in both engines; the Bluesky panel hands its criteria up
+         through (saveRequested) so naming happens in this one shared dialog. -->
+    @if (blueskyMode()) {
+      <button
+        class="btn btn-outline"
+        [disabled]="saved.atLimit()"
+        (click)="blueskyPanel()?.requestSave()"
+      >
+        Save
+      </button>
+    } @else {
       <button class="btn btn-outline" [disabled]="saved.atLimit()" (click)="openSaveDialog()">
         Save
       </button>
+      <!-- Share stays Mastodon-only: it serializes the full structured search
+           into query params, and the Bluesky panel's criteria have no such
+           serializer yet. The Bluesky panel *is* linkable via ?type= now, which
+           is the part that was actually broken. -->
       <button class="btn btn-outline" (click)="share()">
         {{ shareCopied() ? 'Link copied!' : 'Share' }}
       </button>
@@ -274,7 +299,10 @@
     <!-- The whole Mastodon body is replaced, not filtered: Bluesky takes a
          different set of filters, so there is no shared form to reuse. Results
          still render through StatusCard and the same refine helpers. -->
-    <app-bluesky-search-panel />
+    <app-bluesky-search-panel
+      [savedToRun]="pendingBlueskySaved()"
+      (saveRequested)="openBlueskySaveDialog($event)"
+    />
   } @else {
     <div class="search-page" [class.two-box]="twoBox">
       <div class="search-form-box">

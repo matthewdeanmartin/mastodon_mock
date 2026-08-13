@@ -1,7 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { emptySearch, MawkingbirdSearch } from './mawkingbird-search';
-import { SAVED_SEARCH_LIMIT, SavedSearches } from './saved-searches';
+import {
+  isBlueskySaved,
+  isMastodonSaved,
+  SAVED_SEARCH_LIMIT,
+  SavedSearches,
+} from './saved-searches';
 
 function postSearch(words: string): MawkingbirdSearch {
   const s = emptySearch('posts');
@@ -33,7 +38,10 @@ describe('SavedSearches', () => {
     const original = postSearch('a');
     svc.save('X', original, ctx);
     original.post!.words = 'mutated';
-    expect(svc.all()[0].search.post?.words).toBe('a');
+    const stored = svc.all()[0];
+    // `search` is a union now that Bluesky searches can be saved too, so the
+    // Mastodon shape has to be narrowed before its fields are readable.
+    expect(isMastodonSaved(stored) && stored.search.post?.words).toBe('a');
   });
 
   it('enforces the per-account cap', () => {
@@ -58,5 +66,86 @@ describe('SavedSearches', () => {
 
     svc.delete(id);
     expect(svc.all().some((s) => s.id === id)).toBe(false);
+  });
+
+  /**
+   * Saved searches used to be Mastodon-only, which meant a Bluesky-primary
+   * account — who now lands on the Bluesky panel by default — could not save a
+   * single search. Adding a network to the row is a persisted schema change, so
+   * the migration matters as much as the feature.
+   */
+  describe('two networks', () => {
+    it('defaults a save to mastodon, so existing call sites are unchanged', () => {
+      svc.save('X', postSearch('a'), ctx);
+      expect(svc.all()[0].network).toBe('mastodon');
+    });
+
+    it('saves a Bluesky search with no instance', () => {
+      svc.save('Bsky', { text: 'angular' }, { instance: '', authenticated: true, network: 'bluesky' });
+      const stored = svc.all()[0];
+
+      expect(stored.network).toBe('bluesky');
+      // Bluesky has no per-user instance to restore before re-running, so there
+      // is nothing to record here.
+      expect(stored.instance).toBe('');
+      expect(isBlueskySaved(stored) && stored.search.text).toBe('angular');
+    });
+
+    it('keeps the two kinds apart in one list', () => {
+      svc.save('M', postSearch('a'), ctx);
+      svc.save('B', { text: 'b' }, { instance: '', authenticated: true, network: 'bluesky' });
+
+      expect(svc.all().filter(isBlueskySaved).map((s) => s.name)).toEqual(['B']);
+      expect(svc.all().filter(isMastodonSaved).map((s) => s.name)).toEqual(['M']);
+    });
+
+    it('carries the network through a duplicate', () => {
+      const saved = svc.save('B', { text: 'b' }, {
+        instance: '',
+        authenticated: true,
+        network: 'bluesky',
+      });
+      svc.duplicate(saved.ok ? saved.saved.id : '');
+
+      expect(svc.all().every((s) => s.network === 'bluesky')).toBe(true);
+    });
+
+    it('migrates v1 rows to mastodon instead of discarding them', () => {
+      // What a browser that saved searches before this sprint has on disk: no
+      // `network` field, version 1. Losing these would be a user's own curation
+      // quietly disappearing.
+      localStorage.setItem(
+        'mockingbird_saved_searches',
+        JSON.stringify({
+          version: 1,
+          searches: [
+            {
+              id: 'old1',
+              name: 'From before',
+              createdAt: 'x',
+              updatedAt: 'x',
+              instance: 'mastodon.social',
+              authenticated: true,
+              search: postSearch('legacy'),
+            },
+          ],
+        }),
+      );
+
+      const reloaded = new SavedSearches();
+      const row = reloaded.all()[0];
+      expect(row?.name).toBe('From before');
+      expect(row?.network).toBe('mastodon');
+      expect(isMastodonSaved(row) && row.search.post?.words).toBe('legacy');
+    });
+
+    it('starts empty on a version it does not recognise', () => {
+      localStorage.setItem(
+        'mockingbird_saved_searches',
+        JSON.stringify({ version: 99, searches: [{ id: 'x', search: {} }] }),
+      );
+
+      expect(new SavedSearches().all()).toEqual([]);
+    });
   });
 });

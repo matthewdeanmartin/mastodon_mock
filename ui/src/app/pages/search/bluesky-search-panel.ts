@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Status } from '../../models';
@@ -54,6 +54,38 @@ export type BlueskySearchTarget = 'posts' | 'accounts';
 export class BlueskySearchPanel {
   /** post/tweet/florp vocabulary, per the Blue setting. */
   protected words = inject(Terminology).words;
+
+  /**
+   * A saved Bluesky search to load and run, handed down by the page.
+   *
+   * The page owns the saved-search *list* (it is shared with Mastodon and lives
+   * in the shared bar); this panel owns the criteria form. So re-running one is
+   * a hand-off: the page says which, the panel decides how.
+   */
+  readonly savedToRun = input<BlueskyPostSearch | null>(null);
+
+  /** Fired when the panel wants the page to open its save dialog. */
+  readonly saveRequested = output<BlueskyPostSearch>();
+
+  constructor() {
+    // Apply a handed-down saved search once it arrives. An `effect` rather than
+    // a setter so the page can hand one over at any point in its lifecycle —
+    // on first load from `?saved=`, or later from the Saved menu.
+    effect(() => {
+      const saved = this.savedToRun();
+      if (!saved) {
+        return;
+      }
+      this.criteria.set(structuredClone(saved));
+      this.target.set('posts');
+      this.run();
+    });
+  }
+
+  /** The current criteria, for the page's save dialog. */
+  requestSave(): void {
+    this.saveRequested.emit(structuredClone(this.criteria()));
+  }
 
   private search = inject(BlueskySearch);
   private accountSearch = inject(BlueskyAccountSearch);

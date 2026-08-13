@@ -180,6 +180,10 @@ reaches Bluesky only when the user picks `bluesky-posts` from the type
 results by default — from a connector that, after the Sprint 4 reversal, may not
 even exist. Sprint 5 owns making the default follow the account kind.
 
+**Done — [Sprint 5](bsky-first-5-search-parity.md) is complete (2026-08-12).** It
+also found that `blueskyMode` was never in the URL at all, so the Bluesky panel
+could not be linked to and was lost on back-navigation; that is fixed too.
+
 ## Explicit non-goals
 
 - Any change to the left rail's navigation structure.

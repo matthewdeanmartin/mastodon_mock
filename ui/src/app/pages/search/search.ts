@@ -7,12 +7,14 @@ import {
   inject,
   isDevMode,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, EMPTY, Observable, of, Subscription } from 'rxjs';
 import { Api } from '../../api';
+import { Auth } from '../../auth';
 import { Account, Relationship, SearchResults, Status, Tag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { OffsiteDirectories } from '../offsite-directories/offsite-directories';
@@ -85,13 +87,15 @@ import {
 } from './search-sort';
 import { serializeMastodonQuery } from './mastodon-query-serializer';
 import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-explain';
-import { SavedSearches } from './saved-searches';
+import { isBlueskySaved, isMastodonSaved, SavedSearches } from './saved-searches';
+import { BlueskyPostSearch } from '../../providers/bluesky/bluesky-post-search';
 import { decodeSearchFromParams, encodeSearchToParams } from './search-url';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { SearchServer } from '../../search-server';
 import { SearchCapability } from '../../search-capability';
 import { SearchServerDiscovery } from '../../search-server-discovery/search-server-discovery';
 import { BlueskySearchPanel } from './bluesky-search-panel';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { Server } from '../../server';
 import { isTagsOnly, probeSearchServer, SearchServerStatus } from '../../search-server-probe';
 import { normalizeHostUrl } from '../../host-url';
@@ -99,6 +103,16 @@ import { Terminology } from '../../terminology';
 import { LocalModeration } from '../../local-moderation';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
+
+/**
+ * The URL value that means "the Bluesky panel", and the dropdown option id.
+ *
+ * Deliberately **not** a member of {@link SearchType}. It is a wire value
+ * translated once at the URL boundary into `blueskyMode`, so the Mastodon-shaped
+ * consumers — the query serializers, saved searches, the explain panel — never
+ * grow a fourth case. See the note on `blueskyMode`.
+ */
+export const BLUESKY_WIRE_TYPE = 'bluesky-posts';
 
 /** One selected facet value, keyed by "kind:value" (see selectedFacets). */
 interface FacetSelection {
@@ -153,6 +167,10 @@ export class Search implements OnInit, OnDestroy {
   private localMod = inject(LocalModeration);
   protected saved = inject(SavedSearches);
   protected searchServer = inject(SearchServer);
+  /** Which network owns this account, for the landing-panel default. */
+  private auth = inject(Auth);
+  /** Whether a Bluesky search is running signed in, recorded on save. */
+  private session = inject(BlueskySession);
   private activeSearch: Subscription | null = null;
 
   /** Dev-only structured logging. Silent in production builds. */
@@ -376,6 +394,15 @@ export class Search implements OnInit, OnDestroy {
    */
   protected blueskyMode = signal(false);
 
+  /**
+   * A saved Bluesky search waiting for the panel to pick it up.
+   *
+   * The panel owns its own criteria state, so re-running a saved Bluesky search
+   * is a hand-off rather than a method call: this page decides *which* search,
+   * the panel decides how to run it. Cleared by the panel once applied.
+   */
+  protected pendingBlueskySaved = signal<BlueskyPostSearch | null>(null);
+
   /** What the type `<select>` should display, including the Bluesky option. */
   protected typeSelection = computed(() =>
     this.blueskyMode() ? 'bluesky-posts' : (this.type() as string),
@@ -416,8 +443,17 @@ export class Search implements OnInit, OnDestroy {
     this.webDropped.set([]);
     // Bluesky is a whole other engine with its own filters, so it swaps the
     // panel rather than changing the Mastodon search's type.
-    if (value === 'bluesky-posts') {
+    if (value === BLUESKY_WIRE_TYPE) {
       this.blueskyMode.set(true);
+      // Into the URL, so the panel can be linked to and the back button can
+      // restore it. Without this the Bluesky panel is reachable only by using
+      // the dropdown — clicking a result and pressing Back landed you on
+      // Mastodon Accounts with the query gone.
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { type: BLUESKY_WIRE_TYPE, q: null },
+        queryParamsHandling: 'merge',
+      });
       return;
     }
     this.blueskyMode.set(false);
@@ -934,13 +970,48 @@ export class Search implements OnInit, OnDestroy {
       if (savedId) {
         const found = this.saved.all().find((s) => s.id === savedId);
         if (found) {
-          this.applySearch(found.search);
+          // Same routing rule as `runSaved`: the saved network decides the
+          // engine, not the panel that happens to be showing.
+          if (isBlueskySaved(found)) {
+            this.blueskyMode.set(true);
+            this.pendingBlueskySaved.set(found.search);
+          } else if (isMastodonSaved(found)) {
+            this.applySearch(found.search);
+          }
           return;
         }
       }
 
       const q = params.get('q') ?? '';
-      const t = (params.get('type') as SearchType) ?? 'accounts';
+      const rawType = params.get('type');
+
+      // Bluesky is carried as a *wire value*, not as a fourth `SearchType`.
+      // Widening the type would put a "…or bluesky" case in the URL serializer,
+      // the query serializers, saved searches and the explain panel, all of
+      // which are Mastodon-shaped — see the note on `blueskyMode`. Translating
+      // once here keeps that boundary exactly where it already was.
+      if (rawType === BLUESKY_WIRE_TYPE) {
+        this.blueskyMode.set(true);
+        this.urlQuery = q;
+        this.query.set(q);
+        return;
+      }
+
+      // No type in the URL: fall back to the account's own network. A
+      // Bluesky-primary reader searching Mastodon by default is searching a
+      // connector that, after the Sprint 4 opt-in reversal, may not exist at
+      // all — so the default has to follow the identity, not the app's history.
+      //
+      // Only when the URL says nothing. An explicit `?type=` always wins, or a
+      // shared Mastodon link would silently open a different engine for
+      // Bluesky-primary readers and show them something the sender never saw.
+      if (!rawType && !q && this.auth.isBlueskyPrimary) {
+        this.blueskyMode.set(true);
+        return;
+      }
+
+      const t = (rawType as SearchType) ?? 'accounts';
+      this.blueskyMode.set(false);
       this.urlQuery = q;
       this.urlType = t;
       this.query.set(q);
@@ -1208,11 +1279,28 @@ export class Search implements OnInit, OnDestroy {
 
   runSaved(id: string): void {
     const found = this.saved.all().find((s) => s.id === id);
-    if (found) {
-      this.diagnostics.info('Search', 'user:run-saved', { id, target: found.search.target });
-      this.savedMenuOpen.set(false);
-      this.applySearch(found.search);
+    if (!found) {
+      return;
     }
+    this.savedMenuOpen.set(false);
+    // Route by the saved network, not by whichever panel happens to be up.
+    // Applying a Bluesky definition to the Mastodon form would run a search the
+    // user never saved, against an engine that cannot answer it.
+    if (isBlueskySaved(found)) {
+      this.diagnostics.info('Search', 'user:run-saved', { id, network: 'bluesky' });
+      this.blueskyMode.set(true);
+      this.pendingBlueskySaved.set(found.search);
+      return;
+    }
+    if (!isMastodonSaved(found)) {
+      return;
+    }
+    this.diagnostics.info('Search', 'user:run-saved', {
+      id,
+      network: 'mastodon',
+      target: found.search.target,
+    });
+    this.applySearch(found.search);
   }
 
   openSaveDialog(): void {
@@ -1356,10 +1444,50 @@ export class Search implements OnInit, OnDestroy {
     this.diagnostics.info('Search', 'user:search-server-clear', {});
   }
 
+  /**
+   * The Bluesky panel asked to save its current criteria.
+   *
+   * Stashed rather than saved immediately, because naming happens in the shared
+   * dialog — the panel owns the criteria, the page owns the saved-search list.
+   */
+  openBlueskySaveDialog(criteria: BlueskyPostSearch): void {
+    this.pendingBlueskySave.set(criteria);
+    this.saveName.set('');
+    this.saveDialogOpen.set(true);
+  }
+
+  /** Criteria awaiting a name in the save dialog, when saving a Bluesky search. */
+  private pendingBlueskySave = signal<BlueskyPostSearch | null>(null);
+
+  /**
+   * The Bluesky panel, when it is the one showing.
+   *
+   * Needed because Save lives in the shared bar but the criteria live in the
+   * panel — the button has to ask the panel what it is currently searching for.
+   */
+  protected blueskyPanel = viewChild(BlueskySearchPanel);
+
   confirmSave(): void {
+    const bluesky = this.pendingBlueskySave();
+    if (bluesky) {
+      const result = this.saved.save(this.saveName(), bluesky, {
+        // Bluesky has no per-user instance to restore before re-running, so
+        // there is nothing to record here. See `SavedSearch.instance`.
+        instance: '',
+        authenticated: this.session.linked(),
+        network: 'bluesky',
+      });
+      this.pendingBlueskySave.set(null);
+      this.saveDialogOpen.set(false);
+      this.diagnostics.info('Search', 'user:save', { ok: result.ok, network: 'bluesky' });
+      this.savedNotice.set(result.ok ? 'Search saved.' : result.error);
+      setTimeout(() => this.savedNotice.set(''), 3000);
+      return;
+    }
     const result = this.saved.save(this.saveName(), this.currentSearch(), {
       instance: this.capabilities.active ? this.anonymous.server() : '',
       authenticated: !this.capabilities.active,
+      network: 'mastodon',
     });
     this.saveDialogOpen.set(false);
     this.diagnostics.info('Search', 'user:save', {
