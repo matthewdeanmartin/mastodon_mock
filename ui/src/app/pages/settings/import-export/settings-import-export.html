@@ -1,11 +1,15 @@
 <div class="spage-head">
   <h1>Import/Export Friends</h1>
-  <p>Move your friends between Mastodon accounts with a portable CSV file.</p>
+  <p>
+    Move your friends between accounts with a portable CSV file, and find the people you already
+    follow on your other network.
+  </p>
 </div>
 
 <div class="spage-body">
-  <!-- The other half of this page's job. Everything below finds people already
-       on Mastodon; when they aren't there yet, the answer is to invite them. -->
+  <!-- The other half of this page's job. Everything below finds people who are
+       already on Mastodon or Bluesky; when they aren't on either yet, the answer
+       is to invite them. -->
   <a class="invite-callout" routerLink="/invites">
     <span class="invite-callout-emoji" aria-hidden="true">📣</span>
     <span class="invite-callout-body">
@@ -721,6 +725,199 @@
     @if (exportError(); as error) {
       <p class="export-error" role="alert">{{ error }}</p>
     }
+  </section>
+
+  <!-- The bridge finder. Unlike every other section on this page it reads two of
+       your own live networks rather than a foreign archive, so it is gated on
+       having credentials for both — and stays visible, disabled, when it does
+       not, because that is the clearest reason to attach the second account. -->
+  <section id="bridge-finder" class="friend-section bridge-section">
+    <h2>Find the same people on your other network</h2>
+    <p class="muted small">
+      You keep two follow lists that were built at different times. This finds the overlap: who you
+      already follow on one network, and can now follow on the other.
+    </p>
+
+    @if (!bridgeReady()) {
+      <div class="bridge-gate">
+        <p>
+          <strong>This needs both accounts connected.</strong>
+        </p>
+        <ul class="bridge-gate-list">
+          <li [class.bridge-have]="hasMastodon()">
+            <span aria-hidden="true">{{ hasMastodon() ? '✓' : '○' }}</span>
+            Mastodon —
+            @if (hasMastodon()) {
+              connected
+            } @else {
+              <a routerLink="/settings/connections">sign in to a Mastodon account</a>
+            }
+          </li>
+          <li [class.bridge-have]="hasBluesky()">
+            <span aria-hidden="true">{{ hasBluesky() ? '✓' : '○' }}</span>
+            Bluesky —
+            @if (hasBluesky()) {
+              connected
+            } @else {
+              <a routerLink="/settings/connections/bluesky">connect Bluesky</a>
+            }
+          </li>
+        </ul>
+        <p class="muted small">
+          Reading a server anonymously can show you public posts, but it cannot tell us who
+          <em>you</em> follow — so both sides need real credentials.
+        </p>
+      </div>
+    }
+
+    <fieldset class="bridge-body" [disabled]="!bridgeReady()">
+      <div class="bridge-direction" role="group" aria-label="Search direction">
+        <button
+          type="button"
+          class="btn btn-outline"
+          [class.active]="bridgeSource() === 'mastodon'"
+          [attr.aria-pressed]="bridgeSource() === 'mastodon'"
+          (click)="setBridgeDirection('mastodon')"
+        >
+          Mastodon → Bluesky
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline"
+          [class.active]="bridgeSource() === 'bluesky'"
+          [attr.aria-pressed]="bridgeSource() === 'bluesky'"
+          (click)="setBridgeDirection('bluesky')"
+        >
+          Bluesky → Mastodon
+        </button>
+      </div>
+
+      <div class="import-actions">
+        <button
+          type="button"
+          class="btn"
+          [disabled]="bridge.loading() || bridge.running()"
+          (click)="loadBridge()"
+        >
+          {{ bridge.loading() ? 'Reading your follows…' : 'Read my follows (free)' }}
+        </button>
+        @if (bridge.rows().length) {
+          <button type="button" class="link" (click)="bridge.reset()">clear</button>
+        }
+      </div>
+
+      @if (bridge.loadError(); as error) {
+        <p class="export-error" role="alert">{{ error }}</p>
+      }
+
+      @if (bridge.rows().length) {
+        <!-- The free pass is the headline: these matches cost no searches at all,
+             because the people wrote their other handle in a bio we already had. -->
+        <p class="bridge-summary">
+          Read <strong>{{ bridge.rows().length }}</strong> follows over
+          {{ bridge.sourcePageCount() }} page{{ bridge.sourcePageCount() === 1 ? '' : 's' }} and
+          found <strong>{{ bridge.freeMatchCount() }}</strong> from bios alone — no searches spent.
+        </p>
+
+        @if (bridgePendingCount()) {
+          <div class="bridge-scan">
+            <p class="muted small">
+              {{ bridgePendingCount() }} didn’t name their other account. Searching for them costs
+              one request each, so it’s opt-in and capped.
+            </p>
+            <div class="import-actions">
+              <label class="bridge-budget">
+                Search up to
+                <select
+                  [ngModel]="bridgeBudget()"
+                  (ngModelChange)="bridgeBudget.set(+$event)"
+                  name="bridge_budget"
+                  [disabled]="bridge.running()"
+                >
+                  <option [ngValue]="25">25</option>
+                  <option [ngValue]="50">50</option>
+                  <option [ngValue]="200">200</option>
+                  <option [ngValue]="bridgePendingCount()">all {{ bridgePendingCount() }}</option>
+                </select>
+                people
+              </label>
+              @if (!bridge.running()) {
+                <button type="button" class="btn btn-outline" (click)="bridge.scan(bridgeBudget())">
+                  Search
+                </button>
+              } @else {
+                <button type="button" class="btn btn-outline" (click)="bridge.stop()">Stop</button>
+              }
+              <span class="muted small">{{ bridge.callCount() }} searches used</span>
+            </div>
+          </div>
+        }
+
+        @if (bridgeMatchedRows().length) {
+          <ul class="bridge-rows">
+            @for (row of bridgeMatchedRows(); track bridgeRowKey(row)) {
+              <li class="bridge-row">
+                <div class="bridge-person">
+                  <img [src]="row.person.avatar_static || row.person.avatar" alt="" />
+                  <span class="bridge-person-name">
+                    {{ row.person.display_name || row.person.username }}
+                  </span>
+                  <span class="muted small">&#64;{{ row.person.acct }}</span>
+                </div>
+                <ul class="bridge-matches">
+                  @for (match of row.matches; track match.account.id) {
+                    <li class="bridge-match" [class]="'confidence-' + match.confidence">
+                      @if (bridge.isFollowing(match.account)) {
+                        <span class="bridge-followed muted small">Already following</span>
+                      } @else {
+                        <label class="bridge-check">
+                          <input
+                            type="checkbox"
+                            [checked]="bridgeSelected().has(match.account.id)"
+                            (change)="toggleBridgeMatch(match.account.id)"
+                          />
+                          <span class="sr-only">Follow {{ match.account.acct }}</span>
+                        </label>
+                      }
+                      <a class="bridge-match-name" [routerLink]="['/accounts', match.account.id]">
+                        {{ match.account.display_name || match.account.username }}
+                        <span class="muted">&#64;{{ match.account.acct }}</span>
+                      </a>
+                      <span class="bridge-kind">{{ match.confidence }}</span>
+                      <span class="muted small bridge-signals">{{
+                        match.signals.join(' · ')
+                      }}</span>
+                      @if (bridge.followErrors().get(match.account.id); as error) {
+                        <span class="export-error" role="alert">{{ error }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </li>
+            }
+          </ul>
+
+          <div class="import-actions">
+            <button
+              type="button"
+              class="btn"
+              [disabled]="!bridgeFollowTargets().length || bridgeFollowing()"
+              (click)="followBridgeSelection()"
+            >
+              {{
+                bridgeFollowing()
+                  ? 'Following…'
+                  : 'Follow selected (' + bridgeFollowTargets().length + ')'
+              }}
+            </button>
+          </div>
+        } @else if (!bridge.loading()) {
+          <p class="muted small">
+            No matches yet. Nobody you follow named their other account in their bio.
+          </p>
+        }
+      }
+    </fieldset>
   </section>
 
   <section class="friend-section contact-section">

@@ -120,7 +120,7 @@ sites, and Sprint 1 makes that explicit rather than leaving it implicit.
 | 4b | [The rails speak Bluesky](bsky-first-4b-bsky-rails.md) — **COMPLETE** | A bsky-primary account's rails show **Bluesky** widgets — trends and a service card — instead of Mastodon ones it cannot use; popular feeds land on Lists, for everyone |
 | 5 | [Search parity](bsky-first-5-search-parity.md) — **COMPLETE** | Search defaults to the account's own network, the Bluesky panel is linkable, and Bluesky searches can be saved |
 | 6 | [Anonymous Bluesky](bsky-first-6-anonymous-bsky.md) — **COMPLETE** | **One** anonymous experience with both networks in it: search, follow and read Bluesky with no login anywhere |
-| 7 | [Find your people](bsky-first-7-bridge-finder.md) | "Who that I follow on Mastodon is also on Bluesky?" — with match kinds, not just scores |
+| 7 | [Find your people](bsky-first-7-bridge-finder.md) — **COMPLETE** | "Who that I follow on Mastodon is also on Bluesky?" — and the mirror — with match kinds, not just scores. A section in Settings › Import/Export Friends, whose first pass costs no searches at all |
 
 Ordering rationale: 1 is pure plumbing and unblocks everything. 2 is the biggest
 single UX win in the roadmap and — importantly — **does not depend on any

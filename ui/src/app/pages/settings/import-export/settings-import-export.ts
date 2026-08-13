@@ -23,6 +23,10 @@ import {
   TwitterFriendDiscovery,
   TwitterFriendStatus,
 } from './twitter-friend-discovery';
+import { BridgeFinder, BridgeRow } from './bridge-finder';
+import { BridgeNetwork } from './bridge-matching';
+import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
+import { MastodonConnector } from '../../../providers/mastodon/mastodon-connector';
 
 type CsvKind = 'following' | 'mutes' | 'blocks';
 
@@ -67,6 +71,9 @@ export class SettingsImportExport {
   protected github = inject(GitHubSession);
   protected githubDiscovery = inject(GitHubFriendDiscovery);
   protected twitterDiscovery = inject(TwitterFriendDiscovery);
+  protected bridge = inject(BridgeFinder);
+  protected bsky = inject(BlueskySession);
+  protected mastodonConnector = inject(MastodonConnector);
 
   protected readonly mockTooling = environment.mockTooling;
   protected pasted = signal('');
@@ -172,6 +179,102 @@ export class SettingsImportExport {
       );
     }),
   );
+
+  // --- bridge finder ---
+
+  protected bridgeBudget = signal(50);
+  protected bridgeSelected = signal<ReadonlySet<string>>(new Set());
+  protected bridgeFollowing = signal(false);
+
+  /**
+   * Whether the user has credentials on Mastodon.
+   *
+   * Two ways to have them, and both count: a Mastodon-primary account holds the
+   * token as its identity, while a Bluesky-primary account holds it in the
+   * connector. An `anonymous` connector is deliberately *not* enough — reading a
+   * public server anonymously cannot tell us who *you* follow.
+   */
+  protected hasMastodon = computed(
+    () => this.auth.kind() === 'mastodon' || this.mastodonConnector.signedIn(),
+  );
+
+  /** Whether a Bluesky account is linked, in either of its two roles. */
+  protected hasBluesky = computed(() => this.bsky.linked());
+
+  /**
+   * Both sides are required, and the section is disabled rather than hidden when
+   * one is missing — a greyed-out bridge finder is the best argument there is
+   * for attaching the second account.
+   */
+  protected bridgeReady = computed(() => this.hasMastodon() && this.hasBluesky());
+
+  protected bridgeSource = computed(() => this.bridge.direction().source);
+
+  protected bridgeMatchedRows = computed(() =>
+    this.bridge.rows().filter((row) => row.matches.length > 0),
+  );
+
+  protected bridgePendingCount = computed(
+    () => this.bridge.rows().filter((row) => row.status === 'pending').length,
+  );
+
+  /** Matches that are selected, unfollowed, and therefore actionable. */
+  protected bridgeFollowTargets = computed(() =>
+    this.bridgeMatchedRows()
+      .flatMap((row) => row.matches)
+      .filter(
+        (match) =>
+          this.bridgeSelected().has(match.account.id) && !this.bridge.isFollowing(match.account),
+      )
+      .map((match) => match.account),
+  );
+
+  protected setBridgeDirection(source: BridgeNetwork): void {
+    this.bridgeSelected.set(new Set());
+    this.bridge.setDirection(
+      source === 'mastodon'
+        ? { source: 'mastodon', target: 'bluesky' }
+        : { source: 'bluesky', target: 'mastodon' },
+    );
+  }
+
+  protected async loadBridge(): Promise<void> {
+    this.bridgeSelected.set(new Set());
+    await this.bridge.load();
+    // Exact matches are self-published, so they are pre-selected; inferred ones
+    // are not, and weak ones especially must never be followed by default.
+    this.bridgeSelected.set(
+      new Set(
+        this.bridge
+          .rows()
+          .flatMap((row) => row.matches)
+          .filter((match) => match.confidence === 'exact')
+          .map((match) => match.account.id),
+      ),
+    );
+  }
+
+  protected toggleBridgeMatch(id: string): void {
+    this.bridgeSelected.update((selected) => {
+      const next = new Set(selected);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  protected async followBridgeSelection(): Promise<void> {
+    if (this.bridgeFollowing()) return;
+    this.bridgeFollowing.set(true);
+    try {
+      await this.bridge.followAll(this.bridgeFollowTargets());
+    } finally {
+      this.bridgeFollowing.set(false);
+    }
+  }
+
+  protected bridgeRowKey(row: BridgeRow): string {
+    return row.person.id;
+  }
 
   protected importKind = signal<CsvKind>('following');
   protected csvText = signal('');
