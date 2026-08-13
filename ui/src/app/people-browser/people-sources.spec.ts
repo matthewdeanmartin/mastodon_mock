@@ -179,3 +179,76 @@ describe('PeopleSourceFactory — Bluesky', () => {
     ]);
   });
 });
+
+/**
+ * Mastodon's follower/following lists paginate by the id of the internal follow
+ * *relationship*, published only in the `Link` header. Walking them by the last
+ * account's id — which is a different number entirely — stops the list early at
+ * a point that varies by account, and reads on screen like a privacy setting.
+ */
+describe('PeopleSourceFactory — Mastodon paging', () => {
+  let httpMock: HttpTestingController;
+  let factory: PeopleSourceFactory;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    factory = TestBed.inject(PeopleSourceFactory);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  const accounts = [
+    { id: '900', acct: 'a' },
+    { id: '901', acct: 'b' },
+  ] as Account[];
+
+  /** What a real server sends: a relationship cursor unrelated to any account id. */
+  const linkHeader =
+    '<https://example.social/api/v1/accounts/1/followers?max_id=77451>; rel="next", ' +
+    '<https://example.social/api/v1/accounts/1/followers?since_id=77500>; rel="prev"';
+
+  it.each([
+    ['followers', 'followers'],
+    ['following', 'following'],
+  ] as const)('takes the next %s cursor from the Link header', (mode, path) => {
+    const source = factory.create('1', null);
+    let page: PeoplePage | undefined;
+    source.fetch(mode, null).subscribe((result) => (page = result));
+
+    httpMock
+      .expectOne((r) => r.url === `/api/v1/accounts/1/${path}`)
+      .flush(accounts, { headers: { Link: linkHeader } });
+
+    // 77451, not 901. The account id would have been a plausible-looking cursor
+    // that quietly truncates the list.
+    expect(page!.cursor).toBe('77451');
+  });
+
+  it('sends that cursor back as max_id on the next page', () => {
+    const source = factory.create('1', null);
+    source.fetch('followers', '77451').subscribe();
+
+    const request = httpMock.expectOne((r) => r.url === '/api/v1/accounts/1/followers');
+    expect(request.request.params.get('max_id')).toBe('77451');
+    request.flush([]);
+  });
+
+  it('ends the walk when the server stops offering a next link', () => {
+    const source = factory.create('1', null);
+    let page: PeoplePage | undefined;
+    source.fetch('followers', null).subscribe((result) => (page = result));
+
+    // A full page with no `next`: the last page of a list that divides evenly.
+    // The old code kept walking here, because it invented a cursor from the body.
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/accounts/1/followers')
+      .flush(accounts, { headers: { Link: '<https://example.social/x>; rel="prev"' } });
+
+    expect(page!.accounts).toHaveLength(2);
+    expect(page!.cursor).toBeNull();
+  });
+});

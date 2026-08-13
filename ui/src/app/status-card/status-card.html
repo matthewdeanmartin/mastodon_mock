@@ -14,9 +14,18 @@
       <span aria-hidden="true">🔁</span> {{ boostedBy }} {{ words().boosted }}
     </div>
   }
+  <!-- The click handler makes the card's whitespace open the thread; see
+       onCardClick for why it is a decline-list rather than a target list. No
+       role or tabindex goes with it: the card is not a button, every
+       destination it offers is already reachable by keyboard through the
+       anchors inside it and onCardKeydown, and announcing the whole article as
+       one clickable control would make it *harder* to use, not easier. -->
   <article
     class="status"
+    [class.status-clickable]="threadLink"
     tabindex="-1"
+    (mousedown)="onCardMouseDown()"
+    (click)="onCardClick($event)"
     (keydown)="onCardKeydown($event)"
     (mouseenter)="onCardHover()"
   >

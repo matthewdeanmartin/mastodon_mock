@@ -14,6 +14,25 @@
   padding: 12px 16px;
 }
 
+/*
+ * The whole card opens the thread, so say so on hover.
+ *
+ * Only the cursor changes — no background tint. A tint would have to be
+ * suppressed again over the media, the poll and the action row, all of which
+ * decline the click, and a highlight that lies about what a click will do is
+ * worse than no highlight. The cursor is honest by construction: it reverts to
+ * the default over anything with its own cursor rule.
+ */
+.status-clickable {
+  cursor: pointer;
+}
+
+/* Text stays selectable, and selecting it must not feel like arming a link. */
+.status-clickable .content,
+.status-clickable .spoiler {
+  cursor: auto;
+}
+
 /* Keyboard focus ring for j/k navigation between posts. */
 .status:focus {
   outline: 2px solid var(--accent, #1d9bf0);

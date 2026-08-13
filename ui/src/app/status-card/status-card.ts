@@ -17,7 +17,7 @@ import { AccountHoverCard } from '../account-hover-card/account-hover-card';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
 import { Api } from '../api';
 import { Auth } from '../auth';
-import { hashtagNameFrom } from '../rendered-html-links';
+import { hashtagNameFrom, profileRouteFor } from '../rendered-html-links';
 import { ClientPrefs } from '../client-prefs';
 import { Terminology } from '../terminology';
 import { Compose } from '../compose/compose';
@@ -76,6 +76,40 @@ import {
 } from '../providers/anonymous/anonymous-route-ref';
 
 const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
+
+/**
+ * Everything on a card that owns its own clicks.
+ *
+ * Used by {@link StatusCard.onCardClick} to tell "the user clicked the card" from
+ * "the user clicked a thing that happens to be on the card". Kept as one
+ * selector so the list is reviewable in one place: anything added to a card that
+ * responds to a click needs to be reachable from here, and the generic entries
+ * (`button`, `a`, `[role="button"]`) already cover almost everything by
+ * construction.
+ */
+const INTERACTIVE_SELECTOR = [
+  'a',
+  'button',
+  'input',
+  'select',
+  'textarea',
+  'label',
+  'summary',
+  'details',
+  'video',
+  'audio',
+  '[role="button"]',
+  '[role="link"]',
+  // The media thumbnails, the sensitive-content reveal and the alt-text rows are
+  // all real `<button>`s, so `button` above already covers them. These are the
+  // container blocks whose padding is *theirs* rather than the card's — clicking
+  // the gap between two poll options should not navigate away from the poll.
+  '.media',
+  '.poll',
+  '.ai-translation',
+  '.quote-card',
+  'app-account-hover-card',
+].join(',');
 
 interface MastodonPostRef {
   url: string;
@@ -681,6 +715,90 @@ export class StatusCard {
   }
 
   /**
+   * Whether text was selected when this gesture started.
+   *
+   * Recorded on `mousedown` because that is the last moment it is knowable: the
+   * same event collapses the selection, so `click` always sees an empty one.
+   * See {@link onCardClick}.
+   */
+  private selectionAtMouseDown = false;
+
+  /** Snapshot the selection before the browser clears it. */
+  onCardMouseDown(): void {
+    this.selectionAtMouseDown = (getSelection()?.toString() ?? '').length > 0;
+  }
+
+  /**
+   * Open the thread when the click landed on the card's own whitespace.
+   *
+   * ## Why the card needs this at all
+   *
+   * Navigation used to hang entirely off the anchor wrapped around the post
+   * *text*. That works right up until there is no text: an image-only post is a
+   * very common shape, and on one there was literally nothing to click — the
+   * picture opens the lightbox, the avatar and display name go to the profile,
+   * the action row acts, and every pixel between them did nothing at all.
+   *
+   * ## Why this is a guard list rather than a handler on the whitespace
+   *
+   * There is no "whitespace" element to bind to; the gaps are padding and
+   * margins belonging to the card and its rows. So the card listens to every
+   * click and *declines* the ones that belong to something else. Getting that
+   * backwards — navigating unless told not to — is how a card starts eating
+   * clicks on its own buttons, so the checks below are deliberately broad:
+   *
+   * - **Anything interactive**, found by walking up from the target. Buttons,
+   *   links, form controls, the poll, the lightbox triggers, the `<details>`
+   *   menus. `closest()` rather than checking the target itself, because a
+   *   click usually lands on a `<span>` *inside* a button.
+   * - **A text selection.** Measured in a real browser: a drag that selects text
+   *   fires no `click` at all, so that gesture was never at risk. What remains
+   *   is the click that *ends* a selection — text is highlighted, the reader
+   *   clicks elsewhere on the card to dismiss it — and there the browser
+   *   collapses the selection on `mousedown`, before `click` runs. So the flag
+   *   is snapshotted then ({@link selectionAtMouseDown}); reading the live
+   *   selection during the click would always see an empty one.
+   * - **Modified and non-primary clicks.** Ctrl/cmd/shift/middle-click all mean
+   *   "open somewhere else" and are the browser's business, not ours.
+   *
+   * Keyboard users already had a way through: `onCardKeydown` handles Enter and
+   * `o`. This is the pointer equivalent, and it deliberately reuses the same
+   * {@link threadLink}, so a card that is not threadable stays inert.
+   */
+  onCardClick(event: MouseEvent): void {
+    const hadSelection = this.selectionAtMouseDown;
+    this.selectionAtMouseDown = false;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    // Note: double-clicking post *text* still navigates, because that text is
+    // wrapped in its own routerLink and the first click of the pair acts before
+    // any second one is known about. That is long-standing behaviour, not
+    // something this handler introduced, and fixing it would mean delaying every
+    // single click on post text to wait for a possible second — deliberately not
+    // done. Guarding `detail > 1` here would only suppress the redundant second
+    // navigation, which changes nothing the reader can see.
+    const target = event.target as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+    if (target.closest(INTERACTIVE_SELECTOR)) {
+      return;
+    }
+    // Either the gesture began with text already highlighted, or it *was* the
+    // drag that highlighted some. Both mean "the user was reading, not
+    // navigating".
+    if (hadSelection || (getSelection()?.toString() ?? '').length > 0) {
+      return;
+    }
+    const link = this.threadLink;
+    if (!link) {
+      return;
+    }
+    void this.router.navigate(link);
+  }
+
+  /**
    * Intercept clicks inside rendered post HTML: if the user clicked a link
    * that points off-site, open it in a new tab instead of letting the
    * surrounding router link swallow the navigation.
@@ -709,6 +827,17 @@ export class StatusCard {
       event.preventDefault();
       event.stopPropagation();
       void this.router.navigate(mention);
+      return;
+    }
+    // A pasted link to somebody's profile. Not a mention (the server did not
+    // mark it up as one), but it names an account this app can show, and
+    // sending the reader off to a server they are signed out of is the one
+    // outcome nobody wants. See mastodonProfileHandle.
+    const profile = profileRouteFor(href);
+    if (profile) {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.router.navigate(profile);
       return;
     }
     // Treat anything else with an explicit http(s) origin as external.

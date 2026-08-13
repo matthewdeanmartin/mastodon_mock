@@ -23,18 +23,38 @@ class MastodonPeopleSource implements PeopleSource {
     private accountId: string,
   ) {}
 
+  /**
+   * One page, walked by the `Link` header rather than by account id.
+   *
+   * ## Why the obvious cursor is the wrong one
+   *
+   * This used to read `accounts.at(-1).id` and pass it as the next `max_id`,
+   * with a comment claiming Mastodon "has no cursor". It does — it is just not
+   * in the response body. `/followers` and `/following` paginate by the id of
+   * the internal *follow relationship*, which is a different number from the id
+   * of the account on the end of it, and it appears only in the `Link` header.
+   *
+   * Feeding an account id back as `max_id` therefore asks the server for
+   * "relationships older than <an unrelated number>". The result depends on how
+   * that number happens to compare with the relationship ids, so the symptom is
+   * not a clean failure: the list stops early, and *where* it stops varies by
+   * account. An account whose followers all arrived before the account ids in
+   * play terminates on page one, which reads exactly like a privacy setting.
+   *
+   * {@link Api.accountFollowersPage} already existed for this reason — bulk
+   * walkers were fixed earlier — but this browser was still guessing. Now an
+   * absent `next` link, rather than an empty page, is what ends the walk.
+   */
   fetch(mode: PeopleMode, cursor: string | null): Observable<PeoplePage> {
     const maxId = cursor ?? undefined;
     const page =
       mode === 'followers'
-        ? this.api.accountFollowers(this.accountId, maxId)
-        : this.api.accountFollowing(this.accountId, maxId);
+        ? this.api.accountFollowersPage(this.accountId, maxId)
+        : this.api.accountFollowingPage(this.accountId, maxId);
     return page.pipe(
-      map((accounts) => ({
+      map(({ accounts, nextMaxId }) => ({
         accounts,
-        // Mastodon has no cursor: the next page starts below the last id, and
-        // an empty page is the end.
-        cursor: accounts.length ? (accounts.at(-1)?.id ?? null) : null,
+        cursor: nextMaxId,
       })),
     );
   }
@@ -76,17 +96,18 @@ class AnonymousPeopleSource implements PeopleSource {
     private server: string,
   ) {}
 
+  /** Link-header cursor, for the reason given on {@link MastodonPeopleSource.fetch}. */
   fetch(mode: PeopleMode, cursor: string | null): Observable<PeoplePage> {
     const ref = { server: this.server, id: this.accountId };
     const maxId = cursor ?? undefined;
     const page =
       mode === 'followers'
-        ? this.publicApi.getAccountFollowers(ref, maxId)
-        : this.publicApi.getAccountFollowing(ref, maxId);
+        ? this.publicApi.getAccountFollowersPage(ref, maxId)
+        : this.publicApi.getAccountFollowingPage(ref, maxId);
     return page.pipe(
-      map((accounts) => ({
+      map(({ accounts, nextMaxId }) => ({
         accounts,
-        cursor: accounts.length ? (accounts.at(-1)?.id ?? null) : null,
+        cursor: nextMaxId,
       })),
     );
   }

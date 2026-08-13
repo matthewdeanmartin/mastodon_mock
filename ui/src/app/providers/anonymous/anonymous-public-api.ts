@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, timeout } from 'rxjs';
-import { AccountStatusesOptions } from '../../api';
+import { AccountStatusesOptions, nextMaxIdFrom } from '../../api';
 import { Account, Collection, Context, SearchResults, Status, StatusEdit, Tag } from '../../models';
 import { externalFetch } from '../external-fetch';
 import { adaptAnonymousAccount, adaptAnonymousStatus } from './anonymous-mastodon-provider';
@@ -57,10 +57,34 @@ export class AnonymousPublicApi {
   }
 
   getAccountFollowers(ref: AnonymousPublicRef, maxId?: string): Observable<Account[]> {
-    return this.getAccountPeople(ref, 'followers', maxId);
+    return this.getAccountPeople(ref, 'followers', maxId).pipe(map((page) => page.accounts));
   }
 
   getAccountFollowing(ref: AnonymousPublicRef, maxId?: string): Observable<Account[]> {
+    return this.getAccountPeople(ref, 'following', maxId).pipe(map((page) => page.accounts));
+  }
+
+  /**
+   * The same lists, with the cursor that actually walks them.
+   *
+   * `/followers` and `/following` paginate by internal *relationship* id, which
+   * is published only in the `Link` header and is not the id of any account in
+   * the body. A caller that walks by `accounts.at(-1).id` stops early at a point
+   * that varies by account — often on page one, which is indistinguishable from
+   * the account hiding its social graph. See {@link Api.accountFollowersPage},
+   * which is the authenticated twin of this.
+   */
+  getAccountFollowersPage(
+    ref: AnonymousPublicRef,
+    maxId?: string,
+  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+    return this.getAccountPeople(ref, 'followers', maxId);
+  }
+
+  getAccountFollowingPage(
+    ref: AnonymousPublicRef,
+    maxId?: string,
+  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
     return this.getAccountPeople(ref, 'following', maxId);
   }
 
@@ -263,16 +287,25 @@ export class AnonymousPublicApi {
     ref: AnonymousPublicRef,
     kind: 'followers' | 'following',
     maxId?: string,
-  ): Observable<Account[]> {
+  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
     let params = new HttpParams().set('limit', '80');
     if (maxId) params = params.set('max_id', maxId);
     return this.http
       .get<
         Account[]
-      >(`${ref.server}/api/v1/accounts/${encodeURIComponent(ref.id)}/${kind}`, { params, context: externalFetch() })
+      >(`${ref.server}/api/v1/accounts/${encodeURIComponent(ref.id)}/${kind}`, { params, context: externalFetch(), observe: 'response' })
       .pipe(
         timeout(REQUEST_TIMEOUT_MS),
-        map((accounts) => accounts.map((account) => adaptAnonymousAccount(account, ref.server))),
+        map((response) => ({
+          accounts: (response.body ?? []).map((account) =>
+            adaptAnonymousAccount(account, ref.server),
+          ),
+          // A cross-origin read only exposes headers the server allows. Mastodon
+          // sends `Access-Control-Expose-Headers: Link`, so this is populated in
+          // practice; when a server does not, `null` degrades to "one page",
+          // which is the same behaviour as before rather than a new failure.
+          nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
+        })),
       );
   }
 }

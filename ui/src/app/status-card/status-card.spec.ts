@@ -121,6 +121,164 @@ describe('StatusCard', () => {
     return fixture;
   }
 
+  /**
+   * Clicking the card's own whitespace opens the thread.
+   *
+   * The bug: navigation hung off the anchor around the post *text*, so an
+   * image-only post had nothing to click. The risk in fixing it is the opposite
+   * failure — a card that eats clicks meant for its own buttons — so most of
+   * these tests are about what must NOT navigate.
+   */
+  describe('clicking the card body', () => {
+    function clickOn(fixture: ComponentFixture<StatusCard>, selector: string): MouseEvent {
+      const el = (fixture.nativeElement as HTMLElement).querySelector(selector);
+      expect(el, `no element matched ${selector}`).not.toBeNull();
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+      el!.dispatchEvent(event);
+      return event;
+    }
+
+    it('opens the thread when the click lands on the card itself', () => {
+      const fixture = setUp(makeStatus({ id: '42' }));
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      clickOn(fixture, 'article.status');
+
+      expect(navigate).toHaveBeenCalledWith(['/statuses', '42']);
+    });
+
+    // The reported case: no text at all, so the content anchor is empty and the
+    // whole card is the only thing left to click.
+    it('opens the thread from an image-only post', () => {
+      const fixture = setUp(
+        makeStatus({
+          id: '43',
+          content: '',
+          media_attachments: [
+            { id: 'm1', type: 'image', url: 'https://example.com/a.png', preview_url: '' },
+          ] as Status['media_attachments'],
+        }),
+      );
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      clickOn(fixture, 'article.status');
+
+      expect(navigate).toHaveBeenCalledWith(['/statuses', '43']);
+    });
+
+    it('does not navigate when an action button was clicked', () => {
+      const fixture = setUp(makeStatus({ id: '44' }));
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      clickOn(fixture, '[aria-label="Reply"]');
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('does not navigate when a media thumbnail was clicked', () => {
+      const fixture = setUp(
+        makeStatus({
+          id: '45',
+          media_attachments: [
+            { id: 'm1', type: 'image', url: 'https://example.com/a.png', preview_url: '' },
+          ] as Status['media_attachments'],
+        }),
+      );
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      clickOn(fixture, '.media-thumb');
+
+      // That click belongs to the lightbox.
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Clicking the card to dismiss an existing selection must not navigate.
+     *
+     * The sequence matters and is the point of this test. A real browser
+     * collapses the selection on `mousedown`, so a guard reading the live
+     * selection during `click` sees nothing and navigates anyway. The test
+     * therefore dispatches mousedown *while* the selection exists and clears it
+     * before the click, the way a browser actually does.
+     */
+    it('does not navigate when the gesture began with text selected', () => {
+      const fixture = setUp(makeStatus({ id: '46' }));
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      const article = (fixture.nativeElement as HTMLElement).querySelector('article.status')!;
+
+      let selected = 'some highlighted words';
+      vi.spyOn(window, 'getSelection').mockReturnValue({
+        toString: () => selected,
+      } as unknown as Selection);
+
+      article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      selected = ''; // The browser collapses it before the click arrives.
+      article.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('still navigates on a plain click with nothing selected', () => {
+      const fixture = setUp(makeStatus({ id: '49' }));
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      const article = (fixture.nativeElement as HTMLElement).querySelector('article.status')!;
+
+      article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      article.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+
+      expect(navigate).toHaveBeenCalledWith(['/statuses', '49']);
+    });
+
+    // A selection left over from earlier must not disable the card forever.
+    it('navigates on the next click after a selection is dropped', () => {
+      const fixture = setUp(makeStatus({ id: '50' }));
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      const article = (fixture.nativeElement as HTMLElement).querySelector('article.status')!;
+
+      let selected = 'highlighted';
+      vi.spyOn(window, 'getSelection').mockReturnValue({
+        toString: () => selected,
+      } as unknown as Selection);
+
+      article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      selected = '';
+      article.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      expect(navigate).not.toHaveBeenCalled();
+
+      article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      article.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      expect(navigate).toHaveBeenCalledWith(['/statuses', '50']);
+    });
+
+    it.each([
+      ['ctrl', { ctrlKey: true }],
+      ['meta', { metaKey: true }],
+      ['shift', { shiftKey: true }],
+    ])('leaves %s-click to the browser', (_name, modifier) => {
+      const fixture = setUp(makeStatus({ id: '47' }));
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      const article = (fixture.nativeElement as HTMLElement).querySelector('article.status')!;
+      article.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...modifier }),
+      );
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('leaves middle-click to the browser', () => {
+      const fixture = setUp(makeStatus({ id: '48' }));
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      const article = (fixture.nativeElement as HTMLElement).querySelector('article.status')!;
+      article.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, button: 1 }),
+      );
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+  });
+
   it('hides write actions and menus in Anonymous', () => {
     TestBed.inject(Auth).enterAnonymous();
     const f = setUp(makeStatus({ reblogs_count: 2, favourites_count: 3 }));
