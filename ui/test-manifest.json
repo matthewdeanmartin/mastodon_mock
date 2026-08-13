@@ -1,5 +1,5 @@
 {
-  "testCount": 4003,
+  "testCount": 4011,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -3705,6 +3705,14 @@
     "src/app/shell/left-rail/profile-stack/rail-profiles.spec.ts :: RailProfiles keeps the Bluesky card, without counts, when its profile fetch fails",
     "src/app/shell/left-rail/profile-stack/rail-profiles.spec.ts :: RailProfiles offers the browser-local identity as its own card when it is not active",
     "src/app/shell/right-rail/right-rail.spec.ts :: RightRail \"Share this server\" opens a dialog instead of navigating",
+    "src/app/shell/right-rail/right-rail.spec.ts :: RightRail by account kind falls back to getTrendingTopics when getTrends refuses",
+    "src/app/shell/right-rail/right-rail.spec.ts :: RightRail by account kind gives the Mastodon widgets back once the connector is opted into",
+    "src/app/shell/right-rail/right-rail.spec.ts :: RightRail by account kind hides Just My Server, the donate block and the server card without a connector",
+    "src/app/shell/right-rail/right-rail.spec.ts :: RightRail by account kind hides the trends card entirely when the unspecced endpoint refuses",
+    "src/app/shell/right-rail/right-rail.spec.ts :: RightRail by account kind house ads render for a Bluesky-primary account, unchanged",
+    "src/app/shell/right-rail/right-rail.spec.ts :: RightRail by account kind leaves a mastodon-primary account’s rails untouched",
+    "src/app/shell/right-rail/right-rail.spec.ts :: RightRail by account kind makes no Mastodon requests for a Bluesky-primary account with no connector",
+    "src/app/shell/right-rail/right-rail.spec.ts :: RightRail by account kind shows a Bluesky service card naming the PDS, with no donate block",
     "src/app/shell/right-rail/right-rail.spec.ts :: RightRail counts a click on an ad locally, without leaving the rail",
     "src/app/shell/right-rail/right-rail.spec.ts :: RightRail dismisses one ad without opening it, and refills the slot",
     "src/app/shell/right-rail/right-rail.spec.ts :: RightRail exposes an absolute (origin-qualified) share URL for copying, not just a route",

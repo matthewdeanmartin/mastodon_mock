@@ -8,6 +8,8 @@ import { HouseAdStore } from '../../house-ad-store';
 import { HOUSE_ADS_SHOWN } from '../../house-ads';
 import { Account } from '../../models';
 import { Server } from '../../server';
+import { MastodonConnector } from '../../providers/mastodon/mastodon-connector';
+import { seedBskyIdentity } from '../../testing/seed-storage';
 import { RightRail } from './right-rail';
 
 interface RightRailInternals {
@@ -174,5 +176,175 @@ describe('RightRail', () => {
   it('no longer hosts the trends widget (moved to the left rail)', () => {
     const fixture = setUp();
     expect((fixture.nativeElement as HTMLElement).querySelector('.trend')).toBeNull();
+  });
+
+  /**
+   * The rails by account kind.
+   *
+   * A Bluesky-primary account was being shown four Mastodon widgets it cannot
+   * use — Just My Server (Bluesky has no instances to narrow to), a donate block
+   * asking it to fund a server it does not use, a server-info card describing an
+   * instance that is not its home, and Fediverse trends links into endpoints
+   * there is no token for — while being shown no Bluesky equivalent of any of it.
+   *
+   * Widgets are **swapped, not stacked**: what a Bluesky-primary account loses
+   * in Mastodon widgets it gains back in Bluesky ones, so the rail does not grow.
+   */
+  describe('by account kind', () => {
+    function seedBlueskyPrimary(): void {
+      localStorage.setItem('mastodon_mock_account_mode', 'bluesky');
+      seedBskyIdentity({ did: 'did:plc:me', handle: 'me.bsky.social' });
+    }
+
+    /**
+     * Render without the blanket flush `setUp` does, so the *absence* of
+     * requests can be asserted rather than swallowed.
+     */
+    function render(): ComponentFixture<RightRail> {
+      const fixture = TestBed.createComponent(RightRail);
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('makes no Mastodon requests for a Bluesky-primary account with no connector', () => {
+      seedBlueskyPrimary();
+      const fixture = render();
+
+      // The heart of the sprint: no widget may fetch until its predicate says it
+      // will render. Bluesky trends are allowed — those are this account's own
+      // network — so only Mastodon paths are asserted absent.
+      expect(httpMock.match((r) => r.url.startsWith('/api/'))).toEqual([]);
+      httpMock.match((r) => r.url.includes('bsky.app')).forEach((req) => req.flush({}));
+      fixture.detectChanges();
+    });
+
+    it('hides Just My Server, the donate block and the server card without a connector', () => {
+      seedBlueskyPrimary();
+      const fixture = render();
+      httpMock.match(() => true).forEach((req) => req.flush({}));
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      expect(el.querySelector('.server-mode-card')).toBeNull();
+      expect(el.querySelector('.donate-block')).toBeNull();
+      expect(el.querySelector('.server-info')).toBeNull();
+      const hrefs = [...el.querySelectorAll<HTMLAnchorElement>('a[href]')].map((a) =>
+        a.getAttribute('href'),
+      );
+      expect(hrefs).not.toContain('https://joinmastodon.org/sponsors');
+    });
+
+    it('shows a Bluesky service card naming the PDS, with no donate block', () => {
+      seedBlueskyPrimary();
+      const fixture = render();
+      httpMock.match(() => true).forEach((req) => req.flush({}));
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      const card = el.querySelector('.bsky-service-card');
+      expect(card?.textContent).toContain('me.bsky.social');
+      // The entryway/self-hosted distinction is the real information here for
+      // the kind of person who runs their own PDS.
+      expect(card?.textContent).toContain('entryway');
+      // Bluesky has no per-instance donation model, so that block does not exist
+      // here rather than being translated into something meaningless.
+      expect(card?.querySelector('.donate-link')).toBeNull();
+    });
+
+    it('hides the trends card entirely when the unspecced endpoint refuses', () => {
+      seedBlueskyPrimary();
+      const fixture = render();
+      // `unspecced` is unstable by name: a refusal must hide the card, never
+      // render an empty one and never surface an error.
+      //
+      // Refusing `getTrends` falls back to `getTrendingTopics`, so both have to
+      // be refused to reach the "no trends at all" state — which is itself worth
+      // pinning, since the fallback is the reason there are two endpoints.
+      httpMock
+        .expectOne((r) => r.url.includes('getTrends'))
+        .flush({}, { status: 400, statusText: 'Bad Request' });
+      httpMock
+        .expectOne((r) => r.url.includes('getTrendingTopics'))
+        .flush({}, { status: 400, statusText: 'Bad Request' });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      expect(el.querySelector('.bsky-trend')).toBeNull();
+      expect(el.textContent).not.toContain('Trending on Bluesky');
+    });
+
+    it('falls back to getTrendingTopics when getTrends refuses', () => {
+      seedBlueskyPrimary();
+      const fixture = render();
+      httpMock
+        .expectOne((r) => r.url.includes('getTrends'))
+        .flush({}, { status: 404, statusText: 'Not Found' });
+      httpMock.expectOne((r) => r.url.includes('getTrendingTopics')).flush({
+        topics: [{ displayName: 'A topic', link: '/profile/did:plc:x/feed/y' }],
+      });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      const trend = el.querySelector<HTMLAnchorElement>('a.bsky-trend');
+      expect(trend?.textContent).toContain('A topic');
+      // A Bluesky trend links to a generated feed, not a tag timeline, and the
+      // API returns a site-relative path — resolving it against Mawkingbird's
+      // own origin would 404.
+      expect(trend?.getAttribute('href')).toBe('https://bsky.app/profile/did:plc:x/feed/y');
+    });
+
+    it('gives the Mastodon widgets back once the connector is opted into', () => {
+      seedBlueskyPrimary();
+      TestBed.inject(MastodonConnector).enableAnonymous();
+      const fixture = render();
+      // The instance card reads `usage.users`, so answer it with the shape the
+      // real endpoint returns rather than a bare {}.
+      httpMock
+        .match((r) => r.url === '/api/v2/instance' || r.url === '/api/v1/instance')
+        .forEach((req) =>
+          req.flush({
+            domain: 'mastodon.social',
+            title: 'Mastodon',
+            version: '4.3.0',
+            usage: { users: { active_month: 1 } },
+          }),
+        );
+      httpMock.match(() => true).forEach((req) => req.flush({}));
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      expect(el.querySelector('.donate-block')).not.toBeNull();
+      expect(
+        [...el.querySelectorAll<HTMLAnchorElement>('a[href]')].map((a) => a.getAttribute('href')),
+      ).toContain('https://joinmastodon.org/sponsors');
+    });
+
+    it('leaves a mastodon-primary account’s rails untouched', () => {
+      localStorage.setItem('mastodon_mock_account_mode', 'mastodon');
+      localStorage.setItem('mastodon_mock_token', 'tok');
+      TestBed.inject(Auth).account.set({ id: '1', acct: 'matt@elekk.xyz' } as Account);
+      const fixture = setUp();
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      // The standing regression clause: an existing Mastodon session sees no
+      // change at all, and gains no Bluesky chrome it did not ask for.
+      expect(el.querySelector('.donate-block')).not.toBeNull();
+      expect(el.querySelector('.server-mode-card')).not.toBeNull();
+      expect(el.querySelector('.bsky-service-card')).toBeNull();
+      expect(el.querySelector('.bsky-trend')).toBeNull();
+    });
+
+    it('house ads render for a Bluesky-primary account, unchanged', () => {
+      seedBlueskyPrimary();
+      const fixture = render();
+      httpMock.match(() => true).forEach((req) => req.flush({}));
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      // Network-agnostic, and the one thing in the rail that is about
+      // Mawkingbird rather than about a network. They stay in every combination.
+      expect(el.querySelectorAll('.spotlight-card')).toHaveLength(HOUSE_ADS_SHOWN);
+    });
   });
 });

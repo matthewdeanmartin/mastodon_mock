@@ -454,6 +454,26 @@
   }
 }
 
+<!-- Popular feeds across Bluesky. Outside the `linked()` guard above on purpose:
+     this endpoint is anonymous, so it is browsable content for every account
+     kind, not just Bluesky ones. Custom algorithmic feeds have no Mastodon
+     counterpart at all, which is exactly why they are worth surfacing here.
+     Hidden when the unspecced endpoint refuses. -->
+@if (shows('lists') && bskyPopular().length && showsSection('bsky-popular')) {
+  <div class="section-head">🦋 Popular on Bluesky</div>
+  @for (entry of bskyPopular(); track entry.uri) {
+    <a class="list-row" [routerLink]="bskyFeedLink(entry)">
+      <span>
+        {{ entry.displayName }}
+        <span class="muted small">· by &#64;{{ entry.creatorHandle }}</span>
+      </span>
+    </a>
+  }
+  <p class="muted center small">
+    Feeds other people built and published. Anyone can read them — no Bluesky account needed.
+  </p>
+}
+
 @if (listToDelete(); as l) {
   <app-confirm-dialog
     title="Delete this list?"

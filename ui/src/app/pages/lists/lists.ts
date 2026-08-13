@@ -55,7 +55,8 @@ export type FeedSection =
   | 'twitter'
   | 'bsky-pinned'
   | 'bsky-feeds'
-  | 'bsky-lists';
+  | 'bsky-lists'
+  | 'bsky-popular';
 
 /** Picker options, in the order the sections appear down the page. */
 export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
@@ -77,6 +78,9 @@ export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
   { id: 'bsky-pinned', label: 'Pinned on Bluesky' },
   { id: 'bsky-feeds', label: 'Bluesky feeds' },
   { id: 'bsky-lists', label: 'Bluesky lists' },
+  // Last: it is discovery rather than something the reader owns, and every
+  // other section on this page is theirs.
+  { id: 'bsky-popular', label: 'Popular on Bluesky' },
 ];
 
 @Component({
@@ -106,6 +110,8 @@ export class Lists implements OnInit {
 
   /** Saved Bluesky feeds and lists, split into the three sections below. */
   private bskyEntries = signal<BlueskyFeedEntry[]>([]);
+  /** Popular feeds across Bluesky. Discovery, and available to every account. */
+  protected bskyPopular = signal<BlueskyFeedEntry[]>([]);
   protected bskyLoading = signal(false);
   protected bskyError = signal<string | null>(null);
   /** A failed list or collection create/delete, shown by the create box. */
@@ -134,6 +140,29 @@ export class Lists implements OnInit {
    */
   protected bskyFeedLink(entry: BlueskyFeedEntry): (string | number)[] {
     return ['/feeds/bluesky', `${entry.kind}:${encodeURIComponent(entry.uri)}`];
+  }
+
+  /**
+   * Popular feeds across Bluesky — discovery, for **everyone**.
+   *
+   * Deliberately not gated on `bskySession.linked()` the way the saved-feed
+   * sections above are. Those describe *your* feeds and need your account;
+   * this endpoint is anonymous, so a Mastodon-primary or anonymous reader who
+   * has never touched Bluesky can still browse what is worth reading there.
+   * Gating it would withhold public content for no reason.
+   *
+   * A refusal yields an empty list and the section hides itself — `unspecced`
+   * endpoints are unstable by name.
+   */
+  private loadPopularFeeds(): void {
+    this.bskyFeeds.loadPopular().subscribe({
+      next: (entries) => this.bskyPopular.set(entries),
+      error: () => {
+        // `loadPopular` already swallows failures; belt and braces so a rail-
+        // adjacent discovery widget can never break the page it sits on.
+        this.bskyPopular.set([]);
+      },
+    });
   }
 
   private loadBlueskyFeeds(): void {
@@ -309,6 +338,7 @@ export class Lists implements OnInit {
       this.loadCollections();
       this.resolveServerFeeds();
       this.loadBlueskyFeeds();
+      this.loadPopularFeeds();
     }
     if (this.shows('tags')) {
       this.loadTags();

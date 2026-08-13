@@ -26,7 +26,15 @@ import {
  * Distinct from the `bsky.social` entryway, which requires a session even for
  * endpoints whose lexicon says auth is optional.
  */
-const PUBLIC_APPVIEW = 'https://public.api.bsky.app';
+/**
+ * The public AppView. Answers auth-optional endpoints anonymously, unlike the
+ * entryway — see {@link BlueskyApi.publicGet}.
+ *
+ * Exported because some endpoints must go here *even when signed in*: the
+ * `app.bsky.unspecced.*` discovery endpoints are AppView-only, and the entryway
+ * answers them 401 `AuthMissing` whoever is asking (measured 2026-08-12).
+ */
+export const PUBLIC_APPVIEW = 'https://public.api.bsky.app';
 
 interface CreateRecordResponse {
   uri: string;
@@ -155,6 +163,25 @@ export class BlueskyApi {
     return this.publicGet<{ feeds: BskyGeneratorView[] }>(
       'app.bsky.feed.getFeedGenerators',
       params,
+    );
+  }
+
+  /**
+   * Feeds that are popular across Bluesky, for discovery.
+   *
+   * Goes straight to the public AppView rather than through {@link publicGet},
+   * and deliberately so: `app.bsky.unspecced.*` is AppView-only, and the
+   * entryway answers it 401 `AuthMissing` even for a signed-in caller (measured
+   * 2026-08-12). Routing this through `publicGet` would therefore break it for
+   * precisely the accounts most likely to want it.
+   *
+   * `unspecced` is unstable by name — callers must treat a failure as "not
+   * available today" and hide the surface, never surface an error.
+   */
+  getPopularFeedGenerators(limit: number): Observable<{ feeds: BskyGeneratorView[] }> {
+    return this.http.get<{ feeds: BskyGeneratorView[] }>(
+      `${PUBLIC_APPVIEW}/xrpc/app.bsky.unspecced.getPopularFeedGenerators`,
+      { params: new HttpParams().set('limit', String(limit)), context: externalFetch() },
     );
   }
 

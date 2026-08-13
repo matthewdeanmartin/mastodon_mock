@@ -8,6 +8,9 @@ import { InstanceInfo } from '../../models';
 import { SearchServer } from '../../search-server';
 import { Server } from '../../server';
 import { JustMyServer } from '../../just-my-server';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
+import { BlueskyTrends } from '../../providers/bluesky/bluesky-trends';
+import { networkSources } from '../network-sources';
 
 /**
  * Right sidebar: house ads (inventory lives in house-ads.ts — edit that file to
@@ -30,6 +33,50 @@ export class RightRail implements OnInit {
   private server = inject(Server);
   protected searchServer = inject(SearchServer);
   protected justMyServer = inject(JustMyServer);
+
+  /**
+   * Which networks this account can use. Every Mastodon widget below is gated on
+   * `usableMastodon`, and — more importantly than the markup — so are the
+   * requests: a rail that renders nothing but still calls `/api/v1/instance`
+   * spends bandwidth on a network the user declined, which is the exact cost the
+   * Sprint 4 opt-in reversal was about.
+   */
+  private sources = networkSources();
+  protected usableMastodon = this.sources.usableMastodon;
+  protected usableBluesky = this.sources.usableBluesky;
+
+  protected bsky = inject(BlueskySession);
+  protected bskyTrends = inject(BlueskyTrends);
+
+  /**
+   * The Bluesky service card's payload: handle plus the PDS the account lives on.
+   *
+   * The counterpart to the Mastodon server-info card, minus the donate block —
+   * Bluesky has no per-instance donation model and no instance to fund, so that
+   * block simply does not exist here rather than being translated into something
+   * meaningless.
+   *
+   * No DID (user's call). It is the durable identity and it is public, so showing
+   * it would leak nothing — but it is an opaque `did:plc:…` string that means
+   * nothing to most people, and the rail is the scarcest space in the app.
+   *
+   * `pdsUrl` is resolved lazily (chat needs the real PDS and resolves it via
+   * plc.directory), so this falls back to `service` until something has asked.
+   * The entryway/self-hosted distinction is the one piece of real information
+   * here for the kind of person who runs their own.
+   */
+  protected bskyService = computed(() => {
+    const session = this.bsky.session();
+    if (!session) {
+      return null;
+    }
+    const host = (session.pdsUrl ?? session.service).replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return {
+      handle: session.handle,
+      host,
+      entryway: host === 'bsky.social',
+    };
+  });
 
   /**
    * The ads, plus which of them are on and which the user has clicked. The rail
@@ -121,11 +168,29 @@ export class RightRail implements OnInit {
     effect(() => {
       this.auth.account();
       this.server.baseUrl();
-      this.fetchInstance();
+      // No Mastodon source, no Mastodon request. Reading the signal inside the
+      // effect keeps this live: opting the connector in from Settings fills the
+      // card in without a reload.
+      if (this.usableMastodon()) {
+        this.fetchInstance();
+      }
     });
   }
 
   ngOnInit(): void {
+    // Every call below is a Mastodon call, and a Bluesky-primary account that
+    // never opted in must make none of them — the widgets they feed are hidden
+    // for that account anyway, so the requests would be pure waste against a
+    // server the user has no relationship with.
+    // Symmetrically: no Bluesky source, no Bluesky request. The trends endpoints
+    // are anonymous, so this is a policy choice rather than a technical one —
+    // a rail widget nobody will see should not cost a request.
+    if (this.usableBluesky()) {
+      this.bskyTrends.ensure();
+    }
+    if (!this.usableMastodon()) {
+      return;
+    }
     if (this.justMyServer.enabled()) {
       this.justMyServer.checkList();
     }

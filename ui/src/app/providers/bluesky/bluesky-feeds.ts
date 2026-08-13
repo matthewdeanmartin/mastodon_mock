@@ -25,6 +25,9 @@ export interface BlueskyFeedPage {
   cursor: string | null;
 }
 
+/** How many popular feeds the Lists page offers. Enough to browse, not a firehose. */
+const POPULAR_LIMIT = 20;
+
 /** Max uris `getFeedGenerators` will describe in one call. */
 const GENERATOR_BATCH = 25;
 
@@ -54,6 +57,8 @@ export class BlueskyFeeds {
 
   /** Cached for the tab's lifetime; preferences change rarely. */
   private cache = signal<BlueskyFeedEntry[] | null>(null);
+  /** Popular feeds, cached for the session — discovery data moves slowly. */
+  private popularCache = signal<BlueskyFeedEntry[] | null>(null);
 
   readonly entries = this.cache.asReadonly();
 
@@ -166,6 +171,52 @@ export class BlueskyFeeds {
   /** Drop the cache, e.g. after linking a different account. */
   clear(): void {
     this.cache.set(null);
+    this.popularCache.set(null);
+  }
+
+  /**
+   * Feeds that are popular across Bluesky — discovery, not your saved list.
+   *
+   * This is the one widget in the Bluesky-rails sprint with **no Mastodon
+   * counterpart at all**: Mastodon has no user-authored algorithmic feeds to be
+   * popular. It lives on the Lists page rather than in the rail because that
+   * page is already the hub for every custom feed, and the rail is the scarcest
+   * space in the app.
+   *
+   * Available to **everyone**, not just Bluesky accounts:
+   * `getPopularFeedGenerators` is anonymous on the public AppView, so gating it
+   * on having a linked account would withhold browsable content for no reason.
+   * A Mastodon-primary reader who has never touched Bluesky can still find a
+   * feed worth reading here.
+   *
+   * `unspecced` by name and therefore unstable — a refusal yields an empty list
+   * and the section hides, exactly as the trends card does.
+   */
+  loadPopular(): Observable<BlueskyFeedEntry[]> {
+    const cached = this.popularCache();
+    if (cached) {
+      return of(cached);
+    }
+    return this.api.getPopularFeedGenerators(POPULAR_LIMIT).pipe(
+      map(({ feeds }) =>
+        feeds.map(
+          (generator): BlueskyFeedEntry => ({
+            uri: generator.uri,
+            kind: 'feed',
+            displayName: generator.displayName,
+            description: generator.description ?? '',
+            avatar: generator.avatar ?? null,
+            creatorHandle: generator.creator.handle,
+            // Popularity is not pinning. These are other people's feeds that the
+            // reader has not saved, so nothing here is promoted to a tab.
+            pinned: false,
+            memberCount: null,
+          }),
+        ),
+      ),
+      tap((entries) => this.popularCache.set(entries)),
+      catchError(() => of([] as BlueskyFeedEntry[])),
+    );
   }
 }
 

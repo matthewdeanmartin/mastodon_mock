@@ -34,7 +34,11 @@
   </section>
 }
 
-@if (auth.isAuthenticated) {
+<!-- Just My Server narrows Home to one Mastodon instance. Bluesky has no
+     instances to narrow to, so for a Bluesky-primary account without a Mastodon
+     connector this is not merely empty, it is meaningless — and it calls
+     Mastodon list APIs there may be no token for. -->
+@if (auth.isAuthenticated && usableMastodon()) {
   <section class="card server-mode-card">
     <div class="server-mode-heading">
       <div>
@@ -84,6 +88,44 @@
   </section>
 }
 
+<!-- The counterpart to the Mastodon server-info card below, deliberately without
+     a donate block: Bluesky has no per-instance donation model and no instance
+     to fund, so that block does not exist here rather than being translated. -->
+@if (usableBluesky() && bskyService(); as svc) {
+  <section class="card bsky-service-card">
+    <h2 class="card-title">Your Bluesky</h2>
+    <p class="bsky-handle">&#64;{{ svc.handle }}</p>
+    <p class="muted server-line">
+      {{ svc.host }} &middot; {{ svc.entryway ? 'entryway' : 'self-hosted' }}
+    </p>
+  </section>
+}
+
+<!-- Bluesky trends are *topics* linking to generated feeds, not hashtags linking
+     to tag timelines. Separate card, separate service, absolute bsky.app links —
+     forcing them into the Mastodon tag UI would produce dead links. Hidden
+     entirely when the unspecced endpoints refuse. -->
+@if (usableBluesky() && bskyTrends.trends().length) {
+  <section class="card">
+    <h2 class="card-title">Trending on Bluesky</h2>
+    @for (trend of bskyTrends.trends(); track trend.url) {
+      <a
+        class="rail-link bsky-trend"
+        [href]="trend.url"
+        target="_blank"
+        rel="noopener noreferrer"
+        [title]="trend.description || trend.displayName"
+      >
+        <span class="bsky-trend-name">{{ trend.displayName }}</span>
+        @if (trend.postCount) {
+          <span class="muted small">{{ trend.postCount }} posts</span>
+        }
+      </a>
+    }
+  </section>
+}
+
+@if (usableMastodon()) {
 <section class="card">
   <h2 class="card-title">Fediverse</h2>
 
@@ -158,6 +200,7 @@
     </div>
   }
 </section>
+}
 
 @if (shareOpen()) {
   <div

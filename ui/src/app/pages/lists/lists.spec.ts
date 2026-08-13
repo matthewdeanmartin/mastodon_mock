@@ -125,6 +125,18 @@ describe('Lists', () => {
   }
 
   /**
+   * Popular Bluesky feeds load for **every** account kind, not just linked ones
+   * — the endpoint is anonymous, so withholding it would hide public content
+   * for no reason. That means it fires here too, where no Bluesky account
+   * exists. Settled as empty, which hides the section.
+   */
+  function flushPopularFeeds(): void {
+    httpMock
+      .match((r) => r.url.includes('app.bsky.unspecced.getPopularFeedGenerators'))
+      .forEach((req) => req.flush({ feeds: [] }));
+  }
+
+  /**
    * On the default (unfiltered) Feeds view the Tags section loads followed and
    * featured hashtags. Tests don't assert on them, so settle both as empty.
    */
@@ -145,6 +157,7 @@ describe('Lists', () => {
     flushServerFeedProbes();
     flushDirectoryProbe();
     flushTagLoads();
+    flushPopularFeeds();
     return fixture;
   }
 
@@ -348,6 +361,7 @@ describe('Lists', () => {
     flushServerFeedProbes();
     flushDirectoryProbe();
     flushTagLoads();
+    flushPopularFeeds();
 
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
@@ -375,6 +389,7 @@ describe('Lists', () => {
     flushServerFeedProbes();
     flushDirectoryProbe();
     flushTagLoads();
+    flushPopularFeeds();
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')
       .flush({ id: '9', username: 'me', acct: 'me' });
@@ -391,6 +406,7 @@ describe('Lists', () => {
     flushServerFeedProbes();
     flushDirectoryProbe();
     flushTagLoads();
+    flushPopularFeeds();
 
     httpMock
       .expectOne('/api/v1/accounts/verify_credentials')

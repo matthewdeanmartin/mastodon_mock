@@ -198,6 +198,32 @@
   font-size: 14px;
 }
 
+/* The Bluesky service card: the server-info card's counterpart, so it borrows
+   .server-line for the host row and only needs a handle style of its own. */
+.bsky-service-card {
+  padding: 12px 14px;
+}
+
+.bsky-handle {
+  margin: 0;
+  font-weight: 800;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+/* A trend is a phrase, not a hashtag, so it wraps rather than truncating —
+   "Games that didn't click for players" is a normal length here. */
+.bsky-trend {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.bsky-trend-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .server-line {
   margin: 2px 0 0;
   font-size: 12px;

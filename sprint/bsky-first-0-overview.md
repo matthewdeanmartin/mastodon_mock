@@ -117,7 +117,7 @@ sites, and Sprint 1 makes that explicit rather than leaving it implicit.
 | 2 | [The front door](bsky-first-2-front-door.md) — ~~COMPLETE~~ **re-opened, superseded by 2b** | Shipped a landing page instead of the app; see 2b |
 | 3 | [Log in with Bluesky](bsky-first-3-bsky-login.md) | Fresh browser → bsky handle + app password → working app, no Mastodon anything |
 | 4 | [The Mastodon connector](bsky-first-4-mastodon-under-bsky.md) — **COMPLETE** | That same session can *opt into* Explore, trends and tag timelines — and attach a real Mastodon account later |
-| 4b | [The rails speak Bluesky](bsky-first-4b-bsky-rails.md) | A bsky-primary account's rails show **Bluesky** widgets — trends, server/service card, feeds — instead of Mastodon ones it cannot use |
+| 4b | [The rails speak Bluesky](bsky-first-4b-bsky-rails.md) — **COMPLETE** | A bsky-primary account's rails show **Bluesky** widgets — trends and a service card — instead of Mastodon ones it cannot use; popular feeds land on Lists, for everyone |
 | 5 | [Search parity](bsky-first-5-search-parity.md) | Bluesky search has facets, refine, saved searches — and looks like Mastodon search |
 | 6 | [Anonymous Bluesky](bsky-first-6-anonymous-bsky.md) | Browse Bluesky with no login at all, via `public.api.bsky.app` |
 | 7 | [Find your people](bsky-first-7-bridge-finder.md) | "Who that I follow on Mastodon is also on Bluesky?" — with match kinds, not just scores |
