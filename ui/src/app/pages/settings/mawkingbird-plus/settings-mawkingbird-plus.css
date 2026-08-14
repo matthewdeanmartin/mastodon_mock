@@ -1,0 +1,49 @@
+.plus-identity,
+.plus-signin {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 12px 0;
+}
+
+.plus-identity h2,
+.plus-signin h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+/* Two columns so labels and values line up; wraps to one on narrow screens. */
+.plus-identity dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0 0 16px;
+}
+
+.plus-identity dt {
+  color: var(--muted, inherit);
+  font-size: 14px;
+}
+
+.plus-identity dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (width <= 480px) {
+  .plus-identity dl {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .plus-identity dd:not(:last-child) {
+    margin-bottom: 10px;
+  }
+}
+
+.plus-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 6px;
+}

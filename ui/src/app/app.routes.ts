@@ -35,8 +35,7 @@ export const routes: Routes = [
     path: 'login',
     pathMatch: 'full',
     title: 'Sign in',
-    loadComponent: () =>
-      import('./pages/login-chooser/login-chooser').then((m) => m.LoginChooser),
+    loadComponent: () => import('./pages/login-chooser/login-chooser').then((m) => m.LoginChooser),
   },
   {
     path: 'login/mastodon',
@@ -187,6 +186,19 @@ export const routes: Routes = [
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/blue/settings-blue').then((m) => m.SettingsBlue),
+          },
+          {
+            // Also the WorkOS OAuth redirect target — the SDK completes a
+            // pending sign-in on whatever page it loads at, so this needs no
+            // sibling callback route. See `workos-session.ts`.
+            path: 'mawkingbird-plus',
+            title: 'Mawkingbird Plus',
+            canActivate: [featureFlagGuard],
+            data: { featureFlag: 'mawkingbird-plus', preloadSettings: true },
+            loadComponent: () =>
+              import('./pages/settings/mawkingbird-plus/settings-mawkingbird-plus').then(
+                (m) => m.SettingsMawkingbirdPlus,
+              ),
           },
           {
             // Componentless parent: the catalog is the '' child and each

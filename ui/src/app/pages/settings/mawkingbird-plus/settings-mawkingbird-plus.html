@@ -1,0 +1,59 @@
+<div class="spage-head">
+  <h1>Mawkingbird Plus</h1>
+  <p>
+    A free Mawkingbird account. It is optional and always will be — feeds, posting and the CORS
+    proxy all work signed out, exactly as they do today.
+  </p>
+</div>
+
+<div class="spage-body">
+  @if (!session.configured) {
+    <p class="feed-error">
+      Mawkingbird accounts are not configured for this build. This is expected for the mock-embedded
+      UI, which is mastodon_mock's own admin surface rather than the Mawkingbird client.
+    </p>
+  } @else if (!session.ready()) {
+    <p class="muted" role="status">Checking your account…</p>
+  } @else if (session.user(); as user) {
+    <section class="plus-identity">
+      <h2>Signed in</h2>
+      <dl>
+        @if (name(); as displayed) {
+          <dt>Name</dt>
+          <dd>{{ displayed }}</dd>
+        }
+        <dt>Email</dt>
+        <dd>{{ user.email }}</dd>
+      </dl>
+      <button class="btn btn-outline" type="button" (click)="session.signOut()">Sign out</button>
+    </section>
+
+    <p class="muted small">
+      Your email is how the account is identified. Nothing is synced to it yet, and no subscription
+      exists to buy — this is the groundwork for both.
+    </p>
+  } @else {
+    <section class="plus-signin">
+      <h2>Not signed in</h2>
+      <p>
+        There is nothing to gain by signing in yet. The account is here so that settings sync and a
+        paid proxy tier have somewhere to live later; right now it only proves who you are.
+      </p>
+      <div class="plus-actions">
+        <button class="btn" type="button" (click)="session.signIn()">Sign in</button>
+        <button class="btn btn-outline" type="button" (click)="session.signUp()">
+          Create an account
+        </button>
+      </div>
+      <p class="muted small">
+        Sign-in is handled by WorkOS. This browser never holds a long-lived credential for it: the
+        refresh token stays in a cookie our own code cannot read, and the short-lived access token
+        is kept in memory only, so closing the tab ends the session.
+      </p>
+    </section>
+  }
+
+  @if (session.error(); as message) {
+    <p class="feed-error" role="alert">{{ message }}</p>
+  }
+</div>

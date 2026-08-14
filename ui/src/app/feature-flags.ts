@@ -9,6 +9,7 @@ export type FeatureFlagId =
   | 'pastebin'
   | 'links'
   | 'write'
+  | 'mawkingbird-plus'
   | 'connector-mastodon'
   | 'connector-bluesky'
   | 'connector-twitter'
@@ -75,6 +76,17 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     description:
       'The writing workspace at /write — drafts, editor and notes side by side, plus zen mode.',
     defaultState: 'production',
+    group: 'features',
+  },
+  {
+    id: 'mawkingbird-plus',
+    label: 'Mawkingbird Plus',
+    // Says what switching it off removes, per the convention above. Nothing
+    // else in the app depends on an account, so this genuinely only hides the
+    // one settings tab — signed-out users lose no functionality.
+    description:
+      'The Mawkingbird account tab in Settings, where you sign in to your Mawkingbird account.',
+    defaultState: 'canary',
     group: 'features',
   },
   {

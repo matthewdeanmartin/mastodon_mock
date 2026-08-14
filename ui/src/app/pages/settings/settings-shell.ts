@@ -2,6 +2,8 @@ import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../../auth';
 import { environment } from '../../../environments/environment';
+import { FeatureFlagId, FeatureFlags } from '../../feature-flags';
+import { WorkosSession } from '../../providers/workos/workos-session';
 import { SettingsPreloading } from './settings-preloading';
 
 interface SettingsNavItem {
@@ -15,6 +17,10 @@ interface SettingsNavItem {
   anonymous?: boolean;
   /** Meaningful only for the browser-local Anonymous account. */
   anonymousOnly?: boolean;
+  /** Hidden unless this feature flag is on, and unless the build configured it. */
+  featureFlag?: FeatureFlagId;
+  /** Hidden when false — for entries a build can compile out entirely. */
+  available?: boolean;
 }
 
 /**
@@ -30,6 +36,8 @@ interface SettingsNavItem {
 })
 export class SettingsShell {
   protected auth = inject(Auth);
+  private readonly flags = inject(FeatureFlags);
+  private readonly workos = inject(WorkosSession);
   private readonly preloading = inject(SettingsPreloading);
 
   constructor() {
@@ -38,49 +46,67 @@ export class SettingsShell {
     this.preloading.enable();
   }
 
-  protected readonly nav: SettingsNavItem[] = [
-    { label: 'Public profile', path: 'profile', exact: true, anonymous: true },
-    { label: 'Server', path: 'server', exact: true, anonymous: true, anonymousOnly: true },
-    // Client-side premium-style features; the same controls also live in Appearance.
-    { label: 'Mockingbird Blue', path: 'blue', exact: true, anonymous: true },
-    // Client-side (localStorage) accounts on other services: Bluesky, GitHub,
-    // Raindrop.io, Dropbox. Not exact — the catalog's child pages live under it.
-    { label: 'Connections', path: 'connections', exact: false, anonymous: true },
-    // Many feeds rather than one account, so deliberately not a "connection".
-    { label: 'RSS feeds', path: 'rss', exact: true, anonymous: true },
-    { label: 'Posting & Privacy', path: 'privacy', exact: true },
-    { label: 'Writing', path: 'writing', exact: true, anonymous: true },
-    // Appearance is client-side (theme/accent/undo-send in localStorage) and works
-    // against any instance; the page hides its server-backed rows off-mock itself.
-    { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },
-    { label: 'Internationalization', path: 'i18n', exact: true, anonymous: true },
-    { label: 'Local storage', path: 'storage', exact: true, anonymous: true },
-    // Path is 'spotlight' on purpose — see the route's comment in app.routes.ts.
-    { label: 'Ads', path: 'spotlight', exact: true, anonymous: true },
-    { label: 'Signed-in accounts', path: 'accounts', exact: true, anonymous: true },
-    { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
-    { label: 'Approve follow requests', path: 'follows', exact: true },
-    { label: 'Muted & Blocked', path: 'moderation', exact: true },
-    // The flipside of the line above — accounts you want *without* a doorway in
-    // front of them — so it sits next to it. Client-side, hence anonymous: true.
-    { label: 'Content warnings', path: 'content', exact: true, anonymous: true },
-    // Sits under the two lists it can empty, and next to the follow-wide
-    // retweet switches, because that is what all four of them operate on.
-    { label: 'Bulk actions', path: 'bulk-actions', exact: true },
-    { label: 'Filters', path: 'filters', exact: false },
-    { label: 'Automatic post deletion', path: 'deletion', exact: true, mockOnly: true },
-    { label: 'Account', path: 'account', exact: true },
-    { label: 'Import/Export Friends', path: 'import-export', exact: true },
-    { label: 'Import/Export Config', path: 'config', exact: true, anonymous: true },
-    // "Invite links", not "Invite people": /invites is the page that invites
-    // people, and two menu entries reading the same thing is a maze.
-    { label: 'Invite links', path: 'invites', exact: true, mockOnly: true },
-    { label: 'Feature flags', path: 'feature-flags', exact: true, anonymous: true },
-    { label: 'Development', path: 'development', exact: true, mockOnly: true },
-  ].filter(
+  // The element type is annotated on the literal rather than only on `nav`:
+  // `.filter()` breaks the contextual-typing chain, so without it `featureFlag`
+  // widens to `string` and stops being checked against `FeatureFlagId`.
+  protected readonly nav: SettingsNavItem[] = (
+    [
+      { label: 'Public profile', path: 'profile', exact: true, anonymous: true },
+      { label: 'Server', path: 'server', exact: true, anonymous: true, anonymousOnly: true },
+      // Client-side premium-style features; the same controls also live in Appearance.
+      { label: 'Mockingbird Blue', path: 'blue', exact: true, anonymous: true },
+      // A Mawkingbird account. `anonymous: true` because the account belongs to
+      // the human, not to a Mastodon persona — the same reasoning that makes the
+      // CORS proxy key account-unscoped in `cors-proxy-settings.ts`.
+      {
+        label: 'Mawkingbird Plus',
+        path: 'mawkingbird-plus',
+        exact: true,
+        anonymous: true,
+        featureFlag: 'mawkingbird-plus',
+        available: this.workos.configured,
+      },
+      // Client-side (localStorage) accounts on other services: Bluesky, GitHub,
+      // Raindrop.io, Dropbox. Not exact — the catalog's child pages live under it.
+      { label: 'Connections', path: 'connections', exact: false, anonymous: true },
+      // Many feeds rather than one account, so deliberately not a "connection".
+      { label: 'RSS feeds', path: 'rss', exact: true, anonymous: true },
+      { label: 'Posting & Privacy', path: 'privacy', exact: true },
+      { label: 'Writing', path: 'writing', exact: true, anonymous: true },
+      // Appearance is client-side (theme/accent/undo-send in localStorage) and works
+      // against any instance; the page hides its server-backed rows off-mock itself.
+      { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },
+      { label: 'Internationalization', path: 'i18n', exact: true, anonymous: true },
+      { label: 'Local storage', path: 'storage', exact: true, anonymous: true },
+      // Path is 'spotlight' on purpose — see the route's comment in app.routes.ts.
+      { label: 'Ads', path: 'spotlight', exact: true, anonymous: true },
+      { label: 'Signed-in accounts', path: 'accounts', exact: true, anonymous: true },
+      { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
+      { label: 'Approve follow requests', path: 'follows', exact: true },
+      { label: 'Muted & Blocked', path: 'moderation', exact: true },
+      // The flipside of the line above — accounts you want *without* a doorway in
+      // front of them — so it sits next to it. Client-side, hence anonymous: true.
+      { label: 'Content warnings', path: 'content', exact: true, anonymous: true },
+      // Sits under the two lists it can empty, and next to the follow-wide
+      // retweet switches, because that is what all four of them operate on.
+      { label: 'Bulk actions', path: 'bulk-actions', exact: true },
+      { label: 'Filters', path: 'filters', exact: false },
+      { label: 'Automatic post deletion', path: 'deletion', exact: true, mockOnly: true },
+      { label: 'Account', path: 'account', exact: true },
+      { label: 'Import/Export Friends', path: 'import-export', exact: true },
+      { label: 'Import/Export Config', path: 'config', exact: true, anonymous: true },
+      // "Invite links", not "Invite people": /invites is the page that invites
+      // people, and two menu entries reading the same thing is a maze.
+      { label: 'Invite links', path: 'invites', exact: true, mockOnly: true },
+      { label: 'Feature flags', path: 'feature-flags', exact: true, anonymous: true },
+      { label: 'Development', path: 'development', exact: true, mockOnly: true },
+    ] satisfies SettingsNavItem[]
+  ).filter(
     (item) =>
       (environment.mockTooling || !item.mockOnly) &&
       (!this.auth.isAnonymous || item.anonymous) &&
-      (this.auth.isAnonymous || !item.anonymousOnly),
+      (this.auth.isAnonymous || !item.anonymousOnly) &&
+      item.available !== false &&
+      (!item.featureFlag || this.flags.enabled(item.featureFlag)),
   );
 }

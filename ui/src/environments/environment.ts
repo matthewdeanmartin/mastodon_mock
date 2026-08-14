@@ -33,4 +33,16 @@ export const environment = {
    * `<origin>/integrations/blogger/callback`.
    */
   bloggerClientId: '',
+  /**
+   * Public WorkOS client id for Mawkingbird accounts, from the WorkOS
+   * dashboard. Public like the two ids above: AuthKit runs as a *public
+   * client*, so PKCE carries the proof and the WorkOS API key (`sk_…`) is
+   * neither needed in the browser nor safe to ship — never put it here.
+   *
+   * Empty disables the account feature entirely, which is the correct setting
+   * for this build: the mock-embedded UI at `/_ui/` is mastodon_mock's own
+   * admin/test surface and has no business signing anyone into a Mawkingbird
+   * account. Only the Mocking Bird flavor fills this in.
+   */
+  workosClientId: '',
 };
