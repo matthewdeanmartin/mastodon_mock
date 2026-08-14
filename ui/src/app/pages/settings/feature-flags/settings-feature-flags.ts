@@ -25,6 +25,7 @@ export class SettingsFeatureFlags {
 
   protected readonly featureFlags = flagsInGroup('features');
   protected readonly connectorFlags = flagsInGroup('connectors');
+  protected readonly proxyFlags = flagsInGroup('proxies');
 
   protected state(flag: FeatureFlagDefinition): FeatureFlagState {
     return this.flags.state(flag.id);

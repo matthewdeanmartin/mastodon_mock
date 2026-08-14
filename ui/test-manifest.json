@@ -1,5 +1,5 @@
 {
-  "testCount": 4158,
+  "testCount": 4162,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -2651,6 +2651,10 @@
     "src/app/providers/cors-proxy/cors-proxy-settings.spec.ts :: headerCapableCorsProxies keeps the proxies verified to forward them",
     "src/app/providers/cors-proxy/cors-proxy-settings.spec.ts :: headerCapableCorsProxies keeps unproven proxies rather than guessing they fail",
     "src/app/providers/cors-proxy/cors-proxy-settings.spec.ts :: headerCapableCorsProxies still honours the development-origin filter",
+    "src/app/providers/cors-proxy/cors-proxy-settings.spec.ts :: proxy feature flags leaves the first-party and custom proxies unflagged",
+    "src/app/providers/cors-proxy/cors-proxy-settings.spec.ts :: proxy feature flags offers only the first-party and bring-your-own proxies by default",
+    "src/app/providers/cors-proxy/cors-proxy-settings.spec.ts :: proxy feature flags ships all four third-party proxies off",
+    "src/app/providers/cors-proxy/cors-proxy-settings.spec.ts :: proxy feature flags stops using a proxy that was selected before its flag was turned off",
     "src/app/providers/cors-proxy/cors-proxy.spec.ts :: assertProxyable allows a different port on the same hostname",
     "src/app/providers/cors-proxy/cors-proxy.spec.ts :: assertProxyable allows an ordinary public feed",
     "src/app/providers/cors-proxy/cors-proxy.spec.ts :: assertProxyable does not mistake a lookalike host for a credential host",

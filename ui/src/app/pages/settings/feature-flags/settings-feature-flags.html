@@ -55,6 +55,37 @@
     }
   </div>
 
+  <div class="ssection" id="proxies">
+    <h2>CORS proxies</h2>
+    <p class="hint">
+      Which public CORS proxies are offered under
+      <a [routerLink]="['/settings/connections/cors-proxy']">Connections → CORS proxy</a>. All four
+      are off by default: each one failed often enough in testing — stripped API keys, aggressive
+      rate limits, domain registration required, or simply very slow — that recommending them made
+      setup look broken. What remains is the Mawkingbird proxy and any proxy you run yourself.
+      Turning one on here adds it back to the picker, with its measured limitations written on the
+      card. Turning one off also stops it being used if it was already selected.
+    </p>
+    @for (flag of proxyFlags; track flag.id) {
+      <div class="srow">
+        <span class="slabel">{{ flag.label }}</span>
+        <div class="scontrol">
+          <select
+            [ngModel]="state(flag)"
+            (ngModelChange)="setState(flag, $event)"
+            [attr.aria-label]="flag.label + ' rollout'"
+          >
+            <option value="production">Production</option>
+            <option value="canary">Canary only</option>
+            <option value="off">Off everywhere</option>
+          </select>
+          <span class="hint">{{ flag.description }}</span>
+          <span class="hint">{{ defaultHint(flag) }}</span>
+        </div>
+      </div>
+    }
+  </div>
+
   <p class="hint">
     Overrides are local to this browser and this published version. When the published hash changes,
     all flags return to the new version's defaults.

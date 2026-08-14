@@ -21,7 +21,11 @@ export type FeatureFlagId =
   | 'connector-dropbox'
   | 'connector-link-shortener'
   | 'connector-cors-proxy'
-  | 'connector-rss';
+  | 'connector-rss'
+  | 'proxy-allorigins'
+  | 'proxy-corssh'
+  | 'proxy-corsfix'
+  | 'proxy-corslol';
 export type FeatureFlagState = 'production' | 'canary' | 'off';
 
 /**
@@ -29,7 +33,7 @@ export type FeatureFlagState = 'production' | 'canary' | 'off';
  * page, never a unit you can switch. An outage is per-vendor, so the switch is
  * per-vendor too.
  */
-export type FeatureFlagGroup = 'features' | 'connectors';
+export type FeatureFlagGroup = 'features' | 'connectors' | 'proxies';
 
 export interface FeatureFlagDefinition {
   id: FeatureFlagId;
@@ -166,7 +170,80 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     defaultState: 'production',
     group: 'connectors',
   },
+  // ------------------------------------------------------------- proxies
+  //
+  // The four public CORS proxies, all defaulting to `off`.
+  //
+  // Not a judgement about the operators — they run free services and mostly do
+  // what they say. It is that recommending them produced a bad experience often
+  // enough that offering them by default was doing users a disservice. Between
+  // them: AllOrigins strips custom headers (so no API key can pass) and was
+  // measured at 26s for a 1s call, and returns 522s under load; cors.lol 429'd
+  // on nearly every request including the first of a session; Corsfix needs the
+  // deployed domain registered before it answers at all; CORS.SH needs a key you
+  // must go and get. Each is a different way for a first-time setup to fail
+  // while looking like the app is broken.
+  //
+  // What is left on by default is the Mawkingbird proxy — destination-scoped,
+  // and answerable to whoever runs it — and "your own proxy", which nobody else
+  // can rate-limit or shut off. Anyone who wants one of these four back can turn
+  // its flag on; the entries and their honest measured copy stay in the catalog
+  // for exactly that.
+  {
+    id: 'proxy-allorigins',
+    label: 'AllOrigins proxy',
+    description:
+      'Offer AllOrigins as a CORS proxy. Strips custom headers, so no API key can travel through it, and it is frequently very slow.',
+    defaultState: 'off',
+    group: 'proxies',
+  },
+  {
+    id: 'proxy-corssh',
+    label: 'CORS.SH proxy',
+    description: 'Offer CORS.SH as a CORS proxy. Requires a free key before it will answer.',
+    defaultState: 'off',
+    group: 'proxies',
+  },
+  {
+    id: 'proxy-corsfix',
+    label: 'Corsfix proxy',
+    description:
+      'Offer Corsfix as a CORS proxy. Fast, but a deployed site must register its domain first or every request is refused.',
+    defaultState: 'off',
+    group: 'proxies',
+  },
+  {
+    id: 'proxy-corslol',
+    label: 'cors.lol proxy',
+    description:
+      'Offer cors.lol as a CORS proxy. No signup, but it rate-limits aggressively — often on the first request of a session.',
+    defaultState: 'off',
+    group: 'proxies',
+  },
 ];
+
+/**
+ * The flag that governs a proxy catalog entry, or null when it has none.
+ *
+ * Only the third-party proxies are flagged. The Mawkingbird proxy and the
+ * bring-your-own entry deliberately have no flag: the first is the default this
+ * app stands behind, and the second is a URL the user typed, which is not ours
+ * to switch off.
+ */
+export function proxyFeatureFlag(proxyId: string): FeatureFlagId | null {
+  switch (proxyId) {
+    case 'allorigins':
+      return 'proxy-allorigins';
+    case 'corssh':
+      return 'proxy-corssh';
+    case 'corsfix':
+      return 'proxy-corsfix';
+    case 'corslol':
+      return 'proxy-corslol';
+    default:
+      return null;
+  }
+}
 
 const VALID_STATES: readonly FeatureFlagState[] = ['production', 'canary', 'off'];
 

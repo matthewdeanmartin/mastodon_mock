@@ -1,4 +1,4 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   credentialExpired,
   credentialExpiresAt,
@@ -13,6 +13,7 @@ import {
   CorsProxyId,
   corsProxyEntry,
 } from './cors-proxy-catalog';
+import { FeatureFlagId, FeatureFlags, proxyFeatureFlag } from '../../feature-flags';
 
 /**
  * Which CORS proxy this browser uses, and the key for it.
@@ -77,13 +78,38 @@ export interface CorsProxyConfig {
 
 @Injectable({ providedIn: 'root' })
 export class CorsProxySettings implements ExpiringConnection {
+  // `optional` because this service is constructed directly (`new
+  // CorsProxySettings()`) in a few specs and utilities, outside any injector.
+  // A missing FeatureFlags there must not throw NG0203; it means "no flag
+  // service available", and the fallback below treats every proxy as offered,
+  // which is the pre-flag behaviour those callers already expect.
+  private flags = inject(FeatureFlags, { optional: true });
   private config = signal<StoredCorsProxyConfig | null>(readConfig());
   private secret = signal<StoredCorsProxyKey | null>(readSecret());
 
-  /** The chosen proxy, or null when the user has not picked one. */
+  /** Whether a proxy id is switched on, tolerating a missing flag service. */
+  private proxyFlagEnabled = (flagId: string): boolean =>
+    this.flags?.enabled(flagId as FeatureFlagId) ?? true;
+
+  /**
+   * The chosen proxy, or null when the user has not picked one — or when the one
+   * they picked is switched off by a feature flag.
+   *
+   * The flag is enforced *here*, on the read every consumer goes through, rather
+   * than only in the picker. A selection stored before the flag was turned off
+   * would otherwise keep relaying traffic through a proxy the app no longer
+   * offers, which is the opposite of what turning it off means. Everything
+   * downstream — `usable`, `resolve()`, and so every proxied request in the app —
+   * inherits the check from this one computed.
+   */
   readonly chosen = computed<CorsProxyEntry | null>(() => {
     const id = this.config()?.id;
-    return id ? (corsProxyEntry(id) ?? null) : null;
+    const entry = id ? (corsProxyEntry(id) ?? null) : null;
+    if (!entry) {
+      return null;
+    }
+    const flag = proxyFeatureFlag(entry.id);
+    return flag === null || this.proxyFlagEnabled(flag) ? entry : null;
   });
 
   /** Whether a proxy is configured well enough to actually be used. */
@@ -221,7 +247,12 @@ export class CorsProxySettings implements ExpiringConnection {
     if (!id) {
       return false;
     }
-    const stillOffered = availableCorsProxies(hostname).some((entry) => entry.id === id);
+    // Also drops a proxy whose feature flag has since been turned off — the flag
+    // is the same "is this offered at all" question, so a selection made before
+    // it was switched off must not survive as a silently-active relay.
+    const stillOffered = availableCorsProxies(hostname, this.proxyFlagEnabled).some(
+      (entry) => entry.id === id,
+    );
     if (stillOffered) {
       return false;
     }

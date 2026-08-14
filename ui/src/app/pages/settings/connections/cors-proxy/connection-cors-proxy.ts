@@ -14,6 +14,7 @@ import { buildProxiedUrl, proxyHeaders } from '../../../../providers/cors-proxy/
 import { externalFetch } from '../../../../providers/external-fetch';
 import { expiryLabel } from '../expiry-label';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
+import { FeatureFlagId, FeatureFlags } from '../../../../feature-flags';
 
 /**
  * A small, stable, genuinely public feed to prove a proxy works.
@@ -74,7 +75,11 @@ export class ConnectionCorsProxy implements OnInit {
   protected readonly expiryLabel = expiryLabel;
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.browser.detail;
   protected readonly isDevOrigin = isDevelopmentOrigin();
-  protected readonly proxies = availableCorsProxies();
+  private readonly flags = inject(FeatureFlags);
+  /** Flagged-off proxies are not offered at all — see `proxyFeatureFlag`. */
+  protected readonly proxies = availableCorsProxies(location.hostname, (id) =>
+    this.flags.enabled(id as FeatureFlagId),
+  );
 
   /** Form state, seeded from storage and written back only on save. */
   protected selectedId = signal<CorsProxyId | null>(this.settings.currentId());

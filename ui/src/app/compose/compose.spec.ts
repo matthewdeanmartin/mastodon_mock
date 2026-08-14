@@ -16,6 +16,7 @@ import { BloggerSession } from '../providers/blogger/blogger-session';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
 import { HugoEdit, HugoEditSession } from '../providers/hugo/hugo-edit-session';
 import { HugoDeployWatch } from '../providers/hugo/hugo-deploy-watch';
+import { enableProxyFlags } from '../testing/enable-proxy-flags';
 
 /** Edit codes are stored apart from the records — see storage-registry.ts. */
 function storedEditKeys(): Record<string, string> {
@@ -104,6 +105,8 @@ describe('Compose', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
     httpMock = TestBed.inject(HttpTestingController);
   });
 

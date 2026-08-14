@@ -7,6 +7,7 @@ import { CorsProxySettings } from '../cors-proxy/cors-proxy-settings';
 import { ShortenerProxyConsent } from './proxy-consent';
 import { ShortenerReachability } from './shortener-reachability';
 import { ShortenerSettings } from './shortener-settings';
+import { enableProxyFlags } from '../../testing/enable-proxy-flags';
 
 describe('ShortenerReachability', () => {
   let reachability: ShortenerReachability;
@@ -19,6 +20,8 @@ describe('ShortenerReachability', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
     reachability = TestBed.inject(ShortenerReachability);
     httpMock = TestBed.inject(HttpTestingController);
     settings = TestBed.inject(ShortenerSettings);

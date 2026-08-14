@@ -142,6 +142,11 @@ export const SHORTENER_CATALOG: readonly ShortenerCatalogEntry[] = [
     freeTier: 'Unlimited links with no account. Links are permanent and cannot be deleted.',
     domainRequired: false,
     domainHint: 'Optional, and only with a token on a paid plan. Leave blank for tinyurl.com.',
+    // Measured 2026-08-14: `api.tinyurl.com` answers a preflight with an ACAO
+    // and `Access-Control-Allow-Headers` naming `Authorization`, and the
+    // anonymous `tinyurl.com/api-create.php` path sends an ACAO too. It needs no
+    // relay, and the Mawkingbird proxy no longer carries it.
+    corsOpen: true,
   },
   {
     id: 'isgd',
@@ -208,6 +213,10 @@ export const SHORTENER_CATALOG: readonly ShortenerCatalogEntry[] = [
     freeTier: '10 links a month on the free plan, on the t.ly domain.',
     domainRequired: false,
     domainHint: 'Optional, and only on paid plans. Leave blank for t.ly.',
+    // Measured 2026-08-14: preflight 204 with an ACAO and
+    // `access-control-allow-headers: authorization`. Browser-reachable with its
+    // key, so it needs no relay and no longer has a proxy route.
+    corsOpen: true,
   },
   {
     id: 'rebrandly',

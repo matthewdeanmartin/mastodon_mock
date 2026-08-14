@@ -9,6 +9,7 @@ import { TwitterApiError } from './twitter-errors';
 import { TwitterSettings } from './twitter-settings';
 import { TwitterUsage } from './twitter-usage';
 import { buildUrl, TwitterProxyRequired, TwitterTransport } from './twitter-transport';
+import { enableProxyFlags } from '../../testing/enable-proxy-flags';
 
 const PROBE = { path: '/twitter/user/info', params: { userName: 'jack' } };
 
@@ -24,6 +25,8 @@ describe('TwitterTransport', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
     transport = TestBed.inject(TwitterTransport);
     httpMock = TestBed.inject(HttpTestingController);
     settings = TestBed.inject(TwitterSettings);

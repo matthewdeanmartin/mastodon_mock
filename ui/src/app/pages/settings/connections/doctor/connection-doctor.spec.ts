@@ -17,6 +17,7 @@ import {
   rowOutcome,
   timingHint,
 } from './connection-doctor-catalog';
+import { enableProxyFlags } from '../../../../testing/enable-proxy-flags';
 
 /** A ProbeResult with the fields a given assertion does not care about filled in. */
 function result(
@@ -53,8 +54,15 @@ describe('ConnectionDoctor (probes)', () => {
     doctor = TestBed.inject(ConnectionDoctor);
   });
 
-  /** Select a real catalog proxy, so the probe builds a real proxied URL. */
+  /**
+   * Select a real catalog proxy, so the probe builds a real proxied URL.
+   *
+   * AllOrigins ships flagged off, so the flag is lifted first — these tests are
+   * about the doctor's proxy leg, not about which vendor is offered. See
+   * `enable-proxy-flags.ts`.
+   */
   function configureProxy(): void {
+    enableProxyFlags();
     TestBed.inject(CorsProxySettings).select('allorigins');
   }
 

@@ -5,6 +5,7 @@ import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-s
 import { Server } from '../../../../server';
 import { ConnectionDoctorPage } from './connection-doctor-page';
 import { PROBE_TARGETS } from './connection-doctor-catalog';
+import { enableProxyFlags } from '../../../../testing/enable-proxy-flags';
 
 describe('ConnectionDoctorPage', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -14,6 +15,8 @@ describe('ConnectionDoctorPage', () => {
     fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })));
     vi.stubGlobal('fetch', fetchMock);
     TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
   });
 
   afterEach(() => {

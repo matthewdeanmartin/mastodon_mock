@@ -10,6 +10,7 @@ import { LinkProviderError } from './shortener-errors';
 import { ShortenerSettings } from './shortener-settings';
 import { ProxyConsentRequired } from './shortener-transport';
 import { TinyurlShortenerProvider } from './tinyurl-shortener-provider';
+import { enableProxyFlags } from '../../testing/enable-proxy-flags';
 
 /**
  * The two providers that work without an account, and the consequences that has
@@ -26,6 +27,8 @@ describe('key-less shorteners', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
     httpMock = TestBed.inject(HttpTestingController);
     settings = TestBed.inject(ShortenerSettings);
     tinyurl = TestBed.inject(TinyurlShortenerProvider);

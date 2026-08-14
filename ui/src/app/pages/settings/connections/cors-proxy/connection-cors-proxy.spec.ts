@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import { ConnectionCorsProxy } from './connection-cors-proxy';
+import { enableProxyFlags } from '../../../../testing/enable-proxy-flags';
 
 describe('ConnectionCorsProxy', () => {
   let fixture: ComponentFixture<ConnectionCorsProxy>;
@@ -17,6 +18,8 @@ describe('ConnectionCorsProxy', () => {
       imports: [ConnectionCorsProxy],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
     fixture = TestBed.createComponent(ConnectionCorsProxy);
     settings = TestBed.inject(CorsProxySettings);
     httpMock = TestBed.inject(HttpTestingController);

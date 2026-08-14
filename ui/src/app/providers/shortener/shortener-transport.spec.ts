@@ -8,6 +8,7 @@ import { ShortenerProxyConsent } from './proxy-consent';
 import { LinkProviderError } from './shortener-errors';
 import { ShortenerSettings } from './shortener-settings';
 import { ProxyConsentRequired, ShortenerTransport } from './shortener-transport';
+import { enableProxyFlags } from '../../testing/enable-proxy-flags';
 
 describe('ShortenerTransport', () => {
   let transport: ShortenerTransport;
@@ -21,6 +22,8 @@ describe('ShortenerTransport', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
     transport = TestBed.inject(ShortenerTransport);
     httpMock = TestBed.inject(HttpTestingController);
     settings = TestBed.inject(ShortenerSettings);

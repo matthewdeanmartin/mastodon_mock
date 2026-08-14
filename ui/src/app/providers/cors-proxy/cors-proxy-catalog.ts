@@ -1,3 +1,5 @@
+import { proxyFeatureFlag } from '../../feature-flags';
+
 /**
  * The catalog of CORS proxies the RSS reader (and, later, article extraction)
  * can fall back to when a source refuses browser access.
@@ -187,8 +189,7 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
   {
     id: 'mawkingbird',
     label: 'Mawkingbird proxy',
-    pitch:
-      "Run by this app, for this app. No signup, no key. Please see ToS below.",
+    pitch: 'Run by this app, for this app. No signup, no key. Please see ToS below.',
     template: {
       // `{route}` names the policy the proxy should apply; `{url}` is the
       // target. Both are substituted by `buildProxiedUrl`.
@@ -362,8 +363,11 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
  */
 export function headerCapableCorsProxies(
   hostname: string = location.hostname,
+  isFlagEnabled: (flagId: string) => boolean = () => false,
 ): readonly CorsProxyEntry[] {
-  return availableCorsProxies(hostname).filter((entry) => entry.forwardsCustomHeaders !== false);
+  return availableCorsProxies(hostname, isFlagEnabled).filter(
+    (entry) => entry.forwardsCustomHeaders !== false,
+  );
 }
 
 export function corsProxyEntry(id: CorsProxyId): CorsProxyEntry | undefined {
@@ -388,10 +392,32 @@ export function isDevelopmentOrigin(hostname: string = location.hostname): boole
   );
 }
 
-/** The proxies worth showing here: everything, minus dev-only ones in production. */
+/**
+ * The proxies worth showing here: everything, minus dev-only ones in production
+ * and minus any whose feature flag is off.
+ *
+ * The flag check is a parameter rather than an injected service because this is
+ * a pure catalog function called from several places, including one that runs
+ * outside an injection context. Callers that have `FeatureFlags` pass
+ * `(id) => flags.enabled(id)`; the default leaves every flagged proxy hidden,
+ * which is the safe direction — a caller that forgets cannot accidentally offer
+ * a proxy the user switched off.
+ *
+ * This is the single chokepoint for "may this proxy be used at all": the picker
+ * renders from it, and {@link CorsProxySettings.dropUnavailableSelection}
+ * deselects anything it no longer returns, so turning a flag off also unsticks a
+ * proxy that was already selected.
+ */
 export function availableCorsProxies(
   hostname: string = location.hostname,
+  isFlagEnabled: (flagId: string) => boolean = () => false,
 ): readonly CorsProxyEntry[] {
   const local = isDevelopmentOrigin(hostname);
-  return CORS_PROXY_CATALOG.filter((entry) => local || !entry.devOnly);
+  return CORS_PROXY_CATALOG.filter((entry) => {
+    if (!local && entry.devOnly) {
+      return false;
+    }
+    const flag = proxyFeatureFlag(entry.id);
+    return flag === null || isFlagEnabled(flag);
+  });
 }

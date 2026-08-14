@@ -7,6 +7,8 @@ import {
   headerCapableCorsProxies,
   isDevelopmentOrigin,
 } from './cors-proxy-catalog';
+import { enableProxyFlags } from '../../testing/enable-proxy-flags';
+import { FEATURE_FLAGS, FeatureFlags, proxyFeatureFlag } from '../../feature-flags';
 
 describe('CorsProxySettings', () => {
   let settings: CorsProxySettings;
@@ -14,6 +16,9 @@ describe('CorsProxySettings', () => {
   beforeEach(() => {
     localStorage.clear();
     TestBed.configureTestingModule({});
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    // mechanics; those vendors ship flagged off. See enable-proxy-flags.ts.
+    enableProxyFlags();
     settings = TestBed.inject(CorsProxySettings);
   });
 
@@ -66,7 +71,11 @@ describe('CorsProxySettings', () => {
     stored.connectedAt = Date.now() - 400 * 24 * 60 * 60 * 1000;
     localStorage.setItem('mockingbird_cors_proxy_key', JSON.stringify(stored));
 
-    const fresh = new CorsProxySettings();
+    // Re-resolved through the injector rather than `new`: the service injects
+    // FeatureFlags, and `inject()` needs an injection context to run in.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const fresh = TestBed.inject(CorsProxySettings);
     expect(fresh.hasKey()).toBe(false);
     // The choice survives: the user re-pastes a key, they don't reconfigure.
     expect(fresh.currentId()).toBe('corssh');
@@ -105,12 +114,16 @@ describe('CorsProxySettings', () => {
 
   it('ignores a stored id the app no longer ships', () => {
     localStorage.setItem('mockingbird_cors_proxy', JSON.stringify({ id: 'defunct-proxy' }));
-    expect(new CorsProxySettings().currentId()).toBeNull();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(CorsProxySettings).currentId()).toBeNull();
   });
 
   it('survives a corrupt config blob', () => {
     localStorage.setItem('mockingbird_cors_proxy', 'not json');
-    expect(new CorsProxySettings().currentId()).toBeNull();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    expect(TestBed.inject(CorsProxySettings).currentId()).toBeNull();
   });
 
   // corsproxy-io, not corsfix: Corsfix stopped being localhost-only once
@@ -137,9 +150,19 @@ describe('CorsProxySettings', () => {
   });
 });
 
+/**
+ * Every third-party proxy ships flagged off, so `availableCorsProxies` hides
+ * them unless told otherwise. These tests are about the *other* filter — the
+ * devOnly/localhost rule — so they pass an all-on predicate to isolate it.
+ * `flagsOff` below covers the flag filter itself.
+ */
+const allFlagsOn = () => true;
+
 describe('availableCorsProxies', () => {
   it('hides localhost-only proxies on a deployed origin', () => {
-    const ids = availableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    const ids = availableCorsProxies('mockingbird.example.com', allFlagsOn).map(
+      (entry) => entry.id,
+    );
     expect(ids).toContain('allorigins');
     expect(ids).toContain('custom');
     expect(ids).not.toContain('corsproxy-io');
@@ -149,12 +172,14 @@ describe('availableCorsProxies', () => {
     // It used to be marked devOnly and hidden here. That was wrong: localhost is
     // merely allowed *implicitly*, and a registered domain works from anywhere.
     // Hiding it in production hid the fastest free option there is.
-    const ids = availableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    const ids = availableCorsProxies('mockingbird.example.com', allFlagsOn).map(
+      (entry) => entry.id,
+    );
     expect(ids).toContain('corsfix');
   });
 
   it('offers everything under ng serve', () => {
-    const ids = availableCorsProxies('localhost').map((entry) => entry.id);
+    const ids = availableCorsProxies('localhost', allFlagsOn).map((entry) => entry.id);
     expect(ids).toContain('corsfix');
     expect(ids).toContain('corsproxy-io');
   });
@@ -173,14 +198,18 @@ describe('headerCapableCorsProxies', () => {
   // only bites when an API key must ride along. Measurements behind the values:
   // sprint/twitter-1-transport.md.
   it('excludes a proxy measured to strip custom headers', () => {
-    const ids = headerCapableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    const ids = headerCapableCorsProxies('mockingbird.example.com', allFlagsOn).map(
+      (entry) => entry.id,
+    );
     // AllOrigins fetches public feeds fine but drops X-API-Key, so the target
     // answers "no key supplied" and the user blames their own key.
     expect(ids).not.toContain('allorigins');
   });
 
   it('keeps the proxies verified to forward them', () => {
-    const ids = headerCapableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    const ids = headerCapableCorsProxies('mockingbird.example.com', allFlagsOn).map(
+      (entry) => entry.id,
+    );
     expect(ids).toContain('corssh');
     expect(ids).toContain('corsfix');
   });
@@ -188,13 +217,17 @@ describe('headerCapableCorsProxies', () => {
   it('keeps unproven proxies rather than guessing they fail', () => {
     // `custom` is whatever the user deployed. Excluding it would remove the one
     // option nobody can rate-limit, on a guess.
-    const ids = headerCapableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    const ids = headerCapableCorsProxies('mockingbird.example.com', allFlagsOn).map(
+      (entry) => entry.id,
+    );
     expect(ids).toContain('custom');
     expect(corsProxyEntry('custom')!.forwardsCustomHeaders).toBeUndefined();
   });
 
   it('still honours the development-origin filter', () => {
-    const ids = headerCapableCorsProxies('mockingbird.example.com').map((entry) => entry.id);
+    const ids = headerCapableCorsProxies('mockingbird.example.com', allFlagsOn).map(
+      (entry) => entry.id,
+    );
     expect(ids).not.toContain('corsproxy-io');
   });
 });
@@ -212,7 +245,9 @@ describe('catalog facts measured against live proxies', () => {
     const corslol = corsProxyEntry('corslol')!;
     expect(corslol.forwardsCustomHeaders).toBeUndefined();
     expect(corslol.keyRequired).toBeUndefined();
-    expect(availableCorsProxies('mockingbird.example.com').map((e) => e.id)).toContain('corslol');
+    expect(availableCorsProxies('mockingbird.example.com', allFlagsOn).map((e) => e.id)).toContain(
+      'corslol',
+    );
   });
 
   it('records Corsfix as allowlist-based rather than localhost-only', () => {
@@ -222,5 +257,59 @@ describe('catalog facts measured against live proxies', () => {
     // The 403 it returns for an unregistered origin is a setup step, and the UI
     // needs somewhere to send the user.
     expect(corsfix.originAllowlist?.dashboardUrl).toBeTruthy();
+  });
+});
+
+describe('proxy feature flags', () => {
+  /**
+   * The four public proxies ship off. Between them they strip API keys, rate-limit
+   * on the first request, require domain registration, or take 26s — each a
+   * different way for setup to look broken. What is left is the Mawkingbird proxy
+   * and a proxy the user runs themselves.
+   */
+  it('offers only the first-party and bring-your-own proxies by default', () => {
+    const ids = availableCorsProxies(
+      'mockingbird.example.com',
+      (flagId) =>
+        // Stand in for FeatureFlags at its shipped defaults.
+        FEATURE_FLAGS.find((flag) => flag.id === flagId)?.defaultState === 'production',
+    ).map((entry) => entry.id);
+
+    expect(ids).toEqual(['mawkingbird', 'custom']);
+  });
+
+  it('ships all four third-party proxies off', () => {
+    for (const id of ['proxy-allorigins', 'proxy-corssh', 'proxy-corsfix', 'proxy-corslol']) {
+      const flag = FEATURE_FLAGS.find((f) => f.id === id);
+      expect(flag, id).toBeDefined();
+      expect(flag!.defaultState, id).toBe('off');
+    }
+  });
+
+  // The first-party entries must never acquire a flag by accident: the
+  // Mawkingbird proxy is the default this app stands behind, and `custom` is a
+  // URL the user typed, which is not ours to switch off.
+  it('leaves the first-party and custom proxies unflagged', () => {
+    expect(proxyFeatureFlag('mawkingbird')).toBeNull();
+    expect(proxyFeatureFlag('custom')).toBeNull();
+  });
+
+  /**
+   * The important half: turning a flag off must also stop a proxy that was
+   * already selected. Enforced on `chosen()`, which every consumer reads through,
+   * so `resolve()` and every proxied request in the app inherit it.
+   */
+  it('stops using a proxy that was selected before its flag was turned off', () => {
+    const flags = TestBed.inject(FeatureFlags);
+    flags.setState('proxy-allorigins', 'production');
+    const settings = TestBed.inject(CorsProxySettings);
+    settings.select('allorigins');
+    expect(settings.resolve()).not.toBeNull();
+
+    flags.setState('proxy-allorigins', 'off');
+
+    expect(settings.chosen()).toBeNull();
+    expect(settings.resolve()).toBeNull();
+    expect(settings.usable()).toBe(false);
   });
 });

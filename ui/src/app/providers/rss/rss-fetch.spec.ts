@@ -9,6 +9,7 @@ import { Server } from '../../server';
 import { CachedFeed, CachedFeedRecord, RssCache } from './rss-cache';
 import { RssFetch } from './rss-fetch';
 import { ParsedFeed } from './rss-parser';
+import { enableProxyFlags } from '../../testing/enable-proxy-flags';
 
 const FEED_XML = `<?xml version="1.0"?><rss><channel><title>A Feed</title></channel></rss>`;
 
@@ -103,6 +104,8 @@ describe('RssFetch', () => {
         { provide: RssCache, useValue: cache },
       ],
     });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
     fetcher = TestBed.inject(RssFetch);
     http = TestBed.inject(HttpTestingController);
     settings = TestBed.inject(CorsProxySettings);

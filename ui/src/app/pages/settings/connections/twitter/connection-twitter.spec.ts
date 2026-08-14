@@ -7,6 +7,7 @@ import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-s
 import { ProxyConsent } from '../../../../providers/proxy-consent-store';
 import { TwitterSettings } from '../../../../providers/twitter/twitter-settings';
 import { ConnectionTwitter } from './connection-twitter';
+import { enableProxyFlags } from '../../../../testing/enable-proxy-flags';
 
 describe('ConnectionTwitter', () => {
   let fixture: ComponentFixture<ConnectionTwitter>;
@@ -21,6 +22,8 @@ describe('ConnectionTwitter', () => {
       imports: [ConnectionTwitter],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
+    // These specs use a third-party proxy as the vehicle for testing proxy
+    enableProxyFlags();
     fixture = TestBed.createComponent(ConnectionTwitter);
     settings = TestBed.inject(TwitterSettings);
     proxySettings = TestBed.inject(CorsProxySettings);
