@@ -201,32 +201,54 @@ describe('key-less shorteners', () => {
     });
   });
 
-  describe('proxying a key-less request', () => {
-    it('requires URL-disclosure consent, then uses the ordinary proxy path', async () => {
+  describe('when a key-less request fails opaquely', () => {
+    /**
+     * This used to assert the opposite — that an opaque failure prompted for
+     * URL-disclosure consent and then retried through the proxy. That behaviour
+     * was built on the belief that is.gd refuses browsers, which measurement
+     * disproved: it answers `Access-Control-Allow-Origin: *` on success *and* on
+     * its documented JSON errors. The one response that omits the header is an
+     * undocumented plain-text `Error, database insert failed`, emitted while its
+     * database was broken.
+     *
+     * So the proxy was only ever offered when the service was down — the one
+     * situation a relay cannot help with. Worse, the app's own proxy has no route
+     * to is.gd and answered `403`, which surfaced as "This key is not allowed to
+     * do that" for a service that has no keys.
+     */
+    it('does not offer a proxy, because this service answers browsers directly', async () => {
       TestBed.inject(CorsProxySettings).select('allorigins');
       settings.activate('isgd');
-      const consent = TestBed.inject(ShortenerProxyConsent);
-      expect(consent.granted('isgd', 'allorigins')).toBe(false);
+      // Consent granted up front, so the assertion below cannot be explained by
+      // a missing permission.
+      TestBed.inject(ShortenerProxyConsent).grant('isgd', 'allorigins');
 
-      const blocked = firstValueFrom(isgd.createLink({ destinationUrl: 'https://example.com/x' }));
+      const attempt = firstValueFrom(isgd.createLink({ destinationUrl: 'https://example.com/x' }));
       httpMock
         .expectOne((r) => r.url.startsWith('https://is.gd/create.php'))
         .error(new ProgressEvent('error'), { status: 0 });
-      const error = (await blocked.catch((value: unknown) => value)) as ProxyConsentRequired;
-      expect(error).toBeInstanceOf(ProxyConsentRequired);
-      expect(error.carriesCredential).toBe(false);
+
+      const error = (await attempt.catch((value: unknown) => value)) as LinkProviderError;
+      expect(error).not.toBeInstanceOf(ProxyConsentRequired);
+      expect(error.code).toBe('PROVIDER_UNAVAILABLE');
+      // Says what it does not know, and does not send the user to configure a
+      // workaround for a problem they do not have.
+      expect(error.message).not.toMatch(/CORS proxy is needed|set (one|a proxy) up/i);
       httpMock.expectNone((r) => r.url.startsWith('https://api.allorigins.win/raw'));
+    });
 
-      consent.grant('isgd', 'allorigins');
-      const retried = firstValueFrom(isgd.createLink({ destinationUrl: 'https://example.com/x' }));
+    /** The outage itself, once it is readable rather than opaque. */
+    it('names the database failure rather than reporting a generic error', async () => {
+      settings.activate('isgd');
+
+      const attempt = firstValueFrom(isgd.createLink({ destinationUrl: 'https://example.com/x' }));
       httpMock
         .expectOne((r) => r.url.startsWith('https://is.gd/create.php'))
-        .error(new ProgressEvent('error'), { status: 0 });
+        .flush('Error, database insert failed');
 
-      const proxied = httpMock.expectOne((r) => r.url.startsWith('https://api.allorigins.win/raw'));
-      proxied.flush({ shorturl: 'https://is.gd/abc123' });
-
-      expect((await retried).shortUrl).toBe('https://is.gd/abc123');
+      const error = (await attempt.catch((value: unknown) => value)) as LinkProviderError;
+      expect(error.code).toBe('PROVIDER_UNAVAILABLE');
+      expect(error.message).toMatch(/database/i);
     });
   });
 });

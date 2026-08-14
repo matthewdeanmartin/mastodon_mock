@@ -46,6 +46,25 @@
           {{ bulk.running() ? 'Working…' : 'Follow everyone in this collection' }}
         </button>
       }
+      <!-- Shipped kits follow through the importer instead: their ids are
+           foreign, so each member is resolved (or, anonymously, taken straight
+           from the snapshot) rather than followed by id. Offered to anonymous
+           visitors too — the follow is a browser-local row. -->
+      @if (canFollowKit()) {
+        <button
+          class="btn btn-outline"
+          [disabled]="importer.running() || kitFollowDone() === members().length"
+          (click)="followAllShipped()"
+        >
+          @if (importer.running()) {
+            Following… {{ kitFollowDone() }}/{{ members().length }}
+          } @else if (kitFollowDone() === members().length) {
+            Followed {{ kitFollowed() }} of {{ members().length }}
+          } @else {
+            Follow everyone in this collection
+          }
+        </button>
+      }
       @if (isOwner()) {
         <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
         <button class="btn btn-outline danger" (click)="showDeleteConfirm.set(true)">
@@ -57,6 +76,9 @@
         </button>
       }
     </div>
+    @if (kitFollowError(); as message) {
+      <p class="muted small" role="status">{{ message }}</p>
+    }
   </div>
 
   @if (!shipped()) {
@@ -168,6 +190,7 @@
               class="avatar"
               [src]="a.avatar_static || a.avatar"
               [alt]="a.username"
+              [appAvatarFallback]="a.display_name || a.acct"
               loading="lazy"
               decoding="async"
             />
@@ -265,10 +288,14 @@
 }
 
 <ng-template #memberIdentity let-account>
+  <!-- A shipped collection's avatars are absolute CDN URLs frozen into the
+       snapshot; when files.mastodon.social is blocked, every one of them breaks
+       at once. Initials keep the member list legible. -->
   <img
     class="avatar"
     [src]="account.avatar_static || account.avatar"
     [alt]="account.username"
+    [appAvatarFallback]="account.display_name || account.acct"
     loading="lazy"
     decoding="async"
   />

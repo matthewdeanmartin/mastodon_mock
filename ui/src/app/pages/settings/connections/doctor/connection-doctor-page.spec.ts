@@ -67,8 +67,10 @@ describe('ConnectionDoctorPage', () => {
     // Two per host: reachability, then readability. No third leg here, since
     // everything is readable and a proxy would add nothing.
     expect(fetchMock).toHaveBeenCalledTimes(PROBE_TARGETS.length * 2);
-    expect(rowFor(fixture, 'openrouter.ai').textContent).toContain('Reachable');
-    expect(el(fixture).textContent).toContain(`${PROBE_TARGETS.length} reachable, 0 blocked`);
+    // The headline answers "can I use this?", not "did bytes arrive" — a
+    // directly-readable host is plainly "Working".
+    expect(rowFor(fixture, 'openrouter.ai').textContent).toContain('Working');
+    expect(el(fixture).textContent).toContain(`${PROBE_TARGETS.length} working`);
   });
 
   it('offers the tab test only for hosts that failed', async () => {

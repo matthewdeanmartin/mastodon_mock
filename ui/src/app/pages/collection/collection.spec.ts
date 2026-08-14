@@ -7,7 +7,12 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { FollowState } from '../../follow-state';
+import { ImportFollows } from '../../import-follows';
 import { Account, CollectionItem, CollectionWithAccounts, Status } from '../../models';
+import {
+  AnonymousFollows,
+  ANONYMOUS_FOLLOW_LIMIT,
+} from '../../providers/anonymous/anonymous-follows';
 import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 import { CollectionPage } from './collection';
 
@@ -205,6 +210,41 @@ describe('CollectionPage', () => {
     );
     expect(tabs).toEqual(['Collection', 'Posts']);
     expect((fixture.nativeElement as HTMLElement).querySelector('.sample-box')).toBeNull();
+  });
+
+  /**
+   * The gap this closes: a bundled *starter kit* has always offered anonymous
+   * one-click follow-everyone, while the bundled *collections* — the same kind
+   * of snapshot, carrying the same resolved accounts — offered nothing. The
+   * server-side bulk runner cannot do it (a kit's ids are foreign), so this goes
+   * through ImportFollows, which writes browser-local rows.
+   */
+  it('lets an anonymous visitor follow everyone in a bundled collection', async () => {
+    const kit = SHIPPED_STARTER_KITS[0];
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { paramMap: of(convertToParamMap({ id: kit.id })) },
+    });
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+
+    const fixture = setUp();
+    // Component-scoped provider: this page has its own importer.
+    const importer = fixture.debugElement.injector.get(ImportFollows);
+    importer.delayMs = 0;
+
+    const button = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+      (b) => b.textContent?.includes('Follow everyone in this collection'),
+    ) as HTMLButtonElement;
+    expect(button).toBeDefined();
+
+    button.click();
+    await vi.waitFor(() => expect(importer.running()).toBe(false));
+    fixture.detectChanges();
+
+    // The snapshot carries resolved accounts, so nothing is searched for.
+    expect(TestBed.inject(AnonymousFollows).count()).toBe(
+      Math.min(kit.itemCount, ANONYMOUS_FOLLOW_LIMIT),
+    );
+    httpMock.expectNone((request) => request.url.includes('/api/v2/search'));
   });
 
   // A preview used to link its members straight to the origin instance, which

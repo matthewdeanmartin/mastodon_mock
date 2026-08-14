@@ -4,13 +4,14 @@ import { firstValueFrom } from 'rxjs';
 import { AccountHoverCard } from '../account-hover-card/account-hover-card';
 import { Api } from '../api';
 import { Auth } from '../auth';
+import { AvatarFallback } from '../avatar-fallback';
 import { ImportFollows } from '../import-follows';
 import { Account } from '../models';
 import { ShippedStarterKit } from '../starter-kits';
 
 @Component({
   selector: 'app-starter-kit-post',
-  imports: [AccountHoverCard, RouterLink],
+  imports: [AccountHoverCard, AvatarFallback, RouterLink],
   providers: [ImportFollows],
   templateUrl: './starter-kit-post.html',
   styleUrl: './starter-kit-post.css',
@@ -37,8 +38,25 @@ export class StarterKitPost implements OnInit {
     () => this.importer.rows().filter((row) => row.status === 'followed').length,
   );
 
+  /** First real failure reason, or empty. Usually the anonymous follow cap. */
+  protected readonly followError = computed(
+    () => this.importer.rows().find((row) => row.status === 'failed')?.error ?? '',
+  );
+
   ngOnInit(): void {
-    if (!this.auth.isAnonymous) {
+    // Component-scoped importer (see `providers` above), so each card on the
+    // bundled-collections page tracks its own kit. Reset guards a reused
+    // instance from inheriting another kit's rows.
+    this.importer.reset();
+    // Anonymous sessions load the snapshot accounts directly. A shipped kit
+    // already carries the resolved `Account` for every member, so following
+    // them needs no search and no token — the same path the starter collection
+    // page has always taken.
+    if (this.auth.isAnonymous) {
+      this.importer.loadResolved(
+        this.kit().accounts.map((account) => ({ handle: account.acct, account })),
+      );
+    } else {
       this.importer.load(this.kit().accounts.map((account) => account.acct));
     }
   }

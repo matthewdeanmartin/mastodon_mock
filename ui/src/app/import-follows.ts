@@ -243,7 +243,15 @@ function describeHttpError(err: unknown): string {
   if (status === 429) {
     return 'Rate limited — try again later.';
   }
-  return status ? `Request failed (HTTP ${status}).` : 'Request failed.';
+  if (status) {
+    return `Request failed (HTTP ${status}).`;
+  }
+  // Not every failure here is an HTTP one. The anonymous follow cap is a plain
+  // Error carrying the only text that explains why the run stopped, and
+  // flattening it to "Request failed." threw away the reason — which reads as a
+  // bug rather than a limit.
+  const message = err instanceof Error ? err.message.trim() : '';
+  return message || 'Request failed.';
 }
 
 function sleep(ms: number): Promise<void> {

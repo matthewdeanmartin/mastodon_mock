@@ -31,7 +31,20 @@ export const appConfig: ApplicationConfig = {
       routes,
       withPreloading(SettingsPreloading),
       // Enables fragment scrolling (e.g. /credits#privacy from the footer).
-      withInMemoryScrolling({ anchorScrolling: 'enabled' }),
+      //
+      // `scrollPositionRestoration: 'top'` is the other half, and its absence was
+      // a real bug rather than a nicety: the option defaults to `'disabled'`,
+      // which means Angular never touches scroll on navigation at all. So
+      // clicking a link two screens down a long page landed you two screens down
+      // the *next* page — most visibly in Settings, where the sidebar is tall
+      // enough that a tab click from the bottom of Connections dropped you at the
+      // bottom of the next tab, below the button you went there to press.
+      //
+      // 'top' rather than 'enabled': 'enabled' restores the previous offset on
+      // back/forward, which is right for a feed you are returning to but wrong
+      // here, where every settings tab is a fresh page. Pages that need to
+      // restore their own position (search) do it themselves.
+      withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'top' }),
     ),
     // metricsInterceptor is outermost so it times the full round-trip (including
     // the server/auth rewrites) and sees the final response/error.

@@ -1,0 +1,36 @@
+<div class="overlay" role="presentation" tabindex="-1">
+  <!--
+    No click-outside-to-dismiss and no Escape (`[dismissOnEscape]="false"`):
+    there is nothing behind this dialog to go back to. It appears precisely
+    because the app has no reachable server, so an accidental dismissal drops
+    the visitor onto the fail whale this exists to prevent. Leaving is still
+    possible, but has to be chosen.
+  -->
+  <div
+    class="dialog"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="unreachable-title"
+    appFocusTrap
+    [appFocusTrapCloseOnEscape]="false"
+  >
+    <h3 id="unreachable-title">{{ attemptedHost() }} isn’t reachable</h3>
+    <p class="muted small">
+      It may be blocked on this network, or having a bad day. Mawkingbird reads from any Mastodon
+      server, so it’s looking for one that answers — you don’t need an account on it to read.
+    </p>
+
+    <app-server-discovery
+      [autoStart]="true"
+      [currentServer]="attemptedServer()"
+      startLabel="Find a server I can read"
+      (selected)="selected.emit($event)"
+    />
+
+    <div class="unreachable-actions">
+      <button class="text-button" type="button" (click)="cancelled.emit()">
+        Skip — I’ll sign in instead
+      </button>
+    </div>
+  </div>
+</div>

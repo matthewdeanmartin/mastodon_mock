@@ -19,8 +19,17 @@
     {{ doctor.running() ? 'Checking…' : hasRun() ? 'Check again' : 'Check all connections' }}
   </button>
   @if (hasRun() && !doctor.running()) {
+    <!-- Counted by usability, matching the rows. "Working" includes hosts
+         reached through a proxy, because they work. -->
     <p class="muted small doc-summary">
-      {{ reachableCount() }} reachable, {{ blockedCount() }} blocked or unreachable.
+      {{ workingCount() }} working
+      @if (needsSetupCount()) {
+        , {{ needsSetupCount() }} need a proxy
+      }
+      @if (blockedCount()) {
+        , {{ blockedCount() }} blocked or unreachable
+      }
+      .
     </p>
   }
 </section>
@@ -38,9 +47,17 @@
     <h2 class="section-title">{{ group.label }}</h2>
     <ul class="doc-rows">
       @for (row of group.rows; track row.target.id) {
+        <!--
+          One colour per row, driven by `outcome` — "can I use this?" — rather
+          than by three sub-signals each colouring itself. A host that works
+          through a configured proxy used to render amber (CORS blocked) beside
+          green (proxy works), which scans as a problem when the answer is
+          simply yes.
+        -->
         <li
           class="doc-row"
-          [class.doc-row-bad]="row.verdict === 'failed' || row.verdict === 'timeout'"
+          [class.doc-row-bad]="row.outcome === 'unusable'"
+          [class.doc-row-warn]="row.outcome === 'needs-setup'"
         >
           <div class="doc-row-head">
             <span class="doc-host">
@@ -53,26 +70,32 @@
               }
               <span
                 class="doc-verdict"
-                [class.doc-ok]="row.verdict === 'reachable'"
-                [class.doc-bad]="row.verdict === 'failed' || row.verdict === 'timeout'"
+                [class.doc-ok]="row.outcome === 'usable'"
+                [class.doc-warn]="row.outcome === 'needs-setup'"
+                [class.doc-bad]="row.outcome === 'unusable'"
               >
-                {{ verdictLabel(row.verdict) }}
+                {{ row.outcomeLabel }}
               </span>
             </span>
           </div>
           <p class="muted small doc-matters">{{ row.target.matters }}</p>
 
+          <!--
+            Explanations, not verdicts. These only carry colour when they are
+            still an open problem: once the row is `usable`, how the bytes got
+            there is detail, and colouring it amber would contradict the green
+            headline directly above.
+          -->
           @if (row.corsHint; as hint) {
-            <p class="small doc-cors" [class.doc-cors-blocked]="row.corsBlocked">{{ hint }}</p>
-          }
-          @if (row.proxyHint; as hint) {
             <p
-              class="small doc-proxy"
-              [class.doc-proxy-ok]="row.proxyWorks"
-              [class.doc-cors-blocked]="row.proxyRefused"
+              class="small doc-cors"
+              [class.doc-cors-blocked]="row.corsBlocked && row.outcome !== 'usable'"
             >
               {{ hint }}
             </p>
+          }
+          @if (row.proxyHint; as hint) {
+            <p class="small doc-proxy" [class.doc-cors-blocked]="row.proxyRefused">{{ hint }}</p>
           }
           @if (row.timingHint; as hint) {
             <p class="muted small doc-timing-hint">{{ hint }}</p>
@@ -89,7 +112,13 @@
             </p>
           }
 
-          @if (row.verdict === 'failed' || row.verdict === 'timeout') {
+          <!-- Gated on outcome, not the raw verdict: a host the browser cannot
+               reach directly but the proxy does reach is working, and asking the
+               user to go diagnose it in a tab would be busywork about a problem
+               they do not have. -->
+          @if (
+            row.outcome === 'unusable' && (row.verdict === 'failed' || row.verdict === 'timeout')
+          ) {
             <div class="doc-followup">
               <p class="small">
                 Your browser could not fetch this in the background — but that alone cannot tell a

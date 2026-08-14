@@ -7,12 +7,14 @@ import {
   CorsReadable,
   homeServerTarget,
   interpret,
+  outcomeLabel,
   ProbeResult,
   PROBE_TARGETS,
   ProbeTarget,
   ProbeVerdict,
   proxyHint,
   ProxyVerdict,
+  rowOutcome,
   timingHint,
 } from './connection-doctor-catalog';
 
@@ -529,5 +531,191 @@ describe('interpret', () => {
     // A firewall discarding packets and a slow host are genuinely
     // indistinguishable, and the copy has to say so.
     expect(interpret('timeout', 'timed-out')).toContain('looks the same');
+  });
+});
+
+describe('rowOutcome', () => {
+  /**
+   * Object-override rather than the positional `result` above: these assertions
+   * turn on the *combination* of cors and proxy, and naming the fields is what
+   * makes each case readable.
+   */
+  function probe(over: Partial<ProbeResult>): ProbeResult {
+    return {
+      verdict: 'reachable',
+      cors: 'readable',
+      proxy: 'not-needed',
+      ms: 100,
+      proxyMs: null,
+      ...over,
+    };
+  }
+
+  /**
+   * The reported bug, stated as a test. A host that is unreadable directly but
+   * fetched fine through the configured proxy rendered amber ("blocked") beside
+   * green ("proxy works") — two true statements that together scan as "is this
+   * okay or not?". Reached through a relay is still reached.
+   */
+  it('is usable when a proxy got through, even though CORS blocked', () => {
+    const proxied = probe({ cors: 'blocked', proxy: 'works', proxyMs: 250 });
+
+    expect(rowOutcome(proxied)).toBe('usable');
+    // And the headline names the route, because "works directly" and "works via
+    // a proxy" fail differently later.
+    expect(outcomeLabel(rowOutcome(proxied), proxied)).toBe('Working (via proxy)');
+  });
+
+  it('is usable, unqualified, when the host is directly readable', () => {
+    const direct = probe({});
+
+    expect(rowOutcome(direct)).toBe('usable');
+    expect(outcomeLabel(rowOutcome(direct), direct)).toBe('Working');
+  });
+
+  // Amber is for the state the reader can act on, and only that state.
+  it('needs setup when nothing has been configured to reach it', () => {
+    expect(rowOutcome(probe({ cors: 'blocked', proxy: 'none' }))).toBe('needs-setup');
+    expect(rowOutcome(probe({ cors: 'blocked', proxy: 'not-routable' }))).toBe('needs-setup');
+  });
+
+  /** Yellow/red, per the user's framing: bad news and worse news. */
+  it('is unusable when the proxy tried and could not rescue it', () => {
+    expect(rowOutcome(probe({ cors: 'blocked', proxy: 'target-refused' }))).toBe('unusable');
+    expect(rowOutcome(probe({ cors: 'blocked', proxy: 'proxy-unreachable' }))).toBe('unusable');
+  });
+
+  it('is unusable when the host never answered at all', () => {
+    expect(rowOutcome(probe({ verdict: 'failed', cors: 'unknown', proxy: 'unknown' }))).toBe(
+      'unusable',
+    );
+    expect(rowOutcome(probe({ verdict: 'timeout', cors: 'unknown', proxy: 'unknown' }))).toBe(
+      'unusable',
+    );
+  });
+
+  it('is untested before a run and while in flight', () => {
+    expect(rowOutcome(probe({ verdict: 'idle', cors: 'unknown', proxy: 'unknown' }))).toBe(
+      'untested',
+    );
+    expect(rowOutcome(probe({ verdict: 'checking', cors: 'unknown', proxy: 'unknown' }))).toBe(
+      'untested',
+    );
+  });
+
+  // The other half of the mixed signal: once a proxy has solved it, the CORS
+  // line explains the route instead of restating an open problem.
+  it('stops diagnosing CORS once the proxy has solved it', () => {
+    const hint = corsHint(probe({ cors: 'blocked', proxy: 'works' }));
+
+    expect(hint).toContain('goes through your proxy');
+    expect(hint).not.toContain('Access-Control-Allow-Origin');
+  });
+});
+
+describe('probe URLs', () => {
+  /**
+   * The reported bug: is.gd's probe pointed at `https://is.gd/`, which answers
+   * 403 behind a bot-detection challenge, so a working shortener was reported as
+   * blocked. The rule it broke — probe the API, not the website — is worth
+   * pinning, because the homepage is always the tempting thing to reach for.
+   *
+   * `openUrl` is deliberately exempt: that one *is* meant to be a human page.
+   */
+  /**
+   * The rule is "probe the API, not the website", and the distinction that
+   * matters is the *host*, not the path: `api.github.com/` is a documented API
+   * index that answers JSON with permissive CORS, while `is.gd/` was a marketing
+   * page behind a bot check. A bare root is therefore fine on a dedicated API
+   * host and never fine on a host that also serves a website to humans.
+   */
+  it('never probes the root of a host that serves a human website', () => {
+    for (const target of PROBE_TARGETS) {
+      const url = new URL(target.probeUrl);
+      const isBareRoot = url.pathname === '/' && !url.search;
+      // Dedicated API hosts, plus the two honest exceptions: example.com has
+      // nothing but a root, and a proxy's probe URL *is* the proxied request.
+      const apiHost = /^(api|public\.api)\./.test(url.host);
+      const exempt = target.category === 'control' || target.category === 'proxy' || apiHost;
+      expect(
+        isBareRoot && !exempt,
+        `${target.id} probes the root of a website host: ${target.probeUrl}`,
+      ).toBe(false);
+    }
+  });
+
+  /**
+   * The is.gd regression, pinned by name. It is the one probe URL in the catalog
+   * whose host serves a website at `/`, so it is the one most likely to drift
+   * back to the homepage on a future edit.
+   */
+  it('probes the is.gd API rather than its bot-checked homepage', () => {
+    const isgd = PROBE_TARGETS.find((t) => t.id === 'isgd')!;
+
+    expect(new URL(isgd.probeUrl).pathname).not.toBe('/');
+    expect(isgd.probeUrl).toContain('is.gd/');
+    // The human page still belongs in openUrl: the tab test wants something a
+    // person can read, and a block page is unmistakable there.
+    expect(isgd.openUrl).toBe('https://is.gd');
+  });
+
+  it('probes only over https, so a probe cannot be silently downgraded', () => {
+    for (const target of PROBE_TARGETS) {
+      expect(target.probeUrl.startsWith('https://')).toBe(true);
+    }
+  });
+});
+
+describe('a host reachable only through the proxy', () => {
+  /**
+   * The reported bug: the doctor said api.short.io was "blocked or unreachable",
+   * and shortening a link through the configured proxy worked on the very next
+   * screen. Both were true — the browser cannot reach that host directly — but
+   * the page answered a question nobody asked and got the useful one wrong.
+   *
+   * The cause was structural: a failed direct probe returned immediately, on the
+   * reasoning that an unreachable host says nothing about the proxy. It says
+   * nothing about the *host*, but it is precisely the situation a proxy exists
+   * for, so the proxy leg now runs and its answer decides the row.
+   */
+  it('is usable when the direct leg failed but the proxy got through', () => {
+    const viaProxyOnly: ProbeResult = {
+      verdict: 'failed',
+      cors: 'unknown',
+      proxy: 'works',
+      ms: 40,
+      proxyMs: 300,
+    };
+
+    expect(rowOutcome(viaProxyOnly)).toBe('usable');
+    expect(outcomeLabel(rowOutcome(viaProxyOnly), viaProxyOnly)).toBe('Working (via proxy)');
+  });
+
+  // The copy must not claim the path is clear when the direct leg is broken —
+  // this connector now depends on the proxy staying up, and that is worth saying.
+  it('says the connector depends on the proxy, not that everything is fine', () => {
+    const hint = proxyHint(
+      { verdict: 'failed', cors: 'unknown', proxy: 'works', ms: 40, proxyMs: 300 },
+      'AllOrigins',
+    );
+
+    expect(hint).toContain('could not reach this host directly');
+    expect(hint).not.toContain('Everything between you and this service is fine');
+  });
+
+  it('still reports a genuinely unreachable host as unusable', () => {
+    // No proxy configured, so nothing rescued it and nothing has changed here.
+    expect(
+      rowOutcome({ verdict: 'failed', cors: 'unknown', proxy: 'none', ms: 40, proxyMs: null }),
+    ).toBe('unusable');
+    expect(
+      rowOutcome({
+        verdict: 'failed',
+        cors: 'unknown',
+        proxy: 'proxy-unreachable',
+        ms: 40,
+        proxyMs: 90,
+      }),
+    ).toBe('unusable');
   });
 });

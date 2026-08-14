@@ -215,7 +215,14 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     host: 'api.twitterapi.io',
     label: 'Twitter data service',
     category: 'connector',
-    probeUrl: 'https://api.twitterapi.io/',
+    // A real API path rather than the bare root. Measured 2026-08-14: this
+    // answers 403 (no API key), which is the expected reply to an
+    // unauthenticated probe and proves the request reached the endpoint the
+    // connector actually uses — a root's service banner proves only that
+    // something is listening. The account named is @twitter, the platform's own
+    // and the least surprising handle to see in a diagnostic; the probe is
+    // rejected before the name is ever looked up, so it only has to parse.
+    probeUrl: 'https://api.twitterapi.io/twitter/user/info?userName=twitter',
     proxyRoute: 'twitterapi',
     openUrl: 'https://twitterapi.io',
     matters: 'Reading public tweets. Also needs a CORS proxy.',
@@ -368,7 +375,11 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     host: 'api.dub.co',
     label: 'Dub (shortener)',
     category: 'shortener',
-    probeUrl: 'https://api.dub.co/',
+    // `/links` rather than the bare root: the root answers 200 with a service
+    // banner, which says nothing about the API. Measured 2026-08-14: this answers
+    // JSON 401, the expected reply to an unauthenticated probe of the endpoint
+    // the connector actually calls.
+    probeUrl: 'https://api.dub.co/links',
     proxyRoute: 'shortener',
     openUrl: 'https://dub.co',
     matters: 'Shortening links with Dub.',
@@ -384,7 +395,13 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     host: 'api.short.io',
     label: 'Short.io',
     category: 'shortener',
-    probeUrl: 'https://api.short.io/',
+    // A real API path rather than the bare root, for the same reason as Raindrop
+    // and T.LY above: a root that answers with a service banner proves the host
+    // is up but exercises none of the API surface the connector uses, and its
+    // CORS behaviour need not match. Measured 2026-08-14: this answers a clean
+    // JSON 401 — the expected reply to an unauthenticated probe, and evidence the
+    // request was received and understood.
+    probeUrl: 'https://api.short.io/api/links',
     proxyRoute: 'shortener',
     openUrl: 'https://short.io',
     matters: 'Shortening links with Short.io.',
@@ -419,7 +436,19 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     host: 'is.gd',
     label: 'is.gd (shortener)',
     category: 'shortener',
-    probeUrl: 'https://is.gd/',
+    // The *API*, not the homepage. `https://is.gd/` answers 403 behind a
+    // bot-detection challenge, so probing it reported "blocked or unreachable"
+    // about a service that works perfectly — the doctor was testing a front door
+    // the app never knocks on.
+    //
+    // `forward.php` (look up where a short link points) rather than the
+    // `create.php` the app actually calls, because a probe must not have side
+    // effects: create is a GET that mints a real link, and a diagnostic anyone
+    // can re-run should not litter a third party's database. Both live on the
+    // same host behind the same API and answer identically for this purpose.
+    // Measured 2026-08-14: 200 with `Access-Control-Allow-Origin: *`, which is
+    // both a real reachability answer and a correct CORS one.
+    probeUrl: 'https://is.gd/forward.php?format=json&shorturl=is.gd',
     openUrl: 'https://is.gd',
     matters: 'Shortening links without an account.',
     // Deliberately no link. No official page exists, and the outage aggregators
@@ -663,6 +692,93 @@ function formatMs(ms: number): string {
 }
 
 /**
+ * The single question a reader actually has about a row: **can I use this?**
+ *
+ * Added because the page had three independently-coloured signals and no
+ * overall one, so a host that works perfectly *through a configured proxy* read
+ * as amber (CORS blocked) next to green (proxy works) — two true statements
+ * that together scan as "something is wrong here", when the answer is simply
+ * yes. Amber next to green is a question; the reader has to stop and work out
+ * which half wins.
+ *
+ * The rule is that **the outcome is about the destination, not the journey**.
+ * How the bytes get there — directly, or via a relay — is implementation
+ * detail the row can still explain underneath. If they arrive, it is `usable`.
+ *
+ * - `usable` — the app can talk to this host today. Directly readable, or
+ *   readable through the configured proxy; both are working setups.
+ * - `needs-setup` — reachable, unreadable, and fixable by the user. No proxy
+ *   configured, or one that has no route here. Amber: nothing is broken, but
+ *   something must be done.
+ * - `unusable` — reachable but nothing can read it (the proxy tried and the
+ *   target refused), or not reachable at all. Red.
+ * - `untested` — idle or in flight.
+ */
+export type RowOutcome = 'untested' | 'usable' | 'needs-setup' | 'unusable';
+
+export function rowOutcome(result: ProbeResult): RowOutcome {
+  if (result.verdict === 'idle' || result.verdict === 'checking') {
+    return 'untested';
+  }
+  if (result.verdict !== 'reachable') {
+    // Not reachable *directly* — but the proxy leg now runs even here, and if it
+    // got through then the connector works. Reported as unusable, this was the
+    // page's most misleading answer: api.short.io was called "blocked or
+    // unreachable" while shortening links through the proxy worked fine.
+    return result.proxy === 'works' ? 'usable' : 'unusable';
+  }
+  // Reachable. Whether it is *usable* is now entirely about readability.
+  if (result.cors === 'readable') {
+    return 'usable';
+  }
+  switch (result.proxy) {
+    case 'works':
+      // The case this whole type exists for. Reached through a relay is still
+      // reached: the feature works, so the row is green.
+      return 'usable';
+    case 'none':
+    case 'not-routable':
+      // Fixable from here — configure a proxy, or one that reaches this host.
+      return 'needs-setup';
+    case 'target-refused':
+    case 'proxy-unreachable':
+      return 'unusable';
+    default:
+      // Reachable but unreadable with no proxy verdict at all: nothing has
+      // established a way in, so it cannot be called usable.
+      return 'needs-setup';
+  }
+}
+
+/**
+ * The headline for a row, replacing the bare reachability verdict.
+ *
+ * "Reachable" was answering a question nobody asked. What a reader wants to
+ * know is whether the connector will work, and on a proxied host the honest
+ * answer is yes — with the route named, because "works via the proxy" and
+ * "works directly" have different failure modes later.
+ */
+export function outcomeLabel(outcome: RowOutcome, result: ProbeResult): string {
+  switch (outcome) {
+    case 'untested':
+      return result.verdict === 'checking' ? 'Checking…' : 'Not checked';
+    case 'usable':
+      // `cors: 'readable'` only happens on a host reached directly, so anything
+      // else that got here did so through the relay — including a host the
+      // browser could not reach at all.
+      return result.cors === 'readable' ? 'Working' : 'Working (via proxy)';
+    case 'needs-setup':
+      return 'Needs a proxy';
+    case 'unusable':
+      return result.verdict === 'timeout'
+        ? 'Timed out'
+        : result.verdict === 'failed'
+          ? 'Blocked or unreachable'
+          : 'Not usable';
+  }
+}
+
+/**
  * What the CORS leg means, for a host already proven reachable.
  *
  * This is the answer to "which domains do I need to whitelist?" — and the
@@ -683,9 +799,15 @@ export function corsHint(result: ProbeResult): string | null {
     return 'This app can read its replies directly — no proxy needed.';
   }
   if (result.cors === 'blocked') {
+    // When the proxy already got through, this leg is no longer a finding — it
+    // is the reason the row says "via proxy". Stating the full "no ACAO came
+    // back" diagnosis there made a solved problem read like an open one.
+    if (result.proxy === 'works') {
+      return 'This host does not answer browsers directly, which is why the request goes through your proxy.';
+    }
     return (
       'Reachable, but this one URL did not let the app read its reply — no ' +
-      '`Access-Control-Allow-Origin` came back. That is the host\'s policy, not a fault on your ' +
+      "`Access-Control-Allow-Origin` came back. That is the host's policy, not a fault on your " +
       'network, and no browser setting can grant it. Mawkingbird routes these through a CORS ' +
       'proxy instead. One caveat worth knowing: this tests a single URL, and an API can answer ' +
       'differently per path — if the connector itself works, believe the connector, not this row.'
@@ -708,9 +830,17 @@ export function corsHint(result: ProbeResult): string | null {
  */
 export function proxyHint(result: ProbeResult, proxyLabel: string | null): string | null {
   const via = proxyLabel ?? 'your CORS proxy';
+  const took = result.proxyMs !== null ? ` (${formatMs(result.proxyMs)})` : '';
   switch (result.proxy) {
     case 'works':
-      return `Confirmed working through ${via}${result.proxyMs !== null ? ` (${formatMs(result.proxyMs)})` : ''}. Everything between you and this service is fine — so if the feature still fails, the cause is past connectivity: an API key, a plan or credit limit, or a consent not yet given.`;
+      // Two different good-news stories, and conflating them misleads. When the
+      // direct leg never arrived, "everything between you and this service is
+      // fine" would be false — the direct path is genuinely broken here, and the
+      // proxy is the reason the feature works anyway.
+      if (result.verdict !== 'reachable') {
+        return `Your browser could not reach this host directly, but ${via} did${took}. The connector will work — every request to this service goes through the proxy, so it depends on the proxy staying available.`;
+      }
+      return `Confirmed working through ${via}${took}. Everything between you and this service is fine — so if the feature still fails, the cause is past connectivity: an API key, a plan or credit limit, or a consent not yet given.`;
     case 'target-refused':
       return `${via} is reachable and answered, but this service refused the request coming from it. Proxies run in datacentres, and plenty of services block those ranges outright while allowing home connections — so the proxy is healthy and still cannot help here. A different proxy, or one you run yourself, may work where this one does not.`;
     case 'proxy-unreachable':

@@ -12,8 +12,10 @@ import { BulkActions, BulkTarget } from '../../bulk-actions';
 import { BulkActionsDialog } from '../../bulk-actions-dialog/bulk-actions-dialog';
 import { BulkProgress } from '../../bulk-progress/bulk-progress';
 import { ConfirmDialog } from '../../confirm-dialog/confirm-dialog';
+import { AvatarFallback } from '../../avatar-fallback';
 import { FollowButton } from '../../follow-button/follow-button';
 import { FollowState } from '../../follow-state';
+import { ImportFollows } from '../../import-follows';
 import { ListCollectionConverter } from '../../list-collection-converter';
 import { ListFeedResolver } from '../../lists/list-feed-resolver';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
@@ -67,7 +69,10 @@ interface Member {
     FollowButton,
     BulkActionsDialog,
     BulkProgress,
+    AvatarFallback,
   ],
+  // Component-scoped, so a bulk follow started here tracks this collection only.
+  providers: [ImportFollows],
   templateUrl: './collection.html',
   styleUrl: './collection.css',
 })
@@ -81,6 +86,7 @@ export class CollectionPage implements OnInit {
   protected bulk = inject(BulkActions);
   private feedResolver = inject(ListFeedResolver);
   private anonymousApi = inject(AnonymousPublicApi);
+  protected importer = inject(ImportFollows);
 
   protected data = signal<CollectionWithAccounts | null>(null);
   protected shipped = signal<ShippedStarterKit | null>(null);
@@ -185,6 +191,63 @@ export class CollectionPage implements OnInit {
     }
   }
 
+  // -------------------------------------------- shipped kits: follow everyone
+  //
+  // A separate runner from the `BulkActions` one above, because a shipped kit's
+  // members are accounts on other instances: the bulk runner follows by id, and
+  // these ids belong to their home servers. `ImportFollows` is the mechanism
+  // that already handles that — it resolves each member first when signed in,
+  // and writes a browser-local row when anonymous.
+  //
+  // This is what made bundled collections the odd one out. The starter kits have
+  // always offered one-click follow-everyone to anonymous visitors, and the kit
+  // snapshot carries a resolved `Account` for every member, so there was never a
+  // technical reason the collections could not.
+
+  protected readonly kitFollowDone = computed(
+    () =>
+      this.importer
+        .rows()
+        .filter((row) => !['pending', 'resolving', 'following'].includes(row.status)).length,
+  );
+  protected readonly kitFollowed = computed(
+    () => this.importer.rows().filter((row) => row.status === 'followed').length,
+  );
+  /** First real failure, usually the anonymous 50-follow cap. */
+  protected readonly kitFollowError = computed(
+    () => this.importer.rows().find((row) => row.status === 'failed')?.error ?? '',
+  );
+
+  /** Whether this page should offer follow-everyone through the importer. */
+  protected readonly canFollowKit = computed(() => !!this.shipped() && this.members().length > 0);
+
+  protected followAllShipped(): void {
+    if (this.importer.running() || !this.shipped()) {
+      return;
+    }
+    void this.importer.start();
+  }
+
+  /**
+   * Seed the importer with this kit's members.
+   *
+   * Anonymous sessions use the snapshot accounts directly — no search, no token.
+   * Signed-in ones pass handles, so each is webfingered to a local record the
+   * home server can actually follow.
+   */
+  private loadKitRows(): void {
+    this.importer.reset();
+    const accounts = this.members().map((m) => m.account);
+    if (!accounts.length) {
+      return;
+    }
+    if (this.auth.isAnonymous) {
+      this.importer.loadResolved(accounts.map((account) => ({ handle: account.acct, account })));
+    } else {
+      this.importer.load(accounts.map((account) => account.acct));
+    }
+  }
+
   protected confirmFollowAll(): void {
     this.followAllOpen.set(false);
     const target = this.followAllTarget();
@@ -265,9 +328,11 @@ export class CollectionPage implements OnInit {
       this.data.set(shippedStarterKitCollection(kit));
       this.tab.set('members');
       this.loading.set(false);
+      this.loadKitRows();
       return;
     }
     this.shipped.set(null);
+    this.importer.reset();
     this.api.getCollection(id).subscribe({
       next: (d) => {
         this.data.set(d);

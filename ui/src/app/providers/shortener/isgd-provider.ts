@@ -26,20 +26,48 @@ import { ShortenerTransport } from './shortener-transport';
  *
  * ## The CORS situation
  *
- * is.gd's CORS behavior is not a stable API contract. As observed from the
- * deployed Mawkingbird origin, the create response currently has no
- * `Access-Control-Allow-Origin`, so the browser hides it as `status: 0` even
- * though the server answered 200. The transport therefore tries directly, then
- * offers the configured proxy when the browser reports that opaque failure.
- * `format=json` selects the response body shape; it does not affect CORS.
+ * is.gd answers browsers directly, and this entry is marked `corsOpen` in the
+ * catalog so the transport never offers a proxy for it. Measured 2026-08-14
+ * from a browser origin: a successful create sends
+ * `Access-Control-Allow-Origin: *`, and so does every *documented* error — the
+ * JSON `{"errorcode": 1, "errormessage": "Please enter a valid URL to shorten"}`
+ * shape carries the header too. `format=json` selects the body shape and does
+ * not affect CORS.
  *
- * A proxy is still the fallback if a direct call fails for some other reason
- * (offline, DNS, an ad-blocker) — the browser reports all of those identically as
- * `status: 0`, so the app cannot tell them apart and simply tries the proxy next.
- * That fallback is a small ask here: the request carries no credential, so
- * {@link ShortenerTransport} uses the *ordinary* proxy path with no consent
- * dialog. There is no key to steal, and the destination is a URL the user is
- * about to publish anyway.
+ * An earlier version of this comment said the opposite, on the strength of a
+ * create that failed opaquely. That observation was real but the conclusion was
+ * wrong, and the mistake is worth recording because it is easy to repeat: is.gd
+ * has exactly one response that omits the header, and it is undocumented —
+ * `Error, database insert failed`, plain text with a `200` status. A browser
+ * cannot read that, so it looks like `status: 0`, which is indistinguishable
+ * from CORS.
+ *
+ * ## The service does not currently create links
+ *
+ * Stated plainly because it decides whether this provider is worth offering.
+ * Measured repeatedly on 2026-08-14: **every** create for a URL is.gd has not
+ * seen before fails with `Error, database insert failed` — across `format=json`,
+ * `format=simple` and the bare form, and on `v.gd` (the same operator's sibling
+ * domain) too. The only creates that succeed are ones where the destination is
+ * already in their database, which is a lookup of an existing link rather than
+ * an insert, and is why this looked intermittent at first.
+ *
+ * So this is not a passing outage to wait out. Until inserts work again, is.gd
+ * can only hand back links it already had.
+ *
+ * ## The bug this produced
+ *
+ * Their broken insert → a response with no CORS header → an opaque failure → the
+ * app inferring CORS → offering the proxy → the proxy (correctly) having no route
+ * to is.gd → `403` → "This key is not allowed to do that", shown for a service
+ * with no accounts and no keys. Four hops of confident inference from one
+ * ambiguous signal, ending in advice about a credential that cannot exist.
+ *
+ * The general lesson, which applies well beyond this file: **CORS headers vary
+ * by endpoint and by status code within one API**, and error paths drop them far
+ * more often than success paths. "This service is CORS-open" is a claim about
+ * the responses it means to send, never a guarantee about every byte it can
+ * emit — so an opaque failure is not, on its own, evidence for a proxy.
  */
 
 const CREATE_URL = 'https://is.gd/create.php';
@@ -107,40 +135,61 @@ export class IsgdProvider implements ShortenerProvider {
       params.set('shorturl', input.slug);
     }
 
-    return this.transport
-      .request<IsgdResponse>(this.id, {
-        method: 'GET',
-        url: `${CREATE_URL}?${params.toString()}`,
-        idempotent: false,
-        // The query parameter already selects JSON, so no content-negotiation
-        // header is needed. This does not imply that is.gd will allow CORS.
-        simpleRequest: true,
-      })
-      .pipe(
-        map((response) => {
-          // A 200 with an error body is the normal failure shape here.
-          if (!response?.shorturl) {
-            throw new LinkProviderError(
-              codeFor(response?.errorcode),
-              response?.errormessage || 'is.gd could not shorten that link.',
-              this.id,
-            );
-          }
-          const shortUrl = response.shorturl;
-          const slug = shortUrl.replace(/^https?:\/\/is\.gd\//i, '');
-          return {
-            provider: this.id,
-            // No server-side identity exists; the slug is all there is, and
-            // nothing can be done with it afterwards.
-            providerId: slug,
-            shortUrl,
-            destinationUrl: input.destinationUrl,
-            slug,
-            domain: 'is.gd',
-            raw: response,
-          } satisfies ShortLink;
-        }),
-      );
+    return (
+      this.transport
+        // `string` in the union deliberately: is.gd answers its undocumented
+        // database failure as plain text, not JSON, so the parsed body is not
+        // always the shape its docs promise.
+        .request<IsgdResponse | string>(this.id, {
+          method: 'GET',
+          url: `${CREATE_URL}?${params.toString()}`,
+          idempotent: false,
+          // The query parameter already selects JSON, so no content-negotiation
+          // header is needed. This does not imply that is.gd will allow CORS.
+          simpleRequest: true,
+        })
+        .pipe(
+          map((raw) => {
+            const response = typeof raw === 'string' ? null : raw;
+            // A 200 with an error body is the normal failure shape here.
+            if (!response?.shorturl) {
+              // The undocumented one, and the reason this branch is explicit.
+              // While is.gd's database was failing it answered `200` with the
+              // plain text `Error, database insert failed` — no JSON, no
+              // `errorcode`, and (uniquely among its responses) no
+              // `Access-Control-Allow-Origin`, so a browser sees only an opaque
+              // failure. Left to the generic path this became "Something went
+              // wrong talking to the service", which reads as our bug rather than
+              // their outage.
+              if (typeof raw === 'string' && /database|insert failed/i.test(raw)) {
+                throw new LinkProviderError(
+                  'PROVIDER_UNAVAILABLE',
+                  'is.gd is refusing to store new links — it answers “database insert failed” for every new URL. Nothing on your side can fix this; pick another shortener.',
+                  this.id,
+                );
+              }
+              throw new LinkProviderError(
+                codeFor(response?.errorcode),
+                response?.errormessage || 'is.gd could not shorten that link.',
+                this.id,
+              );
+            }
+            const shortUrl = response.shorturl;
+            const slug = shortUrl.replace(/^https?:\/\/is\.gd\//i, '');
+            return {
+              provider: this.id,
+              // No server-side identity exists; the slug is all there is, and
+              // nothing can be done with it afterwards.
+              providerId: slug,
+              shortUrl,
+              destinationUrl: input.destinationUrl,
+              slug,
+              domain: 'is.gd',
+              raw: response,
+            } satisfies ShortLink;
+          }),
+        )
+    );
   }
 
   updateLink(): Observable<ShortLink> {

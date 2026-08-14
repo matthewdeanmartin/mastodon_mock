@@ -30,23 +30,19 @@ import { ProxyConsentRequired, ShortenerTransport } from './shortener-transport'
  * verdict stated with more confidence than the evidence supports is worse than a
  * vaguer true one when someone is debugging.
  *
- * ## Why it does not send a real request
+ * ## Why every probe is a read
  *
- * Every shortener's only universally available operation is *create*, so probing
- * with a real call would litter the user's account with junk links each time
- * they pressed Test. Instead the probe shortens a harmless well-known URL only
- * for providers where a create is cheap and anonymous, and otherwise reports
- * `unknown` rather than inventing a result. See {@link PROBE_DESTINATION}.
- */
-
-/**
- * The URL used for probe creates.
+ * Pressing Test must never leave anything behind. The credentialed providers all
+ * expose a cheap authenticated read, which doubles as a check of the key; is.gd
+ * has no accounts, so it is probed with its link-lookup endpoint instead.
  *
- * `example.com` is reserved by RFC 2606 for exactly this kind of use, so a link
- * pointing at it is inert. Providers dedupe identical destinations, so repeated
- * probes generally return the same short link rather than piling up new ones.
+ * is.gd used to be probed with a real create, on the reasoning that it dedupes
+ * identical destinations and so would return the same throwaway link every time.
+ * That held until its database stopped accepting writes, at which point a probe
+ * of the *write* path declared a service unreachable whose reads were answering
+ * normally. Reachability is a question about the host, so the probe asks the
+ * cheapest question that requires the host to answer it.
  */
-export const PROBE_DESTINATION = 'https://example.com/';
 
 export type ReachabilityStatus =
   /** Direct browser request succeeded. Nothing else needed. */
@@ -125,8 +121,18 @@ export class ShortenerReachability {
 
   private probeUrl(shortener: ShortenerId): string {
     if (shortener === 'isgd') {
-      const params = new URLSearchParams({ format: 'json', url: PROBE_DESTINATION });
-      return `https://is.gd/create.php?${params.toString()}`;
+      // `forward.php` (look up where a short link points), not the `create.php`
+      // the connector actually calls. Creating was defensible while is.gd
+      // deduped identical destinations — the same probe returned the same link
+      // rather than piling up new ones — but that argument holds only while its
+      // database accepts writes. When it stopped (observed 2026-08-14, answering
+      // `Error, database insert failed` for every new URL), a create-based probe
+      // reported the service unreachable while reads were working fine.
+      //
+      // A probe should measure whether the host answers this browser, and a read
+      // does that without depending on the write path or leaving anything
+      // behind. Same host, same API, same CORS treatment.
+      return 'https://is.gd/forward.php?format=json&shorturl=is.gd';
     }
     // The credentialed providers all expose a cheap authenticated read, which is
     // a far better probe than a create: it proves reachability *and* the key.

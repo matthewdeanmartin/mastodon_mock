@@ -151,18 +151,22 @@ describe('EntryPage', () => {
   });
 
   /**
-   * Every candidate down. The preview is lost, but the choice never is: the
-   * modal still has to appear and both answers still have to work.
+   * Every candidate down. This used to enter anyway and show the welcome modal
+   * over an empty feed — but the point of the preview is that the timeline
+   * behind the modal is real, and a network blocking mastodon.social usually
+   * blocks the other two candidates as well. So the short chain hands off to a
+   * search of the full directory rather than to a blank first impression.
    */
-  it('still enters and shows the modal when no server can be reached', async () => {
+  it('asks for a working server instead of entering when no candidate is reachable', async () => {
     probeAnswers({});
-    TestBed.createComponent(EntryPage).detectChanges();
+    const fixture = TestBed.createComponent(EntryPage);
+    fixture.detectChanges();
     await settle(http);
+    fixture.detectChanges();
 
-    expect(TestBed.inject(Auth).isAnonymous).toBe(true);
-    expect(TestBed.inject(PreviewSeed).active).toBe(true);
-    expect(TestBed.inject(AnonymousFollows).count()).toBe(0);
-    expect(navigate).toHaveBeenCalledWith('/home', { replaceUrl: true });
+    expect(fixture.nativeElement.querySelector('app-unreachable-server-dialog')).not.toBeNull();
+    expect(TestBed.inject(Auth).isAnonymous).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   /** It is a router. Rendering anything here is the mistake being corrected. */

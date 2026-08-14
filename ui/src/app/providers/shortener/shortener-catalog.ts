@@ -80,6 +80,31 @@ export interface ShortenerCatalogEntry {
   domainRequired: boolean;
   /** Copy for the domain field, which means something different per provider. */
   domainHint: string;
+  /**
+   * Whether this service answers browsers directly, so a `status: 0` from it is
+   * *not* evidence that a CORS proxy would help.
+   *
+   * Exists because "the request failed opaquely" is a much weaker signal than
+   * the transport used to treat it as. The browser reports CORS, DNS failure,
+   * offline, an ad-blocker and a cancelled request identically, and the app's
+   * response was to assume CORS and offer to relay through a proxy. For a host
+   * that genuinely refuses browsers that is right. For one that does not, it
+   * routes a user's traffic through a third party to work around a problem the
+   * proxy cannot fix.
+   *
+   * is.gd is the case that proved it. Measured 2026-08-14 from a browser origin:
+   * a successful create answers `Access-Control-Allow-Origin: *`, and so does
+   * every documented JSON error (`{"errorcode": 1, ...}`). Only its undocumented
+   * plain-text failure — `Error, database insert failed`, emitted while its
+   * database was broken — omits the header. So the one time a proxy got offered
+   * was the one time the service was down, where relaying changes nothing.
+   *
+   * This is a general trap rather than an is.gd quirk: CORS headers routinely
+   * vary by endpoint and by status code within a single API, and a non-200 path
+   * frequently drops them. A service being "CORS-open" is a statement about the
+   * responses it means to send, not a guarantee about every byte it can emit.
+   */
+  corsOpen?: boolean;
 }
 
 /**
@@ -134,6 +159,9 @@ export const SHORTENER_CATALOG: readonly ShortenerCatalogEntry[] = [
       'Free and unlimited, but anonymous: links cannot be listed, edited or deleted afterwards.',
     domainRequired: false,
     domainHint: '',
+    // Verified from a browser origin: `ACAO: *` on both success and its
+    // documented JSON errors. The proxy has no route here and needs none.
+    corsOpen: true,
   },
   {
     id: 'dub',

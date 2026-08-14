@@ -13,6 +13,7 @@ import {
   toLinkProviderError,
 } from './shortener-errors';
 import { ShortenerSettings } from './shortener-settings';
+import { shortenerEntry } from './shortener-catalog';
 import { ShortenerId } from './shortener-provider';
 
 /**
@@ -103,6 +104,59 @@ export interface ShortenerRequest {
 
 const MAX_RETRIES = 2;
 
+/**
+ * What to say when a CORS-open service fails opaquely.
+ *
+ * The honest answer is a short list of causes, because the browser genuinely
+ * does not say which one it was. What this must *not* do is name CORS as the
+ * cause or suggest a proxy: this provider sends the headers, so both would send
+ * the user to configure a workaround for a problem they do not have.
+ *
+ * The service being down is listed first because it is the likeliest and the
+ * only one the user cannot act on — and, in the case that produced this code,
+ * the actual answer.
+ */
+function corsOpenFailure(provider: ShortenerId): LinkProviderError {
+  const label = shortenerEntry(provider)?.label ?? 'This service';
+  return new LinkProviderError(
+    'PROVIDER_UNAVAILABLE',
+    `Couldn't reach ${label}. It answers browsers directly, so this is not a CORS problem and a proxy would not help — most likely the service is having trouble, or something on this network or in the browser (an extension, an ad blocker) stopped the request. Worth trying again shortly.`,
+    provider,
+  );
+}
+
+/**
+ * The proxy's own refusal message, when a 4xx came from the relay rather than
+ * from the shortener behind it.
+ *
+ * Deliberately narrow. The Mawkingbird Worker answers a request for a host its
+ * route cannot reach with `403 {"error": "Route \"shortener\" does not reach
+ * is.gd."}` — a sentence about *our* allowlist. Shortener error bodies also
+ * carry an `error` key (Dub's is `{"error": {"code": ..., "message": ...}}`), so
+ * matching on the key alone would start blaming the proxy for genuine provider
+ * rejections. The signature required here is a string `error` that names a
+ * route, which is the proxy's phrasing and nobody else's.
+ *
+ * Returns null for anything that might be the provider talking — when in doubt,
+ * the existing pass-through is the safer answer, because it blames the party the
+ * user was actually trying to reach.
+ */
+function proxyRefusalMessage(error: unknown): string | null {
+  if (!(error instanceof HttpErrorResponse) || error.status < 400 || error.status >= 500) {
+    return null;
+  }
+  const body = error.error as { error?: unknown } | string | null;
+  const raw = typeof body === 'string' ? body : typeof body?.error === 'string' ? body.error : null;
+  if (!raw) {
+    return null;
+  }
+  // `route` plus a refusal verb: specific enough that a shortener would have to
+  // be talking about routing to trip it.
+  return /route\b/i.test(raw) && /does not reach|not allowed|refus|denied/i.test(raw)
+    ? raw.trim()
+    : null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ShortenerTransport {
   private http = inject(HttpClient);
@@ -169,6 +223,19 @@ export class ShortenerTransport {
           route: 'direct',
           hint: 'Browser reported status 0 (CORS, DNS, offline, or blocked request)',
         });
+        // A proxy is only a remedy when the host is the thing refusing browsers.
+        // For a service known to send CORS headers, `status: 0` means something
+        // a relay cannot fix — the service is down, the network dropped it, or
+        // an extension cancelled it — so offering one would send the user's
+        // traffic through a third party to solve a problem it is not the cause
+        // of. See `ShortenerCatalogEntry.corsOpen`.
+        if (shortenerEntry(provider)?.corsOpen) {
+          this.diagnostics.warn('Shortener', 'request:proxy-skipped', {
+            provider,
+            reason: 'Provider is CORS-open; a proxy cannot explain this failure.',
+          });
+          return throwError(() => corsOpenFailure(provider));
+        }
         return this.viaProxy<T>(provider, spec, config.auth);
       }),
     );
@@ -284,6 +351,12 @@ export class ShortenerTransport {
    *   usual cause is the proxy returning an error page without CORS headers, so
    *   the browser blocks its response too and we learn nothing at all.
    *
+   * - A `4xx` carrying the *proxy's own* error envelope. A destination-restricted
+   *   proxy answers 403 for a host it has no route to, and that is our allowlist
+   *   refusing, not the service. Reported verbatim it became "This key is not
+   *   allowed to do that. It may be missing a scope or a permission." — advice
+   *   about a credential, for is.gd, which has no accounts and takes no key.
+   *
    * Anything else — a real `4xx` carrying the shortener's own body — is passed
    * through untouched, because that genuinely is the shortener answering.
    */
@@ -293,6 +366,15 @@ export class ShortenerTransport {
     spec: ShortenerRequest,
     proxyLabel: string,
   ): LinkProviderError {
+    const refusal = proxyRefusalMessage(error);
+    if (refusal) {
+      return new LinkProviderError(
+        'CORS_BLOCKED',
+        `${proxyLabel} refused to relay this request: ${refusal} That is this proxy's own destination policy, not the shortener rejecting you — a general-purpose proxy, or one you run yourself, would reach it.`,
+        provider,
+        error instanceof HttpErrorResponse ? error.status : 0,
+      );
+    }
     if (error instanceof HttpErrorResponse && error.status >= 500) {
       return new LinkProviderError(
         'PROVIDER_UNAVAILABLE',

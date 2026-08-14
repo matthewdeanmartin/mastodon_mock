@@ -36,9 +36,13 @@
             (click)="openAccount(account)"
             [attr.aria-label]="'Open ' + (account.display_name || account.acct) + ' in app'"
           >
+            <!-- These avatars are absolute CDN URLs frozen into the snapshot, and
+                 files.mastodon.social is blocked on plenty of networks. Initials
+                 keep the row readable when it is. -->
             <img
               [src]="accountFor(account).avatar_static || accountFor(account).avatar"
               [alt]="accountFor(account).display_name || accountFor(account).acct"
+              [appAvatarFallback]="accountFor(account).display_name || accountFor(account).acct"
               width="38"
               height="38"
               loading="lazy"
@@ -58,22 +62,25 @@
 
     <div class="kit-actions-wrap">
       <div class="kit-actions">
-        @if (!auth.isAnonymous) {
-          <button
-            type="button"
-            class="btn btn-sm"
-            [disabled]="importer.running() || completed() === kit().accounts.length"
-            (click)="followAll()"
-          >
-            @if (importer.running()) {
-              Following… {{ completed() }}/{{ kit().accounts.length }}
-            } @else if (completed() === kit().accounts.length) {
-              Followed {{ followed() }} of {{ kit().accounts.length }}
-            } @else {
-              Follow all
-            }
-          </button>
-        }
+        <!-- Offered anonymously too. An anonymous follow is a browser-local row,
+             so following everyone here needs no account and no network: the kit
+             ships the resolved accounts, which is exactly what the importer
+             wants. Withholding it was the odd one out — the starter kits have
+             always offered this to anonymous visitors. -->
+        <button
+          type="button"
+          class="btn btn-sm"
+          [disabled]="importer.running() || completed() === kit().accounts.length"
+          (click)="followAll()"
+        >
+          @if (importer.running()) {
+            Following… {{ completed() }}/{{ kit().accounts.length }}
+          } @else if (completed() === kit().accounts.length) {
+            Followed {{ followed() }} of {{ kit().accounts.length }}
+          } @else {
+            Follow all
+          }
+        </button>
         <a
           class="btn btn-outline btn-sm kit-link"
           [routerLink]="['/collections/preview', kit().id]"
@@ -81,6 +88,11 @@
           View collection
         </a>
       </div>
+      <!-- The failure worth naming: an anonymous session caps at 50 follows, so a
+           bulk follow can stop partway through for a reason no row explains. -->
+      @if (followError(); as message) {
+        <p class="kit-follow-error muted small" role="status">{{ message }}</p>
+      }
       <a class="kit-home-link muted small" [href]="kit().url" target="_blank" rel="noopener">
         Open original on {{ collectionHost() }} ↗
       </a>

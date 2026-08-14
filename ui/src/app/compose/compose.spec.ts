@@ -154,8 +154,15 @@ describe('Compose', () => {
 
   // ---------------------------------------------------------- link shortening
 
-  it('asks before a keyless proxy sees the URL, then retries after consent', async () => {
-    TestBed.inject(ShortenerSettings).activate('isgd');
+  // A credentialed provider rather than is.gd, and that swap is the point. is.gd
+  // answers browsers directly, so it is marked `corsOpen` and never offers a
+  // proxy at all; the keyed shorteners genuinely refuse browsers, which is what
+  // makes them the honest subject for the consent flow. Dub specifically because
+  // it needs only a key — Short.io additionally requires a domain.
+  it('asks before the proxy sees a credentialed request, then retries after consent', async () => {
+    const settings = TestBed.inject(ShortenerSettings);
+    settings.setKey('dub', 'dub_test');
+    settings.activate('dub');
     TestBed.inject(CorsProxySettings).select('allorigins');
     const f = setUp();
     const original = 'See https://example.com/a-very-long-destination-that-needs-shortening';
@@ -163,29 +170,32 @@ describe('Compose', () => {
 
     const firstAttempt = internals(f).shortenLinks();
     httpMock
-      .expectOne((request) => request.url.startsWith('https://is.gd/create.php'))
+      .expectOne((request) => request.url.startsWith('https://api.dub.co'))
       .error(new ProgressEvent('error'), { status: 0 });
     await firstAttempt;
 
-    expect(internals(f).shortenerConsentPrompt()?.carriesCredential).toBe(false);
+    // A key is on the line here, so the disclosure has to say so.
+    expect(internals(f).shortenerConsentPrompt()?.carriesCredential).toBe(true);
     expect(internals(f).text()).toBe(original);
     httpMock.expectNone((request) => request.url.startsWith('https://api.allorigins.win/raw'));
 
     const retry = internals(f).acceptShortenerConsent();
     httpMock
-      .expectOne((request) => request.url.startsWith('https://is.gd/create.php'))
+      .expectOne((request) => request.url.startsWith('https://api.dub.co'))
       .error(new ProgressEvent('error'), { status: 0 });
     httpMock
       .expectOne((request) => request.url.startsWith('https://api.allorigins.win/raw'))
-      .flush({ shorturl: 'https://is.gd/abc123' });
+      .flush({ shortLink: 'https://dub.sh/abc123', id: 'x1', key: 'abc123' });
     await retry;
 
-    expect(internals(f).text()).toBe('See https://is.gd/abc123');
+    expect(internals(f).text()).toBe('See https://dub.sh/abc123');
     expect(internals(f).shortenerConsentPrompt()).toBeNull();
   });
 
   it('keeps the post unchanged and suggests alternatives when proxy consent is declined', async () => {
-    TestBed.inject(ShortenerSettings).activate('isgd');
+    const settings = TestBed.inject(ShortenerSettings);
+    settings.setKey('dub', 'dub_test');
+    settings.activate('dub');
     TestBed.inject(CorsProxySettings).select('allorigins');
     const f = setUp();
     const original = 'See https://example.com/a-very-long-destination-that-needs-shortening';
@@ -193,7 +203,7 @@ describe('Compose', () => {
 
     const attempt = internals(f).shortenLinks();
     httpMock
-      .expectOne((request) => request.url.startsWith('https://is.gd/create.php'))
+      .expectOne((request) => request.url.startsWith('https://api.dub.co'))
       .error(new ProgressEvent('error'), { status: 0 });
     await attempt;
     internals(f).declineShortenerConsent();

@@ -8,6 +8,7 @@ import {
   corsHint,
   homeServerTarget,
   interpret,
+  outcomeLabel,
   PROBE_TARGETS,
   ProbeCategory,
   ProbeTarget,
@@ -15,6 +16,8 @@ import {
   proxyHint,
   REPORTED_OPTIONS,
   ReportedOutcome,
+  rowOutcome,
+  RowOutcome,
   timingHint,
 } from './connection-doctor-catalog';
 
@@ -22,6 +25,16 @@ import {
 export interface DoctorRow {
   target: ProbeTarget;
   verdict: ProbeVerdict;
+  /**
+   * The one signal that decides the row's colour: can this be used?
+   *
+   * Kept separate from {@link verdict}, which only ever meant "did bytes
+   * arrive". A host reached through a working proxy is green here and
+   * `reachable` there, and that difference is the point.
+   */
+  outcome: RowOutcome;
+  /** Headline text for the outcome, e.g. "Working (via proxy)". */
+  outcomeLabel: string;
   /** How long the probe took, already formatted. Null before a run. */
   timing: string | null;
   /** What that duration suggests, when it suggests anything. */
@@ -104,9 +117,12 @@ export class ConnectionDoctorPage {
       };
       const verdict = result.verdict;
       const reported = reports[target.id] ?? null;
+      const outcome = rowOutcome(result);
       const row: DoctorRow = {
         target,
         verdict,
+        outcome,
+        outcomeLabel: outcomeLabel(outcome, result),
         timing: result.ms !== null && verdict !== 'checking' ? formatDuration(result.ms) : null,
         timingHint: timingHint(result),
         corsHint: corsHint(result),
@@ -138,25 +154,42 @@ export class ConnectionDoctorPage {
 
   protected readonly hasRun = computed(() => this.doctor.lastRunAt() !== null);
 
-  protected readonly reachableCount = computed(
-    () => this.allRows().filter((row) => row.verdict === 'reachable').length,
+  /**
+   * Counted by outcome, not by reachability.
+   *
+   * The summary used to say "12 reachable, 3 blocked" while the rows said
+   * things like "needs a proxy" — counting a different question than the one
+   * the page answers. A host working through a proxy belongs in the good
+   * number, because it works.
+   */
+  protected readonly workingCount = computed(
+    () => this.allRows().filter((row) => row.outcome === 'usable').length,
+  );
+
+  protected readonly needsSetupCount = computed(
+    () => this.allRows().filter((row) => row.outcome === 'needs-setup').length,
   );
 
   protected readonly blockedCount = computed(
-    () =>
-      this.allRows().filter((row) => row.verdict === 'failed' || row.verdict === 'timeout').length,
+    () => this.allRows().filter((row) => row.outcome === 'unusable').length,
   );
 
   /**
-   * Hosts that answer but refuse to be read — the population a CORS proxy
-   * exists for, and the one a "disable CORS" extension would appear to fix
-   * while breaking a browser-wide protection to do it.
+   * Hosts that answer but refuse to be read, *and* that nothing has rescued —
+   * the population a CORS proxy exists for, and the one a "disable CORS"
+   * extension would appear to fix while breaking a browser-wide protection.
+   *
+   * Rows already working through a proxy are excluded: listing a solved host
+   * under "these will not work" is the same mixed signal this page had in its
+   * colours, moved into prose.
    */
   protected readonly corsBlockedRows = computed(() =>
     // The control is excluded deliberately: it exists only to prove the test
     // works, so telling the reader it needs a proxy is advice about a host
     // they will never connect to.
-    this.allRows().filter((row) => row.corsBlocked && row.target.category !== 'control'),
+    this.allRows().filter(
+      (row) => row.corsBlocked && row.outcome !== 'usable' && row.target.category !== 'control',
+    ),
   );
 
   /** Whether a proxy is configured at all, which changes what the advice says. */
@@ -219,25 +252,14 @@ export class ConnectionDoctorPage {
   protected report(id: string, outcome: ReportedOutcome): void {
     this.reports.update((current) => ({ ...current, [id]: outcome }));
   }
-
-  protected verdictLabel(verdict: ProbeVerdict): string {
-    return VERDICT_LABELS[verdict];
-  }
 }
 
 function formatDuration(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-/**
- * Verdict copy. "Blocked or unreachable" is wordy on purpose — the browser
- * genuinely cannot tell a firewall from a dead host, and a bare "Blocked"
- * would be the page asserting something it did not observe.
- */
-const VERDICT_LABELS: Record<ProbeVerdict, string> = {
-  idle: 'Not checked',
-  checking: 'Checking…',
-  reachable: 'Reachable',
-  failed: 'Blocked or unreachable',
-  timeout: 'Timed out',
-};
+// Verdict copy now lives in the catalog's `outcomeLabel`, which words the
+// headline in terms of usability rather than reachability. "Blocked or
+// unreachable" survives there, still wordy on purpose: the browser genuinely
+// cannot tell a firewall from a dead host, and a bare "Blocked" would be the
+// page asserting something it did not observe.

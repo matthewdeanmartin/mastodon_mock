@@ -51,6 +51,12 @@
   border-color: rgb(214 59 59 / 35%);
 }
 
+/* Reachable, unreadable, and fixable from here. A different state from both
+   "working" and "blocked": nothing is broken, but something must be set up. */
+.doc-row-warn {
+  border-color: rgb(160 106 0 / 35%);
+}
+
 .doc-row-head {
   display: flex;
   align-items: baseline;
@@ -90,6 +96,10 @@
   color: #d63b3b;
 }
 
+.doc-warn {
+  color: #a06a00;
+}
+
 .doc-verdict-wrap {
   display: flex;
   align-items: baseline;
@@ -112,16 +122,14 @@
   margin: 6px 0 0;
 }
 
-/* A working proxy is the one genuinely good outcome on an otherwise unreadable
-   host, and it changes where the reader should look next — so it gets the
-   success colour rather than sitting in the same grey as the diagnosis above. */
-.doc-proxy-ok {
-  color: #2b8a3e;
-}
+/* A working proxy no longer colours its own line green: it now decides the
+   row's headline instead, which says "Working (via proxy)". Two green things
+   saying the same thing was redundant, and it was the half of the amber/green
+   pair that made a solved row look unresolved. */
 
-/* The readable/blocked line is the one that decides whether a proxy is needed,
-   so a blocked host is marked — but in the neutral warning colour, not the red
-   used for unreachable. It is a different kind of problem with a real fix. */
+/* Marks a genuinely open CORS problem — but in the neutral warning colour, not
+   the red used for unreachable. Applied only while the row is not yet usable;
+   once a proxy has rescued it, the line stays but loses the colour. */
 .doc-cors-blocked {
   color: #a06a00;
 }

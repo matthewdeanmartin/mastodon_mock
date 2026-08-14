@@ -1,4 +1,4 @@
-import { Component, inject, input, OnDestroy, output, signal } from '@angular/core';
+import { Component, inject, input, OnDestroy, OnInit, output, signal } from '@angular/core';
 import { MastodonServers, ServerSuggestion } from '../mastodon-servers';
 import { probeServerAvailability } from '../server-availability';
 
@@ -17,11 +17,22 @@ export interface DiscoveredServer extends ServerSuggestion {
   templateUrl: './server-discovery.html',
   styleUrl: './server-discovery.css',
 })
-export class ServerDiscovery implements OnDestroy {
+export class ServerDiscovery implements OnDestroy, OnInit {
   private readonly directory = inject(MastodonServers);
 
   readonly currentServer = input('');
   readonly startLabel = input('Find another server');
+  /**
+   * Begin hunting on mount instead of waiting for a click.
+   *
+   * For the unreachable-server dialog, where the visitor did not go looking for
+   * a server picker — they asked to read the app and the door was shut. Making
+   * them press a button to start a search they never requested adds a step to
+   * an error path. Off by default: the settings and login mounts are places
+   * someone chose to go, and a page that starts probing hundreds of hosts on
+   * arrival is not what those pages promise.
+   */
+  readonly autoStart = input(false);
   readonly selected = output<string>();
 
   protected readonly state = signal<DiscoveryState>('idle');
@@ -33,6 +44,12 @@ export class ServerDiscovery implements OnDestroy {
   private readonly attempted = new Set<string>();
   private searchAbort: AbortController | null = null;
   private searchSequence = 0;
+
+  ngOnInit(): void {
+    if (this.autoStart()) {
+      void this.startSearch();
+    }
+  }
 
   ngOnDestroy(): void {
     this.cancel(false);

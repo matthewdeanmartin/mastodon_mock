@@ -25,15 +25,25 @@ describe('AnonymousEntry', () => {
     expect(navigate).toHaveBeenCalledWith('/home', { replaceUrl: true });
   });
 
-  it('sends a fresh browser to the front page when the default server is blocked', async () => {
+  // Previously this redirected to `/`, which probes three hard-coded servers and,
+  // if all are blocked, enters against an unreachable one — a fail whale by a
+  // longer road. A network that blocks mastodon.social usually blocks the other
+  // candidates too, so the dead end became a directory-wide search instead.
+  it('offers a server search instead of entering when the default server is blocked', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('blocked')));
     const auth = TestBed.inject(Auth);
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
 
-    TestBed.createComponent(AnonymousEntry).detectChanges();
+    const fixture = TestBed.createComponent(AnonymousEntry);
+    fixture.detectChanges();
 
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true }));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-unreachable-server-dialog')).not.toBeNull();
+    });
+    // Nothing was entered and nowhere was navigated: the dialog owns what happens next.
+    expect(navigate).not.toHaveBeenCalled();
     expect(auth.isAuthenticated).toBe(false);
   });
 

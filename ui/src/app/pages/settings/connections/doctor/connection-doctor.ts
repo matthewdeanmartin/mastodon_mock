@@ -122,17 +122,26 @@ export class ConnectionDoctor {
       return { verdict: 'reachable', cors, proxy, ms, proxyMs };
     } catch {
       const ms = Math.round(performance.now() - started);
-      // Distinguishing the two is the only inference this method makes, and it
-      // is a safe one: the abort came from our own timer, not from the network.
-      return {
-        verdict: timeout.aborted ? 'timeout' : 'failed',
-        cors: 'unknown',
-        // An unreachable host tells us nothing about the proxy, and testing it
-        // here would blame the proxy for a network block.
-        proxy: 'unknown',
-        ms,
-        proxyMs: null,
-      };
+      const verdict = timeout.aborted ? ('timeout' as const) : ('failed' as const);
+      // The direct request did not arrive. That used to end the enquiry, on the
+      // reasoning that a host we cannot reach tells us nothing about the proxy —
+      // but it gets the practical question backwards and produced a flatly wrong
+      // answer for the user.
+      //
+      // Observed: the doctor reported api.short.io "blocked or unreachable",
+      // while shortening a link through the configured proxy worked on the very
+      // next screen. The direct leg failing is not evidence the *feature* fails;
+      // it is evidence the browser cannot go straight there, which is the exact
+      // situation a proxy exists for.
+      //
+      // So the proxy is still asked. It is a hop that does not depend on this
+      // browser reaching the host at all, and its answer is the one that decides
+      // whether the connector can work. The verdict below stays `failed` —
+      // nothing here reaches the host directly — but the row can now say "not
+      // directly, but your proxy gets there", which is the truth and is
+      // actionable.
+      const { proxy, proxyMs } = await this.probeViaProxy(target, timeoutMs);
+      return { verdict, cors: 'unknown', proxy, ms, proxyMs };
     }
   }
 
