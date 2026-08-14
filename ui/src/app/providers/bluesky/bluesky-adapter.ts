@@ -279,6 +279,11 @@ export function adaptPost(post: BskyPostView): Status {
     sensitive: false,
     poll: null,
     quote_approval_policy: null,
+    // First of the declared languages: the record carries an array, Mastodon's
+    // shape carries one, and everything downstream (the Language facet, the
+    // per-language filter) reads the single value. Absent on plenty of posts,
+    // which is a real null rather than a default worth inventing.
+    language: post.record.langs?.[0] ?? null,
     media_attachments: adaptImages(post.embed, post.uri),
   };
 }

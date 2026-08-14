@@ -50,6 +50,13 @@ export interface BskyPostRecord {
   $type: string;
   text: string;
   createdAt: string;
+  /**
+   * Declared languages, BCP-47. Optional — plenty of clients omit it — and an
+   * array because a post may declare several; Mastodon's `language` is a single
+   * value, so the adapter takes the first. This is what `lang:` filters on and
+   * what the Language facet counts.
+   */
+  langs?: string[];
   facets?: BskyFacet[];
   reply?: {
     root: { uri: string; cid: string };

@@ -89,6 +89,27 @@ describe('adaptPost', () => {
     expect(ref.likeUri).toBeNull();
   });
 
+  it('takes the first declared language, which the Language facet counts', () => {
+    // The record carries an array and Mastodon's shape carries one value, so
+    // the first wins. Without this the Language facet was always empty and the
+    // refine panel silently dropped it for having nothing to discriminate on.
+    const status = adaptPost(
+      makePost({
+        record: {
+          $type: 'app.bsky.feed.post',
+          text: 'Bonjour',
+          createdAt: '2026-07-14T10:00:00.000Z',
+          langs: ['fr', 'en'],
+        },
+      }),
+    );
+    expect(status.language).toBe('fr');
+  });
+
+  it('reports no language when the post declares none, rather than guessing', () => {
+    expect(adaptPost(makePost()).language).toBeNull();
+  });
+
   it('maps viewer like/repost state and keeps the record uris for undo', () => {
     const status = adaptPost(
       makePost({ viewer: { like: 'at://me/like/1', repost: 'at://me/repost/2' } }),

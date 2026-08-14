@@ -51,7 +51,7 @@
         }
       </optgroup>
     </select>
-    <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
+    <button class="btn" [disabled]="searchDisabled()" (click)="run()">Search</button>
     @if (canUseSearchHelper()) {
       <button
         class="btn btn-outline"

@@ -319,74 +319,9 @@
 
 /* ---- Client-side refinement layer (sprint 1) ---- */
 
-.refine-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.refine-filter {
-  flex: 1;
-  min-width: 160px;
-  padding: 7px 12px;
-  border: 1px solid var(--border);
-  border-radius: 9999px;
-  background: var(--col-bg);
-  color: var(--text);
-  font-size: 14px;
-}
-
-.group-by {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 /* Sort-of-loaded-results dropdown, sat beside the filter/group-by controls. */
-.sort-by {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sort-by select {
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: inherit;
-  font-size: 13px;
-}
 
 /* Segmented control, matched to chat's .seg so the app reads as one system. */
-.seg {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.seg button {
-  border: none;
-  background: none;
-  color: inherit;
-  font-size: 13px;
-  padding: 5px 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.seg button + button {
-  border-left: 1px solid var(--border);
-}
-
-.seg button.active {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  font-weight: 700;
-}
 
 /* The on-demand "check activity" offer, and its in-flight/error states. */
 .enrich-offer {
@@ -407,56 +342,6 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
-}
-
-.refine-facets {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.refine-facets > summary {
-  cursor: pointer;
-  font-weight: 700;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.facet {
-  margin-top: 10px;
-}
-
-.facet-label {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 4px;
-}
-
-.facet-value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
-  cursor: pointer;
-}
-
-.facet-value .facet-count {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
-
-.result-status {
-  padding: 10px 16px;
-}
-
-.group-head {
-  padding: 12px 16px 4px;
-  font-weight: 800;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--muted, #777);
-  border-top: 1px solid var(--border);
 }
 
 /* ---- Advanced form fields (sprint 2) ---- */
@@ -529,24 +414,7 @@
 /* ---- API-call budget (sprint 3) ---- */
 
 .budget-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.budget-row {
   flex-wrap: wrap;
-}
-
-.budget-row select {
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--col-bg);
-  color: var(--text);
-  font-size: 14px;
 }
 
 .load-more-row {
@@ -656,70 +524,13 @@
 
 /* --- Flood control (author exclusion + repeat collapsing) --- */
 
-.flood-control {
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-  margin-top: 8px;
-}
-
-.exclude-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.exclude-row .facet-value {
-  flex: 1;
-  min-width: 0;
-}
-
 /* An excluded author stays listed (with their count) so the exclusion can be
    undone knowingly — dimmed, not removed. */
-.exclude-row.excluded .facet-value span:not(.facet-count) {
-  text-decoration: line-through;
-  opacity: 0.6;
-}
-
-.muted-flag {
-  flex: none;
-  font-style: italic;
-}
 
 /* A button that reads as a link: used for low-weight inline actions next to
    real controls, where a second .btn would compete with the primary one. */
-.link-btn {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  color: var(--accent, #1d9bf0);
-  cursor: pointer;
-  white-space: nowrap;
-  flex: none;
-}
-
-.link-btn:hover {
-  text-decoration: underline;
-}
-
-.collapse-note {
-  margin: 2px 0 0 26px;
-}
 
 /* Sits under the post it stands in for, indented so the pair reads as one row. */
-.repeat-note {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 4px 0 8px 16px;
-  border-left: 2px solid var(--border);
-  margin-left: 8px;
-}
-
-.repeat-list {
-  margin-left: 8px;
-  border-left: 2px solid var(--border);
-}
 
 /* The "you excluded so much there's nothing left" nudge. */
 .thin-results {

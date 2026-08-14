@@ -43,6 +43,7 @@ interface SearchInternals {
   onTypeSelect(value: string, el?: HTMLSelectElement): void;
   onNetworkSelect(value: string): void;
   networkSelection(): string;
+  searchDisabled(): boolean;
   typeUnavailable(type: 'accounts' | 'statuses' | 'hashtags'): boolean;
   blueskyTarget(): 'accounts' | 'statuses';
   queryPlaceholder(): string;
@@ -1054,6 +1055,17 @@ describe('Search', () => {
       expect(internals(fixture).blueskyTarget()).toBe('statuses');
     });
 
+    it('keeps what the reader typed when the network changes', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('angular');
+
+      internals(fixture).onNetworkSelect('bluesky');
+
+      // "Search this on the other one" is the reason people reach for the
+      // select, so clearing the box would delete the whole point of the click.
+      expect(internals(fixture).query()).toBe('angular');
+    });
+
     it('names the network in the shared box placeholder', () => {
       const fixture = setUp();
       internals(fixture).type.set('accounts');
@@ -1088,6 +1100,63 @@ describe('Search', () => {
       // No linked account: the link asks for Posts, which would open the select
       // on a disabled option.
       expect(internals(fixture).type()).toBe('accounts');
+    });
+  });
+
+  /**
+   * The shared Search button.
+   *
+   * It is disabled by exactly one thing that always holds — an empty box — plus
+   * the in-flight state of *the network being searched*. Reading Mastodon's
+   * `searching` flag while the Bluesky panel is showing produced a button that
+   * was dead for a request having nothing to do with what was on screen, and
+   * because the Bluesky branch of the URL handler returns early without
+   * clearing the flag, a reload did not fix it either.
+   */
+  describe('shared Search button', () => {
+    it('is disabled only by an empty box when nothing is in flight', () => {
+      const fixture = setUp();
+      expect(internals(fixture).searchDisabled()).toBe(true);
+
+      internals(fixture).query.set('angular');
+
+      expect(internals(fixture).searchDisabled()).toBe(false);
+    });
+
+    it('ignores whitespace, which is not a query', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('   ');
+      expect(internals(fixture).searchDisabled()).toBe(true);
+    });
+
+    it('is disabled while a Mastodon search is in flight', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('angular');
+      internals(fixture).searching.set(true);
+
+      expect(internals(fixture).searchDisabled()).toBe(true);
+    });
+
+    it('stays clickable on Bluesky while a Mastodon search is in flight', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('angular');
+      internals(fixture).searching.set(true);
+
+      internals(fixture).onNetworkSelect('bluesky');
+
+      // The regression: switching away used to leave the button disabled by the
+      // abandoned Mastodon request, and the URL round-trip re-entered through
+      // an early return that never cleared it.
+      expect(internals(fixture).searchDisabled()).toBe(false);
+    });
+
+    it('clears the abandoned Mastodon search when the URL lands on Bluesky', () => {
+      const fixture = setUp();
+      internals(fixture).searching.set(true);
+
+      queryParams$.next(convertToParamMap({ type: 'bluesky-posts' }));
+
+      expect(internals(fixture).searching()).toBe(false);
     });
   });
 });

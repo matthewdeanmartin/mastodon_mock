@@ -147,7 +147,10 @@ const THIN_RESULTS = 10;
     BlueskySearchPanel,
   ],
   templateUrl: './search.html',
-  styleUrl: './search.css',
+  // The refine layer's styles are shared with the Bluesky panel, so they live in
+  // their own file that both components list — see the header of
+  // search-refine.css for why a copy would not do.
+  styleUrls: ['./search.css', './search-refine.css'],
 })
 export class Search implements OnInit, OnDestroy {
   /** post/tweet/florp vocabulary, per the Blue setting. */
@@ -436,6 +439,22 @@ export class Search implements OnInit, OnDestroy {
    */
   protected networkSelection = computed(() => (this.blueskyMode() ? 'bluesky' : 'mastodon'));
 
+  /**
+   * Whether the shared Search button is unavailable.
+   *
+   * Biased towards being clickable: the only reason that always holds is an
+   * empty box. Beyond that we consult the in-flight flag of the network being
+   * searched — and *only* that one. `searching()` is the Mastodon fetch's flag,
+   * so reading it on the Bluesky panel disabled the button for a request that
+   * has nothing to do with what is on screen.
+   */
+  protected searchDisabled = computed(() => {
+    if (!this.query().trim()) {
+      return true;
+    }
+    return this.blueskyMode() ? (this.blueskyPanel()?.searching() ?? false) : this.searching();
+  });
+
   /** What the shared box is searching right now, spelled out for the reader. */
   protected queryPlaceholder = computed(() => {
     const network = this.blueskyMode() ? 'Bluesky' : 'Mastodon';
@@ -497,6 +516,10 @@ export class Search implements OnInit, OnDestroy {
     this.webDropped.set([]);
     if (!bluesky) {
       this.blueskyMode.set(false);
+      // Coming back the other way, the stale flag would be a *Bluesky* request's
+      // — the panel owns that one and clears it itself, but this page's own flag
+      // may still be set from before the reader ever left.
+      this.searching.set(false);
       void this.router.navigate([], {
         relativeTo: this.route,
         queryParams: { type: this.type(), q: this.query().trim() || null },
@@ -505,6 +528,12 @@ export class Search implements OnInit, OnDestroy {
       return;
     }
     this.blueskyMode.set(true);
+    // Abandon any Mastodon request still in flight, here rather than only in the
+    // URL handler below: the navigation is async, so relying on the round-trip
+    // left the shared Search button disabled for the gap between the two — and
+    // entirely, if the navigation coalesced into a no-op.
+    this.activeSearch?.unsubscribe();
+    this.searching.set(false);
     if (this.typeUnavailable(this.type())) {
       this.type.set('accounts');
     }
@@ -512,9 +541,19 @@ export class Search implements OnInit, OnDestroy {
     // restore it. Without this the Bluesky panel is reachable only by using
     // the dropdown — clicking a result and pressing Back landed you on
     // Mastodon Accounts with the query gone.
+    //
+    // The query rides along rather than being cleared. It used to be dropped
+    // (`q: null`) because the panel owned a separate box, so the page's `q` was
+    // not the one on screen. Now there is one box: wiping it would delete what
+    // the reader just typed for the crime of changing network, when "search
+    // this on the other one" is precisely why they reached for the select.
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { type: BLUESKY_WIRE_TYPE, bskyType: this.type(), q: null },
+      queryParams: {
+        type: BLUESKY_WIRE_TYPE,
+        bskyType: this.type(),
+        q: this.query().trim() || null,
+      },
       queryParamsHandling: 'merge',
     });
   }
@@ -1101,6 +1140,13 @@ export class Search implements OnInit, OnDestroy {
       // once here keeps that boundary exactly where it already was.
       if (rawType === BLUESKY_WIRE_TYPE) {
         this.blueskyMode.set(true);
+        // Leaving Mastodon abandons any Mastodon search that was in flight. Its
+        // `searching` flag has to be cleared with it: the flag gates the shared
+        // Search button, so a request left hanging here came back as a dead
+        // button on the *other* network — surviving a reload, because the URL
+        // it reloaded still routed through this early return.
+        this.activeSearch?.unsubscribe();
+        this.searching.set(false);
         // Which half of Bluesky — posts or accounts — rides alongside as
         // `bskyType`, so a shared link restores the type select too. Absent in
         // links made before the selects were split; posts was the only mode
@@ -1123,6 +1169,8 @@ export class Search implements OnInit, OnDestroy {
       // Bluesky-primary readers and show them something the sender never saw.
       if (!rawType && !q && this.auth.isBlueskyPrimary) {
         this.blueskyMode.set(true);
+        this.activeSearch?.unsubscribe();
+        this.searching.set(false);
         // Posts is the interesting default, but it needs a session; without one
         // the select would open on a disabled option.
         this.type.set(this.session.linked() ? 'statuses' : 'accounts');

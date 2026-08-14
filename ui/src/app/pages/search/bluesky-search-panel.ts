@@ -21,7 +21,22 @@ import {
   hasBlueskyFilters,
   parseTags,
 } from '../../providers/bluesky/bluesky-post-search';
-import { filterLoaded, buildFacets, statusMatchesFacet, FacetKind } from './search-refine';
+import {
+  filterLoaded,
+  buildFacets,
+  statusMatchesFacet,
+  excludeAuthors,
+  collapsedCount,
+  groupResults,
+  // Aliased: this component exposes a `collapseRepeats` *signal* of its own,
+  // the same way the Mastodon panel does.
+  collapseRepeats as collapseRepeatRuns,
+  CollapsedStatus,
+  Facet,
+  FacetKind,
+} from './search-refine';
+import { ResultGrouping } from './mawkingbird-search';
+import { LocalModeration } from '../../local-moderation';
 import { parseBlueskyQuery, serializeBlueskyQuery } from './bluesky-query-serializer';
 import {
   sortAccounts,
@@ -53,6 +68,16 @@ import { Terminology } from '../../terminology';
  */
 export type BlueskySearchTarget = 'statuses' | 'accounts';
 
+/** Pages pulled eagerly on Search, before the reader asks for more. */
+const BLUESKY_DEFAULT_BUDGET = 2;
+/**
+ * Where "Load more" stops regardless of what the reader clicks.
+ *
+ * Same purpose as the Mastodon side's cap: the budget is the eager phase, this
+ * is the runaway guard. Bluesky pages are 25, so this is ~750 posts.
+ */
+const BLUESKY_LOAD_MORE_HARD_CAP = 30;
+
 /**
  * Bluesky search: the criteria form and the results, inside the page's layout.
  *
@@ -77,7 +102,7 @@ export type BlueskySearchTarget = 'statuses' | 'accounts';
   selector: 'app-bluesky-search-panel',
   imports: [FormsModule, StatusCard, AccountResultCard],
   templateUrl: './bluesky-search-panel.html',
-  styleUrl: './bluesky-search-panel.css',
+  styleUrls: ['./bluesky-search-panel.css', './search-refine.css'],
 })
 export class BlueskySearchPanel {
   /** post/tweet/florp vocabulary, per the Blue setting. */
@@ -165,6 +190,7 @@ export class BlueskySearchPanel {
   private accountSearch = inject(BlueskyAccountSearch);
   private graph = inject(BlueskyGraph);
   private diagnostics = inject(PageDiagnostics);
+  private localMod = inject(LocalModeration);
   protected session = inject(BlueskySession);
   private auth = inject(Auth);
   private anonymousFollows = inject(AnonymousFollows);
@@ -302,7 +328,8 @@ export class BlueskySearchPanel {
   protected tagInput = signal('');
 
   protected statuses = signal<Status[]>([]);
-  protected searching = signal(false);
+  /** Readable by the page, which owns the shared Search button. */
+  readonly searching = signal(false);
   protected loadingMore = signal(false);
   protected error = signal<string | null>(null);
   protected ran = signal(false);
@@ -310,12 +337,61 @@ export class BlueskySearchPanel {
   /** Signals, not fields: `exhausted` is a computed and must see them change. */
   private cursor = signal<string | null>(null);
 
+  // --- API-call budget ---
+  // The same bargain the Mastodon side strikes: pull several pages eagerly on
+  // Search so client-side faceting has a real corpus to work with, then let
+  // "Load more" keep going past the budget up to a hard cap. Bluesky costs
+  // exactly one request per page for both targets — there is no anonymous
+  // fan-out to account for — so `callsUsed` is simply the page count.
+  protected readonly budgetOptions: { value: number; label: string }[] = [
+    { value: 1, label: '1 page (~25)' },
+    { value: 2, label: '2 pages (~50)' },
+    { value: 3, label: '3 pages (~75)' },
+    { value: 5, label: '5 pages (~125)' },
+    { value: 10, label: '10 pages (~250)' },
+  ];
+  protected apiBudget = signal(BLUESKY_DEFAULT_BUDGET);
+  protected callsUsed = signal(0);
+
+  protected setBudget(value: number | string): void {
+    const next = Number(value) || BLUESKY_DEFAULT_BUDGET;
+    this.diagnostics.info('Search', 'user:set-budget', {
+      network: 'bluesky',
+      from: this.apiBudget(),
+      to: next,
+    });
+    this.apiBudget.set(next);
+    // Raising it after a search tops up with the extra pages, rather than
+    // making the reader re-run the search to spend the budget they just chose.
+    if (this.ran() && !this.searching() && !this.loadingMore() && this.autoFillWants()) {
+      this.loadMore();
+    }
+  }
+
+  /**
+   * Whether to keep paging automatically.
+   *
+   * Guarded on the last page having grown as well as on the budget: a cursor
+   * that keeps returning already-seen posts would otherwise loop until the cap.
+   */
+  private autoFillWants(): boolean {
+    const more = this.target() === 'accounts' ? !!this.accountCursor() : !!this.cursor();
+    return more && this.callsUsed() < this.apiBudget();
+  }
+
   // Client-side refinement over what is already loaded. Identical in behaviour
   // to the Mastodon side because it is literally the same functions.
   protected loadedFilter = signal('');
   /** Facets start open, matching the Mastodon panel's `refineOpen`. */
   protected refineOpen = signal(true);
   protected statusSort = signal<StatusSortKey>('relevance');
+  /** None / author / date, the same three the Mastodon panel offers. */
+  protected grouping = signal<ResultGrouping>('none');
+  /** Authors excluded from *this* search only — the flood-control escape hatch. */
+  protected excludedAuthors = signal<ReadonlySet<string>>(new Set());
+  protected collapseRepeats = signal(false);
+  /** Rows whose folded-away repeats the reader has expanded. */
+  private expandedRepeats = signal<ReadonlySet<string>>(new Set());
   protected selectedFacets = signal<{ kind: FacetKind; value: string }[]>([]);
   protected readonly statusSorts = STATUS_SORTS;
 
@@ -332,29 +408,165 @@ export class BlueskySearchPanel {
 
   protected facets = computed(() => buildFacets(this.statuses()));
 
+  /** The author facet, pulled out to drive flood control. */
+  protected authorFacet = computed<Facet | null>(
+    () => this.facets().find((f) => f.kind === 'author') ?? null,
+  );
+
   protected activeFilters = computed(() => describeBlueskyFilters(this.criteria()));
   protected hasFilters = computed(() => hasBlueskyFilters(this.criteria()));
 
-  /** The loaded posts after the text filter, facet selections and sort. */
-  protected visible = computed(() => {
-    const selected = this.selectedFacets();
-    const matching = this.statuses().filter((status) =>
-      selected.every(({ kind, value }) => statusMatchesFacet(status, kind, value)),
+  /**
+   * The loaded posts after facets, author exclusions, the text filter and sort.
+   *
+   * Deliberately the same order of operations as the Mastodon side's
+   * `refinedStatuses`, using the same pure functions — these are the behaviours
+   * a reader learns once and expects on both networks.
+   */
+  protected refinedStatuses = computed(() => {
+    const all = this.statuses();
+    // Values of the *same* kind OR together (two languages = either), while
+    // different kinds AND (a language and an author = both).
+    const byKind = new Map<FacetKind, string[]>();
+    for (const f of this.selectedFacets()) {
+      byKind.set(f.kind, [...(byKind.get(f.kind) ?? []), f.value]);
+    }
+    const faceted = all.filter((s) =>
+      [...byKind.entries()].every(([kind, values]) =>
+        values.some((v) => statusMatchesFacet(s, kind, v)),
+      ),
     );
-    return sortStatuses(filterLoaded(matching, this.loadedFilter()), this.statusSort());
+    // Exclusion before the text filter, so "hidden by exclusion" counts what it
+    // says it counts.
+    const kept = excludeAuthors(faceted, this.excludedAuthors());
+    return sortStatuses(filterLoaded(kept, this.loadedFilter()), this.statusSort());
   });
+
+  /** One row per surviving post, carrying any near-identical siblings. */
+  protected statusRows = computed<CollapsedStatus[]>(() =>
+    this.collapseRepeats()
+      ? collapseRepeatRuns(this.refinedStatuses())
+      : this.refinedStatuses().map((status) => ({ status, duplicates: [] })),
+  );
+
+  /** The posts actually on screen — what grouping and the counters work from. */
+  protected visible = computed<Status[]>(() => this.statusRows().map((row) => row.status));
+
+  /** Loaded posts reshaped by the current grouping selection. */
+  protected groups = computed(() => groupResults(this.visible(), this.grouping()));
+
+  private duplicatesById = computed(() => {
+    const map = new Map<string, Status[]>();
+    for (const row of this.statusRows()) {
+      if (row.duplicates.length) {
+        map.set(row.status.id, row.duplicates);
+      }
+    }
+    return map;
+  });
+
+  /** Near-identical posts this row stands in for. Empty when none. */
+  protected duplicatesOf(id: string): Status[] {
+    return this.duplicatesById().get(id) ?? [];
+  }
+
+  protected isRepeatExpanded(id: string): boolean {
+    return this.expandedRepeats().has(id);
+  }
+
+  protected toggleRepeat(id: string): void {
+    this.expandedRepeats.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  /** How many posts the exclusions removed from the loaded set. */
+  protected excludedCount = computed(() => {
+    const excluded = this.excludedAuthors();
+    if (!excluded.size) {
+      return 0;
+    }
+    return this.statuses().filter((s) => excluded.has(s.account.acct)).length;
+  });
+
+  /** How many near-identical posts the collapse toggle folded away. */
+  protected repeatsHidden = computed(() =>
+    this.collapseRepeats() ? collapsedCount(this.statusRows()) : 0,
+  );
+
+  protected isAuthorExcluded(acct: string): boolean {
+    return this.excludedAuthors().has(acct);
+  }
+
+  /** Exclude or restore one author for this search. */
+  protected toggleExcludedAuthor(acct: string): void {
+    this.excludedAuthors.update((set) => {
+      const next = new Set(set);
+      if (next.has(acct)) {
+        next.delete(acct);
+      } else {
+        next.add(acct);
+      }
+      return next;
+    });
+    this.diagnostics.info('Search', 'user:toggle-author-exclusion', {
+      network: 'bluesky',
+      total: this.excludedAuthors().size,
+    });
+  }
+
+  protected clearExcludedAuthors(): void {
+    this.excludedAuthors.set(new Set());
+  }
+
+  /**
+   * Mute an author everywhere, not just in this search.
+   *
+   * The same escalation the Mastodon panel offers, through the same
+   * `LocalModeration` store — it is client-side, so it works against Bluesky
+   * accounts exactly as it does against Mastodon ones.
+   */
+  protected muteAuthorEverywhere(acct: string): void {
+    const account = this.statuses().find((s) => s.account.acct === acct)?.account;
+    if (!account) {
+      return;
+    }
+    this.localMod.mute(account, null);
+    this.excludedAuthors.update((set) => new Set(set).add(acct));
+    this.diagnostics.info('Search', 'user:mute-from-search', {
+      from: 'flood-control',
+      network: 'bluesky',
+    });
+  }
+
+  /** True once an author has been muted app-wide, so the row can say so. */
+  protected isAuthorMuted(acct: string): boolean {
+    this.localMod.entries();
+    const account = this.statuses().find((s) => s.account.acct === acct)?.account;
+    return !!account && this.localMod.isMuted(account);
+  }
 
   /** Patch a field of the criteria object without replacing the rest. */
   protected set<K extends keyof BlueskyPostSearch>(key: K, value: BlueskyPostSearch[K]): void {
     this.criteria.update((current) => ({ ...current, [key]: value }));
   }
 
+  /**
+   * Toggle one facet value.
+   *
+   * Additive within a kind, matching the Mastodon panel: picking a second
+   * language widens to "either", it does not replace the first.
+   */
   protected toggleFacet(kind: FacetKind, value: string): void {
     this.selectedFacets.update((current) => {
       const hit = current.find((f) => f.kind === kind && f.value === value);
-      return hit
-        ? current.filter((f) => f !== hit)
-        : [...current.filter((f) => f.kind !== kind), { kind, value }];
+      return hit ? current.filter((f) => f !== hit) : [...current, { kind, value }];
     });
   }
 
@@ -365,6 +577,7 @@ export class BlueskySearchPanel {
   protected clearRefinements(): void {
     this.selectedFacets.set([]);
     this.loadedFilter.set('');
+    this.excludedAuthors.set(new Set());
   }
 
   /** Drop results and paging state, keeping the query the reader typed. */
@@ -372,6 +585,10 @@ export class BlueskySearchPanel {
     this.statuses.set([]);
     this.accounts.set([]);
     this.clearRefinements();
+    this.collapseRepeats.set(false);
+    this.expandedRepeats.set(new Set());
+    this.grouping.set('none');
+    this.callsUsed.set(0);
     this.cursor.set(null);
     this.accountCursor.set(null);
     this.ran.set(false);
@@ -439,9 +656,19 @@ export class BlueskySearchPanel {
     if (!cursor || this.loadingMore() || this.searching()) {
       return;
     }
+    // The manual button keeps working past the budget — the reader asked for
+    // more — but never past the runaway cap.
+    if (this.callsUsed() >= BLUESKY_LOAD_MORE_HARD_CAP) {
+      return;
+    }
     this.loadingMore.set(true);
     this.fetch();
   }
+
+  /** True while there is another page to fetch and room to fetch it. */
+  protected canLoadMore = computed(
+    () => !this.exhausted() && this.callsUsed() < BLUESKY_LOAD_MORE_HARD_CAP,
+  );
 
   private fetch(): void {
     if (this.target() === 'accounts') {
@@ -454,35 +681,50 @@ export class BlueskySearchPanel {
   private fetchPosts(): void {
     this.search.search(this.criteria(), this.cursor()).subscribe({
       next: (page) => {
+        this.callsUsed.update((c) => c + 1);
         this.cursor.set(page.cursor);
         // Dedupe: a shifting index can repeat a post across pages.
         const seen = new Set(this.statuses().map((s) => s.id));
-        this.statuses.update((list) => [...list, ...page.statuses.filter((s) => !seen.has(s.id))]);
+        const fresh = page.statuses.filter((s) => !seen.has(s.id));
+        this.statuses.update((list) => [...list, ...fresh]);
         this.hitsTotal.set(page.hitsTotal ?? null);
         this.settle();
         this.diagnostics.info('Search', 'load:bsky-posts', {
           results: page.statuses.length,
           more: !!page.cursor,
+          callsUsed: this.callsUsed(),
         });
+        // Guarded on the page having actually grown, so a cursor that keeps
+        // handing back posts we already have ends the loop instead of spending
+        // the whole budget on duplicates.
+        this.maybeAutoFill(fresh.length > 0);
       },
       error: (error: unknown) => this.fail(error, 'load:bsky-posts-error'),
     });
   }
 
+  /** Keep paging while the budget allows and the last page brought something. */
+  private maybeAutoFill(pageGrew: boolean): void {
+    if (pageGrew && this.autoFillWants()) {
+      this.loadMore();
+    }
+  }
+
   private fetchAccounts(): void {
     this.accountSearch.search(this.criteria().text.trim(), this.accountCursor()).subscribe({
       next: (page) => {
+        this.callsUsed.update((c) => c + 1);
         this.accountCursor.set(page.cursor);
         const seen = new Set(this.accounts().map((r) => r.account.id));
-        this.accounts.update((list) => [
-          ...list,
-          ...page.results.filter((r) => !seen.has(r.account.id)),
-        ]);
+        const fresh = page.results.filter((r) => !seen.has(r.account.id));
+        this.accounts.update((list) => [...list, ...fresh]);
         this.settle();
         this.diagnostics.info('Search', 'load:bsky-accounts', {
           results: page.results.length,
           more: !!page.cursor,
+          callsUsed: this.callsUsed(),
         });
+        this.maybeAutoFill(fresh.length > 0);
       },
       error: (error: unknown) => this.fail(error, 'load:bsky-accounts-error'),
     });

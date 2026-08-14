@@ -122,7 +122,10 @@
   margin-top: 10px;
 }
 
-/* --- Refinement: identical rules to the Mastodon panel's. --- */
+/* --- Active-filter chips. --- */
+/* Everything below the chips — the refine bar, facets, flood control, result
+   counters, budget row — comes from the shared search-refine.css that this
+   component and the Mastodon panel both list in `styleUrls`. */
 
 .chips {
   display: flex;
@@ -148,78 +151,6 @@
 .chip-server {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-.refine-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.refine-filter {
-  flex: 1;
-  min-width: 160px;
-  padding: 7px 12px;
-  border: 1px solid var(--border);
-  border-radius: 9999px;
-  background: var(--col-bg);
-  color: var(--text);
-  font-size: 14px;
-}
-
-.sort-by {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sort-by select {
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: inherit;
-  font-size: 13px;
-}
-
-.refine-facets {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.refine-facets > summary {
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.facet {
-  margin-top: 10px;
-}
-
-.facet-label {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.facet-value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.facet-count {
-  margin-left: auto;
-  font-size: 13px;
-}
-
-.result-status {
-  padding: 10px 16px;
 }
 
 /* --- Results column. --- */
