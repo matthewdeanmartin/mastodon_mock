@@ -132,13 +132,7 @@ export interface AccountFacetValue {
   count: number;
 }
 
-export type AccountFacetKind =
-  | 'domain'
-  | 'bot'
-  | 'locked'
-  | 'followers'
-  | 'statuses'
-  | 'activity';
+export type AccountFacetKind = 'domain' | 'bot' | 'locked' | 'followers' | 'statuses' | 'activity';
 
 export interface AccountFacet {
   kind: AccountFacetKind;

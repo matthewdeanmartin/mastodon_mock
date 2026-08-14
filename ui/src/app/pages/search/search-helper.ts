@@ -4,6 +4,9 @@ import { Api } from '../../api';
 import { OpenRouterChat } from '../../providers/openrouter/openrouter-chat';
 import { SuggestionReply } from '../../providers/openrouter/json-suggestions';
 import { PromptTemplateStore } from '../../providers/openrouter/prompt-templates';
+import { BlueskySearch } from '../../providers/bluesky/bluesky-search';
+import { BlueskyAccountSearch } from '../../providers/bluesky/bluesky-account-search';
+import { parseBlueskyQuery } from './bluesky-query-serializer';
 
 /**
  * Prose in, a runnable Mastodon search query out.
@@ -90,7 +93,20 @@ export interface SearchContext {
   target: SearchTargetKind;
   /** Advanced-form fields already set, as ready-to-read "Label: value" lines. */
   filters?: string[];
+  /**
+   * Which network the query has to run against.
+   *
+   * The two dialects are close enough to be confused and different enough to
+   * fail: `after:` vs `since:`, `+word` vs bare words, and `has:media` — which
+   * Mastodon honours and Bluesky treats as a literal search word. A model given
+   * the Mastodon prompt writes Mastodon queries, so the network has to reach the
+   * prompt, not just the probe.
+   */
+  network?: SearchNetwork;
 }
+
+/** Which engine a suggested query will be run against. */
+export type SearchNetwork = 'mastodon' | 'bluesky';
 
 /** The bar for one target. Posts want a real result set; the others want a hit. */
 export function thresholdFor(target: SearchTargetKind): number {
@@ -110,6 +126,24 @@ const TARGET_BRIEF: Record<SearchTargetKind, string> = {
 };
 
 /**
+ * The same, for Bluesky.
+ *
+ * Hashtags is present only because `SearchTargetKind` has three members — the
+ * option is disabled in Bluesky mode (there is no tag index to search, only a
+ * tag filter on post search), so this brief should never be reached. It says the
+ * true thing rather than nothing, in case it ever is.
+ */
+const BLUESKY_TARGET_BRIEF: Record<SearchTargetKind, string> = {
+  statuses:
+    'The search box is set to Posts on Bluesky, so post search is running and every operator above is available.',
+  accounts:
+    'The search box is set to Accounts on Bluesky, so the query is matched against handles, display names and bios. ' +
+    'The operators above do NOT apply here — return plain words, names, or handle fragments only.',
+  hashtags:
+    'Bluesky has no hashtag index to search. Return single words without the leading #, which will be matched as post text.',
+};
+
+/**
  * The `{{context}}` block: what the widgets are already set to.
  *
  * Stated as fact rather than instruction. The model is being told what is on
@@ -117,7 +151,11 @@ const TARGET_BRIEF: Record<SearchTargetKind, string> = {
  * the behaviour editable in Settings rather than compiled in here.
  */
 export function describeContext(context: SearchContext): string {
-  const lines = [TARGET_BRIEF[context.target]];
+  const lines = [
+    context.network === 'bluesky'
+      ? BLUESKY_TARGET_BRIEF[context.target]
+      : TARGET_BRIEF[context.target],
+  ];
   const filters = (context.filters ?? []).filter((line) => line.trim());
   if (filters.length) {
     lines.push(
@@ -200,6 +238,8 @@ export class SearchHelper {
   private chat = inject(OpenRouterChat);
   private prompts = inject(PromptTemplateStore);
   private api = inject(Api);
+  private blueskySearch = inject(BlueskySearch);
+  private blueskyAccounts = inject(BlueskyAccountSearch);
 
   /**
    * Suggest, grade, and refine once if nothing worked.
@@ -210,7 +250,8 @@ export class SearchHelper {
    */
   async run(request: string, context: SearchContext): Promise<SearchHelperResult> {
     const threshold = thresholdFor(context.target);
-    const probe = (query: string) => this.countResults(query, context.target);
+    const network = context.network ?? 'mastodon';
+    const probe = (query: string) => this.countResults(query, context.target, network);
     const grade = (queries: string[]) => gradeUntilSuccess(queries, probe, { threshold });
 
     const first = await this.suggest(request, context, '');
@@ -254,12 +295,13 @@ export class SearchHelper {
     feedback: string,
   ): Promise<SuggestionReply> {
     return this.chat.suggest({
-      prompt: this.prompts.render('search', {
+      prompt: this.prompts.render(context.network === 'bluesky' ? 'blueskySearch' : 'search', {
         request,
         feedback,
         context: describeContext(context),
       }),
-      schemaName: 'mastodon_search_queries',
+      schemaName:
+        context.network === 'bluesky' ? 'bluesky_search_queries' : 'mastodon_search_queries',
       max: SEARCH_QUERY_COUNT,
     });
   }
@@ -268,9 +310,17 @@ export class SearchHelper {
    * How many results one query returns, capped at the threshold we care about.
    *
    * Probes the endpoint the user is actually searching: grading an account
-   * query against post search would fail every candidate for the wrong reason.
+   * query against post search would fail every candidate for the wrong reason,
+   * and grading a Bluesky query against Mastodon would fail all five.
    */
-  private async countResults(query: string, target: SearchTargetKind): Promise<number> {
+  private async countResults(
+    query: string,
+    target: SearchTargetKind,
+    network: SearchNetwork,
+  ): Promise<number> {
+    if (network === 'bluesky') {
+      return this.countBlueskyResults(query, target);
+    }
     const results = await firstValueFrom(this.api.search(query, target, { limit: PROBE_LIMIT }));
     if (target === 'accounts') {
       return results.accounts?.length ?? 0;
@@ -279,5 +329,21 @@ export class SearchHelper {
       return results.hashtags?.length ?? 0;
     }
     return results.statuses?.length ?? 0;
+  }
+
+  /**
+   * The same probe against Bluesky.
+   *
+   * The typed query is parsed into criteria first, exactly as the panel does —
+   * so a suggestion using `from:` is graded as the filtered search it will
+   * actually become, not as five words of free text that match nothing.
+   */
+  private async countBlueskyResults(query: string, target: SearchTargetKind): Promise<number> {
+    if (target === 'accounts') {
+      const page = await firstValueFrom(this.blueskyAccounts.search(query.trim(), null));
+      return page.results.length;
+    }
+    const page = await firstValueFrom(this.blueskySearch.search(parseBlueskyQuery(query), null));
+    return page.statuses.length;
   }
 }

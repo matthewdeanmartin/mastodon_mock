@@ -169,6 +169,12 @@
   word-break: break-all;
 }
 
+/* Why an option in the type select is greyed out. Sits directly under the bar,
+   where the reader who just tried to click it is looking. */
+.type-unavailable {
+  margin: 8px 4px 0;
+}
+
 /* Search server: full-width rows under the search bar (a host combo needs the
    width, and the two-box layout below it has none to spare). */
 .search-server-row {

@@ -22,7 +22,7 @@ import { Injectable, signal } from '@angular/core';
 
 const PROMPTS_KEY = 'mockingbird_openrouter_prompts';
 
-export type PromptTemplateId = 'search' | 'tag' | 'translate';
+export type PromptTemplateId = 'search' | 'blueskySearch' | 'tag' | 'translate';
 
 export interface PromptTemplateSpec {
   id: PromptTemplateId;
@@ -39,6 +39,13 @@ export const PROMPT_TEMPLATES: readonly PromptTemplateSpec[] = [
     label: 'Search helper',
     description:
       'Turns what you typed into five runnable Mastodon search queries, then improves them once if they returned too little.',
+    placeholders: ['request', 'context', 'feedback'],
+  },
+  {
+    id: 'blueskySearch',
+    label: 'Search helper (Bluesky)',
+    description:
+      'The same, for Bluesky. A separate prompt because the two dialects overlap enough to be confused: Bluesky spells the date bounds since/until, has no +word or -word, and treats an operator it does not know as a literal search word rather than ignoring it.',
     placeholders: ['request', 'context', 'feedback'],
   },
   {
@@ -87,6 +94,47 @@ Rules:
 - Vary them: a narrow one, a couple of middling ones, and a broad fallback.
 - Never invent an operator that is not listed above.
 - Do not guess an account handle unless the request names one.
+- Bare words are fine; not every query needs an operator.
+- Respect the current state of the search form, described below.
+
+If you cannot answer, say so in "problem" and return no queries. Do that when
+the request asks for another service (Google, the web, YouTube), for something
+this search cannot express (sorting, counting, anything about a specific user's
+followers), or is too vague to guess at. One short sentence, addressed to the
+person, saying what this search can do instead. Otherwise leave "problem" empty
+— never use it to add commentary to a working answer.
+
+The current state of the search form:
+{{context}}
+
+What the person is looking for:
+{{request}}
+
+{{feedback}}`,
+
+  blueskySearch: `You write search queries for Bluesky, using its search syntax.
+
+Supported operators — use ONLY these:
+  word word            all of these words must appear
+  "exact phrase"       the phrase must appear
+  from:handle          posted by this account (e.g. from:pfrazee.com)
+  mentions:handle      mentions this account
+  #tag                 tagged with this hashtag; two tags must BOTH be present
+  lang:xx              two-letter language code
+  domain:host          links to this domain
+  url:address          links to this exact URL
+  since:YYYY-MM-DD     posted on or after this date
+  until:YYYY-MM-DD     posted before this date
+
+Rules:
+- Return exactly 5 queries, ordered most to least likely to be what they meant.
+- Vary them: a narrow one, a couple of middling ones, and a broad fallback.
+- Never invent an operator that is not listed above. Bluesky does NOT support
+  +word, -word, has:media, is:reply, is:sensitive, in:public or before:/after:.
+  An operator it does not know is searched for as literal TEXT, so a wrong one
+  returns nothing at all rather than being ignored.
+- Bluesky handles are domain names (pfrazee.com, jay.bsky.team), not @user@host.
+  Do not guess one unless the request names it.
 - Bare words are fine; not every query needs an operator.
 - Respect the current state of the search form, described below.
 

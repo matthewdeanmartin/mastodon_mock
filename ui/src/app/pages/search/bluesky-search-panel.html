@@ -1,88 +1,18 @@
-<div class="bsky-search-bar">
-  <div class="seg bsky-target" role="group" aria-label="Search Bluesky for">
-    <button [class.active]="target() === 'posts'" (click)="setTarget('posts')">Posts</button>
-    <button [class.active]="target() === 'accounts'" (click)="setTarget('accounts')">
-      Accounts
-    </button>
-  </div>
-  <input
-    type="search"
-    class="bsky-query"
-    [ngModel]="criteria().text"
-    (ngModelChange)="setText($event)"
-    (keyup.enter)="run()"
-    [placeholder]="target() === 'accounts' ? 'Search Bluesky accounts' : 'Search Bluesky posts'"
-    [attr.aria-label]="target() === 'accounts' ? 'Search Bluesky accounts' : 'Search Bluesky posts'"
-  />
-  <!-- Ranking is a server-side choice, so it sits with the query rather than
-       with the in-memory sort in the refine bar. searchActors has no such
-       parameter, so it is posts-only. -->
-  @if (target() === 'posts') {
-    <label class="bsky-sort">
-      <span class="muted small">Rank</span>
-      <select
-        [ngModel]="criteria().sort"
-        (ngModelChange)="set('sort', $event)"
-        aria-label="Ranking order"
-      >
-        <option value="latest">Latest</option>
-        <option value="top">Top</option>
-      </select>
-    </label>
-  }
-  <button class="btn" [disabled]="!criteria().text.trim() || searching()" (click)="run()">
-    Search
-  </button>
-  @if (target() === 'posts') {
-    <button
-      class="btn btn-outline"
-      [class.active]="advancedOpen()"
-      (click)="advancedOpen.set(!advancedOpen())"
-    >
-      Filters{{ hasFilters() ? ' •' : '' }}
-    </button>
-  }
-</div>
+<!-- The same two boxes the Mastodon side uses, with the same class names: the
+     sticky left column holds the form and every refinement control, the right
+     column holds results. The page supplies the query box, the selects, Search,
+     Advanced, Syntax, the AI helper, Save and Share above this. -->
+<div class="search-form-box">
+  @if (advancedOpen() && target() === 'statuses') {
+    <div class="advanced-panel">
+      <p class="muted small">
+        These are Bluesky's own filters. There is deliberately no media/reply/sensitive filter —
+        <code>searchPosts</code> has no such parameter, and offering one would mean silently
+        ignoring it. Everything here can also be typed straight into the search box.
+      </p>
 
-<!-- Posts need a session; accounts do not. Measured: public.api.bsky.app
-     answers searchActors anonymously, the entryway does not, and searchPosts
-     refuses anonymous callers at both. So the notice is scoped to posts and
-     points at the target that does work. -->
-@if (target() === 'posts' && !session.linked()) {
-  <p class="muted center bsky-unlinked">
-    Bluesky post search needs a linked account —
-    <a routerLink="/settings/connections/bluesky">link one in Settings</a>, or
-    <button type="button" class="linklike" (click)="setTarget('accounts')">
-      search accounts instead
-    </button>
-    , which works without one.
-  </p>
-  <!-- The third option, and the one that needs no account anywhere: Bluesky
-       posts are public web pages on bsky.app, so a `site:` search on a real
-       engine finds them. Same hand-off the Mastodon panel offers, pointed at a
-       different host. -->
-  <p class="muted center bsky-unlinked">
-    Or search the public web for Bluesky posts:
-    @for (engine of webEngines; track engine.id) {
-      <button
-        type="button"
-        class="linklike"
-        [disabled]="!criteria().text.trim()"
-        (click)="searchTheWeb(engine.id)"
-      >
-        {{ engine.label }}
-      </button>
-    }
-    <span class="muted small">— finds posts on bsky.app, no account needed.</span>
-  </p>
-} @else {
-  @if (advancedOpen() && target() === 'posts') {
-    <div class="bsky-advanced">
-      <!-- Bluesky's own filters, not Mastodon's. There is deliberately no
-           has:media / is:reply / sensitive here: searchPosts has no such
-           parameters, and offering them would mean silently ignoring them. -->
-      <label>
-        <span>From account</span>
+      <label class="adv-field">
+        <span class="muted small">Posted by</span>
         <input
           type="text"
           [ngModel]="criteria().author"
@@ -90,8 +20,9 @@
           placeholder="handle.bsky.social"
         />
       </label>
-      <label>
-        <span>Mentioning</span>
+
+      <label class="adv-field">
+        <span class="muted small">Mentioning</span>
         <input
           type="text"
           [ngModel]="criteria().mentions"
@@ -99,27 +30,21 @@
           placeholder="handle.bsky.social"
         />
       </label>
-      <label>
-        <span>Hashtags</span>
+
+      <label class="adv-field">
+        <span class="muted small">Hashtags</span>
         <input
           type="text"
           [ngModel]="tagInput()"
           (ngModelChange)="tagInput.set($event)"
           placeholder="angular typescript"
         />
+        <!-- Say "all", because the server ANDs them and readers assume OR. -->
         <small class="muted">Posts with <em>all</em> of these tags.</small>
       </label>
-      <label>
-        <span>Language</span>
-        <input
-          type="text"
-          [ngModel]="criteria().language"
-          (ngModelChange)="set('language', $event)"
-          placeholder="en"
-        />
-      </label>
-      <label>
-        <span>Links to domain</span>
+
+      <label class="adv-field">
+        <span class="muted small">Links to domain</span>
         <input
           type="text"
           [ngModel]="criteria().domain"
@@ -127,8 +52,9 @@
           placeholder="github.com"
         />
       </label>
-      <label>
-        <span>Links to URL</span>
+
+      <label class="adv-field">
+        <span class="muted small">Links to URL</span>
         <input
           type="url"
           [ngModel]="criteria().url"
@@ -136,122 +62,105 @@
           placeholder="https://example.com/post"
         />
       </label>
-      <label>
-        <span>After</span>
-        <input type="date" [ngModel]="criteria().after" (ngModelChange)="set('after', $event)" />
-      </label>
-      <label>
-        <span>Before</span>
-        <input type="date" [ngModel]="criteria().before" (ngModelChange)="set('before', $event)" />
-      </label>
-      <div class="bsky-advanced-actions">
-        <button class="btn btn-outline btn-sm" (click)="reset()">Clear all</button>
+
+      <div class="advanced-fields">
+        <label>
+          <span class="muted small">Posted after</span>
+          <input type="date" [ngModel]="criteria().after" (ngModelChange)="set('after', $event)" />
+        </label>
+        <label>
+          <span class="muted small">Posted before</span>
+          <input
+            type="date"
+            [ngModel]="criteria().before"
+            (ngModelChange)="set('before', $event)"
+          />
+        </label>
+        <label>
+          <span class="muted small">Language</span>
+          <input
+            type="text"
+            class="lang-input"
+            [ngModel]="criteria().language"
+            (ngModelChange)="set('language', $event)"
+            placeholder="en"
+          />
+        </label>
+      </div>
+
+      <div class="advanced-fields">
+        <label>
+          <!-- Ranking is a server-side choice, unlike the in-memory Sort in the
+               refine bar below — so it belongs with the criteria, not with them. -->
+          <span class="muted small">Ranking</span>
+          <select [ngModel]="criteria().sort" (ngModelChange)="set('sort', $event)">
+            <option value="latest">Latest</option>
+            <option value="top">Top</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="advanced-actions">
+        <button class="btn btn-sm" (click)="applyAdvanced()">Apply &amp; search</button>
+        @if (hasFilters()) {
+          <button class="btn btn-outline btn-sm" (click)="reset()">Clear</button>
+        }
       </div>
     </div>
   }
 
-  @if (searching()) {
-    <p class="muted center">Searching Bluesky…</p>
-  } @else if (error(); as message) {
-    <p class="search-error center" role="alert">{{ message }}</p>
-  } @else if (ran() && target() === 'accounts') {
-    @if (empty()) {
-      <p class="muted center">No Bluesky accounts matched that search.</p>
-    } @else {
-      <div class="bsky-result-head muted small">
-        Showing {{ visibleAccounts().length }} of {{ accounts().length }} loaded
-      </div>
+  @if (advancedOpen() && target() === 'accounts') {
+    <div class="advanced-panel">
+      <p class="muted small">
+        Bluesky's account search matches handles, display names and bios, and takes no other
+        parameters — so there is nothing to set here. Use the filter and sort below to narrow the
+        people it found.
+      </p>
+    </div>
+  }
 
-      <div class="refine-bar">
-        <input
-          type="search"
-          class="refine-filter"
-          [ngModel]="loadedFilter()"
-          (ngModelChange)="loadedFilter.set($event)"
-          placeholder="Filter these results"
-          aria-label="Filter loaded results"
-        />
+  <!-- Active-filter chips, the same shape as the Mastodon side's. Everything a
+       Bluesky search sends is server-side, so they are all `chip-server`. -->
+  @if (ran() && activeFilters().length) {
+    <div class="chips">
+      @for (filter of activeFilters(); track filter) {
+        <span class="chip chip-server" title="Sent to Bluesky — changing this needs a new search">
+          {{ filter }}
+        </span>
+      }
+    </div>
+  }
+
+  <!-- Refinement runs on already-loaded results — no API calls — exactly as on
+       the Mastodon side, because it is literally the same functions. -->
+  @if (ran() && !empty()) {
+    <div class="refine-bar">
+      <input
+        type="search"
+        class="refine-filter"
+        [ngModel]="loadedFilter()"
+        (ngModelChange)="loadedFilter.set($event)"
+        [placeholder]="target() === 'accounts' ? 'Filter these people' : 'Filter these results'"
+        aria-label="Filter loaded results"
+      />
+      <!-- One label per branch rather than one label around the branch: a
+           `<label>` whose only control sits inside an `@if` reads as an empty
+           label to the linter, and to a screen reader in the branch that is not
+           taken. -->
+      @if (target() === 'accounts') {
         <label class="sort-by">
           <span class="muted small">Sort</span>
           <select
             [ngModel]="accountSort()"
             (ngModelChange)="accountSort.set($event)"
-            aria-label="Sort accounts"
+            aria-label="Sort people"
           >
             @for (s of accountSorts; track s.value) {
               <option [value]="s.value">{{ s.label }}</option>
             }
           </select>
         </label>
-      </div>
-
-      @if (followUnavailable()) {
-        <!-- No session and no local store to write to: the server sends no
-             viewer block, so follow state is genuinely unknown rather than
-             "not following". Say so instead of showing a Follow button that
-             might duplicate an existing follow. -->
-        <p class="muted small bsky-anon-note">
-          Searching without a linked account: follow state is not available.
-        </p>
-      } @else if (!session.linked()) {
-        <!-- Anonymous, though: following works and is exact. It is stored in
-             this browser and feeds the anonymous Home timeline — no account on
-             Bluesky required. -->
-        <p class="muted small bsky-anon-note">
-          Following saves to this browser and feeds your Home timeline — no Bluesky account needed.
-        </p>
-      }
-
-      @for (result of visibleAccounts(); track result.account.id) {
-        <app-account-result-card
-          [item]="asItem(result)"
-          [relationship]="relationshipFor(result)"
-          [profileLink]="profileLink(result.account)"
-          [followBusy]="isFollowBusy(result.account)"
-          [anonymous]="followUnavailable()"
-          (follow)="toggleFollow($event, false)"
-          (unfollow)="toggleFollow($event, true)"
-        />
-      }
-
-      @if (!exhausted()) {
-        <div class="center">
-          <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
-            {{ loadingMore() ? 'Loading…' : 'Load more' }}
-          </button>
-        </div>
-      }
-    }
-  } @else if (ran()) {
-    @if (activeFilters().length) {
-      <div class="bsky-chips">
-        @for (filter of activeFilters(); track filter) {
-          <span class="chip">{{ filter }}</span>
-        }
-      </div>
-    }
-
-    @if (empty()) {
-      <p class="muted center">No Bluesky posts matched that search.</p>
-    } @else {
-      <div class="bsky-result-head muted small">
-        Showing {{ visible().length }} of {{ statuses().length }} loaded
-        @if (hitsTotal(); as total) {
-          <!-- "may be rounded or incomplete" per the lexicon, and a real query
-               returned exactly 10000 — a ceiling, not a count. Hedged wording. -->
-          <span class="muted">· about {{ total }} matches on Bluesky</span>
-        }
-      </div>
-
-      <div class="refine-bar">
-        <input
-          type="search"
-          class="refine-filter"
-          [ngModel]="loadedFilter()"
-          (ngModelChange)="loadedFilter.set($event)"
-          placeholder="Filter these results"
-          aria-label="Filter loaded results"
-        />
+      } @else {
         <label class="sort-by">
           <span class="muted small">Sort</span>
           <select
@@ -264,42 +173,142 @@
             }
           </select>
         </label>
-        @if (selectedFacets().length || loadedFilter()) {
-          <button class="btn btn-outline btn-sm" (click)="clearRefinements()">Clear</button>
+      }
+    </div>
+
+    @if (target() === 'statuses' && facets().length) {
+      <!-- Checkbox facets with counts, matching the Mastodon panel. These used
+           to be chip-buttons, which made the same idea look like a different
+           feature depending on which network you were on. -->
+      <details class="refine-facets" [open]="refineOpen()">
+        <summary (click)="refineOpen.set(!refineOpen())">
+          Refine loaded results
+          <span class="muted small"
+            >Based on {{ statuses().length }} loaded {{ words().posts }}</span
+          >
+        </summary>
+        @for (facet of facets(); track facet.kind) {
+          <div class="facet">
+            <div class="facet-label muted small">{{ facet.label }}</div>
+            @for (v of facet.values.slice(0, 5); track v.value) {
+              <label class="facet-value">
+                <input
+                  type="checkbox"
+                  [checked]="isFacetSelected(facet.kind, v.value)"
+                  (change)="toggleFacet(facet.kind, v.value)"
+                />
+                <span>{{ v.label }}</span>
+                <span class="muted facet-count">{{ v.count }}</span>
+              </label>
+            }
+          </div>
         }
+        @if (selectedFacets().length || loadedFilter()) {
+          <button class="btn btn-outline btn-sm" (click)="clearRefinements()">Clear filters</button>
+        }
+      </details>
+    }
+
+    <div class="result-status muted small">
+      @if (target() === 'accounts') {
+        Showing {{ visibleAccounts().length }} of {{ accounts().length }} loaded accounts
+      } @else {
+        Showing {{ visible().length }} of {{ statuses().length }} loaded {{ words().posts }}
+        @if (hitsTotal(); as total) {
+          <!-- "may be rounded or incomplete" per the lexicon, and a real query
+               returned exactly 10000 — a ceiling, not a count. Hedged wording. -->
+          <br />about {{ total }} matches on Bluesky
+        }
+      }
+    </div>
+  }
+</div>
+
+<div class="search-results-box">
+  @if (searching()) {
+    <p class="muted center">Searching Bluesky…</p>
+  } @else if (error(); as message) {
+    <p class="search-error center" role="alert">{{ message }}</p>
+  } @else if (!ran()) {
+    <!-- Nothing searched yet: answer the question an empty box poses, which is
+         "what can I type here?" — the same thing the Mastodon side does with its
+         embedded syntax help. -->
+    <div class="search-idle">
+      <div class="page-head">Searching Bluesky</div>
+      @if (target() === 'accounts') {
+        <p class="muted small">
+          Matches handles, display names and bios. Works without a linked account.
+        </p>
+      } @else {
+        <p class="muted small">
+          Type words to match, or use Bluesky's operators:
+          <code>from:handle</code>, <code>mentions:handle</code>, <code>#tag</code>,
+          <code>lang:en</code>, <code>domain:github.com</code>, <code>since:2026-01-01</code>,
+          <code>until:2026-07-01</code>. Press <strong>Syntax?</strong> above for the full list, or
+          fill in <strong>Advanced</strong> and the box will show you the query it built.
+        </p>
+      }
+    </div>
+  } @else if (empty()) {
+    <p class="muted center">
+      No Bluesky {{ target() === 'accounts' ? 'accounts' : words().posts }} matched that search.
+    </p>
+  } @else if (target() === 'accounts') {
+    <div class="page-head">People</div>
+
+    @if (followUnavailable()) {
+      <!-- No session and no local store to write to: the server sends no viewer
+           block, so follow state is genuinely unknown rather than "not
+           following". Say so instead of showing a Follow button that might
+           duplicate an existing follow. -->
+      <p class="muted small bsky-anon-note">
+        Searching without a linked account: follow state is not available.
+      </p>
+    } @else if (!session.linked()) {
+      <!-- Anonymous, though: following works and is exact. It is stored in this
+           browser and feeds the anonymous Home timeline — no account required. -->
+      <p class="muted small bsky-anon-note">
+        Following saves to this browser and feeds your Home timeline — no Bluesky account needed.
+      </p>
+    }
+
+    @for (result of visibleAccounts(); track result.account.id) {
+      <app-account-result-card
+        [item]="asItem(result)"
+        [relationship]="relationshipFor(result)"
+        [profileLink]="profileLink(result.account)"
+        [followBusy]="isFollowBusy(result.account)"
+        [anonymous]="followUnavailable()"
+        (follow)="toggleFollow($event, false)"
+        (unfollow)="toggleFollow($event, true)"
+      />
+    }
+    @if (!visibleAccounts().length) {
+      <p class="muted center">No loaded people match the current filters.</p>
+    }
+
+    @if (!exhausted()) {
+      <div class="load-more-row">
+        <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+          {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        </button>
       </div>
+    }
+  } @else {
+    <div class="page-head">{{ words().Posts }}</div>
+    @for (status of visible(); track status.id) {
+      <app-status-card [status]="status" [showSource]="true" />
+    }
+    @if (!visible().length) {
+      <p class="muted center">No loaded {{ words().posts }} match the current filters.</p>
+    }
 
-      @if (facets().length) {
-        <details class="refine-facets">
-          <summary>Narrow these results</summary>
-          @for (facet of facets(); track facet.kind) {
-            <div class="facet-row">
-              <span class="facet-label muted small">{{ facet.label }}</span>
-              @for (value of facet.values.slice(0, 5); track value.value) {
-                <button
-                  class="chip chip-button"
-                  [class.active]="isFacetSelected(facet.kind, value.value)"
-                  (click)="toggleFacet(facet.kind, value.value)"
-                >
-                  {{ value.label }} ({{ value.count }})
-                </button>
-              }
-            </div>
-          }
-        </details>
-      }
-
-      @for (status of visible(); track status.id) {
-        <app-status-card [status]="status" [showSource]="true" />
-      }
-
-      @if (!exhausted()) {
-        <div class="center">
-          <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
-            {{ loadingMore() ? 'Loading…' : 'Load more' }}
-          </button>
-        </div>
-      }
+    @if (!exhausted()) {
+      <div class="load-more-row">
+        <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+          {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        </button>
+      </div>
     }
   }
-}
+</div>

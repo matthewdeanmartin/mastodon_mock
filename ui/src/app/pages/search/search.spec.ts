@@ -41,6 +41,11 @@ interface SearchInternals {
   onChanged(updated: Status): void;
   onDeleted(removed: Status): void;
   onTypeSelect(value: string, el?: HTMLSelectElement): void;
+  onNetworkSelect(value: string): void;
+  networkSelection(): string;
+  typeUnavailable(type: 'accounts' | 'statuses' | 'hashtags'): boolean;
+  blueskyTarget(): 'accounts' | 'statuses';
+  queryPlaceholder(): string;
   webDropped: WritableSignal<string[]>;
   replies: WritableSignal<'include' | 'only' | 'exclude'>;
   followFilter: WritableSignal<'all' | 'following' | 'not-following'>;
@@ -939,6 +944,150 @@ describe('Search', () => {
       // fourth SearchType — widening it would put a "…or bluesky" case in the
       // query serializers, saved searches and the explain panel.
       expect(['accounts', 'statuses', 'hashtags']).toContain(internals(fixture).type());
+    });
+  });
+
+  /**
+   * One set of widgets for both networks.
+   *
+   * The page used to hide the query box, Search, Advanced, Syntax and the AI
+   * helper whenever Bluesky was showing, and the Bluesky panel brought its own
+   * seg control in their place. The result read as two different applications
+   * sharing a URL. Network and type are now two plain selects driving one
+   * shared bar, and these tests hold that boundary.
+   */
+  describe('network and type selects', () => {
+    /**
+     * A reader with a usable Bluesky session.
+     *
+     * The mode key is not optional decoration: `BlueskySession` picks the
+     * identity key pair over the scoped connector pair at construction, based on
+     * exactly that key (see `blueskyIsPrimaryKind`). Writing the identity keys
+     * without it leaves `linked()` false, because the session goes looking for a
+     * connector that was never stored.
+     */
+    function seedBlueskySession(): void {
+      localStorage.setItem('mastodon_mock_account_mode', 'bluesky');
+      localStorage.setItem(
+        'mockingbird_bsky_identity_profile',
+        JSON.stringify({ did: 'did:plc:me', handle: 'me.bsky.social' }),
+      );
+      localStorage.setItem(
+        'mockingbird_bsky_identity_credentials',
+        JSON.stringify({ accessJwt: 'a', refreshJwt: 'r', connectedAt: Date.now() }),
+      );
+    }
+
+    it('reports the network the selects are pointed at', () => {
+      const fixture = setUp();
+      expect(internals(fixture).networkSelection()).toBe('mastodon');
+
+      internals(fixture).onNetworkSelect('bluesky');
+
+      expect(internals(fixture).networkSelection()).toBe('bluesky');
+      expect(internals(fixture).blueskyMode()).toBe(true);
+    });
+
+    it('keeps the chosen type when switching network, where the network allows it', () => {
+      seedBlueskySession();
+      const fixture = setUp();
+      // A seeded reader lands on Bluesky, so go to Mastodon first and come back
+      // — the switch is what is under test, not the landing panel.
+      internals(fixture).onNetworkSelect('mastodon');
+      internals(fixture).type.set('statuses');
+
+      internals(fixture).onNetworkSelect('bluesky');
+
+      // The whole point of one type select: picking Posts once means Posts on
+      // whichever network you look at next.
+      expect(internals(fixture).type()).toBe('statuses');
+    });
+
+    it('falls back to Accounts when the type the reader is on is Mastodon-only', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('hashtags');
+
+      internals(fixture).onNetworkSelect('bluesky');
+
+      // Bluesky has no hashtag index to search, only a hashtag filter inside
+      // post search — so Hashtags cannot survive the switch.
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('falls back to Accounts for Posts without a linked Bluesky account', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('statuses');
+
+      internals(fixture).onNetworkSelect('bluesky');
+
+      // Measured: searchActors answers anonymously, searchPosts refuses.
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('disables only the types the current network cannot serve', () => {
+      const fixture = setUp();
+      expect(internals(fixture).typeUnavailable('hashtags')).toBe(false);
+
+      internals(fixture).onNetworkSelect('bluesky');
+
+      expect(internals(fixture).typeUnavailable('accounts')).toBe(false);
+      expect(internals(fixture).typeUnavailable('hashtags')).toBe(true);
+      expect(internals(fixture).typeUnavailable('statuses')).toBe(true);
+    });
+
+    it('enables Bluesky posts once an account is linked', () => {
+      seedBlueskySession();
+      const fixture = setUp();
+      internals(fixture).onNetworkSelect('bluesky');
+
+      expect(internals(fixture).typeUnavailable('statuses')).toBe(false);
+    });
+
+    it('narrows the type to what the Bluesky panel accepts', () => {
+      const fixture = setUp();
+      internals(fixture).onNetworkSelect('bluesky');
+      internals(fixture).type.set('hashtags');
+
+      // Unreachable through the UI — the option is disabled — but the select's
+      // value is the page-wide SearchType, so the narrowing is stated once
+      // rather than cast at the binding.
+      expect(internals(fixture).blueskyTarget()).toBe('statuses');
+    });
+
+    it('names the network in the shared box placeholder', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('accounts');
+      expect(internals(fixture).queryPlaceholder()).toBe('Search Mastodon accounts');
+
+      internals(fixture).onNetworkSelect('bluesky');
+
+      expect(internals(fixture).queryPlaceholder()).toBe('Search Bluesky accounts');
+    });
+
+    it('restores which half of Bluesky a shared link meant', () => {
+      queryParams$.next(convertToParamMap({ type: 'bluesky-posts', bskyType: 'accounts' }));
+      const fixture = setUp();
+
+      expect(internals(fixture).blueskyMode()).toBe(true);
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('reads a Bluesky link made before the selects were split as Posts', () => {
+      seedBlueskySession();
+      queryParams$.next(convertToParamMap({ type: 'bluesky-posts' }));
+      const fixture = setUp();
+
+      // Posts was the only thing `type=bluesky-posts` could mean back then.
+      expect(internals(fixture).type()).toBe('statuses');
+    });
+
+    it('does not restore a type the reader cannot run', () => {
+      queryParams$.next(convertToParamMap({ type: 'bluesky-posts', bskyType: 'statuses' }));
+      const fixture = setUp();
+
+      // No linked account: the link asks for Posts, which would open the select
+      // on a disabled option.
+      expect(internals(fixture).type()).toBe('accounts');
     });
   });
 });

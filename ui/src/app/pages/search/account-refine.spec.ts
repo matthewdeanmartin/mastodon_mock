@@ -369,9 +369,9 @@ describe('last-activity facet', () => {
     expect(accountMatchesFacet(fresh, 'activity', 'd1', NOW)).toBe(true);
     expect(accountMatchesFacet(fresh, 'activity', 'd730', NOW)).toBe(false);
     expect(accountMatchesFacet(stale, 'activity', 'd730', NOW)).toBe(true);
-    expect(accountMatchesFacet(makeAccount({ last_status_at: null }), 'activity', 'unknown', NOW)).toBe(
-      true,
-    );
+    expect(
+      accountMatchesFacet(makeAccount({ last_status_at: null }), 'activity', 'unknown', NOW),
+    ).toBe(true);
   });
 
   it('puts each boundary on the inclusive side of the finer bin', () => {

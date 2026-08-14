@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
 interface SyntaxRow {
   /** The operator as you would type it. */
@@ -15,6 +15,9 @@ interface SyntaxGroup {
   note?: string;
   rows: SyntaxRow[];
 }
+
+/** Which network's operators to document. */
+export type SyntaxNetwork = 'mastodon' | 'bluesky';
 
 /**
  * The operator reference, sourced from `mastodon-query-serializer.ts`.
@@ -86,6 +89,78 @@ const GROUPS: SyntaxGroup[] = [
 ];
 
 /**
+ * Bluesky's operators, sourced from `bluesky-query-serializer.ts`.
+ *
+ * Same rule as the Mastodon list and for the same reason: these are exactly the
+ * ones `app.bsky.feed.searchPosts` takes as parameters. Bluesky's failure mode
+ * is worse than Mastodon's, in fact — an operator it does not know is not
+ * ignored, it is treated as a *search word*, so `has:media` quietly searches for
+ * the literal text "has:media" and returns nothing.
+ */
+const BLUESKY_GROUPS: SyntaxGroup[] = [
+  {
+    title: 'Words',
+    note: 'Bare words all have to match. Quotes make them match as a phrase.',
+    rows: [
+      { syntax: 'word word', label: 'All of these words must appear', example: 'rust compiler' },
+      {
+        syntax: '"exact phrase"',
+        label: 'The words must appear together',
+        example: '"borrow checker"',
+      },
+    ],
+  },
+  {
+    title: 'Who and when',
+    rows: [
+      {
+        syntax: 'from:handle',
+        label: 'Posted by this account',
+        example: 'from:pfrazee.com',
+      },
+      {
+        syntax: 'mentions:handle',
+        label: 'Mentions this account',
+        example: 'mentions:jay.bsky.team',
+      },
+      {
+        syntax: 'since:YYYY-MM-DD',
+        label: 'Posted on or after this date',
+        example: 'since:2026-01-01',
+      },
+      {
+        syntax: 'until:YYYY-MM-DD',
+        label: 'Posted before this date',
+        example: 'until:2026-07-01',
+      },
+      {
+        syntax: 'lang:xx',
+        label: 'Written in this language (two-letter code)',
+        example: 'lang:en',
+      },
+    ],
+  },
+  {
+    title: 'Tags and links',
+    note: 'Two tags narrow the results — they must both be present, not either one.',
+    rows: [
+      { syntax: '#tag', label: 'Tagged with this hashtag', example: '#angular #typescript' },
+      { syntax: 'tag:name', label: 'The same thing, written out' },
+      {
+        syntax: 'domain:host',
+        label: 'Links to this domain',
+        example: 'domain:github.com',
+      },
+      {
+        syntax: 'url:address',
+        label: 'Links to this exact URL',
+        example: 'url:https://example.com/post',
+      },
+    ],
+  },
+];
+
+/**
  * The "Syntax?" cheat-sheet for the search bar, in two presentations.
  *
  * As a dialog (the default) it is deliberately the same shape as the
@@ -133,13 +208,15 @@ const GROUPS: SyntaxGroup[] = [
     }
 
     <ng-template #body>
-      <h3 id="search-syntax-title">Search syntax</h3>
+      <h3 id="search-syntax-title">
+        {{ network() === 'bluesky' ? 'Bluesky search syntax' : 'Mastodon search syntax' }}
+      </h3>
       <p class="muted note">
         These work in a <strong>post</strong> search. Account and hashtag searches match plain text
         only — operators there are treated as words.
       </p>
       <div class="groups">
-        @for (group of groups; track group.title) {
+        @for (group of groups(); track group.title) {
           <section>
             <h4>{{ group.title }}</h4>
             @if (group.note) {
@@ -167,12 +244,21 @@ const GROUPS: SyntaxGroup[] = [
           </section>
         }
       </div>
-      <p class="muted note footer-note">
-        Combine them freely, separated by spaces — everything you write must match:
-        <code>+rust from:&#64;a&#64;b.social after:2026-01-01 -is:reply</code>. Anything the server
-        doesn't recognise is quietly ignored, so if a query returns more than you expected, check
-        the spelling of the operator.
-      </p>
+      @if (network() === 'bluesky') {
+        <p class="muted note footer-note">
+          Combine them freely, separated by spaces — everything you write must match:
+          <code>rust from:pfrazee.com since:2026-01-01 #compiler</code>. An operator Bluesky doesn't
+          recognise is treated as a <em>search word</em> rather than ignored, so a misspelled one
+          usually returns nothing at all.
+        </p>
+      } @else {
+        <p class="muted note footer-note">
+          Combine them freely, separated by spaces — everything you write must match:
+          <code>+rust from:&#64;a&#64;b.social after:2026-01-01 -is:reply</code>. Anything the
+          server doesn't recognise is quietly ignored, so if a query returns more than you expected,
+          check the spelling of the operator.
+        </p>
+      }
     </ng-template>
   `,
   styles: `
@@ -261,6 +347,21 @@ const GROUPS: SyntaxGroup[] = [
 export class SearchSyntaxHelp {
   /** Render bare, without the overlay or the Close button. */
   readonly embedded = input(false);
+
+  /**
+   * Whose operators to document.
+   *
+   * One component rather than two, for the same reason the Mastodon list is
+   * generated from one constant: the two dialects are similar enough that two
+   * separate references would be read as one and misremembered. Showing the same
+   * reference in the same shape, with the operators swapped, makes the
+   * differences — `after:` vs `since:`, `+word` vs bare words — visible.
+   */
+  readonly network = input<SyntaxNetwork>('mastodon');
+
   readonly closed = output<void>();
-  protected readonly groups = GROUPS;
+
+  protected readonly groups = computed(() =>
+    this.network() === 'bluesky' ? BLUESKY_GROUPS : GROUPS,
+  );
 }

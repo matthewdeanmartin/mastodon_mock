@@ -94,7 +94,7 @@ import { PageDiagnostics } from '../../page-diagnostics';
 import { SearchServer } from '../../search-server';
 import { SearchCapability } from '../../search-capability';
 import { SearchServerDiscovery } from '../../search-server-discovery/search-server-discovery';
-import { BlueskySearchPanel } from './bluesky-search-panel';
+import { BlueskySearchPanel, BlueskySearchTarget } from './bluesky-search-panel';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { Server } from '../../server';
 import { isTagsOnly, probeSearchServer, SearchServerStatus } from '../../search-server-probe';
@@ -170,7 +170,9 @@ export class Search implements OnInit, OnDestroy {
   /** Which network owns this account, for the landing-panel default. */
   private auth = inject(Auth);
   /** Whether a Bluesky search is running signed in, recorded on save. */
-  private session = inject(BlueskySession);
+  // Protected, not private: the bar reads it to explain why Bluesky Posts is
+  // disabled without a linked account.
+  protected session = inject(BlueskySession);
   private activeSearch: Subscription | null = null;
 
   /** Dev-only structured logging. Silent in production builds. */
@@ -322,9 +324,20 @@ export class Search implements OnInit, OnDestroy {
    * visitors — anonymous post search here is a hashtag transform instead. Offering
    * queries the user cannot run would be worse than offering nothing.
    */
-  protected canUseSearchHelper = computed(
-    () => this.ai.enabled() && this.openrouter.connected() && !this.capabilities.active,
-  );
+  protected canUseSearchHelper = computed(() => {
+    if (!this.ai.enabled() || !this.openrouter.connected()) {
+      return false;
+    }
+    // The anonymous exclusion is Mastodon's, not a general rule: it exists
+    // because anonymous Mastodon post search is a hashtag transform, so DSL
+    // operators cannot run. Bluesky's operators either run or the search needs a
+    // session — and when it needs one, Posts is disabled and there is nothing to
+    // help with. So on Bluesky the helper is offered whenever a search can run.
+    if (this.blueskyMode()) {
+      return this.type() === 'accounts' || this.session.linked();
+    }
+    return !this.capabilities.active;
+  });
 
   /**
    * Take a query from the helper dialog and run it through the normal path.
@@ -349,6 +362,15 @@ export class Search implements OnInit, OnDestroy {
   protected searchHelperContext = computed<SearchContext>(() => {
     const target = this.type();
     const filters: string[] = [];
+    // Bluesky's criteria live in the panel, and its Advanced form is the only
+    // one that applies — the Mastodon fields below are not on screen.
+    if (this.blueskyMode()) {
+      return {
+        target,
+        network: 'bluesky',
+        filters: this.blueskyPanel()?.describeCriteria() ?? [],
+      };
+    }
     if (target === 'statuses') {
       const push = (label: string, value: string) => {
         if (value) {
@@ -377,7 +399,7 @@ export class Search implements OnInit, OnDestroy {
       const source = this.accountSources.find((option) => option.value === this.accountSource());
       filters.push(`Matching against: ${source?.label ?? this.accountSource()}`);
     }
-    return { target, filters };
+    return { target, filters, network: 'mastodon' };
   });
   protected results = signal<SearchResults | null>(null);
   protected searching = signal(false);
@@ -403,10 +425,99 @@ export class Search implements OnInit, OnDestroy {
    */
   protected pendingBlueskySaved = signal<BlueskyPostSearch | null>(null);
 
-  /** What the type `<select>` should display, including the Bluesky option. */
-  protected typeSelection = computed(() =>
-    this.blueskyMode() ? 'bluesky-posts' : (this.type() as string),
+  /**
+   * Which network the two selects are pointed at.
+   *
+   * The reader picks a network and a type separately, exactly as they do on the
+   * Mastodon side — this is one page with one set of widgets, not two engines
+   * with two personalities. `blueskyMode` remains the internal flag (and the URL
+   * contract) because widening `SearchType` would put a "…or bluesky" case in
+   * every Mastodon-shaped consumer; this is only the widget's view of it.
+   */
+  protected networkSelection = computed(() => (this.blueskyMode() ? 'bluesky' : 'mastodon'));
+
+  /** What the shared box is searching right now, spelled out for the reader. */
+  protected queryPlaceholder = computed(() => {
+    const network = this.blueskyMode() ? 'Bluesky' : 'Mastodon';
+    switch (this.type()) {
+      case 'accounts':
+        return `Search ${network} accounts`;
+      case 'hashtags':
+        return `Search ${network} hashtags`;
+      default:
+        return `Search ${network} ${this.words().posts}`;
+    }
+  });
+
+  /**
+   * Bluesky post search needs a linked account; account search does not.
+   *
+   * Measured: `public.api.bsky.app` answers `searchActors` anonymously, but
+   * `searchPosts` refuses unauthenticated callers at both hosts. So Posts is
+   * disabled rather than hidden — the reader can see it exists and why it is
+   * unavailable, instead of wondering where it went.
+   */
+  protected blueskyPostsUnavailable = computed(() => this.blueskyMode() && !this.session.linked());
+
+  /**
+   * Hashtags is Mastodon-only: Bluesky has no tag *index* to search, only a tag
+   * filter on post search. Disabled with the same reasoning as Posts above.
+   */
+  /**
+   * The type select's value, narrowed to what Bluesky can actually serve.
+   *
+   * `hashtags` is unreachable here — the option is disabled in Bluesky mode and
+   * `onNetworkSelect` falls back to Accounts — but the select's type is the
+   * page-wide `SearchType`, so the narrowing has to be stated somewhere. Here,
+   * once, rather than as a cast at the binding.
+   */
+  protected blueskyTarget = computed<BlueskySearchTarget>(() =>
+    this.type() === 'accounts' ? 'accounts' : 'statuses',
   );
+
+  protected typeUnavailable(type: SearchType): boolean {
+    if (!this.blueskyMode()) {
+      return false;
+    }
+    return type === 'hashtags' || (type === 'statuses' && !this.session.linked());
+  }
+
+  /**
+   * Switch network, keeping the type where it legally can be kept.
+   *
+   * Moving to Bluesky while on Hashtags — or on Posts without a session — would
+   * land on a type that network cannot serve, so the selection falls back to
+   * Accounts, which both networks always support.
+   */
+  onNetworkSelect(value: string): void {
+    const bluesky = value === 'bluesky';
+    if (bluesky === this.blueskyMode()) {
+      return;
+    }
+    this.webDropped.set([]);
+    if (!bluesky) {
+      this.blueskyMode.set(false);
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { type: this.type(), q: this.query().trim() || null },
+        queryParamsHandling: 'merge',
+      });
+      return;
+    }
+    this.blueskyMode.set(true);
+    if (this.typeUnavailable(this.type())) {
+      this.type.set('accounts');
+    }
+    // Into the URL, so the panel can be linked to and the back button can
+    // restore it. Without this the Bluesky panel is reachable only by using
+    // the dropdown — clicking a result and pressing Back landed you on
+    // Mastodon Accounts with the query gone.
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { type: BLUESKY_WIRE_TYPE, bskyType: this.type(), q: null },
+      queryParamsHandling: 'merge',
+    });
+  }
 
   // --- Web search hand-off ---
   // The four engines sit at the bottom of the type dropdown, but they are *not*
@@ -441,23 +552,17 @@ export class Search implements OnInit, OnDestroy {
       return;
     }
     this.webDropped.set([]);
-    // Bluesky is a whole other engine with its own filters, so it swaps the
-    // panel rather than changing the Mastodon search's type.
-    if (value === BLUESKY_WIRE_TYPE) {
-      this.blueskyMode.set(true);
-      // Into the URL, so the panel can be linked to and the back button can
-      // restore it. Without this the Bluesky panel is reachable only by using
-      // the dropdown — clicking a result and pressing Back landed you on
-      // Mastodon Accounts with the query gone.
+    // On Bluesky the type select drives the panel's target rather than the
+    // Mastodon search's type, but it is the *same* signal either way — that is
+    // the point of having one widget instead of two.
+    this.type.set(value as SearchType);
+    if (this.blueskyMode()) {
       void this.router.navigate([], {
         relativeTo: this.route,
-        queryParams: { type: BLUESKY_WIRE_TYPE, q: null },
+        queryParams: { bskyType: value },
         queryParamsHandling: 'merge',
       });
-      return;
     }
-    this.blueskyMode.set(false);
-    this.type.set(value as SearchType);
   }
 
   /**
@@ -469,9 +574,12 @@ export class Search implements OnInit, OnDestroy {
    */
   searchTheWeb(engine: WebEngine): void {
     const criteria =
-      this.type() === 'statuses'
+      this.type() === 'statuses' && !this.blueskyMode()
         ? this.postCriteria()
         : // Accounts/hashtags have no post criteria; the raw box is the query.
+          // Bluesky's structured filters have no `site:`-style equivalent
+          // either, so only the free text is translated — an honest "here is a
+          // way to find something", not "your search, minus bits".
           { words: this.query().trim() };
     // Bail on an empty search rather than opening a tab that lists the whole
     // instance. Judged on the *unscoped* query: `site:` alone is non-empty but
@@ -482,7 +590,10 @@ export class Search implements OnInit, OnDestroy {
     }
     // `capabilityHost()` is '' when Api points at the app's own origin, and a
     // bare `site:` would be worse than none — fall back to the actual host.
-    const host = this.capabilityHost() || window.location.host;
+    // On Bluesky the posts live on bsky.app, which is also the escape hatch for
+    // the one thing an unlinked reader genuinely cannot do: `searchPosts`
+    // refuses anonymous callers, but the posts themselves are public web pages.
+    const host = this.blueskyMode() ? 'bsky.app' : this.capabilityHost() || window.location.host;
     const { query, dropped } = serializeWebQuery(criteria, host);
     this.webDropped.set(dropped);
     this.webEngineLabel.set(WEB_ENGINES.find((e) => e.id === engine)?.label ?? '');
@@ -791,9 +902,7 @@ export class Search implements OnInit, OnDestroy {
   );
 
   /** Statuses actually on screen — what grouping and the counters work from. */
-  protected visibleStatuses = computed<Status[]>(() =>
-    this.statusRows().map((row) => row.status),
-  );
+  protected visibleStatuses = computed<Status[]>(() => this.statusRows().map((row) => row.status));
 
   /**
    * Hidden near-identical posts, keyed by the id of the row that stands in for
@@ -992,6 +1101,13 @@ export class Search implements OnInit, OnDestroy {
       // once here keeps that boundary exactly where it already was.
       if (rawType === BLUESKY_WIRE_TYPE) {
         this.blueskyMode.set(true);
+        // Which half of Bluesky — posts or accounts — rides alongside as
+        // `bskyType`, so a shared link restores the type select too. Absent in
+        // links made before the selects were split; posts was the only mode
+        // those could mean.
+        const bskyType = params.get('bskyType');
+        const restored = bskyType === 'accounts' ? 'accounts' : 'statuses';
+        this.type.set(this.typeUnavailable(restored) ? 'accounts' : restored);
         this.urlQuery = q;
         this.query.set(q);
         return;
@@ -1007,6 +1123,9 @@ export class Search implements OnInit, OnDestroy {
       // Bluesky-primary readers and show them something the sender never saw.
       if (!rawType && !q && this.auth.isBlueskyPrimary) {
         this.blueskyMode.set(true);
+        // Posts is the interesting default, but it needs a session; without one
+        // the select would open on a disabled option.
+        this.type.set(this.session.linked() ? 'statuses' : 'accounts');
         return;
       }
 
@@ -1129,6 +1248,23 @@ export class Search implements OnInit, OnDestroy {
   run(): void {
     const q = this.query().trim();
     if (!q) {
+      return;
+    }
+    // Bluesky runs in the panel, which owns the criteria and parses the box's
+    // operators. Same button, same box, different engine underneath — which is
+    // the whole point of the shared bar.
+    if (this.blueskyMode()) {
+      this.diagnostics.info('Search', 'user:run', {
+        type: this.type(),
+        queryLength: q.length,
+        network: 'bluesky',
+      });
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { q, type: BLUESKY_WIRE_TYPE, bskyType: this.type() },
+        queryParamsHandling: 'merge',
+      });
+      this.blueskyPanel()?.runQuery();
       return;
     }
     const type = this.type();

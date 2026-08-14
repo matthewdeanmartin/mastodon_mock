@@ -1,6 +1,14 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { PageDiagnostics } from '../../page-diagnostics';
@@ -14,12 +22,7 @@ import {
   parseTags,
 } from '../../providers/bluesky/bluesky-post-search';
 import { filterLoaded, buildFacets, statusMatchesFacet, FacetKind } from './search-refine';
-import {
-  serializeWebQuery,
-  webSearchUrl,
-  WEB_ENGINES,
-  WebEngine,
-} from './web-query-serializer';
+import { parseBlueskyQuery, serializeBlueskyQuery } from './bluesky-query-serializer';
 import {
   sortAccounts,
   sortStatuses,
@@ -40,22 +43,39 @@ import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { Auth } from '../../auth';
 import { Terminology } from '../../terminology';
 
-/** Which Bluesky index the panel is querying. */
-export type BlueskySearchTarget = 'posts' | 'accounts';
+/**
+ * Which Bluesky index the panel is querying.
+ *
+ * Spelled with the Mastodon side's vocabulary (`statuses`, not `posts`) because
+ * it is now driven by the *same* type select — one signal on the page feeds both
+ * networks, and translating at this boundary is cheaper than teaching the page
+ * two words for one idea.
+ */
+export type BlueskySearchTarget = 'statuses' | 'accounts';
 
 /**
- * Bluesky post search: its own query form, its own results.
+ * Bluesky search: the criteria form and the results, inside the page's layout.
  *
  * A separate component rather than a branch inside `Search` — the two engines
  * take genuinely different filters (see `bluesky-post-search.ts`), and threading
- * a source flag through a 1,700-line component would put a check in front of
+ * a source flag through a 2,000-line component would put a check in front of
  * every widget. What *is* shared is everything that operates on results once
  * they exist: `StatusCard`, `filterLoaded`, `buildFacets`, `sortStatuses`. Those
  * are pure functions over `Status[]` and do not care where the posts came from.
+ *
+ * What is emphatically *not* separate any more is the chrome. The query box,
+ * the network/type selects, Search, Advanced, Syntax, the AI helper, Save and
+ * Share all live on the page and drive this panel through inputs. An earlier
+ * version owned its own copies, which is how Bluesky search ended up looking
+ * like a different application: a seg control where Mastodon had a select, a
+ * filter strip across the top where Mastodon had a sticky left column, and
+ * chip-buttons where Mastodon had checkboxes. The panel renders the page's
+ * layout classes (`search-form-box`, `search-results-box`, `advanced-panel`,
+ * `refine-bar`, `facet`) so the two networks are one interface.
  */
 @Component({
   selector: 'app-bluesky-search-panel',
-  imports: [FormsModule, RouterLink, StatusCard, AccountResultCard],
+  imports: [FormsModule, StatusCard, AccountResultCard],
   templateUrl: './bluesky-search-panel.html',
   styleUrl: './bluesky-search-panel.css',
 })
@@ -72,8 +92,26 @@ export class BlueskySearchPanel {
    */
   readonly savedToRun = input<BlueskyPostSearch | null>(null);
 
+  /**
+   * The shared query box's contents.
+   *
+   * The box lives on the page, so its text arrives as an input and is parsed
+   * into criteria at search time (see `run`). Typed operators — `from:`,
+   * `since:`, `#tag` — are read here exactly as bsky.app reads them.
+   */
+  readonly query = input('');
+
+  /** Posts or accounts, from the page's shared type select. */
+  readonly target = input<BlueskySearchTarget>('statuses');
+
+  /** Whether the page's shared Advanced button is toggled on. */
+  readonly advancedOpen = input(false);
+
   /** Fired when the panel wants the page to open its save dialog. */
   readonly saveRequested = output<BlueskyPostSearch>();
+
+  /** Pushes criteria back into the shared query box, after Advanced edits it. */
+  readonly queryChange = output<string>();
 
   constructor() {
     // Apply a handed-down saved search once it arrives. An `effect` rather than
@@ -85,44 +123,42 @@ export class BlueskySearchPanel {
         return;
       }
       this.criteria.set(structuredClone(saved));
-      this.target.set('posts');
-      this.run();
+      // Reflect it into the shared box, so what ran and what is displayed agree.
+      this.queryChange.emit(serializeBlueskyQuery(this.criteria()));
+      this.runCurrent();
+    });
+
+    // Switching posts/accounts on the shared select drops results: they are
+    // different result shapes from different endpoints, and leaving the old
+    // ones on screen under a new heading is a lie about what was searched.
+    effect(() => {
+      this.target();
+      untracked(() => this.clearResults());
     });
   }
+
+  /**
+   * Whether the two-box grid should apply.
+   *
+   * Same rule as the Mastodon side: one column until a search has actually
+   * produced something to refine, because a lone form in a 360px column beside
+   * an empty box looks broken.
+   */
+  readonly twoBox = computed(() => this.ran() && !this.empty());
 
   /** The current criteria, for the page's save dialog. */
   requestSave(): void {
     this.saveRequested.emit(structuredClone(this.criteria()));
   }
 
-  protected readonly webEngines = WEB_ENGINES;
-
   /**
-   * Hand the query to a web engine, scoped to `bsky.app`.
+   * The active filters as prose, for the AI helper's context block.
    *
-   * The escape hatch for the one thing anonymous visitors genuinely cannot do:
-   * `app.bsky.feed.searchPosts` refuses unauthenticated callers at both hosts —
-   * and refuses them with a Cloudflare-style HTML block page rather than an API
-   * error, so there is nothing to degrade gracefully *into*.
-   *
-   * But Bluesky posts are public web pages, so `site:bsky.app` on a real engine
-   * finds them without any account anywhere. Same hand-off the Mastodon panel
-   * already offers, pointed at a different host.
-   *
-   * Only the free-text half is translated. Bluesky's structured filters (author,
-   * tags, language, date bounds) have no `site:`-style equivalent, and the
-   * serializer reports what it dropped — but this button is offered *instead of*
-   * a search that cannot run at all, so the honest framing is "here is a way to
-   * find something", not "here is your search, minus bits".
+   * The same lines the chips show, so what the model is told matches what the
+   * reader can see set on screen.
    */
-  protected searchTheWeb(engine: WebEngine): void {
-    const text = this.criteria().text.trim();
-    if (!text) {
-      return;
-    }
-    const { query } = serializeWebQuery({ words: text }, 'bsky.app');
-    this.diagnostics.info('Search', 'bsky:web-handoff', { engine });
-    window.open(webSearchUrl(engine, query), '_blank', 'noopener');
+  describeCriteria(): string[] {
+    return describeBlueskyFilters(this.criteria());
   }
 
   private search = inject(BlueskySearch);
@@ -132,25 +168,6 @@ export class BlueskySearchPanel {
   protected session = inject(BlueskySession);
   private auth = inject(Auth);
   private anonymousFollows = inject(AnonymousFollows);
-
-  /**
-   * Posts or accounts.
-   *
-   * The two differ in more than which endpoint runs: account search works
-   * signed out (measured — `public.api.bsky.app` answers it, the entryway does
-   * not) while post search does not, and `searchActors` takes a bare query with
-   * no filters at all. So the advanced panel and the unlinked notice are both
-   * scoped to the posts target.
-   */
-  protected target = signal<BlueskySearchTarget>('posts');
-
-  protected setTarget(target: BlueskySearchTarget): void {
-    if (this.target() === target) {
-      return;
-    }
-    this.target.set(target);
-    this.clearResults();
-  }
 
   /** Account results, hydrated with counts. */
   protected accounts = signal<BlueskyAccountResult[]>([]);
@@ -283,7 +300,6 @@ export class BlueskySearchPanel {
   protected criteria = signal<BlueskyPostSearch>(emptyBlueskyPostSearch());
   /** Tag input is free text; parsed into the AND-matched list on search. */
   protected tagInput = signal('');
-  protected advancedOpen = signal(false);
 
   protected statuses = signal<Status[]>([]);
   protected searching = signal(false);
@@ -297,6 +313,8 @@ export class BlueskySearchPanel {
   // Client-side refinement over what is already loaded. Identical in behaviour
   // to the Mastodon side because it is literally the same functions.
   protected loadedFilter = signal('');
+  /** Facets start open, matching the Mastodon panel's `refineOpen`. */
+  protected refineOpen = signal(true);
   protected statusSort = signal<StatusSortKey>('relevance');
   protected selectedFacets = signal<{ kind: FacetKind; value: string }[]>([]);
   protected readonly statusSorts = STATUS_SORTS;
@@ -329,10 +347,6 @@ export class BlueskySearchPanel {
   /** Patch a field of the criteria object without replacing the rest. */
   protected set<K extends keyof BlueskyPostSearch>(key: K, value: BlueskyPostSearch[K]): void {
     this.criteria.update((current) => ({ ...current, [key]: value }));
-  }
-
-  protected setText(value: string): void {
-    this.set('text', value);
   }
 
   protected toggleFacet(kind: FacetKind, value: string): void {
@@ -368,17 +382,53 @@ export class BlueskySearchPanel {
   reset(): void {
     this.criteria.set(emptyBlueskyPostSearch());
     this.tagInput.set('');
+    this.queryChange.emit('');
     this.clearResults();
   }
 
-  run(): void {
-    const text = this.criteria().text.trim();
-    if (!text || this.searching()) {
+  /**
+   * Run what the shared query box currently says.
+   *
+   * Called by the page's Search button. The box is authoritative: its text is
+   * parsed into criteria, so `from:pfrazee since:2026-01-01` typed by hand and
+   * the same values entered in Advanced produce identical searches — and the AI
+   * helper, which emits this syntax, lands in the form for free.
+   */
+  runQuery(): void {
+    const typed = this.query().trim();
+    if (!typed) {
       return;
     }
-    // Tags are only read at search time, so typing in the box does not silently
+    const parsed = parseBlueskyQuery(typed);
+    // Ranking is not part of the typed syntax, so it survives a re-parse.
+    parsed.sort = this.criteria().sort;
+    this.criteria.set(parsed);
+    this.tagInput.set((parsed.tags ?? []).join(' '));
+    this.runCurrent();
+  }
+
+  /**
+   * Run the structured criteria as they stand.
+   *
+   * The Advanced form's "Apply & search" path, and the one saved searches take.
+   * Reflects back into the box first so the reader can see — and edit, and copy
+   * — what their form choices actually mean in Bluesky's syntax.
+   */
+  applyAdvanced(): void {
+    // Tags are only read at apply time, so typing in the box does not silently
     // change what the "active filters" line claims about the last search.
     this.set('tags', parseTags(this.tagInput()));
+    this.queryChange.emit(serializeBlueskyQuery(this.criteria()));
+    this.runCurrent();
+  }
+
+  private runCurrent(): void {
+    if (!this.criteria().text.trim() && !hasBlueskyFilters(this.criteria())) {
+      return;
+    }
+    if (this.searching()) {
+      return;
+    }
     this.clearResults();
     this.searching.set(true);
     this.fetch();

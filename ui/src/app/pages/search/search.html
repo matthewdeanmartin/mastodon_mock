@@ -9,84 +9,78 @@
 
 <div class="search-shell">
   <div class="search-bar">
-    <!-- The Bluesky panel brings its own query box and Search button, so the
-         Mastodon ones would be a second, non-functioning pair. Only the type
-         select stays, because that is how you get back. -->
-    @if (!blueskyMode()) {
-      <input
-        type="text"
-        [ngModel]="query()"
-        (ngModelChange)="query.set($event)"
-        (keyup.enter)="run()"
-        [placeholder]="
-          type() === 'accounts'
-            ? 'Search accounts'
-            : type() === 'statuses'
-              ? 'Search posts'
-              : 'Search hashtags'
-        "
-      />
-    }
+    <!-- One query box for both networks. The Bluesky panel used to bring its own,
+         which is how the two engines drifted into looking like separate apps —
+         the box, the Search button and every control beside them are shared, and
+         only what they *do* switches on the network. -->
+    <input
+      type="text"
+      [ngModel]="query()"
+      (ngModelChange)="query.set($event)"
+      (keyup.enter)="run()"
+      [placeholder]="queryPlaceholder()"
+    />
+    <!-- Network first, then what to look for: the same two-step the reader makes
+         in their head. Both are plain selects, because the Mastodon side has
+         always been a select and consistency is the whole point here. -->
+    <select
+      [ngModel]="networkSelection()"
+      (ngModelChange)="onNetworkSelect($event)"
+      aria-label="Search network"
+    >
+      <option value="mastodon">Mastodon</option>
+      <option value="bluesky">🦋 Bluesky</option>
+    </select>
     <!-- The engines are an action, not a fourth type: picking one opens a tab and
          the select snaps back to the real type (see onTypeSelect). -->
     <select
       #typeSelect
-      [ngModel]="typeSelection()"
+      [ngModel]="type()"
       (ngModelChange)="onTypeSelect($event, typeSelect)"
       aria-label="Search for"
     >
       <option value="accounts">Accounts</option>
-      <option value="statuses">Posts</option>
-      <option value="hashtags">Hashtags</option>
-      <!-- A different engine with its own filters, not a fourth type — see
-           blueskyMode. It swaps the panel below rather than re-running the
-           Mastodon search with a flag set.
-           Offered without a linked account because account search works signed
-           out (measured); the panel itself says which half needs a session. -->
-      <optgroup label="Bluesky">
-        <option value="bluesky-posts">🦋 Search Bluesky</option>
-      </optgroup>
+      <!-- Disabled rather than hidden: an option that vanishes reads as a bug,
+           while a disabled one with a reason beneath the bar teaches what this
+           network can do. See typeUnavailable. -->
+      <option value="statuses" [disabled]="typeUnavailable('statuses')">Posts</option>
+      <option value="hashtags" [disabled]="typeUnavailable('hashtags')">Hashtags</option>
       <optgroup label="Search the web ↗">
         @for (e of webEngines; track e.id) {
           <option [value]="e.id">{{ e.label }}</option>
         }
       </optgroup>
     </select>
-    @if (!blueskyMode()) {
-      <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">
-        Search
-      </button>
-      @if (canUseSearchHelper()) {
-        <button
-          class="btn btn-outline"
-          type="button"
-          title="Describe what you're looking for and get a query"
-          aria-label="Help me search"
-          (click)="searchHelperOpen.set(true)"
-        >
-          🤖
-        </button>
-      }
+    <button class="btn" [disabled]="!query().trim() || searching()" (click)="run()">Search</button>
+    @if (canUseSearchHelper()) {
       <button
         class="btn btn-outline"
         type="button"
-        [title]="'What you can type in a ' + words().post + ' search'"
-        aria-label="Search syntax help"
-        (click)="syntaxHelpOpen.set(true)"
+        title="Describe what you're looking for and get a query"
+        aria-label="Help me search"
+        (click)="searchHelperOpen.set(true)"
       >
-        Syntax?
+        🤖
       </button>
-      @if (type() === 'statuses' || type() === 'accounts') {
-        <button
-          class="btn btn-outline"
-          [class.on]="advancedOpen()"
-          (click)="toggleAdvanced()"
-          [attr.aria-expanded]="advancedOpen()"
-        >
-          Advanced ▾
-        </button>
-      }
-
+    }
+    <button
+      class="btn btn-outline"
+      type="button"
+      [title]="'What you can type in a ' + words().post + ' search'"
+      aria-label="Search syntax help"
+      (click)="syntaxHelpOpen.set(true)"
+    >
+      Syntax?
+    </button>
+    @if (type() === 'statuses' || type() === 'accounts') {
+      <button
+        class="btn btn-outline"
+        [class.on]="advancedOpen()"
+        (click)="toggleAdvanced()"
+        [attr.aria-expanded]="advancedOpen()"
+      >
+        Advanced ▾
+      </button>
     }
 
     <!-- Saved searches sit OUTSIDE the blueskyMode guard: the list is shared by
@@ -141,15 +135,31 @@
       <button class="btn btn-outline" [disabled]="saved.atLimit()" (click)="openSaveDialog()">
         Save
       </button>
-      <!-- Share stays Mastodon-only: it serializes the full structured search
-           into query params, and the Bluesky panel's criteria have no such
-           serializer yet. The Bluesky panel *is* linkable via ?type= now, which
-           is the part that was actually broken. -->
-      <button class="btn btn-outline" (click)="share()">
-        {{ shareCopied() ? 'Link copied!' : 'Share' }}
-      </button>
     }
+    <!-- Share works on both now. Bluesky's criteria round-trip through the query
+         box (see bluesky-query-serializer), so a Bluesky link carries its
+         operators in `q` rather than needing the Mastodon param encoding. -->
+    <button class="btn btn-outline" (click)="share()">
+      {{ shareCopied() ? 'Link copied!' : 'Share' }}
+    </button>
   </div>
+
+  <!-- Why an option in the type select is greyed out. Sits under the bar rather
+       than in a tooltip: the reader who needs it is the one who just tried to
+       click it. -->
+  @if (blueskyMode() && !session.linked()) {
+    <p class="muted small type-unavailable" role="status">
+      Bluesky post search needs a linked account —
+      <a routerLink="/settings/connections/bluesky">link one in Settings</a>. Account search works
+      without one. Hashtags are Mastodon-only: Bluesky has no hashtag index to search, only a
+      hashtag filter inside post search.
+    </p>
+  } @else if (blueskyMode()) {
+    <p class="muted small type-unavailable" role="status">
+      Hashtags are Mastodon-only — Bluesky has no hashtag index, only a hashtag filter inside post
+      search (set it under Advanced).
+    </p>
+  }
 
   <!-- A web engine can't express replies/media/dates/language, so the serializer
        drops them. Say which, rather than let the tab that just opened look like
@@ -163,38 +173,42 @@
 
   <!-- Search server: a full-width row of its own, directly under the search bar.
        A server combo needs horizontal room and the two-box layout below has none
-       to give, so it spans the shell instead of squeezing into a column. -->
-  <div class="search-server-row">
-    <button
-      class="btn btn-outline btn-sm search-server-toggle"
-      type="button"
-      (click)="toggleSearchServer()"
-      [attr.aria-expanded]="searchServerOpen()"
-    >
-      <!-- Always the actual host, never "this server": the whole point of the chip
+       to give, so it spans the shell instead of squeezing into a column.
+       Mastodon-only, and not for parity's sake: Bluesky has one AppView, so
+       there is no "which server am I searching" question to answer. -->
+  @if (!blueskyMode()) {
+    <div class="search-server-row">
+      <button
+        class="btn btn-outline btn-sm search-server-toggle"
+        type="button"
+        (click)="toggleSearchServer()"
+        [attr.aria-expanded]="searchServerOpen()"
+      >
+        <!-- Always the actual host, never "this server": the whole point of the chip
            is to answer "where am I searching?" from the search page, without
            going to Settings to look it up. -->
-      🔍 Searching:
-      <strong>{{ searchHostLabel() }}</strong>
-      ▾
-    </button>
-    @if (searchServer.active()) {
-      <span class="muted small search-server-note">
-        Public results only. Feeds and profiles still come from
-        {{ browsingHostLabel() }}.
-      </span>
-    } @else {
-      <span class="muted small search-server-note">
-        {{
-          capabilities.active
-            ? 'The server you are browsing. Point search elsewhere if it has search turned off.'
-            : 'Your own server.'
-        }}
-      </span>
-    }
-  </div>
+        🔍 Searching:
+        <strong>{{ searchHostLabel() }}</strong>
+        ▾
+      </button>
+      @if (searchServer.active()) {
+        <span class="muted small search-server-note">
+          Public results only. Feeds and profiles still come from
+          {{ browsingHostLabel() }}.
+        </span>
+      } @else {
+        <span class="muted small search-server-note">
+          {{
+            capabilities.active
+              ? 'The server you are browsing. Point search elsewhere if it has search turned off.'
+              : 'Your own server.'
+          }}
+        </span>
+      }
+    </div>
+  }
 
-  @if (searchServerOpen()) {
+  @if (searchServerOpen() && !blueskyMode()) {
     <div class="search-server-panel">
       <p class="muted small">
         Some servers turn off search for logged-out visitors. Point search at a server that allows
@@ -296,11 +310,19 @@
   }
 
   @if (blueskyMode()) {
-    <!-- The whole Mastodon body is replaced, not filtered: Bluesky takes a
-         different set of filters, so there is no shared form to reuse. Results
-         still render through StatusCard and the same refine helpers. -->
+    <!-- Bluesky renders into the *same* two-box grid as Mastodon: form and
+         refinement controls in the sticky left column, results on the right.
+         The panel used to replace this whole block, which is how it ended up
+         with filters stacked across the top and a layout of its own — the
+         filters were never in a column because there was no column. -->
     <app-bluesky-search-panel
+      class="search-page"
+      [class.two-box]="blueskyPanel()?.twoBox()"
+      [query]="query()"
+      [target]="blueskyTarget()"
+      [advancedOpen]="advancedOpen()"
       [savedToRun]="pendingBlueskySaved()"
+      (queryChange)="query.set($event)"
       (saveRequested)="openBlueskySaveDialog($event)"
     />
   } @else {
@@ -701,7 +723,8 @@
               <div class="thin-results">
                 <p class="muted small">
                   Only {{ shownCount() }} {{ shownCount() === 1 ? 'post' : 'posts' }} left after
-                  excluding. The excluded {{ excludedAuthors().size === 1 ? 'account' : 'accounts' }}
+                  excluding. The excluded
+                  {{ excludedAuthors().size === 1 ? 'account' : 'accounts' }}
                   made up most of what was loaded — fetching more will find posts from other people.
                 </p>
                 <button
@@ -870,7 +893,10 @@
                   <div class="facet-label muted small">{{ facet.label }}</div>
                   <!-- `showAll` facets are bounded ordered ladders where the
                        last row matters as much as the first — see AccountFacet. -->
-                  @for (v of facet.showAll ? facet.values : facet.values.slice(0, 5); track v.value) {
+                  @for (
+                    v of facet.showAll ? facet.values : facet.values.slice(0, 5);
+                    track v.value
+                  ) {
                     <label class="facet-value">
                       <input
                         type="checkbox"
@@ -1096,5 +1122,5 @@
 }
 
 @if (syntaxHelpOpen()) {
-  <app-search-syntax-help (closed)="syntaxHelpOpen.set(false)" />
+  <app-search-syntax-help [network]="networkSelection()" (closed)="syntaxHelpOpen.set(false)" />
 }

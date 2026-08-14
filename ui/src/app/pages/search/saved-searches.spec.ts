@@ -81,7 +81,11 @@ describe('SavedSearches', () => {
     });
 
     it('saves a Bluesky search with no instance', () => {
-      svc.save('Bsky', { text: 'angular' }, { instance: '', authenticated: true, network: 'bluesky' });
+      svc.save(
+        'Bsky',
+        { text: 'angular' },
+        { instance: '', authenticated: true, network: 'bluesky' },
+      );
       const stored = svc.all()[0];
 
       expect(stored.network).toBe('bluesky');
@@ -95,16 +99,30 @@ describe('SavedSearches', () => {
       svc.save('M', postSearch('a'), ctx);
       svc.save('B', { text: 'b' }, { instance: '', authenticated: true, network: 'bluesky' });
 
-      expect(svc.all().filter(isBlueskySaved).map((s) => s.name)).toEqual(['B']);
-      expect(svc.all().filter(isMastodonSaved).map((s) => s.name)).toEqual(['M']);
+      expect(
+        svc
+          .all()
+          .filter(isBlueskySaved)
+          .map((s) => s.name),
+      ).toEqual(['B']);
+      expect(
+        svc
+          .all()
+          .filter(isMastodonSaved)
+          .map((s) => s.name),
+      ).toEqual(['M']);
     });
 
     it('carries the network through a duplicate', () => {
-      const saved = svc.save('B', { text: 'b' }, {
-        instance: '',
-        authenticated: true,
-        network: 'bluesky',
-      });
+      const saved = svc.save(
+        'B',
+        { text: 'b' },
+        {
+          instance: '',
+          authenticated: true,
+          network: 'bluesky',
+        },
+      );
       svc.duplicate(saved.ok ? saved.saved.id : '');
 
       expect(svc.all().every((s) => s.network === 'bluesky')).toBe(true);
