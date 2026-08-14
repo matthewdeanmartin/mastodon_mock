@@ -69,6 +69,8 @@ function makeBskyStatus(id = 'bsky:at://did:plc:x/app.bsky.feed.post/1'): Status
       cid: 'cid-1',
       indexedAt: '2026-01-01T00:00:00Z',
       replyRoot: { uri: 'at://did:plc:x/app.bsky.feed.post/1', cid: 'cid-1' },
+      replyParentUri: null,
+      externalUri: null,
     },
   };
 }

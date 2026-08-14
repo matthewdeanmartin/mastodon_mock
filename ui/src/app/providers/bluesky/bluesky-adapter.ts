@@ -187,6 +187,11 @@ function adaptImages(embed: BskyEmbedView | undefined, postUri: string): MediaAt
   }));
 }
 
+/** The external link card's target url, if this post has one. */
+function externalUri(embed: BskyEmbedView | undefined): string | null {
+  return (embed?.external ?? embed?.media?.external)?.uri ?? null;
+}
+
 function externalCard(embed: BskyEmbedView | undefined): string {
   const external = embed?.external ?? embed?.media?.external;
   if (!external) {
@@ -253,6 +258,8 @@ export function adaptPost(post: BskyPostView): Status {
     repostUri: post.viewer?.repost ?? null,
     // Replying to this post keeps its thread root, or starts one at the post itself.
     replyRoot: post.record.reply?.root ?? { uri: post.uri, cid: post.cid },
+    replyParentUri: post.record.reply?.parent.uri ?? null,
+    externalUri: externalUri(post.embed),
   };
   return {
     provider: 'bluesky',

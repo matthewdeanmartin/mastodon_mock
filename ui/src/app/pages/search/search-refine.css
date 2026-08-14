@@ -230,3 +230,60 @@
   color: var(--text);
   font-size: 14px;
 }
+/* Numeric account facets (followers / following / posts min–max). */
+.num-facet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 6px 0 4px;
+}
+
+.num-facet {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.num-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.num-range input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--col-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+/* Heading that separates network-specific facets from the shared ones, so it is
+   never ambiguous which controls exist on both networks and which don't. */
+.facet-group-label {
+  margin: 14px 0 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Advanced-panel fields that filter loaded results rather than being sent to the
+   server. Set apart because the rest of the panel only takes effect on
+   "Apply & search", and these take effect as you type. */
+.client-side-fields {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.client-side-fields .facet-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 4px;
+}

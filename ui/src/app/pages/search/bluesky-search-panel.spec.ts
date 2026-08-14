@@ -3,7 +3,7 @@ import { WritableSignal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { Observable, of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Account, Status } from '../../models';
 import { BlueskySearchPanel } from './bluesky-search-panel';
@@ -13,8 +13,11 @@ import {
   BlueskyAccountSearch,
 } from '../../providers/bluesky/bluesky-account-search';
 import { FacetKind } from './search-refine';
+import { BlueskyAccountFacetKind, BlueskyPostFacetKind } from './bluesky-refine';
+import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
+import { BskyRef, BskyTimeline } from '../../providers/bluesky/bluesky-types';
 
-function makeAccount(acct: string): Account {
+function makeAccount(acct: string, over: Partial<Account> = {}): Account {
   return {
     id: `bsky:${acct}`,
     username: acct,
@@ -31,6 +34,7 @@ function makeAccount(acct: string): Account {
     bot: false,
     locked: false,
     fields: [],
+    ...over,
   } as Account;
 }
 
@@ -80,6 +84,25 @@ interface PanelInternals {
   clearRefinements(): void;
   runQuery(): void;
   loadMore(): void;
+  // Sprint: account facets + Bluesky-only post filters.
+  togglePostFacet(kind: BlueskyPostFacetKind, value: string): void;
+  isPostFacetSelected(kind: BlueskyPostFacetKind, value: string): boolean;
+  toggleAccountFacet(kind: BlueskyAccountFacetKind, value: string): void;
+  postFacets(): { kind: BlueskyPostFacetKind }[];
+  accountFacets(): { kind: BlueskyAccountFacetKind }[];
+  visibleAccounts(): { account: Account }[];
+  accounts(): { account: Account }[];
+  setEngagementBound(key: 'minLikes' | 'minReposts' | 'minReplies', raw: string): void;
+  setAccountBound(key: 'followers' | 'following' | 'posts', end: 'min' | 'max', raw: string): void;
+  accountBound(key: 'followers' | 'following' | 'posts', end: 'min' | 'max'): number | null;
+  hasRefinements(): boolean;
+  statusSorts: { value: string; label: string }[];
+  canScanActivity(): boolean;
+  activityScanSize(): number;
+  scanActivity(): void;
+  accountsMissingActivity(): { account: Account }[];
+  scanCallsUsed(): number;
+  hasActivityFacet(): boolean;
 }
 
 function internals(fixture: ComponentFixture<BlueskySearchPanel>): PanelInternals {
@@ -92,6 +115,9 @@ describe('BlueskySearchPanel', () => {
   let accountPages: BlueskyAccountPage[];
   let postCalls: number;
   let accountCalls: number;
+  /** did → last-post timestamp, or 'error' to make that lookup fail. */
+  let authorFeeds: Record<string, string>;
+  let authorFeedCalls: string[];
 
   beforeEach(() => {
     localStorage.clear();
@@ -115,6 +141,26 @@ describe('BlueskySearchPanel', () => {
       },
     };
 
+    // The activity scan's transport: one author feed per account. Keyed by the
+    // bare did so a test can give different accounts different last-post dates,
+    // and record every actor asked about so the cap can be asserted.
+    authorFeeds = {};
+    authorFeedCalls = [];
+    const api = {
+      getAuthorFeed: (actor: string): Observable<BskyTimeline> => {
+        authorFeedCalls.push(actor);
+        const when = authorFeeds[actor];
+        if (when === 'error') {
+          return throwError(() => new Error('nope'));
+        }
+        return of(
+          when
+            ? { feed: [{ post: { record: { createdAt: when }, indexedAt: when } }] }
+            : { feed: [] },
+        ) as Observable<BskyTimeline>;
+      },
+    };
+
     TestBed.configureTestingModule({
       imports: [BlueskySearchPanel],
       providers: [
@@ -123,6 +169,7 @@ describe('BlueskySearchPanel', () => {
         provideRouter([]),
         { provide: BlueskySearch, useValue: postSearch },
         { provide: BlueskyAccountSearch, useValue: accountSearch },
+        { provide: BlueskyApi, useValue: api },
       ],
     });
   });
@@ -368,6 +415,280 @@ describe('BlueskySearchPanel', () => {
       // Filters describe a result set; a new result set has none of them yet.
       expect(internals(fixture).excludedAuthors().size).toBe(0);
       expect(internals(fixture).grouping()).toBe('none');
+    });
+  });
+
+  describe('Bluesky-only post filters', () => {
+    function loadPosts(fixture: ComponentFixture<BlueskySearchPanel>, statuses: Status[]) {
+      postPages = [{ statuses, cursor: null }];
+      internals(fixture).apiBudget.set(1);
+      internals(fixture).runQuery();
+    }
+
+    it('offers engagement, thread and link facets the Mastodon page cannot', () => {
+      const fixture = setUp();
+      loadPosts(fixture, [
+        makeStatus('1', 'a.bsky.social', { favourites_count: 0 }),
+        makeStatus('2', 'b.bsky.social', {
+          favourites_count: 500,
+          providerRef: {
+            uri: 'at://2',
+            cid: 'c',
+            likeUri: null,
+            repostUri: null,
+            replyRoot: { uri: 'at://root', cid: 'r' },
+            replyParentUri: 'at://root',
+            externalUri: 'https://github.com/x',
+          } satisfies BskyRef,
+          provider: 'bluesky',
+        } as Partial<Status>),
+      ]);
+
+      const kinds = internals(fixture)
+        .postFacets()
+        .map((f) => f.kind);
+      expect(kinds).toContain('likes');
+      expect(kinds).toContain('threadPosition');
+    });
+
+    it('filters loaded posts by an engagement bucket without a new request', () => {
+      const fixture = setUp();
+      loadPosts(fixture, [
+        makeStatus('1', 'a.bsky.social', { favourites_count: 0 }),
+        makeStatus('2', 'b.bsky.social', { favourites_count: 50 }),
+      ]);
+      const before = postCalls;
+
+      internals(fixture).togglePostFacet('likes', '10-99');
+
+      expect(internals(fixture).visible().map((s) => s.id)).toEqual(['2']);
+      // The whole point of client-side refinement: no second search.
+      expect(postCalls).toBe(before);
+    });
+
+    it('applies the minimum-engagement gate as you type, inclusively', () => {
+      const fixture = setUp();
+      loadPosts(fixture, [
+        makeStatus('1', 'a.bsky.social', { favourites_count: 5 }),
+        makeStatus('2', 'b.bsky.social', { favourites_count: 10 }),
+      ]);
+
+      internals(fixture).setEngagementBound('minLikes', '10');
+      expect(internals(fixture).visible().map((s) => s.id)).toEqual(['2']);
+
+      // Blank clears the gate rather than reading as zero.
+      internals(fixture).setEngagementBound('minLikes', '');
+      expect(internals(fixture).visible().length).toBe(2);
+    });
+
+    it('ANDs a Bluesky-only facet with a shared one', () => {
+      const fixture = setUp();
+      loadPosts(fixture, [
+        makeStatus('1', 'a.bsky.social', { favourites_count: 50, language: 'en' }),
+        makeStatus('2', 'b.bsky.social', { favourites_count: 50, language: 'fr' }),
+        makeStatus('3', 'c.bsky.social', { favourites_count: 0, language: 'en' }),
+      ]);
+
+      internals(fixture).togglePostFacet('likes', '10-99');
+      internals(fixture).toggleFacet('language', 'en');
+
+      expect(internals(fixture).visible().map((s) => s.id)).toEqual(['1']);
+    });
+
+    it('names the sorts after Bluesky, reusing the shared sort keys', () => {
+      const fixture = setUp();
+      const sorts = internals(fixture).statusSorts;
+      expect(sorts.find((s) => s.value === 'favourites')?.label).toBe('Most liked');
+      expect(sorts.find((s) => s.value === 'reblogs')?.label).toBe('Most reposted');
+    });
+
+    it('clears the new filters along with everything else', () => {
+      const fixture = setUp();
+      loadPosts(fixture, [makeStatus('1', 'a.bsky.social', { favourites_count: 50 })]);
+      internals(fixture).togglePostFacet('likes', '10-99');
+      internals(fixture).setEngagementBound('minLikes', '5');
+      expect(internals(fixture).hasRefinements()).toBe(true);
+
+      internals(fixture).clearRefinements();
+
+      expect(internals(fixture).hasRefinements()).toBe(false);
+      expect(internals(fixture).isPostFacetSelected('likes', '10-99')).toBe(false);
+    });
+  });
+
+  describe('account refinement', () => {
+    function loadAccounts(
+      fixture: ComponentFixture<BlueskySearchPanel>,
+      accounts: Account[],
+    ) {
+      accountPages = [{ results: accounts.map((account) => ({ account, relationship: null })), cursor: null }];
+      internals(fixture).apiBudget.set(1);
+      internals(fixture).runQuery();
+    }
+
+    const people = () => [
+      makeAccount('alice.bsky.social', { followers_count: 50, statuses_count: 10 }),
+      makeAccount('bob.bsky.social', { followers_count: 5_000, statuses_count: 2_000 }),
+      makeAccount('mozilla.org', { followers_count: 50_000, statuses_count: 300 }),
+    ];
+
+    it('facets loaded accounts by handle type and follower bucket', () => {
+      const fixture = setUp('accounts');
+      loadAccounts(fixture, people());
+
+      const kinds = internals(fixture)
+        .accountFacets()
+        .map((f) => f.kind);
+      expect(kinds).toContain('handleType');
+      expect(kinds).toContain('followers');
+      // AT Protocol has no bots or locked accounts, so those never appear.
+      expect(kinds).not.toContain('bot');
+    });
+
+    it('narrows to custom-domain handles without a new request', () => {
+      const fixture = setUp('accounts');
+      loadAccounts(fixture, people());
+      const before = accountCalls;
+
+      internals(fixture).toggleAccountFacet('handleType', 'custom');
+
+      expect(internals(fixture).visibleAccounts().map((r) => r.account.acct)).toEqual([
+        'mozilla.org',
+      ]);
+      expect(accountCalls).toBe(before);
+    });
+
+    it('gates accounts by a numeric follower range', () => {
+      const fixture = setUp('accounts');
+      loadAccounts(fixture, people());
+
+      internals(fixture).setAccountBound('followers', 'min', '1000');
+      expect(internals(fixture).visibleAccounts().length).toBe(2);
+
+      internals(fixture).setAccountBound('followers', 'max', '10000');
+      expect(internals(fixture).visibleAccounts().map((r) => r.account.acct)).toEqual([
+        'bob.bsky.social',
+      ]);
+    });
+
+    it('clearing one end of a range leaves the other in force', () => {
+      const fixture = setUp('accounts');
+      loadAccounts(fixture, people());
+      internals(fixture).setAccountBound('followers', 'min', '1000');
+      internals(fixture).setAccountBound('followers', 'max', '10000');
+
+      internals(fixture).setAccountBound('followers', 'max', '');
+
+      expect(internals(fixture).accountBound('followers', 'min')).toBe(1_000);
+      expect(internals(fixture).accountBound('followers', 'max')).toBeNull();
+      expect(internals(fixture).visibleAccounts().length).toBe(2);
+    });
+
+    it('an emptied range stops counting as a refinement', () => {
+      const fixture = setUp('accounts');
+      loadAccounts(fixture, people());
+      internals(fixture).setAccountBound('followers', 'min', '1000');
+      expect(internals(fixture).hasRefinements()).toBe(true);
+
+      internals(fixture).setAccountBound('followers', 'min', '');
+
+      expect(internals(fixture).hasRefinements()).toBe(false);
+    });
+  });
+
+  describe('activity scan', () => {
+    function loadAccounts(fixture: ComponentFixture<BlueskySearchPanel>, accounts: Account[]) {
+      accountPages = [
+        { results: accounts.map((account) => ({ account, relationship: null })), cursor: null },
+      ];
+      internals(fixture).apiBudget.set(1);
+      internals(fixture).runQuery();
+    }
+
+    it('is offered only when some loaded account has no known date', () => {
+      const fixture = setUp('accounts');
+      loadAccounts(fixture, [makeAccount('a.bsky.social')]);
+
+      expect(internals(fixture).canScanActivity()).toBe(true);
+      expect(internals(fixture).activityScanSize()).toBe(1);
+    });
+
+    it('fills in last-post dates, which brings the activity facet into being', () => {
+      const fixture = setUp('accounts');
+      // The panel's ids are `bsky:<acct>` here, so the scan strips the prefix.
+      authorFeeds = {
+        'a.bsky.social': '2026-08-14T09:00:00.000Z',
+        'b.bsky.social': '2025-01-01T00:00:00.000Z',
+      };
+      loadAccounts(fixture, [makeAccount('a.bsky.social'), makeAccount('b.bsky.social')]);
+      expect(internals(fixture).accountFacets().map((f) => f.kind)).not.toContain('activity');
+
+      internals(fixture).scanActivity();
+
+      expect(internals(fixture).accounts()[0].account.last_status_at).toBe(
+        '2026-08-14T09:00:00.000Z',
+      );
+      expect(internals(fixture).accountFacets().map((f) => f.kind)).toContain('activity');
+      expect(internals(fixture).canScanActivity()).toBe(false);
+    });
+
+    it('reports its cost separately from the paging budget', () => {
+      const fixture = setUp('accounts');
+      authorFeeds = { 'a.bsky.social': '2026-08-01T00:00:00.000Z' };
+      loadAccounts(fixture, [makeAccount('a.bsky.social'), makeAccount('b.bsky.social')]);
+      const paging = internals(fixture).callsUsed();
+
+      internals(fixture).scanActivity();
+
+      expect(authorFeedCalls.length).toBe(2);
+      expect(internals(fixture).scanCallsUsed()).toBe(2);
+      // Folding these into `callsUsed` reported "27 of up to 2 API calls used",
+      // because that counter is measured against a budget counted in pages.
+      expect(internals(fixture).callsUsed()).toBe(paging);
+    });
+
+    it('leaves an account that fails or has never posted honestly unknown', () => {
+      const fixture = setUp('accounts');
+      authorFeeds = { 'a.bsky.social': 'error' };
+      loadAccounts(fixture, [makeAccount('a.bsky.social'), makeAccount('b.bsky.social')]);
+
+      internals(fixture).scanActivity();
+
+      // One errored, one returned an empty feed: neither gets an invented date,
+      // and one bad lookup does not fail the whole scan.
+      expect(
+        internals(fixture)
+          .accounts()
+          .every((r) => !r.account.last_status_at),
+      ).toBe(true);
+    });
+
+    it('keeps offering the scan after a partial one, without a second heading', () => {
+      const fixture = setUp('accounts');
+      const many = Array.from({ length: 30 }, (_, i) => makeAccount(`u${i}.bsky.social`));
+      authorFeeds = Object.fromEntries(
+        many.map((a) => [a.acct, '2026-08-01T00:00:00.000Z']),
+      );
+      loadAccounts(fixture, many);
+
+      internals(fixture).scanActivity();
+
+      // 30 accounts, cap 25: the ladder now exists *and* there is more to scan.
+      // The offer block must not print its own "Last active" heading here, or
+      // the column shows the facet name twice.
+      expect(internals(fixture).hasActivityFacet()).toBe(true);
+      expect(internals(fixture).canScanActivity()).toBe(true);
+      expect(internals(fixture).activityScanSize()).toBe(5);
+    });
+
+    it('caps how many accounts one scan will look at', () => {
+      const fixture = setUp('accounts');
+      const many = Array.from({ length: 40 }, (_, i) => makeAccount(`u${i}.bsky.social`));
+      loadAccounts(fixture, many);
+
+      expect(internals(fixture).activityScanSize()).toBe(25);
+      internals(fixture).scanActivity();
+      expect(authorFeedCalls.length).toBe(25);
     });
   });
 });

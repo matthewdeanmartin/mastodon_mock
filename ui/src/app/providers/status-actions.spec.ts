@@ -43,6 +43,8 @@ function bskyStatus(overrides: Partial<Status> = {}): Status {
     likeUri: null,
     repostUri: null,
     replyRoot: { uri: 'at://root', cid: 'cid-root' },
+    replyParentUri: null,
+    externalUri: null,
   };
   return makeStatus({ provider: 'bluesky', providerRef: ref, id: 'bsky:at://...', ...overrides });
 }

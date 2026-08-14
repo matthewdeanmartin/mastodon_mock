@@ -315,4 +315,23 @@ export interface BskyRef {
   repostUri: string | null;
   /** The thread root to use when replying to this post. */
   replyRoot: { uri: string; cid: string };
+  /**
+   * The at-uri of the post this one directly replies to, or null for a
+   * top-level post.
+   *
+   * `Status.in_reply_to_id` carries the same thing, but prefixed and stringly
+   * typed; keeping the raw uri here lets thread-position filtering compare it
+   * against {@link replyRoot} without re-parsing. Equal uris mean a direct
+   * reply to the thread starter; different ones mean a reply further down.
+   */
+  replyParentUri: string | null;
+  /**
+   * The external link card's target, when the post carries one.
+   *
+   * The adapter renders this card into `content` as an anchor, but the
+   * "linked domain" facet needs the url as data. Recovering it by re-parsing
+   * the rendered HTML would couple a filter to a presentation detail, so it
+   * rides here — the place Bluesky-specific post data already lives.
+   */
+  externalUri: string | null;
 }

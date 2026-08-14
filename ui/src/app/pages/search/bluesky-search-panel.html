@@ -118,6 +118,52 @@
         </label>
       </div>
 
+      <!-- Everything above is sent to Bluesky; these are not. `searchPosts` has
+           no engagement parameters, so this gates the posts already loaded —
+           which is why it sits below a divider and takes effect immediately
+           instead of waiting for "Apply & search". -->
+      <div class="client-side-fields">
+        <div class="facet-label muted small">
+          Minimum engagement
+          <span class="muted small">Filters loaded {{ words().posts }} — no new search</span>
+        </div>
+        <div class="advanced-fields">
+          <label>
+            <span class="muted small">Likes</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="any"
+              [ngModel]="engagementBounds().minLikes ?? null"
+              (ngModelChange)="setEngagementBound('minLikes', $event)"
+              aria-label="Minimum likes"
+            />
+          </label>
+          <label>
+            <span class="muted small">Reposts</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="any"
+              [ngModel]="engagementBounds().minReposts ?? null"
+              (ngModelChange)="setEngagementBound('minReposts', $event)"
+              aria-label="Minimum reposts"
+            />
+          </label>
+          <label>
+            <span class="muted small">Replies</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="any"
+              [ngModel]="engagementBounds().minReplies ?? null"
+              (ngModelChange)="setEngagementBound('minReplies', $event)"
+              aria-label="Minimum replies"
+            />
+          </label>
+        </div>
+      </div>
+
       <div class="advanced-actions">
         <button class="btn btn-sm" (click)="applyAdvanced()">Apply &amp; search</button>
         @if (hasFilters()) {
@@ -130,10 +176,76 @@
   @if (advancedOpen() && target() === 'accounts') {
     <div class="advanced-panel">
       <p class="muted small">
-        Bluesky's account search matches handles, display names and bios, and takes no other
-        parameters — so there is nothing to set here. Use the filter and sort below to narrow the
-        people it found.
+        Bluesky's account search takes no parameters beyond the words themselves, so these gates
+        filter the people it already found rather than changing the search.
       </p>
+      <!-- The precise counterpart to the clickable follower/post buckets below,
+           mirroring the Mastodon page's numeric bounds grid. -->
+      <div class="num-facet-grid">
+        <label>
+          <span class="muted small">Followers</span>
+          <span class="num-range">
+            <input
+              type="number"
+              min="0"
+              placeholder="min"
+              [ngModel]="accountBound('followers', 'min')"
+              (ngModelChange)="setAccountBound('followers', 'min', $event)"
+              aria-label="Minimum followers"
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="max"
+              [ngModel]="accountBound('followers', 'max')"
+              (ngModelChange)="setAccountBound('followers', 'max', $event)"
+              aria-label="Maximum followers"
+            />
+          </span>
+        </label>
+        <label>
+          <span class="muted small">Following</span>
+          <span class="num-range">
+            <input
+              type="number"
+              min="0"
+              placeholder="min"
+              [ngModel]="accountBound('following', 'min')"
+              (ngModelChange)="setAccountBound('following', 'min', $event)"
+              aria-label="Minimum following"
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="max"
+              [ngModel]="accountBound('following', 'max')"
+              (ngModelChange)="setAccountBound('following', 'max', $event)"
+              aria-label="Maximum following"
+            />
+          </span>
+        </label>
+        <label>
+          <span class="muted small">Posts</span>
+          <span class="num-range">
+            <input
+              type="number"
+              min="0"
+              placeholder="min"
+              [ngModel]="accountBound('posts', 'min')"
+              (ngModelChange)="setAccountBound('posts', 'min', $event)"
+              aria-label="Minimum posts"
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="max"
+              [ngModel]="accountBound('posts', 'max')"
+              (ngModelChange)="setAccountBound('posts', 'max', $event)"
+              aria-label="Maximum posts"
+            />
+          </span>
+        </label>
+      </div>
     </div>
   }
 
@@ -292,7 +404,96 @@
           </p>
         </div>
 
-        @if (selectedFacets().length || loadedFilter() || excludedAuthors().size) {
+        <!-- Facets Bluesky can offer that Mastodon's search cannot: engagement
+             counts arrive on every result, embeds name what is linked, and the
+             record says how deep in a thread a post sits. Grouped under their
+             own heading so it stays clear which controls are network-specific
+             rather than silently interleaved with the shared ones. -->
+        @if (postFacets().length) {
+          <div class="facet-group-label muted small">Bluesky only</div>
+          @for (facet of postFacets(); track facet.kind) {
+            <div class="facet">
+              <div class="facet-label muted small">{{ facet.label }}</div>
+              @for (v of facet.values.slice(0, 5); track v.value) {
+                <label class="facet-value">
+                  <input
+                    type="checkbox"
+                    [checked]="isPostFacetSelected(facet.kind, v.value)"
+                    (change)="togglePostFacet(facet.kind, v.value)"
+                  />
+                  <span>{{ v.label }}</span>
+                  <span class="muted facet-count">{{ v.count }}</span>
+                </label>
+              }
+              @if (facet.hint) {
+                <p class="muted small collapse-note">{{ facet.hint }}</p>
+              }
+            </div>
+          }
+        }
+
+        @if (hasRefinements()) {
+          <button class="btn btn-outline btn-sm" (click)="clearRefinements()">Clear filters</button>
+        }
+      </details>
+    }
+
+    @if (target() === 'accounts' && (accountFacets().length || canScanActivity())) {
+      <details class="refine-facets" [open]="refineOpen()">
+        <summary (click)="refineOpen.set(!refineOpen())">
+          Refine loaded results
+          <span class="muted small">Based on {{ accounts().length }} loaded accounts</span>
+        </summary>
+
+        @for (facet of accountFacets(); track facet.kind) {
+          <div class="facet">
+            <div class="facet-label muted small">{{ facet.label }}</div>
+            @for (v of facet.showAll ? facet.values : facet.values.slice(0, 5); track v.value) {
+              <label class="facet-value">
+                <input
+                  type="checkbox"
+                  [checked]="isAccountFacetSelected(facet.kind, v.value)"
+                  (change)="toggleAccountFacet(facet.kind, v.value)"
+                />
+                <span>{{ v.label }}</span>
+                <span class="muted facet-count">{{ v.count }}</span>
+              </label>
+            }
+            @if (facet.hint) {
+              <p class="muted small collapse-note">{{ facet.hint }}</p>
+            }
+          </div>
+        }
+
+        <!-- Bluesky profiles carry no last-post date, so the activity ladder has
+             to be bought: one request per account. Hence a button, with the cost
+             stated on it. -->
+        @if (canScanActivity()) {
+          <div class="facet">
+            <!-- No heading of its own once the ladder exists: after a partial
+                 scan this sits directly under the real "Last active" facet, and
+                 a second identical heading would read as a second facet. -->
+            @if (!hasActivityFacet()) {
+              <div class="facet-label muted small">Last active</div>
+            }
+            <p class="muted small collapse-note">
+              Bluesky profiles don't include a last-post date. Checking costs one API call per
+              account.
+            </p>
+            <button class="btn btn-outline btn-sm" (click)="scanActivity()">
+              Check activity for {{ activityScanSize() }}
+              {{ activityScanSize() === 1 ? 'account' : 'accounts' }}
+            </button>
+          </div>
+        }
+        @if (scanningActivity()) {
+          <p class="muted small collapse-note">Checking activity…</p>
+        }
+        @if (scanError(); as err) {
+          <p class="muted small collapse-note">{{ err }}</p>
+        }
+
+        @if (hasRefinements()) {
           <button class="btn btn-outline btn-sm" (click)="clearRefinements()">Clear filters</button>
         }
       </details>
@@ -317,6 +518,12 @@
         }
       }
       {{ callsUsed() }} of up to {{ apiBudget() }} API calls used
+      <!-- The scan is not paging, so it is reported as its own spend rather than
+           counted against a budget measured in pages. -->
+      @if (scanCallsUsed()) {
+        <br />
+        {{ scanCallsUsed() }} more for the activity check
+      }
     </div>
   }
 </div>

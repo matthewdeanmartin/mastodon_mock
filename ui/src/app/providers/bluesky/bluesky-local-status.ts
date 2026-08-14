@@ -31,6 +31,9 @@ export function buildLocalBskyStatus(
       repostUri: null,
       // A top-level post roots its own future thread.
       replyRoot: parent ? parent.replyRoot : { uri, cid },
+      replyParentUri: parent?.uri ?? null,
+      // Composing here never attaches a link card.
+      externalUri: null,
     } satisfies BskyRef,
     id: `bsky:${uri}`,
     created_at: new Date().toISOString(),

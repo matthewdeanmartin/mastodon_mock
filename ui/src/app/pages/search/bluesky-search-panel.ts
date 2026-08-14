@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { catchError, map, merge, of, toArray } from 'rxjs';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { PageDiagnostics } from '../../page-diagnostics';
@@ -35,6 +36,18 @@ import {
   Facet,
   FacetKind,
 } from './search-refine';
+import {
+  accountMeetsBounds,
+  blueskyAccountMatchesFacet,
+  blueskyPostMatchesFacet,
+  BlueskyAccountBounds,
+  BlueskyAccountFacetKind,
+  BlueskyEngagementBounds,
+  BlueskyPostFacetKind,
+  buildBlueskyAccountFacets,
+  buildBlueskyPostFacets,
+  statusMeetsEngagement,
+} from './bluesky-refine';
 import { ResultGrouping } from './mawkingbird-search';
 import { LocalModeration } from '../../local-moderation';
 import { parseBlueskyQuery, serializeBlueskyQuery } from './bluesky-query-serializer';
@@ -53,6 +66,7 @@ import {
   BlueskyAccountResult,
   BlueskyAccountSearch,
 } from '../../providers/bluesky/bluesky-account-search';
+import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
 import { BlueskyGraph } from '../../providers/bluesky/bluesky-graph';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { Auth } from '../../auth';
@@ -77,6 +91,15 @@ const BLUESKY_DEFAULT_BUDGET = 2;
  * is the runaway guard. Bluesky pages are 25, so this is ~750 posts.
  */
 const BLUESKY_LOAD_MORE_HARD_CAP = 30;
+
+/**
+ * How many activity lookups run at once.
+ *
+ * The scan is one request per account, so without a limit a 25-account scan
+ * opens 25 sockets simultaneously and invites rate limiting. Four keeps it
+ * quick without looking like a burst.
+ */
+const ACTIVITY_SCAN_CONCURRENCY = 4;
 
 /**
  * Bluesky search: the criteria form and the results, inside the page's layout.
@@ -188,6 +211,8 @@ export class BlueskySearchPanel {
 
   private search = inject(BlueskySearch);
   private accountSearch = inject(BlueskyAccountSearch);
+  /** Direct API access, used only by the activity scan. */
+  private api = inject(BlueskyApi);
   private graph = inject(BlueskyGraph);
   private diagnostics = inject(PageDiagnostics);
   private localMod = inject(LocalModeration);
@@ -203,16 +228,35 @@ export class BlueskySearchPanel {
   /** DIDs with a follow/unfollow in flight. */
   protected followBusy = signal<Set<string>>(new Set());
 
-  /** Account results after the loaded-text filter and sort. */
+  /** Selected account facet values, keyed by kind + value. */
+  protected selectedAccountFacets = signal<
+    { kind: BlueskyAccountFacetKind; value: string }[]
+  >([]);
+  /** Follower/following/post gates from the Advanced panel. */
+  protected accountBounds = signal<BlueskyAccountBounds>({});
+
+  /** Account results after facets, numeric gates, the loaded-text filter and sort. */
   protected visibleAccounts = computed(() => {
     const needle = this.loadedFilter().trim().toLowerCase();
+    const byKind = new Map<BlueskyAccountFacetKind, string[]>();
+    for (const f of this.selectedAccountFacets()) {
+      byKind.set(f.kind, [...(byKind.get(f.kind) ?? []), f.value]);
+    }
+    const bounds = this.accountBounds();
+    const gated = this.accounts().filter(
+      (r) =>
+        accountMeetsBounds(r.account, bounds) &&
+        [...byKind.entries()].every(([kind, values]) =>
+          values.some((v) => blueskyAccountMatchesFacet(r.account, kind, v)),
+        ),
+    );
     const matching = needle
-      ? this.accounts().filter((r) =>
+      ? gated.filter((r) =>
           `${r.account.display_name} ${r.account.acct} ${r.account.note}`
             .toLowerCase()
             .includes(needle),
         )
-      : this.accounts();
+      : gated;
     const sorted = sortAccounts(
       matching.map((r) => this.asItem(r)),
       this.accountSort(),
@@ -368,6 +412,114 @@ export class BlueskySearchPanel {
     }
   }
 
+  // --- Activity scan -------------------------------------------------------
+  //
+  // Mastodon's account search returns `last_status_at` on every result, so the
+  // "Last active" facet is free there. Bluesky's `profileViewDetailed` has no
+  // such field, and the only way to learn it is one `getAuthorFeed` per account.
+  //
+  // That is genuinely expensive — 25 accounts is 25 requests — so it is a
+  // button rather than something every search pays for silently. The pattern
+  // (offer it, spend on click, merge what came back, leave the rest honestly
+  // unknown) is the one `enrichActivity()` already establishes on the Mastodon
+  // page; only the transport differs.
+
+  /** How many accounts one scan will look at, however many are loaded. */
+  private readonly ACTIVITY_SCAN_CAP = 25;
+
+  protected scanningActivity = signal(false);
+  protected scanError = signal<string | null>(null);
+  /**
+   * Requests the activity scan has spent.
+   *
+   * Counted separately from `callsUsed` rather than added to it: that counter is
+   * reported against `apiBudget`, which is a *paging* budget in pages of 25.
+   * Folding a 25-request scan into it produced the nonsense "27 of up to 2 API
+   * calls used". These are two different kinds of spending and the status line
+   * now says so.
+   */
+  protected scanCallsUsed = signal(0);
+
+  /** True once the activity ladder has real data behind it. */
+  protected hasActivityFacet = computed(() =>
+    this.accountFacets().some((f) => f.kind === 'activity'),
+  );
+
+  /** Loaded accounts whose last-post date nobody has supplied yet. */
+  protected accountsMissingActivity = computed(() =>
+    this.accounts().filter((r) => !r.account.last_status_at),
+  );
+
+  /** Whether to offer the scan at all. */
+  protected canScanActivity = computed(
+    () =>
+      this.target() === 'accounts' &&
+      !this.scanningActivity() &&
+      this.accountsMissingActivity().length > 0,
+  );
+
+  /** How many accounts the next scan would cover — the button says so up front. */
+  protected activityScanSize = computed(() =>
+    Math.min(this.accountsMissingActivity().length, this.ACTIVITY_SCAN_CAP),
+  );
+
+  /**
+   * Fetch each unscanned account's most recent post date.
+   *
+   * One request per account, capped, run with bounded concurrency so a 25-account
+   * scan doesn't open 25 sockets at once. A failure for one account is not a
+   * failure of the scan: that account simply stays in the "Not checked" bin,
+   * which is exactly what the bin is for.
+   */
+  protected scanActivity(): void {
+    const targets = this.accountsMissingActivity().slice(0, this.ACTIVITY_SCAN_CAP);
+    if (!targets.length || this.scanningActivity()) {
+      return;
+    }
+    this.scanningActivity.set(true);
+    this.scanError.set(null);
+    this.diagnostics.info('Search', 'user:scan-activity', {
+      network: 'bluesky',
+      accounts: targets.length,
+    });
+
+    // The did is what `getAuthorFeed` wants; our ids are `bsky:<did>`.
+    const lookups = targets.map((r) =>
+      this.api.getAuthorFeed(r.account.id.replace(/^bsky:/, ''), null, 'posts_no_replies').pipe(
+        map((timeline) => {
+          const newest = timeline.feed[0]?.post;
+          const when = newest?.record.createdAt || newest?.indexedAt || null;
+          return { id: r.account.id, lastStatusAt: when };
+        }),
+        catchError(() => of({ id: r.account.id, lastStatusAt: null })),
+      ),
+    );
+
+    merge(...lookups, ACTIVITY_SCAN_CONCURRENCY)
+      .pipe(toArray())
+      .subscribe({
+        next: (results) => {
+          const byId = new Map(results.map((r) => [r.id, r.lastStatusAt]));
+          this.accounts.update((list) =>
+            list.map((r) => {
+              const when = byId.get(r.account.id);
+              // `undefined` = not in this scan; `null` = scanned, nothing found
+              // (a real answer, but not one that dates the account).
+              return when
+                ? { ...r, account: { ...r.account, last_status_at: when } }
+                : r;
+            }),
+          );
+          this.scanCallsUsed.update((c) => c + results.length);
+          this.scanningActivity.set(false);
+        },
+        error: () => {
+          this.scanningActivity.set(false);
+          this.scanError.set('Could not check activity. Try again.');
+        },
+      });
+  }
+
   /**
    * Whether to keep paging automatically.
    *
@@ -393,7 +545,27 @@ export class BlueskySearchPanel {
   /** Rows whose folded-away repeats the reader has expanded. */
   private expandedRepeats = signal<ReadonlySet<string>>(new Set());
   protected selectedFacets = signal<{ kind: FacetKind; value: string }[]>([]);
-  protected readonly statusSorts = STATUS_SORTS;
+  /** Selected Bluesky-only post facets (engagement, alt text, quotes, links). */
+  protected selectedPostFacets = signal<{ kind: BlueskyPostFacetKind; value: string }[]>([]);
+  /** Minimum-engagement gates from the Advanced panel. */
+  protected engagementBounds = signal<BlueskyEngagementBounds>({});
+
+  /**
+   * The post sorts, relabelled for Bluesky.
+   *
+   * These are the *same* keys the Mastodon panel uses — `favourites_count` and
+   * `reblogs_count` are what the adapter fills from likes and reposts, so the
+   * sorting already worked. Only the words were Mastodon's. Renaming the keys
+   * would fork `search-sort.ts` for nothing.
+   */
+  protected readonly statusSorts = STATUS_SORTS.map((sort) => {
+    const relabelled: Record<string, string> = {
+      favourites: 'Most liked',
+      reblogs: 'Most reposted',
+      replies: 'Most replies',
+    };
+    return relabelled[sort.value] ? { ...sort, label: relabelled[sort.value] } : sort;
+  });
 
   protected exhausted = computed(() =>
     this.target() === 'accounts'
@@ -407,6 +579,17 @@ export class BlueskySearchPanel {
   );
 
   protected facets = computed(() => buildFacets(this.statuses()));
+
+  /**
+   * Facets Bluesky can offer and Mastodon's search cannot, rendered as their own
+   * group below the shared ones so it stays obvious which is which.
+   */
+  protected postFacets = computed(() => buildBlueskyPostFacets(this.statuses()));
+
+  /** Account facets over the loaded results — all client-side, see the module. */
+  protected accountFacets = computed(() =>
+    buildBlueskyAccountFacets(this.accounts().map((r) => r.account)),
+  );
 
   /** The author facet, pulled out to drive flood control. */
   protected authorFacet = computed<Facet | null>(
@@ -431,10 +614,22 @@ export class BlueskySearchPanel {
     for (const f of this.selectedFacets()) {
       byKind.set(f.kind, [...(byKind.get(f.kind) ?? []), f.value]);
     }
-    const faceted = all.filter((s) =>
-      [...byKind.entries()].every(([kind, values]) =>
-        values.some((v) => statusMatchesFacet(s, kind, v)),
-      ),
+    // The Bluesky-only facets follow exactly the same OR-within / AND-across
+    // rule, in their own map because their kinds are a different union.
+    const byPostKind = new Map<BlueskyPostFacetKind, string[]>();
+    for (const f of this.selectedPostFacets()) {
+      byPostKind.set(f.kind, [...(byPostKind.get(f.kind) ?? []), f.value]);
+    }
+    const bounds = this.engagementBounds();
+    const faceted = all.filter(
+      (s) =>
+        [...byKind.entries()].every(([kind, values]) =>
+          values.some((v) => statusMatchesFacet(s, kind, v)),
+        ) &&
+        [...byPostKind.entries()].every(([kind, values]) =>
+          values.some((v) => blueskyPostMatchesFacet(s, kind, v)),
+        ) &&
+        statusMeetsEngagement(s, bounds),
     );
     // Exclusion before the text filter, so "hidden by exclusion" counts what it
     // says it counts.
@@ -574,8 +769,90 @@ export class BlueskySearchPanel {
     return this.selectedFacets().some((f) => f.kind === kind && f.value === value);
   }
 
+  /** The Bluesky-only post facets, same OR-within-kind behaviour as above. */
+  protected togglePostFacet(kind: BlueskyPostFacetKind, value: string): void {
+    this.selectedPostFacets.update((current) => {
+      const hit = current.find((f) => f.kind === kind && f.value === value);
+      return hit ? current.filter((f) => f !== hit) : [...current, { kind, value }];
+    });
+  }
+
+  protected isPostFacetSelected(kind: BlueskyPostFacetKind, value: string): boolean {
+    return this.selectedPostFacets().some((f) => f.kind === kind && f.value === value);
+  }
+
+  protected toggleAccountFacet(kind: BlueskyAccountFacetKind, value: string): void {
+    this.selectedAccountFacets.update((current) => {
+      const hit = current.find((f) => f.kind === kind && f.value === value);
+      return hit ? current.filter((f) => f !== hit) : [...current, { kind, value }];
+    });
+  }
+
+  protected isAccountFacetSelected(kind: BlueskyAccountFacetKind, value: string): boolean {
+    return this.selectedAccountFacets().some((f) => f.kind === kind && f.value === value);
+  }
+
+  /** Read a min-engagement input, treating blank/zero/negative as "unset". */
+  protected setEngagementBound(key: keyof BlueskyEngagementBounds, raw: string): void {
+    const parsed = Number.parseInt(raw, 10);
+    this.engagementBounds.update((bounds) => {
+      const next = { ...bounds };
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        delete next[key];
+      } else {
+        next[key] = parsed;
+      }
+      return next;
+    });
+  }
+
+  /** Read one end of an account numeric gate; blank clears that end. */
+  protected setAccountBound(
+    key: keyof BlueskyAccountBounds,
+    end: 'min' | 'max',
+    raw: string,
+  ): void {
+    const parsed = Number.parseInt(raw, 10);
+    this.accountBounds.update((bounds) => {
+      const range = { ...(bounds[key] ?? {}) };
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        delete range[end];
+      } else {
+        range[end] = parsed;
+      }
+      const next = { ...bounds };
+      // An empty range is no gate at all — drop it so `hasRefinements` is honest.
+      if (range.min == null && range.max == null) {
+        delete next[key];
+      } else {
+        next[key] = range;
+      }
+      return next;
+    });
+  }
+
+  protected accountBound(key: keyof BlueskyAccountBounds, end: 'min' | 'max'): number | null {
+    return this.accountBounds()[key]?.[end] ?? null;
+  }
+
+  /** True when anything is narrowing the loaded results, for the Clear button. */
+  protected hasRefinements = computed(
+    () =>
+      this.selectedFacets().length > 0 ||
+      this.selectedPostFacets().length > 0 ||
+      this.selectedAccountFacets().length > 0 ||
+      Object.keys(this.engagementBounds()).length > 0 ||
+      Object.keys(this.accountBounds()).length > 0 ||
+      this.excludedAuthors().size > 0 ||
+      !!this.loadedFilter().trim(),
+  );
+
   protected clearRefinements(): void {
     this.selectedFacets.set([]);
+    this.selectedPostFacets.set([]);
+    this.selectedAccountFacets.set([]);
+    this.engagementBounds.set({});
+    this.accountBounds.set({});
     this.loadedFilter.set('');
     this.excludedAuthors.set(new Set());
   }
@@ -594,6 +871,10 @@ export class BlueskySearchPanel {
     this.ran.set(false);
     this.error.set(null);
     this.hitsTotal.set(null);
+    // A new search loads new accounts, so nothing has been scanned yet.
+    this.scanningActivity.set(false);
+    this.scanError.set(null);
+    this.scanCallsUsed.set(0);
   }
 
   reset(): void {

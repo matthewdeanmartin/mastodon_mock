@@ -395,6 +395,8 @@ describe('StatusCard', () => {
         likeUri: null,
         repostUri: null,
         replyRoot: { uri: 'at://did:plc:x/app.bsky.feed.post/1', cid: 'c1' },
+        replyParentUri: null,
+        externalUri: null,
       },
     });
     // BlueskyApi has no session in tests → toggleFavourite errors immediately.
@@ -1543,6 +1545,8 @@ describe('StatusCard', () => {
             likeUri: null,
             repostUri: null,
             replyRoot: { uri: 'at://did:plc:x/app.bsky.feed.post/1', cid: 'c' },
+            replyParentUri: null,
+            externalUri: null,
           },
         }),
       );
@@ -1570,6 +1574,8 @@ describe('StatusCard', () => {
             likeUri: null,
             repostUri: null,
             replyRoot: { uri: 'at://did:plc:x/app.bsky.feed.post/1', cid: 'c' },
+            replyParentUri: null,
+            externalUri: null,
           },
         }),
       );
