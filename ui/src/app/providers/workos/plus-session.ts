@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { externalFetch } from '../external-fetch';
 import { accountPageUrl, WorkosSession } from './workos-session';
@@ -64,6 +64,50 @@ export interface SupporterSubscription {
   renewsAt: number;
   /** True when cancelled but still inside the paid period. */
   cancelAtPeriodEnd: boolean;
+}
+
+/**
+ * A message worth showing someone who just pressed "Support Mawkingbird".
+ *
+ * The Worker's own error strings are relayed verbatim, and that is safe by
+ * construction: every one of them is written for a person to read, and the
+ * Worker deliberately refuses to pass Stripe's raw message through (which
+ * could name the account or the key). Suppressing them — as the first version
+ * of this did — meant a misconfigured deployment reported nothing but "please
+ * try again", and the real cause ("Subscriptions are not configured on this
+ * deployment") was only visible in the network tab. That is not an error
+ * message, it is a scavenger hunt.
+ *
+ * Statuses are mapped where the raw text would leave someone stuck:
+ *
+ * - **503** is an operator fault, not a user one. Saying "try again" invites
+ *   someone to keep pressing a button that cannot work.
+ * - **0** is the browser's status for a request that never completed —
+ *   offline, DNS failure, a blocked request. There is no server message to
+ *   relay because no server was reached.
+ */
+export function checkoutErrorMessage(error: unknown): string {
+  const fallback = 'Could not start checkout. Please try again.';
+  if (!(error instanceof HttpErrorResponse)) {
+    return fallback;
+  }
+
+  if (error.status === 0) {
+    return 'Could not reach the subscription service. Check your connection and try again.';
+  }
+
+  const relayed =
+    typeof error.error === 'object' && error.error !== null && 'error' in error.error
+      ? String((error.error as { error: unknown }).error)
+      : '';
+
+  if (error.status === 503) {
+    return relayed
+      ? `${relayed} This is a problem with the service, not with you — nothing was charged.`
+      : 'Subscriptions are unavailable on this deployment right now. Nothing was charged.';
+  }
+
+  return relayed || `${fallback} (HTTP ${error.status})`;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -162,10 +206,8 @@ export class PlusSession {
         return;
       }
       location.assign(response.url);
-    } catch {
-      // Deliberately vague: the Worker already declines to relay Stripe's
-      // message, which can name the account or the key.
-      this.error.set('Could not start checkout. Please try again.');
+    } catch (error: unknown) {
+      this.error.set(checkoutErrorMessage(error));
     } finally {
       this.startingCheckout.set(false);
     }

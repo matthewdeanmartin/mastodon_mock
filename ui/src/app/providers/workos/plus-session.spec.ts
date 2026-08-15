@@ -229,6 +229,65 @@ describe('PlusSession', () => {
       expect(body.returnTo).toBe(new URL('settings/mawkingbird-plus', document.baseURI).toString());
     });
 
+    it('relays the reason the Worker gave, not a generic apology', async () => {
+      const assign = vi.fn();
+      vi.stubGlobal('location', { ...location, assign });
+
+      const pending = plus.startCheckout();
+      await settle();
+      httpMock.expectOne(CHECKOUT_URL).flush(
+        { error: 'Subscriptions are not configured on this deployment.' },
+        { status: 503, statusText: 'Service Unavailable' },
+      );
+      await pending;
+
+      // The bug this covers: the reason was only visible in the network tab,
+      // so a misconfigured deployment looked like a transient glitch.
+      expect(plus.error()).toContain('not configured on this deployment');
+      // And it must not invite someone to keep pressing a button that cannot
+      // work — 503 is an operator fault.
+      expect(plus.error()).not.toContain('try again');
+      expect(assign).not.toHaveBeenCalled();
+    });
+
+    it('reassures that nothing was charged when the service is misconfigured', async () => {
+      vi.stubGlobal('location', { ...location, assign: vi.fn() });
+
+      const pending = plus.startCheckout();
+      await settle();
+      httpMock
+        .expectOne(CHECKOUT_URL)
+        .flush({ error: 'Subscriptions are not configured.' }, { status: 503, statusText: 'x' });
+      await pending;
+
+      expect(plus.error()).toContain('nothing was charged');
+    });
+
+    it('explains an unreachable service rather than blaming the user', async () => {
+      vi.stubGlobal('location', { ...location, assign: vi.fn() });
+
+      const pending = plus.startCheckout();
+      await settle();
+      // Status 0 is what a browser reports when the request never completed —
+      // offline, DNS failure, blocked. There is no server message to relay.
+      httpMock.expectOne(CHECKOUT_URL).error(new ProgressEvent('error'), { status: 0 });
+      await pending;
+
+      expect(plus.error()).toContain('Could not reach');
+    });
+
+    it('includes the status when the Worker sends no message', async () => {
+      vi.stubGlobal('location', { ...location, assign: vi.fn() });
+
+      const pending = plus.startCheckout();
+      await settle();
+      httpMock.expectOne(CHECKOUT_URL).flush('', { status: 500, statusText: 'Server Error' });
+      await pending;
+
+      // Something to quote in a bug report, rather than nothing at all.
+      expect(plus.error()).toContain('500');
+    });
+
     it('surfaces a failure instead of navigating', async () => {
       const assign = vi.fn();
       // jsdom refuses `vi.spyOn(location, 'assign')`. Stubbing the whole object

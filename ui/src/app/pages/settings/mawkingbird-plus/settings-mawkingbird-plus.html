@@ -84,6 +84,14 @@
             {{ plus.startingCheckout() ? 'Starting checkout…' : 'Support Mawkingbird — $30/year' }}
           </button>
         </div>
+        <!--
+          Directly under the button that caused it. An alert at the foot of the
+          page, below the fine print, is one someone has to go looking for —
+          which defeats the point of showing it at all.
+        -->
+        @if (plus.error(); as message) {
+          <p class="feed-error" role="alert">{{ message }}</p>
+        }
         <p class="muted small">
           Payment is handled by Stripe. This browser never sees your card details, and Mawkingbird
           stores nothing beyond which account is a supporter and when the year ends.
@@ -91,7 +99,13 @@
       </section>
     }
 
-    @if (plus.error(); as message) {
+    <!--
+      The same alert again for a signed-in supporter, who has no subscribe
+      button to sit under but can still hit a billing error — a failed token
+      refresh, say. Rendered only when the offer section is absent, so it never
+      appears twice.
+    -->
+    @if (plus.isSupporter() && plus.error(); as message) {
       <p class="feed-error" role="alert">{{ message }}</p>
     }
   } @else {

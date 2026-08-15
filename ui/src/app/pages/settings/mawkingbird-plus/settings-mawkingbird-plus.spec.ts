@@ -213,6 +213,33 @@ describe('SettingsMawkingbirdPlus', () => {
     expect(session.signOut).toHaveBeenCalled();
   });
 
+  it('shows a checkout failure beside the button that caused it', () => {
+    session.ready.set(true);
+    signedIn();
+    plus.error.set('Subscriptions are not configured on this deployment.');
+    fixture.detectChanges();
+
+    const offer = fixture.nativeElement.querySelector('.plus-offer') as HTMLElement | null;
+    // Inside the offer section, not stranded at the foot of the page below the
+    // fine print — the whole point is that nobody should have to go looking.
+    expect(offer?.querySelector('[role="alert"]')?.textContent).toContain('not configured');
+  });
+
+  it('shows a billing error to a supporter, who has no subscribe button', () => {
+    session.ready.set(true);
+    signedIn();
+    plus.tier.set('plus');
+    plus.error.set('Could not reach the subscription service.');
+    fixture.detectChanges();
+
+    const alerts = Array.from(
+      fixture.nativeElement.querySelectorAll('[role="alert"]'),
+    ) as HTMLElement[];
+    const matching = alerts.filter((element) => element.textContent?.includes('Could not reach'));
+    // Exactly one: the two render sites are mutually exclusive by design.
+    expect(matching).toHaveLength(1);
+  });
+
   it('surfaces a billing error', () => {
     session.ready.set(true);
     signedIn();
