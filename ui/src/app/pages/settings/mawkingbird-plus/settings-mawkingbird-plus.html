@@ -15,6 +15,14 @@
   } @else if (!session.ready()) {
     <p class="muted" role="status">Checking your account…</p>
   } @else if (session.user(); as user) {
+    @if (checkoutOutcome() === 'success') {
+      <p class="connection-ok" role="status">
+        Thank you for supporting Mawkingbird. Your account is set up.
+      </p>
+    } @else if (checkoutOutcome() === 'cancel') {
+      <p class="muted" role="status">Checkout cancelled. Nothing was charged.</p>
+    }
+
     <section class="plus-identity">
       <h2>Signed in</h2>
       <dl>
@@ -24,14 +32,68 @@
         }
         <dt>Email</dt>
         <dd>{{ user.email }}</dd>
+        <dt>Plan</dt>
+        <dd>{{ plus.isSupporter() ? 'Mawkingbird Plus' : 'Free' }}</dd>
       </dl>
-      <button class="btn btn-outline" type="button" (click)="session.signOut()">Sign out</button>
+      <button class="btn btn-outline" type="button" (click)="signOut()">Sign out</button>
     </section>
 
-    <p class="muted small">
-      Your email is how the account is identified. Nothing is synced to it yet, and no subscription
-      exists to buy — this is the groundwork for both.
-    </p>
+    @if (plus.isSupporter()) {
+      <section class="plus-supporter">
+        <h2>Your support</h2>
+        @if (plus.subscription(); as subscription) {
+          @if (subscription.cancelAtPeriodEnd) {
+            <p>
+              Cancelled — your support runs until
+              <strong>{{ subscription.renewsAt | date: 'longDate' }}</strong
+              >, and you keep Plus until then.
+            </p>
+          } @else {
+            <p>
+              Renews annually on
+              <strong>{{ subscription.renewsAt | date: 'longDate' }}</strong
+              >.
+            </p>
+          }
+        }
+        <p class="muted small">
+          Manage or cancel your subscription from the receipt email Stripe sent you. Cancelling
+          stops the renewal; you keep Plus for the rest of the year you paid for.
+        </p>
+      </section>
+    } @else {
+      <section class="plus-offer">
+        <h2>Support Mawkingbird</h2>
+        <p>
+          <strong>$30 a year.</strong> This is patronage, not a feature unlock. Mawkingbird is free
+          and stays free — the app, the proxy, and everything in it work exactly the same whether
+          you pay or not.
+        </p>
+        <p>
+          What it does buy: a much higher CORS proxy rate limit (300 requests a minute rather than
+          60), counted per account instead of per address. More supporter features may follow; none
+          are promised.
+        </p>
+        <div class="plus-actions">
+          <button
+            class="btn"
+            type="button"
+            [disabled]="plus.startingCheckout()"
+            (click)="plus.startCheckout()"
+          >
+            {{ plus.startingCheckout() ? 'Starting checkout…' : 'Support Mawkingbird — $30/year' }}
+          </button>
+        </div>
+        <p class="muted small">
+          Payment is handled by Stripe. This browser never sees your card details, and Mawkingbird
+          stores nothing beyond which account is a supporter and when the year ends.
+        </p>
+      </section>
+    }
+
+    @if (plus.error(); as message) {
+      <p class="feed-error" role="alert">{{ message }}</p>
+    }
   } @else {
     <section class="plus-signin">
       <h2>Not signed in</h2>

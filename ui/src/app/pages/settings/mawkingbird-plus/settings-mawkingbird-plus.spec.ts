@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsMawkingbirdPlus } from './settings-mawkingbird-plus';
+import { PlusSession } from '../../../providers/workos/plus-session';
 import { WorkosSession } from '../../../providers/workos/workos-session';
 
 /**
@@ -19,15 +20,32 @@ class FakeWorkosSession {
   signOut = vi.fn().mockResolvedValue(undefined);
 }
 
+/** A stand-in for the billing half, so these specs stay about rendering. */
+class FakePlusSession {
+  tier = signal<'free' | 'plus'>('free');
+  subscription = signal<{ renewsAt: number; cancelAtPeriodEnd: boolean } | null>(null);
+  error = signal<string | null>(null);
+  startingCheckout = signal(false);
+  isSupporter = () => this.tier() === 'plus';
+  refresh = vi.fn().mockResolvedValue(undefined);
+  clear = vi.fn();
+  startCheckout = vi.fn().mockResolvedValue(undefined);
+}
+
 describe('SettingsMawkingbirdPlus', () => {
   let fixture: ComponentFixture<SettingsMawkingbirdPlus>;
   let session: FakeWorkosSession;
+  let plus: FakePlusSession;
 
   beforeEach(() => {
     session = new FakeWorkosSession();
+    plus = new FakePlusSession();
     TestBed.configureTestingModule({
       imports: [SettingsMawkingbirdPlus],
-      providers: [{ provide: WorkosSession, useValue: session }],
+      providers: [
+        { provide: WorkosSession, useValue: session },
+        { provide: PlusSession, useValue: plus },
+      ],
     });
     fixture = TestBed.createComponent(SettingsMawkingbirdPlus);
   });
@@ -102,6 +120,111 @@ describe('SettingsMawkingbirdPlus', () => {
 
     const alert = fixture.nativeElement.querySelector('[role="alert"]') as HTMLElement | null;
     expect(alert?.textContent).toContain('origin not allowed');
+  });
+
+  it('offers the subscription to a signed-in non-supporter', () => {
+    session.ready.set(true);
+    signedIn();
+    const text = render();
+
+    expect(text).toContain('Support Mawkingbird');
+    expect(text).toContain('$30');
+    // Honest framing: the free tier is unaffected either way.
+    expect(text).toContain('free and stays free');
+  });
+
+  it('starts checkout when the button is pressed', () => {
+    session.ready.set(true);
+    signedIn();
+    render();
+
+    const button = Array.from(fixture.nativeElement.querySelectorAll('button')).find((element) =>
+      (element as HTMLButtonElement).textContent?.includes('$30/year'),
+    ) as HTMLButtonElement | undefined;
+    button?.click();
+
+    expect(plus.startCheckout).toHaveBeenCalled();
+  });
+
+  it('shows the renewal date for a supporter', () => {
+    session.ready.set(true);
+    signedIn();
+    plus.tier.set('plus');
+    plus.subscription.set({ renewsAt: Date.UTC(2027, 7, 12), cancelAtPeriodEnd: false });
+    const text = render();
+
+    expect(text).toContain('Renews annually');
+    expect(text).toContain('2027');
+    expect(text).not.toContain('Support Mawkingbird —');
+  });
+
+  it('tells a cancelled supporter when their support ends', () => {
+    session.ready.set(true);
+    signedIn();
+    plus.tier.set('plus');
+    plus.subscription.set({ renewsAt: Date.UTC(2027, 7, 12), cancelAtPeriodEnd: true });
+    const text = render();
+
+    // The distinction the whole `cancelAtPeriodEnd` field exists for: someone
+    // who just cancelled needs to see that it worked *and* that they keep the
+    // year they paid for.
+    expect(text).toContain('Cancelled');
+    expect(text).toContain('runs until');
+    expect(text).toContain('2027');
+  });
+
+  it('thanks a supporter returning from a successful checkout', async () => {
+    vi.stubGlobal('location', { ...location, search: '?checkout=success' });
+    session.ready.set(true);
+    signedIn();
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Thank you');
+    // Re-minted immediately, so the tier updates now rather than in fifteen
+    // minutes.
+    expect(plus.refresh).toHaveBeenCalled();
+  });
+
+  it('says nothing was charged when checkout was cancelled', async () => {
+    vi.stubGlobal('location', { ...location, search: '?checkout=cancel' });
+    session.ready.set(true);
+    signedIn();
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Nothing was charged');
+  });
+
+  it('clears the billing session on sign out', async () => {
+    session.ready.set(true);
+    signedIn();
+    render();
+
+    await fixture.componentInstance['signOut']();
+
+    // Otherwise the next person to sign in on this browser would briefly see
+    // the previous account's tier.
+    expect(plus.clear).toHaveBeenCalled();
+    expect(session.signOut).toHaveBeenCalled();
+  });
+
+  it('surfaces a billing error', () => {
+    session.ready.set(true);
+    signedIn();
+    plus.error.set('Could not start checkout. Please try again.');
+    fixture.detectChanges();
+
+    const alerts = Array.from(
+      fixture.nativeElement.querySelectorAll('[role="alert"]'),
+    ) as HTMLElement[];
+    expect(
+      alerts.some((element) => element.textContent?.includes('Could not start checkout')),
+    ).toBe(true);
   });
 
   it('signs in, signs up and signs out through the session', () => {

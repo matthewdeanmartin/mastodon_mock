@@ -1,4 +1,6 @@
-import { Component, computed, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { PlusSession } from '../../../providers/workos/plus-session';
 import { displayName, WorkosSession } from '../../../providers/workos/workos-session';
 
 /**
@@ -21,11 +23,13 @@ import { displayName, WorkosSession } from '../../../providers/workos/workos-ses
  */
 @Component({
   selector: 'app-settings-mawkingbird-plus',
+  imports: [DatePipe],
   templateUrl: './settings-mawkingbird-plus.html',
   styleUrl: './settings-mawkingbird-plus.css',
 })
 export class SettingsMawkingbirdPlus implements OnInit {
   protected session = inject(WorkosSession);
+  protected plus = inject(PlusSession);
 
   /** The signed-in user's name, or null when they never supplied one. */
   protected readonly name = computed(() => {
@@ -33,10 +37,41 @@ export class SettingsMawkingbirdPlus implements OnInit {
     return user ? displayName(user) : null;
   });
 
-  ngOnInit(): void {
-    // Also completes a pending sign-in redirect, since this page is the
-    // redirect target. Deliberately not awaited: the template renders a
-    // loading state from `ready()` and errors land in `error()`.
-    void this.session.ensureReady();
+  /**
+   * Set when this page was reached by returning from Stripe.
+   *
+   * Read once in `ngOnInit` rather than from a router signal, because the
+   * value is a one-shot fact about how the page was entered — leaving it in
+   * the URL would make a refresh re-congratulate the user.
+   */
+  protected readonly checkoutOutcome = signal<'success' | 'cancel' | null>(null);
+
+  async ngOnInit(): Promise<void> {
+    // Also completes a pending sign-in redirect, since this page is the WorkOS
+    // redirect target. Awaited here — unlike before — because everything below
+    // needs to know whether anyone is signed in.
+    await this.session.ensureReady();
+
+    const outcome = new URLSearchParams(location.search).get('checkout');
+    if (outcome === 'success' || outcome === 'cancel') {
+      this.checkoutOutcome.set(outcome);
+      // Strip the parameter so a reload does not repeat the message. The
+      // WorkOS SDK does the same for its own `code`/`state`.
+      const clean = new URL(location.href);
+      clean.searchParams.delete('checkout');
+      history.replaceState({}, '', clean);
+    }
+
+    if (this.session.user()) {
+      // A fresh mint rather than a cached one: on a checkout return the
+      // entitlement was written seconds ago, and a stale token would show the
+      // old tier for up to fifteen minutes.
+      await this.plus.refresh();
+    }
+  }
+
+  protected async signOut(): Promise<void> {
+    this.plus.clear();
+    await this.session.signOut();
   }
 }

@@ -23,6 +23,7 @@ export type FeatureFlagId =
   | 'connector-link-shortener'
   | 'connector-cors-proxy'
   | 'connector-rss'
+  | 'proxy-mawkingbird-plus'
   | 'proxy-allorigins'
   | 'proxy-corssh'
   | 'proxy-corsfix'
@@ -202,6 +203,14 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
   // its flag on; the entries and their honest measured copy stay in the catalog
   // for exactly that.
   {
+    id: 'proxy-mawkingbird-plus',
+    label: 'Mawkingbird Plus proxy',
+    description:
+      'Offer the supporter tier of the Mawkingbird proxy. Needs an account and a subscription; the free Mawkingbird proxy is unaffected either way.',
+    defaultState: 'canary',
+    group: 'proxies',
+  },
+  {
     id: 'proxy-allorigins',
     label: 'AllOrigins proxy',
     description:
@@ -244,6 +253,8 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
  */
 export function proxyFeatureFlag(proxyId: string): FeatureFlagId | null {
   switch (proxyId) {
+    case 'mawkingbird-plus':
+      return 'proxy-mawkingbird-plus';
     case 'allorigins':
       return 'proxy-allorigins';
     case 'corssh':

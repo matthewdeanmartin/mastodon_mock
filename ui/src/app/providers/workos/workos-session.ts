@@ -9,6 +9,25 @@ export const WORKOS_CLIENT_ID = new InjectionToken<string>('WORKOS_CLIENT_ID', {
 });
 
 /**
+ * `createClient`, behind an injection token.
+ *
+ * Injected rather than imported directly so tests can supply a fake without
+ * `vi.mock`. That is not merely a convenience: the Angular unit-test builder
+ * runs with `isolate: false`, so spec files share one module registry, and a
+ * module-level mock is only in force if the mocking file happens to win the
+ * load race. Depending on that made this service's spec fail on roughly half
+ * of full-suite runs while passing alone — see `src/test-setup.ts` for the
+ * same class of bug with `window.location`.
+ *
+ * An injection token has no such ambiguity: whoever configures the injector
+ * decides, every time.
+ */
+export const WORKOS_CREATE_CLIENT = new InjectionToken<typeof createClient>(
+  'WORKOS_CREATE_CLIENT',
+  { providedIn: 'root', factory: () => createClient },
+);
+
+/**
  * The Mawkingbird account session, via WorkOS AuthKit.
  *
  * ## Why this is a thin wrapper and not another hand-rolled OAuth flow
@@ -64,6 +83,7 @@ export const WORKOS_CLIENT_ID = new InjectionToken<string>('WORKOS_CLIENT_ID', {
 @Injectable({ providedIn: 'root' })
 export class WorkosSession {
   private clientId = inject(WORKOS_CLIENT_ID);
+  private createClient = inject(WORKOS_CREATE_CLIENT);
 
   /** The signed-in user, or null. Populated once {@link ensureReady} resolves. */
   readonly user = signal<User | null>(null);
@@ -173,7 +193,7 @@ export class WorkosSession {
   }
 
   private connect(): Promise<AuthkitClient> {
-    this.client ??= createClient(this.clientId, {
+    this.client ??= this.createClient(this.clientId, {
       redirectUri: accountPageUrl(),
       // Keeps `user` in step with the SDK's own refresh cycle, so a session
       // that dies overnight is reflected in the UI rather than showing a stale
