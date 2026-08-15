@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { BUILD_INFO } from './build-info';
-import { isCanaryBuild } from './build-flavor';
+import { isCanaryBuild, isTestBuild } from './build-flavor';
 
 const STORAGE_KEY = 'mockingbird_feature_flags';
 const DEV_BUILD_HASH = 'development';
@@ -28,7 +28,13 @@ export type FeatureFlagId =
   | 'proxy-corssh'
   | 'proxy-corsfix'
   | 'proxy-corslol';
-export type FeatureFlagState = 'production' | 'canary' | 'off';
+/**
+ * How far down the rollout ladder a feature has been released.
+ *
+ * Read as "on at this rung and below": `production` is everywhere, `canary` is
+ * canary and test, `test` is test only. `off` is nowhere.
+ */
+export type FeatureFlagState = 'production' | 'canary' | 'test' | 'off';
 
 /**
  * Flags are grouped only for display — a group is a heading on the settings
@@ -87,7 +93,10 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     // one settings tab — signed-out users lose no functionality.
     description:
       'The Mawkingbird account tab in Settings, where you sign in to your Mawkingbird account.',
-    defaultState: 'canary',
+    // `test`, not `canary`: canary is production, on live billing, and this tab
+    // leads to a checkout. Until there is a live Stripe price it must not be
+    // reachable anywhere a real customer can press the button.
+    defaultState: 'test',
     group: 'features',
   },
   {
@@ -207,7 +216,9 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     label: 'Mawkingbird Plus proxy',
     description:
       'Offer the supporter tier of the Mawkingbird proxy. Needs an account and a subscription; the free Mawkingbird proxy is unaffected either way.',
-    defaultState: 'canary',
+    // Paired with `mawkingbird-plus` above, and for the same reason: offering a
+    // proxy tier nobody can buy is worse than not offering it.
+    defaultState: 'test',
     group: 'proxies',
   },
   {
@@ -268,16 +279,53 @@ export function proxyFeatureFlag(proxyId: string): FeatureFlagId | null {
   }
 }
 
-const VALID_STATES: readonly FeatureFlagState[] = ['production', 'canary', 'off'];
+const VALID_STATES: readonly FeatureFlagState[] = ['production', 'canary', 'test', 'off'];
 
 /** Flags in one group, in declaration order — for the settings page's sections. */
 export function flagsInGroup(group: FeatureFlagGroup): readonly FeatureFlagDefinition[] {
   return FEATURE_FLAGS.filter((flag) => flag.group === group);
 }
 
-/** Resolve a rollout state for one concrete deployment channel. */
-export function isFeatureEnabled(state: FeatureFlagState, isCanary: boolean): boolean {
-  return state === 'production' || (state === 'canary' && isCanary);
+/**
+ * Where a deployment sits on the rollout ladder.
+ *
+ * Ordered, and the order is the whole point: a channel runs everything enabled
+ * at its own rung *and below*. `test` sees the most, production the least.
+ */
+const CHANNEL_RANK = { production: 0, canary: 1, test: 2 } as const;
+
+/** Which channel this build is. */
+export type DeploymentChannel = keyof typeof CHANNEL_RANK;
+
+/**
+ * The channel this build is running as.
+ *
+ * Note that `test` is a channel here but **canary and production are the same
+ * environment** — canary is a release channel on production infrastructure,
+ * against live billing. The ladder is about which features are *visible*, not
+ * about which backend is in use; those are separate questions and conflating
+ * them is how a feature ends up enabled somewhere it cannot work.
+ */
+export function deploymentChannel(baseUri: string = document.baseURI): DeploymentChannel {
+  if (isTestBuild(baseUri)) {
+    return 'test';
+  }
+  return isCanaryBuild(baseUri) ? 'canary' : 'production';
+}
+
+/**
+ * Resolve a rollout state for one concrete deployment channel.
+ *
+ * A feature flagged `canary` is on in canary *and* test, because test is
+ * further down the ladder — a feature that skipped test on its way to canary
+ * would make the test deployment useless for exactly the features most worth
+ * testing.
+ */
+export function isFeatureEnabled(state: FeatureFlagState, channel: DeploymentChannel): boolean {
+  if (state === 'off') {
+    return false;
+  }
+  return CHANNEL_RANK[channel] >= CHANNEL_RANK[state];
 }
 
 /**
@@ -291,6 +339,8 @@ export function isFeatureEnabled(state: FeatureFlagState, isCanary: boolean): bo
 export class FeatureFlags {
   readonly publishedHash = BUILD_INFO.commit ?? DEV_BUILD_HASH;
   readonly isCanary = isCanaryBuild();
+  /** Which rung of the rollout ladder this build is on. */
+  readonly channel = deploymentChannel();
   readonly definitions = FEATURE_FLAGS;
 
   private readonly states = signal<Record<FeatureFlagId, FeatureFlagState>>(this.defaults());
@@ -304,7 +354,7 @@ export class FeatureFlags {
   }
 
   enabled(id: FeatureFlagId): boolean {
-    return isFeatureEnabled(this.states()[id], this.isCanary);
+    return isFeatureEnabled(this.states()[id], this.channel);
   }
 
   /**

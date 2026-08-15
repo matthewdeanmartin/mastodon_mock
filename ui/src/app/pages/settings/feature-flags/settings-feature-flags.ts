@@ -10,7 +10,8 @@ import {
 
 const STATE_LABELS: Record<FeatureFlagState, string> = {
   production: 'Production',
-  canary: 'Canary only',
+  canary: 'Canary and test',
+  test: 'Test only',
   off: 'Off everywhere',
 };
 
@@ -38,7 +39,7 @@ export class SettingsFeatureFlags {
   /** "Default for this release: X. It is currently on/off on this build." */
   protected defaultHint(flag: FeatureFlagDefinition): string {
     const enabled = this.flags.enabled(flag.id) ? 'enabled' : 'disabled';
-    const channel = this.flags.isCanary ? 'canary' : 'production';
+    const channel = this.flags.channel;
     return `Default for this release: ${STATE_LABELS[flag.defaultState]}. It is currently ${enabled} on this ${channel} build.`;
   }
 }

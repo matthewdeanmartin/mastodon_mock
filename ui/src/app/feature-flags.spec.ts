@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { FeatureFlags, FEATURE_FLAGS, flagsInGroup, isFeatureEnabled } from './feature-flags';
+import {
+  deploymentChannel,
+  FeatureFlags,
+  FEATURE_FLAGS,
+  flagsInGroup,
+  isFeatureEnabled,
+} from './feature-flags';
 import {
   CONNECTION_CATALOG,
   CONNECTION_FLAGS,
@@ -8,13 +14,52 @@ import {
 const STORAGE_KEY = 'mockingbird_feature_flags';
 
 describe('feature flag rollout states', () => {
-  it('enables production on both channels, canary only on canary, and off nowhere', () => {
-    expect(isFeatureEnabled('production', false)).toBe(true);
-    expect(isFeatureEnabled('production', true)).toBe(true);
-    expect(isFeatureEnabled('canary', false)).toBe(false);
-    expect(isFeatureEnabled('canary', true)).toBe(true);
-    expect(isFeatureEnabled('off', false)).toBe(false);
-    expect(isFeatureEnabled('off', true)).toBe(false);
+  it('runs everything released at its own rung and below', () => {
+    // production: everywhere.
+    expect(isFeatureEnabled('production', 'production')).toBe(true);
+    expect(isFeatureEnabled('production', 'canary')).toBe(true);
+    expect(isFeatureEnabled('production', 'test')).toBe(true);
+
+    // canary: canary and test, but not production.
+    expect(isFeatureEnabled('canary', 'production')).toBe(false);
+    expect(isFeatureEnabled('canary', 'canary')).toBe(true);
+    // The rung that makes test useful: a feature staged on canary must be
+    // visible in test too, or the deployment meant for trying things out is
+    // the one place you cannot try them.
+    expect(isFeatureEnabled('canary', 'test')).toBe(true);
+
+    // test: test only.
+    expect(isFeatureEnabled('test', 'production')).toBe(false);
+    expect(isFeatureEnabled('test', 'canary')).toBe(false);
+    expect(isFeatureEnabled('test', 'test')).toBe(true);
+
+    // off: nowhere, including test.
+    expect(isFeatureEnabled('off', 'production')).toBe(false);
+    expect(isFeatureEnabled('off', 'canary')).toBe(false);
+    expect(isFeatureEnabled('off', 'test')).toBe(false);
+  });
+});
+
+describe('deploymentChannel', () => {
+  it('reads the channel from the base href', () => {
+    expect(deploymentChannel('https://mawkingbird.com/')).toBe('production');
+    expect(deploymentChannel('https://mawkingbird.com/canary/')).toBe('canary');
+    expect(deploymentChannel('https://mawkingbird.com/test/')).toBe('test');
+  });
+});
+
+describe('the billing flags', () => {
+  it('keeps Mawkingbird Plus off anywhere a real customer could buy it', () => {
+    // Canary is production: same origin, live billing, real users. Until a live
+    // Stripe price exists, a checkout button there is a button that takes money
+    // for something that cannot be delivered.
+    for (const id of ['mawkingbird-plus', 'proxy-mawkingbird-plus'] as const) {
+      const state = FEATURE_FLAGS.find((flag) => flag.id === id)?.defaultState;
+      expect(state).toBe('test');
+      expect(isFeatureEnabled(state!, 'production')).toBe(false);
+      expect(isFeatureEnabled(state!, 'canary')).toBe(false);
+      expect(isFeatureEnabled(state!, 'test')).toBe(true);
+    }
   });
 });
 
