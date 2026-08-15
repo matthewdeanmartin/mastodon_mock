@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 MAKEFLAGS += --no-print-directory
 
-.PHONY: help install format format-check lint storage test test-ci build build-admin build-mockingbird security check check-ci
+.PHONY: help install format format-check lint storage subpaths test test-ci build build-admin build-mockingbird security check check-ci
 
 help:
 	@echo "Angular quality gates (admin UI + Mockingbird):"
@@ -34,6 +34,11 @@ lint:
 storage:
 	npm run check:storage
 
+# Guards deep links on subpath deployments: a subpath the 404 shim does not know
+# about silently boots the production app instead of the one that owns the link.
+subpaths:
+	npm run check:subpaths
+
 test:
 	npm run test:source-integrity
 	npm run test:ci
@@ -51,6 +56,6 @@ build-mockingbird:
 security:
 	npm audit --omit=dev --audit-level=high
 
-check: format-check lint storage test build security
+check: format-check lint storage subpaths test build security
 
 check-ci: check

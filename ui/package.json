@@ -24,7 +24,8 @@
     "check:terminology": "node scripts/check-terminology.mjs",
     "gen:api-docs": "node scripts/gen-api-docs.mjs",
     "starter-kits:update": "node scripts/update-bundled-starter-kits.mjs",
-    "starter-kits:check": "node scripts/update-bundled-starter-kits.mjs --check"
+    "starter-kits:check": "node scripts/update-bundled-starter-kits.mjs --check",
+    "check:subpaths": "node scripts/check-subpath-deployments.mjs"
   },
   "private": true,
   "packageManager": "npm@11.17.0",
