@@ -55,6 +55,42 @@
   --accent-soft: color-mix(in srgb, var(--accent) 18%, var(--col-bg));
 }
 
+/* The /test/ deployment: a light grey page, so it never passes for production.
+   Set on <html> by boot.js before first paint (see the comment there for why
+   it is not done from the Angular bundle).
+
+   Only --bg moves. The columns keep --col-bg, so the grey reads as a wider,
+   flatter surround rather than as a broken theme, and every other token —
+   text, borders, accents — stays exactly where it is in both light and dark.
+   Overriding more would make the test build hard to compare against the real
+   one, which is the only thing it is for. */
+:root.is-test-build {
+  --bg: #dcdfe1;
+}
+:root.is-test-build[data-theme='dark'] {
+  /* Lifted off the near-black rather than lightened toward grey: in dark mode
+     "lighter than the columns" is what reads as unusual, and #dcdfe1 here
+     would just look like a broken light theme. */
+  --bg: #232d36;
+}
+
+/* A permanent, non-dismissable marker. Dismissable would defeat it: the whole
+   point is that six months from now nobody has to remember which tab is which
+   before wondering why a subscription vanished. */
+.test-build-banner {
+  background: #8a6d3b;
+  color: #fff;
+  text-align: center;
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.test-build-banner a {
+  color: #fff;
+  text-decoration: underline;
+}
+
 /* Feed reader mode: every timeline's post text takes the reader typography.
    The --reader-* variables are set on <html> by ClientPrefs. */
 :root[data-feed-reader='on'] .status .content {

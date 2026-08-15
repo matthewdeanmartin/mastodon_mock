@@ -42,6 +42,7 @@
  * the other answers can express.
  */
 
+import { corsProxyOrigin } from '../../../../build-flavor';
 import { CorsProxyRoute } from '../../../../providers/cors-proxy/cors-proxy-catalog';
 
 /** Groups the probe list so a blocked *category* is visible at a glance. */
@@ -294,7 +295,10 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
   },
   {
     id: 'mawkingbird-proxy',
-    host: 'mawkingbird-cors-proxy.matthewdeanmartin.workers.dev',
+    // Follows the deployment: /test/ probes the sandbox Worker, so the doctor
+    // answers "is the proxy *this build uses* reachable" rather than the
+    // reachability of a Worker this build never calls.
+    host: new URL(corsProxyOrigin()).host,
     label: 'Mawkingbird proxy',
     category: 'proxy',
     // `/health` rather than a real proxied fetch: it is the one endpoint that
@@ -303,11 +307,11 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
     // consuming the rate limit. A proxied probe would conflate the proxy being
     // down with the *target* refusing it, which is the exact confusion the
     // separate proxy leg of this page exists to resolve.
-    probeUrl: 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/health',
+    probeUrl: `${corsProxyOrigin()}/health`,
     // Deliberately no `proxyRoute`. This host is the proxy itself; routing a
     // probe of it *through* it would be a loop, and the reachability check above
     // already answers the only question worth asking.
-    openUrl: 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/',
+    openUrl: `${corsProxyOrigin()}/`,
     matters:
       'The proxy this app runs itself: RSS feeds, pastes, link shorteners and the Twitter data services.',
     // No status page, and honestly so: it is one Cloudflare Worker run by one

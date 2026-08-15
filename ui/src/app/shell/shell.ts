@@ -8,7 +8,7 @@ import { AccountChoice, Auth, Session } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { BotPeers } from '../chat/bot-peers';
 import { environment } from '../../environments/environment';
-import { brandLogoSrc, isCanaryBuild } from '../build-flavor';
+import { brandLogoSrc, isCanaryBuild, isTestBuild } from '../build-flavor';
 import { Hotkeys } from '../hotkeys';
 import { ShortcutHelp } from '../shortcut-help/shortcut-help';
 import { AppFooter } from './app-footer/app-footer';
@@ -88,7 +88,15 @@ export class Shell implements OnInit {
   protected mockTooling = environment.mockTooling;
   /** Canary deployments (/canary/ base href) show a distinct name, mark, accent. */
   protected isCanary = isCanaryBuild();
-  protected brand = this.isCanary ? 'Canary' : environment.brand;
+  /**
+   * Test deployments (/test/ base href) say so, loudly and permanently.
+   *
+   * Unlike canary — which is production, for real customers, with new features
+   * — /test/ talks to the sandbox Worker and sandbox Stripe. Nothing bought
+   * there is real, so it must never be mistakable for the app that takes money.
+   */
+  protected isTest = isTestBuild();
+  protected brand = this.isCanary ? 'Canary' : this.isTest ? 'Mawkingbird Test' : environment.brand;
   /** Recomputed so switching illustration sets repaints the mark without a reload. */
   protected logoSrc = computed(() => brandLogoSrc(this.prefs.artStyle()));
 

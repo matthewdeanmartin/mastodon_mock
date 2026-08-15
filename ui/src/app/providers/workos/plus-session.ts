@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { corsProxyOrigin } from '../../build-flavor';
 import { externalFetch } from '../external-fetch';
 import { accountPageUrl, WorkosSession } from './workos-session';
 
@@ -35,8 +36,17 @@ import { accountPageUrl, WorkosSession } from './workos-session';
 /** How long before expiry to re-mint. Two minutes of slack on a 15-minute token. */
 const REFRESH_MARGIN_MS = 2 * 60 * 1000;
 
-/** The proxy's own origin. Not the app's, and not a configured route. */
-const PROXY_BASE = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev';
+/**
+ * The proxy's own origin. Not the app's, and not a configured route.
+ *
+ * Resolved per deployment: `/test/` talks to the sandbox Worker, where Stripe
+ * is in test mode and a checkout costs nothing. Getting this wrong in either
+ * direction is expensive — a test build reaching live Stripe would take real
+ * money, and a production build reaching the sandbox would take none — so it
+ * comes from one function shared with the proxy catalog rather than being
+ * written out here a second time.
+ */
+const PROXY_BASE = corsProxyOrigin();
 
 /** What the Worker returns from `/plus/token`. */
 interface TokenResponse {

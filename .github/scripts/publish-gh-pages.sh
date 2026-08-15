@@ -41,10 +41,18 @@ git clone --depth 1 --branch "$branch" "$remote" "$work" 2>/dev/null || {
 
 if [ "$subpath" = "root" ]; then
   # Production owns the branch root. Clear every top-level entry EXCEPT the
-  # canary subtree and its root redirect shim (and .git), then lay down the new
-  # production build. canary.html lets bare /canary bounce to /canary/.
+  # sibling subtrees and their root redirect shims (and .git), then lay down the
+  # new production build. canary.html lets bare /canary bounce to /canary/.
+  #
+  # Every sibling app must be named here. A subtree missing from this list is
+  # deleted by the next production deploy and does not come back until its own
+  # workflow next runs — which, for anything published on the same trigger as
+  # canary, is a window rather than a permanent loss and so is easy to miss.
   find "$work" -mindepth 1 -maxdepth 1 \
-    ! -name '.git' ! -name 'canary' ! -name 'canary.html' -exec rm -rf {} +
+    ! -name '.git' \
+    ! -name 'canary' ! -name 'canary.html' \
+    ! -name 'test' ! -name 'test.html' \
+    -exec rm -rf {} +
   cp -R "$source_dir/." "$work/"
 elif [ "$subpath" = "standalone" ]; then
   # A mirror site owns the whole publishing branch and has no sibling apps or

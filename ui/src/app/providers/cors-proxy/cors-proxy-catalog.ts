@@ -1,4 +1,15 @@
+import { corsProxyOrigin } from '../../build-flavor';
 import { proxyFeatureFlag } from '../../feature-flags';
+
+/**
+ * Which Mawkingbird proxy deployment this build talks to.
+ *
+ * `/test/` gets the sandbox Worker; everything else — production and canary
+ * alike — gets the real one. Both Mawkingbird entries below build on this, so
+ * the free and Plus tiers can never end up pointed at different deployments,
+ * which is the failure that would make a supporter token unverifiable.
+ */
+const MAWKINGBIRD_PROXY = corsProxyOrigin();
 
 /**
  * The catalog of CORS proxies the RSS reader (and, later, article extraction)
@@ -194,8 +205,7 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
     template: {
       // `{route}` names the policy the proxy should apply; `{url}` is the
       // target. Both are substituted by `buildProxiedUrl`.
-      pattern:
-        'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/?route={route}&url={url}',
+      pattern: `${MAWKINGBIRD_PROXY}/?route={route}&url={url}`,
       encodeTarget: true,
       routed: true,
     },
@@ -210,7 +220,7 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
     // The service's own terms page, not the source repository — the repo is
     // private, so linking it would send users to a 404 and imply the service is
     // open source when it is not.
-    homepage: 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/',
+    homepage: `${MAWKINGBIRD_PROXY}/`,
   },
   {
     id: 'mawkingbird-plus',
@@ -223,8 +233,7 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
       // in a header the app attaches per request. Two consequences worth
       // having: a lapsed subscriber silently degrades to free limits instead
       // of breaking, and there is no second hostname to keep in step.
-      pattern:
-        'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/?route={route}&url={url}',
+      pattern: `${MAWKINGBIRD_PROXY}/?route={route}&url={url}`,
       encodeTarget: true,
       routed: true,
     },
@@ -236,7 +245,7 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
       'Feeds and every other route: 300 requests per minute, counted per account rather than ' +
       'per address. The same destinations, size caps and content-type rules as the free proxy — ' +
       'a subscription raises the ceiling, it does not widen what the proxy will reach.',
-    homepage: 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/',
+    homepage: `${MAWKINGBIRD_PROXY}/`,
   },
   {
     id: 'allorigins',

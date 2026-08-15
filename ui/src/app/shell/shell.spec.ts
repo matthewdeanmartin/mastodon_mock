@@ -191,6 +191,28 @@ describe('Shell account switching', () => {
     expect(links.some((link) => link.textContent?.includes('Canary'))).toBe(false);
   });
 
+  it('marks the test deployment with a permanent banner', () => {
+    const fixture = createShell();
+    const component = fixture.componentInstance as unknown as { isTest: boolean };
+    component.isTest = true;
+    fixture.detectChanges();
+    drainRailRequests();
+
+    const banner = fixture.nativeElement.querySelector('.test-build-banner') as HTMLElement | null;
+    expect(banner?.textContent).toContain('nothing here is real');
+    // Says where the real app is, because the reader who needs this banner is
+    // the one who thought they were already there.
+    expect(banner?.querySelector('a')?.getAttribute('href')).toBe('https://mawkingbird.com/');
+  });
+
+  it('shows no such banner on production or canary', () => {
+    const fixture = createShell();
+    fixture.detectChanges();
+    drainRailRequests();
+
+    expect(fixture.nativeElement.querySelector('.test-build-banner')).toBeNull();
+  });
+
   // Starter Kits and "Find my friends" were separate rows here until they were
   // collapsed into the Find Friends hub; this asserts the surviving entry point.
   it('always includes Find Friends in the More menu for signed-in users', () => {

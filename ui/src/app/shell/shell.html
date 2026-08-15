@@ -1,3 +1,15 @@
+<!-- The test-deployment marker, deliberately OUTSIDE the writing-zen block: zen
+     hides the chrome, and "which deployment am I on" is not chrome. It is the
+     one thing that must be true on every screen of this build, because the
+     answer changes what every other thing on the page means. -->
+@if (isTest) {
+  <div class="test-build-banner" role="status">
+    Test deployment — nothing here is real. Payments use Stripe's sandbox and no
+    money moves. The real app is at
+    <a href="https://mawkingbird.com/">mawkingbird.com</a>.
+  </div>
+}
+
 <!-- Writing zen hides the universal chrome as well as the rails — the header and
      footer live here, outside the outlet, so /write cannot hide them itself.
      This is deliberately a superset of the global zen preference: with both on,

@@ -1,4 +1,11 @@
-import { brandLogoSrc, failWhaleArt, isCanaryBuild } from './build-flavor';
+import { describe, expect, it } from 'vitest';
+import {
+  brandLogoSrc,
+  corsProxyOrigin,
+  failWhaleArt,
+  isCanaryBuild,
+  isTestBuild,
+} from './build-flavor';
 
 describe('build-flavor', () => {
   it('detects canary from a /canary/ base href', () => {
@@ -50,5 +57,52 @@ describe('build-flavor', () => {
       height: 451,
     });
     expect(failWhaleArt()).toEqual(failWhaleArt('hand'));
+  });
+});
+
+describe('isTestBuild', () => {
+  it('recognises the /test/ deployment, with or without a trailing slash', () => {
+    expect(isTestBuild('https://mawkingbird.com/test/')).toBe(true);
+    expect(isTestBuild('https://mawkingbird.com/test')).toBe(true);
+    // The github.io mirror nests everything one level deeper.
+    expect(isTestBuild('https://matthewdeanmartin.github.io/mawkingbird/test/')).toBe(true);
+  });
+
+  it('does not mistake production, canary or a lookalike path for it', () => {
+    expect(isTestBuild('https://mawkingbird.com/')).toBe(false);
+    expect(isTestBuild('https://mawkingbird.com/canary/')).toBe(false);
+    // The suffix check is on a whole path segment: a page about testing is not
+    // the test deployment, and treating it as one would point real users at
+    // sandbox billing.
+    expect(isTestBuild('https://mawkingbird.com/testing/')).toBe(false);
+    expect(isTestBuild('https://mawkingbird.com/latest/')).toBe(false);
+  });
+
+  it('is false for an unparseable base', () => {
+    expect(isTestBuild('not a url')).toBe(false);
+  });
+});
+
+describe('corsProxyOrigin', () => {
+  it('sends the test deployment to the sandbox Worker', () => {
+    expect(corsProxyOrigin('https://mawkingbird.com/test/')).toBe(
+      'https://mawkingbird-cors-proxy-test.matthewdeanmartin.workers.dev',
+    );
+  });
+
+  it('sends production AND canary to the real Worker', () => {
+    // Canary is production: real customers, real billing, new features first.
+    // Pointing it at the sandbox would mean canary users could not subscribe.
+    const real = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev';
+    expect(corsProxyOrigin('https://mawkingbird.com/')).toBe(real);
+    expect(corsProxyOrigin('https://mawkingbird.com/canary/')).toBe(real);
+  });
+
+  it('never returns a URL with a trailing slash', () => {
+    // Callers append '/plus/token' and '/health'; a trailing slash here would
+    // produce '//plus/token', which the Worker routes as a different path.
+    for (const base of ['https://mawkingbird.com/', 'https://mawkingbird.com/test/']) {
+      expect(corsProxyOrigin(base).endsWith('/')).toBe(false);
+    }
   });
 });

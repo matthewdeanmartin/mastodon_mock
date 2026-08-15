@@ -1,11 +1,18 @@
 ---
-name: Deploy Mawkingbird Canary
-# Publish every main-branch commit to the /canary/ subpath of this repo's own
-# GitHub Pages site: https://mawkingbird.com/canary/.
+name: Deploy Mawkingbird Canary and Test
+# Publish every main-branch commit to the /canary/ and /test/ subpaths of this
+# repo's own GitHub Pages site.
 #
 # The published site lives on the gh-pages branch of THIS repository:
 #   /         -> production (updated manually by mockingbird-pages.yml)
 #   /canary/  -> canary     (updated by this workflow on every commit)
+#   /test/    -> test       (updated by this workflow on every commit)
+#
+# Canary and production are the SAME environment: canary is the preview of
+# upcoming features for real customers, on live billing. /test/ is the odd one
+# out — it points at the sandbox CORS Worker, where Stripe is in test mode, and
+# its accounts are limited to an explicit tester list held in that Worker's KV.
+# Nothing bought at /test/ is real.
 # The same commit is also published to the mirror repository at:
 #   https://matthewdeanmartin.github.io/mawkingbird/canary/
 #
@@ -54,6 +61,54 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/publish-gh-pages.sh canary ui/dist-mockingbird/browser
+
+  test-deployment:
+    name: Build and deploy /test/
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    # Deliberately a job in THIS workflow rather than a file of its own. /test/
+    # and /canary/ are meant to be the same commit, and sharing the trigger
+    # makes that structural instead of coincidental — two workflows on the same
+    # `on:` would drift the moment one of them failed or was disabled.
+    #
+    # Also deliberately NOT mirrored to github.io. The mirror exists as a
+    # fallback for production if the custom domain breaks; a second copy of the
+    # test build would be extra public surface serving no purpose.
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Stamp build info
+        run: node ui/scripts/gen-build-info.mjs
+      - name: Build /test/
+        # The base href is the whole configuration. `isTestBuild()` reads it at
+        # runtime to pick the sandbox CORS Worker, and boot.js reads it to paint
+        # the grey background before first frame — so there is no separate
+        # Angular build configuration to keep in step, and no way to produce a
+        # bundle that disagrees with itself about which deployment it is.
+        run: make mockingbird MOCKINGBIRD_BASE_HREF=/test/
+      - name: Add test marker
+        run: printf '%s\n' "$GITHUB_SHA" > ui/dist-mockingbird/browser/test-commit.txt
+      - name: Verify this really is a test build
+        # Cheap insurance against the one failure that matters: a build that
+        # looks like production, talks to live Stripe, and is served at /test/
+        # where nobody expects real money to move.
+        run: |
+          grep --fixed-strings '<base href="/test/"/>' ui/dist-mockingbird/browser/index.html
+          test ! -e ui/dist-mockingbird/browser/CNAME
+      - name: Publish /test/ to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/publish-gh-pages.sh test ui/dist-mockingbird/browser
 
   mirror:
     name: Build and deploy github.io Canary
