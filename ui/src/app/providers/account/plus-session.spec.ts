@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlusSession } from './plus-session';
 import { MawkingbirdSession } from './mawkingbird-session';
 
-const TOKEN_URL = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/plus/token';
-const CHECKOUT_URL = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/plus/checkout';
+const TOKEN_URL = 'https://cors.mawkingbird.com/plus/token';
+const CHECKOUT_URL = 'https://cors.mawkingbird.com/plus/checkout';
 
 /** Seconds, as the Worker mints them. */
 const nowSeconds = () => Math.floor(Date.now() / 1000);

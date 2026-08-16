@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import { ConnectionCorsProxy } from './connection-cors-proxy';
 import { enableProxyFlags } from '../../../../testing/enable-proxy-flags';
+import { corsProxyOrigin } from '../../../../build-flavor';
 
 describe('ConnectionCorsProxy', () => {
   let fixture: ComponentFixture<ConnectionCorsProxy>;
@@ -104,7 +105,10 @@ describe('ConnectionCorsProxy', () => {
       choose('mawkingbird');
 
       fixture.componentInstance.runTest();
-      const request = httpMock.expectOne((req) => req.url.includes('workers.dev'));
+      // Matched against the origin the build actually resolves, not a hostname
+      // literal — the Workers moved from workers.dev to mawkingbird.com and a
+      // literal here would break a test that was never about DNS.
+      const request = httpMock.expectOne((req) => req.url.startsWith(corsProxyOrigin()));
       expect(request.request.url).toContain('route=feeds');
       expect(request.request.url).not.toContain('{route}');
       request.flush('<rss></rss>');

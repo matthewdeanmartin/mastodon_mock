@@ -11,7 +11,7 @@ import { SupporterStatus } from './supporter-status';
 import { FeatureFlags } from '../../feature-flags';
 import { PLUS_TOKEN_HEADER, plusTokenInterceptor, PlusTokenSource } from './plus-token.interceptor';
 
-const PROXY = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev';
+const PROXY = 'https://cors.mawkingbird.com';
 
 /**
  * A stand-in token source.

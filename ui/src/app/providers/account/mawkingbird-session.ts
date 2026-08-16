@@ -67,20 +67,26 @@ export const ACCOUNT_ORIGIN = new InjectionToken<string>('ACCOUNT_ORIGIN', {
  * build talks to the sandbox services and cannot mint a token production would
  * accept — the issuer differs, and the proxy pins it.
  *
- * These are `*.workers.dev` until the `auth.mawkingbird.com` subdomain exists.
- * See `mawkingbird_auth/docs/dns.md`; the move is a one-file change there and
- * two constants here.
+ * Production is on `*.mawkingbird.com`; test stays on `*.workers.dev` so that
+ * "am I on test?" is visible in the address bar. Must agree with `hostsFor()`
+ * in `mawkingbird_auth/src/shared/hosts.ts` — a disagreement means the app
+ * talks to a service that will not accept its origin.
+ *
+ * Production being same-site with the app is what lets the session cookie use
+ * `SameSite=Lax`, which restores the browser's own CSRF protection. On
+ * `workers.dev` it had to be `SameSite=None`, leaving the origin allowlist to
+ * do that job alone.
  */
 export function authOrigin(): string {
   return isTestBuild()
     ? 'https://mawkingbird-auth-test.matthewdeanmartin.workers.dev'
-    : 'https://mawkingbird-auth.matthewdeanmartin.workers.dev';
+    : 'https://auth.mawkingbird.com';
 }
 
 export function accountOrigin(): string {
   return isTestBuild()
     ? 'https://mawkingbird-account-test.matthewdeanmartin.workers.dev'
-    : 'https://mawkingbird-account.matthewdeanmartin.workers.dev';
+    : 'https://account.mawkingbird.com';
 }
 
 /** How strongly the caller proved who they are. */

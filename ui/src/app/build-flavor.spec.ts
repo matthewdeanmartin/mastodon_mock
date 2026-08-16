@@ -93,7 +93,7 @@ describe('corsProxyOrigin', () => {
   it('sends production AND canary to the real Worker', () => {
     // Canary is production: real customers, real billing, new features first.
     // Pointing it at the sandbox would mean canary users could not subscribe.
-    const real = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev';
+    const real = 'https://cors.mawkingbird.com';
     expect(corsProxyOrigin('https://mawkingbird.com/')).toBe(real);
     expect(corsProxyOrigin('https://mawkingbird.com/canary/')).toBe(real);
   });

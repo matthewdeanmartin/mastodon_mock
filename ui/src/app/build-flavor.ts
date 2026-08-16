@@ -77,7 +77,7 @@ export function isTestBuild(baseUri: string = document.baseURI): boolean {
 export function corsProxyOrigin(baseUri: string = document.baseURI): string {
   return isTestBuild(baseUri)
     ? 'https://mawkingbird-cors-proxy-test.matthewdeanmartin.workers.dev'
-    : 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev';
+    : 'https://cors.mawkingbird.com';
 }
 
 /**
