@@ -1,5 +1,6 @@
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { corsProxyOrigin, isTestBuild } from '../../build-flavor';
+import { authDebug } from './auth-debug';
 
 /**
  * The Mawkingbird account session.
@@ -67,8 +68,10 @@ export const ACCOUNT_ORIGIN = new InjectionToken<string>('ACCOUNT_ORIGIN', {
  * build talks to the sandbox services and cannot mint a token production would
  * accept — the issuer differs, and the proxy pins it.
  *
- * Production is on `*.mawkingbird.com`; test stays on `*.workers.dev` so that
- * "am I on test?" is visible in the address bar. Must agree with `hostsFor()`
+ * Both environments are on mawkingbird.com subdomains, and that is required
+ * rather than cosmetic: these are called with `credentials: 'include'`, and a
+ * session cookie from a `workers.dev` host is third-party to this app, which
+ * Chrome drops by default. Must agree with `hostsFor()`
  * in `mawkingbird_auth/src/shared/hosts.ts` — a disagreement means the app
  * talks to a service that will not accept its origin.
  *
@@ -79,13 +82,13 @@ export const ACCOUNT_ORIGIN = new InjectionToken<string>('ACCOUNT_ORIGIN', {
  */
 export function authOrigin(): string {
   return isTestBuild()
-    ? 'https://mawkingbird-auth-test.matthewdeanmartin.workers.dev'
+    ? 'https://auth-test.mawkingbird.com'
     : 'https://auth.mawkingbird.com';
 }
 
 export function accountOrigin(): string {
   return isTestBuild()
-    ? 'https://mawkingbird-account-test.matthewdeanmartin.workers.dev'
+    ? 'https://account-test.mawkingbird.com'
     : 'https://account.mawkingbird.com';
 }
 
@@ -238,8 +241,11 @@ export class MawkingbirdSession {
   }
 
   private async mint(): Promise<MintedToken | null> {
+    authDebug('mint:start', { authBase: this.authBase });
+
     const signedIn = await this.post({ grant: 'cookie' });
     if (signedIn) {
+      authDebug('mint:signed-in', { auth: signedIn.auth, tier: signedIn.tier });
       this.held = signedIn;
       this.user.set({ auth: signedIn.auth, tier: signedIn.tier });
       return signedIn;
@@ -247,7 +253,17 @@ export class MawkingbirdSession {
 
     // A 401 from the cookie grant is what an expired 90-day session looks like.
     // Not an error — fall back to anonymous and show signed-out UI.
+    //
+    // But it is ALSO what a dropped session cookie looks like, and those need
+    // telling apart. The cookie is HttpOnly and on another origin, so script
+    // here cannot inspect it; `mint:cookie-refused` immediately after a
+    // redemption means the browser did not send it, which is a SameSite or
+    // third-party-cookie problem rather than an expiry.
+    authDebug('mint:cookie-refused', {
+      hint: 'expired session, or the browser did not send the session cookie',
+    });
     const anonymous = await this.post({ grant: 'anon' });
+    authDebug('mint:anonymous', { ok: anonymous !== null });
     this.held = anonymous;
     this.user.set(null);
     return anonymous;
@@ -262,6 +278,11 @@ export class MawkingbirdSession {
         body: JSON.stringify(body),
       });
       if (!response.ok) {
+        // Logged with the status, because 401 and 503 mean very different
+        // things here: the first is "no usable session", the second is "this
+        // deployment is misconfigured", and they are indistinguishable in the
+        // UI without this line.
+        authDebug('mint:rejected', { grant: body.grant, status: response.status });
         return null;
       }
       const minted = (await response.json()) as Partial<MintedToken>;
@@ -274,7 +295,14 @@ export class MawkingbirdSession {
         auth: minted.auth ?? 'anon',
         tier: minted.tier ?? 'free',
       };
-    } catch {
+    } catch (error: unknown) {
+      // A network-level failure, not an HTTP error: CORS refusal, DNS, offline.
+      // A CORS refusal is the likeliest cause on a fresh deployment and looks
+      // identical to being offline from here, so the origin is logged too.
+      authDebug('mint:unreachable', {
+        grant: body.grant,
+        message: error instanceof Error ? error.message : 'unknown',
+      });
       return null;
     }
   }
