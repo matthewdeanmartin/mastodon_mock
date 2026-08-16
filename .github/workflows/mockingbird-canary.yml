@@ -68,6 +68,13 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+    # Serialized behind canary because both push to gh-pages. GitHub's
+    # `concurrency:` group serializes whole workflow RUNS, not jobs, so two jobs
+    # in THIS run are outside that lock and would race — the loser's push being
+    # rejected with "fetch first". The publish script retries from a fresh clone
+    # and would recover on its own, but a retry costs a rebuild-length wait, and
+    # not racing is cheaper than losing gracefully.
+    needs: deploy
     # Deliberately a job in THIS workflow rather than a file of its own. /test/
     # and /canary/ are meant to be the same commit, and sharing the trigger
     # makes that structural instead of coincidental — two workflows on the same
