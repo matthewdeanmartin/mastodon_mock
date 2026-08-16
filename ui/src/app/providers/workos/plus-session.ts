@@ -198,7 +198,9 @@ export class PlusSession {
    * before handing it to Stripe.
    */
   async startCheckout(): Promise<void> {
+    authDebug('checkout:start');
     const accessToken = await this.workos.accessToken();
+    authDebug('checkout:have-access-token', { present: accessToken !== null });
     if (!accessToken) {
       this.error.set('Sign in before subscribing.');
       return;
@@ -206,6 +208,7 @@ export class PlusSession {
 
     this.error.set(null);
     this.startingCheckout.set(true);
+    authDebug('checkout:requesting-session', { url: `${PROXY_BASE}/plus/checkout` });
     try {
       const response = await firstValueFrom(
         this.http.post<CheckoutResponse>(
@@ -234,7 +237,9 @@ export class PlusSession {
   }
 
   private async mint(): Promise<string | null> {
+    authDebug('mint:start');
     const accessToken = await this.workos.accessToken();
+    authDebug('mint:have-access-token', { present: accessToken !== null });
     if (!accessToken) {
       this.tier.set('free');
       this.subscription.set(null);
@@ -256,10 +261,17 @@ export class PlusSession {
         ),
       );
       if (!response?.token) {
+        authDebug('mint:no-token-in-response');
         return null;
       }
 
-      authDebug('token:minted', { tier: response.tier });
+      // The line that answers "why does it not know I subscribed?". `tier: free`
+      // here with a signed-in account means the Worker looked up the entitlement
+      // and did not find one — check the KV record, not the app.
+      authDebug('mint:ok', {
+        tier: response.tier,
+        hasSubscription: response.subscription !== null,
+      });
       this.tier.set(response.tier);
       this.status.isSupporter.set(response.tier === 'plus');
       this.subscription.set(
@@ -274,10 +286,22 @@ export class PlusSession {
       );
       this.held = { value: response.token, expiresAtMs: response.expiresAt * 1000 };
       return this.held.value;
-    } catch {
-      // Not surfaced as an error: failing to mint means free-tier limits, and
-      // the app keeps working. Only checkout failures are worth telling
-      // someone about, because those are the ones they asked for.
+    } catch (error: unknown) {
+      // Not surfaced *to the user* as an error: failing to mint means free-tier
+      // limits, and the app keeps working. Only checkout failures are worth
+      // telling someone about, because those are the ones they asked for.
+      //
+      // But it is logged, because this is also where "I subscribed and the app
+      // does not know it" lands. A 403 here is the tester gate refusing the
+      // account; a 401 is a rejected WorkOS token; a 503 is an unconfigured
+      // Worker. Silently returning null made all three look identical.
+      authDebug('mint:failed', {
+        status: error instanceof HttpErrorResponse ? error.status : 'non-http',
+        message:
+          error instanceof HttpErrorResponse && typeof error.error === 'object' && error.error
+            ? String((error.error as { error?: unknown }).error ?? '')
+            : '',
+      });
       return null;
     }
   }

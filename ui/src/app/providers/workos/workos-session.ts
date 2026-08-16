@@ -116,6 +116,35 @@ export function authDebug(step: string, detail: Record<string, unknown> = {}): v
  * fails with the SDK's "login which did not originate at the application"
  * error. Both entries must be registered in the WorkOS dashboard.
  *
+ * ## Why sessions do not survive as long as they should
+ *
+ * A social app should sign you in once and keep you signed in for years. This
+ * one currently does not, and the cause is in the SDK's storage model rather
+ * than in anything here:
+ *
+ * - `devMode` defaults to true on `localhost` and false everywhere else.
+ * - With `devMode: false`, the refresh token is kept in **memory only**. A page
+ *   reload loses it.
+ * - Reloads therefore depend entirely on the HttpOnly session cookie the SDK
+ *   sends with `useCookie: true` — and that cookie belongs to
+ *   `api.workos.com`, which makes it a **third-party cookie** for this origin.
+ *
+ * Safari and Firefox block third-party cookies outright, and Chrome restricts
+ * them. When the cookie is dropped, `initialize()` finds nothing to refresh
+ * from and the user is signed out — which reads as "it logged me out again"
+ * within hours rather than years.
+ *
+ * The fix is configuration, not code: point {@link CreateClientOptions.apiHostname}
+ * at a first-party domain (`auth.mawkingbird.com`, CNAME'd to WorkOS in the
+ * dashboard) so the cookie is first-party for this site. Raising token
+ * lifetimes does not help, because the problem is the credential vanishing
+ * rather than expiring.
+ *
+ * Do **not** "fix" this by setting `devMode: true` in production. That moves
+ * the refresh token into `localStorage`, where any script on this origin can
+ * read a multi-day credential — the exact thing the module comment above
+ * explains this SDK was chosen to avoid.
+ *
  * ## Failure posture
  *
  * Signed out is a normal state, not an error. Initialisation failures leave

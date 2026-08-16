@@ -79,6 +79,20 @@ export const plusTokenInterceptor: HttpInterceptorFn = (request, next) => {
     return next(request);
   }
 
+  // The account endpoints are never proxied traffic, and attaching a token to
+  // them **deadlocks**: `/plus/token` is how a token is obtained, so minting one
+  // would re-enter this interceptor, which would wait for a mint that is itself
+  // queued behind the token it is waiting for. `PlusSession.mint()` dedupes
+  // concurrent callers, so the second request does not loop — it awaits a
+  // promise that can never resolve. The symptom is a button stuck on "Starting
+  // checkout…" with no network traffic at all.
+  //
+  // These endpoints authenticate with the WorkOS bearer token instead, which
+  // `PlusSession` sets directly.
+  if (new URL(request.url, location.href).pathname.startsWith('/plus/')) {
+    return next(request);
+  }
+
   const config = settings.resolve();
   if (!config || !isProxyRequest(request.url, config.pattern)) {
     return next(request);

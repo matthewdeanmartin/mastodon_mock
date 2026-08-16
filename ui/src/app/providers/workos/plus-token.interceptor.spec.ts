@@ -96,6 +96,21 @@ describe('plusTokenInterceptor', () => {
     expect(request.request.headers.get(PLUS_TOKEN_HEADER)).toBe('supporter-token');
   });
 
+  it('leaves the account endpoints alone, so minting cannot deadlock', async () => {
+    settings.select('mawkingbird-plus');
+
+    // `/plus/token` is how a token is obtained. Attaching one to it means
+    // minting a token in order to mint a token: `PlusSession.mint()` dedupes,
+    // so it does not loop — it awaits a promise that can never resolve, and the
+    // request never leaves the browser. Symptom: "Starting checkout…" forever,
+    // with nothing in the network tab.
+    for (const path of ['/plus/token', '/plus/checkout']) {
+      const request = await fire(`${PROXY}${path}`);
+      expect(request.request.headers.has(PLUS_TOKEN_HEADER)).toBe(false);
+    }
+    expect(plus.token).not.toHaveBeenCalled();
+  });
+
   it('never attaches it to a host that is not the proxy', async () => {
     settings.select('mawkingbird-plus');
 
