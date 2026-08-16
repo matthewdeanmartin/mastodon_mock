@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { PlusSession } from '../../../providers/workos/plus-session';
-import { displayName, WorkosSession } from '../../../providers/workos/workos-session';
+import { authDebug, displayName, WorkosSession } from '../../../providers/workos/workos-session';
 
 /**
  * Settings → Mawkingbird Plus.
@@ -47,10 +47,24 @@ export class SettingsMawkingbirdPlus implements OnInit {
   protected readonly checkoutOutcome = signal<'success' | 'cancel' | null>(null);
 
   async ngOnInit(): Promise<void> {
+    const returningFromCheckout = new URLSearchParams(location.search).has('checkout');
+    authDebug('page:init', { returningFromCheckout });
+
     // Also completes a pending sign-in redirect, since this page is the WorkOS
     // redirect target. Awaited here — unlike before — because everything below
     // needs to know whether anyone is signed in.
     await this.session.ensureReady();
+
+    // The exact symptom being chased: signed out immediately after paying, then
+    // signed in again on a manual retry. If `signedIn` is false here while the
+    // session cookie is present, the SDK had something to restore from and did
+    // not; if the cookie is absent, the browser dropped it on the way back from
+    // Stripe and no amount of app code will recover it.
+    authDebug('page:after-ensureReady', {
+      returningFromCheckout,
+      signedIn: this.session.user() !== null,
+      error: this.session.error(),
+    });
 
     const outcome = new URLSearchParams(location.search).get('checkout');
     if (outcome === 'success' || outcome === 'cancel') {
@@ -63,6 +77,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
     }
 
     if (this.session.user()) {
+      authDebug('page:refreshing-tier');
       // A fresh mint rather than a cached one: on a checkout return the
       // entitlement was written seconds ago, and a stale token would show the
       // old tier for up to fifteen minutes.

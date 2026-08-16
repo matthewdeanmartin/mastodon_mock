@@ -14,6 +14,7 @@ import {
   corsProxyEntry,
 } from './cors-proxy-catalog';
 import { FeatureFlagId, FeatureFlags, proxyFeatureFlag } from '../../feature-flags';
+import { SupporterStatus } from '../workos/supporter-status';
 
 /**
  * Which CORS proxy this browser uses, and the key for it.
@@ -84,6 +85,9 @@ export class CorsProxySettings implements ExpiringConnection {
   // service available", and the fallback below treats every proxy as offered,
   // which is the pre-flag behaviour those callers already expect.
   private flags = inject(FeatureFlags, { optional: true });
+  // Also optional, for the same `new CorsProxySettings()` callers. Absent means
+  // "not a supporter", which resolves to the free tier — the safe default.
+  private plus = inject(SupporterStatus, { optional: true });
   private config = signal<StoredCorsProxyConfig | null>(readConfig());
   private secret = signal<StoredCorsProxyKey | null>(readSecret());
 
@@ -109,8 +113,51 @@ export class CorsProxySettings implements ExpiringConnection {
       return null;
     }
     const flag = proxyFeatureFlag(entry.id);
-    return flag === null || this.proxyFlagEnabled(flag) ? entry : null;
+    if (flag !== null && !this.proxyFlagEnabled(flag)) {
+      return null;
+    }
+    return this.upgradeToSupporterTier(entry);
   });
+
+  /**
+   * Swap the free Mawkingbird proxy for the supporter tier when the account is
+   * entitled to it.
+   *
+   * ## Why this is automatic rather than a setting
+   *
+   * A subscriber who has to find Settings, open Connections, pick "Mawkingbird
+   * Plus" from a list, and press Save is a subscriber who paid for a higher rate
+   * limit and is still being rate-limited at the free tier until they stumble
+   * across the right screen. Nobody buys a rate limit in order to configure one.
+   *
+   * The swap is safe precisely because the two entries are the same service:
+   * byte-identical URL patterns, the same routes, the same destinations, and no
+   * key to paste. The tier travels in a header the app attaches per request, so
+   * "upgrading" changes nothing about how a request is built — only which
+   * ceiling the Worker applies to it.
+   *
+   * ## Why it does not write to storage
+   *
+   * The stored selection stays whatever the user chose. Entitlement is a fact
+   * about the account, not a preference, and persisting it would strand the free
+   * entry's users on a paid entry the moment a subscription lapsed — which is
+   * the reverse of the degradation this whole design is built around. Read it
+   * live and the lapse resolves itself on the next mint.
+   *
+   * A user who explicitly picked something else — AllOrigins, their own proxy —
+   * is left alone. This only ever promotes the free Mawkingbird proxy to its own
+   * paid tier.
+   */
+  private upgradeToSupporterTier(entry: CorsProxyEntry): CorsProxyEntry {
+    if (entry.id !== 'mawkingbird' || !this.plus?.isSupporter()) {
+      return entry;
+    }
+    const flag = proxyFeatureFlag('mawkingbird-plus');
+    if (flag !== null && !this.proxyFlagEnabled(flag)) {
+      return entry;
+    }
+    return corsProxyEntry('mawkingbird-plus') ?? entry;
+  }
 
   /** Whether a proxy is configured well enough to actually be used. */
   readonly usable = computed(() => this.resolve() !== null);

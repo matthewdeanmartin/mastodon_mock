@@ -3,7 +3,8 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { corsProxyOrigin } from '../../build-flavor';
 import { externalFetch } from '../external-fetch';
-import { accountPageUrl, WorkosSession } from './workos-session';
+import { SupporterStatus } from './supporter-status';
+import { authDebug, accountPageUrl, WorkosSession } from './workos-session';
 
 /**
  * The supporter session: proxy tokens, subscription state, and checkout.
@@ -124,6 +125,10 @@ export function checkoutErrorMessage(error: unknown): string {
 export class PlusSession {
   private http = inject(HttpClient);
   private workos = inject(WorkosSession);
+  // Published separately so `CorsProxySettings` can offer the supporter tier
+  // without importing this service, and so pulling the AuthKit SDK into the
+  // initial bundle. See `supporter-status.ts`.
+  private status = inject(SupporterStatus);
 
   /** The caller's tier, as last minted. */
   readonly tier = signal<'free' | 'plus'>('free');
@@ -180,6 +185,7 @@ export class PlusSession {
   clear(): void {
     this.held = null;
     this.tier.set('free');
+    this.status.isSupporter.set(false);
     this.subscription.set(null);
     this.error.set(null);
   }
@@ -215,6 +221,10 @@ export class PlusSession {
         this.error.set('Could not start checkout. Please try again.');
         return;
       }
+      // Logged just before leaving: `returnTo` is what Stripe will send the
+      // browser back to, and a mismatch with the WorkOS redirect URI is one of
+      // the few ways to come back to a page that cannot restore the session.
+      authDebug('checkout:leaving', { returnTo: accountPageUrl() });
       location.assign(response.url);
     } catch (error: unknown) {
       this.error.set(checkoutErrorMessage(error));
@@ -228,6 +238,7 @@ export class PlusSession {
     if (!accessToken) {
       this.tier.set('free');
       this.subscription.set(null);
+      this.status.isSupporter.set(false);
       return null;
     }
 
@@ -248,7 +259,9 @@ export class PlusSession {
         return null;
       }
 
+      authDebug('token:minted', { tier: response.tier });
       this.tier.set(response.tier);
+      this.status.isSupporter.set(response.tier === 'plus');
       this.subscription.set(
         response.subscription
           ? {

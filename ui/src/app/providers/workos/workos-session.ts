@@ -1,6 +1,7 @@
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { createClient, type User } from '@workos-inc/authkit-js';
 import { environment } from '../../../environments/environment';
+import { isTestBuild } from '../../build-flavor';
 import { appCallbackUrl } from '../../pkce';
 
 export const WORKOS_CLIENT_ID = new InjectionToken<string>('WORKOS_CLIENT_ID', {
@@ -26,6 +27,49 @@ export const WORKOS_CREATE_CLIENT = new InjectionToken<typeof createClient>(
   'WORKOS_CREATE_CLIENT',
   { providedIn: 'root', factory: () => createClient },
 );
+
+/**
+ * Diagnostic logging for the sign-in and checkout-return flow.
+ *
+ * On by default on the test deployment, and switchable anywhere else with
+ * `localStorage.setItem('mawkingbird_debug_auth', '1')` — the failure this
+ * exists for only reproduces on a real deployment with real cookies and a real
+ * round trip through Stripe, so it has to be enable-able in production without
+ * a rebuild.
+ *
+ * Never logs a token, a code, or a verifier. The interesting facts are all
+ * *shapes*: whether a cookie is present, whether a user came back, which branch
+ * the SDK took. A log line carrying the credential would be a worse bug than
+ * the one being chased.
+ */
+export function authDebugEnabled(): boolean {
+  try {
+    if (localStorage.getItem('mawkingbird_debug_auth') === '1') {
+      return true;
+    }
+  } catch {
+    // Storage can be unavailable (private mode, blocked cookies). Fall through.
+  }
+  return isTestBuild();
+}
+
+/** Log a step in the auth flow, with no credential material in it. */
+export function authDebug(step: string, detail: Record<string, unknown> = {}): void {
+  if (!authDebugEnabled()) {
+    return;
+  }
+  console.info(`[mawkingbird auth] ${step}`, {
+    ...detail,
+    // The hint cookie the SDK uses to decide whether a session is worth
+    // restoring. Its absence on a checkout return is the single most likely
+    // explanation for "you are not logged in" after paying: the cookie is set
+    // by WorkOS for its own domain, and a browser that dropped it during the
+    // trip through Stripe leaves the SDK with nothing to refresh from.
+    hasSessionCookie: /(?:^|;\s*)workos-has-session=/.test(document.cookie),
+    path: location.pathname,
+    query: [...new URLSearchParams(location.search).keys()].join(','),
+  });
+}
 
 /**
  * The Mawkingbird account session, via WorkOS AuthKit.
@@ -118,12 +162,19 @@ export class WorkosSession {
       this.ready.set(true);
       return;
     }
+    authDebug('ensureReady:start', { alreadyConnected: this.client !== null });
     try {
       const client = await this.connect();
-      this.user.set(client.getUser());
+      const user = client.getUser();
+      this.user.set(user);
+      // The line that answers "why did it say I was not logged in?". A false
+      // here on a checkout return means the SDK found no session to restore,
+      // which is a cookie problem rather than anything this app did.
+      authDebug('ensureReady:done', { signedIn: user !== null });
     } catch (error: unknown) {
       // A failure here is usually a misconfigured dashboard (an unregistered
       // origin or redirect URI) rather than anything the user did.
+      authDebug('ensureReady:failed', { message: messageOf(error, 'unknown') });
       this.error.set(messageOf(error, 'Could not reach the Mawkingbird account service.'));
     } finally {
       this.ready.set(true);
@@ -193,13 +244,27 @@ export class WorkosSession {
   }
 
   private connect(): Promise<AuthkitClient> {
+    // Logged because the redirect URI must match a WorkOS dashboard entry
+    // *exactly*, and each deployment has its own — /test/ and /canary/ differ
+    // from production only by base href, so a missing entry looks like a
+    // mysterious sign-in failure rather than a configuration error.
+    authDebug('connect', { redirectUri: accountPageUrl(), reused: this.client !== null });
     this.client ??= this.createClient(this.clientId, {
       redirectUri: accountPageUrl(),
       // Keeps `user` in step with the SDK's own refresh cycle, so a session
       // that dies overnight is reflected in the UI rather than showing a stale
       // name until the next reload.
-      onRefresh: ({ user }) => this.user.set(user),
-      onRefreshFailure: () => this.user.set(null),
+      onRefresh: ({ user }) => {
+        authDebug('onRefresh', { signedIn: user !== null });
+        this.user.set(user);
+      },
+      onRefreshFailure: () => {
+        // Fires when the refresh token is gone or rejected. On a checkout
+        // return this is the other candidate explanation, and it is worth
+        // distinguishing from "no cookie at all".
+        authDebug('onRefreshFailure');
+        this.user.set(null);
+      },
     });
     return this.client;
   }

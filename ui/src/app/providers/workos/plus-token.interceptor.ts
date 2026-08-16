@@ -68,7 +68,14 @@ export const plusTokenInterceptor: HttpInterceptorFn = (request, next) => {
   const settings = inject(CorsProxySettings);
   const source = inject(PlusTokenSource);
 
-  if (settings.currentId() !== 'mawkingbird-plus') {
+  // `chosen()`, not `currentId()`. The stored id is what the user picked; the
+  // chosen entry is what the app is actually using, and an entitled supporter is
+  // upgraded from the free Mawkingbird entry automatically (see
+  // `upgradeToSupporterTier`). Gating on the stored id would attach no token to
+  // exactly those auto-upgraded requests, so the Worker would meter a paying
+  // supporter at the free rate — the one outcome this whole path exists to
+  // prevent.
+  if (settings.chosen()?.id !== 'mawkingbird-plus') {
     return next(request);
   }
 

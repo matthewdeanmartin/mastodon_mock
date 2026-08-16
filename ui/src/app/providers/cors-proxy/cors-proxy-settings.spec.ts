@@ -9,6 +9,7 @@ import {
 } from './cors-proxy-catalog';
 import { enableProxyFlags } from '../../testing/enable-proxy-flags';
 import { FEATURE_FLAGS, FeatureFlags, proxyFeatureFlag } from '../../feature-flags';
+import { SupporterStatus } from '../workos/supporter-status';
 
 describe('CorsProxySettings', () => {
   let settings: CorsProxySettings;
@@ -157,6 +158,73 @@ describe('CorsProxySettings', () => {
  * `flagsOff` below covers the flag filter itself.
  */
 const allFlagsOn = () => true;
+
+describe('the supporter tier upgrade', () => {
+  let settings: CorsProxySettings;
+  let status: SupporterStatus;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({});
+    enableProxyFlags();
+    settings = TestBed.inject(CorsProxySettings);
+    status = TestBed.inject(SupporterStatus);
+    // The Plus proxy ships `test`, so it is off in a jsdom run (base href `/`).
+    // Lifted explicitly here rather than in `enableProxyFlags`, which is about
+    // third-party vendors — and leaving it out of that helper keeps every other
+    // spec running against the shipped default.
+    TestBed.inject(FeatureFlags).setState('proxy-mawkingbird-plus', 'production');
+    settings.select('mawkingbird');
+  });
+
+  it('leaves a non-supporter on the free proxy', () => {
+    expect(settings.chosen()?.id).toBe('mawkingbird');
+  });
+
+  it('offers the supporter tier as soon as entitlement is known', () => {
+    status.isSupporter.set(true);
+
+    // No second visit to Settings, no picker, no Save. Somebody who paid for a
+    // higher rate limit should not have to go and configure one.
+    expect(settings.chosen()?.id).toBe('mawkingbird-plus');
+  });
+
+  it('drops back to free when a subscription lapses', () => {
+    status.isSupporter.set(true);
+    status.isSupporter.set(false);
+
+    // The reason the upgrade is never written to storage: a lapsed subscriber
+    // must degrade to the free tier by themselves, not stay pinned to a paid
+    // entry they can no longer use.
+    expect(settings.chosen()?.id).toBe('mawkingbird');
+    expect(settings.currentId()).toBe('mawkingbird');
+  });
+
+  it('does not touch the stored selection', () => {
+    status.isSupporter.set(true);
+
+    // What the user picked stays what the user picked. Entitlement is a fact
+    // about the account, layered on at read time.
+    expect(settings.currentId()).toBe('mawkingbird');
+  });
+
+  it('leaves a deliberately chosen third-party proxy alone', () => {
+    settings.select('allorigins');
+    status.isSupporter.set(true);
+
+    // Only ever promotes the free Mawkingbird proxy to its own paid tier.
+    // Someone who picked another vendor chose it for a reason.
+    expect(settings.chosen()?.id).toBe('allorigins');
+  });
+
+  it('stays on free when the Plus proxy flag is off', () => {
+    const flags = TestBed.inject(FeatureFlags);
+    flags.setState('proxy-mawkingbird-plus', 'off');
+    status.isSupporter.set(true);
+
+    expect(settings.chosen()?.id).toBe('mawkingbird');
+  });
+});
 
 describe('availableCorsProxies', () => {
   it('hides localhost-only proxies on a deployed origin', () => {

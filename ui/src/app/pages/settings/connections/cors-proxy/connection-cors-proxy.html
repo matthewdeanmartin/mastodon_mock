@@ -54,6 +54,14 @@
           }
         </span>
         <span class="muted small">{{ proxy.pitch }}</span>
+        <!--
+          The supporter tier is not a separate option in this list; it is a
+          property of the account. Someone entitled to it is already on it, so
+          this says so rather than asking them to pick it.
+        -->
+        @if (proxy.id === 'mawkingbird' && onSupporterTier()) {
+          <span class="proxy-tag">Mawkingbird Plus active — supporter rate limit</span>
+        }
         <span class="muted small">{{ proxy.limits }}</span>
         <a class="small" [href]="proxy.homepage" target="_blank" rel="noopener noreferrer">
           {{ proxy.label }} website
@@ -149,7 +157,8 @@
 
 @if (preview(); as previewUrl) {
   <p class="muted small preview">
-    Test fetches <code>{{ testFeedUrl }}</code>, sent as:<br />
+    Test fetches <code>{{ testFeedUrl }}</code
+    >, sent as:<br />
     <code class="preview-url">{{ previewUrl }}</code>
   </p>
 }

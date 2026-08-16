@@ -7,12 +7,9 @@ import {
 } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CorsProxySettings } from '../cors-proxy/cors-proxy-settings';
+import { SupporterStatus } from './supporter-status';
 import { FeatureFlags } from '../../feature-flags';
-import {
-  PLUS_TOKEN_HEADER,
-  plusTokenInterceptor,
-  PlusTokenSource,
-} from './plus-token.interceptor';
+import { PLUS_TOKEN_HEADER, plusTokenInterceptor, PlusTokenSource } from './plus-token.interceptor';
 
 const PROXY = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev';
 
@@ -82,6 +79,21 @@ describe('plusTokenInterceptor', () => {
 
     expect(request.request.headers.has(PLUS_TOKEN_HEADER)).toBe(false);
     expect(plus.token).not.toHaveBeenCalled();
+  });
+
+  it('attaches the token when an entitled account is auto-upgraded', async () => {
+    // The user picked the *free* entry and never visited Settings again;
+    // `CorsProxySettings` promotes them because they are entitled. If this
+    // interceptor gated on the stored id instead of the effective one, the
+    // request would go out untokenised and the Worker would meter a paying
+    // supporter at the free rate — silently, and only under load.
+    settings.select('mawkingbird');
+    TestBed.inject(FeatureFlags).setState('proxy-mawkingbird-plus', 'production');
+    TestBed.inject(SupporterStatus).isSupporter.set(true);
+
+    const request = await fire(`${PROXY}/?route=feeds&url=https%3A%2F%2Fexample.com%2Ffeed.xml`);
+
+    expect(request.request.headers.get(PLUS_TOKEN_HEADER)).toBe('supporter-token');
   });
 
   it('never attaches it to a host that is not the proxy', async () => {

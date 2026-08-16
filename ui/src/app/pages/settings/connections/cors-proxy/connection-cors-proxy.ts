@@ -76,9 +76,23 @@ export class ConnectionCorsProxy implements OnInit {
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.browser.detail;
   protected readonly isDevOrigin = isDevelopmentOrigin();
   private readonly flags = inject(FeatureFlags);
-  /** Flagged-off proxies are not offered at all — see `proxyFeatureFlag`. */
+  /**
+   * Flagged-off proxies are not offered at all — see `proxyFeatureFlag`.
+   *
+   * The supporter tier is also absent, deliberately: it is not something to
+   * choose. `CorsProxySettings` promotes the free Mawkingbird entry to it
+   * automatically for an entitled account, so listing it here would offer a
+   * radio button that either does nothing (already entitled) or cannot work
+   * (not entitled) — and would let someone select a tier they have not bought,
+   * whose only effect is a token the Worker refuses.
+   */
   protected readonly proxies = availableCorsProxies(location.hostname, (id) =>
     this.flags.enabled(id as FeatureFlagId),
+  ).filter((entry) => entry.id !== 'mawkingbird-plus');
+
+  /** True when this account is getting supporter limits on the Mawkingbird proxy. */
+  protected readonly onSupporterTier = computed(
+    () => this.settings.chosen()?.id === 'mawkingbird-plus',
   );
 
   /** Form state, seeded from storage and written back only on save. */
