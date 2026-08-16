@@ -171,7 +171,11 @@ function load(): StoredState {
     const parsed = JSON.parse(
       localStorage.getItem(scopedKey(BASE_KEY)) ?? 'null',
     ) as Partial<StoredState> | null;
-    if (parsed?.version !== STATE_VERSION || typeof parsed.entries !== 'object' || !parsed.entries) {
+    if (
+      parsed?.version !== STATE_VERSION ||
+      typeof parsed.entries !== 'object' ||
+      !parsed.entries
+    ) {
       return empty;
     }
     const entries: Record<string, Entry> = {};

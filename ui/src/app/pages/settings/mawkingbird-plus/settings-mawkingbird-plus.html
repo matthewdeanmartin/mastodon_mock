@@ -7,12 +7,7 @@
 </div>
 
 <div class="spage-body">
-  @if (!session.configured) {
-    <p class="feed-error">
-      Mawkingbird accounts are not configured for this build. This is expected for the mock-embedded
-      UI, which is mastodon_mock's own admin surface rather than the Mawkingbird client.
-    </p>
-  } @else if (!session.ready()) {
+  @if (!session.ready()) {
     <p class="muted" role="status">Checking your account…</p>
   } @else if (session.user(); as user) {
     @if (checkoutOutcome() === 'success') {
@@ -26,15 +21,15 @@
     <section class="plus-identity">
       <h2>Signed in</h2>
       <dl>
-        @if (name(); as displayed) {
-          <dt>Name</dt>
-          <dd>{{ displayed }}</dd>
-        }
-        <dt>Email</dt>
-        <dd>{{ user.email }}</dd>
+        <dt>Sign-in</dt>
+        <dd>{{ user.auth === 'email' ? 'Confirmed email address' : 'Full account' }}</dd>
         <dt>Plan</dt>
         <dd>{{ plus.isSupporter() ? 'Mawkingbird Plus' : 'Free' }}</dd>
       </dl>
+      <p class="muted small">
+        Signing out here stops new sessions immediately. A token already issued to this browser
+        stays valid until it expires, so close other tabs if you are on a shared machine.
+      </p>
       <button class="btn btn-outline" type="button" (click)="signOut()">Sign out</button>
     </section>
 
@@ -112,19 +107,43 @@
     <section class="plus-signin">
       <h2>Not signed in</h2>
       <p>
-        There is nothing to gain by signing in yet. The account is here so that settings sync and a
-        paid proxy tier have somewhere to live later; right now it only proves who you are.
+        Signing in is optional. It exists so that settings sync, saved connections and a paid proxy
+        tier have somewhere to live later; right now it mainly raises your proxy rate limit if you
+        choose to support the project.
       </p>
-      <div class="plus-actions">
-        <button class="btn" type="button" (click)="session.signIn()">Sign in</button>
-        <button class="btn btn-outline" type="button" (click)="session.signUp()">
-          Create an account
-        </button>
-      </div>
+
+      @if (linkSent()) {
+        <!--
+          Deliberately says nothing about whether the address is known. The
+          service answers identically for a registered and an unregistered
+          address, and a message like "welcome back" here would hand back the
+          enumeration answer the endpoint refuses to give.
+        -->
+        <p class="connection-ok" role="status">
+          If that address can receive mail, a sign-in link is on its way. It expires in 15 minutes
+          and can only be used once.
+        </p>
+      } @else {
+        <form class="plus-signin-form" (submit)="$event.preventDefault(); sendLink()">
+          <label for="plus-email">Email address</label>
+          <input
+            id="plus-email"
+            type="email"
+            autocomplete="email"
+            required
+            [value]="email()"
+            (input)="email.set($any($event.target).value)"
+          />
+          <button class="btn" type="submit" [disabled]="session.sendingLink()">
+            {{ session.sendingLink() ? 'Sending…' : 'Email me a sign-in link' }}
+          </button>
+        </form>
+      }
+
       <p class="muted small">
-        Sign-in is handled by WorkOS. This browser never holds a long-lived credential for it: the
-        refresh token stays in a cookie our own code cannot read, and the short-lived access token
-        is kept in memory only, so closing the tab ends the session.
+        There is no password. Mawkingbird sends a one-time link instead, so there is nothing to
+        remember and nothing for us to lose. Your address is used to identify the account and to
+        send that link — nothing else.
       </p>
     </section>
   }

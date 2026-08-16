@@ -9,7 +9,7 @@ import {
 } from './cors-proxy-catalog';
 import { enableProxyFlags } from '../../testing/enable-proxy-flags';
 import { FEATURE_FLAGS, FeatureFlags, proxyFeatureFlag } from '../../feature-flags';
-import { SupporterStatus } from '../workos/supporter-status';
+import { SupporterStatus } from '../account/supporter-status';
 
 describe('CorsProxySettings', () => {
   let settings: CorsProxySettings;

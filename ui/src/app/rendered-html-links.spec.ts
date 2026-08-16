@@ -104,7 +104,11 @@ describe('RenderedHtmlLinks', () => {
     (fixture.nativeElement.querySelector('a') as HTMLAnchorElement).click();
 
     expect(navigate).not.toHaveBeenCalled();
-    expect(open).toHaveBeenCalledWith('https://mas.to/@SoNotNic/109995', '_blank', expect.any(String));
+    expect(open).toHaveBeenCalledWith(
+      'https://mas.to/@SoNotNic/109995',
+      '_blank',
+      expect.any(String),
+    );
   });
 
   it('leaves clicks that missed a link alone', () => {

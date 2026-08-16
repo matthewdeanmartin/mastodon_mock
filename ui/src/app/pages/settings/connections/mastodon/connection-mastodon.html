@@ -47,12 +47,14 @@
     </p>
     @if (state() === 'anonymous') {
       <p class="muted small">
-        Anonymous reading covers Explore, trends and hashtags. Your home timeline stays Bluesky-only:
-        an anonymous connection has no follows, so its "home" is a public firehose of strangers.
-        Signing in merges Mastodon into home.
+        Anonymous reading covers Explore, trends and hashtags. Your home timeline stays
+        Bluesky-only: an anonymous connection has no follows, so its "home" is a public firehose of
+        strangers. Signing in merges Mastodon into home.
       </p>
     } @else {
-      <p class="muted small">Mastodon posts from the people you follow are merged into your home timeline.</p>
+      <p class="muted small">
+        Mastodon posts from the people you follow are merged into your home timeline.
+      </p>
     }
   </div>
 
@@ -101,7 +103,9 @@
     </p>
   } @else {
     <p>
-      <button class="btn btn-outline btn-sm" (click)="changingServer.set(true)">Change server</button>
+      <button class="btn btn-outline btn-sm" (click)="changingServer.set(true)">
+        Change server
+      </button>
     </p>
     <p class="muted small">
       Changing servers signs you out of this one — a token only works on the server that issued it.

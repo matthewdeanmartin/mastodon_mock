@@ -2,21 +2,27 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsMawkingbirdPlus } from './settings-mawkingbird-plus';
-import { PlusSession } from '../../../providers/workos/plus-session';
-import { WorkosSession } from '../../../providers/workos/workos-session';
+import { PlusSession } from '../../../providers/account/plus-session';
+import { MawkingbirdSession } from '../../../providers/account/mawkingbird-session';
 
 /**
  * A stand-in for the real session, so these specs exercise the page's rendering
- * rather than the SDK. `WorkosSession` has its own spec for the flow itself.
+ * rather than the network.
+ *
+ * Note what the user object does NOT carry: no name, no email address. The
+ * token deliberately holds no personal information — it travels in a header to
+ * services that log less than they could — so the page has none to render and
+ * these specs must not pretend otherwise.
  */
-class FakeWorkosSession {
-  configured = true;
-  user = signal<{ email: string; firstName: string | null; lastName: string | null } | null>(null);
+class FakeMawkingbirdSession {
+  user = signal<{ auth: 'anon' | 'email' | 'idp'; tier: 'free' | 'plus' | 'business' } | null>(
+    null,
+  );
   ready = signal(false);
   error = signal<string | null>(null);
+  sendingLink = signal(false);
   ensureReady = vi.fn().mockResolvedValue(undefined);
-  signIn = vi.fn().mockResolvedValue(undefined);
-  signUp = vi.fn().mockResolvedValue(undefined);
+  requestSignInLink = vi.fn().mockResolvedValue(true);
   signOut = vi.fn().mockResolvedValue(undefined);
 }
 
@@ -34,16 +40,16 @@ class FakePlusSession {
 
 describe('SettingsMawkingbirdPlus', () => {
   let fixture: ComponentFixture<SettingsMawkingbirdPlus>;
-  let session: FakeWorkosSession;
+  let session: FakeMawkingbirdSession;
   let plus: FakePlusSession;
 
   beforeEach(() => {
-    session = new FakeWorkosSession();
+    session = new FakeMawkingbirdSession();
     plus = new FakePlusSession();
     TestBed.configureTestingModule({
       imports: [SettingsMawkingbirdPlus],
       providers: [
-        { provide: WorkosSession, useValue: session },
+        { provide: MawkingbirdSession, useValue: session },
         { provide: PlusSession, useValue: plus },
       ],
     });
@@ -55,15 +61,8 @@ describe('SettingsMawkingbirdPlus', () => {
     return fixture.nativeElement.textContent as string;
   };
 
-  const signedIn = (
-    overrides: Partial<{ firstName: string | null; lastName: string | null }> = {},
-  ) =>
-    session.user.set({
-      email: 'reader@example.com',
-      firstName: 'Ada',
-      lastName: 'Lovelace',
-      ...overrides,
-    });
+  const signedIn = (auth: 'email' | 'idp' = 'email') =>
+    session.user.set({ auth, tier: 'free' });
 
   it('completes a pending sign-in redirect when the page loads', () => {
     // This page is the OAuth redirect target, so initialising is what finishes
@@ -84,33 +83,34 @@ describe('SettingsMawkingbirdPlus', () => {
     expect(text).not.toContain('Sign out');
   });
 
-  it('shows the name and email of a signed-in user', () => {
+  it('shows how a signed-in user proved who they are', () => {
     session.ready.set(true);
     signedIn();
     const text = render();
 
     expect(text).toContain('Signed in');
-    expect(text).toContain('Ada Lovelace');
-    expect(text).toContain('reader@example.com');
+    expect(text).toContain('Confirmed email address');
   });
 
-  it('shows the email alone when the provider supplied no name', () => {
+  it('renders no personal information, because the token carries none', () => {
+    // The page cannot show a name or an address even if it wanted to: the token
+    // holds neither. Asserted so that re-adding either has to be a deliberate
+    // change to the claim set rather than a quiet template edit.
     session.ready.set(true);
-    signedIn({ firstName: null, lastName: null });
+    signedIn();
     const text = render();
 
-    // Email is the identifier, so it is the one field that always renders.
-    expect(text).toContain('reader@example.com');
+    expect(text).not.toContain('@');
     expect(text).not.toContain('Name');
   });
 
-  it('explains itself instead of offering an account when the build has no client id', () => {
-    session.configured = false;
+  it('warns that existing tokens outlive sign-out', () => {
+    // Revocation stops new tokens; it cannot recall one already issued. Saying
+    // so is the honest alternative to implying an instant global sign-out.
     session.ready.set(true);
-    const text = render();
+    signedIn();
 
-    expect(text).toContain('not configured for this build');
-    expect(text).not.toContain('Sign in');
+    expect(render()).toContain('stays valid until it expires');
   });
 
   it('surfaces an error as an alert', () => {
@@ -254,28 +254,79 @@ describe('SettingsMawkingbirdPlus', () => {
     ).toBe(true);
   });
 
-  it('signs in, signs up and signs out through the session', () => {
+  it('requests a sign-in link for the typed address', async () => {
     session.ready.set(true);
     fixture.detectChanges();
 
-    const buttons = () =>
-      Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
-    const click = (label: string) => {
-      buttons()
-        .find((button) => button.textContent?.trim() === label)
-        ?.click();
-      fixture.detectChanges();
-    };
+    const input = fixture.nativeElement.querySelector('#plus-email') as HTMLInputElement;
+    input.value = 'person@example.com';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
 
-    click('Sign in');
-    expect(session.signIn).toHaveBeenCalled();
+    (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+      new Event('submit'),
+    );
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-    click('Create an account');
-    expect(session.signUp).toHaveBeenCalled();
+    expect(session.requestSignInLink).toHaveBeenCalledWith('person@example.com');
+    expect(fixture.nativeElement.textContent).toContain('a sign-in link is on its way');
+  });
 
+  it('never implies the address was recognised', async () => {
+    // The service answers identically for a known and an unknown address, and
+    // the UI must not hand back the answer the endpoint refuses to give. A
+    // message like "welcome back" here would be an enumeration oracle wearing a
+    // friendly greeting.
+    session.ready.set(true);
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('#plus-email') as HTMLInputElement;
+    input.value = 'stranger@example.com';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+      new Event('submit'),
+    );
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('If that address can receive mail');
+    expect(text).not.toContain('Welcome back');
+    expect(text).not.toContain('No account');
+  });
+
+  it('does not claim a link was sent when the request failed', async () => {
+    // A rate limit or a network failure must show the error, not "check your
+    // inbox" for mail that was never sent.
+    session.requestSignInLink.mockResolvedValue(false);
+    session.ready.set(true);
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('#plus-email') as HTMLInputElement;
+    input.value = 'person@example.com';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('form') as HTMLFormElement).dispatchEvent(
+      new Event('submit'),
+    );
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('on its way');
+  });
+
+  it('signs out through the session', () => {
+    session.ready.set(true);
     signedIn();
     fixture.detectChanges();
-    click('Sign out');
+
+    const button = Array.from(
+      fixture.nativeElement.querySelectorAll('button'),
+    ).find((element) => (element as HTMLButtonElement).textContent?.trim() === 'Sign out');
+    (button as HTMLButtonElement).click();
+
     expect(session.signOut).toHaveBeenCalled();
   });
 });

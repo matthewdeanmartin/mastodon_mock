@@ -4,12 +4,13 @@ import { firstValueFrom } from 'rxjs';
 import { corsProxyOrigin } from '../../build-flavor';
 import { externalFetch } from '../external-fetch';
 import { SupporterStatus } from './supporter-status';
-import { authDebug, accountPageUrl, WorkosSession } from './workos-session';
+import { accountPageUrl, authDebug } from './auth-debug';
+import { MawkingbirdSession } from './mawkingbird-session';
 
 /**
  * The supporter session: proxy tokens, subscription state, and checkout.
  *
- * Separate from {@link WorkosSession}, which knows only about identity. This
+ * Separate from {@link MawkingbirdSession}, which knows only about identity. This
  * one knows about money, and keeping the two apart means signing in still
  * works if the billing endpoints are down or unconfigured.
  *
@@ -22,7 +23,7 @@ import { authDebug, accountPageUrl, WorkosSession } from './workos-session';
  * Held **in memory only**, deliberately. It is a bearer credential, it is
  * cheap to re-mint from the WorkOS session, and writing it to `localStorage`
  * would put a spendable token somewhere any script on this origin can read it
- * — the same reasoning that keeps AuthKit's own tokens out of web storage. It
+ * — the same reasoning that keeps the identity token out of web storage. It
  * also means this service registers no storage key, so the export
  * classification in `portable-config.ts` is untouched.
  *
@@ -124,7 +125,7 @@ export function checkoutErrorMessage(error: unknown): string {
 @Injectable({ providedIn: 'root' })
 export class PlusSession {
   private http = inject(HttpClient);
-  private workos = inject(WorkosSession);
+  private session = inject(MawkingbirdSession);
   // Published separately so `CorsProxySettings` can offer the supporter tier
   // without importing this service, and so pulling the AuthKit SDK into the
   // initial bundle. See `supporter-status.ts`.
@@ -199,7 +200,7 @@ export class PlusSession {
    */
   async startCheckout(): Promise<void> {
     authDebug('checkout:start');
-    const accessToken = await this.workos.accessToken();
+    const accessToken = await this.session.token();
     authDebug('checkout:have-access-token', { present: accessToken !== null });
     if (!accessToken) {
       this.error.set('Sign in before subscribing.');
@@ -238,7 +239,7 @@ export class PlusSession {
 
   private async mint(): Promise<string | null> {
     authDebug('mint:start');
-    const accessToken = await this.workos.accessToken();
+    const accessToken = await this.session.token();
     authDebug('mint:have-access-token', { present: accessToken !== null });
     if (!accessToken) {
       this.tier.set('free');

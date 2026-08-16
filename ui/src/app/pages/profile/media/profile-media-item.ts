@@ -220,9 +220,7 @@ export function extractMedia(status: Status): ExtractedMedia[] {
 
 /** Attachment types that belong on a photo wall (audio and unknown do not). */
 function isVisualAttachment(attachment: MediaAttachment): boolean {
-  return (
-    attachment.type === 'image' || attachment.type === 'video' || attachment.type === 'gifv'
-  );
+  return attachment.type === 'image' || attachment.type === 'video' || attachment.type === 'gifv';
 }
 
 /**
@@ -250,7 +248,8 @@ function scrapeHtmlImages(html: string): { url: string; description: string | nu
     }
     // `srcset` wins where present: feeds that offer one usually list a genuinely
     // large rendition there while `src` holds a thumbnail.
-    const candidate = largestFromSrcset(element.getAttribute('srcset')) ||
+    const candidate =
+      largestFromSrcset(element.getAttribute('srcset')) ||
       element.getAttribute('src') ||
       element.getAttribute('data-src') ||
       '';

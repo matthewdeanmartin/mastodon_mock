@@ -25,18 +25,4 @@ export const environment = {
    * for the /canary/ deployment.
    */
   bloggerClientId: '',
-  /**
-   * Public WorkOS client id, for Mawkingbird accounts (Settings → Mawkingbird
-   * Plus). Safe in the bundle: AuthKit runs as a *public client*, so PKCE
-   * carries the proof and the WorkOS API key (`sk_…`) is never used in the
-   * browser. Do not add that key here or anywhere else in this bundle.
-   *
-   * Empty hides the account page. Filling it in also requires, in the WorkOS
-   * dashboard:
-   *  - this build's origin in Sessions → allowed origins, and
-   *  - `https://<origin>/<base href>settings/mawkingbird-plus` as a redirect
-   *    URI, with a *separate* entry for the /canary/ deployment — canary and
-   *    production share an origin and differ only by base href.
-   */
-  workosClientId: 'client_01KX8J8NQ459M3H89Y8SC7N6RK',
 };

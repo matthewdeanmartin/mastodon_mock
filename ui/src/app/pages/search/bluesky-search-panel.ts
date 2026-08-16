@@ -229,9 +229,7 @@ export class BlueskySearchPanel {
   protected followBusy = signal<Set<string>>(new Set());
 
   /** Selected account facet values, keyed by kind + value. */
-  protected selectedAccountFacets = signal<
-    { kind: BlueskyAccountFacetKind; value: string }[]
-  >([]);
+  protected selectedAccountFacets = signal<{ kind: BlueskyAccountFacetKind; value: string }[]>([]);
   /** Follower/following/post gates from the Advanced panel. */
   protected accountBounds = signal<BlueskyAccountBounds>({});
 
@@ -505,9 +503,7 @@ export class BlueskySearchPanel {
               const when = byId.get(r.account.id);
               // `undefined` = not in this scan; `null` = scanned, nothing found
               // (a real answer, but not one that dates the account).
-              return when
-                ? { ...r, account: { ...r.account, last_status_at: when } }
-                : r;
+              return when ? { ...r, account: { ...r.account, last_status_at: when } } : r;
             }),
           );
           this.scanCallsUsed.update((c) => c + results.length);

@@ -126,80 +126,80 @@
 }
 
 @if (usableMastodon()) {
-<section class="card">
-  <h2 class="card-title">Fediverse</h2>
+  <section class="card">
+    <h2 class="card-title">Fediverse</h2>
 
-  <!-- Trends are not universal: some instances serve no trending links at all,
+    <!-- Trends are not universal: some instances serve no trending links at all,
        and a rail row leading to an error page reads as our bug. Hidden only
        once the server has actually refused the endpoint. -->
-  @if (feedCaps.shows('trending-links')) {
-    <a class="rail-link" routerLink="/feeds/news">
+    @if (feedCaps.shows('trending-links')) {
+      <a class="rail-link" routerLink="/feeds/news">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="m15.5 8.5-2 5-5 2 2-5z" />
+        </svg>
+        <span>News</span>
+      </a>
+    }
+    @if (feedCaps.shows('trending-statuses')) {
+      <a class="rail-link" routerLink="/feeds/trending">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 17l6-6 4 4 7-7M14 8h6v6" />
+        </svg>
+        <span>Trending posts</span>
+      </a>
+    }
+    <a class="rail-link" routerLink="/feeds">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" />
-        <path d="m15.5 8.5-2 5-5 2 2-5z" />
+        <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
       </svg>
-      <span>News</span>
+      <span>All feeds</span>
     </a>
-  }
-  @if (feedCaps.shows('trending-statuses')) {
-    <a class="rail-link" routerLink="/feeds/trending">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 17l6-6 4 4 7-7M14 8h6v6" />
-      </svg>
-      <span>Trending posts</span>
-    </a>
-  }
-  <a class="rail-link" routerLink="/feeds">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-    </svg>
-    <span>All feeds</span>
-  </a>
 
-  <div class="donate-block">
-    <p class="donate-head muted">Keep the network running</p>
-    <a class="donate-link" [href]="donateServerUrl()" target="_blank" rel="noopener noreferrer">
-      💙 Donate to {{ homeHost() || 'your server' }}
-    </a>
-    @if (showSearchServerDonate()) {
+    <div class="donate-block">
+      <p class="donate-head muted">Keep the network running</p>
+      <a class="donate-link" [href]="donateServerUrl()" target="_blank" rel="noopener noreferrer">
+        💙 Donate to {{ homeHost() || 'your server' }}
+      </a>
+      @if (showSearchServerDonate()) {
+        <a
+          class="donate-link search-server-donate"
+          [href]="searchServer.donateUrl()"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          🔍 Donate to {{ searchServer.host() }}
+          <span class="muted small">Your search server</span>
+        </a>
+      }
       <a
-        class="donate-link search-server-donate"
-        [href]="searchServer.donateUrl()"
+        class="donate-link"
+        href="https://joinmastodon.org/sponsors"
         target="_blank"
         rel="noopener noreferrer"
       >
-        🔍 Donate to {{ searchServer.host() }}
-        <span class="muted small">Your search server</span>
+        🐘 Donate to Mastodon
       </a>
-    }
-    <a
-      class="donate-link"
-      href="https://joinmastodon.org/sponsors"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      🐘 Donate to Mastodon
-    </a>
-  </div>
-
-  @if (instance() || homeHost()) {
-    <div class="server-info">
-      @if (instance(); as info) {
-        <p class="server-title">{{ info.title }}</p>
-        <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
-        <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
-      }
-      <button
-        type="button"
-        class="btn btn-outline btn-sm share-server"
-        (click)="openShare()"
-        title="Copy a link that opens this server anonymously"
-      >
-        Share this server
-      </button>
     </div>
-  }
-</section>
+
+    @if (instance() || homeHost()) {
+      <div class="server-info">
+        @if (instance(); as info) {
+          <p class="server-title">{{ info.title }}</p>
+          <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
+          <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
+        }
+        <button
+          type="button"
+          class="btn btn-outline btn-sm share-server"
+          (click)="openShare()"
+          title="Copy a link that opens this server anonymously"
+        >
+          Share this server
+        </button>
+      </div>
+    }
+  </section>
 }
 
 @if (shareOpen()) {

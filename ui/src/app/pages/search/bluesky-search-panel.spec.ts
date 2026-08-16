@@ -461,7 +461,11 @@ describe('BlueskySearchPanel', () => {
 
       internals(fixture).togglePostFacet('likes', '10-99');
 
-      expect(internals(fixture).visible().map((s) => s.id)).toEqual(['2']);
+      expect(
+        internals(fixture)
+          .visible()
+          .map((s) => s.id),
+      ).toEqual(['2']);
       // The whole point of client-side refinement: no second search.
       expect(postCalls).toBe(before);
     });
@@ -474,7 +478,11 @@ describe('BlueskySearchPanel', () => {
       ]);
 
       internals(fixture).setEngagementBound('minLikes', '10');
-      expect(internals(fixture).visible().map((s) => s.id)).toEqual(['2']);
+      expect(
+        internals(fixture)
+          .visible()
+          .map((s) => s.id),
+      ).toEqual(['2']);
 
       // Blank clears the gate rather than reading as zero.
       internals(fixture).setEngagementBound('minLikes', '');
@@ -492,7 +500,11 @@ describe('BlueskySearchPanel', () => {
       internals(fixture).togglePostFacet('likes', '10-99');
       internals(fixture).toggleFacet('language', 'en');
 
-      expect(internals(fixture).visible().map((s) => s.id)).toEqual(['1']);
+      expect(
+        internals(fixture)
+          .visible()
+          .map((s) => s.id),
+      ).toEqual(['1']);
     });
 
     it('names the sorts after Bluesky, reusing the shared sort keys', () => {
@@ -517,11 +529,10 @@ describe('BlueskySearchPanel', () => {
   });
 
   describe('account refinement', () => {
-    function loadAccounts(
-      fixture: ComponentFixture<BlueskySearchPanel>,
-      accounts: Account[],
-    ) {
-      accountPages = [{ results: accounts.map((account) => ({ account, relationship: null })), cursor: null }];
+    function loadAccounts(fixture: ComponentFixture<BlueskySearchPanel>, accounts: Account[]) {
+      accountPages = [
+        { results: accounts.map((account) => ({ account, relationship: null })), cursor: null },
+      ];
       internals(fixture).apiBudget.set(1);
       internals(fixture).runQuery();
     }
@@ -552,9 +563,11 @@ describe('BlueskySearchPanel', () => {
 
       internals(fixture).toggleAccountFacet('handleType', 'custom');
 
-      expect(internals(fixture).visibleAccounts().map((r) => r.account.acct)).toEqual([
-        'mozilla.org',
-      ]);
+      expect(
+        internals(fixture)
+          .visibleAccounts()
+          .map((r) => r.account.acct),
+      ).toEqual(['mozilla.org']);
       expect(accountCalls).toBe(before);
     });
 
@@ -566,9 +579,11 @@ describe('BlueskySearchPanel', () => {
       expect(internals(fixture).visibleAccounts().length).toBe(2);
 
       internals(fixture).setAccountBound('followers', 'max', '10000');
-      expect(internals(fixture).visibleAccounts().map((r) => r.account.acct)).toEqual([
-        'bob.bsky.social',
-      ]);
+      expect(
+        internals(fixture)
+          .visibleAccounts()
+          .map((r) => r.account.acct),
+      ).toEqual(['bob.bsky.social']);
     });
 
     it('clearing one end of a range leaves the other in force', () => {
@@ -621,14 +636,22 @@ describe('BlueskySearchPanel', () => {
         'b.bsky.social': '2025-01-01T00:00:00.000Z',
       };
       loadAccounts(fixture, [makeAccount('a.bsky.social'), makeAccount('b.bsky.social')]);
-      expect(internals(fixture).accountFacets().map((f) => f.kind)).not.toContain('activity');
+      expect(
+        internals(fixture)
+          .accountFacets()
+          .map((f) => f.kind),
+      ).not.toContain('activity');
 
       internals(fixture).scanActivity();
 
       expect(internals(fixture).accounts()[0].account.last_status_at).toBe(
         '2026-08-14T09:00:00.000Z',
       );
-      expect(internals(fixture).accountFacets().map((f) => f.kind)).toContain('activity');
+      expect(
+        internals(fixture)
+          .accountFacets()
+          .map((f) => f.kind),
+      ).toContain('activity');
       expect(internals(fixture).canScanActivity()).toBe(false);
     });
 
@@ -666,9 +689,7 @@ describe('BlueskySearchPanel', () => {
     it('keeps offering the scan after a partial one, without a second heading', () => {
       const fixture = setUp('accounts');
       const many = Array.from({ length: 30 }, (_, i) => makeAccount(`u${i}.bsky.social`));
-      authorFeeds = Object.fromEntries(
-        many.map((a) => [a.acct, '2026-08-01T00:00:00.000Z']),
-      );
+      authorFeeds = Object.fromEntries(many.map((a) => [a.acct, '2026-08-01T00:00:00.000Z']));
       loadAccounts(fixture, many);
 
       internals(fixture).scanActivity();

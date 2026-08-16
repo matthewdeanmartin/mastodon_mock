@@ -188,9 +188,9 @@ export const routes: Routes = [
               import('./pages/settings/blue/settings-blue').then((m) => m.SettingsBlue),
           },
           {
-            // Also the WorkOS OAuth redirect target — the SDK completes a
-            // pending sign-in on whatever page it loads at, so this needs no
-            // sibling callback route. See `workos-session.ts`.
+            // Sign-in lands here already authenticated: the account service
+            // sets a cookie and redirects back, so there is no code to
+            // exchange and no callback route. See `mawkingbird-session.ts`.
             path: 'mawkingbird-plus',
             title: 'Mawkingbird Plus',
             canActivate: [featureFlagGuard],

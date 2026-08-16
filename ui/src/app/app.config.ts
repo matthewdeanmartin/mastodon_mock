@@ -16,7 +16,7 @@ import { GlobalErrorHandler } from './global-error-handler';
 import { SettingsPreloading } from './pages/settings/settings-preloading';
 import { dedupeInterceptor } from './dedupe.interceptor';
 import { rateLimitInterceptor } from './rate-limit.interceptor';
-import { plusTokenInterceptor } from './providers/workos/plus-token.interceptor';
+import { plusTokenInterceptor } from './providers/account/plus-token.interceptor';
 import { PageTitleStrategy } from './a11y/page-title-strategy';
 
 export const appConfig: ApplicationConfig = {

@@ -213,7 +213,9 @@ describe('StatusCard', () => {
 
       article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       selected = ''; // The browser collapses it before the click arrives.
-      article.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      article.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+      );
 
       expect(navigate).not.toHaveBeenCalled();
     });
@@ -224,7 +226,9 @@ describe('StatusCard', () => {
       const article = (fixture.nativeElement as HTMLElement).querySelector('article.status')!;
 
       article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      article.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      article.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+      );
 
       expect(navigate).toHaveBeenCalledWith(['/statuses', '49']);
     });
@@ -242,11 +246,15 @@ describe('StatusCard', () => {
 
       article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       selected = '';
-      article.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      article.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+      );
       expect(navigate).not.toHaveBeenCalled();
 
       article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      article.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+      article.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+      );
       expect(navigate).toHaveBeenCalledWith(['/statuses', '50']);
     });
 

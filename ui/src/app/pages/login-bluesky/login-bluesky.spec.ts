@@ -18,13 +18,7 @@ describe('LoginBluesky', () => {
   beforeEach(() => {
     localStorage.clear();
     TestBed.configureTestingModule({
-      providers: [
-        Auth,
-        Server,
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [Auth, Server, provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     httpMock = TestBed.inject(HttpTestingController);
   });
@@ -120,7 +114,8 @@ describe('LoginBluesky', () => {
 
     expect(localStorage.getItem(PROFILE_KEY)).not.toBeNull();
     const connectorKeys = Object.keys(localStorage).filter(
-      (k) => k.startsWith('mockingbird_bsky_profile') || k.startsWith('mockingbird_bsky_credentials'),
+      (k) =>
+        k.startsWith('mockingbird_bsky_profile') || k.startsWith('mockingbird_bsky_credentials'),
     );
     expect(connectorKeys).toEqual([]);
   });

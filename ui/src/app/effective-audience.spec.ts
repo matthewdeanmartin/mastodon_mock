@@ -47,7 +47,9 @@ describe('judgeAccount', () => {
   });
 
   it('treats silence past the threshold as dormant', () => {
-    const quiet = live({ last_status_at: new Date(NOW - (DORMANT_AFTER_DAYS + 1) * DAY).toISOString() });
+    const quiet = live({
+      last_status_at: new Date(NOW - (DORMANT_AFTER_DAYS + 1) * DAY).toISOString(),
+    });
     expect(judgeAccount(quiet, NOW).dormant).toBe(true);
     const justInside = live({
       last_status_at: new Date(NOW - (DORMANT_AFTER_DAYS - 1) * DAY).toISOString(),
@@ -200,7 +202,13 @@ describe('estimateAudience', () => {
    * warning about it produced "read more than there were (2,914 vs 2,914)".
    */
   it('does not cry over-read when the server counter is slightly stale', () => {
-    const tally = { scanned: 2_914, active: 1_257, dormant: 1_657, lowCadence: 1_127, zombies: 999 };
+    const tally = {
+      scanned: 2_914,
+      active: 1_257,
+      dormant: 1_657,
+      lowCadence: 1_127,
+      zombies: 999,
+    };
     const estimate = estimateAudience(tally, 2_912);
     expect(estimate.overRead).toBe(false);
     // The original figure survives so a warning could name both numbers.
@@ -210,7 +218,13 @@ describe('estimateAudience', () => {
 
   it('still flags a runaway walk that read a multiple of the list', () => {
     // The 9,040-of-3,109 bug: a cursor that never advanced.
-    const tally = { scanned: 9_040, active: 5_537, dormant: 3_503, lowCadence: 3_616, zombies: 2_825 };
+    const tally = {
+      scanned: 9_040,
+      active: 5_537,
+      dormant: 3_503,
+      lowCadence: 3_616,
+      zombies: 2_825,
+    };
     const estimate = estimateAudience(tally, 3_109);
     expect(estimate.overRead).toBe(true);
     expect(estimate.statedTotal).toBe(3_109);

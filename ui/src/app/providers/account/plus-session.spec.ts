@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlusSession } from './plus-session';
-import { WorkosSession } from './workos-session';
+import { MawkingbirdSession } from './mawkingbird-session';
 
 const TOKEN_URL = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/plus/token';
 const CHECKOUT_URL = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.dev/plus/checkout';
@@ -11,22 +11,22 @@ const CHECKOUT_URL = 'https://mawkingbird-cors-proxy.matthewdeanmartin.workers.d
 /** Seconds, as the Worker mints them. */
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
-class FakeWorkosSession {
-  accessToken = vi.fn().mockResolvedValue('workos-access-token');
+class FakeMawkingbirdSession {
+  token = vi.fn().mockResolvedValue('mawkingbird-token');
 }
 
 describe('PlusSession', () => {
   let plus: PlusSession;
   let httpMock: HttpTestingController;
-  let workos: FakeWorkosSession;
+  let session: FakeMawkingbirdSession;
 
   beforeEach(() => {
-    workos = new FakeWorkosSession();
+    session = new FakeMawkingbirdSession();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: WorkosSession, useValue: workos },
+        { provide: MawkingbirdSession, useValue: session },
       ],
     });
     plus = TestBed.inject(PlusSession);
@@ -79,7 +79,7 @@ describe('PlusSession', () => {
     const request = respond();
     await pending;
 
-    expect(request.request.headers.get('Authorization')).toBe('Bearer workos-access-token');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer mawkingbird-token');
   });
 
   it('converts the expiry to milliseconds', async () => {
@@ -133,7 +133,7 @@ describe('PlusSession', () => {
   });
 
   it('returns null without asking when nobody is signed in', async () => {
-    workos.accessToken.mockResolvedValue(null);
+    session.token.mockResolvedValue(null);
 
     await expect(plus.token()).resolves.toBeNull();
     await settle();
@@ -235,10 +235,12 @@ describe('PlusSession', () => {
 
       const pending = plus.startCheckout();
       await settle();
-      httpMock.expectOne(CHECKOUT_URL).flush(
-        { error: 'Subscriptions are not configured on this deployment.' },
-        { status: 503, statusText: 'Service Unavailable' },
-      );
+      httpMock
+        .expectOne(CHECKOUT_URL)
+        .flush(
+          { error: 'Subscriptions are not configured on this deployment.' },
+          { status: 503, statusText: 'Service Unavailable' },
+        );
       await pending;
 
       // The bug this covers: the reason was only visible in the network tab,
@@ -305,7 +307,7 @@ describe('PlusSession', () => {
     });
 
     it('refuses to start when nobody is signed in', async () => {
-      workos.accessToken.mockResolvedValue(null);
+      session.token.mockResolvedValue(null);
 
       await plus.startCheckout();
 

@@ -14,7 +14,7 @@ import {
   corsProxyEntry,
 } from './cors-proxy-catalog';
 import { FeatureFlagId, FeatureFlags, proxyFeatureFlag } from '../../feature-flags';
-import { SupporterStatus } from '../workos/supporter-status';
+import { SupporterStatus } from '../account/supporter-status';
 
 /**
  * Which CORS proxy this browser uses, and the key for it.

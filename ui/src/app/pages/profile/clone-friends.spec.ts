@@ -345,9 +345,9 @@ describe('tunable quality gate', () => {
   it('respects a raised adopt target', () => {
     const candidates = Array.from({ length: 30 }, (_, i) => good(String(i)));
     expect(selectCloneCandidates({ ...base, candidates, now: NOW }).adopt).toHaveLength(20);
-    expect(
-      selectCloneCandidates({ ...base, candidates, now: NOW, target: 30 }).adopt,
-    ).toHaveLength(30);
+    expect(selectCloneCandidates({ ...base, candidates, now: NOW, target: 30 }).adopt).toHaveLength(
+      30,
+    );
   });
 
   it('respects a raised page budget when deciding to keep reading', () => {

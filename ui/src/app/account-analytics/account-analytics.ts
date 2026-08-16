@@ -377,7 +377,9 @@ export class AccountAnalytics implements OnInit {
   protected topDomains = computed<CountedItem[]>(() => topLinkDomains(this.posts()));
 
   /** True when there is anything at all to show in the "what they post about" box. */
-  protected hasTopicData = computed(() => this.topTags().length > 0 || this.topDomains().length > 0);
+  protected hasTopicData = computed(
+    () => this.topTags().length > 0 || this.topDomains().length > 0,
+  );
 
   /** The follower with the biggest audience of their own. */
   protected topFollower = computed<Account | null>(() => {

@@ -88,9 +88,7 @@ describe('PreviewSeed', () => {
   /** A blocked or rate-limited lookup costs a stale avatar, never the preview. */
   it('keeps the snapshot when the refresh fails', async () => {
     const seeding = seed.seed(PREVIEW_SERVER);
-    http
-      .expectOne((r) => r.url.includes('/api/v1/accounts'))
-      .error(new ProgressEvent('blocked'));
+    http.expectOne((r) => r.url.includes('/api/v1/accounts')).error(new ProgressEvent('blocked'));
     await seeding;
 
     expect(follows.count()).toBe(3);
@@ -154,9 +152,7 @@ describe('PreviewSeed', () => {
     await seeding;
 
     expect(follows.count()).toBe(3);
-    expect(follows.findByAccountId(federatedId)?.account.display_name).toBe(
-      'ProPublica Refreshed',
-    );
+    expect(follows.findByAccountId(federatedId)?.account.display_name).toBe('ProPublica Refreshed');
   });
 
   it('clear is a no-op when no preview is running', () => {

@@ -279,9 +279,11 @@ describe('RightRail', () => {
       httpMock
         .expectOne((r) => r.url.includes('getTrends'))
         .flush({}, { status: 404, statusText: 'Not Found' });
-      httpMock.expectOne((r) => r.url.includes('getTrendingTopics')).flush({
-        topics: [{ displayName: 'A topic', link: '/profile/did:plc:x/feed/y' }],
-      });
+      httpMock
+        .expectOne((r) => r.url.includes('getTrendingTopics'))
+        .flush({
+          topics: [{ displayName: 'A topic', link: '/profile/did:plc:x/feed/y' }],
+        });
       fixture.detectChanges();
       const el = fixture.nativeElement as HTMLElement;
 

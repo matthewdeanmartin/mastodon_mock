@@ -76,9 +76,27 @@ describe('extractMedia', () => {
   it('marks video and gifv attachments so the grid can badge them', () => {
     const status = makeStatus({
       media_attachments: [
-        { id: 'm1', type: 'video', url: 'https://cdn.example/a.mp4', preview_url: '', description: null },
-        { id: 'm2', type: 'gifv', url: 'https://cdn.example/b.gifv', preview_url: '', description: null },
-        { id: 'm3', type: 'audio', url: 'https://cdn.example/c.mp3', preview_url: '', description: null },
+        {
+          id: 'm1',
+          type: 'video',
+          url: 'https://cdn.example/a.mp4',
+          preview_url: '',
+          description: null,
+        },
+        {
+          id: 'm2',
+          type: 'gifv',
+          url: 'https://cdn.example/b.gifv',
+          preview_url: '',
+          description: null,
+        },
+        {
+          id: 'm3',
+          type: 'audio',
+          url: 'https://cdn.example/c.mp3',
+          preview_url: '',
+          description: null,
+        },
       ],
     });
     const media = extractMedia(status);
@@ -152,14 +170,32 @@ describe('buildMediaItems', () => {
       makeStatus({
         id: 'a',
         media_attachments: [
-          { id: '1', type: 'image', url: 'https://cdn.example/a1.jpg', preview_url: '', description: null },
-          { id: '2', type: 'image', url: 'https://cdn.example/a2.jpg', preview_url: '', description: null },
+          {
+            id: '1',
+            type: 'image',
+            url: 'https://cdn.example/a1.jpg',
+            preview_url: '',
+            description: null,
+          },
+          {
+            id: '2',
+            type: 'image',
+            url: 'https://cdn.example/a2.jpg',
+            preview_url: '',
+            description: null,
+          },
         ],
       }),
       makeStatus({
         id: 'b',
         media_attachments: [
-          { id: '3', type: 'image', url: 'https://cdn.example/b1.jpg', preview_url: '', description: null },
+          {
+            id: '3',
+            type: 'image',
+            url: 'https://cdn.example/b1.jpg',
+            preview_url: '',
+            description: null,
+          },
         ],
       }),
     ];
@@ -180,14 +216,26 @@ describe('buildMediaItems', () => {
         reblog: makeStatus({
           id: 'other',
           media_attachments: [
-            { id: '1', type: 'image', url: 'https://cdn.example/x.jpg', preview_url: '', description: null },
+            {
+              id: '1',
+              type: 'image',
+              url: 'https://cdn.example/x.jpg',
+              preview_url: '',
+              description: null,
+            },
           ],
         }),
       }),
       makeStatus({
         id: 'mine',
         media_attachments: [
-          { id: '2', type: 'image', url: 'https://cdn.example/y.jpg', preview_url: '', description: null },
+          {
+            id: '2',
+            type: 'image',
+            url: 'https://cdn.example/y.jpg',
+            preview_url: '',
+            description: null,
+          },
         ],
       }),
     ];

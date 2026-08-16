@@ -3,7 +3,6 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../../auth';
 import { environment } from '../../../environments/environment';
 import { FeatureFlagId, FeatureFlags } from '../../feature-flags';
-import { WorkosSession } from '../../providers/workos/workos-session';
 import { SettingsPreloading } from './settings-preloading';
 
 interface SettingsNavItem {
@@ -17,10 +16,8 @@ interface SettingsNavItem {
   anonymous?: boolean;
   /** Meaningful only for the browser-local Anonymous account. */
   anonymousOnly?: boolean;
-  /** Hidden unless this feature flag is on, and unless the build configured it. */
+  /** Hidden unless this feature flag is on. */
   featureFlag?: FeatureFlagId;
-  /** Hidden when false — for entries a build can compile out entirely. */
-  available?: boolean;
 }
 
 /**
@@ -37,7 +34,6 @@ interface SettingsNavItem {
 export class SettingsShell {
   protected auth = inject(Auth);
   private readonly flags = inject(FeatureFlags);
-  private readonly workos = inject(WorkosSession);
   private readonly preloading = inject(SettingsPreloading);
 
   constructor() {
@@ -64,7 +60,6 @@ export class SettingsShell {
         exact: true,
         anonymous: true,
         featureFlag: 'mawkingbird-plus',
-        available: this.workos.configured,
       },
       // Client-side (localStorage) accounts on other services: Bluesky, GitHub,
       // Raindrop.io, Dropbox. Not exact — the catalog's child pages live under it.
@@ -106,7 +101,6 @@ export class SettingsShell {
       (environment.mockTooling || !item.mockOnly) &&
       (!this.auth.isAnonymous || item.anonymous) &&
       (this.auth.isAnonymous || !item.anonymousOnly) &&
-      item.available !== false &&
       (!item.featureFlag || this.flags.enabled(item.featureFlag)),
   );
 }

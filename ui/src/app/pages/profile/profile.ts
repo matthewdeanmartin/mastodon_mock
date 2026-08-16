@@ -447,10 +447,7 @@ export class Profile implements OnInit, OnDestroy {
             return;
           }
           const seen = new Set(this.mediaStatuses().map((s) => s.id));
-          this.mediaStatuses.update((list) => [
-            ...list,
-            ...batch.filter((s) => !seen.has(s.id)),
-          ]);
+          this.mediaStatuses.update((list) => [...list, ...batch.filter((s) => !seen.has(s.id))]);
           this.mediaExhausted.set(batch.length < Profile.MEDIA_PAGE);
         },
         error: () => this.mediaLoadingMore.set(false),
@@ -794,8 +791,7 @@ export class Profile implements OnInit, OnDestroy {
     // Honour a deep link to the wall. `load` resets the tab on every profile
     // change, so reading the snapshot here is what stops it stomping on a
     // pasted `?tab=media&photo=…` URL before the query-param subscription runs.
-    const deepLinkedToMedia =
-      this.route.snapshot?.queryParamMap?.get('tab') === 'media';
+    const deepLinkedToMedia = this.route.snapshot?.queryParamMap?.get('tab') === 'media';
     this.tab.set(deepLinkedToMedia ? 'media' : 'posts');
     // Deep links must also *fetch* the wall. The query-param subscription fires
     // before the account is resolved, so it has no id to load with and bails;

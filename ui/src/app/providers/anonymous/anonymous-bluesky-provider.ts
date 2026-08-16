@@ -89,8 +89,7 @@ export class AnonymousBlueskyProvider implements FeedProvider {
    * dedupes within a provider, not across two that claim the same name.
    */
   readonly linked = computed(
-    () =>
-      this.auth.isAnonymousIdentity && !this.session.linked() && this.bskyFollows().length > 0,
+    () => this.auth.isAnonymousIdentity && !this.session.linked() && this.bskyFollows().length > 0,
   );
 
   readonly errors = signal<string[]>([]);

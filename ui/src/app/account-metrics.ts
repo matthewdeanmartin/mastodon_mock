@@ -401,7 +401,10 @@ export interface CountedItem {
 }
 
 /** Sort by count (desc), breaking ties alphabetically so the order is stable. */
-function topBy(counts: Map<string, { label: string; count: number }>, limit: number): CountedItem[] {
+function topBy(
+  counts: Map<string, { label: string; count: number }>,
+  limit: number,
+): CountedItem[] {
   return [...counts.entries()]
     .map(([key, { label, count }]) => ({ key, label, count }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))

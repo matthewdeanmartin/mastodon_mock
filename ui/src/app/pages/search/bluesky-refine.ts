@@ -140,7 +140,11 @@ const ACTIVITY_BINS: readonly ActivityBin[] = [
  * reader spends budget on it, and whatever the scan couldn't reach stays here
  * rather than being quietly dropped or optimistically dated.
  */
-const UNKNOWN_ACTIVITY: ActivityBin = { key: 'unknown', label: 'Not checked', withinDays: Infinity };
+const UNKNOWN_ACTIVITY: ActivityBin = {
+  key: 'unknown',
+  label: 'Not checked',
+  withinDays: Infinity,
+};
 
 function daysSinceActivity(account: Account, now: number): number | null {
   const last = account.last_status_at;
@@ -252,8 +256,16 @@ export function buildBlueskyAccountFacets(
     }),
   );
 
-  push('followers', 'Followers', bucketValues(accounts, COUNT_BUCKETS, (a) => a.followers_count));
-  push('statuses', 'Posts', bucketValues(accounts, COUNT_BUCKETS, (a) => a.statuses_count));
+  push(
+    'followers',
+    'Followers',
+    bucketValues(accounts, COUNT_BUCKETS, (a) => a.followers_count),
+  );
+  push(
+    'statuses',
+    'Posts',
+    bucketValues(accounts, COUNT_BUCKETS, (a) => a.statuses_count),
+  );
 
   const known = accounts.some((a) => !!a.last_status_at);
   if (known) {
@@ -456,9 +468,21 @@ export function buildBlueskyPostFacets(statuses: readonly Status[]): BlueskyPost
     }
   };
 
-  push('likes', 'Likes', bucketStatuses(statuses, (s) => s.favourites_count));
-  push('reposts', 'Reposts', bucketStatuses(statuses, (s) => s.reblogs_count));
-  push('replyCount', 'Replies', bucketStatuses(statuses, (s) => s.replies_count));
+  push(
+    'likes',
+    'Likes',
+    bucketStatuses(statuses, (s) => s.favourites_count),
+  );
+  push(
+    'reposts',
+    'Reposts',
+    bucketStatuses(statuses, (s) => s.reblogs_count),
+  );
+  push(
+    'replyCount',
+    'Replies',
+    bucketStatuses(statuses, (s) => s.replies_count),
+  );
 
   push(
     'threadPosition',

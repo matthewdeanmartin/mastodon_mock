@@ -209,7 +209,12 @@ describe('AnonymousFollows', () => {
       follows.follow(bskyAccount('alice.bsky.social', 'did:plc:alice'), '');
 
       expect(follows.count()).toBe(2);
-      expect(follows.follows().map((f) => f.network).sort()).toEqual(['bluesky', 'mastodon']);
+      expect(
+        follows
+          .follows()
+          .map((f) => f.network)
+          .sort(),
+      ).toEqual(['bluesky', 'mastodon']);
     });
 
     it('survives a reload — a Bluesky row is not discarded for having no origin', () => {

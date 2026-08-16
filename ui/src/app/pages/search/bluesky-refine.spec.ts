@@ -276,8 +276,14 @@ describe('buildBlueskyPostFacets', () => {
   it('separates top-level, direct and deep posts', () => {
     const threaded = [
       status(),
-      status({ in_reply_to_id: 'x' }, { replyRoot: { uri: 'at://r', cid: 'c' }, replyParentUri: 'at://r' }),
-      status({ in_reply_to_id: 'y' }, { replyRoot: { uri: 'at://r', cid: 'c' }, replyParentUri: 'at://m' }),
+      status(
+        { in_reply_to_id: 'x' },
+        { replyRoot: { uri: 'at://r', cid: 'c' }, replyParentUri: 'at://r' },
+      ),
+      status(
+        { in_reply_to_id: 'y' },
+        { replyRoot: { uri: 'at://r', cid: 'c' }, replyParentUri: 'at://m' },
+      ),
     ];
     const facet = buildBlueskyPostFacets(threaded).find((f) => f.kind === 'threadPosition');
     expect(facet?.values.map((v) => v.value).sort()).toEqual(['deep', 'direct', 'top']);
@@ -285,8 +291,16 @@ describe('buildBlueskyPostFacets', () => {
 
   it('counts alt text only over posts that have images', () => {
     const withMedia = [
-      status({ media_attachments: [{ id: '1', type: 'image', url: '', preview_url: '', description: 'a bird' }] }),
-      status({ media_attachments: [{ id: '2', type: 'image', url: '', preview_url: '', description: null }] }),
+      status({
+        media_attachments: [
+          { id: '1', type: 'image', url: '', preview_url: '', description: 'a bird' },
+        ],
+      }),
+      status({
+        media_attachments: [
+          { id: '2', type: 'image', url: '', preview_url: '', description: null },
+        ],
+      }),
       // Text-only: must not be counted as "missing".
       status(),
     ] as Status[];
@@ -306,7 +320,11 @@ describe('buildBlueskyPostFacets', () => {
           { id: '2', type: 'image', url: '', preview_url: '', description: null },
         ],
       }),
-      status({ media_attachments: [{ id: '3', type: 'image', url: '', preview_url: '', description: 'ok' }] }),
+      status({
+        media_attachments: [
+          { id: '3', type: 'image', url: '', preview_url: '', description: 'ok' },
+        ],
+      }),
     ] as Status[];
     const facet = buildBlueskyPostFacets(partial).find((f) => f.kind === 'altText');
     expect(facet?.values).toContainEqual({ value: 'no', label: 'Missing alt text', count: 1 });

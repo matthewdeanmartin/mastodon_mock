@@ -88,7 +88,11 @@ describe('AnonymousBlueskyProvider', () => {
     it('ignores Mastodon follows', () => {
       goAnonymous();
       TestBed.inject(AnonymousFollows).follow(
-        { ...bskyAccount('bob', 'x'), id: 'example.social:bob', url: 'https://example.social/@bob' },
+        {
+          ...bskyAccount('bob', 'x'),
+          id: 'example.social:bob',
+          url: 'https://example.social/@bob',
+        },
         'https://example.social',
       );
       expect(TestBed.inject(AnonymousBlueskyProvider).linked()).toBe(false);

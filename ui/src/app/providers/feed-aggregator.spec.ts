@@ -283,7 +283,10 @@ describe('FeedAggregator', () => {
    */
   it('does not query the Mastodon timeline for a Bluesky-primary account', async () => {
     const auth = TestBed.inject(Auth);
-    localStorage.setItem('mockingbird_bsky_identity_profile', JSON.stringify({ did: 'did:plc:me', handle: 'me.bsky.social' }));
+    localStorage.setItem(
+      'mockingbird_bsky_identity_profile',
+      JSON.stringify({ did: 'did:plc:me', handle: 'me.bsky.social' }),
+    );
     localStorage.setItem(
       'mockingbird_bsky_identity_credentials',
       JSON.stringify({ accessJwt: 'a', refreshJwt: 'r', connectedAt: Date.now() }),
@@ -307,7 +310,10 @@ describe('FeedAggregator', () => {
    */
   it('does not re-enable Mastodon for a Bluesky-primary account with no other source', async () => {
     const auth = TestBed.inject(Auth);
-    localStorage.setItem('mockingbird_bsky_identity_profile', JSON.stringify({ did: 'did:plc:me', handle: 'me.bsky.social' }));
+    localStorage.setItem(
+      'mockingbird_bsky_identity_profile',
+      JSON.stringify({ did: 'did:plc:me', handle: 'me.bsky.social' }),
+    );
     localStorage.setItem(
       'mockingbird_bsky_identity_credentials',
       JSON.stringify({ accessJwt: 'a', refreshJwt: 'r', connectedAt: Date.now() }),

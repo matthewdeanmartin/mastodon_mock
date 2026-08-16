@@ -1,10 +1,4 @@
-<div
-  class="overlay"
-  role="presentation"
-  tabindex="-1"
-  (click)="close()"
-  (keyup.escape)="close()"
->
+<div class="overlay" role="presentation" tabindex="-1" (click)="close()" (keyup.escape)="close()">
   <div
     class="dialog audience-dialog"
     role="dialog"
@@ -132,62 +126,64 @@
       @if (hasResults()) {
         @for (row of resultRows(); track row.side) {
           @let r = row.result;
-            <section class="result">
-              <h4>
-                {{ row.label }}
-                <span class="muted small coverage">{{ coverageLabel(r) }}</span>
-              </h4>
+          <section class="result">
+            <h4>
+              {{ row.label }}
+              <span class="muted small coverage">{{ coverageLabel(r) }}</span>
+            </h4>
 
-              <div class="tiles">
-                <div class="tile">
-                  <span class="tile-label muted">Effective</span>
-                  <span class="tile-value">
-                    {{ r.complete ? '' : '~' }}{{ fmt(r.effective) }}
-                    <small class="tile-sub muted">{{ r.effectiveRatePct }}% of {{ fmt(r.total) }}</small>
-                  </span>
-                </div>
-                <div class="tile">
-                  <span class="tile-label muted">Zombies</span>
-                  <span class="tile-value">
-                    {{ r.complete ? '' : '~' }}{{ fmt(r.estimatedZombies) }}
-                    <small class="tile-sub muted">{{ r.zombieRatePct }}% zombie rate</small>
-                  </span>
-                </div>
-                <div class="tile">
-                  <span class="tile-label muted">Dormant</span>
-                  <span class="tile-value">
-                    {{ fmt(r.dormant) }}
-                    <small class="tile-sub muted">of {{ fmt(r.scanned) }} read</small>
-                  </span>
-                </div>
-                <div class="tile">
-                  <span class="tile-label muted">Low-cadence</span>
-                  <span class="tile-value">
-                    {{ fmt(r.lowCadence) }}
-                    <small class="tile-sub muted">under {{ lowCadenceRate }}/day</small>
-                  </span>
-                </div>
+            <div class="tiles">
+              <div class="tile">
+                <span class="tile-label muted">Effective</span>
+                <span class="tile-value">
+                  {{ r.complete ? '' : '~' }}{{ fmt(r.effective) }}
+                  <small class="tile-sub muted"
+                    >{{ r.effectiveRatePct }}% of {{ fmt(r.total) }}</small
+                  >
+                </span>
               </div>
+              <div class="tile">
+                <span class="tile-label muted">Zombies</span>
+                <span class="tile-value">
+                  {{ r.complete ? '' : '~' }}{{ fmt(r.estimatedZombies) }}
+                  <small class="tile-sub muted">{{ r.zombieRatePct }}% zombie rate</small>
+                </span>
+              </div>
+              <div class="tile">
+                <span class="tile-label muted">Dormant</span>
+                <span class="tile-value">
+                  {{ fmt(r.dormant) }}
+                  <small class="tile-sub muted">of {{ fmt(r.scanned) }} read</small>
+                </span>
+              </div>
+              <div class="tile">
+                <span class="tile-label muted">Low-cadence</span>
+                <span class="tile-value">
+                  {{ fmt(r.lowCadence) }}
+                  <small class="tile-sub muted">under {{ lowCadenceRate }}/day</small>
+                </span>
+              </div>
+            </div>
 
-              @if (r.overRead) {
-                <p class="muted small bias">
-                  Read {{ r.scanned.toLocaleString() }} accounts, but the server's count says
-                  {{ r.statedTotal.toLocaleString() }}. Each account was counted once, so the
-                  figures below are based on what was actually read.
-                </p>
-              }
-              @if (!r.complete) {
-                <!-- Sampling bias, said out loud. Mastodon returns followers
+            @if (r.overRead) {
+              <p class="muted small bias">
+                Read {{ r.scanned.toLocaleString() }} accounts, but the server's count says
+                {{ r.statedTotal.toLocaleString() }}. Each account was counted once, so the figures
+                below are based on what was actually read.
+              </p>
+            }
+            @if (!r.complete) {
+              <!-- Sampling bias, said out loud. Mastodon returns followers
                      newest-first, and recent followers skew active, so a partial
                      read flatters the effective number. Hiding that would make
                      the estimate quietly wrong in a consistent direction. -->
-                <p class="muted small bias">
-                  Estimated by scaling up a {{ coveragePct(r) }}% sample. Lists come back
-                  newest-first and recent accounts skew active, so the real effective count is
-                  likely a little lower than this.
-                </p>
-              }
-            </section>
+              <p class="muted small bias">
+                Estimated by scaling up a {{ coveragePct(r) }}% sample. Lists come back newest-first
+                and recent accounts skew active, so the real effective count is likely a little
+                lower than this.
+              </p>
+            }
+          </section>
         }
       }
     }

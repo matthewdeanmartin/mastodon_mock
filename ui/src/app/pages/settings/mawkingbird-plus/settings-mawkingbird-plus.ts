@@ -1,25 +1,25 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { PlusSession } from '../../../providers/workos/plus-session';
-import { authDebug, displayName, WorkosSession } from '../../../providers/workos/workos-session';
+import { PlusSession } from '../../../providers/account/plus-session';
+import { authDebug } from '../../../providers/account/auth-debug';
+import { MawkingbirdSession } from '../../../providers/account/mawkingbird-session';
 
 /**
  * Settings → Mawkingbird Plus.
  *
- * Today this page does one thing: sign in, show who you are, sign out. It is
- * named for what it will become rather than what it currently is, because the
- * account exists to hang paid features off later and renaming a settings tab
- * costs users their bearings.
+ * Sign in with an email address, see who you are, sign out.
  *
  * The account is deliberately free and deliberately optional. Nothing in the
  * app requires one — the CORS proxy stays anonymous, feeds keep working signed
- * out — so this page has to be honest that there is currently nothing to gain
- * by signing in. Overselling it now would be the kind of thing that makes the
- * later, real pitch untrustworthy.
+ * out — so this page has to be honest that there is currently little to gain by
+ * signing in. Overselling it now would make the later, real pitch untrustworthy.
  *
- * The redirect lands back *here*, and the SDK completes the exchange during
- * {@link WorkosSession.ensureReady} — see the class doc there for why there is
- * no callback route.
+ * ## No OAuth redirect to complete
+ *
+ * This page used to be the WorkOS redirect target and completed a code exchange
+ * on load. It no longer does: signing in means receiving a link, and the link
+ * lands on the account service, which sets a cookie and redirects back here
+ * already signed in. There is nothing to unpack from the URL.
  */
 @Component({
   selector: 'app-settings-mawkingbird-plus',
@@ -28,21 +28,29 @@ import { authDebug, displayName, WorkosSession } from '../../../providers/workos
   styleUrl: './settings-mawkingbird-plus.css',
 })
 export class SettingsMawkingbirdPlus implements OnInit {
-  protected session = inject(WorkosSession);
+  protected session = inject(MawkingbirdSession);
   protected plus = inject(PlusSession);
 
-  /** The signed-in user's name, or null when they never supplied one. */
-  protected readonly name = computed(() => {
-    const user = this.session.user();
-    return user ? displayName(user) : null;
-  });
+  /** What the user typed into the email field. */
+  protected readonly email = signal('');
+
+  /**
+   * True once a link has been sent.
+   *
+   * Drives the "check your inbox" message. Note what it deliberately does
+   * *not* mean: that an account exists. The service answers identically for a
+   * known and an unknown address, so the UI must never imply the address was
+   * recognised — that would reintroduce the enumeration oracle the endpoint
+   * goes out of its way to avoid.
+   */
+  protected readonly linkSent = signal(false);
 
   /**
    * Set when this page was reached by returning from Stripe.
    *
-   * Read once in `ngOnInit` rather than from a router signal, because the
-   * value is a one-shot fact about how the page was entered — leaving it in
-   * the URL would make a refresh re-congratulate the user.
+   * Read once in `ngOnInit` rather than from a router signal, because the value
+   * is a one-shot fact about how the page was entered — leaving it in the URL
+   * would make a refresh re-congratulate the user.
    */
   protected readonly checkoutOutcome = signal<'success' | 'cancel' | null>(null);
 
@@ -50,16 +58,8 @@ export class SettingsMawkingbirdPlus implements OnInit {
     const returningFromCheckout = new URLSearchParams(location.search).has('checkout');
     authDebug('page:init', { returningFromCheckout });
 
-    // Also completes a pending sign-in redirect, since this page is the WorkOS
-    // redirect target. Awaited here — unlike before — because everything below
-    // needs to know whether anyone is signed in.
     await this.session.ensureReady();
 
-    // The exact symptom being chased: signed out immediately after paying, then
-    // signed in again on a manual retry. If `signedIn` is false here while the
-    // session cookie is present, the SDK had something to restore from and did
-    // not; if the cookie is absent, the browser dropped it on the way back from
-    // Stripe and no amount of app code will recover it.
     authDebug('page:after-ensureReady', {
       returningFromCheckout,
       signedIn: this.session.user() !== null,
@@ -69,8 +69,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
     const outcome = new URLSearchParams(location.search).get('checkout');
     if (outcome === 'success' || outcome === 'cancel') {
       this.checkoutOutcome.set(outcome);
-      // Strip the parameter so a reload does not repeat the message. The
-      // WorkOS SDK does the same for its own `code`/`state`.
+      // Strip the parameter so a reload does not repeat the message.
       const clean = new URL(location.href);
       clean.searchParams.delete('checkout');
       history.replaceState({}, '', clean);
@@ -85,8 +84,21 @@ export class SettingsMawkingbirdPlus implements OnInit {
     }
   }
 
+  protected async sendLink(): Promise<void> {
+    const address = this.email().trim();
+    if (!address) {
+      return;
+    }
+    const accepted = await this.session.requestSignInLink(address);
+    // Only on acceptance, so a rate-limit or network failure shows the error
+    // rather than a "check your inbox" for mail that was never sent.
+    this.linkSent.set(accepted);
+  }
+
   protected async signOut(): Promise<void> {
     this.plus.clear();
     await this.session.signOut();
+    this.linkSent.set(false);
+    this.email.set('');
   }
 }

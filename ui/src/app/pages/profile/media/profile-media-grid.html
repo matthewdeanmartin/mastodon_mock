@@ -21,9 +21,7 @@
         role="listitem"
         [class.blurred]="blurred(item)"
         [attr.aria-label]="
-          blurred(item)
-            ? 'Sensitive image, click to reveal'
-            : item.description || 'Open picture'
+          blurred(item) ? 'Sensitive image, click to reveal' : item.description || 'Open picture'
         "
         (click)="blurred(item) ? reveal($event, item) : open(item)"
       >
@@ -50,7 +48,12 @@
        whether to keep going further back through someone's pictures. -->
   @if (!exhausted()) {
     <div class="media-more">
-      <button type="button" class="btn btn-outline" [disabled]="loadingMore()" (click)="more.emit()">
+      <button
+        type="button"
+        class="btn btn-outline"
+        [disabled]="loadingMore()"
+        (click)="more.emit()"
+      >
         {{ loadingMore() ? 'Loading…' : 'More' }}
       </button>
     </div>

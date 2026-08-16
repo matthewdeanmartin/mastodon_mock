@@ -201,9 +201,7 @@ export class BlueskySession implements ExpiringConnection {
 
   /** Authenticate and store the result as a **connector** under the active account. */
   login(identifier: string, appPassword: string): Observable<BskySession> {
-    return this.authenticate(identifier, appPassword).pipe(
-      tap((session) => this.persist(session)),
-    );
+    return this.authenticate(identifier, appPassword).pipe(tap((session) => this.persist(session)));
   }
 
   /**

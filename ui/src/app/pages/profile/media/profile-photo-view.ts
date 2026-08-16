@@ -341,9 +341,7 @@ export class ProfilePhotoView {
       return;
     }
     this.menuOpen.set(false);
-    const call = target.bookmarked
-      ? this.api.unbookmark(target.id)
-      : this.api.bookmark(target.id);
+    const call = target.bookmarked ? this.api.unbookmark(target.id) : this.api.bookmark(target.id);
     call.subscribe({
       next: (updated) => this.applyPatch(updated),
       error: () => this.actionError.set('Could not bookmark this post.'),
