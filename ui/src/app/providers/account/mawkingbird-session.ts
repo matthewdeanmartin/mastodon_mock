@@ -1,6 +1,6 @@
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { corsProxyOrigin, isTestBuild } from '../../build-flavor';
-import { authDebug } from './auth-debug';
+import { authDebug, registerAuthOrigins } from './auth-debug';
 
 /**
  * The Mawkingbird account session.
@@ -91,6 +91,10 @@ export function accountOrigin(): string {
     ? 'https://account-test.mawkingbird.com'
     : 'https://account.mawkingbird.com';
 }
+
+// Registered at module load so the diagnostic banner can print the hostnames
+// this bundle was actually built with — the fastest way to spot a stale deploy.
+registerAuthOrigins(authOrigin, accountOrigin);
 
 /** How strongly the caller proved who they are. */
 export type AuthStrength = 'anon' | 'email' | 'idp';
@@ -185,6 +189,10 @@ export class MawkingbirdSession {
   async requestSignInLink(email: string, returnTo = '/settings/mawkingbird-plus'): Promise<boolean> {
     this.error.set(null);
     this.sendingLink.set(true);
+    // Logged with the full URL: the request's *destination* is the thing most
+    // likely to be wrong after a hostname change, and a stale bundle calling an
+    // old host is invisible from the app's own logs otherwise.
+    authDebug('signin:requesting-link', { url: `${this.accountBase}/auth/email/start` });
     try {
       const response = await fetch(`${this.accountBase}/auth/email/start`, {
         method: 'POST',
@@ -194,6 +202,7 @@ export class MawkingbirdSession {
         credentials: 'include',
         body: JSON.stringify({ email, returnTo }),
       });
+      authDebug('signin:link-response', { status: response.status });
       if (response.status === 429) {
         this.error.set('Too many sign-in emails. Please wait a minute and try again.');
         return false;
@@ -203,7 +212,13 @@ export class MawkingbirdSession {
         return false;
       }
       return true;
-    } catch {
+    } catch (error: unknown) {
+      // A CORS refusal lands here and is indistinguishable from being offline
+      // without the message — and CORS is the likeliest cause right after a
+      // hostname change, because the origin allowlist has to agree.
+      authDebug('signin:link-failed', {
+        message: error instanceof Error ? error.message : 'unknown',
+      });
       this.error.set('Could not reach the sign-in service. Check your connection.');
       return false;
     } finally {

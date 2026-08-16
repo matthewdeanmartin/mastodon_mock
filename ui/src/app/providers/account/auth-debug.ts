@@ -28,11 +28,60 @@ export function authDebugEnabled(): boolean {
   return isTestBuild();
 }
 
+/**
+ * Whether the banner has been printed this page load.
+ *
+ * The banner exists because of a real hour lost to it: the deployed bundle was
+ * an older build calling old hostnames, and nothing on screen or in the Worker
+ * logs said so. "Which bundle is this?" has to be answerable from the browser,
+ * because that is where the wrong answer hides.
+ */
+let bannerPrinted = false;
+
+function printBanner(): void {
+  if (bannerPrinted) {
+    return;
+  }
+  bannerPrinted = true;
+  console.info(
+    `[mawkingbird auth] session config
+` +
+      `  build:    ${isTestBuild() ? 'TEST (/test/)' : 'production'}
+` +
+      `  baseURI:  ${document.baseURI}
+` +
+      `  auth:     ${authOriginForLog()}
+` +
+      `  account:  ${accountOriginForLog()}
+` +
+      `  If those hostnames are not what you expect, the deployed bundle is
+` +
+      `  stale — rebuild and republish before debugging anything else.`,
+  );
+}
+
+/**
+ * The origins this bundle was built with.
+ *
+ * Read lazily through function references rather than imported at module load,
+ * because `mawkingbird-session.ts` imports this file and a static import back
+ * would be a cycle.
+ */
+let authOriginForLog: () => string = () => '(not yet registered)';
+let accountOriginForLog: () => string = () => '(not yet registered)';
+
+/** Called once by the session service so the banner can name its origins. */
+export function registerAuthOrigins(auth: () => string, account: () => string): void {
+  authOriginForLog = auth;
+  accountOriginForLog = account;
+}
+
 /** Log a step in the auth flow, with no credential material in it. */
 export function authDebug(step: string, detail: Record<string, unknown> = {}): void {
   if (!authDebugEnabled()) {
     return;
   }
+  printBanner();
   console.info(`[mawkingbird auth] ${step}`, {
     ...detail,
     path: location.pathname,
