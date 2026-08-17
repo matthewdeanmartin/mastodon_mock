@@ -48,6 +48,7 @@ import { ENGINE_LABELS, TranslationEngine, TranslationUsage } from '../translati
 import { AutoTranslateEligibility } from '../trend-language-filter';
 import { MutedPosts } from '../muted-posts';
 import { LocalModeration } from '../local-moderation';
+import { FollowTrust } from '../follow-trust';
 import { TrustedAccounts } from '../trusted-accounts';
 import { StatusVisibility } from '../status-visibility';
 import { serverKnowsStatus, ProviderCapabilities } from '../providers/provider';
@@ -191,6 +192,8 @@ export class StatusCard {
   private prefs = inject(ClientPrefs);
   /** Accounts whose CWs and sensitive flags this viewer has opted out of. */
   private trusted = inject(TrustedAccounts);
+  /** Resolves the "everyone I follow" trust levels; read for its revision. */
+  private followTrust = inject(FollowTrust);
   /** For "Save as to-do", which parks a local draft rather than publishing. */
   private drafts = inject(Drafts);
   private actions = inject(StatusActions);
@@ -313,7 +316,8 @@ export class StatusCard {
    */
   protected authorTrustedForCw = computed(() => {
     this.trusted.entries();
-    return this.trusted.cwExpanded(this.display.account);
+    this.followTrust.revision();
+    return this.trusted.cwExpanded(this.display.account, this.booster);
   });
 
   /**
@@ -343,7 +347,8 @@ export class StatusCard {
   /** True when this author's sensitive media should render unblurred. */
   protected authorTrustedForSensitive = computed(() => {
     this.trusted.entries();
-    return this.trusted.sensitiveShown(this.display.account);
+    this.followTrust.revision();
+    return this.trusted.sensitiveShown(this.display.account, this.booster);
   });
 
   /**
@@ -889,6 +894,18 @@ export class StatusCard {
   get display(): Status {
     const s = this.status();
     return s.reblog ?? s;
+  }
+
+  /**
+   * Who boosted this, or null when it is not a boost.
+   *
+   * The counterpart to {@link display}: that unwraps to the original author,
+   * this keeps hold of the person who passed it along, which the
+   * `follows-boosts` trust level needs.
+   */
+  get booster(): Account | null {
+    const s = this.status();
+    return s.reblog ? s.account : null;
   }
 
   protected bookmarkActive(): boolean {

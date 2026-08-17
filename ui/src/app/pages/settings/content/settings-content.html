@@ -13,6 +13,75 @@
 </div>
 
 <div class="spage-body">
+  <h2>How far trust goes</h2>
+  <p class="muted small">
+    One choice, so there is never a question of which setting wins. Whoever this covers, their
+    content warnings open on their own and their sensitive media renders unblurred.
+  </p>
+
+  <div class="scontrol trust-levels">
+    <label class="checkline">
+      <input
+        type="radio"
+        name="trust_level"
+        [checked]="trusted.level() === 'none'"
+        (change)="setLevel('none')"
+      />
+      Trust no one
+    </label>
+    <p class="muted small checkline-note">
+      Every warning and blur stays in place, including for accounts on the list below.
+    </p>
+
+    <label class="checkline">
+      <input
+        type="radio"
+        name="trust_level"
+        [checked]="trusted.level() === 'individuals'"
+        (change)="setLevel('individuals')"
+      />
+      Trust individual people
+    </label>
+    <p class="muted small checkline-note">
+      Only the accounts you have named, listed further down. This is the default.
+    </p>
+
+    <label class="checkline">
+      <input
+        type="radio"
+        name="trust_level"
+        [checked]="trusted.level() === 'follows'"
+        (change)="setLevel('follows')"
+      />
+      Trust everyone I follow
+    </label>
+    <p class="muted small checkline-note">
+      Including people you follow in future — this is checked as you read, not copied into a list,
+      so it keeps up on its own. Boosts are still judged by whoever originally wrote them.
+    </p>
+
+    <label class="checkline">
+      <input
+        type="radio"
+        name="trust_level"
+        [checked]="trusted.level() === 'follows-boosts'"
+        (change)="setLevel('follows-boosts')"
+      />
+      Trust everyone I follow, and what they boost
+    </label>
+    <p class="muted small checkline-note">
+      The widest setting. A boost from someone you follow opens the warning on the boosted post too,
+      even though you may not follow — or know — whoever wrote it.
+    </p>
+  </div>
+
+  @if (trusted.trustsFollows()) {
+    <p class="muted small">
+      Nobody is added to your list by this. Your named accounts below are kept exactly as they are,
+      so switching back to "individual people" finds them still there.
+    </p>
+  }
+
   <h2>Everyone</h2>
   <p class="muted small">
     Applies to every post from every account, on this Mastodon account only. Stored in this browser
@@ -23,7 +92,8 @@
     <label class="checkline">
       <input
         type="checkbox"
-        [checked]="trusted.expandAllCw()"
+        [checked]="trusted.expandAllCwSetting()"
+        [disabled]="trusted.level() === 'none'"
         (change)="toggleCw()"
         name="expand_all_cw"
       />
@@ -37,7 +107,8 @@
     <label class="checkline">
       <input
         type="checkbox"
-        [checked]="trusted.showAllSensitive()"
+        [checked]="trusted.showAllSensitiveSetting()"
+        [disabled]="trusted.level() === 'none'"
         (change)="toggleSensitive()"
         name="show_all_sensitive"
       />
@@ -48,14 +119,32 @@
     </p>
   </div>
 
-  <!-- There is a same-named server preference on the Appearance page. It is
-       written to Mastodon but nothing in this client reads it back, so saying
-       nothing here would leave two switches that look like they disagree. -->
-  <p class="muted small">
-    Note: Appearance has an "Always expand posts marked with content warnings" box. That one is a
-    server-side preference saved to your Mastodon account for other apps to honour — this one is
-    what Mockingbird itself obeys.
-  </p>
+  @if (trusted.level() === 'none') {
+    <p class="muted small">
+      These two are off while trust is revoked. Choose another level above to use them.
+    </p>
+  }
+
+  <!-- Mastodon serves `reading:expand:spoilers` on GET /api/v1/preferences but
+       offers no way to write it: it is settable only from the instance's own web
+       Preferences page, behind a session cookie. Hence a status row and a link
+       out, rather than a switch that would silently fail to save. -->
+  @if (showsServerRow() && serverExpandsCw() !== null) {
+    <h2>On your server</h2>
+    <p class="muted small">
+      Your Mastodon account has its own "always expand content warnings" preference, which other
+      apps read. It is currently
+      <strong>{{ serverExpandsCw() ? 'on' : 'off' }}</strong
+      >. Mawkingbird can read it but not change it — Mastodon has no API for that, so it can only be
+      set from your server's own settings page.
+      @if (serverPrefsUrl(); as prefsUrl) {
+        <a [href]="prefsUrl" target="_blank" rel="noopener noreferrer">Change it there</a>.
+      }
+    </p>
+    <p class="muted small">
+      The switches above are what Mawkingbird itself obeys, and are independent of it.
+    </p>
+  }
 
   <h2>Trusted accounts</h2>
   <p class="muted small">
@@ -83,6 +172,15 @@
       Stop trusting everyone ({{ trusted.count() }})
     </button>
   }
+
+  <h2>Revoke everything</h2>
+  <p class="muted small">
+    Drops to "trust no one", turns both switches off, and forgets every account you have trusted.
+    Unlike the choices above, this one throws the list away — there is no undo.
+  </p>
+  <button type="button" class="btn btn-outline btn-sm" (click)="revokeAll()">
+    Revoke all trust
+  </button>
 
   <p class="muted small footnote">
     Trust never overrides a filter. A word filter you set, or a post your server chose to hide,

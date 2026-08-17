@@ -1,10 +1,35 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { scopedKey } from './account-scope';
+import { FollowTrust } from './follow-trust';
 import { accountKey } from './local-moderation';
 import { Account } from './models';
 
 const BASE_KEY = 'mockingbird_trusted_accounts';
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
+
+/**
+ * How far trust extends, as one exclusive choice.
+ *
+ * A radio rather than a set of stacking switches because the levels are not
+ * independent: "trust nobody" has to beat everything else, and two checkboxes
+ * that disagree about the same post is a worse thing to explain than one list
+ * you pick a rung on.
+ *
+ * - `none` — global revocation. Nothing is trusted, whoever it is.
+ * - `individuals` — only the accounts on the list. The long-standing behaviour,
+ *   and the default.
+ * - `follows` — everyone you follow, including people you follow in future,
+ *   plus the list.
+ * - `follows-boosts` — as `follows`, and also whatever those people boost.
+ */
+export type TrustLevel = 'none' | 'individuals' | 'follows' | 'follows-boosts';
+
+export const TRUST_LEVELS: readonly TrustLevel[] = [
+  'none',
+  'individuals',
+  'follows',
+  'follows-boosts',
+];
 
 /** One trusted account. */
 interface Entry {
@@ -22,6 +47,8 @@ interface StoredState {
   expandAllCw: boolean;
   /** Show every sensitive image, from anyone. */
   showAllSensitive: boolean;
+  /** How far trust reaches beyond the named list. */
+  level: TrustLevel;
 }
 
 /**
@@ -50,10 +77,24 @@ interface StoredState {
  * Deliberately **not** timed, unlike a mute: trust is a standing judgement about
  * a person, and one that silently expired would restore the blur without ever
  * saying why.
+ *
+ * ## Levels
+ *
+ * Beyond the named list there is a {@link TrustLevel}, so "everyone I follow"
+ * can be said once instead of a thousand times. The broader levels are resolved
+ * live through {@link FollowTrust} rather than by copying the follow list in:
+ * they mean *now and in future*, and a snapshot would silently stop covering
+ * people you followed afterwards.
+ *
+ * The named list survives every level change. Someone who moves from trusting
+ * five people to trusting everyone they follow, and later moves back, should
+ * find their five people still there — so `none` suppresses the list rather than
+ * reading it, and only {@link clearAll} ever empties it.
  */
 @Injectable({ providedIn: 'root' })
 export class TrustedAccounts {
   private state = signal<StoredState>(load());
+  private follows = inject(FollowTrust);
 
   /** Live view of the entries, so cards re-evaluate when trust changes. */
   readonly entries = computed(() => this.state().entries);
@@ -74,31 +115,96 @@ export class TrustedAccounts {
 
   readonly count = computed(() => Object.keys(this.entries()).length);
 
-  /** Expand every CW regardless of author. */
-  readonly expandAllCw = computed(() => this.state().expandAllCw);
-  /** Show every sensitive image regardless of author. */
-  readonly showAllSensitive = computed(() => this.state().showAllSensitive);
+  /**
+   * Expand every CW regardless of author.
+   *
+   * Forced off at `none`: global revocation has to beat the account-wide
+   * switches too, or "trust no one" would leave every warning open.
+   */
+  readonly expandAllCw = computed(() => this.level() !== 'none' && this.state().expandAllCw);
+  /** Show every sensitive image regardless of author. Same override as CWs. */
+  readonly showAllSensitive = computed(
+    () => this.level() !== 'none' && this.state().showAllSensitive,
+  );
 
-  /** True when this specific account has been trusted. */
+  /** The stored switch positions, for the settings UI to render unmodified. */
+  readonly expandAllCwSetting = computed(() => this.state().expandAllCw);
+  readonly showAllSensitiveSetting = computed(() => this.state().showAllSensitive);
+
+  /** How far trust currently reaches. */
+  readonly level = computed(() => this.state().level);
+
+  /** True when the level takes in everyone the viewer follows. */
+  readonly trustsFollows = computed(
+    () => this.level() === 'follows' || this.level() === 'follows-boosts',
+  );
+
+  /** True when a boost by a followed account carries trust to what it boosted. */
+  readonly trustsBoosts = computed(() => this.level() === 'follows-boosts');
+
+  /**
+   * True when this specific account is on the named list.
+   *
+   * Only ever the list — the follow-derived levels are resolved in
+   * {@link trusts}, so the settings UI can still show who is explicitly named
+   * while a broader level is active.
+   */
   isTrusted(account: Pick<Account, 'acct' | 'url' | 'id'>): boolean {
     return accountKey(account) in this.entries();
   }
 
   /**
+   * The real question a card asks: is this author trusted, at the current level?
+   *
+   * At `none`, nobody is, including the named list. Otherwise the list always
+   * counts, and the follow-derived levels add to it.
+   */
+  trusts(account: Pick<Account, 'acct' | 'url' | 'id'> | null | undefined): boolean {
+    if (!account || this.level() === 'none') {
+      return false;
+    }
+    if (this.isTrusted(account)) {
+      return true;
+    }
+    return this.trustsFollows() && this.follows.isFollowing(account);
+  }
+
+  /**
+   * Does a boost carry trust from the booster to the boosted post?
+   *
+   * Only at `follows-boosts`, and only when the *booster* is someone the rule
+   * covers. Everywhere else a boost is someone else's content passing through a
+   * friend, and gets judged on its own author.
+   */
+  private boostCarriesTrust(booster: Pick<Account, 'acct' | 'url' | 'id'> | null | undefined) {
+    return this.trustsBoosts() && !!booster && this.trusts(booster);
+  }
+
+  /**
    * Should this post's content warning render already open?
    *
-   * True when the account-wide switch is on, or the author is trusted. Callers
-   * pass the *displayed* account (the booster's target, not the booster) —
-   * trusting someone is about what they write, and a boost is someone else's
-   * content passing through.
+   * True when the account-wide switch is on, or the author is trusted at the
+   * current level. `account` is the *displayed* account (a boost's target, not
+   * the booster) — trusting someone is about what they write, and a boost is
+   * someone else's content passing through.
+   *
+   * `booster` is that passer-through, and matters only at `follows-boosts`,
+   * where the point of the level is precisely that a friend's boost vouches for
+   * what it carries.
    */
-  cwExpanded(account: Pick<Account, 'acct' | 'url' | 'id'> | null | undefined): boolean {
-    return this.expandAllCw() || (!!account && this.isTrusted(account));
+  cwExpanded(
+    account: Pick<Account, 'acct' | 'url' | 'id'> | null | undefined,
+    booster?: Pick<Account, 'acct' | 'url' | 'id'> | null,
+  ): boolean {
+    return this.expandAllCw() || this.trusts(account) || this.boostCarriesTrust(booster);
   }
 
   /** Should this post's sensitive media render unblurred? Same rule as CWs. */
-  sensitiveShown(account: Pick<Account, 'acct' | 'url' | 'id'> | null | undefined): boolean {
-    return this.showAllSensitive() || (!!account && this.isTrusted(account));
+  sensitiveShown(
+    account: Pick<Account, 'acct' | 'url' | 'id'> | null | undefined,
+    booster?: Pick<Account, 'acct' | 'url' | 'id'> | null,
+  ): boolean {
+    return this.showAllSensitive() || this.trusts(account) || this.boostCarriesTrust(booster);
   }
 
   trust(account: Pick<Account, 'acct' | 'url' | 'id'>): void {
@@ -144,7 +250,41 @@ export class TrustedAccounts {
     this.state.update((prev) => this.persist({ ...prev, showAllSensitive: on }));
   }
 
-  /** Forget every trusted account. The switches are left alone. */
+  /**
+   * Move to a trust level.
+   *
+   * Never touches the named list, in either direction: going up to "everyone I
+   * follow" does not absorb the list into itself (nothing is materialised — see
+   * {@link FollowTrust}), and coming back down finds it as it was.
+   *
+   * `none` is the exception only in that it is worth confirming first, since
+   * {@link revokeAll} pairs it with a wipe.
+   */
+  setLevel(level: TrustLevel): void {
+    this.state.update((prev) => this.persist({ ...prev, level }));
+  }
+
+  /**
+   * Global trust revocation: drop to `none` *and* forget everyone.
+   *
+   * The destructive half is the point. "Trust no one" as a reversible override
+   * would leave the list sitting there intact, which is not what someone reaches
+   * for this button to achieve — they want the trust gone, not parked. Callers
+   * confirm before invoking.
+   */
+  revokeAll(): void {
+    this.state.update((prev) =>
+      this.persist({
+        ...prev,
+        entries: {},
+        level: 'none',
+        expandAllCw: false,
+        showAllSensitive: false,
+      }),
+    );
+  }
+
+  /** Forget every trusted account. The switches and level are left alone. */
   clearAll(): void {
     this.state.update((prev) => this.persist({ ...prev, entries: {} }));
   }
@@ -166,14 +306,18 @@ function load(): StoredState {
     entries: {},
     expandAllCw: false,
     showAllSensitive: false,
+    level: 'individuals',
   };
   try {
     const parsed = JSON.parse(
       localStorage.getItem(scopedKey(BASE_KEY)) ?? 'null',
     ) as Partial<StoredState> | null;
+    // v1 had no `level`, and behaved exactly as `individuals` does — so it is
+    // read rather than discarded, and existing trust lists survive the upgrade.
+    const version = parsed?.version;
     if (
-      parsed?.version !== STATE_VERSION ||
-      typeof parsed.entries !== 'object' ||
+      (version !== STATE_VERSION && version !== 1) ||
+      typeof parsed?.entries !== 'object' ||
       !parsed.entries
     ) {
       return empty;
@@ -192,6 +336,9 @@ function load(): StoredState {
       entries,
       expandAllCw: parsed.expandAllCw === true,
       showAllSensitive: parsed.showAllSensitive === true,
+      level: TRUST_LEVELS.includes(parsed.level as TrustLevel)
+        ? (parsed.level as TrustLevel)
+        : 'individuals',
     };
   } catch {
     return empty;
