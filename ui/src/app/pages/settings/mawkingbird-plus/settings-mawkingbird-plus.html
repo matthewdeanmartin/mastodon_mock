@@ -124,6 +124,14 @@
           and can only be used once.
         </p>
       } @else {
+        <!--
+          Under the form that caused it. An alert at the foot of the page, below
+          the fine print, is one someone has to go looking for — which defeats
+          the point of showing it. The same reasoning as the checkout error.
+        -->
+        @if (session.error(); as message) {
+          <p class="feed-error" role="alert">{{ message }}</p>
+        }
         <form class="plus-signin-form" (submit)="$event.preventDefault(); sendLink()">
           <label for="plus-email">Email address</label>
           <input
@@ -148,7 +156,12 @@
     </section>
   }
 
-  @if (session.error(); as message) {
+  <!--
+    The same alert for a signed-in user, who has no sign-in form for it to sit
+    under but can still hit a service error on a token refresh. Rendered only
+    when signed in, so it never appears twice.
+  -->
+  @if (session.user() && session.error(); as message) {
     <p class="feed-error" role="alert">{{ message }}</p>
   }
 </div>

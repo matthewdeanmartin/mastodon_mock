@@ -208,7 +208,12 @@ export class MawkingbirdSession {
         return false;
       }
       if (!response.ok) {
-        this.error.set('Could not send the sign-in email. Please try again.');
+        // Relay the service's own sentence when it sent one. Those messages are
+        // written for a person to read, and the alternative — one generic
+        // "please try again" for a malformed address, an unconfigured
+        // deployment, and a mail outage alike — sends people to the console.
+        const relayed = await this.errorMessageFrom(response);
+        this.error.set(relayed ?? `Could not send the sign-in email. (HTTP ${response.status})`);
         return false;
       }
       return true;
@@ -281,7 +286,33 @@ export class MawkingbirdSession {
     authDebug('mint:anonymous', { ok: anonymous !== null });
     this.held = anonymous;
     this.user.set(null);
+
+    // Being signed out is normal and must not shout. But if even the anonymous
+    // mint failed, the service is unreachable and the page would otherwise show
+    // a bare "Not signed in" for what is actually an outage — which is exactly
+    // the confusion this whole debugging session was made of.
+    if (!anonymous) {
+      this.error.set(
+        'Could not reach the Mawkingbird account service. Signing in will not work until it is back.',
+      );
+    }
     return anonymous;
+  }
+
+  /**
+   * The service's own error sentence, when it sent one.
+   *
+   * Safe to show verbatim: every error string these Workers emit is written for
+   * a person, and they deliberately never relay an upstream provider's message
+   * (which could name an account or a key).
+   */
+  private async errorMessageFrom(response: Response): Promise<string | null> {
+    try {
+      const body = (await response.json()) as { error?: unknown };
+      return typeof body.error === 'string' && body.error ? body.error : null;
+    } catch {
+      return null;
+    }
   }
 
   private async post(body: { grant: 'anon' | 'cookie' }): Promise<MintedToken | null> {

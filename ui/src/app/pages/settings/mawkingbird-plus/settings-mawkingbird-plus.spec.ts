@@ -317,6 +317,28 @@ describe('SettingsMawkingbirdPlus', () => {
     expect(fixture.nativeElement.textContent).not.toContain('on its way');
   });
 
+  it('shows a service error next to the sign-in form', async () => {
+    // The failure mode this exists for: the page said only "Not signed in"
+    // while the real cause — an unreachable service, a rate limit, a
+    // misconfigured deployment — was visible nowhere but the browser console.
+    session.ready.set(true);
+    session.error.set('Could not reach the Mawkingbird account service.');
+    fixture.detectChanges();
+
+    const alert = fixture.nativeElement.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('Could not reach');
+  });
+
+  it('shows a service error only once', async () => {
+    session.ready.set(true);
+    session.error.set('Something went wrong.');
+    fixture.detectChanges();
+
+    // Two copies of the same alert is how a page teaches people to ignore them.
+    const alerts = fixture.nativeElement.querySelectorAll('[role="alert"]');
+    expect(alerts.length).toBe(1);
+  });
+
   it('signs out through the session', () => {
     session.ready.set(true);
     signedIn();
