@@ -70,25 +70,103 @@ function declaredKeys() {
   return found;
 }
 
-/** Key bases listed in the registry, with their sensitivity. */
+/**
+ * Key bases listed in the registry, with their sensitivity.
+ *
+ * ## Why this is not one regex over the whole file
+ *
+ * It used to be, and it silently under-reported. The pattern required
+ * `sensitivity` on the line immediately after `suffix`, so any entry with an
+ * explanatory comment between its fields became invisible — and an invisible
+ * entry is then reported as an *unclassified key*, which is the opposite of the
+ * truth. Three `mockingbird_blogger_*` entries sat like that, correctly
+ * classified and reported as errors, while the tool claimed to have checked
+ * them.
+ *
+ * That is the worst failure mode a checker like this can have: a registry entry
+ * can be present and correct, and the guard both ignores it *and* accuses it.
+ * Adding a comment to explain a subtle classification — exactly what the
+ * registry asks contributors to do — was enough to trigger it.
+ *
+ * So each entry is now located by its `base:` line and read within its own
+ * block, with fields found independently. Comments, blank lines and field
+ * reordering are all fine; only a missing field is an error, and it is reported
+ * rather than silently skipped.
+ */
 function registeredKeys() {
   const text = readFileSync(REGISTRY, 'utf8');
-  const entry =
-    /base:\s*'([^']+)',\s*\n\s*storage:\s*'(?:local|session)',\s*\n\s*suffix:\s*'(?:none|account|instance)',\s*\n\s*sensitivity:\s*'([^']+)'/g;
   const found = new Map();
-  for (const match of text.matchAll(entry)) {
-    found.set(match[1], match[2]);
+  const malformed = [];
+
+  // Split on the closing brace of each array element. Tolerates CRLF, because
+  // this repo is developed on Windows and a \n-only pattern silently matches
+  // nothing there — the same class of bug as the one above.
+  const blocks = text.split(/\r?\n\s*\},?\r?\n/);
+
+  for (const block of blocks) {
+    const base = /^\s*base:\s*'([^']+)'/m.exec(block);
+    if (!base) continue;
+
+    const sensitivity = /^\s*sensitivity:\s*'([^']+)'/m.exec(block);
+    const storage = /^\s*storage:\s*'(local|session)'/m.exec(block);
+    const suffix = /^\s*suffix:\s*'(none|account|instance)'/m.exec(block);
+
+    if (!sensitivity || !storage || !suffix) {
+      const missing = [
+        !storage && 'storage',
+        !suffix && 'suffix',
+        !sensitivity && 'sensitivity',
+      ].filter(Boolean);
+      malformed.push(`'${base[1]}' is missing ${missing.join(', ')}`);
+      continue;
+    }
+    found.set(base[1], sensitivity[1]);
   }
-  return found;
+
+  return { found, malformed };
+}
+
+/**
+ * Every `base:` line in the registry, however the entry is formatted.
+ *
+ * A deliberately dumb count, used only to cross-check the parser above. If the
+ * two disagree, the parser is dropping entries and every result it produced is
+ * suspect — so that is reported as a tool failure rather than as a finding
+ * about the code being checked.
+ */
+function rawBaseCount() {
+  return [...readFileSync(REGISTRY, 'utf8').matchAll(/^\s*base:\s*'/gm)].length;
 }
 
 const declared = declaredKeys();
-const registered = registeredKeys();
+const { found: registered, malformed } = registeredKeys();
 const problems = [];
 
 if (registered.size === 0) {
   problems.push(
     'Could not parse any entries out of storage-registry.ts — has STORAGE_KEYS changed shape?',
+  );
+}
+
+for (const entry of malformed) {
+  problems.push(`Registry entry ${entry} — every entry needs all four fields.`);
+}
+
+/*
+ * The parser must see every entry that exists.
+ *
+ * Reported separately from the findings below, and worded as a tool failure,
+ * because a parser that drops entries produces confident nonsense: a dropped
+ * entry is reported as an unclassified key, so the output accuses the one file
+ * that got it right. Checking this is cheap and it is the only thing standing
+ * between a formatting change and a guard that quietly stops guarding.
+ */
+const rawCount = rawBaseCount();
+if (registered.size + malformed.length !== rawCount) {
+  problems.push(
+    `This checker parsed ${registered.size + malformed.length} registry entries but the file ` +
+      `contains ${rawCount} 'base:' lines. The parser in this script is dropping entries, so ` +
+      `every result below is unreliable. Fix registeredKeys() before trusting this output.`,
   );
 }
 

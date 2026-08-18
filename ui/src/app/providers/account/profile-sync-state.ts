@@ -108,10 +108,7 @@ export function readSyncRecord(storage: Storage = localStorage): ProfileSyncReco
   }
 }
 
-export function writeSyncRecord(
-  record: ProfileSyncRecord,
-  storage: Storage = localStorage,
-): void {
+export function writeSyncRecord(record: ProfileSyncRecord, storage: Storage = localStorage): void {
   try {
     storage.setItem(PROFILE_SYNC_KEY, JSON.stringify(record));
   } catch {

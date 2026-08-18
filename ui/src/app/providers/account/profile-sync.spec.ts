@@ -352,9 +352,13 @@ describe('ProfileSync', () => {
     it('adopts the winner on a 412 and keeps the dirty flag', async () => {
       sync.resetForTest({ state: 'on', etag: '"stale"', revision: 3, dirty: true });
       fetchStub.mockResolvedValue(
-        respond(412, { code: 'conflict', current: storedDocument({ revision: 9 }) }, {
-          ETag: '"winner"',
-        }),
+        respond(
+          412,
+          { code: 'conflict', current: storedDocument({ revision: 9 }) },
+          {
+            ETag: '"winner"',
+          },
+        ),
       );
 
       const ok = await sync.push();

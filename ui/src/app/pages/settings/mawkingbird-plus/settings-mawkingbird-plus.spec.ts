@@ -61,8 +61,7 @@ describe('SettingsMawkingbirdPlus', () => {
     return fixture.nativeElement.textContent as string;
   };
 
-  const signedIn = (auth: 'email' | 'idp' = 'email') =>
-    session.user.set({ auth, tier: 'free' });
+  const signedIn = (auth: 'email' | 'idp' = 'email') => session.user.set({ auth, tier: 'free' });
 
   it('completes a pending sign-in redirect when the page loads', () => {
     // This page is the OAuth redirect target, so initialising is what finishes
@@ -344,9 +343,9 @@ describe('SettingsMawkingbirdPlus', () => {
     signedIn();
     fixture.detectChanges();
 
-    const button = Array.from(
-      fixture.nativeElement.querySelectorAll('button'),
-    ).find((element) => (element as HTMLButtonElement).textContent?.trim() === 'Sign out');
+    const button = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      (element) => (element as HTMLButtonElement).textContent?.trim() === 'Sign out',
+    );
     (button as HTMLButtonElement).click();
 
     expect(session.signOut).toHaveBeenCalled();

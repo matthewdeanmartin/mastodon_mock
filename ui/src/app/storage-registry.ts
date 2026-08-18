@@ -700,20 +700,15 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     sensitivity: 'private',
     note: 'Remote configuration URL, check cadence, last verified hash, and check timestamp. Operational sync state is never included in a portable config.',
   },
-  // `private` rather than `setting`, for the same reason as
-  // mockingbird_config_sync above: it is operational state about one browser's
-  // relationship to a server, not a preference. Exporting it would carry an
-  // ETag and revision that mean nothing in another browser and would make that
-  // browser think it was up to date when it holds different bytes.
-  //
-  // NOTE: this comment sits above the entry rather than inside it. The
-  // `check:storage` script parses these entries with a regex that expects
-  // `sensitivity` on the line after `suffix`, so an interleaved comment makes
-  // the entry invisible to it and the key reads as unclassified.
   {
     base: 'mockingbird_profile_sync',
     storage: 'local',
     suffix: 'none',
+    // `private` rather than `setting`, for the same reason as
+    // mockingbird_config_sync above: it is operational state about one browser's
+    // relationship to a server, not a preference. Exporting it would carry an
+    // ETag and revision that mean nothing in another browser, and would make
+    // that browser think it was up to date while holding different bytes.
     sensitivity: 'private',
     note: 'Mawkingbird Plus settings-sync state: whether sync is on, the last ETag and revision seen, whether local edits are unpushed, and any persistent failure. Never synced itself — a document that described its own sync position would be describing the wrong browser the moment it arrived.',
   },

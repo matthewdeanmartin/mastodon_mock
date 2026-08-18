@@ -42,3 +42,64 @@ jobs:
         run: uv sync --all-extras
       - name: Run quality gates
         run: uv run make check-ci
+
+  # The UI's own gates.
+  #
+  # Separate from `quality-gates` above, which runs `make check-ci` — that is the
+  # *Python* Makefile, and it never touched the UI check scripts. The result was
+  # that `check:storage`, `check:terminology` and friends existed, were referred
+  # to in comments as "wired into make check", and in fact ran nowhere: they
+  # could only be invoked by hand, so nobody did, and they drifted.
+  #
+  # The deploy workflow (mockingbird-pages.yml) still builds and publishes with
+  # no gate of its own. This job is what stops a broken change reaching main; it
+  # deliberately does not slow the deploy path down.
+  ui-gates:
+    name: UI gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+
+      # Cheap and fast, so they run first and fail before anything expensive.
+      - name: Static checks
+        run: npm run check:static
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test:ci
+
+      # ## Why this step is allowed to fail
+      #
+      # These three checks were already failing before this job existed —
+      # `check:storage` on 15 genuinely unclassified keys, `check:terminology` on
+      # reader-vocabulary wording, `test:source-integrity` on one vacuous
+      # assertion. None of that is new, and none of it was introduced by the
+      # change that added this job.
+      #
+      # Turning them red on arrival would train everyone to ignore a red build,
+      # which is worse than the drift they are meant to catch. So they run,
+      # visibly, and report — and move up into the enforcing steps above as each
+      # backlog is cleared. `check:storage` is closest: it needs 13 keys
+      # classified and 2 stale registry entries removed.
+      - name: Known-failing checks (reported, not enforced)
+        continue-on-error: true
+        run: npm run check:known-failing

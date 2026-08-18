@@ -81,15 +81,11 @@ export const ACCOUNT_ORIGIN = new InjectionToken<string>('ACCOUNT_ORIGIN', {
  * do that job alone.
  */
 export function authOrigin(): string {
-  return isTestBuild()
-    ? 'https://auth-test.mawkingbird.com'
-    : 'https://auth.mawkingbird.com';
+  return isTestBuild() ? 'https://auth-test.mawkingbird.com' : 'https://auth.mawkingbird.com';
 }
 
 export function accountOrigin(): string {
-  return isTestBuild()
-    ? 'https://account-test.mawkingbird.com'
-    : 'https://account.mawkingbird.com';
+  return isTestBuild() ? 'https://account-test.mawkingbird.com' : 'https://account.mawkingbird.com';
 }
 
 // Registered at module load so the diagnostic banner can print the hostnames
@@ -186,7 +182,10 @@ export class MawkingbirdSession {
    * therefore say "check your inbox" rather than anything implying the address
    * was recognised.
    */
-  async requestSignInLink(email: string, returnTo = '/settings/mawkingbird-plus'): Promise<boolean> {
+  async requestSignInLink(
+    email: string,
+    returnTo = '/settings/mawkingbird-plus',
+  ): Promise<boolean> {
     this.error.set(null);
     this.sendingLink.set(true);
     // Logged with the full URL: the request's *destination* is the thing most
