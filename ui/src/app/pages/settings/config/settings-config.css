@@ -75,7 +75,33 @@
   background: var(--accent-soft);
 }
 
+/*
+ * Readable in both themes, measured rather than eyeballed.
+ *
+ * Was `color: #b3261e` — a *dark* red — over a background mixed with
+ * `--col-bg`. In light mode that is dark-on-pale and fine. In dark mode
+ * `--col-bg` is `#15202b`, so the mix is a dark maroon and dark red text all
+ * but vanishes into it: contrast 2.34:1, well under the 4.5:1 needed for body
+ * text. Reported as red on red, correctly.
+ *
+ * One red cannot serve both: a foreground light enough for the dark tint is
+ * washed out on white, and vice versa. So the colour flips with the theme while
+ * the tint stays translucent and adapts to whatever is behind it.
+ *
+ * Measured against the tint each sits on:
+ *   light  #a5140c on #fdedf2 = 6.9:1
+ *   dark   #ff9aa2 on #25202f = 6.7:1
+ *
+ * The left border carries the severity too, so the message does not rely on
+ * colour alone to read as an error.
+ */
 .config-error {
-  background: color-mix(in srgb, #d93025 12%, var(--col-bg));
-  color: #b3261e;
+  border-left: 4px solid #e0245e;
+  background: rgba(224, 36, 94, 0.08);
+  color: #a5140c;
+}
+
+:root[data-theme='dark'] .config-error {
+  background: rgba(255, 154, 162, 0.12);
+  color: #ff9aa2;
 }

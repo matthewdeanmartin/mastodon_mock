@@ -130,12 +130,14 @@
           <span class="export-status" role="status" aria-live="polite">{{ syncMessage() }}</span>
         }
         <!--
-          A failure gets `role="alert"` and the error style, never the status
-          style. The two were previously the same slot, which is how a failed
-          upload came to be announced as "Saved this browser's settings."
+          One error slot, not two. A failure gets `role="alert"` and the error
+          style, never the status style — that separation is how a failed upload
+          stopped being announced as "Saved this browser's settings." But the
+          component's own error and the service's were both rendered here, so a
+          402 seen by both showed the same sentence twice, stacked.
         -->
-        @if (syncError()) {
-          <p class="config-error" role="alert">{{ syncError() }}</p>
+        @if (syncFailure(); as failure) {
+          <p class="config-error" role="alert">{{ failure }}</p>
         }
         @if (syncUploaded(); as uploaded) {
           <div class="export-preview">
@@ -153,9 +155,6 @@
               }
             </ul>
           </div>
-        }
-        @if (profile.error(); as message) {
-          <p class="config-error" role="alert">{{ message }}</p>
         }
       </div>
     </div>

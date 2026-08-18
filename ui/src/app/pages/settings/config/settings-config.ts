@@ -71,6 +71,26 @@ export class SettingsConfig {
   protected readonly offersRemote = computed(() => this.profile.offersRemote());
 
   /**
+   * The one sync failure to show, from either source.
+   *
+   * `syncError` is what this page observed from an action the user took;
+   * `profile.error()` is what the service last reported. They are usually the
+   * same sentence for the same cause — a 402 sets both — and rendering them in
+   * two slots stacked the identical message twice.
+   *
+   * Deduplicated by value rather than by picking a winner, so a genuinely
+   * different pair still shows both, separated.
+   */
+  protected readonly syncFailure = computed(() => {
+    const mine = this.syncError();
+    const service = this.profile.error() ?? '';
+    if (mine && service && mine !== service) {
+      return `${mine} ${service}`;
+    }
+    return mine || service;
+  });
+
+  /**
    * A human sentence for the sync state.
    *
    * Deliberately says *when*, not just *whether*. "On" with no timestamp is the
@@ -363,6 +383,12 @@ export class SettingsConfig {
   /** Pull now, surfacing a decision if this browser has unsaved edits. */
   protected async syncNow(): Promise<void> {
     this.clearNotice();
+    // Re-read the manifest first, bypassing the focus throttle. An explicit
+    // "Sync now" is the one moment a user is watching, and this is where a
+    // read-only flag left over from a stale free-tier token gets corrected —
+    // otherwise the button would keep reporting a lapsed subscription that the
+    // account does not have.
+    await this.profile.recheckOnFocus(true);
     const outcome = await this.profile.pull();
     switch (outcome.kind) {
       case 'applied':
@@ -386,7 +412,9 @@ export class SettingsConfig {
         this.reportPush(await this.profile.push(true));
         return;
       case 'failed':
-        this.syncMessage.set(outcome.message);
+        // An error, not a status line — same reason the two signals are
+        // separate at all.
+        this.syncError.set(outcome.message);
         return;
     }
   }

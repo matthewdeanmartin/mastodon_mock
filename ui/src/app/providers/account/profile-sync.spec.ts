@@ -19,6 +19,13 @@ const PREFS = 'mockingbird_client_prefs';
 
 class FakeMawkingbirdSession {
   token = vi.fn().mockResolvedValue('mawkingbird-token');
+  /**
+   * Present because `recheckEntitlement()` calls it. A double missing a method
+   * the subject calls fails as a thrown TypeError rather than as a wrong
+   * answer, which is a confusing way to learn the fake is incomplete.
+   */
+  upgradeIfStale = vi.fn().mockResolvedValue(false);
+  heldTier = vi.fn().mockReturnValue('plus');
 }
 
 /** The last request `fetch` was called with. */
@@ -520,6 +527,33 @@ describe('ProfileSync', () => {
       // A boolean comparison, not a request: repeated mints of an
       // already-correct token must stay free.
       expect(calls).toHaveLength(before);
+    });
+
+    /**
+     * Regression: re-reading the manifest is useless while the token is stale.
+     *
+     * The held token is cached until it expires, so a `recheckEntitlement()`
+     * that only refetched kept presenting the same free-tier claim and kept
+     * getting the same correct 402. The retry was real; it was re-asking with
+     * the wrong credential — which is what made this look racy rather than
+     * simply wrong.
+     */
+    it('discards a stale free-tier token before re-reading the manifest', async () => {
+      const supporter = TestBed.inject(SupporterStatus);
+      const session = TestBed.inject(MawkingbirdSession);
+      const upgrade = vi.spyOn(session, 'upgradeIfStale').mockResolvedValue(true);
+
+      supporter.isSupporter.set(false);
+      sync.resetForTest({ state: 'unasked' });
+      fetchStub.mockResolvedValue(
+        respond(200, { readOnly: true, quota: { used: 0, limit: 100 }, conflicts: 0 }),
+      );
+      await sync.start();
+
+      supporter.isSupporter.set(true);
+      await sync.recheckEntitlement();
+
+      expect(upgrade).toHaveBeenCalledWith(true);
     });
 
     it('does not push when sync is off', async () => {

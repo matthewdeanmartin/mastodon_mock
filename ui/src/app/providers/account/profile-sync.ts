@@ -10,6 +10,7 @@ import {
 import { ProfileClient, type SettingsDocument } from './profile-client';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { SupporterStatus } from './supporter-status';
+import { MawkingbirdSession } from './mawkingbird-session';
 import { STORAGE_KEYS } from '../../storage-registry';
 import {
   FAILURES_BEFORE_WARNING,
@@ -63,8 +64,20 @@ const WRITER_KEY = 'mockingbird_profile_writer';
 /** Debounce before pushing a local change, in milliseconds. */
 export const PUSH_DEBOUNCE_MS = 10_000;
 
-/** Re-check the manifest when a tab regains focus after this long. */
-export const FOCUS_RECHECK_MS = 5 * 60 * 1000;
+/**
+ * Re-check the manifest when a tab regains focus after this long.
+ *
+ * Was five minutes, which made the feature look broken in the way it is most
+ * often used: change something on one browser, switch to the other to check,
+ * and nothing happens — because the throttle swallowed the recheck. Reported
+ * after two attempts.
+ *
+ * Twenty seconds instead. The cost of being wrong in this direction is one
+ * small manifest request; the cost in the other is a user concluding sync does
+ * not work. `GET /manifest` is a single R2 head plus a KV read, and the
+ * document fetch behind it answers 304 when nothing moved.
+ */
+export const FOCUS_RECHECK_MS = 20 * 1000;
 
 export const SETTINGS_KIND = 'mawkingbird-profile-settings';
 export const SETTINGS_SCHEMA_VERSION = 1;
@@ -145,6 +158,12 @@ export class ProfileSync {
    * only Angular, which is exactly why it exists as a separate service.
    */
   private supporter = inject(SupporterStatus);
+  /**
+   * The token source, so a stale free-tier claim can be discarded.
+   *
+   * Already loaded whenever this module is: `ProfileClient` depends on it.
+   */
+  private session = inject(MawkingbirdSession);
 
   /** This browser's view of the account-level switch. */
   readonly record = signal<ProfileSyncRecord>(readSyncRecord());
@@ -333,7 +352,20 @@ export class ProfileSync {
     if (!this.supporter.isSupporter() || this.startedEntitled) {
       return;
     }
+    // Discard the held free-tier token *before* re-reading. The manifest is
+    // only as good as the claim it was fetched with, and re-asking with the
+    // same stale token gets the same correct 402 — which is what made the
+    // previous attempt at this look racy rather than simply wrong.
+    // Guarded: a token refresh that throws must not cost us the manifest
+    // re-read, which is the part that actually repairs the stale state.
+    let upgraded = false;
+    try {
+      upgraded = await this.session.upgradeIfStale(true);
+    } catch (error: unknown) {
+      this.diagnostics.error('ProfileSync', 'entitlement:upgrade-failed', error);
+    }
     this.diagnostics.info('ProfileSync', 'entitlement:improved', {
+      upgradedToken: upgraded,
       note: 'tier corrected after startup; re-reading the manifest',
     });
     await this.start();
@@ -346,8 +378,14 @@ export class ProfileSync {
    * itself costs almost nothing. This is what catches the other-machine case
    * without polling.
    */
-  async recheckOnFocus(): Promise<void> {
-    if (!this.syncing() || Date.now() - this.lastManifestAt < FOCUS_RECHECK_MS) {
+  async recheckOnFocus(force = false): Promise<void> {
+    if (!this.syncing()) {
+      return;
+    }
+    if (!force && Date.now() - this.lastManifestAt < FOCUS_RECHECK_MS) {
+      this.diagnostics.info('ProfileSync', 'focus:throttled', {
+        sinceLastManifestMs: Date.now() - this.lastManifestAt,
+      });
       return;
     }
     await this.start();
