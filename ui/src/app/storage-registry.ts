@@ -217,6 +217,17 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'CORS proxy API key, plus the header name a custom proxy wants it in. Billable on a paid plan, so it is retention-governed like the other pasted tokens. Unscoped: the subscription belongs to the human, not to one persona. Split out of mockingbird_cors_proxy so the proxy choice itself stays exportable.',
   },
   {
+    // Declared as SECRET_KEY in twitter-settings.ts, deliberately split from
+    // CONFIG_KEY (mockingbird_twitter) so the service choice and the probe
+    // verdict stay exportable while the credential never is. Same split as
+    // mockingbird_cors_proxy / mockingbird_cors_proxy_key.
+    base: 'mockingbird_twitter_keys',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'secret',
+    note: "API keys for the Twitter/X read services (per service, each with its own retention stamp). Billable on a paid plan and able to read on the user's behalf, so it is treated exactly like the other pasted tokens. Unscoped: the subscription belongs to the human, not to one persona.",
+  },
+  {
     base: 'mockingbird_shortener_keys',
     storage: 'local',
     suffix: 'none',
@@ -327,6 +338,41 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'none',
     sensitivity: 'private',
     note: 'Which link shortener is active, and the short domain configured for each. Not secret — the keys live in mockingbird_shortener_keys — but a branded domain names the user, which is rather the point of one.',
+  },
+  {
+    base: 'mockingbird_twitter',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'Which Twitter/X read service is selected, and the cached verdict on whether it can be reached from a browser at all. Not secret — the keys live in mockingbird_twitter_keys — but naming the service you read through is a disclosure, same reasoning as mockingbird_cors_proxy.',
+  },
+  {
+    base: 'mockingbird_twitter_follows',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Which Twitter/X accounts are followed into the timeline. A follow list: not a credential, and squarely the kind of thing that should never reach a published gist.',
+  },
+  {
+    base: 'mockingbird_nitter_host',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'The Nitter instance used for Twitter/X reads, replaceable when one dies. Private rather than setting for the same reason as mastodon_mock_server: a niche instance names where the reader goes.',
+  },
+  {
+    base: 'mockingbird_trusted_accounts',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Accounts the reader marked as trusted, and the trust level each was given. A judgement about named people — closer to mockingbird_local_moderation than to a preference, and the kind of list that reads very differently out of context.',
+  },
+  {
+    base: 'mockingbird_proxy_consent',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'Which (service, CORS proxy) pairings the user agreed to send an API key through, and when. Supersedes mockingbird_shortener_proxy_consent, which is folded in on first read. Holds no credential itself, but it records a security decision: exporting and re-importing it elsewhere would carry consent the person never gave in that browser.',
   },
   {
     base: 'mockingbird_shortener_proxy_consent',
@@ -441,11 +487,15 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Short links this browser created: destination, short URL and the provider id needed to edit or delete them. Content rather than private because the destinations are things the user chose to publish. Link passwords are deliberately never stored here.',
   },
   {
-    base: 'mockingbird_eliza_dm',
+    // Replaces mockingbird_eliza_dm and mockingbird_eliza_notifications, which
+    // held the same thing under a bot-specific name before conversations became
+    // a general store. `content` is inherited from both, and is right for the
+    // same reason: these are messages the user wrote, in full.
+    base: 'mockingbird_conversations',
     storage: 'local',
     suffix: 'account',
     sensitivity: 'content',
-    note: 'Local DM threads.',
+    note: 'Local DM threads with in-app correspondents, message bodies included. Capped per correspondent and per conversation, but the cap is a size limit, not a privacy measure — a truncated private conversation is still a private conversation.',
   },
   {
     base: 'mockingbird_local_posts',
@@ -455,11 +505,11 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Locally-composed posts.',
   },
   {
-    base: 'mockingbird_eliza_notifications',
+    base: 'mockingbird_write_workspace',
     storage: 'local',
     suffix: 'account',
     sensitivity: 'content',
-    note: 'Locally-generated notifications.',
+    note: 'The writing board: draft cards, their column placement and split-view layout. Holds draft text, so it is content rather than a setting even though the layout half of it is only a preference.',
   },
 
   // ---- setting: the publishable payload ----
@@ -511,6 +561,23 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'account',
     sensitivity: 'setting',
     note: 'Connector credential retention policy (30d / 90d / never).',
+  },
+  {
+    base: 'mockingbird_pkm_vocabulary',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'setting',
+    note: 'The words that mean #NOTE, #TODO and #CAL for this account. Account-scoped because they are language-specific — an English account and a German one want different words, and a global setting would make one of them wrong on every switch.',
+  },
+  {
+    base: 'mockingbird_rss_feed_limit',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'setting',
+    // Deliberately NOT private, unlike mockingbird_rss_feeds beside it: a count
+    // of how many feeds to fetch says nothing about which ones. Splitting them
+    // is what lets the number be shared while the subscriptions are not.
+    note: 'How many RSS feeds to pull into the timeline. A number, not a list — the subscriptions themselves are mockingbird_rss_feeds and are private.',
   },
   {
     base: 'mockingbird_anonymous_preferences',
@@ -598,6 +665,22 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'none',
     sensitivity: 'cache',
     note: 'Which feeds (local/federated timelines, the three trends endpoints) each host actually serves, so we stop linking to feeds that answer 404 or 422 there. Keyed by host and by whether we held a token, because those answers genuinely differ. Refetchable, 24h TTL, records no content.',
+  },
+  {
+    base: 'mockingbird_twitter_usage',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'cache',
+    // Same reasoning as mockingbird_cors_proxy_usage below: counters only, no
+    // URLs and no handles, so it never records what was read.
+    note: "Daily Twitter/X request counts against the reader's own budget, bucketed by local calendar day. Counters only — resetting them loses nothing but the day's tally.",
+  },
+  {
+    base: 'mockingbird_first_run_preview',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'cache',
+    note: 'In-flight first-run state: the server the preview seeded from, and which follows already existed so the seed can be removed cleanly. Exists only while the first-run modal is open and is deleted when it closes — a half-finished onboarding is not something to carry to another machine.',
   },
   {
     base: 'mockingbird_cors_proxy_usage',

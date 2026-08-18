@@ -13,18 +13,14 @@ import {
 // The complementary check — that every key declared in the source appears in
 // this registry — needs filesystem access, which the Angular test build has no
 // types for. It lives in scripts/check-storage-registry.mjs (`npm run
-// check:storage`), and runs in CI as part of the `ui-gates` job in
+// check:storage`), and is enforced in CI by the `ui-gates` job in
 // .github/workflows/build.yml.
-//
-// It is currently in that job's *reported* step rather than its enforcing one,
-// because 13 keys are still unclassified and two registry entries are stale.
-// Until that backlog is cleared, this file's guarantees are the enforced ones
-// and the script's are advisory.
 //
 // This comment previously claimed the script was "wired into make check". It
 // was not wired into anything — `make check-ci` is the Python Makefile and never
 // ran it — so the script could only be invoked by hand, and the drift it exists
-// to prevent accumulated unnoticed for as long as the comment stayed wrong.
+// to prevent accumulated unnoticed for as long as the comment stayed wrong. If
+// you move where it runs, fix this sentence in the same commit.
 
 describe('storage registry', () => {
   it('lists no duplicate key bases', () => {

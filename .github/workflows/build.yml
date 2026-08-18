@@ -87,19 +87,17 @@ jobs:
       - name: Tests
         run: npm run test:ci
 
-      # ## Why this step is allowed to fail
+      # ## Why these two are allowed to fail
       #
-      # These three checks were already failing before this job existed —
-      # `check:storage` on 15 genuinely unclassified keys, `check:terminology` on
+      # Both were already failing before this job existed: `check:terminology` on
       # reader-vocabulary wording, `test:source-integrity` on one vacuous
-      # assertion. None of that is new, and none of it was introduced by the
-      # change that added this job.
+      # assertion. Neither is new, and turning them red on arrival would train
+      # everyone to ignore a red build — worse than the drift they catch.
       #
-      # Turning them red on arrival would train everyone to ignore a red build,
-      # which is worse than the drift they are meant to catch. So they run,
-      # visibly, and report — and move up into the enforcing steps above as each
-      # backlog is cleared. `check:storage` is closest: it needs 13 keys
-      # classified and 2 stale registry entries removed.
+      # They move up into the enforcing steps above as each backlog is cleared.
+      # `check:storage` already did: its 15 findings were resolved (12 keys
+      # classified, 2 stale entries replaced by their successor, 1 false positive
+      # fixed in the script), so it is enforced in `check:static` now.
       - name: Known-failing checks (reported, not enforced)
         continue-on-error: true
         run: npm run check:known-failing

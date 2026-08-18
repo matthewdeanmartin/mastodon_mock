@@ -44,6 +44,22 @@ function sourceFiles(dir) {
 }
 
 /**
+ * Declarations that carry a `mockingbird_*` name but are **not** localStorage
+ * keys, matched on the declared constant's name.
+ *
+ * The only member today is `DB_NAME` in `rss-cache.ts`, which names an
+ * *IndexedDB database*. It was reported as an unclassified storage key for as
+ * long as this script ran, and it can never be classified, because the registry
+ * describes `localStorage` and `sessionStorage` and this is neither.
+ *
+ * Matching on the constant's name rather than its value is the point: it is the
+ * name that says what the string is for. A new IndexedDB store should be called
+ * `DB_NAME` and be skipped automatically; a genuine key called something
+ * unusual still gets checked.
+ */
+const NON_STORAGE_DECLARATIONS = /^(?:DB_NAME|DATABASE_NAME|CACHE_NAME|STORE_NAME)$/;
+
+/**
  * Storage keys declared in the source, as `base -> file`.
  *
  * Every key in this app is declared as a `const NAME = '<literal>'` so it can
@@ -54,17 +70,19 @@ function sourceFiles(dir) {
 function declaredKeys() {
   const found = new Map();
   const declaration =
-    /(?:const|readonly)\s+\w+\s*(?::\s*string\s*)?=\s*'((?:mastodon_mock|mockingbird)[._][a-z0-9._:-]+)'/g;
+    /(?:const|readonly)\s+(\w+)\s*(?::\s*string\s*)?=\s*'((?:mastodon_mock|mockingbird)[._][a-z0-9._:-]+)'/g;
   for (const file of sourceFiles(APP_DIR)) {
     if (file === REGISTRY) continue;
     const text = readFileSync(file, 'utf8');
     for (const match of text.matchAll(declaration)) {
+      const [, name, key] = match;
       // A trailing `_` or `.` marks a key *prefix* used to match a family of
       // keys (ANONYMOUS_PREFIX), not a key base. A trailing `:` is different:
       // that is how instance-suffixed keys are built, so the literal really is
       // the registered base.
-      if (/[._]$/.test(match[1])) continue;
-      found.set(match[1], relative(ROOT, file).replaceAll('\\', '/'));
+      if (/[._]$/.test(key)) continue;
+      if (NON_STORAGE_DECLARATIONS.test(name)) continue;
+      found.set(key, relative(ROOT, file).replaceAll('\\', '/'));
     }
   }
   return found;
