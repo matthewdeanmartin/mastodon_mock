@@ -26,8 +26,11 @@ function withFollows(...following: string[]): TrustedAccounts {
         useValue: {
           revision: () => ({}),
           isFollowing: (a: Account | null) => !!a && following.includes(a.acct),
-          prime: () => {},
-          reset: () => {},
+          // `vi.fn()` rather than `() => {}`: these are deliberately inert on a
+          // test double, and an empty arrow trips no-empty-function, which would
+          // fail the lint gate for a stub that is doing exactly what it should.
+          prime: vi.fn(),
+          reset: vi.fn(),
         },
       },
     ],

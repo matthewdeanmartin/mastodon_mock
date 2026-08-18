@@ -78,7 +78,19 @@ export type PullOutcome =
    * Remote is ahead AND this browser has unpushed edits. The one case that
    * must ask, because either answer loses something.
    */
-  | { kind: 'needs-decision'; remote: PortableConfig; changes: ConfigChange[]; etag: string }
+  /**
+   * `revision` is the *remote* revision, and it is load-bearing: whichever way
+   * the user decides, the next write has to advance past it or the service
+   * answers 409. Carrying it here rather than re-reading it later is what keeps
+   * "keep mine" from needing a second round trip to become legal.
+   */
+  | {
+      kind: 'needs-decision';
+      remote: PortableConfig;
+      changes: ConfigChange[];
+      etag: string;
+      revision: number;
+    }
   | { kind: 'failed'; message: string };
 
 @Injectable({ providedIn: 'root' })
@@ -274,7 +286,7 @@ export class ProfileSync {
         // The one case that must ask. Deliberately does not apply anything
         // first: the user may choose to keep this browser's copy, and a partial
         // application would have already destroyed it.
-        return { kind: 'needs-decision', remote, changes, etag };
+        return { kind: 'needs-decision', remote, changes, etag, revision: document.revision };
       }
 
       importPortableConfig(remote, localStorage);

@@ -1,7 +1,8 @@
-import { effect, Injectable, signal, WritableSignal } from '@angular/core';
+import { effect, inject, Injectable, signal, WritableSignal } from '@angular/core';
 import { scopedKey } from './account-scope';
 import { isCanaryBuild } from './build-flavor';
 import { ProviderId } from './models';
+import { ProfileSyncStarter } from './providers/account/profile-sync-starter';
 import { DEFAULT_PKM_VOCABULARY, PkmVocabulary, normalizeVocabulary } from './pkm/pkm-tags';
 import { ALL_STEPS_ON, WIZARD_STEPS, WizardStep, WizardSteps } from './publish-wizard';
 
@@ -372,6 +373,15 @@ function clamp(value: number, min: number, max: number): number {
  */
 @Injectable({ providedIn: 'root' })
 export class ClientPrefs {
+  /**
+   * Settings sync, behind an indirection that loads nothing until it is needed.
+   *
+   * See the note at the end of {@link persist}. This service is instantiated
+   * eagerly so theme and accent apply on every route, so anything it imports is
+   * in the initial bundle — which the account machinery must not be.
+   */
+  private readonly profileSync = inject(ProfileSyncStarter);
+
   readonly themeMode = signal<ThemeMode>('auto');
   /**
    * Accent defaults to blue, but canary builds (/canary/ base href) default to
@@ -1209,6 +1219,21 @@ export class ClientPrefs {
     // Its own scoped key, not the shared blob: the vocabulary is per-account and
     // language-specific, so it must not follow the user to another login.
     localStorage.setItem(scopedKey(PKM_VOCABULARY_KEY_BASE), JSON.stringify(this.pkmVocabulary()));
+
+    // Tell settings sync a synced key moved, so it schedules a debounced push.
+    //
+    // Only `mockingbird_client_prefs` above is actually synced — the three
+    // account-scoped keys are not, because the settings document carries global
+    // keys only. Marking dirty on any of them is deliberately imprecise: this
+    // effect fires as one unit, distinguishing which half changed would mean
+    // diffing the blob, and the cost of being wrong is one debounced request
+    // that uploads identical bytes.
+    //
+    // Via the starter, not `ProfileSync` directly: this service is eager (theme
+    // has to apply on every route) and a direct import would put the account
+    // machinery in the initial bundle for every visitor. The call is a boolean
+    // check until sync is confirmed on.
+    this.profileSync.noteLocalChange();
   }
 
   /**

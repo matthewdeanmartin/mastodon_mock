@@ -1,8 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ConfigSync, ConfigSyncFrequency, RemoteConfigResult } from '../../../config-sync';
 import { PasteHistory } from '../../../providers/paste/paste-history';
+import { ProfileSync } from '../../../providers/account/profile-sync';
+import { SupporterStatus } from '../../../providers/account/supporter-status';
 import {
   configChanges,
   ConfigChange,
@@ -21,6 +23,53 @@ import {
 export class SettingsConfig {
   protected readonly sync = inject(ConfigSync);
   private readonly pasteHistory = inject(PasteHistory);
+
+  /**
+   * Mawkingbird Plus settings sync.
+   *
+   * Sits alongside the URL-based `ConfigSync` above rather than replacing it.
+   * The two answer different needs and both are legitimate: a published URL is
+   * how you hand your setup to somebody else or keep a fleet of machines on one
+   * config you edit by hand, while this is your own account following you
+   * between your own browsers. Someone can reasonably use either, or neither.
+   */
+  protected readonly profile = inject(ProfileSync);
+  private readonly supporter = inject(SupporterStatus);
+
+  /** The upload preview shown before enabling sync for the first time. */
+  protected readonly syncPreview = signal<ConfigChange[] | null>(null);
+  /** A remote document waiting on a keep-mine-or-take-theirs decision. */
+  protected readonly syncDecision = signal<{
+    remote: PortableConfig;
+    changes: ConfigChange[];
+    etag: string;
+    revision: number;
+  } | null>(null);
+  protected readonly syncMessage = signal('');
+
+  /** Whether to offer turning sync on. Entitlement is read, never assumed. */
+  protected readonly offersSync = computed(() =>
+    this.profile.offersSync(this.supporter.isSupporter()),
+  );
+  protected readonly offersRemote = computed(() => this.profile.offersRemote());
+
+  /**
+   * A human sentence for the sync state.
+   *
+   * Deliberately says *when*, not just *whether*. "On" with no timestamp is the
+   * shape of a feature that silently stopped working three weeks ago.
+   */
+  protected syncSummaryLine(): string {
+    const record = this.profile.record();
+    if (record.state !== 'on') {
+      return 'Not syncing on this browser.';
+    }
+    const at = record.lastSyncedAt;
+    if (at === undefined) {
+      return 'Syncing — nothing saved yet.';
+    }
+    return `Syncing — last saved ${new Date(at).toLocaleString()}.`;
+  }
 
   protected readonly includePrivate = signal(false);
   protected readonly importText = signal('');
@@ -213,6 +262,143 @@ export class SettingsConfig {
     }
     const checked = saved.lastCheckedAt ? new Date(saved.lastCheckedAt).toLocaleString() : 'never';
     return `${saved.frequency === 'manual' ? 'On demand' : saved.frequency} · last checked ${checked}`;
+  }
+
+  // --- Mawkingbird Plus settings sync -------------------------------------
+
+  /**
+   * Show what turning sync on would upload, before it uploads anything.
+   *
+   * Worth a click of its own because the first push defines the baseline every
+   * other browser inherits. "Show me first" costs nothing here — the diff is
+   * the same `configChanges()` the import preview already uses.
+   */
+  protected previewSyncUpload(): void {
+    this.clearNotice();
+    const upload = this.profile.previewUpload();
+    // Against an empty store, so this reads as "what would be uploaded" rather
+    // than "what would change", which is the question being asked.
+    this.syncPreview.set(
+      Object.keys(upload.values).map((key) => ({ key, action: 'add' as const })),
+    );
+  }
+
+  protected cancelSyncPreview(): void {
+    this.syncPreview.set(null);
+  }
+
+  protected async enableSync(): Promise<void> {
+    this.clearNotice();
+    this.syncPreview.set(null);
+    const ok = await this.profile.enable();
+    this.syncMessage.set(
+      ok
+        ? 'Settings sync is on. Your other browsers will pick these up next time you use them.'
+        : 'Could not save your settings just now. Sync stays on and will retry.',
+    );
+  }
+
+  /** Decline permanently. The offer does not return. */
+  protected declineSync(): void {
+    this.clearNotice();
+    this.profile.decline();
+    this.syncMessage.set('Settings stay on this browser only.');
+  }
+
+  protected disableSync(): void {
+    this.clearNotice();
+    this.profile.disable();
+    // Says explicitly that nothing was deleted. An off switch people are afraid
+    // of is an off switch that does not get used.
+    this.syncMessage.set(
+      'Stopped syncing on this browser. Nothing was deleted — your stored settings are still there.',
+    );
+  }
+
+  /** Adopt settings this account already has stored from another browser. */
+  protected async adoptRemote(): Promise<void> {
+    this.clearNotice();
+    const outcome = await this.profile.adoptRemote();
+    if (outcome.kind === 'applied') {
+      this.syncMessage.set(`Applied ${outcome.changes.length} setting(s). Reloading…`);
+      location.reload();
+      return;
+    }
+    if (outcome.kind === 'needs-decision') {
+      this.syncDecision.set({
+        remote: outcome.remote,
+        changes: outcome.changes,
+        etag: outcome.etag,
+        revision: outcome.revision,
+      });
+      return;
+    }
+    this.syncMessage.set(
+      outcome.kind === 'failed' ? outcome.message : 'Nothing stored for this account yet.',
+    );
+  }
+
+  /** Pull now, surfacing a decision if this browser has unsaved edits. */
+  protected async syncNow(): Promise<void> {
+    this.clearNotice();
+    const outcome = await this.profile.pull();
+    switch (outcome.kind) {
+      case 'applied':
+        this.syncMessage.set(`Applied ${outcome.changes.length} setting(s). Reloading…`);
+        location.reload();
+        return;
+      case 'needs-decision':
+        this.syncDecision.set({
+          remote: outcome.remote,
+          changes: outcome.changes,
+          etag: outcome.etag,
+          revision: outcome.revision,
+        });
+        return;
+      case 'unchanged':
+        // Push anyway: unchanged means the *remote* has not moved, which says
+        // nothing about whether this browser has edits waiting.
+        await this.profile.push();
+        this.syncMessage.set('Already up to date.');
+        return;
+      case 'absent':
+        await this.profile.push();
+        this.syncMessage.set('Saved this browser’s settings.');
+        return;
+      case 'failed':
+        this.syncMessage.set(outcome.message);
+        return;
+    }
+  }
+
+  /** Resolve a decision by taking the other browser's copy. */
+  protected useRemote(): void {
+    const decision = this.syncDecision();
+    if (!decision) {
+      return;
+    }
+    this.profile.useRemote(decision.remote, decision.etag, decision.revision);
+    this.syncDecision.set(null);
+    location.reload();
+  }
+
+  /** Resolve a decision by keeping this browser's copy and pushing it. */
+  protected async keepLocal(): Promise<void> {
+    const decision = this.syncDecision();
+    if (!decision) {
+      return;
+    }
+    const ok = await this.profile.keepLocal(decision.etag, decision.revision);
+    this.syncDecision.set(null);
+    this.syncMessage.set(
+      ok
+        ? 'Kept this browser’s settings and saved them to your account.'
+        : 'Could not save just now. This browser’s settings are unchanged and will retry.',
+    );
+  }
+
+  protected dismissDecision(): void {
+    this.syncDecision.set(null);
   }
 
   private previewConfig(config: PortableConfig): void {

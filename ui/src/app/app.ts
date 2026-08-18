@@ -9,6 +9,7 @@ import { ServerHealth } from './server-health';
 import { UpdateOverlay } from './update-overlay/update-overlay';
 import { UpdateRecovery } from './update-recovery';
 import { ConfigSync } from './config-sync';
+import { ProfileSyncStarter } from './providers/account/profile-sync-starter';
 
 @Component({
   selector: 'app-root',
@@ -32,6 +33,15 @@ export class App {
   private readonly routeLog = inject(RouteLog);
   /** Checks an explicitly configured remote client config when its cadence is due. */
   private readonly configSync = inject(ConfigSync);
+  /**
+   * Settings sync for a Mawkingbird Plus account.
+   *
+   * Behind a starter rather than injected directly: `ProfileSync` reaches
+   * `MawkingbirdSession`, and pulling that into the root component would put the
+   * whole account machinery in the initial bundle for every visitor — including
+   * the anonymous github.io deployment, where there are no accounts at all.
+   */
+  private readonly profileSync = inject(ProfileSyncStarter);
 
   constructor() {
     // Count page views on every router navigation (GoatCounter, no_onload).
@@ -43,5 +53,16 @@ export class App {
     // auto-reload, clear it once we've run cleanly for a bit.
     this.recovery.markApplicationStableAfterDelay();
     this.configSync.start();
+    // Never awaited: sync settling is not something application start should
+    // wait on, and the starter swallows its own failures.
+    void this.profileSync.start();
+    // Catches the other-machine case without polling. Rate-limited inside
+    // `recheckOnFocus` to once every few minutes, so tabbing back and forth
+    // costs nothing.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        void this.profileSync.recheckOnFocus();
+      }
+    });
   }
 }

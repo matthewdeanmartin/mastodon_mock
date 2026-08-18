@@ -4,6 +4,138 @@
 </div>
 
 <div class="spage-body">
+  <!--
+    Mawkingbird Plus sync, first because it is the one that needs no setup: the
+    URL-based sync below is still the right answer for publishing a setup or
+    driving a fleet of machines from one file you edit by hand.
+  -->
+  <div class="ssection">
+    <div class="srow">
+      <span class="slabel">Mawkingbird Plus sync</span>
+      <div class="scontrol">
+        <!-- Never asked, and entitled. The one-time offer. -->
+        @if (offersSync()) {
+          <p>
+            Keep these settings on your Mawkingbird account so they follow you to your other
+            browsers.
+          </p>
+          <span class="hint">
+            Turning this on uploads <strong>this browser's</strong> settings and makes them your
+            profile. Your other browsers will take these settings the next time you use them, so
+            it's worth a look first if this isn't the browser you set up on.
+          </span>
+          <div class="config-actions">
+            <button type="button" class="btn" (click)="enableSync()" [disabled]="profile.busy()">
+              Turn on sync
+            </button>
+            <button type="button" class="btn btn-outline" (click)="previewSyncUpload()">
+              Show what would be uploaded
+            </button>
+            <button type="button" class="btn btn-outline" (click)="declineSync()">No thanks</button>
+          </div>
+          @if (syncPreview(); as keys) {
+            <div class="export-preview">
+              <p>{{ keys.length }} setting(s) would be uploaded:</p>
+              <ul>
+                @for (change of keys; track change.key) {
+                  <li>
+                    <code>{{ change.key }}</code>
+                  </li>
+                }
+              </ul>
+              <button type="button" class="btn btn-outline" (click)="cancelSyncPreview()">
+                Close
+              </button>
+            </div>
+          }
+        } @else if (offersRemote()) {
+          <!--
+            Settings exist on the account but this browser is not syncing — they
+            turned it on somewhere else. Neither silently pulling (settings
+            changing on their own is alarming) nor silently ignoring (they turned
+            it on for a reason) is honest, so it gets its own offer.
+          -->
+          <p>Your account has settings synced from another browser.</p>
+          <div class="config-actions">
+            <button type="button" class="btn" (click)="adoptRemote()" [disabled]="profile.busy()">
+              Use them on this browser
+            </button>
+            <button type="button" class="btn btn-outline" (click)="declineSync()">
+              Not on this browser
+            </button>
+          </div>
+        } @else {
+          <span class="hint">{{ syncSummaryLine() }}</span>
+          @if (profile.syncing()) {
+            <div class="config-actions">
+              <button
+                type="button"
+                class="btn btn-outline"
+                (click)="syncNow()"
+                [disabled]="profile.busy()"
+              >
+                {{ profile.busy() ? 'Syncing…' : 'Sync now' }}
+              </button>
+              <button type="button" class="btn btn-outline" (click)="disableSync()">
+                Stop syncing
+              </button>
+            </div>
+            <span class="hint">
+              Stopping keeps everything as it is — nothing is deleted, and you can turn it back on.
+            </span>
+          }
+        }
+
+        <!--
+          The one case that must ask: the remote moved AND this browser has
+          edits that were never saved. Either answer loses something, so it is
+          not ours to choose.
+        -->
+        @if (syncDecision(); as decision) {
+          <div class="export-preview" role="alertdialog" aria-label="Settings conflict">
+            <p>
+              Your settings changed on another device, and this browser also has unsaved changes.
+            </p>
+            @if (decision.changes.length) {
+              <p>{{ decision.changes.length }} setting(s) differ:</p>
+              <ul>
+                @for (change of decision.changes; track change.key) {
+                  <li>
+                    <strong>{{ change.action }}</strong> <code>{{ change.key }}</code>
+                  </li>
+                }
+              </ul>
+            }
+            <div class="config-actions">
+              <button type="button" class="btn" (click)="useRemote()">
+                Use the other device's
+              </button>
+              <button type="button" class="btn btn-outline" (click)="keepLocal()">
+                Keep this browser's
+              </button>
+              <button type="button" class="btn btn-outline" (click)="dismissDecision()">
+                Decide later
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (profile.readOnly()) {
+          <span class="hint">
+            Your subscription has lapsed, so settings are no longer being saved. Everything already
+            stored stays readable and can be exported at any time.
+          </span>
+        }
+        @if (syncMessage()) {
+          <span class="export-status" role="status" aria-live="polite">{{ syncMessage() }}</span>
+        }
+        @if (profile.error(); as message) {
+          <p class="config-error" role="alert">{{ message }}</p>
+        }
+      </div>
+    </div>
+  </div>
+
   <div class="ssection">
     <div class="srow">
       <span class="slabel">Export</span>
