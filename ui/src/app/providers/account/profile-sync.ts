@@ -8,6 +8,8 @@ import {
   type PortableConfig,
 } from '../../portable-config';
 import { ProfileClient, type SettingsDocument } from './profile-client';
+import { PageDiagnostics } from '../../page-diagnostics';
+import { STORAGE_KEYS } from '../../storage-registry';
 import {
   FAILURES_BEFORE_WARNING,
   isSyncing,
@@ -66,6 +68,34 @@ export const FOCUS_RECHECK_MS = 5 * 60 * 1000;
 export const SETTINGS_KIND = 'mawkingbird-profile-settings';
 export const SETTINGS_SCHEMA_VERSION = 1;
 
+/**
+ * What a push did, so the UI can say what happened.
+ *
+ * Replaced a `boolean`. The boolean was the bug: three call sites discarded it
+ * and printed "Saved this browser's settings." unconditionally, so a failed
+ * upload was reported as a success. A shape with a `kind` cannot be ignored the
+ * same way, and it carries the counts the UI needs to say something specific
+ * rather than something reassuring.
+ */
+export type PushOutcome =
+  /** Written. `keys`, `bytes` and `byCategory` describe what actually went up. */
+  | {
+      kind: 'saved';
+      revision: number;
+      keys: number;
+      bytes: number;
+      /** Uploaded key names grouped by their registry sensitivity. */
+      byCategory: Record<string, string[]>;
+    }
+  /** Sync is off on this browser; nothing was attempted. */
+  | { kind: 'not-syncing' }
+  /** Lapsed, so writes are refused. Reads and export still work. */
+  | { kind: 'read-only'; message: string }
+  /** Someone else wrote first. The next pull surfaces the decision. */
+  | { kind: 'conflict' }
+  /** Offline, refused, or unreadable. */
+  | { kind: 'failed'; message: string };
+
 /** What a pull decided, so the UI can say what happened. */
 export type PullOutcome =
   /** Nothing stored remotely. */
@@ -96,6 +126,17 @@ export type PullOutcome =
 @Injectable({ providedIn: 'root' })
 export class ProfileSync {
   private client = inject(ProfileClient);
+  /**
+   * Console logging for the sync path.
+   *
+   * Added after a real session where sync appeared to do nothing: the settings
+   * GET 404'd (correct — nothing stored yet), the follow-up push failed, and the
+   * UI said "Saved this browser's settings." With no log line anywhere there was
+   * no way to tell from the outside which half had gone wrong. Every outcome is
+   * logged now, success included, because "it silently worked" and "it silently
+   * did nothing" are indistinguishable without one.
+   */
+  private diagnostics = inject(PageDiagnostics);
 
   /** This browser's view of the account-level switch. */
   readonly record = signal<ProfileSyncRecord>(readSyncRecord());
@@ -132,16 +173,15 @@ export class ProfileSync {
    * defines what every other machine will inherit. The UI must say so before
    * calling this.
    */
-  async enable(): Promise<boolean> {
+  async enable(): Promise<PushOutcome> {
     this.setRecord(updateSyncRecord({ state: 'on', dirty: true }));
-    const pushed = await this.push();
-    if (!pushed) {
-      // Left `on` with the dirty flag set, so the next trigger retries. Turning
-      // it back off would discard an explicit decision because of a transient
-      // network failure.
-      return false;
-    }
-    return true;
+    // Interactive: the user just clicked "Turn on sync", so a failure has to be
+    // reported now rather than counted towards a later warning.
+    //
+    // On failure sync is left `on` with the dirty flag set, so the next trigger
+    // retries. Turning it back off would discard an explicit decision because
+    // of a transient network blip — but the caller is still told it failed.
+    return this.push(true);
   }
 
   /**
@@ -188,11 +228,15 @@ export class ProfileSync {
 
     if (manifest.kind === 'payment-required') {
       this.readOnly.set(true);
+      this.diagnostics.info('ProfileSync', 'start:read-only', { reason: 'payment-required' });
       return;
     }
     if (manifest.kind !== 'ok') {
-      // Signed out or unreachable. Neither is an error worth showing: the app
-      // works without this service.
+      // Signed out or unreachable. Neither is an error worth showing to the
+      // user — the app works without this service — but both are worth a log
+      // line, because 'sync did nothing' and 'sync could not reach the
+      // service' look the same from the outside.
+      this.diagnostics.info('ProfileSync', 'start:unavailable', { kind: manifest.kind });
       return;
     }
 
@@ -202,16 +246,26 @@ export class ProfileSync {
     // Locally never asked, remotely present: they enabled sync somewhere else.
     if (current.state === 'unasked' && manifest.value.settings) {
       this.setRecord(updateSyncRecord({ state: 'off-but-remote-exists' }));
+      this.diagnostics.info('ProfileSync', 'start:remote-exists', {
+        remoteRevision: manifest.value.settings.revision,
+      });
       return;
     }
 
     if (!isSyncing(current)) {
+      this.diagnostics.info('ProfileSync', 'start:not-syncing', { state: current.state });
       return;
     }
 
     // Only fetch when the remote is actually ahead. A revision comparison costs
     // nothing and saves a round trip on every start where nothing changed.
     const remoteRevision = manifest.value.settings?.revision;
+    this.diagnostics.info('ProfileSync', 'start:syncing', {
+      localRevision: current.revision ?? null,
+      remoteRevision: remoteRevision ?? null,
+      dirty: current.dirty ?? false,
+      readOnly: manifest.value.readOnly,
+    });
     if (remoteRevision !== undefined && remoteRevision > (current.revision ?? -1)) {
       await this.pull();
     }
@@ -264,17 +318,26 @@ export class ProfileSync {
       const fetched = await this.client.fetchSettings(current.etag);
 
       if (fetched.kind === 'unchanged') {
+        this.diagnostics.info('ProfileSync', 'pull:unchanged', { etag: current.etag ?? null });
         return { kind: 'unchanged' };
       }
       if (fetched.kind === 'absent') {
+        // A 404 here is normal and not a failure: nothing has been stored for
+        // this account yet. Logged at info so a console reader can tell it apart
+        // from the request having gone wrong, which looks identical in devtools.
+        this.diagnostics.info('ProfileSync', 'pull:absent', {
+          note: 'nothing stored for this account yet',
+        });
         return { kind: 'absent' };
       }
       if (fetched.kind === 'payment-required') {
         this.readOnly.set(true);
+        this.diagnostics.warn('ProfileSync', 'pull:payment-required', { message: fetched.message });
         return { kind: 'failed', message: fetched.message };
       }
       if (fetched.kind !== 'ok') {
         const message = 'message' in fetched ? fetched.message : 'Could not read your profile.';
+        this.diagnostics.warn('ProfileSync', 'pull:failed', { kind: fetched.kind, message });
         return { kind: 'failed', message };
       }
 
@@ -286,6 +349,10 @@ export class ProfileSync {
         // The one case that must ask. Deliberately does not apply anything
         // first: the user may choose to keep this browser's copy, and a partial
         // application would have already destroyed it.
+        this.diagnostics.info('ProfileSync', 'pull:needs-decision', {
+          remoteRevision: document.revision,
+          differing: changes.length,
+        });
         return { kind: 'needs-decision', remote, changes, etag, revision: document.revision };
       }
 
@@ -299,6 +366,11 @@ export class ProfileSync {
           failures: 0,
         }),
       );
+      this.diagnostics.info('ProfileSync', 'pull:applied', {
+        revision: document.revision,
+        changed: changes.length,
+        keys: changes.map((change) => change.key),
+      });
       return { kind: 'applied', changes };
     } finally {
       this.busy.set(false);
@@ -329,20 +401,37 @@ export class ProfileSync {
    * rather than a doomed create — the local *content* wins, the remote
    * *position in the sequence* is respected.
    */
-  async keepLocal(etag: string, remoteRevision: number): Promise<boolean> {
+  async keepLocal(etag: string, remoteRevision: number): Promise<PushOutcome> {
     this.setRecord(updateSyncRecord({ etag, revision: remoteRevision, dirty: true }));
-    return this.push();
+    // Interactive: the user picked this in a dialog, so a failure must say so.
+    return this.push(true);
   }
 
   /**
    * Push this browser's settings.
    *
-   * Returns false on any failure, having recorded it. Never throws into a
-   * caller: a UI action must not fail because a background sync did.
+   * Never throws into a caller: a UI action must not fail because a background
+   * sync did. The outcome is *returned* rather than only recorded, because the
+   * two kinds of caller need different things from it — see {@link PushOutcome}
+   * and the `interactive` flag.
+   *
+   * `interactive` marks a push the user asked for by clicking something. Those
+   * report a failure immediately; background pushes stay quiet until the failure
+   * looks persistent, since one blip is usually a tunnel and not worth a
+   * message. Reporting nothing at all for a *clicked* button is the bug this
+   * flag exists to make impossible.
    */
-  async push(): Promise<boolean> {
-    if (!this.syncing() || this.readOnly()) {
-      return false;
+  async push(interactive = false): Promise<PushOutcome> {
+    if (!this.syncing()) {
+      this.diagnostics.info('ProfileSync', 'push:skipped', { reason: 'not-syncing' });
+      return { kind: 'not-syncing' };
+    }
+    if (this.readOnly()) {
+      this.diagnostics.info('ProfileSync', 'push:skipped', { reason: 'read-only' });
+      return {
+        kind: 'read-only',
+        message: 'Your subscription has lapsed, so settings are no longer being saved.',
+      };
     }
     this.cancelPush();
     this.busy.set(true);
@@ -363,7 +452,20 @@ export class ProfileSync {
           }),
         );
         this.error.set(null);
-        return true;
+        this.diagnostics.info('ProfileSync', 'push:ok', {
+          revision: result.value.revision,
+          keys: Object.keys(document.values).length,
+          bytes: new Blob([JSON.stringify(document)]).size,
+          byCategory: groupBySensitivity(Object.keys(document.values)),
+          interactive,
+        });
+        return {
+          kind: 'saved',
+          revision: result.value.revision,
+          keys: Object.keys(document.values).length,
+          bytes: new Blob([JSON.stringify(document)]).size,
+          byCategory: groupBySensitivity(Object.keys(document.values)),
+        };
       }
 
       if (result.kind === 'conflict') {
@@ -373,17 +475,30 @@ export class ProfileSync {
         this.setRecord(
           updateSyncRecord({ etag: result.etag, revision: result.current.revision, dirty: true }),
         );
-        return false;
+        this.diagnostics.info('ProfileSync', 'push:conflict', {
+          remoteRevision: result.current.revision,
+        });
+        return { kind: 'conflict' };
       }
 
       if (result.kind === 'payment-required') {
         this.readOnly.set(true);
         this.error.set(result.message);
-        return false;
+        this.diagnostics.warn('ProfileSync', 'push:payment-required', { message: result.message });
+        return { kind: 'read-only', message: result.message };
       }
 
-      this.noteFailure('message' in result ? result.message : 'Could not save your settings.');
-      return false;
+      const message = 'message' in result ? result.message : 'Could not save your settings.';
+      // Logged unconditionally, even when noteFailure() stays quiet: the point
+      // of the debounce is not to nag the user, not to hide the failure from
+      // whoever is reading a console trying to work out why nothing synced.
+      this.diagnostics.warn('ProfileSync', 'push:failed', {
+        kind: result.kind,
+        message,
+        interactive,
+      });
+      this.noteFailure(message, interactive);
+      return { kind: 'failed', message };
     } finally {
       this.busy.set(false);
     }
@@ -486,10 +601,13 @@ export class ProfileSync {
    * nothing has synced since March. One failed push, though, is usually a tunnel
    * or a sleeping laptop and is not worth a message.
    */
-  private noteFailure(message: string): void {
+  private noteFailure(message: string, interactive = false): void {
     const failures = (this.record().failures ?? 0) + 1;
     const patch: Partial<ProfileSyncRecord> = { failures, dirty: true };
-    if (failures >= FAILURES_BEFORE_WARNING) {
+    // A push the user asked for reports immediately. The counting exists to
+    // keep *background* failures quiet until they look persistent, and applying
+    // that patience to a clicked button means the click appears to do nothing.
+    if (interactive || failures >= FAILURES_BEFORE_WARNING) {
       patch.warning = message;
       this.error.set(message);
     }
@@ -505,4 +623,25 @@ export class ProfileSync {
     writeSyncRecord(record);
     this.record.set(record);
   }
+}
+
+/**
+ * Group uploaded key names by their registry sensitivity.
+ *
+ * Read from `storage-registry.ts` rather than from a list kept here, so the
+ * breakdown shown to the user cannot drift from the classification that
+ * actually decides what may be exported. A key with no registry entry is
+ * impossible in practice — `exportPortableConfig()` only emits registered keys
+ * — but is grouped as `unclassified` rather than dropped, because silently
+ * omitting something from a summary of what was uploaded would defeat its
+ * purpose.
+ */
+function groupBySensitivity(keys: string[]): Record<string, string[]> {
+  const grouped: Record<string, string[]> = {};
+  for (const key of keys) {
+    const spec = STORAGE_KEYS.find((candidate) => candidate.base === key);
+    const category = spec?.sensitivity ?? 'unclassified';
+    grouped[category] = [...(grouped[category] ?? []), key];
+  }
+  return grouped;
 }

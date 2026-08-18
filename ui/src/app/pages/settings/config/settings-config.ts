@@ -4,7 +4,9 @@ import { RouterLink } from '@angular/router';
 import { ConfigSync, ConfigSyncFrequency, RemoteConfigResult } from '../../../config-sync';
 import { PasteHistory } from '../../../providers/paste/paste-history';
 import { ProfileSync } from '../../../providers/account/profile-sync';
+import type { PushOutcome } from '../../../providers/account/profile-sync';
 import { SupporterStatus } from '../../../providers/account/supporter-status';
+import { formatBytes } from '../../../observability/local-storage-inspector';
 import {
   configChanges,
   ConfigChange,
@@ -46,6 +48,21 @@ export class SettingsConfig {
     revision: number;
   } | null>(null);
   protected readonly syncMessage = signal('');
+  /**
+   * A sync failure, kept apart from {@link syncMessage}.
+   *
+   * Separate signals because they are separate things: a status update and a
+   * failure should not be able to occupy the same slot, which is how "Saved
+   * this browser's settings." came to be shown for an upload that never landed.
+   */
+  protected readonly syncError = signal('');
+  /**
+   * What the last successful upload contained, by registry category.
+   *
+   * Shown rather than kept for the log alone: 'it synced' is not a claim a
+   * user can check, while '3 settings, 1 private' names what left the browser.
+   */
+  protected readonly syncUploaded = signal<{ category: string; keys: string[] }[] | null>(null);
 
   /** Whether to offer turning sync on. Entitlement is read, never assumed. */
   protected readonly offersSync = computed(() =>
@@ -290,12 +307,17 @@ export class SettingsConfig {
   protected async enableSync(): Promise<void> {
     this.clearNotice();
     this.syncPreview.set(null);
-    const ok = await this.profile.enable();
-    this.syncMessage.set(
-      ok
-        ? 'Settings sync is on. Your other browsers will pick these up next time you use them.'
-        : 'Could not save your settings just now. Sync stays on and will retry.',
-    );
+    const outcome = await this.profile.enable();
+    if (outcome.kind === 'saved') {
+      this.syncMessage.set(
+        `Settings sync is on. Uploaded ${outcome.keys} setting(s) (${formatBytes(outcome.bytes)}). Your other browsers will pick these up next time you use them.`,
+      );
+      this.showUploaded(outcome.byCategory);
+      return;
+    }
+    // Sync stays on either way — see `enable()` — but the failure is stated
+    // rather than dressed up as a partial success.
+    this.reportPush(outcome);
   }
 
   /** Decline permanently. The offer does not return. */
@@ -358,15 +380,48 @@ export class SettingsConfig {
       case 'unchanged':
         // Push anyway: unchanged means the *remote* has not moved, which says
         // nothing about whether this browser has edits waiting.
-        await this.profile.push();
-        this.syncMessage.set('Already up to date.');
+        this.reportPush(await this.profile.push(true), 'Already up to date.');
         return;
       case 'absent':
-        await this.profile.push();
-        this.syncMessage.set('Saved this browser’s settings.');
+        this.reportPush(await this.profile.push(true));
         return;
       case 'failed':
         this.syncMessage.set(outcome.message);
+        return;
+    }
+  }
+
+  /**
+   * Turn a push outcome into a sentence.
+   *
+   * Every branch says what actually happened. The previous version discarded
+   * the result and printed a success message unconditionally, so a failed
+   * upload read as "Saved this browser's settings." — the failure mode that
+   * makes a user trust a sync that is not running.
+   *
+   * `whenNothingToDo` covers the case where the push was a no-op because there
+   * was nothing to send; the caller knows which reassurance fits.
+   */
+  private reportPush(outcome: PushOutcome, whenNothingToDo?: string): void {
+    switch (outcome.kind) {
+      case 'saved':
+        this.showUploaded(outcome.byCategory);
+        this.syncMessage.set(
+          `Saved ${outcome.keys} setting(s) (${formatBytes(outcome.bytes)}) as revision ${outcome.revision}.`,
+        );
+        return;
+      case 'not-syncing':
+        this.syncMessage.set(whenNothingToDo ?? 'Sync is off on this browser.');
+        return;
+      case 'read-only':
+      case 'failed':
+        // Deliberately not `syncMessage`: a failure is not a status update.
+        this.syncError.set(outcome.message);
+        return;
+      case 'conflict':
+        this.syncMessage.set(
+          'Your settings changed on another device while saving. Sync again to see what differs.',
+        );
         return;
     }
   }
@@ -388,13 +443,16 @@ export class SettingsConfig {
     if (!decision) {
       return;
     }
-    const ok = await this.profile.keepLocal(decision.etag, decision.revision);
+    const outcome = await this.profile.keepLocal(decision.etag, decision.revision);
     this.syncDecision.set(null);
-    this.syncMessage.set(
-      ok
-        ? 'Kept this browser’s settings and saved them to your account.'
-        : 'Could not save just now. This browser’s settings are unchanged and will retry.',
-    );
+    if (outcome.kind === 'saved') {
+      this.syncMessage.set(
+        `Kept this browser’s settings and saved ${outcome.keys} setting(s) to your account.`,
+      );
+      this.showUploaded(outcome.byCategory);
+      return;
+    }
+    this.reportPush(outcome);
   }
 
   protected dismissDecision(): void {
@@ -410,6 +468,24 @@ export class SettingsConfig {
     this.error.set('');
     this.message.set('');
     this.exportMessage.set('');
+    // Cleared too, so the result of the last sync cannot linger next to the
+    // outcome of a different action and be read as describing it.
+    this.syncMessage.set('');
+    this.syncError.set('');
+    this.syncUploaded.set(null);
+  }
+
+  /**
+   * Record what an upload contained, for display.
+   *
+   * Sorted with the largest category first so the summary leads with the bulk
+   * of what was sent rather than with whichever name happened to sort first.
+   */
+  private showUploaded(byCategory: Record<string, string[]>): void {
+    const entries = Object.entries(byCategory)
+      .map(([category, keys]) => ({ category, keys }))
+      .sort((a, b) => b.keys.length - a.keys.length);
+    this.syncUploaded.set(entries.length ? entries : null);
   }
 
   private showError(error: unknown): void {

@@ -129,6 +129,31 @@
         @if (syncMessage()) {
           <span class="export-status" role="status" aria-live="polite">{{ syncMessage() }}</span>
         }
+        <!--
+          A failure gets `role="alert"` and the error style, never the status
+          style. The two were previously the same slot, which is how a failed
+          upload came to be announced as "Saved this browser's settings."
+        -->
+        @if (syncError()) {
+          <p class="config-error" role="alert">{{ syncError() }}</p>
+        }
+        @if (syncUploaded(); as uploaded) {
+          <div class="export-preview">
+            <p class="hint">What went to your account:</p>
+            <ul>
+              @for (group of uploaded; track group.category) {
+                <li>
+                  <strong>{{ group.keys.length }}</strong> {{ group.category }}
+                  <span class="hint">
+                    @for (key of group.keys; track key) {
+                      <code>{{ key }}</code>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
         @if (profile.error(); as message) {
           <p class="config-error" role="alert">{{ message }}</p>
         }

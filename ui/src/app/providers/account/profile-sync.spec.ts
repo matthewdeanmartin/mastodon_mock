@@ -149,9 +149,13 @@ describe('ProfileSync', () => {
       localStorage.setItem(PREFS, '{"theme":"light"}');
       fetchStub.mockResolvedValue(respond(200, { ok: true, etag: '"new"', revision: 1 }));
 
-      const ok = await sync.enable();
+      const outcome = await sync.enable();
 
-      expect(ok).toBe(true);
+      expect(outcome.kind).toBe('saved');
+      // The counts the UI reports come from here, so they are asserted rather
+      // than assumed: a wrong number is a confidently wrong claim to the user.
+      expect(outcome.kind === 'saved' && outcome.revision).toBe(1);
+      expect(outcome.kind === 'saved' && outcome.keys).toBeGreaterThan(0);
       const put = calls.find((call) => call.init.method === 'PUT')!;
       // A create, not an update: nothing was stored, so there is no ETag to
       // match and an unconditional write would be refused with 428.
@@ -163,9 +167,11 @@ describe('ProfileSync', () => {
 
     it('stays on when the first push fails, so the decision is not lost', async () => {
       fetchStub.mockResolvedValue(respond(500, { error: 'boom' }));
-      const ok = await sync.enable();
+      const outcome = await sync.enable();
 
-      expect(ok).toBe(false);
+      // Names the failure rather than merely being falsy — the whole point of
+      // replacing the boolean, since a discarded `false` was reported as success.
+      expect(outcome.kind).toBe('failed');
       // Turning it back off would discard an explicit decision because of a
       // transient network failure.
       expect(sync.record().state).toBe('on');
@@ -361,18 +367,81 @@ describe('ProfileSync', () => {
         ),
       );
 
-      const ok = await sync.push();
+      const outcome = await sync.push();
 
-      expect(ok).toBe(false);
+      expect(outcome.kind).toBe('conflict');
       expect(sync.record().etag).toBe('"winner"');
       expect(sync.record().revision).toBe(9);
       // Still unsaved: this browser's edits have not been stored anywhere.
       expect(sync.record().dirty).toBe(true);
     });
 
+    /**
+     * Regression, from a real session.
+     *
+     * GET /settings returned 404 (correct — nothing stored yet), the follow-up
+     * push failed, and the config page said "Saved this browser's settings."
+     * The cause was `push()` returning a boolean that all three call sites
+     * discarded. What makes the fix real is not that the message changed but
+     * that a failure is now *unrepresentable* as a success: there is no boolean
+     * left to drop.
+     */
+    it('reports a failure as a failure, never as saved', async () => {
+      sync.resetForTest({ state: 'on', dirty: true });
+      fetchStub.mockResolvedValue(respond(500, { error: 'boom' }));
+
+      const outcome = await sync.push();
+
+      expect(outcome.kind).toBe('failed');
+      expect(outcome.kind === 'failed' && outcome.message).toBeTruthy();
+      // Nothing recorded as synced, so the UI cannot claim a save happened.
+      expect(sync.record().lastSyncedAt).toBeUndefined();
+      expect(sync.record().dirty).toBe(true);
+    });
+
+    it('an interactive push surfaces the first failure immediately', async () => {
+      // Background pushes stay quiet until a failure looks persistent, which is
+      // right for a blip and wrong for a button the user just clicked.
+      sync.resetForTest({ state: 'on', dirty: true });
+      fetchStub.mockResolvedValue(respond(500, { error: 'boom' }));
+
+      await sync.push(true);
+
+      expect(sync.error()).toBeTruthy();
+    });
+
+    it('a background push stays quiet on a first failure', async () => {
+      sync.resetForTest({ state: 'on', dirty: true });
+      fetchStub.mockResolvedValue(respond(500, { error: 'boom' }));
+
+      await sync.push();
+
+      expect(sync.error()).toBeNull();
+    });
+
+    it('reports what was uploaded, grouped by registry category', async () => {
+      localStorage.setItem(PREFS, '{"theme":"light"}');
+      fetchStub.mockResolvedValue(respond(200, { ok: true, etag: '"new"', revision: 4 }));
+      sync.resetForTest({ state: 'on', dirty: true });
+
+      const outcome = await sync.push(true);
+
+      expect(outcome.kind).toBe('saved');
+      if (outcome.kind !== 'saved') {
+        return;
+      }
+      expect(outcome.bytes).toBeGreaterThan(0);
+      // Grouped from storage-registry.ts, so the breakdown shown to the user
+      // cannot drift from the classification that decides what may be exported.
+      expect(Object.keys(outcome.byCategory).length).toBeGreaterThan(0);
+      const grouped = Object.values(outcome.byCategory).flat();
+      expect(grouped).toHaveLength(outcome.keys);
+      expect(outcome.byCategory['unclassified']).toBeUndefined();
+    });
+
     it('does not push when sync is off', async () => {
       sync.resetForTest({ state: 'off' });
-      expect(await sync.push()).toBe(false);
+      expect((await sync.push()).kind).toBe('not-syncing');
       expect(calls).toHaveLength(0);
     });
 
@@ -384,7 +453,7 @@ describe('ProfileSync', () => {
       await sync.start();
       calls = [];
 
-      expect(await sync.push()).toBe(false);
+      expect((await sync.push()).kind).toBe('read-only');
       expect(calls).toHaveLength(0);
     });
 
