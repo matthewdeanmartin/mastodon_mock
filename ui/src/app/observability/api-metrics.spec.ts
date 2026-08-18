@@ -1,7 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ALL_SCOPES,
   ApiMetrics,
+  dayStart,
+  latencyFamily,
+  packHistogram,
+  unpackHistogram,
   ClientErrorGroup,
   EndpointStat,
   describeError,
@@ -9,6 +14,7 @@ import {
   normalizeErrorMessage,
 } from './api-metrics';
 import { Server } from '../server';
+import { emptyHistogram } from './latency-histogram';
 
 function storageKey(server: string): string {
   return `mockingbird_api_metrics:${encodeURIComponent(server)}`;
@@ -191,18 +197,171 @@ describe('ApiMetrics', () => {
     expect(reloaded.timeline().length).toBe(1);
   });
 
-  it('aggregates accounts on one server and isolates activity on another server', () => {
+  it('files calls under the server they were made against, whatever is selected', () => {
     metrics.record('GET', '/api/v1/home', 10, 200, true);
     metrics.record('GET', '/api/v1/home', 20, 200, true);
-    expect(metrics.totals().count).toBe(2);
-
     server.setBaseUrl('https://msdn.social');
     metrics.record('GET', '/api/v1/home', 30, 200, true);
-    expect(metrics.serverLabel()).toBe('https://msdn.social');
+
+    // Selecting a scope shows exactly that server, whichever one is active —
+    // the picker changes the view, never where a call was recorded.
+    metrics.selectScope('https://msdn.social');
     expect(metrics.totals().count).toBe(1);
+
+    metrics.selectScope('https://mastodon.social');
+    expect(metrics.totals().count).toBe(2);
 
     server.setBaseUrl('https://mastodon.social');
     expect(metrics.totals().count).toBe(2);
+  });
+
+  it('merges every server under the all-scopes selection', () => {
+    metrics.record('GET', '/api/v1/home', 10, 200, true);
+    server.setBaseUrl('https://msdn.social');
+    metrics.record('GET', '/api/v1/home', 30, 200, true);
+    metrics.record('GET', '/api/v1/notifications', 40, 500, false);
+
+    metrics.selectScope(ALL_SCOPES);
+    expect(metrics.totals().count).toBe(3);
+    expect(metrics.totals().errors).toBe(1);
+    expect(metrics.scopes()).toContain('https://msdn.social');
+    expect(metrics.scopes()).toContain('https://mastodon.social');
+
+    // The shared endpoint is one row carrying both servers' calls.
+    const home = metrics.stats().find((s) => s.key === 'GET /api/v1/home');
+    expect(home?.count).toBe(2);
+    expect(home?.minMs).toBe(10);
+    expect(home?.maxMs).toBe(30);
+  });
+
+  it('resets only the selected server, and every server when merged', () => {
+    metrics.record('GET', '/api/v1/home', 10, 200, true);
+    server.setBaseUrl('https://msdn.social');
+    metrics.record('GET', '/api/v1/home', 30, 200, true);
+
+    metrics.selectScope('https://msdn.social');
+    metrics.reset();
+    expect(metrics.totals().count).toBe(0);
+
+    metrics.selectScope('https://mastodon.social');
+    expect(metrics.totals().count).toBe(1);
+
+    metrics.selectScope(ALL_SCOPES);
+    metrics.reset();
+    expect(metrics.totals().count).toBe(0);
+  });
+
+  // -------------------------------------------------------- daily + latency
+
+  /** Record `n` successful calls to one endpoint at a fixed duration. */
+  function calls(endpoint: string, n: number, ms: number): void {
+    for (let i = 0; i < n; i++) {
+      metrics.record('GET', endpoint, ms, 200, true);
+    }
+  }
+
+  it('rolls calls into a daily bucket alongside the minute ring', () => {
+    calls('/api/v1/home', 3, 10);
+    metrics.record('GET', '/api/v1/home', 10, 500, false);
+
+    const days = metrics.daily();
+    expect(days.length).toBe(1);
+    expect(days[0].count).toBe(4);
+    expect(days[0].errors).toBe(1);
+    expect(days[0].t).toBe(dayStart(Date.now()));
+  });
+
+  it('routes search into the slow family and everything else into the fast one', () => {
+    expect(latencyFamily('GET /api/v2/search')).toBe('slow');
+    expect(latencyFamily('POST /api/v2/media')).toBe('slow');
+    expect(latencyFamily('GET /api/v1/timelines/home')).toBe('fast');
+
+    calls('/api/v2/search', 6, 900);
+    calls('/api/v1/timelines/home', 6, 12);
+
+    expect(metrics.latencySeries('slow')[0].n).toBe(6);
+    expect(metrics.latencySeries('fast')[0].n).toBe(6);
+  });
+
+  it('keeps errors out of the latency distribution', () => {
+    // A connection refused in 0ms and one that hung for 30s are both "no
+    // answer"; neither describes how fast the API is.
+    metrics.record('GET', '/api/v1/home', 0, 0, false);
+    metrics.record('GET', '/api/v1/home', 30_000, 500, false);
+    calls('/api/v1/home', 5, 20);
+
+    const point = metrics.latencySeries('fast')[0];
+    expect(point.n).toBe(5);
+    expect(point.median!).toBeLessThan(60);
+  });
+
+  it('withholds the median entirely below five samples', () => {
+    calls('/api/v1/home', 4, 20);
+    const point = metrics.latencySeries('fast')[0];
+    expect(point.n).toBe(4);
+    // A gap, not a zero: zero would read as "instant" on the chart.
+    expect(point.median).toBeNull();
+    expect(point.p95).toBeNull();
+  });
+
+  it('shows a median but withholds the variance band between five and twenty samples', () => {
+    calls('/api/v1/home', 10, 20);
+    const point = metrics.latencySeries('fast')[0];
+    expect(point.median).not.toBeNull();
+    expect(point.p25).toBeNull();
+    expect(point.p95).toBeNull();
+  });
+
+  it('shows the band once there are twenty samples', () => {
+    calls('/api/v1/home', 20, 20);
+    const point = metrics.latencySeries('fast')[0];
+    expect(point.median).not.toBeNull();
+    expect(point.p25).not.toBeNull();
+    expect(point.p95).not.toBeNull();
+    expect(point.p95!).toBeGreaterThanOrEqual(point.p25!);
+  });
+
+  it('persists and reloads daily buckets, histograms included', () => {
+    vi.useFakeTimers();
+    try {
+      calls('/api/v1/home', 25, 20);
+      // Writes are debounced, so nothing is on disk until the timer fires.
+      vi.advanceTimersByTime(2_000);
+    } finally {
+      vi.useRealTimers();
+    }
+    const before = metrics.latencySeries('fast')[0];
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [ApiMetrics, Server] });
+    TestBed.inject(Server).setBaseUrl('https://mastodon.social');
+    const reloaded = TestBed.inject(ApiMetrics);
+
+    const after = reloaded.latencySeries('fast')[0];
+    expect(after.n).toBe(before.n);
+    expect(after.median).toBe(before.median);
+    expect(after.p95).toBe(before.p95);
+  });
+
+  it('round-trips a histogram through the packed zero-run encoding', () => {
+    const hist = emptyHistogram();
+    hist[0] = 3;
+    hist[7] = 11;
+    expect(unpackHistogram(packHistogram(hist))).toEqual(hist);
+    // The common case really is mostly zeroes, which is why packing pays.
+    expect(packHistogram(hist).length).toBeLessThan(hist.length);
+  });
+
+  it('merges the same local day across servers into one column', () => {
+    calls('/api/v1/home', 6, 20);
+    server.setBaseUrl('https://msdn.social');
+    calls('/api/v1/home', 6, 20);
+
+    metrics.selectScope(ALL_SCOPES);
+    const days = metrics.daily();
+    expect(days.length).toBe(1);
+    expect(days[0].count).toBe(12);
+    expect(metrics.latencySeries('fast')[0].n).toBe(12);
   });
 
   // ------------------------------------------------------------ client errors

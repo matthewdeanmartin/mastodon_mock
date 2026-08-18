@@ -111,6 +111,141 @@
   margin-left: auto;
 }
 
+/* ------------------------------------------------------------- server picker */
+.obs-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.obs-scope select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+  color: inherit;
+  font: inherit;
+  max-width: 260px;
+}
+
+/* --------------------------------------------------------- volume + latency */
+.volume-chart,
+.latency-chart {
+  width: 100%;
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--col-bg);
+  overflow: visible;
+}
+
+.volume-chart {
+  height: 150px;
+}
+
+.latency-chart {
+  height: 130px;
+}
+
+.volume-chart .bar {
+  fill: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.volume-chart .bar:hover {
+  fill: var(--accent);
+}
+
+.volume-chart .bar-err {
+  fill: #e0245e;
+}
+
+.volume-chart .axis {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.latency-chart .grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The viewBox is stretched horizontally by preserveAspectRatio="none", which
+   would stretch glyphs with it; the axis labels opt out of that scaling. */
+.latency-chart .tick {
+  fill: var(--muted);
+  font-size: 9px;
+  vector-effect: non-scaling-stroke;
+}
+
+.latency-chart .band {
+  stroke: none;
+}
+
+.latency-chart .band-fast {
+  fill: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.latency-chart .band-slow {
+  fill: color-mix(in srgb, #b46be0 18%, transparent);
+}
+
+.latency-chart .median {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.latency-chart .median-fast {
+  stroke: var(--accent);
+}
+
+.latency-chart .median-slow {
+  stroke: #b46be0;
+}
+
+.latency-chart .pt-fast {
+  fill: var(--accent);
+}
+
+.latency-chart .pt-slow {
+  fill: #b46be0;
+}
+
+.legend {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.legend .key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin: 0 3px 0 8px;
+  vertical-align: -1px;
+}
+
+.legend .key-fast {
+  background: var(--accent);
+}
+
+.legend .key-slow {
+  background: #b46be0;
+}
+
 /* -------------------------------------------------------------- calls chart */
 .chart-figure {
   margin: 16px 0 4px;

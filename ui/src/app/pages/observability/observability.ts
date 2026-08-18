@@ -1,11 +1,15 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  ALL_SCOPES,
   ApiError,
   ApiMetrics,
   BUCKET_MS,
   ClientErrorGroup,
+  DayBucket,
   EndpointStat,
+  LatencyFamily,
+  LatencyPoint,
   TimeBucket,
 } from '../../observability/api-metrics';
 import { EndpointDoc, endpointDoc } from '../../observability/api-docs';
@@ -41,6 +45,98 @@ interface ChartPoint {
 const CHART_W = 720;
 const CHART_H = 160;
 const CHART_PAD = 4;
+/** Heights of the two stacked charts. Latency is shorter; it is a trend, not a total. */
+const VOLUME_H = 150;
+const LATENCY_H = 130;
+/**
+ * Minimum bar slots on the volume chart. With fewer days than this, bars keep
+ * their width and the chart is left-aligned rather than stretching three days
+ * across an axis that would then imply three months.
+ */
+const MIN_VOLUME_SLOTS = 14;
+/** Space a latency axis label needs above a gridline before it clips. */
+const TICK_LABEL_MARGIN = 11;
+
+/** One day's latency point, laid out in SVG space. */
+interface LatencyPlot {
+  point: LatencyPoint;
+  x: number;
+  /** Null when the day had too few samples to place a median. */
+  y: number | null;
+}
+
+/** One family's drawn geometry. */
+interface LatencySeries {
+  name: LatencyFamily;
+  /** Median polylines, split at gaps. */
+  segments: string[];
+  /** Filled p25–p95 band polygons, split at gaps. */
+  band: string[];
+  points: LatencyPlot[];
+}
+
+/**
+ * Split a series into polyline strings, breaking wherever a day has no median.
+ *
+ * The break is the point. Joining across a quiet day would draw a confident
+ * line through a period that was never measured, and the reader has no way to
+ * tell that segment from a measured one.
+ */
+function segmentsOf(
+  points: LatencyPoint[],
+  x: (i: number) => number,
+  y: (ms: number) => number,
+): string[] {
+  const out: string[] = [];
+  let run: string[] = [];
+  points.forEach((p, i) => {
+    if (p.median === null) {
+      if (run.length > 1) {
+        out.push(run.join(' '));
+      }
+      run = [];
+      return;
+    }
+    run.push(`${x(i).toFixed(1)},${y(p.median).toFixed(1)}`);
+  });
+  if (run.length > 1) {
+    out.push(run.join(' '));
+  }
+  return out;
+}
+
+/**
+ * The p25–p95 band as filled polygons, again split at gaps.
+ *
+ * A run of a single banded day yields no polygon: a band needs two points to
+ * have a width, and a lone day's spread is shown by its tooltip instead.
+ */
+function bandOf(
+  points: LatencyPoint[],
+  x: (i: number) => number,
+  y: (ms: number) => number,
+): string[] {
+  const out: string[] = [];
+  let upper: string[] = [];
+  let lower: string[] = [];
+  const close = (): void => {
+    if (upper.length > 1) {
+      out.push([...upper, ...lower.reverse()].join(' '));
+    }
+    upper = [];
+    lower = [];
+  };
+  points.forEach((p, i) => {
+    if (p.p25 === null || p.p95 === null) {
+      close();
+      return;
+    }
+    upper.push(`${x(i).toFixed(1)},${y(p.p95).toFixed(1)}`);
+    lower.push(`${x(i).toFixed(1)},${y(p.p25).toFixed(1)}`);
+  });
+  close();
+  return out;
+}
 
 /** How the route table is sorted. */
 type RouteSortKey = 'visits' | 'time';
@@ -87,6 +183,28 @@ export class Observability {
   protected readonly proxyUsage = this.proxyUsageStore.usage;
   protected readonly proxyLabel = computed(() => this.proxySettings.chosen()?.label ?? null);
   protected readonly proxiedFeedCount = computed(() => this.rssSubs.proxiedCount());
+
+  // ----------------------------------------------------------- server picker
+
+  protected readonly allScopes = ALL_SCOPES;
+  protected readonly scopes = this.metrics.scopes;
+  protected readonly scope = this.metrics.scope;
+
+  /** True when the view is merged across every server. */
+  protected readonly merged = computed(() => this.scope() === ALL_SCOPES);
+
+  selectScope(value: string): void {
+    this.metrics.selectScope(value);
+  }
+
+  onScopeChange(event: Event): void {
+    this.selectScope((event.target as HTMLSelectElement).value);
+  }
+
+  /** A server origin without its scheme, for a label that fits a dropdown. */
+  protected scopeLabel(scope: string): string {
+    return scope.replace(/^https?:\/\//, '');
+  }
 
   resetProxyUsage(): void {
     this.proxyUsageStore.reset();
@@ -312,6 +430,143 @@ export class Observability {
 
   setSort(key: SortKey): void {
     this.sortKey.set(key);
+  }
+
+  // ----------------------------------------------------- volume + latency charts
+
+  protected readonly volumeH = VOLUME_H;
+  protected readonly latencyH = LATENCY_H;
+
+  /**
+   * The daily volume chart: one bar per day, errors stacked on top.
+   *
+   * Bars rather than the old line, because the quantity is a *count over an
+   * interval* and a line between two daily totals implies intermediate values
+   * that were never measured. The previous chart drew a line across one-minute
+   * buckets, which is why it looked like noise: it was noise, faithfully
+   * rendered.
+   */
+  protected readonly volumeChart = computed(() => {
+    const days = this.metrics.daily();
+    if (!days.length) {
+      return null;
+    }
+    const max = Math.max(1, ...days.map((d) => d.count));
+    const innerW = CHART_W - CHART_PAD * 2;
+    const innerH = VOLUME_H - CHART_PAD * 2;
+    // Bars are laid out on a fixed slot width so a 3-day history reads as three
+    // bars near the left, not three columns stretched across the whole box —
+    // stretching would imply the axis covers a span it does not.
+    const slot = innerW / Math.max(days.length, MIN_VOLUME_SLOTS);
+    const barW = Math.max(1, slot * 0.7);
+    const bars = days.map((d, i) => {
+      const h = (d.count / max) * innerH;
+      const errH = (d.errors / max) * innerH;
+      return {
+        day: d,
+        x: CHART_PAD + i * slot + (slot - barW) / 2,
+        w: barW,
+        // Errors sit at the top of the bar, so the total height stays the total.
+        y: CHART_PAD + innerH - h,
+        h: Math.max(d.count ? 1 : 0, h),
+        errY: CHART_PAD + innerH - h,
+        errH,
+      };
+    });
+    return { bars, max, baseline: CHART_PAD + innerH };
+  });
+
+  /**
+   * The latency chart: median line plus a p25–p95 band, one series per family.
+   *
+   * Both families share a y-axis so they are honestly comparable, and the axis
+   * is logarithmic — a linear axis with search at 900 ms and a timeline read at
+   * 8 ms flattens the fast series onto the floor, which is exactly the series
+   * most calls belong to.
+   */
+  protected readonly latencyChart = computed(() => {
+    const fast = this.metrics.latencySeries('fast');
+    const slow = this.metrics.latencySeries('slow');
+    const all = [...fast, ...slow];
+    const values = all.flatMap((p) =>
+      [p.median, p.p25, p.p95].filter((v): v is number => v !== null),
+    );
+    if (values.length < 2) {
+      return null;
+    }
+    const lo = Math.max(1, Math.min(...values));
+    const hi = Math.max(...values, lo * 2);
+    const innerW = CHART_W - CHART_PAD * 2;
+    const innerH = LATENCY_H - CHART_PAD * 2;
+    const span = Math.max(1, all.length ? fast.length - 1 : 1);
+    const logLo = Math.log(lo);
+    const logHi = Math.log(hi);
+    const y = (ms: number): number =>
+      CHART_PAD + innerH - ((Math.log(Math.max(1, ms)) - logLo) / (logHi - logLo)) * innerH;
+    const x = (i: number): number => CHART_PAD + (span === 0 ? 0 : i / span) * innerW;
+
+    const series = (points: LatencyPoint[], name: LatencyFamily): LatencySeries => ({
+      name,
+      // Segments, not one polyline: a day below the sample floor is a gap, and
+      // a polyline would bridge it with a straight line that asserts continuity
+      // the data does not have.
+      segments: segmentsOf(points, x, y),
+      band: bandOf(points, x, y),
+      points: points.map((p, i) => ({
+        point: p,
+        x: x(i),
+        y: p.median === null ? null : y(p.median),
+      })),
+    });
+    return { fast: series(fast, 'fast'), slow: series(slow, 'slow'), lo, hi };
+  });
+
+  /** Axis ticks for the latency chart, at readable round magnitudes. */
+  protected readonly latencyTicks = computed(() => {
+    const c = this.latencyChart();
+    if (!c) {
+      return [];
+    }
+    const innerH = LATENCY_H - CHART_PAD * 2;
+    const logLo = Math.log(c.lo);
+    const logHi = Math.log(c.hi);
+    return [1, 10, 100, 1_000, 10_000]
+      .filter((ms) => ms >= c.lo && ms <= c.hi)
+      .map((ms) => {
+        const y = CHART_PAD + innerH - ((Math.log(ms) - logLo) / (logHi - logLo)) * innerH;
+        return {
+          ms,
+          label: ms >= 1_000 ? `${ms / 1_000}s` : `${ms}ms`,
+          y,
+          // The label sits above its gridline, except near the top of the box
+          // where that would clip it against the border — there it drops below.
+          labelY: y < TICK_LABEL_MARGIN ? y + TICK_LABEL_MARGIN : y - 3,
+        };
+      });
+  });
+
+  /** Day label for an axis or tooltip ("Aug 18"). */
+  protected dayLabel(t: number): string {
+    return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  /** Tooltip text for a volume bar. */
+  protected volumeLabel(d: DayBucket): string {
+    return `${this.dayLabel(d.t)} · ${d.count.toLocaleString()} call${d.count === 1 ? '' : 's'}${
+      d.errors ? ` · ${d.errors} error${d.errors === 1 ? '' : 's'}` : ''
+    }`;
+  }
+
+  /** Tooltip text for a latency point, including why a band may be missing. */
+  protected latencyLabel(p: LatencyPoint, family: LatencyFamily): string {
+    if (p.median === null) {
+      return `${this.dayLabel(p.t)} · ${family} · ${p.n} sample${p.n === 1 ? '' : 's'} — too few to summarise`;
+    }
+    const band =
+      p.p25 === null
+        ? ` (no spread shown: ${p.n} samples)`
+        : ` · p25 ${this.round(p.p25)}ms · p95 ${this.round(p.p95!)}ms`;
+    return `${this.dayLabel(p.t)} · ${family} · median ${this.round(p.median)}ms${band} · n=${p.n}`;
   }
 
   // ------------------------------------------------------------ calls chart
