@@ -796,6 +796,21 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Mawkingbird Plus settings-sync state: whether sync is on, the last ETag and revision seen, whether local edits are unpushed, and any persistent failure. Never synced itself — a document that described its own sync position would be describing the wrong browser the moment it arrived.',
   },
   {
+    base: 'mockingbird_profile_list_copy',
+    storage: 'local',
+    // Global rather than account-scoped even though its *contents* are account
+    // keys. Scoping it would key a record of "which accounts were asked" by a
+    // token hash that changes on re-login, which is precisely the instability
+    // the Plus account keys exist to avoid — the prompt would then reappear
+    // after every sign-in.
+    suffix: 'none',
+    // `private` rather than `setting`: it names which accounts this browser has
+    // seen, so exporting it would leak a list of the user's personas into a
+    // config file meant to be shareable.
+    sensitivity: 'private',
+    note: "Which Mawkingbird accounts have been offered the one-time copy of this browser's client lists to Plus storage. Records only that the question was asked, never the answer — declining keeps the copy available on demand, so a stored 'no' would have nothing to gate.",
+  },
+  {
     base: 'mockingbird_profile_writer',
     storage: 'local',
     suffix: 'none',

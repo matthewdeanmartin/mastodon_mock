@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ClientList, ClientLists } from '../../lists/client-lists';
+import { ProfileLists } from '../../providers/account/profile-lists';
 import { ListFeedResolver, MERGE_MEMBER_CAP } from '../../lists/list-feed-resolver';
 import { Account, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
@@ -24,6 +25,7 @@ import { PageDiagnostics } from '../../page-diagnostics';
 export class ClientListPage implements OnInit {
   private route = inject(ActivatedRoute);
   private store = inject(ClientLists);
+  private profileLists = inject(ProfileLists);
   private resolver = inject(ListFeedResolver);
   private diagnostics = inject(PageDiagnostics);
 
@@ -50,19 +52,38 @@ export class ClientListPage implements OnInit {
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
-        this.load(id);
+        void this.load(id);
       }
     });
   }
 
-  private load(id: string): void {
+  /**
+   * Resolve a list from whichever store holds it.
+   *
+   * The route is shared by both destinations because a list is a list: the page
+   * renders members and posts identically whether the record came from this
+   * browser or from the account. Only the lookup differs, and the ids do not
+   * collide — a Plus list is `mwk-list-*`, a local one `client-list-*`.
+   *
+   * Local is checked first and without awaiting anything, so the common case
+   * still renders synchronously and signed-out users never wait on a network
+   * call they have no account for.
+   */
+  private async load(id: string): Promise<void> {
     this.loading.set(true);
     this.tab.set('posts');
     this.statuses.set([]);
     this.members.set([]);
     this.unresolved.set([]);
 
-    const list = this.store.get(id);
+    let list = this.store.get(id);
+    if (!list) {
+      // Only reachable for an id this browser does not hold locally, so a
+      // signed-out visitor pays nothing: `ProfileLists.load()` refuses before
+      // the network when there is no account key.
+      await this.profileLists.load();
+      list = this.profileLists.get(id);
+    }
     this.list.set(list);
     if (!list || !list.memberHandles.length) {
       this.loading.set(false);

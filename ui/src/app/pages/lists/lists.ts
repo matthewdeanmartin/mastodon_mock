@@ -20,6 +20,10 @@ import { BlueskyFeedEntry, BlueskyFeeds } from '../../providers/bluesky/bluesky-
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { describeHttpError, PageDiagnostics } from '../../page-diagnostics';
 import { Terminology } from '../../terminology';
+import { ProfileAccountKey } from '../../providers/account/profile-account-key';
+import { ProfileList, ProfileLists } from '../../providers/account/profile-lists';
+import { CopyPreview, ProfileListCopy } from '../../providers/account/profile-list-copy';
+import { SupporterStatus } from '../../providers/account/supporter-status';
 
 /**
  * Which sections the Feeds page shows. `/feeds` shows everything; `/feeds/lists`
@@ -281,6 +285,84 @@ export class Lists implements OnInit {
     this.clientLists.remove(list.id);
   }
 
+  /**
+   * Lists stored on a Mawkingbird Plus account.
+   *
+   * A second *destination*, not a synced copy of the section above: a list lives
+   * in one place. Client lists stay in the browser and work signed out; these
+   * follow the account to another machine. Nothing reconciles between them,
+   * which is what keeps this free of the duplicate-and-undeletable class of bug.
+   *
+   * Injected directly rather than through a starter indirection: this page is
+   * already lazily routed, so the cost lands only on someone who opened it.
+   */
+  protected profileLists = inject(ProfileLists);
+  protected profileAccountKey = inject(ProfileAccountKey);
+  protected listCopy = inject(ProfileListCopy);
+  protected supporter = inject(SupporterStatus);
+  protected newProfileListTitle = signal('');
+  protected profileListToDelete = signal<ProfileList | null>(null);
+  protected copyOffer = signal<CopyPreview | null>(null);
+
+  /** Whether to show the Plus section at all. */
+  protected showsProfileLists = computed(
+    () => this.supporter.isSupporter() && this.profileAccountKey.current() !== null,
+  );
+
+  async createProfileList(): Promise<void> {
+    const title = this.newProfileListTitle().trim();
+    if (!title) {
+      return;
+    }
+    this.newProfileListTitle.set('');
+    await this.profileLists.create(title);
+  }
+
+  askDeleteProfileList(list: ProfileList, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.profileListToDelete.set(list);
+  }
+
+  async removeProfileList(list: ProfileList): Promise<void> {
+    this.profileListToDelete.set(null);
+    await this.profileLists.remove(list.id);
+  }
+
+  /** Copy this browser's client lists to the account. Originals are untouched. */
+  async copyClientListsToProfile(): Promise<void> {
+    await this.listCopy.copy(this.profileAccountKey.current());
+    this.copyOffer.set(null);
+  }
+
+  declineCopyOffer(): void {
+    this.listCopy.decline(this.profileAccountKey.current());
+    this.copyOffer.set(null);
+  }
+
+  /** Show the copy offer on demand, even after it was declined once. */
+  showCopyOffer(): void {
+    this.copyOffer.set(this.listCopy.preview());
+  }
+
+  /**
+   * Fetch the account's lists, then decide whether to offer the copy.
+   *
+   * Order matters: `shouldOffer` only fires when the collection is loaded and
+   * empty, so asking before the fetch would offer a copy into a collection that
+   * might already have lists in it.
+   */
+  private async loadProfileLists(): Promise<void> {
+    if (!this.showsProfileLists()) {
+      return;
+    }
+    await this.profileLists.load();
+    const accountKey = this.profileAccountKey.current();
+    if (this.listCopy.shouldOffer(accountKey)) {
+      this.copyOffer.set(this.listCopy.preview());
+    }
+  }
+
   /** Tag bundles — hashtag lists read as one feed. Anonymous-friendly. */
   protected tagBundles = inject(TagBundles);
   protected newBundleTitle = signal('');
@@ -339,6 +421,7 @@ export class Lists implements OnInit {
       this.resolveServerFeeds();
       this.loadBlueskyFeeds();
       this.loadPopularFeeds();
+      void this.loadProfileLists();
     }
     if (this.shows('tags')) {
       this.loadTags();

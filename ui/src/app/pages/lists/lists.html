@@ -92,6 +92,93 @@
   }
 }
 
+@if (shows('lists') && showsSection('client-lists') && showsProfileLists()) {
+  <div class="section-head">Mawkingbird lists</div>
+  <p class="muted small section-note">
+    Kept on your Mawkingbird account, so they follow you to your other browsers. Client lists
+    (above) stay in this browser. A list lives in one place — nothing is copied between them unless
+    you ask.
+  </p>
+
+  @if (copyOffer(); as offer) {
+    <div class="new-list copy-offer">
+      <p class="small">
+        This browser has {{ offer.lists }} client {{ offer.lists === 1 ? 'list' : 'lists' }} ({{
+          offer.accounts
+        }}
+        {{ offer.accounts === 1 ? 'account' : 'accounts' }}). Copy
+        {{ offer.lists === 1 ? 'it' : 'them' }} to your Mawkingbird account?
+      </p>
+      <p class="muted small">Your browser keeps its own copies — nothing is moved or deleted.</p>
+      <div class="config-actions">
+        <button class="btn" [disabled]="listCopy.busy()" (click)="copyClientListsToProfile()">
+          {{ listCopy.busy() ? 'Copying…' : 'Copy to my account' }}
+        </button>
+        <button class="btn btn-outline" (click)="declineCopyOffer()">No thanks</button>
+      </div>
+    </div>
+  }
+  @if (listCopy.message(); as copied) {
+    <p class="muted small section-note" role="status" aria-live="polite">{{ copied }}</p>
+  }
+
+  @if (profileLists.canWrite()) {
+    <div class="new-list">
+      <input
+        type="text"
+        [ngModel]="newProfileListTitle()"
+        (ngModelChange)="newProfileListTitle.set($event)"
+        (keyup.enter)="createProfileList()"
+        placeholder="New Mawkingbird list name"
+      />
+      <button class="btn" [disabled]="!newProfileListTitle().trim()" (click)="createProfileList()">
+        Create
+      </button>
+    </div>
+  } @else {
+    <p class="muted small section-note">
+      Your subscription has lapsed, so these are read-only. Nothing has been deleted, and you can
+      still remove or export anything here.
+    </p>
+  }
+
+  @if (profileLists.error(); as message) {
+    <p class="muted small section-note" role="alert">{{ message }}</p>
+  }
+
+  <!--
+    `loaded()` rather than `count()`: this collection arrives over the network,
+    so "none yet" before it lands would be telling the user their lists are gone.
+  -->
+  @if (!profileLists.loaded()) {
+    <p class="muted center small">Loading…</p>
+  } @else if (!profileLists.count()) {
+    <p class="muted center small">
+      None yet — create one above.
+      @if (listCopy.preview() && !copyOffer()) {
+        <button class="link" (click)="showCopyOffer()">Copy this browser's lists?</button>
+      }
+    </p>
+  } @else {
+    @for (l of profileLists.lists(); track l.id) {
+      <a class="list-row" [routerLink]="['/client-lists', l.id]">
+        <span>
+          {{ l.title }}
+          <span class="muted small">
+            · {{ l.memberHandles.length }}
+            {{ l.memberHandles.length === 1 ? 'member' : 'members' }}
+          </span>
+        </span>
+        @if (profileLists.canWrite()) {
+          <button class="del" (click)="askDeleteProfileList(l, $event)" title="Delete list">
+            ✕
+          </button>
+        }
+      </a>
+    }
+  }
+}
+
 @if (shows('lists') && showsSection('searches')) {
   <div class="section-head">Saved searches</div>
   @if (!saved.count()) {
@@ -499,6 +586,19 @@
     confirmLabel="Delete list"
     (confirmed)="removeClientList(l)"
     (cancelled)="clientListToDelete.set(null)"
+  />
+}
+@if (profileListToDelete(); as l) {
+  <app-confirm-dialog
+    title="Delete this Mawkingbird list?"
+    [message]="
+      '“' +
+      l.title +
+      '” will be removed from your Mawkingbird account, on every browser. This cannot be undone.'
+    "
+    confirmLabel="Delete list"
+    (confirmed)="removeProfileList(l)"
+    (cancelled)="profileListToDelete.set(null)"
   />
 }
 @if (rssToRemove(); as f) {
