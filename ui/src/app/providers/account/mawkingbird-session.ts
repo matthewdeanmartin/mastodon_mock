@@ -2,6 +2,7 @@ import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { corsProxyOrigin, isTestBuild } from '../../build-flavor';
 import { authDebug, registerAuthOrigins } from './auth-debug';
 import { MawkingbirdMetrics, billingTier } from '../../observability/mawkingbird-metrics';
+import { forgetAccountLocalState } from './account-local-state';
 
 /**
  * The Mawkingbird account session.
@@ -270,6 +271,10 @@ export class MawkingbirdSession {
     }
     this.held = null;
     this.user.set(null);
+    // Forget what belonged to that account, and only that. Signing out left
+    // this behind, so the next account inherited the previous one's sync
+    // decision — including a stopped-syncing state it never chose.
+    forgetAccountLocalState();
     // Re-mint anonymously so the app keeps a working token.
     await this.token();
   }

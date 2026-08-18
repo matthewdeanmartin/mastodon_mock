@@ -69,6 +69,15 @@ export class SettingsConfig {
     this.profile.offersSync(this.supporter.isSupporter()),
   );
   protected readonly offersRemote = computed(() => this.profile.offersRemote());
+  /**
+   * Whether to offer turning sync back on.
+   *
+   * The branch that used to have no controls at all: a browser that had stopped
+   * syncing, or declined once, rendered a status line and nothing else.
+   */
+  protected readonly offersResume = computed(() =>
+    this.profile.offersResume(this.supporter.isSupporter()),
+  );
 
   /**
    * The one sync failure to show, from either source.
@@ -99,7 +108,12 @@ export class SettingsConfig {
   protected syncSummaryLine(): string {
     const record = this.profile.record();
     if (record.state !== 'on') {
-      return 'Not syncing on this browser.';
+      // Says what is stored, not just that nothing is happening. "Not syncing"
+      // alone reads as a dead end, which is how this looked when the state had
+      // no way out.
+      return record.lastSyncedAt === undefined
+        ? 'Not syncing on this browser.'
+        : `Not syncing on this browser — last saved ${new Date(record.lastSyncedAt).toLocaleString()}.`;
     }
     const at = record.lastSyncedAt;
     if (at === undefined) {
@@ -344,7 +358,46 @@ export class SettingsConfig {
   protected declineSync(): void {
     this.clearNotice();
     this.profile.decline();
-    this.syncMessage.set('Settings stay on this browser only.');
+    this.syncMessage.set(
+      'Settings stay on this browser only. You can turn sync on here later if you change your mind.',
+    );
+  }
+
+  /**
+   * Turn sync back on after stopping or declining.
+   *
+   * Routed through the same outcome handling as `syncNow()` because it is the
+   * same situation: this browser is rejoining an account whose settings may
+   * have moved on, and the conflict case has to be offered, not guessed.
+   */
+  protected async resumeSync(): Promise<void> {
+    this.clearNotice();
+    const outcome = await this.profile.resume();
+    switch (outcome.kind) {
+      case 'applied':
+        this.syncMessage.set(
+          `Sync is back on. Applied ${outcome.changes.length} setting(s) from your account. Reloading…`,
+        );
+        location.reload();
+        return;
+      case 'needs-decision':
+        this.syncDecision.set({
+          remote: outcome.remote,
+          changes: outcome.changes,
+          etag: outcome.etag,
+          revision: outcome.revision,
+        });
+        return;
+      case 'unchanged':
+      case 'absent':
+        // Nothing to take from the account, so this browser's settings become
+        // what it holds. Same push the enable path performs.
+        this.reportPush(await this.profile.push(true), 'Sync is back on.');
+        return;
+      case 'failed':
+        this.syncError.set(outcome.message);
+        return;
+    }
   }
 
   protected disableSync(): void {
@@ -353,7 +406,7 @@ export class SettingsConfig {
     // Says explicitly that nothing was deleted. An off switch people are afraid
     // of is an off switch that does not get used.
     this.syncMessage.set(
-      'Stopped syncing on this browser. Nothing was deleted — your stored settings are still there.',
+      'Stopped syncing on this browser. Nothing was deleted — your stored settings are still there, and you can turn sync back on here whenever you like.',
     );
   }
 

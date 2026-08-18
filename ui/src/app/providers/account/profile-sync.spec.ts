@@ -210,18 +210,66 @@ describe('ProfileSync', () => {
     it('records a decline permanently', () => {
       sync.decline();
       expect(sync.record().state).toBe('off');
+      // The *prompt* never returns...
       expect(sync.offersSync(true)).toBe(false);
+      // ...but the settings page still offers a way back. Suppressing a nag is
+      // not the same as taking the control away.
+      expect(sync.offersResume(true)).toBe(true);
     });
 
     it('stops syncing without deleting anything', async () => {
       sync.resetForTest({ state: 'on', etag: '"a"', revision: 4 });
       sync.disable();
 
-      expect(sync.record().state).toBe('off');
+      expect(sync.record().state).toBe('paused');
       // No DELETE. Turning sync off says "stop changing my browser", not
       // "destroy my profile", and conflating those makes the off switch
       // frightening to use.
       expect(calls.filter((call) => call.init.method === 'DELETE')).toHaveLength(0);
+      // The position is kept, so resuming picks up where this browser left off
+      // rather than colliding with its own last write.
+      expect(sync.record().etag).toBe('"a"');
+      expect(sync.record().revision).toBe(4);
+    });
+
+    it('offers a way back after stopping, and takes it', async () => {
+      // The bug this pair exists for: `disable()` used to write the same
+      // terminal `off` as a decline, so a misclicked off switch was permanent
+      // and the settings page rendered a status line with no controls at all.
+      sync.resetForTest({ state: 'on', etag: '"a"', revision: 4 });
+      sync.disable();
+      expect(sync.offersResume(true)).toBe(true);
+
+      fetchStub.mockResolvedValue(respond(200, storedDocument(), { ETag: '"remote"' }));
+      await sync.resume();
+
+      expect(sync.record().state).toBe('on');
+      expect(sync.syncing()).toBe(true);
+    });
+
+    it('does not discard edits made while sync was stopped', async () => {
+      // While paused, `noteLocalChange()` returns early, so the dirty flag says
+      // nothing about that window — and settings changing during it is the
+      // whole point of the window. Resuming has to assume there are edits, or
+      // `pull()` takes the silent-overwrite path and they are gone with no
+      // prompt.
+      sync.resetForTest({ state: 'on', etag: '"a"', revision: 4, dirty: false });
+      sync.disable();
+      localStorage.setItem(PREFS, '{"theme":"light"}');
+      fetchStub.mockResolvedValue(respond(200, storedDocument(), { ETag: '"remote"' }));
+
+      const outcome = await sync.resume();
+
+      expect(outcome.kind).toBe('needs-decision');
+      // Untouched until the user answers.
+      expect(localStorage.getItem(PREFS)).toBe('{"theme":"light"}');
+    });
+
+    it('offers no resume to an account that is not entitled', () => {
+      // A button whose only possible outcome is 402 is worse than no button.
+      sync.resetForTest({ state: 'on' });
+      sync.disable();
+      expect(sync.offersResume(false)).toBe(false);
     });
   });
 

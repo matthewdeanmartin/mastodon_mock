@@ -2,20 +2,26 @@
  * Whether settings sync is on, and what this browser knows about the account's
  * stored profile.
  *
- * ## Four states, not a boolean
+ * ## Five states, not a boolean
  *
- * A boolean cannot express the two cases that actually cause support questions:
+ * A boolean cannot express the cases that actually cause support questions:
  *
  * - **`unasked`** — never prompted. The prompt fires on the Plus page when the
  *   account is entitled and this is the state.
  * - **`on`** — syncing.
  * - **`off`** — asked, declined. **Never prompt again.** A prompt that returns
  *   after a decline is a nag, and it teaches people to dismiss dialogs without
- *   reading them.
+ *   reading them. Not prompting is not the same as hiding the control: the
+ *   settings page always offers a way back, because a page the user navigated
+ *   to deliberately is not a nag.
+ * - **`paused`** — was on, switched off here. Reversible, and distinct from
+ *   `off` precisely so it can be: "stop syncing" is an off *switch*, and people
+ *   click it by mistake. Collapsing it into `off` is what made the off switch a
+ *   one-way door.
  * - **`off-but-remote-exists`** — not syncing here, but a settings document
  *   exists on the server. They said yes somewhere, sometime.
  *
- * The fourth is the one that gets forgotten. It happens whenever someone enables
+ * `off-but-remote-exists` is the one that gets forgotten. It happens whenever someone enables
  * sync on one machine and later signs in on another: locally `unasked`,
  * remotely present. Silently pulling would be alarming (settings changing on
  * their own); silently ignoring would waste something they deliberately turned
@@ -32,10 +38,10 @@
  * re-derived when the account changes.
  */
 
-/** The storage key. Registered in `storage-registry.ts` as a `setting`. */
+/** The storage key. Registered in `storage-registry.ts` as `private`. */
 export const PROFILE_SYNC_KEY = 'mockingbird_profile_sync';
 
-export type SyncState = 'unasked' | 'on' | 'off' | 'off-but-remote-exists';
+export type SyncState = 'unasked' | 'on' | 'off' | 'paused' | 'off-but-remote-exists';
 
 export interface ProfileSyncRecord {
   state: SyncState;
@@ -71,7 +77,11 @@ const DEFAULT: ProfileSyncRecord = { state: 'unasked' };
 
 function isSyncState(value: unknown): value is SyncState {
   return (
-    value === 'unasked' || value === 'on' || value === 'off' || value === 'off-but-remote-exists'
+    value === 'unasked' ||
+    value === 'on' ||
+    value === 'off' ||
+    value === 'paused' ||
+    value === 'off-but-remote-exists'
   );
 }
 
@@ -135,11 +145,29 @@ export function isSyncing(record: ProfileSyncRecord): boolean {
 /**
  * Whether the first-enable prompt should be shown.
  *
- * Only from `unasked`, and only when entitled. `off` is permanent by design,
- * and `off-but-remote-exists` has its own, different offer.
+ * Only from `unasked`, and only when entitled. The other non-syncing states all
+ * have their own, different offer: `off-but-remote-exists` adopts what is
+ * already stored, while `off` and `paused` get the plain resume control from
+ * {@link shouldOfferResume}. This one is the *first-run* prompt specifically,
+ * which is why it never returns once answered.
  */
 export function shouldOfferSync(record: ProfileSyncRecord, entitled: boolean): boolean {
   return entitled && record.state === 'unasked';
+}
+
+/**
+ * Whether a plain "turn sync on" control belongs on the settings page.
+ *
+ * True for every entitled state that is not already syncing and is not one of
+ * the two states with their own richer offer. That deliberately includes `off`:
+ * declining suppresses the *prompt*, not the user's ability to change their
+ * mind on a page they went looking for.
+ *
+ * Entitlement is still required — offering a button that can only 402 is worse
+ * than offering nothing.
+ */
+export function shouldOfferResume(record: ProfileSyncRecord, entitled: boolean): boolean {
+  return entitled && (record.state === 'off' || record.state === 'paused');
 }
 
 /**

@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  isSyncing,
   PROFILE_SYNC_KEY,
+  isSyncing,
   readSyncRecord,
   shouldOfferRemote,
+  shouldOfferResume,
   shouldOfferSync,
   updateSyncRecord,
   writeSyncRecord,
@@ -120,6 +121,37 @@ describe('profile sync state', () => {
       expect(shouldOfferRemote({ state: 'unasked' })).toBe(false);
       expect(shouldOfferRemote({ state: 'on' })).toBe(false);
       expect(shouldOfferRemote({ state: 'off' })).toBe(false);
+      expect(shouldOfferRemote({ state: 'paused' })).toBe(false);
+    });
+  });
+
+  describe('shouldOfferResume', () => {
+    it('offers a way back from both stopped states', () => {
+      // `paused` is a misclicked off switch; `off` is a considered decline. The
+      // page offers both a control, because neither is a reason to hide it —
+      // only the unsolicited prompt is suppressed after a decline.
+      expect(shouldOfferResume({ state: 'paused' }, true)).toBe(true);
+      expect(shouldOfferResume({ state: 'off' }, true)).toBe(true);
+    });
+
+    it('stays out of the way of the states with their own offer', () => {
+      expect(shouldOfferResume({ state: 'unasked' }, true)).toBe(false);
+      expect(shouldOfferResume({ state: 'off-but-remote-exists' }, true)).toBe(false);
+      expect(shouldOfferResume({ state: 'on' }, true)).toBe(false);
+    });
+
+    it('requires entitlement', () => {
+      expect(shouldOfferResume({ state: 'paused' }, false)).toBe(false);
+    });
+  });
+
+  describe('readSyncRecord', () => {
+    it('round-trips the paused state', () => {
+      // A state the parser does not recognise resets to `unasked`, which for a
+      // paused browser would resurrect the first-run prompt.
+      writeSyncRecord({ state: 'paused', etag: '"a"', revision: 2 }, localStorage);
+      expect(readSyncRecord(localStorage).state).toBe('paused');
+      expect(readSyncRecord(localStorage).revision).toBe(2);
     });
   });
 });

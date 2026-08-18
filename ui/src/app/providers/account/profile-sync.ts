@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import {
   configChanges,
   exportPortableConfig,
@@ -17,6 +17,7 @@ import {
   isSyncing,
   readSyncRecord,
   shouldOfferRemote,
+  shouldOfferResume,
   shouldOfferSync,
   updateSyncRecord,
   writeSyncRecord,
@@ -168,6 +169,27 @@ export class ProfileSync {
   /** This browser's view of the account-level switch. */
   readonly record = signal<ProfileSyncRecord>(readSyncRecord());
 
+  /**
+   * Re-read the record when the signed-in account changes.
+   *
+   * `signOut()` clears the account-scoped keys from storage, but this signal was
+   * populated at construction and would happily go on reporting the previous
+   * account's sync state — including scheduling pushes for it — because the
+   * Plus page signs out without reloading.
+   *
+   * Reacting to `user()` rather than being called by the session keeps the
+   * dependency pointing this way: the session stays free of any knowledge of
+   * sync, which is what allows this whole module to stay lazily loaded.
+   */
+  private readonly accountWatch = effect(() => {
+    // Read defensively. This runs during change detection, where a throw is an
+    // application-level error — and the whole posture of this module is that
+    // sync failing must never mean the app does not load.
+    this.session.user?.();
+    this.cancelPush();
+    this.record.set(readSyncRecord());
+  });
+
   /** True while a push or pull is in flight. */
   readonly busy = signal(false);
 
@@ -218,6 +240,11 @@ export class ProfileSync {
     return shouldOfferRemote(this.record());
   }
 
+  /** Whether to show a plain "turn sync on" control for a stopped browser. */
+  offersResume(entitled: boolean): boolean {
+    return shouldOfferResume(this.record(), entitled);
+  }
+
   /**
    * Turn sync on, uploading this browser's settings as the baseline.
    *
@@ -255,7 +282,39 @@ export class ProfileSync {
    */
   disable(): void {
     this.cancelPush();
-    this.setRecord(updateSyncRecord({ state: 'off', dirty: false }));
+    // `paused`, not `off`: this is the off *switch*, and it has to be
+    // reversible. Writing `off` here made a misclick permanent, because `off`
+    // is the declined-the-prompt state and nothing offers a way out of it.
+    //
+    // The etag and revision are deliberately kept. They are what lets a resume
+    // pick up where this browser left off instead of colliding with its own
+    // last write.
+    this.setRecord(updateSyncRecord({ state: 'paused', dirty: false }));
+  }
+
+  /**
+   * Turn sync back on after it was stopped or declined.
+   *
+   * Pulls rather than pushes, which is the opposite of {@link enable} and the
+   * safer direction here. `enable()` uploads because a first-run browser is
+   * *defining* the baseline; a resuming browser is rejoining one that may have
+   * moved on without it, and blindly pushing stale local settings would
+   * overwrite whatever the other browsers have done since.
+   *
+   * `pull()` already handles the case where this browser has unpushed edits: it
+   * returns `needs-decision` and the UI asks, rather than either side losing.
+   *
+   * Which is why this marks the browser dirty first. While sync was off,
+   * `noteLocalChange()` returned early for every edit, so the flag says nothing
+   * about the paused window — and the whole point of that window is that people
+   * change settings during it. Assuming clean would let `pull()` take the
+   * silent-overwrite path and discard exactly those edits. Assuming dirty costs
+   * at most one conflict prompt that the user can answer with "use the other
+   * device's"; assuming clean costs their settings with no prompt at all.
+   */
+  async resume(): Promise<PullOutcome> {
+    this.setRecord(updateSyncRecord({ state: 'on', dirty: true }));
+    return this.pull();
   }
 
   /**

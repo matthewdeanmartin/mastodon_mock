@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileSyncStarter } from './profile-sync-starter';
@@ -15,6 +16,8 @@ import { PROFILE_ORIGIN } from './profile-client';
 
 class FakeMawkingbirdSession {
   token = vi.fn().mockResolvedValue('mawkingbird-token');
+  /** Watched by `ProfileSync` so its record follows the signed-in account. */
+  user = signal<{ auth: string; tier: string } | null>(null);
 }
 
 describe('ProfileSyncStarter', () => {

@@ -64,6 +64,24 @@
               Not on this browser
             </button>
           </div>
+        } @else if (offersResume()) {
+          <!--
+            Stopped here, or declined once. Previously this fell into the branch
+            below and rendered a status line with no controls whatsoever — an
+            off switch that could not be switched back on, which is the bug this
+            branch exists to fix. Not a prompt: a control on a page the user
+            navigated to on purpose.
+          -->
+          <span class="hint">{{ syncSummaryLine() }}</span>
+          <div class="config-actions">
+            <button type="button" class="btn" (click)="resumeSync()" [disabled]="profile.busy()">
+              {{ profile.busy() ? 'Turning on…' : 'Turn sync back on' }}
+            </button>
+          </div>
+          <span class="hint">
+            Your account's settings are taken first, so this browser matches your others. If this
+            browser has changes your account doesn't, you'll be asked which to keep.
+          </span>
         } @else {
           <span class="hint">{{ syncSummaryLine() }}</span>
           @if (profile.syncing()) {
