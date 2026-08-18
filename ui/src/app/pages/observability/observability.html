@@ -439,6 +439,81 @@
     </section>
   }
 
+  <!-- ============================ Mawkingbird =========================== -->
+  <!-- Mawkingbird's own services, kept out of the endpoint table above: that
+       table describes a Mastodon instance, and these are a different API whose
+       rows no Mastodon documentation covers. The split that matters here is
+       not per-endpoint timing but who paid. -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>Mawkingbird services</h2>
+      <div class="section-actions">
+        <button class="btn btn-outline btn-sm" (click)="resetMawkingbird()">Reset counters</button>
+      </div>
+    </div>
+    <p class="muted small section-note">
+      Calls to Mawkingbird's own services — signing in, syncing settings, and fetching feeds through
+      the CORS proxy. Each call is counted against whichever tier paid for it at the time, so
+      subscribing later does not relabel what came before. Counters only: no paths and no URLs are
+      recorded.
+    </p>
+
+    @if (mawkingbirdTotals().calls) {
+      <div class="tiles">
+        <div class="tile">
+          <div class="tile-value">{{ mawkingbirdTotals().calls.toLocaleString() }}</div>
+          <div class="tile-label muted">total calls</div>
+        </div>
+        <div class="tile">
+          <div class="tile-value">{{ mawkingbirdTotals().paid.toLocaleString() }}</div>
+          <div class="tile-label muted">paid</div>
+        </div>
+        <div class="tile">
+          <div class="tile-value">{{ mawkingbirdTotals().free.toLocaleString() }}</div>
+          <div class="tile-label muted">free</div>
+        </div>
+        <div class="tile" [class.tile-bad]="mawkingbirdTotals().errors > 0">
+          <div class="tile-value">{{ mawkingbirdTotals().errors.toLocaleString() }}</div>
+          <div class="tile-label muted">errors ({{ pct(mawkingbirdTotals().errorRate) }})</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="obs-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Tier</th>
+              <th class="num">Calls</th>
+              <th class="num">Avg</th>
+              <th class="num">Errors</th>
+              <th class="num">Last</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of mawkingbirdRows(); track s.service + s.tier) {
+              <tr [class.row-bad]="s.errors > 0">
+                <td>{{ serviceLabel(s.service) }}</td>
+                <td>
+                  <span class="tier-tag" [attr.data-tier]="s.tier">{{ s.tier }}</span>
+                </td>
+                <td class="num">{{ s.calls.toLocaleString() }}</td>
+                <td class="num">{{ round(mawkingbirdMean(s)) }} ms</td>
+                <td class="num">{{ s.errors ? s.errors.toLocaleString() : '—' }}</td>
+                <td class="num muted" [title]="when(s.lastAt)">{{ stamp(s.lastAt) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="muted center">
+        No calls to Mawkingbird services yet. Signing in or turning on settings sync will start the
+        count.
+      </p>
+    }
+  </section>
+
   <!-- ======================= Storage summary ============================= -->
   <!-- The detail moved to its own page; this keeps the number in the overview
        so "how much is this app storing" is still answerable from here. -->

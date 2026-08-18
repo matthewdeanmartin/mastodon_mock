@@ -23,6 +23,11 @@ import {
   inspectLocalStorage,
 } from '../../observability/local-storage-inspector';
 import { RouteLog, RouteStat, formatDuration } from '../../observability/route-log';
+import {
+  MawkingbirdMetrics,
+  MawkingbirdService,
+  ServiceStat,
+} from '../../observability/mawkingbird-metrics';
 
 /** How the endpoint table is sorted. */
 type SortKey = 'count' | 'avg' | 'max' | 'errors';
@@ -176,6 +181,42 @@ export class Observability {
   protected readonly proxyUsage = this.proxyUsageStore.usage;
   protected readonly proxyLabel = computed(() => this.proxySettings.chosen()?.label ?? null);
   protected readonly proxiedFeedCount = computed(() => this.rssSubs.proxiedCount());
+
+  // ------------------------------------------------------------- Mawkingbird
+
+  private mawkingbirdMetrics = inject(MawkingbirdMetrics);
+
+  protected readonly mawkingbirdTotals = this.mawkingbirdMetrics.totals;
+  protected readonly mawkingbirdRows = this.mawkingbirdMetrics.rows;
+
+  /** Mean response time for a Mawkingbird row (ms). */
+  protected mawkingbirdMean(s: ServiceStat): number {
+    return MawkingbirdMetrics.mean(s);
+  }
+
+  /** How the service is named in the table. */
+  protected serviceLabel(service: MawkingbirdService): string {
+    switch (service) {
+      case 'auth':
+        return 'Token service';
+      case 'account':
+        return 'Account service';
+      case 'profile':
+        return 'Profile sync';
+      case 'proxy':
+        return 'CORS proxy';
+      default:
+        return 'Other';
+    }
+  }
+
+  resetMawkingbird(): void {
+    if (!confirm('Clear the Mawkingbird call counters?')) {
+      return;
+    }
+    this.mawkingbirdMetrics.reset();
+    this.refreshStorage();
+  }
 
   // ----------------------------------------------------------- server picker
 

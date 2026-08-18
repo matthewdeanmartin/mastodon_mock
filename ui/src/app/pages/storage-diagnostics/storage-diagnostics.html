@@ -83,6 +83,56 @@
     }
   </section>
 
+  <!-- ========================= Remote storage ============================ -->
+  <!-- The service's own byte counter, not an estimate made here: it is the
+       number that decides whether a write succeeds, so a second opinion
+       computed on this side would only be a worse copy of it. -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>Remote storage</h2>
+      @if (remote(); as r) {
+        <div class="section-actions">
+          <span class="tier-tag" [attr.data-tier]="r.tier">{{ r.tier }} plan</span>
+        </div>
+      }
+    </div>
+    @if (remote(); as r) {
+      <div class="tiles">
+        <div class="tile">
+          <div class="tile-value">{{ formatBytes(r.used) }}</div>
+          <div class="tile-label muted">used on the profile service</div>
+        </div>
+        <div class="tile">
+          <div class="tile-value">{{ formatBytes(r.limit) }}</div>
+          <div class="tile-label muted">allowance</div>
+        </div>
+      </div>
+      <!-- `!== null`, not a truthiness check: an empty account is a ratio of 0,
+           which is a real reading and should draw an empty bar rather than no
+           bar at all. -->
+      @if (remoteRatio() !== null) {
+        <div
+          class="quota-bar"
+          role="img"
+          [attr.aria-label]="'Remote storage: ' + remoteLabel()"
+          [title]="remoteLabel()"
+        >
+          <div class="quota-fill" [style.width.%]="(remoteRatio() ?? 0) * 100"></div>
+        </div>
+      }
+      <p class="muted small section-note">
+        {{ remoteLabel() }} — as counted by the profile service itself, read {{ remoteWhen() }}. The
+        figure updates whenever settings sync talks to the service, so it can lag a recent change
+        until the next sync.
+      </p>
+    } @else {
+      <p class="muted center">
+        Nothing synced from this browser yet. Turn on settings sync to store settings on the profile
+        service and see the figure here.
+      </p>
+    }
+  </section>
+
   <!-- ============================= IndexedDB ============================= -->
   <section class="obs-section">
     <div class="section-head">

@@ -1,4 +1,4 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   DatabaseInfo,
@@ -12,6 +12,7 @@ import {
   formatBytes,
   inspectLocalStorage,
 } from '../../observability/local-storage-inspector';
+import { RemoteStorageUsage } from '../../observability/remote-storage-usage';
 
 /**
  * Storage Diagnostics — what this app is keeping on this device, and how much
@@ -90,6 +91,34 @@ export class StorageDiagnostics {
     const entries = this.storage().entries;
     return entries.length ? entries.reduce((a, b) => (b.bytes > a.bytes ? b : a)) : null;
   });
+
+  // ---------------------------------------------------------- remote storage
+
+  private remoteStorage = inject(RemoteStorageUsage);
+
+  protected readonly remote = this.remoteStorage.usage;
+
+  /** Fraction of the remote allowance used, 0–1, or null when unknown. */
+  protected remoteRatio(): number | null {
+    return this.remoteStorage.ratio();
+  }
+
+  /** `"12.4 MB of 100 MB (12.4%)"`. */
+  protected remoteLabel(): string {
+    const u = this.remote();
+    if (!u) {
+      return '';
+    }
+    const ratio = this.remoteRatio();
+    const pct = ratio === null ? '' : ` (${(ratio * 100).toFixed(1)}%)`;
+    return `${formatBytes(u.used)} of ${formatBytes(u.limit)}${pct}`;
+  }
+
+  /** When the figure was read, so a stale number is visibly stale. */
+  protected remoteWhen(): string {
+    const u = this.remote();
+    return u?.at ? new Date(u.at).toLocaleString() : 'never';
+  }
 
   // --------------------------------------------------------------- IndexedDB
 

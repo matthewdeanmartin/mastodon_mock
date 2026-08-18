@@ -704,6 +704,24 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Discovered instance status pages.',
   },
   {
+    base: 'mockingbird_remote_storage_usage',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'cache',
+    note: 'Last known remote storage figure from the profile service (bytes used, allowance, tier, when it was read). A cached copy of a server-side number — resetting it only blanks the display until the next sync.',
+  },
+  {
+    base: 'mockingbird_mawkingbird_metrics',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'cache',
+    // Counters only, and deliberately no paths: which endpoint of the account
+    // service was called can imply what the person was doing with their
+    // account, and a usage tally has no need to know. Same reasoning as
+    // mockingbird_cors_proxy_usage.
+    note: 'Call counts against Mawkingbird services, split by service and by whether a paid or free token was sent. Diagnostics, not settings — resetting them loses nothing but the tally.',
+  },
+  {
     base: 'mockingbird_api_metrics:',
     storage: 'local',
     suffix: 'instance',

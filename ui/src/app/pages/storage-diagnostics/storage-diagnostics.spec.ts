@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StorageDiagnostics } from './storage-diagnostics';
+import { RemoteStorageUsage } from '../../observability/remote-storage-usage';
 
 describe('StorageDiagnostics', () => {
   let fixture: ComponentFixture<StorageDiagnostics>;
@@ -61,6 +62,39 @@ describe('StorageDiagnostics', () => {
     localStorage.removeItem('mastodon_mock_token');
     component.refreshStorage();
     expect(component['storage']().entries.length).toBe(before - 1);
+  });
+
+  describe('remote storage', () => {
+    it('invites the reader to sync when nothing has ever been recorded', () => {
+      expect(text()).toContain('Nothing synced from this browser yet');
+    });
+
+    it('shows the figure, the allowance and the tier once one is known', async () => {
+      TestBed.inject(RemoteStorageUsage).record(
+        { used: 25 * 1024 * 1024, limit: 100 * 1024 * 1024 },
+        'paid',
+      );
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(text()).toContain('25.00 MB');
+      expect(text()).toContain('100.00 MB');
+      expect(text()).toContain('(25.0%)');
+      expect(text()).toContain('paid plan');
+      // The reading's age is shown, so a stale number is visibly stale rather
+      // than passing for a live one.
+      expect(text()).not.toContain('read never');
+    });
+
+    it('draws the quota bar even for an empty account', async () => {
+      TestBed.inject(RemoteStorageUsage).record({ used: 0, limit: 100 }, 'free');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.quota-bar')).not.toBeNull();
+    });
   });
 
   it('links back to Observability', () => {

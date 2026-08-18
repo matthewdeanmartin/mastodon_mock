@@ -411,3 +411,23 @@
   font-weight: 500;
   margin-left: 6px;
 }
+
+/* ------------------------------------------------------------- tier tags */
+.tier-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.tier-tag[data-tier='paid'] {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.tier-tag[data-tier='free'] {
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  color: var(--muted);
+}

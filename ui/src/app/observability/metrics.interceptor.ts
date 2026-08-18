@@ -4,18 +4,55 @@ import { tap } from 'rxjs';
 import { EXTERNAL_FETCH } from '../providers/external-fetch';
 import { Server } from '../server';
 import { ApiMetrics } from './api-metrics';
+import { BillingTier, MawkingbirdMetrics, mawkingbirdService } from './mawkingbird-metrics';
+import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
 
 /**
  * Times every instance API call and folds it into {@link ApiMetrics} for the
  * Observability page. Foreign-host fetches (RSS feeds etc.) are skipped — they
  * aren't the instance's traffic.
  *
+ * Calls bound for Mawkingbird's own services are skipped by that same rule —
+ * the CORS proxy is a foreign host — but are not unmeasured: they go to
+ * {@link MawkingbirdMetrics} instead, which counts them per service and per
+ * billing tier. See that class for why they are kept apart from the instance's
+ * endpoint stats.
+ *
  * Uses `performance.now()` for a monotonic duration unaffected by clock changes.
  */
 export const metricsInterceptor: HttpInterceptorFn = (req, next) => {
   const server = inject(Server);
   if (req.context.get(EXTERNAL_FETCH) && !targetsActiveServer(req.url, server.baseUrl())) {
-    return next(req);
+    const service = mawkingbirdService(req.url);
+    if (!service) {
+      return next(req);
+    }
+    // Which tier pays for this call is decided by the same condition
+    // `plusTokenInterceptor` gates on — the *chosen* proxy entry, not the
+    // stored id, since an entitled supporter is auto-upgraded from the free
+    // entry and gating on the stored id would count their paid calls as free.
+    //
+    // Deliberately not read from the request's headers. This interceptor is
+    // outermost and `plusTokenInterceptor` is last, so the supporter token is
+    // attached to a *clone* made downstream of here: at this point in the
+    // chain the header is never present, and testing for it would label every
+    // proxied call free.
+    const tier: BillingTier =
+      inject(CorsProxySettings).chosen()?.id === 'mawkingbird-plus' ? 'paid' : 'free';
+    const mawkingbird = inject(MawkingbirdMetrics);
+    const externalStart = performance.now();
+    return next(req).pipe(
+      tap({
+        next: (event) => {
+          if (event instanceof HttpResponse) {
+            mawkingbird.record(service, tier, performance.now() - externalStart, true);
+          }
+        },
+        error: () => {
+          mawkingbird.record(service, tier, performance.now() - externalStart, false);
+        },
+      }),
+    );
   }
   const metrics = inject(ApiMetrics);
   const start = performance.now();

@@ -1,5 +1,7 @@
 import { inject, Injectable, InjectionToken } from '@angular/core';
 import { MawkingbirdSession } from './mawkingbird-session';
+import { MawkingbirdMetrics, billingTier } from '../../observability/mawkingbird-metrics';
+import { RemoteStorageUsage } from '../../observability/remote-storage-usage';
 import { profileOrigin } from './profile-origin';
 import type { PortableConfig } from '../../portable-config';
 
@@ -96,10 +98,21 @@ export type ProfileResult<T> =
 export class ProfileClient {
   private base = inject(PROFILE_ORIGIN);
   private session = inject(MawkingbirdSession);
+  private metrics = inject(MawkingbirdMetrics);
+  private remoteStorage = inject(RemoteStorageUsage);
 
   /** What the account has stored, and whether writes are allowed. */
   async manifest(): Promise<ProfileResult<ProfileManifest>> {
-    return this.request<ProfileManifest>('/manifest', { method: 'GET' });
+    const result = await this.request<ProfileManifest>('/manifest', { method: 'GET' });
+    // Bank the quota on the way past. It is the service's own accounting —
+    // a KV counter it keeps per user — so it is the only honest source for
+    // "how much am I storing remotely", and it arrives free on a request the
+    // app already makes. Captured here rather than at the call sites because
+    // every caller comes through this method.
+    if (result.kind === 'ok' && result.value.quota) {
+      this.remoteStorage.record(result.value.quota, billingTier(this.session.heldTier()));
+    }
+    return result;
   }
 
   /**
@@ -316,14 +329,26 @@ export class ProfileClient {
     if (!token) {
       return 'Could not reach the Mawkingbird account service.';
     }
+    // The tier of the token actually being sent, captured before the request
+    // rather than after it: this is what the service will bill against, and a
+    // subscription that starts or lapses mid-flight must not relabel a call
+    // that was already paid for at the old rate.
+    const tier = billingTier(this.session.heldTier());
+    const start = performance.now();
     try {
-      return await fetch(`${this.base}${path}`, {
+      const response = await fetch(`${this.base}${path}`, {
         ...init,
         // No cookies, ever. See the class comment.
         credentials: 'omit',
         headers: { ...init.headers, Authorization: `Bearer ${token}` },
       });
+      // A 402 or 409 is a real answer from a service that did the work of
+      // deciding, so it counts as a call. Only a request that never completed
+      // is an error here, which is the `catch` below.
+      this.metrics.record('profile', tier, performance.now() - start, response.ok);
+      return response;
     } catch (error: unknown) {
+      this.metrics.record('profile', tier, performance.now() - start, false);
       return error instanceof Error && error.message
         ? `Could not reach the profile service. (${error.message})`
         : 'Could not reach the profile service.';

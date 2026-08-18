@@ -1,6 +1,7 @@
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { corsProxyOrigin, isTestBuild } from '../../build-flavor';
 import { authDebug, registerAuthOrigins } from './auth-debug';
+import { MawkingbirdMetrics, billingTier } from '../../observability/mawkingbird-metrics';
 
 /**
  * The Mawkingbird account session.
@@ -120,6 +121,7 @@ const REFRESH_MARGIN_MS = 2 * 60 * 1000;
 export class MawkingbirdSession {
   private authBase = inject(AUTH_ORIGIN);
   private accountBase = inject(ACCOUNT_ORIGIN);
+  private metrics = inject(MawkingbirdMetrics);
 
   /** The signed-in account, or null when anonymous. */
   readonly user = signal<AccountUser | null>(null);
@@ -192,6 +194,8 @@ export class MawkingbirdSession {
     // likely to be wrong after a hostname change, and a stale bundle calling an
     // old host is invisible from the app's own logs otherwise.
     authDebug('signin:requesting-link', { url: `${this.accountBase}/auth/email/start` });
+    // Declared outside the try so the catch below can time a failure too.
+    const emailStart = performance.now();
     try {
       const response = await fetch(`${this.accountBase}/auth/email/start`, {
         method: 'POST',
@@ -201,6 +205,9 @@ export class MawkingbirdSession {
         credentials: 'include',
         body: JSON.stringify({ email, returnTo }),
       });
+      // Sign-in happens before any subscription is known to this browser, so
+      // it is free traffic by construction.
+      this.metrics.record('account', 'free', performance.now() - emailStart, response.ok);
       authDebug('signin:link-response', { status: response.status });
       if (response.status === 429) {
         this.error.set('Too many sign-in emails. Please wait a minute and try again.');
@@ -220,6 +227,7 @@ export class MawkingbirdSession {
       // A CORS refusal lands here and is indistinguishable from being offline
       // without the message — and CORS is the likeliest cause right after a
       // hostname change, because the origin allowlist has to agree.
+      this.metrics.record('account', 'free', performance.now() - emailStart, false);
       authDebug('signin:link-failed', {
         message: error instanceof Error ? error.message : 'unknown',
       });
@@ -238,12 +246,25 @@ export class MawkingbirdSession {
    * rather than implying an instant global sign-out.
    */
   async signOut(): Promise<void> {
+    const signOutStart = performance.now();
     try {
-      await fetch(`${this.accountBase}/auth/signout`, {
+      const response = await fetch(`${this.accountBase}/auth/signout`, {
         method: 'POST',
         credentials: 'include',
       });
+      this.metrics.record(
+        'account',
+        billingTier(this.held?.tier ?? null),
+        performance.now() - signOutStart,
+        response.ok,
+      );
     } catch {
+      this.metrics.record(
+        'account',
+        billingTier(this.held?.tier ?? null),
+        performance.now() - signOutStart,
+        false,
+      );
       // Revoking failed, but forgetting the local token is still correct: the
       // user asked to be signed out here.
     }
@@ -348,6 +369,11 @@ export class MawkingbirdSession {
   }
 
   private async post(body: { grant: 'anon' | 'cookie' }): Promise<MintedToken | null> {
+    // A mint is always attributed to the free tier. It is the call that
+    // *obtains* the credential, so there is nothing paid to attribute it to
+    // yet — and reading the previously held token's tier would credit the new
+    // subscription for the request that established it.
+    const mintStart = performance.now();
     try {
       const response = await fetch(`${this.authBase}/mint`, {
         method: 'POST',
@@ -355,6 +381,7 @@ export class MawkingbirdSession {
         credentials: 'include',
         body: JSON.stringify(body),
       });
+      this.metrics.record('auth', 'free', performance.now() - mintStart, response.ok);
       if (!response.ok) {
         // Logged with the status, because 401 and 503 mean very different
         // things here: the first is "no usable session", the second is "this
@@ -377,6 +404,7 @@ export class MawkingbirdSession {
       // A network-level failure, not an HTTP error: CORS refusal, DNS, offline.
       // A CORS refusal is the likeliest cause on a fresh deployment and looks
       // identical to being offline from here, so the origin is logged too.
+      this.metrics.record('auth', 'free', performance.now() - mintStart, false);
       authDebug('mint:unreachable', {
         grant: body.grant,
         message: error instanceof Error ? error.message : 'unknown',
