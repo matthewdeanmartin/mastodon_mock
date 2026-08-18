@@ -18,13 +18,6 @@ import { CorsProxyUsageStore } from '../../providers/cors-proxy/cors-proxy-usage
 import { TwitterUsage } from '../../providers/twitter/twitter-usage';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import {
-  DatabaseInfo,
-  IndexedDbReport,
-  inspectIndexedDb,
-  totalRecords,
-} from '../../observability/indexed-db-inspector';
-import {
-  StorageEntry,
   StorageReport,
   formatBytes,
   inspectLocalStorage,
@@ -161,7 +154,7 @@ type RouteSortKey = 'visits' | 'time';
   selector: 'app-observability',
   imports: [RouterLink],
   templateUrl: './observability.html',
-  styleUrl: './observability.css',
+  styleUrls: ['./diagnostics-shared.css', './observability.css'],
 })
 export class Observability {
   private metrics = inject(ApiMetrics);
@@ -213,7 +206,6 @@ export class Observability {
   constructor() {
     // Bank the time spent getting here, so this page's own row isn't stale.
     this.routeLog.refresh();
-    void this.refreshIndexedDb();
   }
 
   protected readonly sortKey = signal<SortKey>('count');
@@ -344,45 +336,6 @@ export class Observability {
     ]
       .filter((line): line is string => line !== null)
       .join('\n');
-  }
-
-  // --------------------------------------------------------------- IndexedDB
-
-  protected readonly idb = signal<IndexedDbReport | null>(null);
-  protected readonly idbLoading = signal(false);
-  protected readonly totalRecords = totalRecords;
-
-  async refreshIndexedDb(): Promise<void> {
-    this.idbLoading.set(true);
-    try {
-      this.idb.set(await inspectIndexedDb());
-    } finally {
-      this.idbLoading.set(false);
-    }
-  }
-
-  /** `"12.4 MB of 2.1 GB (0.6%)"`, or a shorter form when the browser is coy. */
-  protected quotaLabel(): string {
-    const q = this.idb()?.quota;
-    if (!q || q.usage === null) {
-      return 'Storage usage unavailable in this browser.';
-    }
-    const used = formatBytes(q.usage);
-    if (q.quota === null) {
-      return `${used} used`;
-    }
-    const pct = q.ratio === null ? '' : ` (${(q.ratio * 100).toFixed(1)}%)`;
-    return `${used} of ${formatBytes(q.quota)}${pct}`;
-  }
-
-  protected storeSummary(db: DatabaseInfo): string {
-    if (db.error) {
-      return db.error;
-    }
-    if (!db.stores.length) {
-      return 'no object stores';
-    }
-    return db.stores.map((s) => `${s.name} (${s.count ?? '?'})`).join(', ');
   }
 
   // --------------------------------------------------------------- route log
@@ -640,31 +593,6 @@ export class Observability {
 
   refreshStorage(): void {
     this.storage.set(inspectLocalStorage());
-  }
-
-  /** Human label for a known key, so the list isn't just opaque slugs. */
-  keyNote(key: string): string {
-    if (key.startsWith('mockingbird_api_metrics:')) {
-      return 'this page’s metrics';
-    }
-    if (key === 'mockingbird_route_log') {
-      return 'this page’s route log';
-    }
-    if (key.startsWith('mockingbird_')) {
-      return 'Mockingbird';
-    }
-    if (key.startsWith('mastodon_mock_')) {
-      return 'session';
-    }
-    return '';
-  }
-
-  deleteKey(entry: StorageEntry): void {
-    if (!confirm(`Delete localStorage key "${entry.key}"? This can’t be undone.`)) {
-      return;
-    }
-    localStorage.removeItem(entry.key);
-    this.refreshStorage();
   }
 
   // ------------------------------------------------------------------- reset

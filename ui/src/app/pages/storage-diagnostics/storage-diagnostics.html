@@ -1,0 +1,146 @@
+<div class="obs-page">
+  <div class="obs-head">
+    <h1>Storage Diagnostics</h1>
+    <p class="muted">
+      What this app is keeping on this device, and how much room the browser will give it. Every
+      figure here is a live scan of this browser — nothing on this page is sent anywhere.
+    </p>
+    <nav class="page-menu">
+      <a class="page-menu-link" routerLink="/observability">← Observability</a>
+    </nav>
+  </div>
+
+  <!-- ========================== Local storage ============================ -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>Local storage</h2>
+      <div class="section-actions">
+        <button class="btn btn-outline btn-sm" (click)="refreshStorage()">Refresh</button>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile">
+        <div class="tile-value">{{ storage().entries.length }}</div>
+        <div class="tile-label muted">keys</div>
+      </div>
+      <div class="tile">
+        <div class="tile-value">{{ formatBytes(storage().totalBytes) }}</div>
+        <div class="tile-label muted">total size</div>
+      </div>
+      @if (biggest(); as b) {
+        <div class="tile">
+          <div class="tile-value">{{ formatBytes(b.bytes) }}</div>
+          <div class="tile-label muted" [title]="b.key">largest key</div>
+        </div>
+      }
+    </div>
+
+    <p class="muted small section-note">
+      This is where the app actually keeps its data — settings, feeds, lists and the metrics behind
+      the Observability page. Deleting a key here is immediate and permanent; the app will rebuild
+      what it can and forget the rest.
+    </p>
+
+    @if (storage().entries.length) {
+      <div class="table-wrap">
+        <table class="obs-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th class="num">Size</th>
+              <th class="num">Chars</th>
+              <th class="actions-col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of storage().entries; track entry.key) {
+              <tr>
+                <td class="storage-key">
+                  <code>{{ entry.key }}</code>
+                  @if (keyNote(entry.key); as note) {
+                    <span class="muted small key-note">{{ note }}</span>
+                  }
+                </td>
+                <td class="num">{{ formatBytes(entry.bytes) }}</td>
+                <td class="num muted">{{ entry.valueChars.toLocaleString() }}</td>
+                <td class="actions-col">
+                  <button
+                    class="btn btn-outline btn-sm danger"
+                    (click)="deleteKey(entry)"
+                    [attr.aria-label]="'Delete ' + entry.key"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="muted center">Local storage is empty.</p>
+    }
+  </section>
+
+  <!-- ============================= IndexedDB ============================= -->
+  <section class="obs-section">
+    <div class="section-head">
+      <h2>IndexedDB &amp; quota</h2>
+      <div class="section-actions">
+        <span class="muted small">{{ quotaLabel() }}</span>
+        <button
+          class="btn btn-outline btn-sm"
+          (click)="refreshIndexedDb()"
+          [disabled]="idbLoading()"
+        >
+          {{ idbLoading() ? 'Scanning…' : 'Refresh' }}
+        </button>
+      </div>
+    </div>
+    <p class="muted small section-note">
+      This app keeps its data in local storage, not IndexedDB — so an entry here is something else
+      on this origin. The quota figure covers <em>all</em> browser storage for this site, which is
+      what the browser actually checks before evicting anything.
+    </p>
+    @if (idb(); as report) {
+      @if (report.quota.persisted) {
+        <p class="muted small">
+          Storage is persistent: this origin is exempt from automatic eviction.
+        </p>
+      }
+      @if (!report.supported) {
+        <p class="muted center">{{ report.note }}</p>
+      } @else if (report.databases.length) {
+        <div class="table-wrap">
+          <table class="obs-table">
+            <thead>
+              <tr>
+                <th>Database</th>
+                <th class="num">Version</th>
+                <th>Object stores</th>
+                <th class="num">Records</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (db of report.databases; track db.name) {
+                <tr [class.row-bad]="!!db.error">
+                  <td class="storage-key">
+                    <code>{{ db.name }}</code>
+                  </td>
+                  <td class="num muted">{{ db.version ?? '—' }}</td>
+                  <td class="muted small">{{ storeSummary(db) }}</td>
+                  <td class="num">{{ db.error ? '—' : totalRecords(db).toLocaleString() }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="muted center">No IndexedDB databases on this origin.</p>
+      }
+    } @else {
+      <p class="muted center">Scanning…</p>
+    }
+  </section>
+</div>

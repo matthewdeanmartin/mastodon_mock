@@ -120,6 +120,14 @@ describe('application routes', () => {
     expect(shellChild('observability')?.canActivate).toBeUndefined();
   });
 
+  it('keeps storage diagnostics available to Anonymous', () => {
+    // It reports this browser's own storage, which an anonymous reader has as
+    // much of as anyone — and is the one page that can explain a full disk.
+    const route = shellChild('storage-diagnostics');
+    expect(route).toBeDefined();
+    expect(route?.canActivate).toBeUndefined();
+  });
+
   it('guards pastebin routes behind the pastebin feature flag', () => {
     const route = shellChild('pastes');
 

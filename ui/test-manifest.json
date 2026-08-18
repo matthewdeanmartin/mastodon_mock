@@ -1,5 +1,5 @@
 {
-  "testCount": 4495,
+  "testCount": 4501,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -233,6 +233,7 @@
     "src/app/app.routes.spec.ts :: application routes keeps interaction-only routes guarded from Anonymous",
     "src/app/app.routes.spec.ts :: application routes keeps observability available to Anonymous",
     "src/app/app.routes.spec.ts :: application routes keeps public hashtag timelines available to Anonymous",
+    "src/app/app.routes.spec.ts :: application routes keeps storage diagnostics available to Anonymous",
     "src/app/app.routes.spec.ts :: application routes leaves the writing workspace open to Anonymous, who have local drafts too",
     "src/app/app.routes.spec.ts :: application routes provides a shareable Anonymous entry route",
     "src/app/app.routes.spec.ts :: application routes the login doors gives each network its own unguarded page",
@@ -2303,6 +2304,11 @@
     "src/app/pages/settings/storage/settings-storage.spec.ts :: SettingsStorage shows only storage belonging to the active account",
     "src/app/pages/starter-collection/starter-collection.spec.ts :: StarterCollection loads the themed kit selected by the route",
     "src/app/pages/starter-collection/starter-collection.spec.ts :: StarterCollection opens a clicked member from the built-in Anonymous account snapshot",
+    "src/app/pages/storage-diagnostics/storage-diagnostics.spec.ts :: StorageDiagnostics deletes a key only after the confirmation is accepted",
+    "src/app/pages/storage-diagnostics/storage-diagnostics.spec.ts :: StorageDiagnostics labels known keys, so the list is not just opaque slugs",
+    "src/app/pages/storage-diagnostics/storage-diagnostics.spec.ts :: StorageDiagnostics links back to Observability",
+    "src/app/pages/storage-diagnostics/storage-diagnostics.spec.ts :: StorageDiagnostics lists every localStorage key with its size",
+    "src/app/pages/storage-diagnostics/storage-diagnostics.spec.ts :: StorageDiagnostics re-scans on refresh, so a key deleted elsewhere disappears",
     "src/app/pages/tag/tag.spec.ts :: Tag (timeline) \"My posts\" narrows the tag feed to the signed-in account",
     "src/app/pages/tag/tag.spec.ts :: Tag (timeline) URL-encodes the tag name in requests",
     "src/app/pages/tag/tag.spec.ts :: Tag (timeline) clears loading on timeline HTTP error",

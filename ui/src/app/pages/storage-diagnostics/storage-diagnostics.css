@@ -1,0 +1,11 @@
+/* Page-specific styling. The frame — sections, tiles, tables, storage rows —
+   comes from diagnostics-shared.css, which this page and Observability both
+   pull in. */
+
+/* The largest-key tile holds a key name that can be far wider than the tile;
+   the full key is in the row below and in the tile's tooltip. */
+.tile-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

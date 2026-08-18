@@ -692,6 +692,16 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/observability/observability').then((m) => m.Observability),
       },
+      {
+        // Split out of Observability: an inventory of what is stored on this
+        // device, where every destructive control on local data now lives.
+        path: 'storage-diagnostics',
+        title: 'Storage Diagnostics',
+        loadComponent: () =>
+          import('./pages/storage-diagnostics/storage-diagnostics').then(
+            (m) => m.StorageDiagnostics,
+          ),
+      },
       // Docs hub + the "blog-post"-style pages it links to. Design lives inside
       // the shell now (rendered as a virtual tweet), so the reader keeps the top
       // nav, rails and footer instead of dropping into a bare full-page layout.
