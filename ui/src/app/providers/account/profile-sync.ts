@@ -9,6 +9,7 @@ import {
 } from '../../portable-config';
 import { ProfileClient, type SettingsDocument } from './profile-client';
 import { PageDiagnostics } from '../../page-diagnostics';
+import { SupporterStatus } from './supporter-status';
 import { STORAGE_KEYS } from '../../storage-registry';
 import {
   FAILURES_BEFORE_WARNING,
@@ -137,6 +138,13 @@ export class ProfileSync {
    * did nothing" are indistinguishable without one.
    */
   private diagnostics = inject(PageDiagnostics);
+  /**
+   * Live entitlement, rewritten on every token mint.
+   *
+   * Costs nothing to depend on: `SupporterStatus` holds one boolean and imports
+   * only Angular, which is exactly why it exists as a separate service.
+   */
+  private supporter = inject(SupporterStatus);
 
   /** This browser's view of the account-level switch. */
   readonly record = signal<ProfileSyncRecord>(readSyncRecord());
@@ -147,14 +155,39 @@ export class ProfileSync {
   /** The last failure worth showing, or null. */
   readonly error = signal<string | null>(null);
 
-  /** True when the subscription lapsed: reads work, writes do not. */
-  readonly readOnly = signal(false);
+  /**
+   * Whether the service last refused a write for payment.
+   *
+   * Private, and never read directly — see {@link readOnly}. Latching this on
+   * its own was a real bug: tokens are minted twice on a cold load, and the
+   * first mint reports `tier: 'free'` before the subscription lookup completes.
+   * A `start()` landing in that window recorded read-only and nothing ever
+   * cleared it, so a paying account was told "your subscription has lapsed"
+   * for the rest of the session and every push was skipped.
+   */
+  private readonly refusedForPayment = signal(false);
+
+  /**
+   * True when the subscription lapsed: reads work, writes do not.
+   *
+   * Derived rather than latched. `SupporterStatus` is rewritten on **every**
+   * mint, so when the corrected `tier: 'plus'` token arrives this clears itself
+   * — no re-check, no ordering assumption, and no way for a stale observation
+   * to outlive the fact it was about.
+   *
+   * The refusal still counts: a supporter flag that says yes while the service
+   * says 402 means the service is right and the flag is ahead of a lapse it has
+   * not seen yet. So this is "refused AND not currently entitled".
+   */
+  readonly readOnly = computed(() => this.refusedForPayment() && !this.supporter.isSupporter());
 
   readonly syncing = computed(() => isSyncing(this.record()));
   readonly lastSyncedAt = computed(() => this.record().lastSyncedAt ?? null);
 
   private pushTimer: ReturnType<typeof setTimeout> | null = null;
   private lastManifestAt = 0;
+  /** Entitlement as it stood when `start()` last read the manifest. */
+  private startedEntitled = false;
 
   /** Whether to show the first-enable prompt. */
   offersSync(entitled: boolean): boolean {
@@ -227,10 +260,15 @@ export class ProfileSync {
     this.lastManifestAt = Date.now();
 
     if (manifest.kind === 'payment-required') {
-      this.readOnly.set(true);
+      this.refusedForPayment.set(true);
       this.diagnostics.info('ProfileSync', 'start:read-only', { reason: 'payment-required' });
       return;
     }
+    // The manifest reflects whichever token was current when it was fetched,
+    // and on a cold load that is often the pre-subscription-lookup one. Record
+    // what we saw so `recheckEntitlement()` can tell a stale answer from a real
+    // one without refetching on every mint.
+    this.startedEntitled = this.supporter.isSupporter();
     if (manifest.kind !== 'ok') {
       // Signed out or unreachable. Neither is an error worth showing to the
       // user — the app works without this service — but both are worth a log
@@ -240,7 +278,7 @@ export class ProfileSync {
       return;
     }
 
-    this.readOnly.set(manifest.value.readOnly);
+    this.refusedForPayment.set(manifest.value.readOnly);
     const current = this.record();
 
     // Locally never asked, remotely present: they enabled sync somewhere else.
@@ -269,6 +307,36 @@ export class ProfileSync {
     if (remoteRevision !== undefined && remoteRevision > (current.revision ?? -1)) {
       await this.pull();
     }
+  }
+
+  /**
+   * Re-run startup when entitlement improves after the fact.
+   *
+   * ## Why this exists
+   *
+   * Tokens are minted twice on a cold load. The first reports `tier: 'free'`
+   * because the subscription lookup has not finished; the second reports the
+   * real tier. A `start()` that lands in that window fetches a manifest saying
+   * `readOnly: true`, and every later push is skipped — a paying account told
+   * its subscription had lapsed, observed in a real session.
+   *
+   * {@link readOnly} being computed already fixes the *message*. This fixes the
+   * *state*: the manifest itself was read under the wrong identity, so the
+   * offers and revisions derived from it are equally stale and the whole of
+   * `start()` has to run again.
+   *
+   * Cheap and idempotent — it only refetches when entitlement actually crossed
+   * from false to true since the last read, so the common case where the tier
+   * was right the first time costs one boolean comparison.
+   */
+  async recheckEntitlement(): Promise<void> {
+    if (!this.supporter.isSupporter() || this.startedEntitled) {
+      return;
+    }
+    this.diagnostics.info('ProfileSync', 'entitlement:improved', {
+      note: 'tier corrected after startup; re-reading the manifest',
+    });
+    await this.start();
   }
 
   /**
@@ -331,7 +399,7 @@ export class ProfileSync {
         return { kind: 'absent' };
       }
       if (fetched.kind === 'payment-required') {
-        this.readOnly.set(true);
+        this.refusedForPayment.set(true);
         this.diagnostics.warn('ProfileSync', 'pull:payment-required', { message: fetched.message });
         return { kind: 'failed', message: fetched.message };
       }
@@ -482,7 +550,7 @@ export class ProfileSync {
       }
 
       if (result.kind === 'payment-required') {
-        this.readOnly.set(true);
+        this.refusedForPayment.set(true);
         this.error.set(result.message);
         this.diagnostics.warn('ProfileSync', 'push:payment-required', { message: result.message });
         return { kind: 'read-only', message: result.message };

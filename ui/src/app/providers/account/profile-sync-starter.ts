@@ -1,4 +1,5 @@
-import { inject, Injectable, Injector } from '@angular/core';
+import { effect, inject, Injectable, Injector } from '@angular/core';
+import { SupporterStatus } from './supporter-status';
 
 /**
  * Starts settings sync without dragging it into the initial bundle.
@@ -32,6 +33,25 @@ import { inject, Injectable, Injector } from '@angular/core';
 @Injectable({ providedIn: 'root' })
 export class ProfileSyncStarter {
   private injector = inject(Injector);
+  private supporter = inject(SupporterStatus);
+
+  constructor() {
+    // Tokens are minted twice on a cold load: the first reports `tier: 'free'`
+    // before the subscription lookup finishes, the second reports the truth. A
+    // `start()` landing in that window reads a manifest saying `readOnly: true`
+    // and skips every push thereafter — a paying account told its subscription
+    // had lapsed, seen in a real session.
+    //
+    // Watching the flag here rather than inside `ProfileSync` keeps the module
+    // lazy: `SupporterStatus` is one boolean with no imports beyond Angular, so
+    // a signed-out visitor pays for this effect and nothing behind it.
+    effect(() => {
+      if (!this.supporter.isSupporter() || !this.startAttempted) {
+        return;
+      }
+      void this.recheckEntitlement();
+    });
+  }
 
   /** Settle sync state, if this browser has an account and sync is on. */
   async start(): Promise<void> {
@@ -43,8 +63,31 @@ export class ProfileSyncStarter {
       // state from the manifest, so `syncing()` is the real answer rather than
       // whatever this browser last wrote down.
       this.started = sync.syncing();
+      // Gates the entitlement effect, and is deliberately *not* `started`:
+      // `start()` returns early for an `unasked` browser, leaving `started`
+      // false while a manifest has very much been read — under a token that may
+      // have said `free`. Keying the recheck on `started` would skip exactly
+      // the case this is meant to repair.
+      this.startAttempted = true;
     } catch {
       // See the class comment: optional feature, mandatory app start.
+    }
+  }
+
+  /**
+   * Re-read the manifest once entitlement improves.
+   *
+   * Guarded inside `ProfileSync` so repeated mints of an already-correct token
+   * cost a boolean comparison rather than a request.
+   */
+  async recheckEntitlement(): Promise<void> {
+    try {
+      const { ProfileSync } = await import('./profile-sync');
+      const sync = this.injector.get(ProfileSync);
+      await sync.recheckEntitlement();
+      this.started = sync.syncing();
+    } catch {
+      // As above.
     }
   }
 
@@ -95,4 +138,12 @@ export class ProfileSyncStarter {
    * or has declined.
    */
   private started = false;
+
+  /**
+   * True once {@link start} has read a manifest, whatever it concluded.
+   *
+   * Distinct from {@link started}, which means "sync is on and worth talking
+   * to". See the comment in `start()`.
+   */
+  private startAttempted = false;
 }

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MawkingbirdSession } from './mawkingbird-session';
 import { PROFILE_ORIGIN } from './profile-client';
+import { SupporterStatus } from './supporter-status';
 import { ProfileSync, SETTINGS_KIND, SETTINGS_SCHEMA_VERSION } from './profile-sync';
 import { PROFILE_SYNC_KEY, writeSyncRecord } from './profile-sync-state';
 
@@ -437,6 +438,88 @@ describe('ProfileSync', () => {
       const grouped = Object.values(outcome.byCategory).flat();
       expect(grouped).toHaveLength(outcome.keys);
       expect(outcome.byCategory['unclassified']).toBeUndefined();
+    });
+
+    /**
+     * Regression, from a real session.
+     *
+     * Tokens are minted twice on a cold load: the first says `tier: 'free'`
+     * because the subscription lookup has not finished, the second says
+     * `tier: 'plus'`. `start()` ran in that window, the manifest came back
+     * `readOnly: true`, and the flag was latched — so a paying account was told
+     * "your subscription has lapsed" and every push was skipped for the rest of
+     * the session.
+     *
+     * The fix is that `readOnly` is *derived* rather than stored, so it cannot
+     * outlive the fact it was about.
+     */
+    it('stops being read-only once the corrected tier arrives', async () => {
+      const supporter = TestBed.inject(SupporterStatus);
+      supporter.isSupporter.set(false);
+      sync.resetForTest({ state: 'on', etag: '"a"', revision: 1 });
+      fetchStub.mockResolvedValue(
+        respond(200, { readOnly: true, quota: { used: 0, limit: 100 }, conflicts: 0 }),
+      );
+
+      await sync.start();
+      expect(sync.readOnly()).toBe(true);
+
+      // The second mint lands, reporting the real tier.
+      supporter.isSupporter.set(true);
+
+      expect(sync.readOnly()).toBe(false);
+    });
+
+    it('stays read-only when the account genuinely is not entitled', async () => {
+      // The other direction, so the fix cannot become "never read-only": a
+      // refusal with no supporter flag behind it is a real lapse.
+      TestBed.inject(SupporterStatus).isSupporter.set(false);
+      sync.resetForTest({ state: 'on', etag: '"a"', revision: 1 });
+      fetchStub.mockResolvedValue(
+        respond(200, { readOnly: true, quota: { used: 0, limit: 100 }, conflicts: 0 }),
+      );
+
+      await sync.start();
+
+      expect(sync.readOnly()).toBe(true);
+      expect((await sync.push()).kind).toBe('read-only');
+    });
+
+    it('re-reads the manifest when entitlement improves after startup', async () => {
+      // Clearing the flag is not enough on its own: the manifest itself was
+      // read under the wrong identity, so the offers and revisions taken from
+      // it are stale too.
+      const supporter = TestBed.inject(SupporterStatus);
+      supporter.isSupporter.set(false);
+      sync.resetForTest({ state: 'unasked' });
+      fetchStub.mockResolvedValue(
+        respond(200, { readOnly: true, quota: { used: 0, limit: 100 }, conflicts: 0 }),
+      );
+
+      await sync.start();
+      const before = calls.length;
+
+      supporter.isSupporter.set(true);
+      await sync.recheckEntitlement();
+
+      expect(calls.length).toBeGreaterThan(before);
+    });
+
+    it('does not refetch when entitlement was already correct', async () => {
+      const supporter = TestBed.inject(SupporterStatus);
+      supporter.isSupporter.set(true);
+      sync.resetForTest({ state: 'on', etag: '"a"', revision: 1 });
+      fetchStub.mockResolvedValue(
+        respond(200, { readOnly: false, quota: { used: 0, limit: 100 }, conflicts: 0 }),
+      );
+
+      await sync.start();
+      const before = calls.length;
+      await sync.recheckEntitlement();
+
+      // A boolean comparison, not a request: repeated mints of an
+      // already-correct token must stay free.
+      expect(calls).toHaveLength(before);
     });
 
     it('does not push when sync is off', async () => {
