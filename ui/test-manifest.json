@@ -1,5 +1,5 @@
 {
-  "testCount": 4533,
+  "testCount": 4539,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -1155,6 +1155,7 @@
     "src/app/observability/api-metrics.spec.ts :: ApiMetrics merges the same local day across servers into one column",
     "src/app/observability/api-metrics.spec.ts :: ApiMetrics persists and reloads daily buckets, histograms included",
     "src/app/observability/api-metrics.spec.ts :: ApiMetrics persists client-error groups and reloads them",
+    "src/app/observability/api-metrics.spec.ts :: ApiMetrics re-normalizes and merges rows stored before the templates were consulted",
     "src/app/observability/api-metrics.spec.ts :: ApiMetrics reset clears client errors along with everything else",
     "src/app/observability/api-metrics.spec.ts :: ApiMetrics reset clears everything and empties the stored blob",
     "src/app/observability/api-metrics.spec.ts :: ApiMetrics resets only the selected server, and every server when merged",
@@ -1172,8 +1173,13 @@
     "src/app/observability/api-metrics.spec.ts :: describeError reads name, message and the first stack frame off an Error",
     "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint collapses numeric id segments to :id",
     "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint collapses provider-scoped (colon) ids",
+    "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint collapses tag names, whatever they look like",
+    "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint collapses the other word-shaped identifiers that used to leak",
     "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint drops the query string",
+    "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint gives one row for one endpoint however many different tags are read",
+    "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint keeps a static endpoint that sits where an id could",
     "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint keeps route names that merely contain letters and digits but are short",
+    "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint still collapses ids on paths the documentation does not cover",
     "src/app/observability/api-metrics.spec.ts :: normalizeEndpoint strips the origin",
     "src/app/observability/api-metrics.spec.ts :: normalizeErrorMessage blanks URLs, uuids, long ids and numbers so one bug is one group",
     "src/app/observability/api-metrics.spec.ts :: normalizeErrorMessage collapses whitespace and caps length",

@@ -95,6 +95,63 @@ function familyOf(segments: string[]): string | null {
 }
 
 /**
+ * The documented path template a request path belongs to, or null.
+ *
+ * Exported for {@link normalizeEndpoint}, which has the same problem this
+ * module already solved and used to solve it badly. Guessing whether a segment
+ * is an identifier from its *shape* cannot work: `/api/v1/tags/SciFi` and
+ * `/api/v1/tags/100DaysOfCode` are the same endpoint, but only the second
+ * looks id-like, so the two were recorded as different rows — and every tag a
+ * person searched became a row of its own, in a table whose whole design is to
+ * stay bounded.
+ *
+ * The API's own shape is the answer. A path that matches a documented template
+ * takes that template's `:id` positions, whatever the values look like.
+ *
+ * Method-insensitive on purpose. A GET to a path documented only for DELETE is
+ * still that path, and grouping it under the template is better than leaking
+ * the id — the endpoint *rows* keep the method, so nothing is conflated by it.
+ */
+export function documentedTemplate(path: string): string | null {
+  const segments = path.split('/');
+  let best: string | null = null;
+  let bestScore = -1;
+  for (const rows of methodAgnosticIndex().get(segments.length) ?? []) {
+    const s = score(segments, rows);
+    if (s > bestScore) {
+      best = rows;
+      bestScore = s;
+    }
+  }
+  return best;
+}
+
+/** Templates bucketed by segment count, with duplicates across methods folded. */
+let bySegmentCount: Map<number, string[]> | null = null;
+
+function methodAgnosticIndex(): Map<number, string[]> {
+  if (bySegmentCount) {
+    return bySegmentCount;
+  }
+  bySegmentCount = new Map<number, string[]>();
+  const seen = new Set<string>();
+  for (const row of DOC_ROWS) {
+    if (seen.has(row[1])) {
+      continue;
+    }
+    seen.add(row[1]);
+    const n = row[1].split('/').length;
+    const bucket = bySegmentCount.get(n);
+    if (bucket) {
+      bucket.push(row[1]);
+    } else {
+      bySegmentCount.set(n, [row[1]]);
+    }
+  }
+  return bySegmentCount;
+}
+
+/**
  * Look up documentation for one endpoint key (`"GET /api/v1/accounts/:id"`).
  * Returns null when the endpoint isn't part of the Mastodon API.
  */

@@ -33,6 +33,45 @@ describe('normalizeEndpoint', () => {
     );
   });
 
+  it('collapses tag names, whatever they look like', () => {
+    // The bug this replaced: `SciFi` kept its name while `100DaysOfCode`
+    // collapsed, so one endpoint became two rows according to what was
+    // searched for — and every tag a person looked up became a row.
+    expect(normalizeEndpoint('/api/v1/tags/SciFi')).toBe('/api/v1/tags/:id');
+    expect(normalizeEndpoint('/api/v1/tags/100DaysOfCode')).toBe('/api/v1/tags/:id');
+    expect(normalizeEndpoint('/api/v1/tags/caturday')).toBe('/api/v1/tags/:id');
+    expect(normalizeEndpoint('/api/v1/tags/introductions')).toBe('/api/v1/tags/:id');
+  });
+
+  it('gives one row for one endpoint however many different tags are read', () => {
+    const tags = ['SciFi', 'rust', 'photography', '100DaysOfCode', 'caturday'];
+    const rows = new Set(tags.map((t) => normalizeEndpoint(`/api/v1/tags/${t}`)));
+    expect(rows.size).toBe(1);
+  });
+
+  it('collapses the other word-shaped identifiers that used to leak', () => {
+    expect(normalizeEndpoint('/api/v1/timelines/tag/rust')).toBe('/api/v1/timelines/tag/:id');
+    expect(normalizeEndpoint('/api/v1/featured_tags/art')).toBe('/api/v1/featured_tags/:id');
+    expect(normalizeEndpoint('/api/v1/lists/work')).toBe('/api/v1/lists/:id');
+    expect(normalizeEndpoint('/api/v1/filters/spam')).toBe('/api/v1/filters/:id');
+  });
+
+  it('keeps a static endpoint that sits where an id could', () => {
+    // `lookup` is a real endpoint, not somebody's account id; a rule that
+    // collapsed by position alone would lose it.
+    expect(normalizeEndpoint('/api/v1/accounts/lookup')).toBe('/api/v1/accounts/lookup');
+    expect(normalizeEndpoint('/api/v1/accounts/verify_credentials')).toBe(
+      '/api/v1/accounts/verify_credentials',
+    );
+    expect(normalizeEndpoint('/api/v2/search')).toBe('/api/v2/search');
+  });
+
+  it('still collapses ids on paths the documentation does not cover', () => {
+    // The mock's own routes are not in the Mastodon docs, so these fall through
+    // to the shape guess — which is why it is kept.
+    expect(normalizeEndpoint('/api/v1/_mock/dev_users/12345')).toBe('/api/v1/_mock/dev_users/:id');
+  });
+
   it('drops the query string', () => {
     expect(normalizeEndpoint('/api/v1/timelines/home?max_id=999&limit=40')).toBe(
       '/api/v1/timelines/home',
@@ -249,6 +288,43 @@ describe('ApiMetrics', () => {
     metrics.selectScope(ALL_SCOPES);
     metrics.reset();
     expect(metrics.totals().count).toBe(0);
+  });
+
+  it('re-normalizes and merges rows stored before the templates were consulted', () => {
+    // A blob as an older build would have written it: one row per tag name,
+    // with the names sitting in localStorage.
+    const blob = {
+      v: 2,
+      e: [
+        ['GET /api/v1/tags/SciFi', 3, 0, 300, 80, 120, 30600, 200, 1000],
+        ['GET /api/v1/tags/caturday', 2, 1, 400, 150, 250, 85000, 500, 2000],
+        ['GET /api/v2/search', 1, 0, 900, 900, 900, 810000, 200, 1500],
+      ],
+      b: [],
+      x: [[1000, 'GET', '/api/v1/tags/SciFi', 500, 'HTTP 500 after 120ms']],
+      d: [],
+    };
+    localStorage.setItem(storageKey('https://mastodon.social'), JSON.stringify(blob));
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [ApiMetrics, Server] });
+    TestBed.inject(Server).setBaseUrl('https://mastodon.social');
+    const reloaded = TestBed.inject(ApiMetrics);
+
+    // The two tag rows became one, and their counts were added rather than one
+    // of them winning.
+    const tags = reloaded.stats().find((s) => s.key === 'GET /api/v1/tags/:id');
+    expect(tags?.count).toBe(5);
+    expect(tags?.errors).toBe(1);
+    expect(tags?.minMs).toBe(80);
+    expect(tags?.maxMs).toBe(250);
+    // Nothing still carries a tag name.
+    expect(reloaded.stats().some((s) => s.key.includes('SciFi'))).toBe(false);
+    expect(reloaded.stats().some((s) => s.key.includes('caturday'))).toBe(false);
+    // An unrelated row is untouched.
+    expect(reloaded.stats().find((s) => s.key === 'GET /api/v2/search')?.count).toBe(1);
+    // And the error ring is cleaned too.
+    expect(reloaded.errors()[0].endpoint).toBe('/api/v1/tags/:id');
   });
 
   // -------------------------------------------------------- daily + latency

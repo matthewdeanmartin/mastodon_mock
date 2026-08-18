@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Server } from '../server';
+import { documentedTemplate } from './api-docs';
 import {
   BUCKET_COUNT,
   addSample,
@@ -328,9 +329,35 @@ function storageKey(scope: string): string {
 }
 
 /**
- * Collapse a request URL into an endpoint template: drop the query string and
- * replace id-like path segments with `:id`, so `/accounts/42/followers` and
- * `/accounts/99/followers` aggregate into one row.
+ * Collapse a request URL into an endpoint template, so every call to one
+ * endpoint aggregates into one row.
+ *
+ * ## Why the API's own shape decides, not the segment's appearance
+ *
+ * This used to guess: a segment that was all digits, or long and mixed
+ * alphanumeric, was an id. That cannot work, because plenty of real identifiers
+ * are ordinary words. `/api/v1/tags/SciFi` kept the tag, while
+ * `/api/v1/tags/100DaysOfCode` collapsed to `:id` — the *same endpoint*
+ * splitting into different rows according to what the person happened to search
+ * for. Three things went wrong at once:
+ *
+ *  - **The row set grew without bound.** Rows are meant to be O(endpoints);
+ *    keyed on user-supplied tag and list names they became O(what you browsed),
+ *    which is exactly what the count-don't-store scheme exists to prevent.
+ *  - **It recorded lookups.** A tag name is a search someone made.
+ *    `sanitizePath` has always treated it that way for the route log; this did
+ *    not, and wrote them to localStorage.
+ *  - **The numbers were wrong.** One endpoint's traffic scattered across dozens
+ *    of rows, so "busiest endpoint" and the latency families under-counted it.
+ *
+ * So a path is matched against the documented templates first
+ * ({@link documentedTemplate}), and the winning template says which positions
+ * are identifiers regardless of what they contain.
+ *
+ * {@link isIdSegment} remains as the fallback for paths the docs don't cover —
+ * the mock's own `/api/v1/_mock/...` routes, a future endpoint, a
+ * provider-scoped id. It is a guess, but it is only reached where there is
+ * nothing better, and it errs toward collapsing.
  */
 export function normalizeEndpoint(url: string): string {
   // Strip origin and query/hash.
@@ -341,6 +368,12 @@ export function normalizeEndpoint(url: string): string {
     path = slash === -1 ? '/' : path.slice(slash);
   }
   path = path.split('?')[0].split('#')[0];
+
+  const documented = documentedTemplate(path);
+  if (documented) {
+    return documented;
+  }
+
   return (
     path
       .split('/')
@@ -349,7 +382,13 @@ export function normalizeEndpoint(url: string): string {
   );
 }
 
-/** True for a path segment that looks like an id rather than a route name. */
+/**
+ * True for a path segment that *looks* like an id rather than a route name.
+ *
+ * Only consulted for paths {@link documentedTemplate} does not cover — see
+ * {@link normalizeEndpoint} for why appearance is the wrong test whenever
+ * something better is available.
+ */
 function isIdSegment(seg: string): boolean {
   if (!seg) {
     return false;
@@ -393,6 +432,21 @@ export function normalizeErrorMessage(message: string): string {
       .trim()
       .slice(0, MAX_CLIENT_MSG_LEN)
   );
+}
+
+/**
+ * Re-normalize a stored endpoint key (`"GET /api/v1/tags/SciFi"`).
+ *
+ * Splits off the method, re-runs the path through {@link normalizeEndpoint},
+ * and reassembles. Keys written by the current code are already normalized and
+ * pass through unchanged, so this is safe to run on every load.
+ */
+function renormalizeKey(key: string): string {
+  const space = key.indexOf(' ');
+  if (space === -1) {
+    return key;
+  }
+  return `${key.slice(0, space)} ${normalizeEndpoint(key.slice(space + 1))}`;
 }
 
 /** Type + message + first stack frame for an arbitrary thrown value. */
@@ -992,7 +1046,31 @@ export class ApiMetrics {
       return state;
     }
     for (const row of blob.e ?? []) {
-      const [key, count, errors, totalMs, minMs, maxMs, sumSqMs, lastStatus, lastAt] = row;
+      const [storedKey, count, errors, totalMs, minMs, maxMs, sumSqMs, lastStatus, lastAt] = row;
+      // Re-normalize on the way in. Rows written before `normalizeEndpoint`
+      // consulted the documented templates have tag and list *names* baked into
+      // their keys, and loading them verbatim would keep those lookups in
+      // localStorage — and keep one endpoint split across a row per tag —
+      // for as long as the browser held the blob.
+      //
+      // Merging rather than overwriting, because that is exactly what the old
+      // keys need: `…/tags/SciFi` and `…/tags/caturday` both become
+      // `…/tags/:id`, and their counts belong together.
+      const key = renormalizeKey(storedKey);
+      const prev = state.endpoints.get(key);
+      if (prev) {
+        prev.count += count;
+        prev.errors += errors;
+        prev.totalMs += totalMs;
+        prev.sumSqMs += sumSqMs;
+        prev.minMs = Math.min(prev.minMs, minMs);
+        prev.maxMs = Math.max(prev.maxMs, maxMs);
+        if (lastAt > prev.lastAt) {
+          prev.lastAt = lastAt;
+          prev.lastStatus = lastStatus;
+        }
+        continue;
+      }
       state.endpoints.set(key, {
         key,
         count,
@@ -1016,7 +1094,9 @@ export class ApiMetrics {
     state.errorRing = (blob.x ?? []).map(([at, method, endpoint, status, message]) => ({
       at,
       method,
-      endpoint,
+      // Same reasoning as the endpoint rows above: the ring stored the
+      // pre-normalization endpoint, names and all.
+      endpoint: normalizeEndpoint(endpoint),
       status,
       message,
     }));
