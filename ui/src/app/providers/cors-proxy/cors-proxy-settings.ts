@@ -152,11 +152,61 @@ export class CorsProxySettings implements ExpiringConnection {
     if (entry.id !== 'mawkingbird' || !this.plus?.isSupporter()) {
       return entry;
     }
+    return this.supporterEntry() ?? entry;
+  }
+
+  /** The Plus proxy entry, when the account is entitled and the flag allows it. */
+  private supporterEntry(): CorsProxyEntry | null {
+    if (!this.plus?.isSupporter()) {
+      return null;
+    }
     const flag = proxyFeatureFlag('mawkingbird-plus');
     if (flag !== null && !this.proxyFlagEnabled(flag)) {
-      return entry;
+      return null;
     }
-    return corsProxyEntry('mawkingbird-plus') ?? entry;
+    return corsProxyEntry('mawkingbird-plus') ?? null;
+  }
+
+  /**
+   * Whether this browser is falling back to no proxy while entitled to one.
+   *
+   * The gap {@link upgradeToSupporterTier} does not close. That promotes the
+   * *free Mawkingbird entry* to the paid one, which does nothing for the states
+   * a subscriber actually arrives in:
+   *
+   * - never chose a proxy at all — the default, and the common case;
+   * - chose `custom` and never filled in a template, so it cannot build a URL;
+   * - sits on a legacy free proxy whose feature flag has since been turned off.
+   *
+   * All three resolve to null, so a paying subscriber gets no proxy at all while
+   * the thing they paid for sits unused. That is the bug this reports, and
+   * {@link adoptSupporterProxy} is what fixes it.
+   *
+   * Deliberately false for a *working* deliberate choice — someone on AllOrigins
+   * or their own working proxy is left alone. Wanting to fund the project and
+   * not wanting to route traffic through it are compatible positions.
+   */
+  readonly missingEntitledProxy = computed(
+    () => this.supporterEntry() !== null && this.resolve() === null,
+  );
+
+  /**
+   * Switch this browser onto the Mawkingbird proxy it is entitled to.
+   *
+   * Writes `mawkingbird` rather than `mawkingbird-plus`: the stored selection
+   * stays the free entry and the live read promotes it, so a lapsed subscription
+   * degrades to the free tier by itself instead of stranding someone on a paid
+   * entry they no longer have — the same reasoning as
+   * {@link upgradeToSupporterTier}, which is why this does not bypass it.
+   *
+   * Nothing here needs a key, so there is no credential decision to make and
+   * nothing to prompt about.
+   */
+  adoptSupporterProxy(): void {
+    if (this.supporterEntry() === null) {
+      return;
+    }
+    this.select('mawkingbird');
   }
 
   /** Whether a proxy is configured well enough to actually be used. */

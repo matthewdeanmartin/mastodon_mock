@@ -33,6 +33,39 @@
       <button class="btn btn-outline" type="button" (click)="signOut()">Sign out</button>
     </section>
 
+    @if (plus.isSupporter() && features.decided()) {
+      <!--
+        The same toggles as the welcome dialog, so a decision made once in a
+        modal is never a decision the user is stuck with. Shown only after the
+        dialog has been answered, so the two are never on screen together
+        disagreeing about the same switches.
+      -->
+      <section class="plus-features">
+        <h2>What's switched on</h2>
+        <p class="muted small">
+          Turn any of these off and back on whenever you like. Turning one off stops it syncing —
+          nothing stored on your account is deleted.
+        </p>
+        <ul class="plus-feature-list">
+          @for (row of featureRows(); track row.feature) {
+            <li>
+              <label>
+                <input
+                  type="checkbox"
+                  [checked]="row.on"
+                  (change)="setFeature(row.feature, $any($event.target).checked)"
+                />
+                <span>{{ row.label }}</span>
+              </label>
+            </li>
+          }
+        </ul>
+        @if (adoptionError(); as failure) {
+          <p class="config-error" role="alert">{{ failure }}</p>
+        }
+      </section>
+    }
+
     @if (plus.isSupporter()) {
       <section class="plus-supporter">
         <h2>Your support</h2>
@@ -165,3 +198,20 @@
     <p class="feed-error" role="alert">{{ message }}</p>
   }
 </div>
+
+<!-- Rendered last so it sits above the page it blocks. -->
+@if (showWelcome()) {
+  <app-plus-welcome-dialog (saved)="features.refresh()" />
+}
+
+<!-- Only one of these is ever on screen: the welcome dialog cannot be answered
+     without closing, and a toggle cannot be flipped behind it. -->
+@if (pendingAdoption(); as pending) {
+  <app-adoption-dialog
+    [collection]="pending.collection"
+    [localCount]="pending.localCount"
+    [remoteCount]="pending.remoteCount"
+    (chose)="resolveAdoption($event)"
+    (cancelled)="cancelAdoption()"
+  />
+}

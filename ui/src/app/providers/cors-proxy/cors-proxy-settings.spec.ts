@@ -226,6 +226,86 @@ describe('the supporter tier upgrade', () => {
   });
 });
 
+describe('adopting the proxy a subscriber is entitled to', () => {
+  let settings: CorsProxySettings;
+  let status: SupporterStatus;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({});
+    enableProxyFlags();
+    settings = TestBed.inject(CorsProxySettings);
+    status = TestBed.inject(SupporterStatus);
+    TestBed.inject(FeatureFlags).setState('proxy-mawkingbird-plus', 'production');
+  });
+
+  it('reports the gap for a subscriber who never chose a proxy', () => {
+    // The default, and the common case: someone subscribes and the thing they
+    // paid for sits unused because the picker was never opened.
+    status.isSupporter.set(true);
+
+    expect(settings.currentId()).toBeNull();
+    expect(settings.missingEntitledProxy()).toBe(true);
+  });
+
+  it('reports the gap for a custom proxy with no template', () => {
+    // Selected `custom`, never filled in the URL. Resolves to null, so no
+    // request can be built — indistinguishable from having no proxy.
+    settings.select('custom', { template: '' });
+    status.isSupporter.set(true);
+
+    expect(settings.missingEntitledProxy()).toBe(true);
+  });
+
+  it('reports the gap for a legacy proxy whose flag was turned off', () => {
+    settings.select('allorigins');
+    status.isSupporter.set(true);
+    TestBed.inject(FeatureFlags).setState('proxy-allorigins', 'off');
+
+    expect(settings.missingEntitledProxy()).toBe(true);
+  });
+
+  it('reports no gap for a working deliberate choice', () => {
+    // Funding the project and not wanting to route traffic through it are
+    // compatible positions, so a proxy that works is never overridden.
+    settings.select('allorigins');
+    status.isSupporter.set(true);
+
+    expect(settings.missingEntitledProxy()).toBe(false);
+  });
+
+  it('reports no gap for someone who is not entitled', () => {
+    expect(settings.missingEntitledProxy()).toBe(false);
+  });
+
+  it('switches a subscriber onto the proxy they are paying for', () => {
+    status.isSupporter.set(true);
+
+    settings.adoptSupporterProxy();
+
+    // Stored as the free entry and promoted on read, so a lapse degrades by
+    // itself rather than stranding them on a paid entry.
+    expect(settings.currentId()).toBe('mawkingbird');
+    expect(settings.chosen()?.id).toBe('mawkingbird-plus');
+    expect(settings.missingEntitledProxy()).toBe(false);
+  });
+
+  it('does nothing for an account with no entitlement', () => {
+    settings.adoptSupporterProxy();
+
+    expect(settings.currentId()).toBeNull();
+  });
+
+  it('does nothing when the Plus proxy flag is off', () => {
+    TestBed.inject(FeatureFlags).setState('proxy-mawkingbird-plus', 'off');
+    status.isSupporter.set(true);
+
+    settings.adoptSupporterProxy();
+
+    expect(settings.currentId()).toBeNull();
+  });
+});
+
 describe('availableCorsProxies', () => {
   it('hides localhost-only proxies on a deployed origin', () => {
     const ids = availableCorsProxies('mockingbird.example.com', allFlagsOn).map(

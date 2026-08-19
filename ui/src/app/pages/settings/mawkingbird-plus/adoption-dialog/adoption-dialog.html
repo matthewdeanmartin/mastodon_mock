@@ -1,0 +1,48 @@
+<!-- Cancellable, unlike the welcome dialog: there is a real third answer here
+     (leave it off and decide later), and forcing an irreversible data decision
+     on the spot is how people lose things. -->
+<button class="ad-backdrop" type="button" aria-label="Cancel" (click)="cancel()"></button>
+<section class="ad-dialog" role="dialog" aria-modal="true" aria-labelledby="ad-title">
+  <h2 id="ad-title">Your {{ noun() }} are in two places</h2>
+
+  <p class="ad-summary">
+    This browser has <strong>{{ localCount() }}</strong> and your account has
+    <strong>{{ remoteCount() }}</strong
+    >. Which should this browser end up with?
+  </p>
+
+  <div class="ad-choices">
+    <div class="ad-choice">
+      <button class="btn" type="button" [disabled]="busy()" (click)="choose('merge')">
+        Keep both
+      </button>
+      <p class="ad-detail">
+        Everything from both, and anything in both places keeps your account's version.
+      </p>
+    </div>
+
+    <div class="ad-choice">
+      <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="choose('replace')">
+        Use my account's
+      </button>
+      <p class="ad-detail">
+        Take the {{ remoteCount() }} on your account. This browser's {{ localCount() }} are dropped.
+      </p>
+    </div>
+  </div>
+
+  <!-- Said out loud rather than left to be discovered. Someone looking for
+       "upload mine and overwrite theirs" should find out here that it does not
+       exist, and why. -->
+  <p class="ad-note">
+    There's no option to overwrite your account with this browser's copy — that would delete data
+    from your other browsers, and sorting out which edit came first isn't something this app tries
+    to do.
+  </p>
+
+  <div class="ad-actions">
+    <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="cancel()">
+      Not now
+    </button>
+  </div>
+</section>

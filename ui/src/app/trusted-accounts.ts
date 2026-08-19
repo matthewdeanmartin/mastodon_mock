@@ -32,7 +32,7 @@ export const TRUST_LEVELS: readonly TrustLevel[] = [
 ];
 
 /** One trusted account. */
-interface Entry {
+export interface Entry {
   /** Display handle, so the management list can name who is trusted. */
   acct: string;
   /** When they were trusted, epoch-ms — lets the list sort by most recent. */
@@ -240,6 +240,37 @@ export class TrustedAccounts {
       this.trust(account);
     }
     return !trusted;
+  }
+
+  /**
+   * Replace the whole list with one reconciled against the account.
+   *
+   * Needed because {@link trust} stamps `since` with the current time, which is
+   * right for a fresh judgement and wrong for one being restored — adopting a
+   * stored list through it would re-date every entry to the moment of adoption
+   * and destroy the ordering the settings list sorts by.
+   *
+   * Takes the level and flags too, because they arrive from the same document
+   * and applying them in two writes would persist twice and briefly show a list
+   * under the wrong level.
+   */
+  adoptAll(
+    entries: Record<string, Entry>,
+    settings?: { level: TrustLevel; expandAllCw: boolean; showAllSensitive: boolean },
+  ): void {
+    this.state.update((prev) =>
+      this.persist({
+        ...prev,
+        entries: { ...entries },
+        ...(settings
+          ? {
+              level: settings.level,
+              expandAllCw: settings.expandAllCw,
+              showAllSensitive: settings.showAllSensitive,
+            }
+          : {}),
+      }),
+    );
   }
 
   setExpandAllCw(on: boolean): void {

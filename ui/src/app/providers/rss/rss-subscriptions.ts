@@ -155,6 +155,35 @@ export class RssSubscriptions {
     return null;
   }
 
+  /**
+   * Replace the whole subscription list with one reconciled against the account.
+   *
+   * A bulk write rather than repeated {@link add} calls: `add` enforces the
+   * subscription limit one feed at a time and would silently drop the tail of an
+   * adopted list, and each call persists, so N feeds meant N writes and N
+   * signal updates for what is one operation.
+   *
+   * Per-feed operational flags are preserved from the existing local entry where
+   * there is one, and default off otherwise — `useProxy` especially, which is a
+   * decision to route a request through a third party and must never be turned
+   * on by machinery the user did not ask for.
+   */
+  adoptAll(feeds: { url: string; title: string }[]): void {
+    const existing = new Map(this.feeds().map((feed) => [feed.url, feed]));
+    this.persist(
+      feeds.slice(0, this.limit()).map((feed) => {
+        const previous = existing.get(feed.url);
+        return {
+          url: feed.url,
+          title: feed.title,
+          enabled: previous?.enabled ?? true,
+          ...(previous?.useProxy ? { useProxy: true } : {}),
+          ...(previous?.itemCount === undefined ? {} : { itemCount: previous.itemCount }),
+        };
+      }),
+    );
+  }
+
   remove(url: string): void {
     this.persist(this.feeds().filter((f) => f.url !== url));
   }

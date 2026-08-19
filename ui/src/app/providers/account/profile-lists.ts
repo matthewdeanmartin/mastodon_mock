@@ -221,6 +221,34 @@ export class ProfileLists {
     return { kind: 'ok', value: { written: result.value.written } };
   }
 
+  /**
+   * Write lists through as they are, keeping their ids.
+   *
+   * The counterpart to {@link copyIn}, and deliberately not the same thing.
+   * `copyIn` regenerates ids so that running it twice duplicates rather than
+   * silently overwriting — right when the user is *copying* lists in. This is
+   * for reconciliation, where a list carrying an id the account already knows is
+   * the same list and must land on top of it.
+   *
+   * One batch, so N lists cost one index write rather than N racing each other.
+   */
+  async writeAll(lists: ProfileList[]): Promise<boolean> {
+    if (lists.length === 0) {
+      return true;
+    }
+    const result = await this.collections.batch(
+      COLLECTION,
+      lists.map((list) => ({ op: 'put' as const, id: list.id, value: list })),
+    );
+    if (result.kind !== 'ok') {
+      this.note(result);
+      return false;
+    }
+    await this.load();
+    this.diagnostics.info('ProfileLists', 'list:write-all', { count: lists.length });
+    return true;
+  }
+
   /** Replace one list, rolling back if the write is refused. */
   private async write(list: ProfileList): Promise<boolean> {
     const previous = this.state();

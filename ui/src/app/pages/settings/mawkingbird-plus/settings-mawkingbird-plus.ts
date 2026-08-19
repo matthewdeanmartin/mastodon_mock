@@ -1,8 +1,16 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { PlusSession } from '../../../providers/account/plus-session';
 import { authDebug } from '../../../providers/account/auth-debug';
 import { MawkingbirdSession } from '../../../providers/account/mawkingbird-session';
+import { PlusFeatures } from '../../../providers/account/plus-features';
+import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
+import type { PlusFeature } from '../../../providers/account/plus-features';
+import { PlusWelcomeDialog } from './plus-welcome-dialog/plus-welcome-dialog';
+import { AdoptionDialog } from './adoption-dialog/adoption-dialog';
+import { CollectionAdoptionRunner } from '../../../providers/account/collection-adoption-runner';
+import type { AdoptableCollection } from '../../../providers/account/collection-adoption-runner';
+import type { AdoptionChoice } from '../../../providers/account/collection-adoption';
 
 /**
  * Settings → Mawkingbird Plus.
@@ -23,13 +31,103 @@ import { MawkingbirdSession } from '../../../providers/account/mawkingbird-sessi
  */
 @Component({
   selector: 'app-settings-mawkingbird-plus',
-  imports: [DatePipe],
+  imports: [DatePipe, PlusWelcomeDialog, AdoptionDialog],
   templateUrl: './settings-mawkingbird-plus.html',
   styleUrl: './settings-mawkingbird-plus.css',
 })
 export class SettingsMawkingbirdPlus implements OnInit {
   protected session = inject(MawkingbirdSession);
   protected plus = inject(PlusSession);
+  private proxy = inject(CorsProxySettings);
+  protected features = inject(PlusFeatures);
+  private adoption = inject(CollectionAdoptionRunner);
+
+  /**
+   * The collection waiting on a merge-or-replace answer, if any.
+   *
+   * Held here rather than in the dialog so that backing out can put the toggle
+   * back where it was — the dialog itself has no idea a toggle was involved.
+   */
+  protected readonly pendingAdoption = signal<{
+    collection: AdoptableCollection;
+    localCount: number;
+    remoteCount: number;
+  } | null>(null);
+
+  /** A failure from the last adoption attempt, shown next to the toggles. */
+  protected readonly adoptionError = signal('');
+
+  /**
+   * Whether to show the one-time welcome dialog.
+   *
+   * Signed in, entitled, and never answered. Entitlement is part of it because
+   * the dialog is about what a *subscription* switches on — showing it to a free
+   * account would be an advert wearing a dialog's clothes.
+   */
+  protected readonly showWelcome = computed(
+    () => this.session.user() !== null && this.plus.isSupporter() && !this.features.decided(),
+  );
+
+  /** The toggles, mirrored here so a decision can always be revisited. */
+  protected readonly featureRows = computed(() =>
+    this.features.all().map((row) => ({ ...row, label: FEATURE_LABELS[row.feature] })),
+  );
+
+  protected async setFeature(feature: PlusFeature, on: boolean): Promise<void> {
+    this.adoptionError.set('');
+    this.features.set(feature, on);
+
+    if (feature === 'corsProxy' && on && this.proxy.missingEntitledProxy()) {
+      this.proxy.adoptSupporterProxy();
+      return;
+    }
+
+    // Turning a collection *off* is just a setting: nothing is uploaded and
+    // nothing stored is deleted, so there is nothing to reconcile.
+    const collection = COLLECTION_FOR[feature];
+    if (!collection || !on) {
+      return;
+    }
+
+    const inspection = await this.adoption.inspect(collection);
+    if (inspection.error) {
+      // Put the toggle back: claiming a collection is syncing when the first
+      // read failed is the lie that makes people trust a sync that is not
+      // running.
+      this.features.set(feature, false);
+      this.adoptionError.set(inspection.error);
+      return;
+    }
+    if (inspection.needsChoice) {
+      this.pendingAdoption.set({
+        collection: inspection.collection,
+        localCount: inspection.localCount,
+        remoteCount: inspection.remoteCount,
+      });
+    }
+  }
+
+  protected async resolveAdoption(choice: AdoptionChoice): Promise<void> {
+    const pending = this.pendingAdoption();
+    if (!pending) {
+      return;
+    }
+    const ok = await this.adoption.apply(pending.collection, choice);
+    this.pendingAdoption.set(null);
+    if (!ok) {
+      this.features.set(FEATURE_FOR[pending.collection], false);
+      this.adoptionError.set('That could not be saved to your account. Nothing was changed.');
+    }
+  }
+
+  /** Backed out of the question: the toggle goes back off, nothing is touched. */
+  protected cancelAdoption(): void {
+    const pending = this.pendingAdoption();
+    if (pending) {
+      this.features.set(FEATURE_FOR[pending.collection], false);
+    }
+    this.pendingAdoption.set(null);
+  }
 
   /** What the user typed into the email field. */
   protected readonly email = signal('');
@@ -98,7 +196,31 @@ export class SettingsMawkingbirdPlus implements OnInit {
   protected async signOut(): Promise<void> {
     this.plus.clear();
     await this.session.signOut();
+    // `signOut()` clears the stored record; this re-reads it, so the next
+    // account gets the dialog rather than inheriting this one's answer.
+    this.features.refresh();
     this.linkSent.set(false);
     this.email.set('');
   }
 }
+
+const FEATURE_LABELS: Record<PlusFeature, string> = {
+  corsProxy: 'Mawkingbird CORS proxy',
+  settingsSync: 'Settings sync',
+  trustSync: 'Trusted accounts',
+  listsSync: 'Client lists',
+  feedsSync: 'RSS subscription list',
+};
+
+/** Which collection a toggle governs. Toggles with no collection sync nothing. */
+const COLLECTION_FOR: Partial<Record<PlusFeature, AdoptableCollection>> = {
+  trustSync: 'trust',
+  feedsSync: 'feeds',
+  listsSync: 'lists',
+};
+
+const FEATURE_FOR: Record<AdoptableCollection, PlusFeature> = {
+  trust: 'trustSync',
+  feeds: 'feedsSync',
+  lists: 'listsSync',
+};

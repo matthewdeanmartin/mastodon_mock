@@ -1,3 +1,4 @@
+import { PLUS_FEATURES_KEY } from './plus-features';
 import { PROFILE_SYNC_KEY } from './profile-sync-state';
 
 /**
@@ -28,6 +29,11 @@ const ACCOUNT_SCOPED_KEYS: readonly string[] = [
   // previous account's usage to the next one is simply a wrong reading, and it
   // costs nothing to drop — the next sync refetches it.
   'mockingbird_remote_storage_usage',
+  // Which Plus features the *previous* account switched on, and the fact that
+  // it answered the dialog at all. Inheriting `decided: true` would deny the
+  // next account the one-time dialog entirely, which is the same silent-denial
+  // bug as inheriting a `paused` sync state.
+  PLUS_FEATURES_KEY,
 ];
 
 /**

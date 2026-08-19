@@ -323,7 +323,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'account',
     sensitivity: 'private',
-    note: 'Subscribed feed URLs — what the user reads. Also near-secret: private feed URLs (Feedbin, Miniflux, Google Alerts) routinely embed an API key in the URL itself. Each feed also carries its opt-in flag for the CORS proxy.',
+    note: 'Subscribed feed URLs — what the user reads. Private feed URLs (Feedbin, Miniflux, Google Alerts) routinely embed an API key in the URL itself; by a decided business rule these are stored as-is and NOT treated as secrets, and no warning is shown — see mawkingbird_profile/docs/01-data-model.md. Real secret storage is future work. Each feed also carries its opt-in flag for the CORS proxy.',
   },
   {
     base: 'mockingbird_cors_proxy',
@@ -793,6 +793,18 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'none',
     sensitivity: 'setting',
     note: 'User-edited prompt templates for the search and tag helpers. Only present for templates edited away from the shipped default.',
+  },
+  {
+    base: 'mockingbird_plus_features',
+    storage: 'local',
+    suffix: 'none',
+    // `setting`, unlike mockingbird_profile_sync below: these are preferences
+    // that mean the same thing in every browser ("sync my trust list"), not
+    // operational state about one browser's relationship with a server. So they
+    // travel with the rest of the settings, and someone who answered the dialog
+    // on their desktop does not answer it again on their laptop.
+    sensitivity: 'setting',
+    note: 'Which Mawkingbird Plus features are switched on (CORS proxy, settings sync, trust list, client lists, RSS OPML list), and whether the one-time post-sign-in dialog has been answered. Cleared on sign-out so the next account decides for itself.',
   },
   {
     base: 'mockingbird_config_sync',

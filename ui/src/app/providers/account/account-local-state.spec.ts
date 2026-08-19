@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { forgetAccountLocalState } from './account-local-state';
+import { PLUS_FEATURES_KEY } from './plus-features';
 import { PROFILE_SYNC_KEY } from './profile-sync-state';
 
 describe('forgetAccountLocalState', () => {
@@ -14,11 +15,15 @@ describe('forgetAccountLocalState', () => {
     // sync offer, since neither state prompts.
     localStorage.setItem(PROFILE_SYNC_KEY, JSON.stringify({ state: 'paused', revision: 3 }));
     localStorage.setItem('mockingbird_remote_storage_usage', '{"bytes":100}');
+    // Inheriting `decided: true` would deny the next account the one-time
+    // dialog entirely — the same silent denial as inheriting a paused sync.
+    localStorage.setItem(PLUS_FEATURES_KEY, JSON.stringify({ decided: true, enabled: {} }));
 
     forgetAccountLocalState(localStorage);
 
     expect(localStorage.getItem(PROFILE_SYNC_KEY)).toBeNull();
     expect(localStorage.getItem('mockingbird_remote_storage_usage')).toBeNull();
+    expect(localStorage.getItem(PLUS_FEATURES_KEY)).toBeNull();
   });
 
   it('leaves the user’s own client data alone', () => {

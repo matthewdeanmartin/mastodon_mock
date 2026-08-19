@@ -138,6 +138,19 @@ export class ClientLists {
     return list;
   }
 
+  /**
+   * Replace every list with one reconciled against the account.
+   *
+   * A bulk write rather than repeated {@link create}: `create` mints a fresh id
+   * and `createdAt`, which is right for a new list and wrong for one being
+   * adopted — it would re-date the user's oldest list to the moment they turned
+   * sync on, and change ids that other local state may already reference.
+   */
+  adoptAll(lists: ClientList[]): void {
+    this.persist(lists.map((list) => ({ ...list })));
+    this.diagnostics.info('ClientLists', 'list:adopt', { count: lists.length });
+  }
+
   rename(id: string, title: string): void {
     const next = title.trim();
     if (!next) {
