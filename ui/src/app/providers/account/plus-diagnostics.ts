@@ -45,6 +45,15 @@ export interface CollectionRow {
   local: number;
   /** Null when the account's copy could not be read. */
   remote: number | null;
+  /**
+   * Why the account's copy could not be read, when it could not.
+   *
+   * Carried to the row rather than logged only. A cell reading "0" for a
+   * collection whose read actually failed is a quiet lie, and it is the lie
+   * that makes someone press Sync to fix a problem that is not the one they
+   * have.
+   */
+  error?: string;
 }
 
 /** The settings document, both sides. */
@@ -116,6 +125,39 @@ export class PlusDiagnostics {
 
   readonly quota = computed(() => this.manifest()?.quota ?? null);
   readonly conflicts = computed(() => this.manifest()?.conflicts ?? null);
+
+  /**
+   * The account is reachable but refuses writes.
+   *
+   * Straight from the manifest, so it reflects what the *server* thinks rather
+   * than what a token claim says. Those can disagree — a `tier: 'plus'` mint
+   * against a Worker that answers `readOnly: true` is exactly the contradiction
+   * this field exists to make visible instead of leaving it to be discovered by
+   * pressing a button that then 402s.
+   */
+  readonly readOnly = computed(() => this.manifest()?.readOnly === true);
+
+  /**
+   * Why a sync cannot be attempted, or null when it can.
+   *
+   * Separate from {@link drifted}: something can genuinely differ *and* be
+   * impossible to fix, and reporting the difference while hiding the reason is
+   * how a user ends up pressing a button that quietly does nothing. That was a
+   * real reported bug, not a hypothetical.
+   */
+  readonly blocked = computed<string | null>(() => {
+    if (this.state() !== 'ready') {
+      return null;
+    }
+    if (this.readOnly()) {
+      return (
+        'Your account is reachable but is refusing writes — the server does not ' +
+        'currently consider it a supporter. Nothing can be uploaded until that is ' +
+        'resolved, and nothing already stored has been lost.'
+      );
+    }
+    return null;
+  });
 
   /**
    * Whether anything looks out of step, so the UI can offer to fix it.
@@ -200,6 +242,7 @@ export class PlusDiagnostics {
         collection,
         label: COLLECTION_LABELS[collection],
         local: this.adoption.localCount(collection),
+        ...(failure ? { error: failure } : {}),
         // Null rather than zero on a failed read. Zero would read as "the
         // account holds nothing", which is a different and much more alarming
         // claim than "this could not be checked".

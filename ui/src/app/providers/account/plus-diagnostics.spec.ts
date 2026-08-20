@@ -136,6 +136,52 @@ describe('what it reports', () => {
   });
 });
 
+describe('an account the server refuses to write to', () => {
+  const readOnlyManifest = {
+    kind: 'ok',
+    value: {
+      readOnly: true,
+      quota: { used: 0, limit: 100_000_000 },
+      conflicts: 0,
+    },
+  };
+
+  it('says so, rather than reporting an empty account', () => {
+    // The reported bug. A `tier: 'plus'` token against a service answering
+    // `readOnly: true` rendered as "nothing stored" with a Sync button that
+    // 402'd in silence. The refusal is the headline, not the emptiness.
+    const { diagnostics } = build({ manifest: readOnlyManifest });
+    return diagnostics.load().then(() => {
+      expect(diagnostics.readOnly()).toBe(true);
+      expect(diagnostics.blocked()).toContain('refusing writes');
+    });
+  });
+
+  it('reports nothing blocked for an account that accepts writes', async () => {
+    const { diagnostics } = build();
+    await diagnostics.load();
+    expect(diagnostics.blocked()).toBeNull();
+  });
+
+  it('says nothing before anything has been read', () => {
+    // `idle` must not claim a refusal it has not observed.
+    const { diagnostics } = build({ manifest: readOnlyManifest });
+    expect(diagnostics.blocked()).toBeNull();
+  });
+});
+
+describe('carrying read failures to the row', () => {
+  it('keeps the reason next to the collection that failed', async () => {
+    // A cell reading "0" for a collection whose read actually failed is a quiet
+    // lie, and it is the lie that sends someone to fix the wrong problem.
+    const { diagnostics } = build({ trust: remoteDouble(0, 'offline') });
+    await diagnostics.load();
+    const row = diagnostics.collectionRows().find((entry) => entry.collection === 'trust');
+    expect(row?.remote).toBeNull();
+    expect(row?.error).toBe('offline');
+  });
+});
+
 describe('deciding whether anything drifted', () => {
   it('reports drift when this browser has unpushed changes', async () => {
     const { diagnostics } = build({ dirty: true });

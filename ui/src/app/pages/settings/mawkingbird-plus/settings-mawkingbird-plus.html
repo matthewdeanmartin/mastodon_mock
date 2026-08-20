@@ -162,8 +162,13 @@
                   <td>
                     @if (row.remote === null) {
                       <!-- Not "0": a failed read is a fact about the network, not
-                           a claim that the account holds nothing. -->
+                           a claim that the account holds nothing. The reason is
+                           shown, not just the fact — a bare "could not read"
+                           sends people to guess. -->
                       <span class="muted">Could not read</span>
+                      @if (row.error; as reason) {
+                        <span class="config-error small">{{ reason }}</span>
+                      }
                     } @else {
                       {{ row.remote }}
                     }
@@ -182,6 +187,15 @@
             </p>
           }
 
+          <!--
+            A refusal is reported before any difference is, and it disables the
+            fix. Otherwise the panel says "these do not match, press Sync" about
+            an account the server is refusing to write to — which is what
+            happened: the button 402'd silently and the page kept insisting.
+          -->
+          @if (diagnostics.blocked(); as reason) {
+            <p class="config-error" role="alert">{{ reason }}</p>
+          }
           @if (diagnostics.drifted()) {
             <p role="status">
               This browser and your account do not match. Syncing sends this browser's settings up.
@@ -197,7 +211,9 @@
             <button
               class="btn"
               type="button"
-              [disabled]="syncing() || syncBlockedReason() !== null"
+              [disabled]="
+                syncing() || syncBlockedReason() !== null || diagnostics.blocked() !== null
+              "
               (click)="syncNow()"
             >
               {{ syncing() ? 'Syncing…' : 'Sync now' }}

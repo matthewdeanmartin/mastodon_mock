@@ -1,4 +1,5 @@
 import { inject, Injectable, InjectionToken } from '@angular/core';
+import { PageDiagnostics } from '../../page-diagnostics';
 import { MawkingbirdSession } from './mawkingbird-session';
 import { MawkingbirdMetrics, billingTier } from '../../observability/mawkingbird-metrics';
 import { RemoteStorageUsage } from '../../observability/remote-storage-usage';
@@ -96,6 +97,17 @@ export type ProfileResult<T> =
 
 @Injectable({ providedIn: 'root' })
 export class ProfileClient {
+  /**
+   * Console logging for every profile request.
+   *
+   * Added after a deployed session where a `PUT /settings` answered 402 and
+   * nothing anywhere said so: the UI reported "nothing stored" and offered a
+   * Sync button that silently did nothing. The request layer is the only place
+   * that knows the status code, so it is the only place that can report it.
+   *
+   * Status and path only — never a response body, which carries settings.
+   */
+  private log = inject(PageDiagnostics);
   private base = inject(PROFILE_ORIGIN);
   private session = inject(MawkingbirdSession);
   private metrics = inject(MawkingbirdMetrics);
@@ -255,17 +267,29 @@ export class ProfileClient {
    * drift.
    */
   private async request<T>(path: string, init: RequestInit): Promise<ProfileResult<T>> {
+    const method = init.method ?? 'GET';
     const response = await this.send(path, init);
     if (typeof response === 'string') {
+      this.log.warn('ProfileClient', 'request:unreachable', { method, path, message: response });
       return { kind: 'failed', message: response };
     }
     if (response.status === 404) {
+      // Expected whenever nothing is stored yet, so `info` rather than `warn`.
+      this.log.info('ProfileClient', 'request:absent', { method, path, status: 404 });
       return { kind: 'absent' };
     }
     const refusal = await this.refusalFor(response);
     if (refusal) {
+      this.log.warn('ProfileClient', 'request:refused', {
+        method,
+        path,
+        status: response.status,
+        kind: refusal.kind,
+        message: 'message' in refusal ? refusal.message : null,
+      });
       return refusal;
     }
+    this.log.info('ProfileClient', 'request:ok', { method, path, status: response.status });
     try {
       return { kind: 'ok', value: (await response.json()) as T };
     } catch {
@@ -346,9 +370,27 @@ export class ProfileClient {
       // deciding, so it counts as a call. Only a request that never completed
       // is an error here, which is the `catch` below.
       this.metrics.record('profile', tier, performance.now() - start, response.ok);
+      if (!response.ok) {
+        // Every non-OK answer, logged once, here — the only place that sees the
+        // status. `sentTier` is included because a mismatch between the tier in
+        // the token and the service's verdict is precisely the bug that is
+        // otherwise invisible: the UI says Plus, the Worker answers 402, and
+        // nothing on either side names the disagreement.
+        this.log.warn('ProfileClient', 'http:not-ok', {
+          method: init.method ?? 'GET',
+          path,
+          status: response.status,
+          sentTier: tier,
+        });
+      }
       return response;
     } catch (error: unknown) {
       this.metrics.record('profile', tier, performance.now() - start, false);
+      this.log.warn('ProfileClient', 'http:unreachable', {
+        method: init.method ?? 'GET',
+        path,
+        sentTier: tier,
+      });
       return error instanceof Error && error.message
         ? `Could not reach the profile service. (${error.message})`
         : 'Could not reach the profile service.';

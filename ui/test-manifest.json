@@ -1,5 +1,5 @@
 {
-  "testCount": 4777,
+  "testCount": 4781,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -2676,6 +2676,10 @@
     "src/app/providers/account/collection-adoption.spec.ts :: planAdoption replace takes the stored copy and uploads nothing",
     "src/app/providers/account/collection-adoption.spec.ts :: planAdoption uploads everything to an account that holds nothing",
     "src/app/providers/account/collection-adoption.spec.ts :: planAdoption uploads everything to an empty account even when replace was chosen",
+    "src/app/providers/account/plus-diagnostics.spec.ts :: an account the server refuses to write to reports nothing blocked for an account that accepts writes",
+    "src/app/providers/account/plus-diagnostics.spec.ts :: an account the server refuses to write to says nothing before anything has been read",
+    "src/app/providers/account/plus-diagnostics.spec.ts :: an account the server refuses to write to says so, rather than reporting an empty account",
+    "src/app/providers/account/plus-diagnostics.spec.ts :: carrying read failures to the row keeps the reason next to the collection that failed",
     "src/app/providers/account/plus-diagnostics.spec.ts :: deciding whether anything drifted does not call an unreadable collection drift",
     "src/app/providers/account/plus-diagnostics.spec.ts :: deciding whether anything drifted is quiet when both sides agree",
     "src/app/providers/account/plus-diagnostics.spec.ts :: deciding whether anything drifted reports drift when a collection count differs",
