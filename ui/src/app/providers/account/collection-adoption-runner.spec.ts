@@ -158,6 +158,18 @@ describe('CollectionAdoptionRunner', () => {
       expect(remoteTrust.replaceAll).not.toHaveBeenCalled();
       expect(Object.keys(localTrust.entries())).toEqual(['a@x.social']);
     });
+
+    it('reports a failed automatic upload', async () => {
+      localTrust.trust({ acct: 'a@x.social', url: '', id: '1' });
+      remoteTrust.writeOk = false;
+
+      const result = await runner.inspect('trust');
+
+      expect(result.error).toContain('could not be saved');
+      expect(result.needsChoice).toBe(false);
+      // A refused write must not masquerade as a completed adoption.
+      expect(Object.keys(localTrust.entries())).toEqual(['a@x.social']);
+    });
   });
 
   describe('trust', () => {

@@ -90,7 +90,16 @@ export class CollectionAdoptionRunner {
 
     // One possible outcome, so take it. `merge` and `replace` agree whenever one
     // side is empty, which is exactly when this branch is reached.
-    await this.apply(collection, 'merge');
+    const applied = await this.apply(collection, 'merge');
+    if (!applied) {
+      return {
+        collection,
+        localCount,
+        remoteCount,
+        needsChoice: false,
+        error: 'That could not be saved to your account. Nothing was changed.',
+      };
+    }
     return { collection, localCount, remoteCount, needsChoice: false };
   }
 

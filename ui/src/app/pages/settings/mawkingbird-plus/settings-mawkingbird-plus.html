@@ -203,7 +203,8 @@
           }
           @if (diagnostics.drifted()) {
             <p role="status">
-              This browser and your account do not match. Syncing sends this browser's settings up.
+              This browser and your account do not match. Syncing sends this browser's enabled data
+              up.
             </p>
             <!--
               The reason is shown *before* the press, not after it. A "Sync now"
@@ -217,7 +218,10 @@
               class="btn"
               type="button"
               [disabled]="
-                syncing() || syncBlockedReason() !== null || diagnostics.blocked() !== null
+                syncing() ||
+                pendingAdoption() !== null ||
+                syncBlockedReason() !== null ||
+                diagnostics.blocked() !== null
               "
               (click)="syncNow()"
             >
@@ -364,7 +368,7 @@
 
 <!-- Rendered last so it sits above the page it blocks. -->
 @if (showWelcome()) {
-  <app-plus-welcome-dialog (saved)="features.refresh()" />
+  <app-plus-welcome-dialog (saved)="welcomeSaved()" />
 }
 
 <!-- Only one of these is ever on screen: the welcome dialog cannot be answered

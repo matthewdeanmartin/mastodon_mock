@@ -75,6 +75,9 @@ export class SettingsMawkingbirdPlus implements OnInit {
   /** A failure from the last adoption attempt, shown next to the toggles. */
   protected readonly adoptionError = signal('');
 
+  /** Collections left to inspect after the current merge-or-replace question. */
+  private adoptionQueue: AdoptableCollection[] = [];
+
   /**
    * Whether to show the one-time welcome dialog.
    *
@@ -179,16 +182,36 @@ export class SettingsMawkingbirdPlus implements OnInit {
     if (!ok) {
       this.features.set(FEATURE_FOR[pending.collection], false);
       this.adoptionError.set('That could not be saved to your account. Nothing was changed.');
+      this.adoptionQueue = [];
+      return;
     }
+    await this.continueCollectionReconciliation();
   }
 
   /** Backed out of the question: the toggle goes back off, nothing is touched. */
-  protected cancelAdoption(): void {
+  protected async cancelAdoption(): Promise<void> {
     const pending = this.pendingAdoption();
     if (pending) {
       this.features.set(FEATURE_FOR[pending.collection], false);
     }
     this.pendingAdoption.set(null);
+    await this.continueCollectionReconciliation();
+  }
+
+  /**
+   * The welcome dialog records the choices; this performs their network side.
+   *
+   * Without this hand-off, the default-on collection switches were persisted
+   * as though they were active but their first adoption never ran. Since the
+   * switches were already on, there was no later off-to-on transition to run it.
+   */
+  protected async welcomeSaved(): Promise<void> {
+    this.features.refresh();
+    this.adoptionError.set('');
+    const result = await this.reconcileCollections(this.enabledCollections(), true);
+    if (result.errors.length > 0) {
+      this.adoptionError.set(result.errors.join(' '));
+    }
   }
 
   /** What the user typed into the email field. */
@@ -279,8 +302,8 @@ export class SettingsMawkingbirdPlus implements OnInit {
    * button that looks broken — the reason was knowable before the press.
    */
   protected syncBlockedReason(): string | null {
-    if (!this.settingsSync.on()) {
-      return 'Settings sync is off. Turn it on above and this will start working.';
+    if (!this.settingsSync.on() && this.enabledCollections().length === 0) {
+      return 'All sync features are off. Turn on at least one above and this will start working.';
     }
     if (this.sync.readOnly()) {
       return 'Your subscription has lapsed, so settings are not being saved.';
@@ -289,7 +312,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
   }
 
   /**
-   * Push this browser's settings, then re-read so the panel shows the result.
+   * Push this browser's settings and enabled collections, then re-read.
    *
    * Interactive, so a failure is reported now rather than counted towards a
    * later warning — the user is watching a button they just pressed.
@@ -305,24 +328,95 @@ export class SettingsMawkingbirdPlus implements OnInit {
     try {
       const outcome = await this.sync.push(true);
       this.log.info('PlusPage', 'sync-now:outcome', { kind: outcome.kind });
+      const messages: string[] = [];
       switch (outcome.kind) {
         case 'saved':
-          this.syncMessage.set(
-            `Uploaded ${outcome.keys} setting(s) as revision ${outcome.revision}.`,
-          );
+          messages.push(`Uploaded ${outcome.keys} setting(s) as revision ${outcome.revision}.`);
           break;
         case 'not-syncing':
-          this.syncMessage.set('Settings sync is off. Turn it on above first.');
+          messages.push('Settings sync is off. Turn it on above first.');
           break;
         case 'conflict':
-          this.syncMessage.set('Your account changed first. Check again to see what it holds.');
+          messages.push('Your account changed first. Check again to see what it holds.');
           break;
         default:
-          this.syncMessage.set(outcome.message);
+          messages.push(outcome.message);
       }
+
+      const collections = await this.reconcileCollections(this.enabledCollections(), false);
+      if (collections.synced.length > 0) {
+        messages.push(
+          `Synced ${collections.synced.map((collection) => COLLECTION_LABELS[collection]).join(', ')}.`,
+        );
+      }
+      if (collections.pending) {
+        messages.push(`Choose how to reconcile ${COLLECTION_LABELS[collections.pending]}.`);
+      }
+      if (collections.errors.length > 0) {
+        messages.push(collections.errors.join(' '));
+      }
+      this.syncMessage.set(messages.join(' '));
       await this.diagnostics.load();
     } finally {
       this.syncing.set(false);
+    }
+  }
+
+  /** Collections whose saved Plus choices say they belong on the account. */
+  private enabledCollections(): AdoptableCollection[] {
+    return (Object.keys(FEATURE_FOR) as AdoptableCollection[]).filter((collection) =>
+      this.features.isOn(FEATURE_FOR[collection]),
+    );
+  }
+
+  /**
+   * Settle each enabled collection until one needs a user decision.
+   *
+   * The remaining work is queued because only one adoption dialog can be on
+   * screen at a time. Resolving or cancelling that dialog resumes the queue.
+   */
+  private async reconcileCollections(
+    collections: AdoptableCollection[],
+    disableOnFailure: boolean,
+  ): Promise<CollectionReconciliation> {
+    this.adoptionQueue = [];
+    const synced: AdoptableCollection[] = [];
+    const errors: string[] = [];
+
+    for (const [index, collection] of collections.entries()) {
+      const inspection = await this.adoption.inspect(collection);
+      if (inspection.error) {
+        if (disableOnFailure) {
+          this.features.set(FEATURE_FOR[collection], false);
+        }
+        errors.push(`${COLLECTION_LABELS[collection]}: ${inspection.error}`);
+        continue;
+      }
+      if (inspection.needsChoice) {
+        this.adoptionQueue = collections.slice(index + 1);
+        this.pendingAdoption.set({
+          collection: inspection.collection,
+          localCount: inspection.localCount,
+          remoteCount: inspection.remoteCount,
+        });
+        return { synced, errors, pending: collection };
+      }
+      synced.push(collection);
+    }
+
+    return { synced, errors, pending: null };
+  }
+
+  /** Continue work that was paused behind an adoption dialog. */
+  private async continueCollectionReconciliation(): Promise<void> {
+    const remaining = this.adoptionQueue;
+    this.adoptionQueue = [];
+    if (remaining.length === 0) {
+      return;
+    }
+    const result = await this.reconcileCollections(remaining, true);
+    if (result.errors.length > 0) {
+      this.adoptionError.set(result.errors.join(' '));
     }
   }
 }
@@ -340,6 +434,12 @@ interface FeatureRow {
   feature: ToggleId;
   on: boolean;
   label: string;
+}
+
+interface CollectionReconciliation {
+  synced: AdoptableCollection[];
+  errors: string[];
+  pending: AdoptableCollection | null;
 }
 
 const FEATURE_LABELS: Record<PlusFeature, string> = {
@@ -360,4 +460,10 @@ const FEATURE_FOR: Record<AdoptableCollection, PlusFeature> = {
   trust: 'trustSync',
   feeds: 'feedsSync',
   lists: 'listsSync',
+};
+
+const COLLECTION_LABELS: Record<AdoptableCollection, string> = {
+  trust: 'trusted accounts',
+  feeds: 'RSS subscriptions',
+  lists: 'client lists',
 };
