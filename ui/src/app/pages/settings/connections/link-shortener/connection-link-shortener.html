@@ -86,6 +86,9 @@
       <span class="connection-ok">
         {{ settings.hasKey(entry().id) ? 'Key saved' : 'Ready — no account needed' }}
       </span>
+      @if (settings.hasKey(entry().id) || where(entry().id) === 'locked') {
+        <app-storage-badge [where]="where(entry().id)" />
+      }
       @if (!isActive(entry().id)) {
         <button class="btn btn-outline" type="button" (click)="activate(entry().id)">
           Make active

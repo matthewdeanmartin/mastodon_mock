@@ -6,17 +6,23 @@ import { MataroaSettings } from '../../../../providers/mataroa/mataroa-settings'
 import { CorsProxy } from '../../../../providers/cors-proxy/cors-proxy';
 import { ProxyConsent } from '../../../../providers/proxy-consent-store';
 import { expiryLabel } from '../expiry-label';
+import { credentialLocation, StorageBadge } from '../storage-badge';
+import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+
+/** The registry base this page's credential is stored under. */
+const MATAROA_KEY = 'mockingbird_mataroa_connection';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 
 /** Settings → Connections → Blog (Mataroa). */
 @Component({
   selector: 'app-connection-mataroa',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, StorageBadge],
   templateUrl: './connection-mataroa.html',
   styleUrls: ['../connection-page.css', './connection-mataroa.css'],
 })
 export class ConnectionMataroa implements OnInit {
   protected readonly settings = inject(MataroaSettings);
+  private readonly bridge = inject(VaultBridge);
   private readonly api = inject(MataroaApi);
   private readonly proxy = inject(CorsProxy);
   private readonly consent = inject(ProxyConsent);
@@ -34,6 +40,16 @@ export class ConnectionMataroa implements OnInit {
   );
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;
   protected readonly expiryLabel = expiryLabel;
+
+  /**
+   * Where this credential lives, for the badge.
+   *
+   * Reads the connector's own facts rather than the vault's state: a locked
+   * vault is not a locked credential. See `storage-badge.ts`.
+   */
+  protected where() {
+    return credentialLocation(this.bridge.syncs(MATAROA_KEY), this.settings.needsFetch());
+  }
 
   ngOnInit(): void {
     this.settings.enforceLifetime();

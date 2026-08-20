@@ -12,10 +12,19 @@ import { computed, Injectable, signal } from '@angular/core';
  * said it once should not have to say it again on their laptop. So the record is
  * classified `setting` and travels with the rest of them.
  *
- * That creates one ordering subtlety worth naming: settings sync carries the
- * switch that controls settings sync. Turning it off therefore syncs the "off"
- * to the other browsers before it stops — which is the behaviour a user expects
- * from a preference, and the reason the switch is stored rather than derived.
+ * ## Why `settingsSync` is *not* one of these
+ *
+ * It used to be, and that was the bug: a stored `settingsSync: true` said
+ * settings sync was on while `mockingbird_profile_sync` independently sat at
+ * `unasked`, so the Plus page showed every feature enabled and the Config page
+ * correctly reported "Sync is off on this browser". Both were reading their own
+ * switch and both were right.
+ *
+ * Two switches for one thing is a footgun with no scenario behind it — nobody
+ * wants to hold the entitlement and separately not sync. So settings sync now
+ * has exactly one piece of state, `ProfileSyncRecord.state`, and the Plus toggle
+ * is a *view* of it: see `SettingsSyncToggle`. Every other feature here is a
+ * genuine preference with nothing else representing it, which is why they stay.
  *
  * ## Why `undecided` is not `false`
  *
@@ -37,14 +46,13 @@ export const PLUS_FEATURES_KEY = 'mockingbird_plus_features';
  * is worth more than a shorter list — and it answers "is my API key synced?"
  * with a visible no.
  */
-export type PlusFeature = 'corsProxy' | 'settingsSync' | 'trustSync' | 'listsSync' | 'feedsSync';
+export type PlusFeature = 'corsProxy' | 'trustSync' | 'listsSync' | 'feedsSync';
 
 /** Features shown but not yet available. */
 export type PlannedFeature = 'apiKeys' | 'chat';
 
 export const PLUS_FEATURES: readonly PlusFeature[] = [
   'corsProxy',
-  'settingsSync',
   'trustSync',
   'listsSync',
   'feedsSync',

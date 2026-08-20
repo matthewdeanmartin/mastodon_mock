@@ -1,8 +1,8 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, Observable, tap, throwError } from 'rxjs';
+import { catchError, map, Observable, tap, throwError } from 'rxjs';
 import { CorsProxy } from '../cors-proxy/cors-proxy';
-import { CorsProxyUsageStore } from '../cors-proxy/cors-proxy-usage';
+import { CorsProxyUsageStore, toResponse } from '../cors-proxy/cors-proxy-usage';
 import { externalFetch } from '../external-fetch';
 
 /**
@@ -84,14 +84,18 @@ export class PasteFeedFetch {
 
     return this.http
       .get<T>(requestUrl, {
+        // `observe: 'response'` so the proxy's `X-Proxy-Usage` header is
+        // readable. The body is unwrapped again below.
+        observe: 'response',
         context: externalFetch(),
         ...(headers ? { headers } : {}),
       })
       .pipe(
         tap({
-          next: () => useProxy && this.proxyUsage.record(true),
+          next: (response) => useProxy && this.proxyUsage.record(true, toResponse(response)),
           error: () => useProxy && this.proxyUsage.record(false),
         }),
+        map((response) => response.body as T),
         catchError((error: unknown) =>
           throwError(() => new Error(describeFeedError(error, useProxy, label))),
         ),

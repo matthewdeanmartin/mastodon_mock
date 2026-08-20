@@ -1,4 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { credentialLocation, StorageBadge } from '../storage-badge';
+import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+
+/** The registry base this page's credentials are stored under. */
+const SHORTENER_KEY = 'mockingbird_shortener_keys';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -50,7 +55,7 @@ import { expiryLabel } from '../expiry-label';
  */
 @Component({
   selector: 'app-connection-link-shortener',
-  imports: [FormsModule, RouterLink, ProxyConsentDialog],
+  imports: [FormsModule, RouterLink, ProxyConsentDialog, StorageBadge],
   templateUrl: './connection-link-shortener.html',
   styleUrls: ['../connection-page.css', './connection-link-shortener.css'],
 })
@@ -58,6 +63,7 @@ export class ConnectionLinkShortener {
   protected settings = inject(ShortenerSettings);
   protected registry = inject(ShortenerRegistry);
   protected consent = inject(ShortenerProxyConsent);
+  private bridge = inject(VaultBridge);
   private proxy = inject(CorsProxy);
   private history = inject(ShortenerHistory);
   private reachability = inject(ShortenerReachability);
@@ -346,6 +352,21 @@ export class ConnectionLinkShortener {
 
   private entryFor(id: ShortenerId): ShortenerCatalogEntry {
     return this.catalog.find((item) => item.id === id) ?? this.catalog[0];
+  }
+
+  /**
+   * Where a provider's key lives, for the badge.
+   *
+   * Per provider, because this store is a keyed map: one vault address holds
+   * every provider's key, and `needsFetch` lists exactly the ones this browser
+   * is missing. Reads the connector's own facts rather than the vault's state —
+   * a locked vault is not a locked credential. See `storage-badge.ts`.
+   */
+  protected where(id: ShortenerId) {
+    return credentialLocation(
+      this.bridge.syncs(SHORTENER_KEY),
+      this.settings.needsFetch().includes(id),
+    );
   }
 }
 

@@ -39,6 +39,7 @@
 @if (settings.connected()) {
   <div class="connected-row">
     <span class="connection-ok">Connected</span>
+    <app-storage-badge [where]="where()" />
     <a [href]="'https://github.com/' + settings.slug()" target="_blank" rel="noopener noreferrer"
       >{{ settings.slug() }} ↗</a
     >

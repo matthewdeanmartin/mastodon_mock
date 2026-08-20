@@ -29,10 +29,18 @@
 @if (raindrop.connected()) {
   <div class="raindrop-actions">
     <span class="connection-ok">Connected</span>
+    <app-storage-badge [where]="where()" />
     <button class="btn btn-outline" type="button" (click)="disconnectRaindrop()">Disconnect</button>
   </div>
   @if (expiryLabel(raindrop.expiresAt()); as expiry) {
-    <p class="muted small">This token is deleted from this browser on {{ expiry }}.</p>
+    <p class="muted small">
+      @if (where() === 'local') {
+        This token is deleted from this browser on {{ expiry }}.
+      } @else {
+        This token is cleared from this browser on {{ expiry }}, and fetched back from your vault
+        the next time it is needed.
+      }
+    </p>
   }
 } @else {
   <form class="raindrop-form" (ngSubmit)="connectRaindrop()">

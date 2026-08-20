@@ -13,6 +13,11 @@ import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-s
 import { buildProxiedUrl, proxyHeaders } from '../../../../providers/cors-proxy/cors-proxy';
 import { externalFetch } from '../../../../providers/external-fetch';
 import { expiryLabel } from '../expiry-label';
+import { credentialLocation, StorageBadge } from '../storage-badge';
+import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+
+/** The registry base this page's credential is stored under. */
+const PROXY_KEY = 'mockingbird_cors_proxy_key';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { FeatureFlagId, FeatureFlags } from '../../../../feature-flags';
 
@@ -64,15 +69,26 @@ type TestState =
  */
 @Component({
   selector: 'app-connection-cors-proxy',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, StorageBadge],
   templateUrl: './connection-cors-proxy.html',
   styleUrls: ['../connection-page.css', './connection-cors-proxy.css'],
 })
 export class ConnectionCorsProxy implements OnInit {
   protected settings = inject(CorsProxySettings);
+  private bridge = inject(VaultBridge);
   private http = inject(HttpClient);
 
   protected readonly expiryLabel = expiryLabel;
+
+  /**
+   * Where this credential lives, for the badge.
+   *
+   * Reads the connector's own facts rather than the vault's state: a locked
+   * vault is not a locked credential. See `storage-badge.ts`.
+   */
+  protected where() {
+    return credentialLocation(this.bridge.syncs(PROXY_KEY), this.settings.needsFetch());
+  }
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.browser.detail;
   protected readonly isDevOrigin = isDevelopmentOrigin();
   private readonly flags = inject(FeatureFlags);

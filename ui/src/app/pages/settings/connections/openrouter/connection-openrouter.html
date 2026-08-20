@@ -12,12 +12,22 @@
 @if (openrouter.connected()) {
   <div class="or-actions">
     <span class="connection-ok">Connected</span>
+    <app-storage-badge [where]="where()" />
     <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
   </div>
   @if (expiryLabel(openrouter.expiresAt()); as expiry) {
     <p class="muted small">
-      This key is deleted from this browser on {{ expiry }}. The retention policy of the account you
-      are signed in as is the one that applies.
+      @if (where() === 'local') {
+        This key is deleted from this browser on {{ expiry }}. The retention policy of the account
+        you are signed in as is the one that applies.
+      } @else {
+        <!-- Deleted is the wrong word once a stored copy exists: the plaintext
+             leaves this browser and the connection stays. Saying "deleted" here
+             sends people to reconnect something that never disconnected. -->
+        This key is cleared from this browser on {{ expiry }}, and fetched back from your vault the
+        next time it is needed. The retention policy of the account you are signed in as is the one
+        that applies.
+      }
     </p>
   }
 

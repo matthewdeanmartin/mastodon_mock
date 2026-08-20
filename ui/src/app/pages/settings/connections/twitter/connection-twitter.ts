@@ -40,6 +40,11 @@ import {
 } from '../../../../providers/twitter/twitter-source';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
+import { credentialLocation, StorageBadge } from '../storage-badge';
+import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+
+/** The registry base this page's credentials are stored under. */
+const TWITTER_KEY = 'mockingbird_twitter_keys';
 import { Terminology } from '../../../../terminology';
 
 /**
@@ -71,7 +76,7 @@ import { Terminology } from '../../../../terminology';
  */
 @Component({
   selector: 'app-connection-twitter',
-  imports: [DecimalPipe, FormsModule, RouterLink, TwitterConsentDialog],
+  imports: [DecimalPipe, FormsModule, RouterLink, TwitterConsentDialog, StorageBadge],
   templateUrl: './connection-twitter.html',
   styleUrls: ['../connection-page.css', './connection-twitter.css'],
 })
@@ -83,6 +88,7 @@ export class ConnectionTwitter implements OnInit {
   protected consent = inject(ProxyConsent);
   protected follows = inject(TwitterFollows);
   protected usage = inject(TwitterUsage);
+  private bridge = inject(VaultBridge);
   private feed = inject(TwitterFeed);
   private proxy = inject(CorsProxy);
   private reachability = inject(TwitterReachability);
@@ -720,5 +726,20 @@ export class ConnectionTwitter implements OnInit {
     this.lastProbe.set(null);
     this.notice.set('Disconnected. Your API key has been removed from this browser.');
     this.error.set(null);
+  }
+
+  /**
+   * Where a provider's key lives, for the badge.
+   *
+   * Per provider, because this store is a keyed map: one vault address holds
+   * every provider's key, and `needsFetch` lists exactly the ones this browser
+   * is missing. Reads the connector's own facts rather than the vault's state —
+   * a locked vault is not a locked credential. See `storage-badge.ts`.
+   */
+  protected where(id: TwitterSourceId) {
+    return credentialLocation(
+      this.bridge.syncs(TWITTER_KEY),
+      this.settings.needsFetch().includes(id),
+    );
   }
 }

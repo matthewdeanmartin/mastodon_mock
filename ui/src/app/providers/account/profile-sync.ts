@@ -22,6 +22,7 @@ import {
   updateSyncRecord,
   writeSyncRecord,
   type ProfileSyncRecord,
+  type SyncState,
 } from './profile-sync-state';
 
 /**
@@ -224,6 +225,16 @@ export class ProfileSync {
 
   readonly syncing = computed(() => isSyncing(this.record()));
   readonly lastSyncedAt = computed(() => this.record().lastSyncedAt ?? null);
+
+  /**
+   * The sync state itself, for UI that must distinguish the ways of being off.
+   *
+   * Just the state, not the record: the ETag, revision and dirty flag are this
+   * browser's bookkeeping with the server and mean nothing to a settings page.
+   * Exposing the record wholesale would invite a component to make decisions
+   * from them, which is how a second source of truth starts.
+   */
+  readonly state = computed<SyncState>(() => this.record().state);
 
   private pushTimer: ReturnType<typeof setTimeout> | null = null;
   private lastManifestAt = 0;

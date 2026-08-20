@@ -18,14 +18,39 @@
       <p class="muted" role="status">Checkout cancelled. Nothing was charged.</p>
     }
 
+    <!--
+      Sign-in and plan in one block. They were two sections saying overlapping
+      things — "Plan: Mawkingbird Plus" in one and the renewal date in the
+      other — which meant the answer to "what am I paying for and until when"
+      was split across the page with a feature list in between.
+    -->
     <section class="plus-identity">
-      <h2>Signed in</h2>
+      <h2>Your account</h2>
       <dl>
         <dt>Sign-in</dt>
         <dd>{{ user.auth === 'email' ? 'Confirmed email address' : 'Full account' }}</dd>
         <dt>Plan</dt>
-        <dd>{{ plus.isSupporter() ? 'Mawkingbird Plus' : 'Free' }}</dd>
+        <dd>
+          {{ plus.isSupporter() ? 'Mawkingbird Plus' : 'Free' }}
+          @if (plus.isSupporter() && plus.subscription(); as subscription) {
+            @if (subscription.cancelAtPeriodEnd) {
+              <span class="muted small">
+                — cancelled, yours until {{ subscription.renewsAt | date: 'longDate' }}
+              </span>
+            } @else {
+              <span class="muted small">
+                — renews {{ subscription.renewsAt | date: 'longDate' }}
+              </span>
+            }
+          }
+        </dd>
       </dl>
+      @if (plus.isSupporter()) {
+        <p class="muted small">
+          Manage or cancel your subscription from the receipt email Stripe sent you. Cancelling
+          stops the renewal; you keep Plus for the rest of the year you paid for.
+        </p>
+      }
       <p class="muted small">
         Signing out here stops new sessions immediately. A token already issued to this browser
         stays valid until it expires, so close other tabs if you are on a shared machine.
@@ -67,29 +92,123 @@
     }
 
     @if (plus.isSupporter()) {
-      <section class="plus-supporter">
-        <h2>Your support</h2>
-        @if (plus.subscription(); as subscription) {
-          @if (subscription.cancelAtPeriodEnd) {
-            <p>
-              Cancelled — your support runs until
-              <strong>{{ subscription.renewsAt | date: 'longDate' }}</strong
-              >, and you keep Plus until then.
-            </p>
-          } @else {
-            <p>
-              Renews annually on
-              <strong>{{ subscription.renewsAt | date: 'longDate' }}</strong
-              >.
+      <!--
+        Diagnostics, in two halves because there are two different questions.
+        "Is it working" wants local against remote with the drift named; "is it
+        worth it" wants what the subscription has actually done. Mixing them
+        produces a table that answers neither.
+
+        Nothing here loads on its own: reading diagnostics must not change what
+        it reports, and polling would add background requests to answer a
+        question nobody is asking most of the time.
+      -->
+      <section class="plus-diagnostics">
+        <h2>Diagnostics</h2>
+
+        <h3>What is stored</h3>
+        @if (diagnostics.state() === 'idle') {
+          <p class="muted small">
+            Compare what this browser holds with what your account holds. Nothing is changed by
+            looking.
+          </p>
+          <button class="btn btn-outline" type="button" (click)="loadDiagnostics()">Check</button>
+        } @else if (diagnostics.state() === 'loading') {
+          <p class="muted" role="status">Reading your account…</p>
+        } @else if (diagnostics.state() === 'failed') {
+          <p class="config-error" role="alert">{{ diagnostics.error() }}</p>
+          <button class="btn btn-outline" type="button" (click)="loadDiagnostics()">
+            Try again
+          </button>
+        } @else {
+          <table class="plus-diag-table">
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                <th scope="col">This browser</th>
+                <th scope="col">Your account</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Settings</th>
+                <td>
+                  {{ diagnostics.settings().localKeys }} keys ({{
+                    formatBytes(diagnostics.settings().localBytes)
+                  }})
+                </td>
+                <td>
+                  @if (diagnostics.settings().remoteBytes === null) {
+                    <span class="muted">Nothing stored</span>
+                  } @else {
+                    {{ formatBytes(diagnostics.settings().remoteBytes ?? 0) }}, revision
+                    {{ diagnostics.settings().remoteRevision }}
+                  }
+                </td>
+              </tr>
+              @for (row of diagnostics.collectionRows(); track row.collection) {
+                <tr>
+                  <th scope="row">{{ row.label }}</th>
+                  <td>{{ row.local }}</td>
+                  <td>
+                    @if (row.remote === null) {
+                      <!-- Not "0": a failed read is a fact about the network, not
+                           a claim that the account holds nothing. -->
+                      <span class="muted">Could not read</span>
+                    } @else {
+                      {{ row.remote }}
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (diagnostics.settings().remoteUpdatedAt; as updated) {
+            <p class="muted small">Account last updated {{ updated | date: 'medium' }}.</p>
+          }
+          @if (diagnostics.quota(); as quota) {
+            <p class="muted small">
+              Using {{ formatBytes(quota.used) }} of {{ formatBytes(quota.limit) }}.
             </p>
           }
+
+          @if (diagnostics.drifted()) {
+            <p role="status">
+              This browser and your account do not match. Syncing sends this browser's settings up.
+            </p>
+            <button class="btn" type="button" [disabled]="syncing()" (click)="syncNow()">
+              {{ syncing() ? 'Syncing…' : 'Sync now' }}
+            </button>
+          } @else {
+            <p class="muted small" role="status">Everything matches.</p>
+          }
+          @if (syncMessage(); as message) {
+            <p class="muted small" role="status">{{ message }}</p>
+          }
         }
-        <p class="muted small">
-          Manage or cancel your subscription from the receipt email Stripe sent you. Cancelling
-          stops the renewal; you keep Plus for the rest of the year you paid for.
-        </p>
+
+        <h3>What you are getting</h3>
+        <dl class="plus-usage">
+          @if (proxyUsage().accountTotal; as total) {
+            <dt>Proxy requests, all devices</dt>
+            <!-- Reported by the proxy on traffic that was happening anyway, so
+                 knowing it costs no extra request. -->
+            <dd>{{ total | number }}</dd>
+          }
+          <dt>Proxy requests, this browser</dt>
+          <dd>{{ proxyUsage().requests | number }}</dd>
+          @for (row of diagnostics.collectionRows(); track row.collection) {
+            <dt>{{ row.label }}</dt>
+            <dd>{{ row.local | number }}</dd>
+          }
+        </dl>
+        @if (diagnostics.state() === 'idle') {
+          <p class="muted small">Check above to include what your account holds.</p>
+        }
       </section>
-    } @else {
+    }
+
+    @if (!plus.isSupporter()) {
       <section class="plus-offer">
         <h2>Support Mawkingbird</h2>
         <p>

@@ -3,17 +3,23 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { GitHubSession } from '../../../../providers/github/github-session';
 import { expiryLabel } from '../expiry-label';
+import { credentialLocation, StorageBadge } from '../storage-badge';
+import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+
+/** The registry base this page's credential is stored under. */
+const GITHUB_KEY = 'mockingbird_github_credentials';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 
 /** Settings → Connections → GitHub. Token paste, validation, and the API proof. */
 @Component({
   selector: 'app-connection-github',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, StorageBadge],
   templateUrl: './connection-github.html',
   styleUrls: ['../connection-page.css', './connection-github.css'],
 })
 export class ConnectionGitHub implements OnInit {
   protected github = inject(GitHubSession);
+  private bridge = inject(VaultBridge);
 
   protected githubToken = signal('');
   protected githubBusy = signal(false);
@@ -21,6 +27,16 @@ export class ConnectionGitHub implements OnInit {
   protected githubNotice = signal<string | null>(null);
 
   protected readonly expiryLabel = expiryLabel;
+
+  /**
+   * Where this credential lives, for the badge.
+   *
+   * Reads the connector's own facts rather than the vault's state: a locked
+   * vault is not a locked credential. See `storage-badge.ts`.
+   */
+  protected where() {
+    return credentialLocation(this.bridge.syncs(GITHUB_KEY), this.github.needsFetch());
+  }
 
   /** The storage-scope sentence shown under the heading. */
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;

@@ -15,7 +15,7 @@ import {
 import { ClientPrefs } from '../../client-prefs';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { CorsProxy } from '../cors-proxy/cors-proxy';
-import { CorsProxyUsageStore } from '../cors-proxy/cors-proxy-usage';
+import { CorsProxyUsageStore, toResponse } from '../cors-proxy/cors-proxy-usage';
 import { externalFetch } from '../external-fetch';
 import { FAILURE_COOLDOWN_MS, RssCache } from './rss-cache';
 import { ParsedFeed, parseFeed } from './rss-parser';
@@ -297,15 +297,19 @@ export class RssFetch {
     return this.http
       .get(requestUrl, {
         responseType: 'text',
+        // `observe: 'response'` so the proxy's `X-Proxy-Usage` header is
+        // readable. The body is still the text this parser wants; only the
+        // wrapper changes.
+        observe: 'response',
         context: externalFetch(),
         ...(headers ? { headers } : {}),
       })
       .pipe(
         tap({
-          next: () => viaProxy && this.proxyUsage.record(true),
+          next: (response) => viaProxy && this.proxyUsage.record(true, toResponse(response)),
           error: () => viaProxy && this.proxyUsage.record(false),
         }),
-        map((xml) => parseFeed(xml)),
+        map((response) => parseFeed(response.body ?? '')),
         catchError((err: unknown) => throwError(() => new Error(describe(err, viaProxy)))),
       );
   }

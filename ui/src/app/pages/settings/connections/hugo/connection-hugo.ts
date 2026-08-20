@@ -18,12 +18,17 @@ import {
 import { HugoValidate } from '../../../../providers/hugo/hugo-validate';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
+import { credentialLocation, StorageBadge } from '../storage-badge';
+import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+
+/** The registry base this page's credential is stored under. */
+const HUGO_KEY = 'mockingbird_hugo_credentials';
 import { Terminology } from '../../../../terminology';
 
 /** Settings → Connections → Blog (Hugo). */
 @Component({
   selector: 'app-connection-hugo',
-  imports: [DatePipe, FormsModule, RouterLink],
+  imports: [DatePipe, FormsModule, RouterLink, StorageBadge],
   templateUrl: './connection-hugo.html',
   styleUrls: ['../connection-page.css', './connection-hugo.css'],
 })
@@ -33,6 +38,7 @@ export class ConnectionHugo implements OnInit {
 
   protected readonly settings = inject(HugoSettings);
   protected readonly posts = inject(HugoPosts);
+  private readonly bridge = inject(VaultBridge);
   private readonly validate = inject(HugoValidate);
   private readonly github = inject(GitHubSession);
   private readonly hugoEdit = inject(HugoEditSession);
@@ -62,6 +68,16 @@ export class ConnectionHugo implements OnInit {
 
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;
   protected readonly expiryLabel = expiryLabel;
+
+  /**
+   * Where this credential lives, for the badge.
+   *
+   * Reads the connector's own facts rather than the vault's state: a locked
+   * vault is not a locked credential. See `storage-badge.ts`.
+   */
+  protected where() {
+    return credentialLocation(this.bridge.syncs(HUGO_KEY), this.settings.needsFetch());
+  }
   protected readonly canSubmit = computed(
     () => !!this.token().trim() && !!this.repoInput().trim() && !this.busy(),
   );

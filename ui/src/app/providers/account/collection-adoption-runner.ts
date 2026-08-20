@@ -239,7 +239,14 @@ export class CollectionAdoptionRunner {
     return true;
   }
 
-  private localCount(collection: AdoptableCollection): number {
+  /**
+   * How many of a collection this browser holds.
+   *
+   * Public so the Plus diagnostics panel can report it without duplicating the
+   * three different shapes these collections have. Reading it changes nothing —
+   * unlike {@link inspect}, which adopts whatever it can settle.
+   */
+  localCount(collection: AdoptableCollection): number {
     switch (collection) {
       case 'trust':
         return Object.keys(this.localTrust.entries()).length;

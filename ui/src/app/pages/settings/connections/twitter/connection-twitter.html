@@ -101,6 +101,7 @@
       (ngModelChange)="keyDraft.set($event)"
     />
     @if (hasKey(entry().id)) {
+      <app-storage-badge [where]="where(entry().id)" />
       <span class="muted small">
         A key is saved. Paste a new one to replace it.
         @if (expiryLabel(settings.expiresAt()); as expiry) {

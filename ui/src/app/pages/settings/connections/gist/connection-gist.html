@@ -36,6 +36,7 @@
 @if (settings.connected()) {
   <div class="connected-row">
     <span class="connection-ok">Connected</span>
+    <app-storage-badge [where]="where()" />
     @if (settings.profile()?.login; as login) {
       <a [href]="'https://gist.github.com/' + login" target="_blank" rel="noopener noreferrer">
         View your gists ↗

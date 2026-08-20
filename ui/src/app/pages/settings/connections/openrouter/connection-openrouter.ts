@@ -1,4 +1,8 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+
+/** The registry base this page's credential is stored under. */
+const OPENROUTER_KEY = 'mockingbird_openrouter_key';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -22,6 +26,7 @@ import {
 import { TranslationPreference } from '../../../../translation-preference';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
+import { credentialLocation, StorageBadge } from '../storage-badge';
 
 /**
  * Settings → Connections → OpenRouter. PKCE connect, model picker, credits.
@@ -31,7 +36,7 @@ import { expiryLabel } from '../expiry-label';
  */
 @Component({
   selector: 'app-connection-openrouter',
-  imports: [FormsModule, RouterLink, DecimalPipe],
+  imports: [FormsModule, RouterLink, DecimalPipe, StorageBadge],
   templateUrl: './connection-openrouter.html',
   styleUrls: ['../connection-page.css', './connection-openrouter.css'],
 })
@@ -42,12 +47,23 @@ export class ConnectionOpenRouter implements OnInit {
   protected prompts = inject(PromptTemplateStore);
   protected translatePref = inject(TranslationPreference);
   private credits = inject(OpenRouterCredits);
+  private bridge = inject(VaultBridge);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.browser.detail;
   protected readonly defaultModelId = DEFAULT_MODEL_ID;
   protected readonly expiryLabel = expiryLabel;
+
+  /**
+   * Where this key lives, for the badge.
+   *
+   * Reads the connector's own two facts rather than the vault's state — a
+   * locked vault is not a locked credential. See `storage-badge.ts`.
+   */
+  protected where() {
+    return credentialLocation(this.bridge.syncs(OPENROUTER_KEY), this.openrouter.needsFetch());
+  }
   protected readonly perMillionTokens = perMillionTokens;
   protected readonly describeCredits = describeCredits;
 

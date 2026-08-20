@@ -1,8 +1,13 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { PlusSession } from '../../../providers/account/plus-session';
 import { authDebug } from '../../../providers/account/auth-debug';
 import { MawkingbirdSession } from '../../../providers/account/mawkingbird-session';
+import { SettingsSyncToggle } from '../../../providers/account/settings-sync-toggle';
+import { PlusDiagnostics } from '../../../providers/account/plus-diagnostics';
+import { ProfileSync } from '../../../providers/account/profile-sync';
+import { CorsProxyUsageStore } from '../../../providers/cors-proxy/cors-proxy-usage';
+import { formatBytes } from '../../../observability/local-storage-inspector';
 import { PlusFeatures } from '../../../providers/account/plus-features';
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import type { PlusFeature } from '../../../providers/account/plus-features';
@@ -31,7 +36,7 @@ import type { AdoptionChoice } from '../../../providers/account/collection-adopt
  */
 @Component({
   selector: 'app-settings-mawkingbird-plus',
-  imports: [DatePipe, PlusWelcomeDialog, AdoptionDialog],
+  imports: [DatePipe, DecimalPipe, PlusWelcomeDialog, AdoptionDialog],
   templateUrl: './settings-mawkingbird-plus.html',
   styleUrl: './settings-mawkingbird-plus.css',
 })
@@ -40,6 +45,17 @@ export class SettingsMawkingbirdPlus implements OnInit {
   protected plus = inject(PlusSession);
   private proxy = inject(CorsProxySettings);
   protected features = inject(PlusFeatures);
+  /** Settings sync, as one on/off over `ProfileSync`'s five states. */
+  protected settingsSync = inject(SettingsSyncToggle);
+  protected diagnostics = inject(PlusDiagnostics);
+  private sync = inject(ProfileSync);
+  private proxyUsageStore = inject(CorsProxyUsageStore);
+
+  /** Proxy counters, local and account-wide. */
+  protected readonly proxyUsage = this.proxyUsageStore.usage;
+  protected readonly formatBytes = formatBytes;
+  protected readonly syncing = signal(false);
+  protected readonly syncMessage = signal<string | null>(null);
   private adoption = inject(CollectionAdoptionRunner);
 
   /**
@@ -69,12 +85,37 @@ export class SettingsMawkingbirdPlus implements OnInit {
   );
 
   /** The toggles, mirrored here so a decision can always be revisited. */
-  protected readonly featureRows = computed(() =>
-    this.features.all().map((row) => ({ ...row, label: FEATURE_LABELS[row.feature] })),
-  );
+  /**
+   * The toggle list, with settings sync spliced in as a live row.
+   *
+   * Settings sync is **not** a stored preference — it is a view of
+   * `ProfileSync`, which is the only thing that decides whether anything
+   * uploads. It used to be both, and the two disagreed: a stored
+   * `settingsSync: true` showed the toggle on while sync sat at `unasked`,
+   * so this page said "enabled" while the Config page correctly said "off".
+   *
+   * Rendered first because it is the one people look for, and because the rest
+   * of the list is about *what* syncs while this one is about *whether*.
+   */
+  protected readonly featureRows = computed<FeatureRow[]>(() => [
+    {
+      feature: 'settingsSync' as const,
+      on: this.settingsSync.on(),
+      label: 'Settings sync',
+    },
+    ...this.features.all().map((row) => ({ ...row, label: FEATURE_LABELS[row.feature] })),
+  ]);
 
-  protected async setFeature(feature: PlusFeature, on: boolean): Promise<void> {
+  protected async setFeature(feature: ToggleId, on: boolean): Promise<void> {
     this.adoptionError.set('');
+
+    if (feature === 'settingsSync') {
+      // Straight through to ProfileSync. Nothing is stored here, so there is no
+      // second copy of this answer to fall out of step.
+      await this.settingsSync.set(on);
+      return;
+    }
+
     this.features.set(feature, on);
 
     if (feature === 'corsProxy' && on && this.proxy.missingEntitledProxy()) {
@@ -202,11 +243,63 @@ export class SettingsMawkingbirdPlus implements OnInit {
     this.linkSent.set(false);
     this.email.set('');
   }
+
+  /** Read local and remote state. Changes nothing — see `plus-diagnostics.ts`. */
+  protected async loadDiagnostics(): Promise<void> {
+    this.syncMessage.set(null);
+    await this.diagnostics.load();
+  }
+
+  /**
+   * Push this browser's settings, then re-read so the panel shows the result.
+   *
+   * Interactive, so a failure is reported now rather than counted towards a
+   * later warning — the user is watching a button they just pressed.
+   */
+  protected async syncNow(): Promise<void> {
+    this.syncing.set(true);
+    this.syncMessage.set(null);
+    try {
+      const outcome = await this.sync.push(true);
+      switch (outcome.kind) {
+        case 'saved':
+          this.syncMessage.set(
+            `Uploaded ${outcome.keys} setting(s) as revision ${outcome.revision}.`,
+          );
+          break;
+        case 'not-syncing':
+          this.syncMessage.set('Settings sync is off. Turn it on above first.');
+          break;
+        case 'conflict':
+          this.syncMessage.set('Your account changed first. Check again to see what it holds.');
+          break;
+        default:
+          this.syncMessage.set(outcome.message);
+      }
+      await this.diagnostics.load();
+    } finally {
+      this.syncing.set(false);
+    }
+  }
+}
+
+/**
+ * What a toggle can govern.
+ *
+ * `settingsSync` is not a {@link PlusFeature} — it has no stored preference and
+ * lives entirely in `ProfileSync`. It is a toggle on this page and nothing else,
+ * which is exactly what this type says.
+ */
+type ToggleId = PlusFeature | 'settingsSync';
+
+interface FeatureRow {
+  feature: ToggleId;
+  on: boolean;
+  label: string;
 }
 
 const FEATURE_LABELS: Record<PlusFeature, string> = {
   corsProxy: 'Mawkingbird CORS proxy',
-  settingsSync: 'Settings sync',
   trustSync: 'Trusted accounts',
   listsSync: 'Client lists',
   feedsSync: 'RSS subscription list',

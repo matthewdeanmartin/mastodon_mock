@@ -17,14 +17,13 @@ describe('PlusFeatures', () => {
     // `undecided` is not `off`: the dialog has to distinguish "never asked"
     // from "asked, said no", or it either nags or never appears.
     expect(features.decided()).toBe(false);
-    expect(features.isOn('settingsSync')).toBe(true);
+    expect(features.isOn('feedsSync')).toBe(true);
     expect(features.isOn('corsProxy')).toBe(true);
   });
 
   it('records an answer', () => {
     features.save({
       corsProxy: false,
-      settingsSync: true,
       trustSync: true,
       listsSync: false,
       feedsSync: true,
@@ -33,13 +32,12 @@ describe('PlusFeatures', () => {
     expect(features.decided()).toBe(true);
     expect(features.isOn('corsProxy')).toBe(false);
     expect(features.isOn('listsSync')).toBe(false);
-    expect(features.isOn('settingsSync')).toBe(true);
+    expect(features.isOn('feedsSync')).toBe(true);
   });
 
   it('survives a reload', () => {
     features.save({
       corsProxy: false,
-      settingsSync: true,
       trustSync: true,
       listsSync: true,
       feedsSync: true,
@@ -54,7 +52,6 @@ describe('PlusFeatures', () => {
   it('changes one feature without disturbing the others', () => {
     features.save({
       corsProxy: true,
-      settingsSync: true,
       trustSync: true,
       listsSync: true,
       feedsSync: true,
@@ -63,7 +60,7 @@ describe('PlusFeatures', () => {
     features.set('trustSync', false);
 
     expect(features.isOn('trustSync')).toBe(false);
-    expect(features.isOn('settingsSync')).toBe(true);
+    expect(features.isOn('feedsSync')).toBe(true);
     // Still answered — changing a setting is not un-answering the dialog.
     expect(features.decided()).toBe(true);
   });
@@ -71,7 +68,6 @@ describe('PlusFeatures', () => {
   it('forgets everything on reset, so the next account decides for itself', () => {
     features.save({
       corsProxy: false,
-      settingsSync: false,
       trustSync: false,
       listsSync: false,
       feedsSync: false,
@@ -92,7 +88,7 @@ describe('PlusFeatures', () => {
     // Being asked twice is a small annoyance; silently switching off something
     // someone turned on is not.
     expect(features.decided()).toBe(false);
-    expect(features.isOn('settingsSync')).toBe(true);
+    expect(features.isOn('feedsSync')).toBe(true);
   });
 
   it('ignores junk values inside an otherwise valid record', () => {
@@ -113,7 +109,10 @@ describe('PlusFeatures', () => {
 
     const rows = features.all();
 
-    expect(rows).toHaveLength(5);
+    // Four, not five: settings sync is no longer a stored preference. It is a
+    // view of `ProfileSync` via `SettingsSyncToggle`, because two switches for
+    // one thing is what let the Plus page and the Config page disagree.
+    expect(rows).toHaveLength(4);
     expect(rows.find((row) => row.feature === 'feedsSync')?.on).toBe(false);
     expect(rows.find((row) => row.feature === 'listsSync')?.on).toBe(true);
   });

@@ -117,7 +117,6 @@ export class PlusWelcomeDialog {
 
 const LABELS: Record<PlusFeature, string> = {
   corsProxy: 'Mawkingbird CORS proxy',
-  settingsSync: 'Settings sync',
   trustSync: 'Trusted accounts',
   listsSync: 'Client lists',
   feedsSync: 'RSS subscription list',
@@ -125,7 +124,6 @@ const LABELS: Record<PlusFeature, string> = {
 
 const DETAILS: Record<PlusFeature, string> = {
   corsProxy: 'Fetch feeds and pages that block browsers directly. Uses your Plus rate limit.',
-  settingsSync: 'Your preferences follow you to your other browsers.',
   trustSync: 'Who you trust, kept per Mastodon account.',
   listsSync: 'Your lists, stored on your account instead of only in this browser.',
   feedsSync: 'The list of feeds you subscribe to — not the articles themselves.',

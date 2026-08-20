@@ -87,7 +87,9 @@ describe('SettingsMawkingbirdPlus', () => {
     signedIn();
     const text = render();
 
-    expect(text).toContain('Signed in');
+    // "Your account" since sign-in and plan were merged into one block: they
+    // were two sections answering overlapping halves of the same question.
+    expect(text).toContain('Your account');
     expect(text).toContain('Confirmed email address');
   });
 
@@ -152,7 +154,9 @@ describe('SettingsMawkingbirdPlus', () => {
     plus.subscription.set({ renewsAt: Date.UTC(2027, 7, 12), cancelAtPeriodEnd: false });
     const text = render();
 
-    expect(text).toContain('Renews annually');
+    // The renewal date now sits next to the plan rather than in its own
+    // section. The claim is unchanged: a supporter is told when it renews.
+    expect(text).toContain('renews');
     expect(text).toContain('2027');
     expect(text).not.toContain('Support Mawkingbird —');
   });
@@ -167,8 +171,10 @@ describe('SettingsMawkingbirdPlus', () => {
     // The distinction the whole `cancelAtPeriodEnd` field exists for: someone
     // who just cancelled needs to see that it worked *and* that they keep the
     // year they paid for.
-    expect(text).toContain('Cancelled');
-    expect(text).toContain('runs until');
+    expect(text).toContain('cancelled');
+    // "yours until" rather than "runs until" — same promise, said next to the
+    // plan it qualifies.
+    expect(text).toContain('yours until');
     expect(text).toContain('2027');
   });
 

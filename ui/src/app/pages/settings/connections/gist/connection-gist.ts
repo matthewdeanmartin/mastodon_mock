@@ -5,6 +5,11 @@ import { GistProvider } from '../../../../providers/paste/gist-provider';
 import { GistSettings } from '../../../../providers/paste/gist-settings';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
+import { credentialLocation, StorageBadge } from '../storage-badge';
+import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+
+/** The registry base this page's credential is stored under. */
+const GIST_KEY = 'mockingbird_gist_credentials';
 
 /**
  * Settings → Connections → GitHub Gist.
@@ -16,12 +21,13 @@ import { expiryLabel } from '../expiry-label';
  */
 @Component({
   selector: 'app-connection-gist',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, StorageBadge],
   templateUrl: './connection-gist.html',
   styleUrls: ['../connection-page.css'],
 })
 export class ConnectionGist implements OnInit {
   protected readonly settings = inject(GistSettings);
+  private readonly bridge = inject(VaultBridge);
   private readonly provider = inject(GistProvider);
 
   protected readonly token = signal('');
@@ -30,6 +36,16 @@ export class ConnectionGist implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;
   protected readonly expiryLabel = expiryLabel;
+
+  /**
+   * Where this credential lives, for the badge.
+   *
+   * Reads the connector's own facts rather than the vault's state: a locked
+   * vault is not a locked credential. See `storage-badge.ts`.
+   */
+  protected where() {
+    return credentialLocation(this.bridge.syncs(GIST_KEY), this.settings.needsFetch());
+  }
 
   ngOnInit(): void {
     this.settings.enforceLifetime();

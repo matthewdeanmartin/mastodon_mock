@@ -145,6 +145,7 @@
   @if (settings.hasKey()) {
     <p class="key-state">
       <span class="connection-ok">A key is saved in this browser.</span>
+      <app-storage-badge [where]="where()" />
       <button class="btn btn-outline btn-small" type="button" (click)="clearKey()">
         Remove key
       </button>
