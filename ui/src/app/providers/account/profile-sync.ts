@@ -602,7 +602,13 @@ export class ProfileSync {
       this.diagnostics.info('ProfileSync', 'push:skipped', { reason: 'not-syncing' });
       return { kind: 'not-syncing' };
     }
-    if (this.readOnly()) {
+    // `readOnly` may be a verdict reached under a stale free-tier token: the
+    // manifest is fetched with whatever credential was current, and on a cold
+    // load that predates the subscription lookup. Refusing here on that basis
+    // would make the flag self-sustaining — nothing would ever ask again, so
+    // nothing would ever discover it was wrong. When the account is entitled,
+    // let the request through and believe the service instead.
+    if (this.readOnly() && !this.supporter.isSupporter()) {
       this.diagnostics.info('ProfileSync', 'push:skipped', { reason: 'read-only' });
       return {
         kind: 'read-only',
@@ -658,6 +664,50 @@ export class ProfileSync {
       }
 
       if (result.kind === 'payment-required') {
+        // A 402 while the account *is* entitled means the token is stale, not
+        // the subscription. The auth token is minted before the subscription
+        // lookup can answer, so a browser that subscribed in this session holds
+        // a `tier: free` claim the service rightly rejects. Re-mint once and
+        // retry; only a second refusal is really about payment.
+        //
+        // Deliberately not a loop: `upgradeIfStale` returns false unless it
+        // actually replaced a free token with a better one, so this can run at
+        // most once per push and cannot spin against a genuinely lapsed account.
+        if (this.supporter.isSupporter() && (await this.session.upgradeIfStale(true))) {
+          this.diagnostics.info('ProfileSync', 'push:retry-after-upgrade', {
+            note: 'token said free while the account is entitled; re-minted',
+          });
+          const retry = await this.client.putSettings(document, current.etag);
+          if (retry.kind === 'ok') {
+            this.setRecord(
+              updateSyncRecord({
+                etag: retry.value.etag,
+                revision: retry.value.revision,
+                dirty: false,
+                lastSyncedAt: Date.now(),
+                failures: 0,
+                warning: undefined,
+              }),
+            );
+            this.error.set(null);
+            this.refusedForPayment.set(false);
+            this.diagnostics.info('ProfileSync', 'push:ok', {
+              revision: retry.value.revision,
+              keys: Object.keys(document.values).length,
+              bytes: new Blob([JSON.stringify(document)]).size,
+              byCategory: groupBySensitivity(Object.keys(document.values)),
+              interactive,
+              afterUpgrade: true,
+            });
+            return {
+              kind: 'saved',
+              revision: retry.value.revision,
+              keys: Object.keys(document.values).length,
+              bytes: new Blob([JSON.stringify(document)]).size,
+              byCategory: groupBySensitivity(Object.keys(document.values)),
+            };
+          }
+        }
         this.refusedForPayment.set(true);
         this.error.set(result.message);
         this.diagnostics.warn('ProfileSync', 'push:payment-required', { message: result.message });

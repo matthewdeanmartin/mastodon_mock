@@ -120,13 +120,20 @@ export class SettingsMawkingbirdPlus implements OnInit {
       // answerable from a console paste.
       const before = this.settingsSync.detail();
       this.log.info('PlusPage', 'settings-sync:set', { on, before });
-      await this.settingsSync.set(on);
+      const failure = await this.settingsSync.set(on);
       this.log.info('PlusPage', 'settings-sync:done', {
         on,
         before,
         after: this.settingsSync.detail(),
         syncing: this.settingsSync.on(),
+        failure,
       });
+      // Shown, not just logged. Turning sync on can be refused by the service,
+      // and a toggle that quietly returns to off tells the user nothing about
+      // why — which is exactly how a stale-token 402 stayed invisible.
+      if (failure) {
+        this.adoptionError.set(failure);
+      }
       return;
     }
 

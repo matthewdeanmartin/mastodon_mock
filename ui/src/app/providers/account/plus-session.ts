@@ -275,6 +275,19 @@ export class PlusSession {
       });
       this.tier.set(response.tier);
       this.status.isSupporter.set(response.tier === 'plus');
+      // The auth token and this proxy token are separate credentials, minted by
+      // separate Workers. This call is the moment the app first *learns* the
+      // account is entitled — and on a cold load the auth token was very likely
+      // minted before that was knowable, so it still carries `tier: free`.
+      //
+      // Nothing else closes that gap: `upgradeIfStale` is guarded on entitlement
+      // improving since the last manifest read, which is false by the time
+      // anyone asks. Left alone, every profile write authenticates with the
+      // stale free-tier claim and the service correctly answers 402 — a paying
+      // account that cannot save, with both halves individually behaving.
+      if (response.tier === 'plus') {
+        await this.session.upgradeIfStale(true);
+      }
       this.subscription.set(
         response.subscription
           ? {

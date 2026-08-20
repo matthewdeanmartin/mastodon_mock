@@ -13,6 +13,13 @@ const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 class FakeMawkingbirdSession {
   token = vi.fn().mockResolvedValue('mawkingbird-token');
+  /**
+   * Called when a mint reports `tier: 'plus'`, to re-mint an auth token that
+   * still carries a stale free-tier claim. Resolves false here: these tests are
+   * about the proxy token, and a double that omitted it would reject inside
+   * `mint()` and fail every case for the wrong reason.
+   */
+  upgradeIfStale = vi.fn().mockResolvedValue(false);
 }
 
 describe('PlusSession', () => {

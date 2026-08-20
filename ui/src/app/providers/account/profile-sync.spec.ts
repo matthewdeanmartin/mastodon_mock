@@ -86,6 +86,66 @@ describe('ProfileSync', () => {
     localStorage.clear();
   });
 
+  describe('a 402 caused by a stale token', () => {
+    /**
+     * The reported bug, end to end.
+     *
+     * Auth tokens and proxy tokens are minted by different Workers. On a cold
+     * load the auth token is minted before the subscription lookup can answer,
+     * so it carries `tier: free`; the proxy token minted moments later correctly
+     * says `plus`. Every profile write then authenticates with the stale claim
+     * and the service answers 402 — a subscriber who cannot save, with both
+     * halves individually behaving correctly.
+     */
+    it('re-mints and retries rather than reporting a lapsed subscription', async () => {
+      const session = TestBed.inject(MawkingbirdSession) as unknown as FakeMawkingbirdSession;
+      TestBed.inject(SupporterStatus).isSupporter.set(true);
+      writeSyncRecord({ state: 'on', revision: 1 });
+      sync.resetForTest({ state: 'on', revision: 1 });
+
+      // The upgrade succeeds, standing in for a fresh token that says `plus`.
+      session.upgradeIfStale.mockResolvedValue(true);
+      fetchStub
+        .mockResolvedValueOnce(respond(402, { error: 'Profile storage is part of Plus.' }))
+        .mockResolvedValueOnce(respond(200, { etag: '"b"', revision: 2 }));
+
+      const outcome = await sync.push(true);
+
+      expect(session.upgradeIfStale).toHaveBeenCalledWith(true);
+      expect(outcome.kind).toBe('saved');
+      // And the read-only flag must not be left set, or every later push is
+      // skipped before it can even try.
+      expect(sync.readOnly()).toBe(false);
+    });
+
+    it('still reports read-only when the account really is not entitled', async () => {
+      TestBed.inject(SupporterStatus).isSupporter.set(false);
+      writeSyncRecord({ state: 'on', revision: 1 });
+      sync.resetForTest({ state: 'on', revision: 1 });
+
+      fetchStub.mockResolvedValue(respond(402, { error: 'Profile storage is part of Plus.' }));
+      const outcome = await sync.push(true);
+
+      expect(outcome.kind).toBe('read-only');
+    });
+
+    it('does not retry forever when the fresh token is refused too', async () => {
+      const session = TestBed.inject(MawkingbirdSession) as unknown as FakeMawkingbirdSession;
+      TestBed.inject(SupporterStatus).isSupporter.set(true);
+      writeSyncRecord({ state: 'on', revision: 1 });
+      sync.resetForTest({ state: 'on', revision: 1 });
+
+      session.upgradeIfStale.mockResolvedValue(true);
+      fetchStub.mockResolvedValue(respond(402, { error: 'Profile storage is part of Plus.' }));
+
+      const outcome = await sync.push(true);
+
+      expect(outcome.kind).toBe('read-only');
+      // Exactly one retry: the PUT, then the retried PUT, and no more.
+      expect(calls.filter((c) => c.init.method === 'PUT')).toHaveLength(2);
+    });
+  });
+
   describe('start', () => {
     it('detects settings stored by another browser', async () => {
       // Locally never asked, remotely present. The state that gets forgotten and

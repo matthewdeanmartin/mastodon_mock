@@ -105,9 +105,20 @@ describe('turning it off', () => {
     expect(sync.disable).toHaveBeenCalled();
   });
 
+  it('reports a refusal instead of failing silently', async () => {
+    // The reported bug: a stale free-tier token made the service answer 402,
+    // `set` swallowed the outcome, and the toggle flipped back with nothing
+    // shown or said. The message has to reach the caller for the UI to render.
+    const { toggle, sync } = toggleOver('unasked');
+    sync.enable.mockResolvedValue({ kind: 'read-only', message: 'Profile storage is Plus.' });
+    await expect(toggle.set(true)).resolves.toBe('Profile storage is Plus.');
+  });
+
   it('is safe to turn off when already off', async () => {
     const { toggle, sync } = toggleOver('paused');
-    await expect(toggle.set(false)).resolves.toBeUndefined();
+    // null is the "nothing went wrong" answer: `set` now reports a failure
+    // message so a refused toggle cannot fail silently.
+    await expect(toggle.set(false)).resolves.toBeNull();
     expect(sync.enable).not.toHaveBeenCalled();
   });
 });

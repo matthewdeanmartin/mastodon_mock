@@ -77,19 +77,27 @@ export class SettingsSyncToggle {
    * line between `enable()` and `resume()`; this picks the right side of it so
    * no caller has to know the difference.
    */
-  async set(on: boolean): Promise<void> {
+  async set(on: boolean): Promise<string | null> {
     if (!on) {
       this.sync.disable();
-      return;
+      return null;
     }
     const detail = this.detail();
     if (detail === 'on') {
-      return;
+      return null;
     }
-    if (detail === 'never-asked') {
-      await this.sync.enable();
-      return;
+    // The outcome is returned rather than dropped. Turning sync on can fail for
+    // a reason the user needs to hear — a stale token answered 402, the service
+    // was unreachable — and a toggle that flips back with no message is the
+    // worst version of that: indistinguishable from a dead button.
+    const outcome =
+      detail === 'never-asked' ? await this.sync.enable() : await this.sync.resume();
+    switch (outcome.kind) {
+      case 'read-only':
+      case 'failed':
+        return outcome.message;
+      default:
+        return null;
     }
-    await this.sync.resume();
   }
 }
