@@ -295,12 +295,11 @@ export class MawkingbirdSession {
    *
    * ## Why this is needed
    *
-   * A cold load mints twice: the first `cookie` grant answers before the
-   * subscription lookup has finished and reports `tier: 'free'`, the second
-   * reports the truth. The held token is cached until it expires, so anything
-   * that asked in between keeps being handed the free-tier token for the rest
-   * of its lifetime — and the profile service, which reads `tier` from the
-   * claim, keeps correctly answering 402.
+   * Checkout can finish just after a `cookie` grant minted `tier: 'free'`.
+   * The Account webhook then updates the authoritative billing row, but the
+   * held token is cached until it expires. Anything that asked in between keeps
+   * receiving its old free-tier claim, and the profile service correctly
+   * answers 402 until the client deliberately re-mints.
    *
    * Re-reading the manifest does not help while the token itself is stale,
    * which is what made the earlier fix look racy: the retry was real, it was
