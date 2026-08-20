@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { PageDiagnostics } from '../../page-diagnostics';
 import { MawkingbirdSession } from './mawkingbird-session';
 import { ProfileAccountKey } from './profile-account-key';
 import { PROFILE_ORIGIN } from './profile-client';
@@ -76,6 +77,15 @@ export class ProfileCollections {
   private base = inject(PROFILE_ORIGIN);
   private session = inject(MawkingbirdSession);
   private accountKey = inject(ProfileAccountKey);
+  /**
+   * Console logging, matching `ProfileClient`.
+   *
+   * This client has its own `fetch` and was entirely unlogged, so a collection
+   * that could not be read said so on screen and nowhere else — including the
+   * pre-network refusal below, which is not an HTTP failure at all and so left
+   * no trace even in the network tab.
+   */
+  private log = inject(PageDiagnostics);
 
   /**
    * Fetch a collection's index.
@@ -285,21 +295,45 @@ export class ProfileCollections {
   private async send(path: string, init: RequestInit): Promise<Response | string> {
     const account = this.accountKey.header();
     if (account === null) {
+      // Not a network failure, and the reason it was previously invisible: this
+      // returns before any request is made, so nothing appears in the network
+      // tab either. On screen it reads as "could not read", which points at the
+      // server for a decision made entirely on this side.
+      this.log.warn('ProfileCollections', 'send:no-account', {
+        method: init.method ?? 'GET',
+        path,
+      });
       return NO_ACCOUNT;
     }
     const token = await this.session.token();
     if (!token) {
+      this.log.warn('ProfileCollections', 'send:no-token', {
+        method: init.method ?? 'GET',
+        path,
+      });
       return 'Could not reach the Mawkingbird account service.';
     }
     try {
-      return await fetch(`${this.base}${path}`, {
+      const response = await fetch(`${this.base}${path}`, {
         ...init,
         // No cookies, ever — the service authenticates by bearer header and
         // deliberately does not send Access-Control-Allow-Credentials.
         credentials: 'omit',
         headers: { ...init.headers, ...account, Authorization: `Bearer ${token}` },
       });
+      if (!response.ok) {
+        this.log.warn('ProfileCollections', 'http:not-ok', {
+          method: init.method ?? 'GET',
+          path,
+          status: response.status,
+        });
+      }
+      return response;
     } catch (error: unknown) {
+      this.log.warn('ProfileCollections', 'http:unreachable', {
+        method: init.method ?? 'GET',
+        path,
+      });
       return error instanceof Error && error.message
         ? `Could not reach the profile service. (${error.message})`
         : 'Could not reach the profile service.';

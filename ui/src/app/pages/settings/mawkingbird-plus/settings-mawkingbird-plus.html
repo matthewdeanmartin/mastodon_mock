@@ -165,9 +165,14 @@
                            a claim that the account holds nothing. The reason is
                            shown, not just the fact — a bare "could not read"
                            sends people to guess. -->
-                      <span class="muted">Could not read</span>
                       @if (row.error; as reason) {
+                        <!-- The reason, not a generic phrase. "Could not read"
+                             points at the server for failures that are often
+                             decided entirely on this side — a missing account
+                             key never reaches the network at all. -->
                         <span class="config-error small">{{ reason }}</span>
+                      } @else {
+                        <span class="muted">Could not read</span>
                       }
                     } @else {
                       {{ row.remote }}
