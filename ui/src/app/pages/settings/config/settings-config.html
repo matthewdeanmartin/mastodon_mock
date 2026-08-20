@@ -35,12 +35,10 @@
           </div>
           @if (syncPreview(); as keys) {
             <div class="export-preview">
-              <p>{{ keys.length }} setting(s) would be uploaded:</p>
+              <p>This browser would save:</p>
               <ul>
                 @for (change of keys; track change.key) {
-                  <li>
-                    <code>{{ change.key }}</code>
-                  </li>
+                  <li>{{ configKeyLabel(change.key) }}</li>
                 }
               </ul>
               <button type="button" class="btn btn-outline" (click)="cancelSyncPreview()">
@@ -115,11 +113,12 @@
               Your settings changed on another device, and this browser also has unsaved changes.
             </p>
             @if (decision.changes.length) {
-              <p>{{ decision.changes.length }} setting(s) differ:</p>
+              <p>These preferences differ:</p>
               <ul>
                 @for (change of decision.changes; track change.key) {
                   <li>
-                    <strong>{{ change.action }}</strong> <code>{{ change.key }}</code>
+                    <strong>{{ configChangeLabel(change.action) }}:</strong>
+                    {{ configKeyLabel(change.key) }}
                   </li>
                 }
               </ul>
@@ -159,17 +158,10 @@
         }
         @if (syncUploaded(); as uploaded) {
           <div class="export-preview">
-            <p class="hint">What went to your account:</p>
+            <p class="hint">Saved from this browser:</p>
             <ul>
-              @for (group of uploaded; track group.category) {
-                <li>
-                  <strong>{{ group.keys.length }}</strong> {{ group.category }}
-                  <span class="hint">
-                    @for (key of group.keys; track key) {
-                      <code>{{ key }}</code>
-                    }
-                  </span>
-                </li>
+              @for (preference of uploaded; track preference.key) {
+                <li>{{ preference.label }}</li>
               }
             </ul>
           </div>

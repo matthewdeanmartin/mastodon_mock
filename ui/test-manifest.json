@@ -1,5 +1,5 @@
 {
-  "testCount": 4790,
+  "testCount": 4791,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -2076,6 +2076,7 @@
     "src/app/pages/settings/appearance/settings-appearance.spec.ts :: SettingsAppearance loads the server-backed rows from mock settings (theme stays client-side)",
     "src/app/pages/settings/appearance/settings-appearance.spec.ts :: SettingsAppearance save() PUTs only the appearance section, sourcing theme from ClientPrefs",
     "src/app/pages/settings/appearance/settings-appearance.spec.ts :: SettingsAppearance theme radio changes apply instantly through ClientPrefs",
+    "src/app/pages/settings/config/settings-config.spec.ts :: SettingsConfig describes a successful account sync without exposing storage keys or revisions",
     "src/app/pages/settings/config/settings-config.spec.ts :: SettingsConfig previews an export without downloading, copying, or publishing it",
     "src/app/pages/settings/config/settings-config.spec.ts :: SettingsConfig requires a publish preview and saves the paste plus edit password in My Pastes",
     "src/app/pages/settings/config/settings-config.spec.ts :: SettingsConfig shows copy success beside the export controls",

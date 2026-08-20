@@ -101,4 +101,33 @@ describe('SettingsConfig', () => {
       'Configuration copied to the clipboard',
     );
   });
+
+  it('describes a successful account sync without exposing storage keys or revisions', () => {
+    const fixture = TestBed.createComponent(SettingsConfig);
+    fixture.componentInstance['reportPush']({
+      kind: 'saved',
+      keys: 4,
+      bytes: 2900,
+      revision: 9,
+      byCategory: {
+        setting: [
+          'mockingbird_client_prefs',
+          'mockingbird_feature_flags',
+          'mockingbird_translation_usage',
+          'mockingbird_plus_features',
+        ],
+      },
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Your Mawkingbird account is up to date');
+    expect(text).toContain('Appearance, reading, composing, and accessibility preferences');
+    expect(text).toContain('Optional feature choices');
+    expect(text).toContain('Translation usage counters');
+    expect(text).toContain('Mawkingbird Plus feature choices');
+    expect(text).not.toContain('mockingbird_');
+    expect(text).not.toContain('revision 9');
+    expect(text).not.toContain('setting(s)');
+  });
 });

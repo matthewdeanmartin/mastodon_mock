@@ -56,13 +56,8 @@ export class SettingsConfig {
    * this browser's settings." came to be shown for an upload that never landed.
    */
   protected readonly syncError = signal('');
-  /**
-   * What the last successful upload contained, by registry category.
-   *
-   * Shown rather than kept for the log alone: 'it synced' is not a claim a
-   * user can check, while '3 settings, 1 private' names what left the browser.
-   */
-  protected readonly syncUploaded = signal<{ category: string; keys: string[] }[] | null>(null);
+  /** What the last successful upload contained, in user-facing language. */
+  protected readonly syncUploaded = signal<SyncedPreference[] | null>(null);
 
   /** Whether to offer turning sync on. Entitlement is read, never assumed. */
   protected readonly offersSync = computed(() =>
@@ -120,6 +115,23 @@ export class SettingsConfig {
       return 'Syncing — nothing saved yet.';
     }
     return `Syncing — last saved ${new Date(at).toLocaleString()}.`;
+  }
+
+  /** Translate an internal storage key into the preference it represents. */
+  protected configKeyLabel(key: string): string {
+    return CONFIG_KEY_LABELS[key] ?? 'Other browser preference';
+  }
+
+  /** A config diff action written as a sentence fragment rather than an enum. */
+  protected configChangeLabel(action: ConfigChange['action']): string {
+    switch (action) {
+      case 'add':
+        return 'Added';
+      case 'change':
+        return 'Changed';
+      case 'remove':
+        return 'Removed';
+    }
   }
 
   protected readonly includePrivate = signal(false);
@@ -344,7 +356,7 @@ export class SettingsConfig {
     const outcome = await this.profile.enable();
     if (outcome.kind === 'saved') {
       this.syncMessage.set(
-        `Settings sync is on. Uploaded ${outcome.keys} setting(s) (${formatBytes(outcome.bytes)}). Your other browsers will pick these up next time you use them.`,
+        `Settings sync is on. Saved ${formatBytes(outcome.bytes)} of preferences from this browser to your account. Your other browsers will pick them up next time you use them.`,
       );
       this.showUploaded(outcome.byCategory);
       return;
@@ -375,9 +387,7 @@ export class SettingsConfig {
     const outcome = await this.profile.resume();
     switch (outcome.kind) {
       case 'applied':
-        this.syncMessage.set(
-          `Sync is back on. Applied ${outcome.changes.length} setting(s) from your account. Reloading…`,
-        );
+        this.syncMessage.set('Sync is back on. Updated this browser from your account. Reloading…');
         location.reload();
         return;
       case 'needs-decision':
@@ -415,7 +425,7 @@ export class SettingsConfig {
     this.clearNotice();
     const outcome = await this.profile.adoptRemote();
     if (outcome.kind === 'applied') {
-      this.syncMessage.set(`Applied ${outcome.changes.length} setting(s). Reloading…`);
+      this.syncMessage.set('Updated this browser from your account. Reloading…');
       location.reload();
       return;
     }
@@ -445,7 +455,7 @@ export class SettingsConfig {
     const outcome = await this.profile.pull();
     switch (outcome.kind) {
       case 'applied':
-        this.syncMessage.set(`Applied ${outcome.changes.length} setting(s). Reloading…`);
+        this.syncMessage.set('Updated this browser from your account. Reloading…');
         location.reload();
         return;
       case 'needs-decision':
@@ -488,7 +498,7 @@ export class SettingsConfig {
       case 'saved':
         this.showUploaded(outcome.byCategory);
         this.syncMessage.set(
-          `Saved ${outcome.keys} setting(s) (${formatBytes(outcome.bytes)}) as revision ${outcome.revision}.`,
+          `Your Mawkingbird account is up to date. Saved ${formatBytes(outcome.bytes)} of preferences from this browser.`,
         );
         return;
       case 'not-syncing':
@@ -528,7 +538,7 @@ export class SettingsConfig {
     this.syncDecision.set(null);
     if (outcome.kind === 'saved') {
       this.syncMessage.set(
-        `Kept this browser’s settings and saved ${outcome.keys} setting(s) to your account.`,
+        `Kept this browser’s preferences and saved them to your Mawkingbird account.`,
       );
       this.showUploaded(outcome.byCategory);
       return;
@@ -557,15 +567,17 @@ export class SettingsConfig {
   }
 
   /**
-   * Record what an upload contained, for display.
+   * Record what an upload contained without exposing localStorage key names.
    *
-   * Sorted with the largest category first so the summary leads with the bulk
-   * of what was sent rather than with whichever name happened to sort first.
+   * `byCategory` remains part of the service result for diagnostics, but a user
+   * cannot act on "setting" or `mockingbird_client_prefs`. The page names the
+   * actual preference groups instead.
    */
   private showUploaded(byCategory: Record<string, string[]>): void {
-    const entries = Object.entries(byCategory)
-      .map(([category, keys]) => ({ category, keys }))
-      .sort((a, b) => b.keys.length - a.keys.length);
+    const keys = [...new Set(Object.values(byCategory).flat())];
+    const entries = keys
+      .map((key) => ({ key, label: this.configKeyLabel(key) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
     this.syncUploaded.set(entries.length ? entries : null);
   }
 
@@ -573,3 +585,27 @@ export class SettingsConfig {
     this.error.set(error instanceof Error ? error.message : 'Configuration operation failed.');
   }
 }
+
+interface SyncedPreference {
+  /** Retained only as a stable render identity; never shown. */
+  key: string;
+  label: string;
+}
+
+/** Human descriptions for every unscoped key portable config can contain. */
+const CONFIG_KEY_LABELS: Readonly<Record<string, string>> = {
+  mockingbird_client_prefs: 'Appearance, reading, composing, and accessibility preferences',
+  mockingbird_house_ads: 'House-ad choices',
+  mockingbird_feature_flags: 'Optional feature choices',
+  mockingbird_anonymous_preferences: 'Anonymous-mode preferences',
+  mockingbird_search_server_v1: 'Search-server choice',
+  mockingbird_translation_preference: 'Translation-service choice',
+  mockingbird_translation_usage: 'Translation usage counters (counts only — never translated text)',
+  mockingbird_vault_device: 'This browser’s display name',
+  mockingbird_openrouter_model: 'AI model choice',
+  mockingbird_openrouter_prompts: 'Custom AI prompt templates',
+  mockingbird_plus_features: 'Mawkingbird Plus feature choices',
+  mastodon_mock_server: 'Home Mastodon server',
+  mockingbird_cors_proxy: 'Web access and proxy choice',
+  mockingbird_shortener: 'Link-shortener choice',
+};
