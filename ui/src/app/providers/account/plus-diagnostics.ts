@@ -36,6 +36,7 @@ import { ProfileFeeds } from './profile-feeds';
 import { ProfileLists } from './profile-lists';
 import { ProfileSync } from './profile-sync';
 import { ProfileTrust } from './profile-trust';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /** One collection, both sides. */
 export interface CollectionRow {
@@ -75,6 +76,15 @@ export class PlusDiagnostics {
   private profileTrust = inject(ProfileTrust);
   private profileFeeds = inject(ProfileFeeds);
   private profileLists = inject(ProfileLists);
+  /**
+   * Console logging, the same as everywhere else in this module.
+   *
+   * This panel exists because sync is invisible when it works. A panel that is
+   * *itself* invisible when it misbehaves would have the same problem one level
+   * up — so every read logs what it found, and a bug report can be a console
+   * paste rather than a description.
+   */
+  private log = inject(PageDiagnostics);
 
   readonly state = signal<LoadState>('idle');
   readonly error = signal<string | null>(null);
@@ -139,13 +149,34 @@ export class PlusDiagnostics {
     this.state.set('loading');
     this.error.set(null);
 
+    this.log.info('PlusDiagnostics', 'load:start', {
+      syncState: this.sync.record().state,
+      syncing: this.sync.syncing(),
+      dirty: this.sync.record().dirty === true,
+      revision: this.sync.record().revision ?? null,
+      etag: this.sync.record().etag ?? null,
+    });
+
     const manifest = await this.client.manifest();
     if (manifest.kind === 'ok') {
+      this.log.info('PlusDiagnostics', 'load:manifest', {
+        hasSettings: manifest.value.settings !== undefined,
+        revision: manifest.value.settings?.revision ?? null,
+        size: manifest.value.settings?.size ?? null,
+        quotaUsed: manifest.value.quota.used,
+        conflicts: manifest.value.conflicts,
+        readOnly: manifest.value.readOnly,
+      });
       this.manifest.set(manifest.value);
     } else if (manifest.kind === 'absent') {
+      this.log.info('PlusDiagnostics', 'load:manifest-absent', {});
       // Nothing stored yet is a legitimate answer, not a failure.
       this.manifest.set(null);
     } else {
+      this.log.warn('PlusDiagnostics', 'load:manifest-failed', {
+        kind: manifest.kind,
+        message: describe(manifest),
+      });
       this.manifest.set(null);
       this.error.set(describe(manifest));
       this.state.set('failed');
@@ -156,6 +187,15 @@ export class PlusDiagnostics {
     for (const collection of ['trust', 'feeds', 'lists'] as AdoptableCollection[]) {
       const remote = this.remoteFor(collection);
       await remote.load();
+      const failure = remote.error();
+      if (failure) {
+        // Logged per collection: "could not read" on screen is one cell, and
+        // which collection failed and why is the part a report needs.
+        this.log.warn('PlusDiagnostics', 'load:collection-failed', {
+          collection,
+          message: failure,
+        });
+      }
       rows.push({
         collection,
         label: COLLECTION_LABELS[collection],
@@ -163,11 +203,20 @@ export class PlusDiagnostics {
         // Null rather than zero on a failed read. Zero would read as "the
         // account holds nothing", which is a different and much more alarming
         // claim than "this could not be checked".
-        remote: remote.error() ? null : remote.count(),
+        remote: failure ? null : remote.count(),
       });
     }
     this.collections.set(rows);
     this.state.set('ready');
+    this.log.info('PlusDiagnostics', 'load:ready', {
+      collections: rows.map((row) => ({
+        collection: row.collection,
+        local: row.local,
+        remote: row.remote,
+      })),
+      settings: this.settings(),
+      drifted: this.drifted(),
+    });
   }
 
   private remoteFor(collection: AdoptableCollection) {

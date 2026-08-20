@@ -6,6 +6,7 @@ import { MawkingbirdSession } from '../../../providers/account/mawkingbird-sessi
 import { SettingsSyncToggle } from '../../../providers/account/settings-sync-toggle';
 import { PlusDiagnostics } from '../../../providers/account/plus-diagnostics';
 import { ProfileSync } from '../../../providers/account/profile-sync';
+import { PageDiagnostics } from '../../../page-diagnostics';
 import { CorsProxyUsageStore } from '../../../providers/cors-proxy/cors-proxy-usage';
 import { formatBytes } from '../../../observability/local-storage-inspector';
 import { PlusFeatures } from '../../../providers/account/plus-features';
@@ -50,6 +51,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
   protected diagnostics = inject(PlusDiagnostics);
   private sync = inject(ProfileSync);
   private proxyUsageStore = inject(CorsProxyUsageStore);
+  private log = inject(PageDiagnostics);
 
   /** Proxy counters, local and account-wide. */
   protected readonly proxyUsage = this.proxyUsageStore.usage;
@@ -112,7 +114,19 @@ export class SettingsMawkingbirdPlus implements OnInit {
     if (feature === 'settingsSync') {
       // Straight through to ProfileSync. Nothing is stored here, so there is no
       // second copy of this answer to fall out of step.
+      //
+      // Logged on both sides of the call: this toggle decides whether anything
+      // syncs at all, and "I clicked it and nothing happened" needs to be
+      // answerable from a console paste.
+      const before = this.settingsSync.detail();
+      this.log.info('PlusPage', 'settings-sync:set', { on, before });
       await this.settingsSync.set(on);
+      this.log.info('PlusPage', 'settings-sync:done', {
+        on,
+        before,
+        after: this.settingsSync.detail(),
+        syncing: this.settingsSync.on(),
+      });
       return;
     }
 
@@ -251,6 +265,23 @@ export class SettingsMawkingbirdPlus implements OnInit {
   }
 
   /**
+   * Why the sync button is unavailable, or null when it is fine.
+   *
+   * Shown next to the button rather than left for the click to reveal. "Sync
+   * now" that reports "settings sync is off" only after being pressed is a
+   * button that looks broken — the reason was knowable before the press.
+   */
+  protected syncBlockedReason(): string | null {
+    if (!this.settingsSync.on()) {
+      return 'Settings sync is off. Turn it on above and this will start working.';
+    }
+    if (this.sync.readOnly()) {
+      return 'Your subscription has lapsed, so settings are not being saved.';
+    }
+    return null;
+  }
+
+  /**
    * Push this browser's settings, then re-read so the panel shows the result.
    *
    * Interactive, so a failure is reported now rather than counted towards a
@@ -259,8 +290,14 @@ export class SettingsMawkingbirdPlus implements OnInit {
   protected async syncNow(): Promise<void> {
     this.syncing.set(true);
     this.syncMessage.set(null);
+    this.log.info('PlusPage', 'sync-now:start', {
+      syncState: this.sync.record().state,
+      syncing: this.sync.syncing(),
+      dirty: this.sync.record().dirty === true,
+    });
     try {
       const outcome = await this.sync.push(true);
+      this.log.info('PlusPage', 'sync-now:outcome', { kind: outcome.kind });
       switch (outcome.kind) {
         case 'saved':
           this.syncMessage.set(

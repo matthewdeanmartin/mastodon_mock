@@ -1,9 +1,19 @@
 <div class="spage-head">
   <h1>Mawkingbird Plus</h1>
-  <p>
-    A free Mawkingbird account. It is optional and always will be — feeds, posting and the CORS
-    proxy all work signed out, exactly as they do today.
-  </p>
+  <!--
+    The pitch is for people who are not supporters yet. Rendering it
+    unconditionally told a paying subscriber their account was free, directly
+    above a "Plan: Mawkingbird Plus" line — the contradiction that made the
+    whole page untrustworthy.
+  -->
+  @if (!plus.isSupporter()) {
+    <p>
+      A free Mawkingbird account. It is optional and always will be — feeds, posting and the CORS
+      proxy all work signed out, exactly as they do today.
+    </p>
+  } @else {
+    <p>Thank you for supporting Mawkingbird. Here is what your subscription is doing.</p>
+  }
 </div>
 
 <div class="spage-body">
@@ -176,7 +186,20 @@
             <p role="status">
               This browser and your account do not match. Syncing sends this browser's settings up.
             </p>
-            <button class="btn" type="button" [disabled]="syncing()" (click)="syncNow()">
+            <!--
+              The reason is shown *before* the press, not after it. A "Sync now"
+              that only reports "settings sync is off" once clicked is a button
+              that looks broken, and the reason was knowable all along.
+            -->
+            @if (syncBlockedReason(); as blocked) {
+              <p class="config-error" role="alert">{{ blocked }}</p>
+            }
+            <button
+              class="btn"
+              type="button"
+              [disabled]="syncing() || syncBlockedReason() !== null"
+              (click)="syncNow()"
+            >
               {{ syncing() ? 'Syncing…' : 'Sync now' }}
             </button>
           } @else {

@@ -134,6 +134,30 @@ describe('SettingsMawkingbirdPlus', () => {
     expect(text).toContain('free and stays free');
   });
 
+  it('does not tell a supporter their account is free', () => {
+    // Reported from a deployed build: the page's static subtitle said "A free
+    // Mawkingbird account" directly above "Plan: Mawkingbird Plus". Two
+    // contradictory claims about the same account, one of them addressed to
+    // someone who had just paid.
+    session.ready.set(true);
+    signedIn();
+    plus.tier.set('plus');
+    const text = render();
+
+    expect(text).not.toContain('A free Mawkingbird account');
+    expect(text).toContain('Mawkingbird Plus');
+  });
+
+  it('still explains the free tier to someone who has not subscribed', () => {
+    // The other half: the pitch is honest and must stay for its actual
+    // audience. Fixing the contradiction must not delete the explanation.
+    session.ready.set(true);
+    signedIn();
+    const text = render();
+
+    expect(text).toContain('A free Mawkingbird account');
+  });
+
   it('starts checkout when the button is pressed', () => {
     session.ready.set(true);
     signedIn();

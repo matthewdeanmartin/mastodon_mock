@@ -63,7 +63,10 @@ function build(
       { provide: ProfileLists, useValue: options.lists ?? remoteDouble(1) },
       {
         provide: ProfileSync,
-        useValue: { record: signal({ state: 'on', dirty: options.dirty ?? false }) },
+        useValue: {
+          record: signal({ state: 'on', dirty: options.dirty ?? false }),
+          syncing: signal(true),
+        },
       },
     ],
   });
