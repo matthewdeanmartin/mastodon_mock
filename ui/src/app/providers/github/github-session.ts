@@ -1,7 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
+import { ProfileAccountKey } from '../account/profile-account-key';
+import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 import {
-  credentialExpired,
   credentialExpiresAt,
   ensureStamped,
   ExpiringCredential,
@@ -126,6 +127,8 @@ interface GitHubGraphQlResponse {
 /** Browser-only GitHub REST session using a user-supplied classic token. */
 @Injectable({ providedIn: 'root' })
 export class GitHubSession implements ExpiringConnection {
+  private bridge = inject(VaultBridge);
+  private accountKey = inject(ProfileAccountKey);
   private readonly userKey = scopedKey(USER_KEY_BASE);
   private readonly credentialsKey = scopedKey(CREDENTIALS_KEY_BASE);
   private token = signal<StoredGitHubToken | null>(readToken(this.userKey, this.credentialsKey));
@@ -135,6 +138,20 @@ export class GitHubSession implements ExpiringConnection {
   readonly notifications = signal<GitHubNotification[] | null>(null);
   readonly following = signal<GitHubUser[] | null>(null);
 
+  /**
+   * Connected, but the token is not in this browser right now.
+   *
+   * Set when local retention expired a vaulted token. Rendered as locked rather
+   * than disconnected — see `VaultBridge.verdictFor`.
+   */
+  readonly needsFetch = signal(false);
+
+  constructor() {
+    // Retention is applied here rather than in `readToken`, which cannot tell a
+    // vaulted token from a local-only one.
+    this.enforceLifetime();
+  }
+
   async connect(accessToken: string): Promise<GitHubUser> {
     const trimmed = accessToken.trim();
     if (!trimmed) {
@@ -142,14 +159,63 @@ export class GitHubSession implements ExpiringConnection {
     }
 
     const user = await githubRequest<GitHubUser>('/user', trimmed);
-    const credentials = stampCredential({ accessToken: trimmed });
+    this.persist(stampCredential({ accessToken: trimmed }), user);
+    // Not awaited: connecting should feel instant. Failures are observable via
+    // `syncToVault()`, which the settings page calls when the user opts in.
+    void this.bridge.writeThrough(
+      CREDENTIALS_KEY_BASE,
+      serialize(trimmed, user),
+      this.accountKey.current(),
+    );
+    return user;
+  }
+
+  /**
+   * The access token, falling back to the vault on a local miss.
+   *
+   * `localStorage` first, always — this connector worked before the vault
+   * existed and must keep working with it locked, unavailable or never set up.
+   *
+   * The vaulted record carries the profile as well as the token, because
+   * {@link readToken} treats a token with no profile as unusable and clears it.
+   */
+  accessToken(): string | null {
+    const local = this.token()?.accessToken;
+    if (local) {
+      return local;
+    }
+    const fromVault = this.bridge.readThrough(CREDENTIALS_KEY_BASE, this.accountKey.current());
+    if (!fromVault) {
+      return null;
+    }
+    const parsed = parseVaulted(fromVault);
+    if (!parsed) {
+      return null;
+    }
+    this.persist(stampCredential({ accessToken: parsed.accessToken }), parsed.user);
+    return parsed.accessToken;
+  }
+
+  /** Write both halves locally and update the signals. */
+  private persist(credentials: StoredGitHubCredentials, user: GitHubUser): void {
     localStorage.setItem(this.userKey, JSON.stringify(user));
     localStorage.setItem(this.credentialsKey, JSON.stringify(credentials));
-    const stored: StoredGitHubToken = { ...credentials, user };
-    this.token.set(stored);
+    this.token.set({ ...credentials, user });
     this.user.set(user);
     this.connected.set(true);
-    return user;
+    this.needsFetch.set(false);
+  }
+
+  /** Push the current credential to the vault and report what happened. */
+  async syncToVault(): Promise<SyncOutcome> {
+    const stored = this.token();
+    return stored
+      ? this.bridge.writeThrough(
+          CREDENTIALS_KEY_BASE,
+          serialize(stored.accessToken, stored.user),
+          this.accountKey.current(),
+        )
+      : { kind: 'skipped' };
   }
 
   /** When this token ages out under the retention policy, or null. */
@@ -157,16 +223,31 @@ export class GitHubSession implements ExpiringConnection {
     return credentialExpiresAt(this.token()?.connectedAt);
   }
 
-  /** Drop the token if it has outlived the retention policy. */
+  /**
+   * Apply the local retention policy: lock if vaulted, disconnect otherwise.
+   *
+   * For a vaulted token this clears the plaintext and keeps the connection —
+   * the next {@link accessToken} pulls it back. See `VaultBridge.verdictFor`.
+   */
   enforceLifetime(): void {
     const token = this.token();
-    if (token && credentialExpired(token.connectedAt)) {
+    if (!token) {
+      return;
+    }
+    const verdict = this.bridge.verdictFor(CREDENTIALS_KEY_BASE, token.connectedAt);
+    if (verdict.kind === 'disconnect') {
       this.disconnect();
+    } else if (verdict.kind === 'lock') {
+      this.forgetLocally();
+      this.needsFetch.set(true);
     }
   }
 
   async runProof(): Promise<void> {
-    const accessToken = this.token()?.accessToken;
+    // Through `accessToken()` rather than the signal, so a call made while the
+    // local copy is locked pulls the vault copy back instead of telling the user
+    // to connect something that is already connected.
+    const accessToken = this.accessToken();
     if (!accessToken) {
       throw new Error('Connect GitHub first.');
     }
@@ -238,18 +319,32 @@ export class GitHubSession implements ExpiringConnection {
     };
   }
 
+  /** Disconnect here, and remove the stored copy so it cannot come back. */
   disconnect(): void {
+    void this.bridge.removeThrough(CREDENTIALS_KEY_BASE, this.accountKey.current());
+    this.forgetLocally();
+    this.connected.set(false);
+    this.needsFetch.set(false);
+  }
+
+  /**
+   * Clear the local copies and anything derived from them.
+   *
+   * The fetched notifications and following list go too: they were read with a
+   * credential this browser no longer holds, and leaving them on screen would
+   * show private data behind a connection that is locked.
+   */
+  private forgetLocally(): void {
     localStorage.removeItem(this.userKey);
     localStorage.removeItem(this.credentialsKey);
     this.token.set(null);
     this.user.set(null);
-    this.connected.set(false);
     this.notifications.set(null);
     this.following.set(null);
   }
 
   private async graphQl(query: string, cursor: string | null): Promise<GitHubGraphQlResponse> {
-    const accessToken = this.token()?.accessToken;
+    const accessToken = this.accessToken();
     if (!accessToken) {
       throw new Error('Connect GitHub first.');
     }
@@ -401,16 +496,39 @@ function readToken(userKey: string, credentialsKey: string): StoredGitHubToken |
       localStorage.removeItem(credentialsKey);
       return null;
     }
+    // Expiry is *not* decided here any more. This function has no injector and
+    // so cannot ask whether the token is vaulted; dropping it unconditionally
+    // would delete the plaintext of a vaulted token while reporting it as never
+    // connected. `enforceLifetime` owns that decision and can tell lock from
+    // disconnect.
     const stamped = ensureStamped(credentialsKey, credentials as StoredGitHubCredentials);
-    if (credentialExpired(stamped.connectedAt)) {
-      localStorage.removeItem(userKey);
-      localStorage.removeItem(credentialsKey);
-      return null;
-    }
     return { ...stamped, user };
   } catch {
     localStorage.removeItem(userKey);
     localStorage.removeItem(credentialsKey);
+    return null;
+  }
+}
+
+/** The vaulted form: the token and the profile it belongs to. */
+function serialize(accessToken: string, user: GitHubUser): string {
+  return JSON.stringify({ accessToken, user });
+}
+
+/** Parse a record read back out of the vault. */
+function parseVaulted(raw: string): { accessToken: string; user: GitHubUser } | null {
+  try {
+    const parsed = JSON.parse(raw) as { accessToken?: unknown; user?: GitHubUser };
+    if (typeof parsed?.accessToken !== 'string' || !parsed.accessToken) {
+      return null;
+    }
+    // A token with no profile is exactly what `readToken` refuses to keep, so
+    // refuse it here too rather than writing a record the next read would clear.
+    if (typeof parsed.user?.login !== 'string' || !parsed.user.login) {
+      return null;
+    }
+    return { accessToken: parsed.accessToken, user: parsed.user };
+  } catch {
     return null;
   }
 }

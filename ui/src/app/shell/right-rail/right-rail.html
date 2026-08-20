@@ -118,7 +118,7 @@
       >
         <span class="bsky-trend-name">{{ trend.displayName }}</span>
         @if (trend.postCount) {
-          <span class="muted small">{{ trend.postCount }} posts</span>
+          <span class="muted small">{{ trend.postCount }} {{ words().posts }}</span>
         }
       </a>
     }

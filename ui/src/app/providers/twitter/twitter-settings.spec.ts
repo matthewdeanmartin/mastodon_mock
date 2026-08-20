@@ -1,13 +1,27 @@
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TwitterSettings } from './twitter-settings';
 import { availableTwitterSources, twitterApiHosts, twitterSourceEntry } from './twitter-source';
+
+/**
+ * A fresh instance reading whatever localStorage now holds.
+ *
+ * Through the injector rather than `new TwitterSettings()`: the service injects
+ * `VaultBridge`, and constructing it outside an injection context throws
+ * NG0203. Resetting the module is what makes it re-read storage.
+ */
+function newSettings(): TwitterSettings {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({});
+  return TestBed.inject(TwitterSettings);
+}
 
 describe('TwitterSettings', () => {
   let settings: TwitterSettings;
 
   beforeEach(() => {
     localStorage.clear();
-    settings = new TwitterSettings();
+    settings = newSettings();
   });
 
   it('is unusable until both a source and a key are present', () => {
@@ -60,24 +74,24 @@ describe('TwitterSettings', () => {
   it('persists across instances', () => {
     settings.activate('twitterapi-io');
     settings.setKey('twitterapi-io', 'secret');
-    const reloaded = new TwitterSettings();
+    const reloaded = newSettings();
     expect(reloaded.activeId()).toBe('twitterapi-io');
     expect(reloaded.resolve()?.auth.value).toBe('secret');
   });
 
   it('survives a corrupt config blob', () => {
     localStorage.setItem('mockingbird_twitter', 'not json');
-    expect(new TwitterSettings().activeId()).toBeNull();
+    expect(newSettings().activeId()).toBeNull();
   });
 
   it('survives a corrupt key blob', () => {
     localStorage.setItem('mockingbird_twitter_keys', '{{{');
-    expect(new TwitterSettings().hasKey('twitterapi-io')).toBe(false);
+    expect(newSettings().hasKey('twitterapi-io')).toBe(false);
   });
 
   it('discards a source id it no longer ships', () => {
     localStorage.setItem('mockingbird_twitter', JSON.stringify({ active: 'defunct-service' }));
-    expect(new TwitterSettings().activeId()).toBeNull();
+    expect(newSettings().activeId()).toBeNull();
   });
 
   it('never exposes the key through a public accessor', () => {
@@ -93,7 +107,7 @@ describe('direct reachability verdict', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    settings = new TwitterSettings();
+    settings = newSettings();
   });
 
   it('starts untested and records what the probe observed', () => {
@@ -118,7 +132,7 @@ describe('direct reachability verdict', () => {
 
   it('persists across instances', () => {
     settings.recordDirectReachability('twitterapi-io', 'blocked');
-    expect(new TwitterSettings().directReachability('twitterapi-io')).toBe('blocked');
+    expect(newSettings().directReachability('twitterapi-io')).toBe('blocked');
   });
 });
 

@@ -147,7 +147,7 @@
               placeholder="any"
               [ngModel]="engagementBounds().minReposts ?? null"
               (ngModelChange)="setEngagementBound('minReposts', $event)"
-              aria-label="Minimum reposts"
+              [attr.aria-label]="'Minimum ' + words().boosts"
             />
           </label>
           <label>
@@ -233,7 +233,7 @@
               placeholder="min"
               [ngModel]="accountBound('posts', 'min')"
               (ngModelChange)="setAccountBound('posts', 'min', $event)"
-              aria-label="Minimum posts"
+              [attr.aria-label]="'Minimum ' + words().posts"
             />
             <input
               type="number"
@@ -241,7 +241,7 @@
               placeholder="max"
               [ngModel]="accountBound('posts', 'max')"
               (ngModelChange)="setAccountBound('posts', 'max', $event)"
-              aria-label="Maximum posts"
+              [attr.aria-label]="'Maximum ' + words().posts"
             />
           </span>
         </label>

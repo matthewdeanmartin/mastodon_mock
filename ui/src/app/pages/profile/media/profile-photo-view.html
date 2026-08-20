@@ -143,7 +143,7 @@
                 type="button"
                 class="photo-action"
                 (click)="startReply(p)"
-                title="Reply to this post"
+                [title]="'Reply to this ' + words().post"
               >
                 ↩
                 @if (p.replies_count) {

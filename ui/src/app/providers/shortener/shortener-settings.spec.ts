@@ -5,8 +5,22 @@ import { ShortenerSettings } from './shortener-settings';
 describe('ShortenerSettings', () => {
   let settings: ShortenerSettings;
 
+  /**
+   * A fresh instance reading whatever localStorage now holds.
+   *
+   * Through the injector rather than `new ShortenerSettings()`: the service
+   * injects `VaultBridge`, and constructing it outside an injection context
+   * throws NG0203. Resetting the module is what makes it re-read storage.
+   */
+  function rebuild(): ShortenerSettings {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    return TestBed.inject(ShortenerSettings);
+  }
+
   beforeEach(() => {
     localStorage.clear();
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
     settings = TestBed.inject(ShortenerSettings);
   });
@@ -111,7 +125,7 @@ describe('ShortenerSettings', () => {
   it('discards a stored provider id it no longer ships', () => {
     localStorage.setItem('mockingbird_shortener', JSON.stringify({ active: 'bitly' }));
 
-    const reloaded = new ShortenerSettings();
+    const reloaded = rebuild();
 
     // A dangling selection would render as a provider that cannot be configured.
     expect(reloaded.activeId()).toBeNull();
@@ -120,12 +134,12 @@ describe('ShortenerSettings', () => {
   it('survives a corrupt key blob rather than throwing on construction', () => {
     localStorage.setItem('mockingbird_shortener_keys', '{not json');
 
-    const reloaded = new ShortenerSettings();
+    const reloaded = rebuild();
 
     expect(reloaded.hasKey('dub')).toBe(false);
   });
 
-  it('drops a key that has outlived the retention policy', () => {
+  it('locks rather than drops a key that has outlived the retention policy', () => {
     const longAgo = Date.now() - 91 * 24 * 60 * 60 * 1000;
     localStorage.setItem(
       'mockingbird_shortener_keys',
@@ -133,10 +147,15 @@ describe('ShortenerSettings', () => {
     );
     localStorage.setItem('mockingbird_shortener', JSON.stringify({ active: 'dub' }));
 
-    const reloaded = new ShortenerSettings();
+    const reloaded = rebuild();
 
-    // The default policy is 90 days; a key older than that is gone on read.
+    // The default policy is 90 days, and the plaintext still leaves this browser
+    // on read. What changed with the vault is what that *means*: these keys are
+    // vaulted, so the provider stays active and `needsFetch` marks it as locked.
+    // Deactivating here would tell the user to reconnect something the next
+    // resolve() would have pulled back out of the vault on its own.
     expect(reloaded.hasKey('dub')).toBe(false);
-    expect(reloaded.activeId()).toBeNull();
+    expect(reloaded.activeId()).toBe('dub');
+    expect(reloaded.needsFetch()).toEqual(['dub']);
   });
 });

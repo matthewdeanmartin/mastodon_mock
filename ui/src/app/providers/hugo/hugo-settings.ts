@@ -1,7 +1,8 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
+import { ProfileAccountKey } from '../account/profile-account-key';
+import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 import {
-  credentialExpired,
   credentialExpiresAt,
   ensureStamped,
   ExpiringConnection,
@@ -24,6 +25,15 @@ import { normalizeContentPath, predictedPermalink } from './hugo-post';
  * an existing user's connection needs, and would put every repo they own behind
  * one leaked string. A fine-grained token scoped to the one Hugo repo is the
  * whole point — see `sprint/hugo-0-overview.md`, decision 1.
+ *
+ * ## What the vault stores
+ *
+ * The **token only**. The repo coordinates already travel in the ordinary
+ * settings document, which is the right store for them: they are not a secret,
+ * and duplicating them into the vault would mean two places to disagree about
+ * which branch a blog builds from. That split is also why local expiry here has
+ * always dropped the token and kept the repo — the vault inherits that shape
+ * rather than changing it.
  */
 const REPO_KEY_BASE = 'mockingbird_hugo_repo';
 const CREDENTIALS_KEY_BASE = 'mockingbird_hugo_credentials';
@@ -113,12 +123,12 @@ function loadCredentials(key: string): StoredCredentials | null {
     if (typeof parsed?.accessToken !== 'string' || !parsed.accessToken) {
       return null;
     }
-    const stamped = ensureStamped(key, parsed as StoredCredentials);
-    if (credentialExpired(stamped.connectedAt)) {
-      localStorage.removeItem(key);
-      return null;
-    }
-    return stamped;
+    // Expiry is *not* decided here any more. This function has no injector and
+    // so cannot ask whether the token is vaulted; dropping it unconditionally
+    // would delete the plaintext of a vaulted token while reporting it as never
+    // connected. `enforceLifetime` owns that decision and can tell lock from
+    // disconnect.
+    return ensureStamped(key, parsed as StoredCredentials);
   } catch {
     return null;
   }
@@ -127,6 +137,8 @@ function loadCredentials(key: string): StoredCredentials | null {
 /** One Hugo-on-GitHub blog linked to the current Mawkingbird account. */
 @Injectable({ providedIn: 'root' })
 export class HugoSettings implements ExpiringConnection {
+  private bridge = inject(VaultBridge);
+  private accountKey = inject(ProfileAccountKey);
   private readonly repoKey = scopedKey(REPO_KEY_BASE);
   private readonly credentialsKey = scopedKey(CREDENTIALS_KEY_BASE);
 
@@ -145,6 +157,21 @@ export class HugoSettings implements ExpiringConnection {
    * nothing can be published, so the composer must not offer the target.
    */
   readonly connected = computed(() => this.repoState() !== null && this.credentials() !== null);
+
+  /**
+   * The repo is configured, but the token is not in this browser right now.
+   *
+   * Set when local retention expired a vaulted token. The connections page
+   * renders this as locked rather than disconnected: the blog is still linked
+   * and the next {@link token} pulls the credential back.
+   */
+  readonly needsFetch = signal(false);
+
+  constructor() {
+    // Retention is applied here rather than in `loadCredentials`, which cannot
+    // tell a vaulted token from a local-only one.
+    this.enforceLifetime();
+  }
 
   /** `owner/repo`, for display. */
   readonly slug = computed(() => {
@@ -187,9 +214,24 @@ export class HugoSettings implements ExpiringConnection {
     }
   });
 
-  /** The write token, or null. Only the contents API should need this. */
+  /**
+   * The write token, falling back to the vault on a local miss.
+   *
+   * `localStorage` first, always — this connector worked before the vault
+   * existed and must keep working with it locked, unavailable or never set up.
+   */
   token(): string | null {
-    return this.credentials()?.accessToken ?? null;
+    const local = this.credentials()?.accessToken;
+    if (local) {
+      return local;
+    }
+    const fromVault = this.bridge.readThrough(CREDENTIALS_KEY_BASE, this.accountKey.current());
+    if (fromVault) {
+      // Repopulate, so the next call is local and the retention clock restarts
+      // from this use rather than from the original connection.
+      this.writeCredentials(stampCredential({ accessToken: fromVault }));
+    }
+    return fromVault;
   }
 
   /**
@@ -216,11 +258,27 @@ export class HugoSettings implements ExpiringConnection {
       throw new Error('Paste a GitHub token with write access to your blog repository.');
     }
     const normalized: HugoRepo = { ...repo, contentPath: normalizeContentPath(repo.contentPath) };
-    const credentials = stampCredential({ accessToken: trimmed });
     localStorage.setItem(this.repoKey, JSON.stringify(normalized));
-    localStorage.setItem(this.credentialsKey, JSON.stringify(credentials));
     this.repoState.set(normalized);
+    this.writeCredentials(stampCredential({ accessToken: trimmed }));
+    // Not awaited: connecting should feel instant. Failures are observable via
+    // `syncToVault()`, which the settings page calls when the user opts in.
+    void this.bridge.writeThrough(CREDENTIALS_KEY_BASE, trimmed, this.accountKey.current());
+  }
+
+  /** Persist the token locally and clear the locked flag. */
+  private writeCredentials(credentials: StoredCredentials): void {
+    localStorage.setItem(this.credentialsKey, JSON.stringify(credentials));
     this.credentials.set(credentials);
+    this.needsFetch.set(false);
+  }
+
+  /** Push the current token to the vault and report what happened. */
+  async syncToVault(): Promise<SyncOutcome> {
+    const token = this.credentials()?.accessToken;
+    return token
+      ? this.bridge.writeThrough(CREDENTIALS_KEY_BASE, token, this.accountKey.current())
+      : { kind: 'skipped' };
   }
 
   setIncludeInProfile(include: boolean): void {
@@ -254,10 +312,18 @@ export class HugoSettings implements ExpiringConnection {
     this.repoState.set(next);
   }
 
+  /** Disconnect here, and remove the stored copy so it cannot come back. */
   disconnect(): void {
+    void this.bridge.removeThrough(CREDENTIALS_KEY_BASE, this.accountKey.current());
     localStorage.removeItem(this.repoKey);
-    localStorage.removeItem(this.credentialsKey);
     this.repoState.set(null);
+    this.forgetTokenLocally();
+    this.needsFetch.set(false);
+  }
+
+  /** Clear the local token only. The repo and any vault copy survive. */
+  private forgetTokenLocally(): void {
+    localStorage.removeItem(this.credentialsKey);
     this.credentials.set(null);
   }
 
@@ -265,14 +331,25 @@ export class HugoSettings implements ExpiringConnection {
     return credentialExpiresAt(this.credentials()?.connectedAt);
   }
 
+  /**
+   * Apply the local retention policy to the token.
+   *
+   * Only the token ages out either way. The repo coordinates are not a secret,
+   * and keeping them means reconnecting is one paste rather than a form — which
+   * is also why the vaulted case is a *lock*: the blog stays linked, the
+   * plaintext goes, and the next {@link token} fetches it back.
+   */
   enforceLifetime(): void {
     const current = this.credentials();
-    if (current && credentialExpired(current.connectedAt)) {
-      // Only the token ages out. The repo coordinates are not a secret, and
-      // keeping them means reconnecting is one paste rather than a form.
-      localStorage.removeItem(this.credentialsKey);
-      this.credentials.set(null);
+    if (!current) {
+      return;
     }
+    const verdict = this.bridge.verdictFor(CREDENTIALS_KEY_BASE, current.connectedAt);
+    if (verdict.kind === 'keep') {
+      return;
+    }
+    this.forgetTokenLocally();
+    this.needsFetch.set(verdict.kind === 'lock');
   }
 }
 

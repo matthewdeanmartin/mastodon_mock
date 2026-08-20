@@ -1,11 +1,11 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import {
-  credentialExpired,
   credentialExpiresAt,
   ExpiringConnection,
   ExpiringCredential,
   stampCredential,
 } from '../credential-lifetime';
+import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 import { TwitterSourceEntry, TwitterSourceId, twitterSourceEntry } from './twitter-source';
 
 /**
@@ -38,6 +38,18 @@ import { TwitterSourceEntry, TwitterSourceId, twitterSourceEntry } from './twitt
  * It lives with the config rather than the key because it is a fact about the
  * *service*, not about the user's credential: it stays true when the key is
  * rotated, and it must survive the key ageing out.
+ *
+ * ## How the vault sees this store
+ *
+ * The **whole key map** goes into the vault under one address, exactly as
+ * {@link ShortenerSettings} does, and for the same reason: the vault merges at
+ * the granularity of a registry base, so the per-source union lives here in
+ * {@link mergeKeys} rather than being faked with several addresses.
+ *
+ * The probe verdict deliberately does **not** sync. It is a fact about *this
+ * browser's* network path — a corporate proxy, an extension, a captive portal —
+ * and carrying one device's verdict to another would record a block somewhere it
+ * was never observed.
  */
 
 const CONFIG_KEY = 'mockingbird_twitter';
@@ -75,8 +87,18 @@ export interface TwitterConfig {
 
 @Injectable({ providedIn: 'root' })
 export class TwitterSettings implements ExpiringConnection {
+  private bridge = inject(VaultBridge);
   private config = signal<StoredTwitterConfig>(readConfig());
   private keys = signal<StoredKeys>(readKeys());
+
+  /**
+   * Sources whose keys the vault holds but this browser does not.
+   *
+   * Populated when local retention expired vaulted keys. Rendered as locked
+   * rather than missing — these keys cost money to re-issue, so telling someone
+   * to replace one that is still stored is worse here than the usual case.
+   */
+  readonly needsFetch = signal<TwitterSourceId[]>([]);
 
   /** The active source's catalog entry, or null when none is chosen. */
   readonly chosen = computed<TwitterSourceEntry | null>(
@@ -137,7 +159,7 @@ export class TwitterSettings implements ExpiringConnection {
     if (!entry) {
       return null;
     }
-    const key = this.keys()[entry.id]?.key ?? '';
+    const key = this.keyFor(entry.id);
     if (!key) {
       return null;
     }
@@ -181,13 +203,52 @@ export class TwitterSettings implements ExpiringConnection {
       this.clearKey(id);
       return;
     }
-    this.writeKeys({ ...this.keys(), [id]: stampCredential({ key: trimmed }) });
+    const next = { ...this.keys(), [id]: stampCredential({ key: trimmed }) };
+    this.writeKeys(next);
+    this.needsFetch.update((ids) => ids.filter((pending) => pending !== id));
+    // Not awaited: pasting a key should feel instant. Failures are observable
+    // via `syncToVault()`, which the settings page calls when the user opts in.
+    void this.bridge.writeThrough(SECRET_KEY, JSON.stringify(next));
+  }
+
+  /**
+   * One source's key, falling back to the vault on a local miss.
+   *
+   * `localStorage` first, always — this connector worked before the vault
+   * existed and must keep working with it locked, unavailable or never set up.
+   *
+   * A hit rehydrates the whole map, because the vault stores it as one value and
+   * there is no cheaper read.
+   */
+  private keyFor(id: TwitterSourceId): string {
+    const local = this.keys()[id]?.key ?? '';
+    if (local) {
+      return local;
+    }
+    const fromVault = this.bridge.readThrough(SECRET_KEY);
+    if (!fromVault) {
+      return '';
+    }
+    const remote = parseKeys(fromVault);
+    if (!remote) {
+      return '';
+    }
+    // Merge rather than replace: a key added on this device seconds ago must not
+    // be discarded by a stale remote map.
+    const merged = mergeKeys(this.keys(), remote);
+    this.writeKeys(merged);
+    this.needsFetch.set([]);
+    return merged[id]?.key ?? '';
   }
 
   clearKey(id: TwitterSourceId): void {
     const next = { ...this.keys() };
     delete next[id];
     this.writeKeys(next);
+    this.needsFetch.update((ids) => ids.filter((pending) => pending !== id));
+    // The stored copy follows the local one, or clearing a key here is undone by
+    // the next sync from another device.
+    void this.pushOrRemove(next);
     if (this.config().active === id) {
       this.deactivate();
     }
@@ -210,21 +271,71 @@ export class TwitterSettings implements ExpiringConnection {
     const keys = { ...this.keys() };
     delete keys[id];
     this.writeKeys(keys);
+    this.needsFetch.update((ids) => ids.filter((pending) => pending !== id));
+    void this.pushOrRemove(keys);
   }
 
-  /** {@link ExpiringConnection}: drop keys that outlive the policy. */
+  /**
+   * {@link ExpiringConnection}: apply the local retention policy.
+   *
+   * Expired keys leave this browser either way; what differs is what that
+   * *means*. A vaulted key is locked — the plaintext goes, the source stays
+   * configured, and the next {@link resolve} pulls it back. A non-vaulted one is
+   * gone, and an active source that just lost its only key is deactivated.
+   *
+   * The vault copy is deliberately not touched: local expiry is a statement
+   * about this browser, and the stored copy has its own clock on the server.
+   */
   enforceLifetime(): void {
     const keys = this.keys();
-    const kept = Object.fromEntries(
-      Object.entries(keys).filter(([, stored]) => !credentialExpired(stored?.connectedAt)),
-    ) as StoredKeys;
-    if (Object.keys(kept).length !== Object.keys(keys).length) {
-      this.writeKeys(kept);
-      const active = this.config().active;
-      if (active && !kept[active]) {
-        this.deactivate();
+    const kept: StoredKeys = {};
+    const locked: TwitterSourceId[] = [];
+    let expired = false;
+
+    for (const [id, stored] of Object.entries(keys) as [TwitterSourceId, StoredTwitterKey][]) {
+      const verdict = this.bridge.verdictFor(SECRET_KEY, stored?.connectedAt);
+      if (verdict.kind === 'keep') {
+        kept[id] = stored;
+        continue;
+      }
+      expired = true;
+      if (verdict.kind === 'lock') {
+        locked.push(id);
       }
     }
+
+    if (!expired) {
+      return;
+    }
+    this.writeKeys(kept);
+    this.needsFetch.set(locked);
+    const active = this.config().active;
+    // A locked source is still connected. Deactivating it would tell the user to
+    // reconnect something the next resolve() would have restored on its own.
+    if (active && !kept[active] && !locked.includes(active)) {
+      this.deactivate();
+    }
+  }
+
+  /** Push the current key map to the vault and report what happened. */
+  async syncToVault(): Promise<SyncOutcome> {
+    const keys = this.keys();
+    return Object.keys(keys).length
+      ? this.bridge.writeThrough(SECRET_KEY, JSON.stringify(keys))
+      : { kind: 'skipped' };
+  }
+
+  /**
+   * Mirror a key-map change to the vault.
+   *
+   * An emptied map removes the stored copy rather than storing an empty object,
+   * so disconnecting everything reaches the server instead of leaving a husk
+   * that still counts on the settings page.
+   */
+  private pushOrRemove(next: StoredKeys): Promise<SyncOutcome> {
+    return Object.keys(next).length
+      ? this.bridge.writeThrough(SECRET_KEY, JSON.stringify(next))
+      : this.bridge.removeThrough(SECRET_KEY);
   }
 
   /** {@link ExpiringConnection}: when the *active* key ages out. */
@@ -275,6 +386,60 @@ function readConfig(): StoredTwitterConfig {
   } catch {
     return empty;
   }
+}
+
+/**
+ * Parse a key map read back out of the vault.
+ *
+ * Same validation as {@link readKeys} — an unknown source id is dropped rather
+ * than trusted — without the localStorage backfill, since this map came from
+ * another device and is not what this browser has stored.
+ */
+function parseKeys(raw: string): StoredKeys | null {
+  try {
+    const parsed = JSON.parse(raw) as StoredKeys;
+    if (typeof parsed !== 'object' || parsed === null) {
+      return null;
+    }
+    const kept: StoredKeys = {};
+    for (const [id, stored] of Object.entries(parsed)) {
+      if (
+        twitterSourceEntry(id as TwitterSourceId) &&
+        typeof stored?.key === 'string' &&
+        stored.key
+      ) {
+        kept[id as TwitterSourceId] = stored;
+      }
+    }
+    return kept;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Union two key maps, per source.
+ *
+ * Same rules as the shortener merge, and the same reason: a union loses neither
+ * device's source, and a genuine same-source conflict takes the newer
+ * `connectedAt`. Ours wins a tie and wins an unreadable stamp, because the local
+ * copy is the one the user can see in front of them.
+ */
+function mergeKeys(mine: StoredKeys, theirs: StoredKeys): StoredKeys {
+  const merged: StoredKeys = { ...theirs, ...mine };
+  for (const id of Object.keys(merged) as TwitterSourceId[]) {
+    const ours = mine[id];
+    const remote = theirs[id];
+    if (!ours || !remote) {
+      continue;
+    }
+    const ourTime = ours.connectedAt ?? NaN;
+    const theirTime = remote.connectedAt ?? NaN;
+    if (Number.isFinite(theirTime) && !(ourTime >= theirTime)) {
+      merged[id] = remote;
+    }
+  }
+  return merged;
 }
 
 function readKeys(): StoredKeys {

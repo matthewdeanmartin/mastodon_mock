@@ -1,14 +1,14 @@
-import { Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
 import { Status } from '../../models';
 import {
-  credentialExpired,
   credentialExpiresAt,
   ensureStamped,
   ExpiringCredential,
   ExpiringConnection,
   stampCredential,
 } from '../credential-lifetime';
+import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 
 const TOKEN_KEY_BASE = 'mockingbird_raindrop_token';
 const LEGACY_CREDENTIALS_KEY_BASE = 'mockingbird_raindrop_credentials';
@@ -57,16 +57,29 @@ interface RaindropListResponse<T> {
  */
 @Injectable({ providedIn: 'root' })
 export class RaindropSession implements ExpiringConnection {
+  private bridge = inject(VaultBridge);
   private readonly tokenKey = TOKEN_KEY_BASE;
   private token = signal<StoredRaindropToken | null>(adoptScopedToken(this.tokenKey));
 
   readonly connected = signal(this.token() !== null);
+
+  /**
+   * Connected, but the token is not in this browser right now.
+   *
+   * Set when local retention expired a vaulted token. Rendered as locked rather
+   * than disconnected — see `VaultBridge.verdictFor`.
+   */
+  readonly needsFetch = signal(false);
 
   constructor() {
     // Do not retain client secrets saved by the superseded OAuth implementation,
     // under either the current or the old per-account key.
     localStorage.removeItem(LEGACY_CREDENTIALS_KEY_BASE);
     localStorage.removeItem(scopedKey(LEGACY_CREDENTIALS_KEY_BASE));
+    // Retention is applied here rather than in `readToken`, which cannot tell a
+    // vaulted token from a local-only one. Same construction-time timing as
+    // every other connector.
+    this.enforceLifetime();
   }
 
   connect(accessToken: string): void {
@@ -74,10 +87,44 @@ export class RaindropSession implements ExpiringConnection {
     if (!trimmed) {
       throw new Error('Paste the Test token from your Raindrop.io app settings.');
     }
-    const token = stampCredential({ accessToken: trimmed });
+    this.store(stampCredential({ accessToken: trimmed }));
+  }
+
+  /**
+   * The access token, falling back to the vault on a local miss.
+   *
+   * `localStorage` first, always — this connector worked before the vault
+   * existed and must keep working with it locked, unavailable or never set up.
+   */
+  accessToken(): string | null {
+    const local = this.token()?.accessToken;
+    if (local) {
+      return local;
+    }
+    const fromVault = this.bridge.readThrough(TOKEN_KEY_BASE);
+    if (fromVault) {
+      // Repopulate, so the next call is local and the retention clock restarts
+      // from this use rather than from the original connection.
+      this.store(stampCredential({ accessToken: fromVault }));
+    }
+    return fromVault;
+  }
+
+  /** Persist locally, then push to the vault. */
+  private store(token: StoredRaindropToken): void {
     localStorage.setItem(this.tokenKey, JSON.stringify(token));
     this.token.set(token);
     this.connected.set(true);
+    this.needsFetch.set(false);
+    // Not awaited: pasting a token should feel instant. Failures are observable
+    // via `syncToVault()`, which the settings page calls when the user opts in.
+    void this.bridge.writeThrough(TOKEN_KEY_BASE, token.accessToken);
+  }
+
+  /** Push the current token to the vault and report what happened. */
+  async syncToVault(): Promise<SyncOutcome> {
+    const token = this.token()?.accessToken;
+    return token ? this.bridge.writeThrough(TOKEN_KEY_BASE, token) : { kind: 'skipped' };
   }
 
   /** When this token ages out under the retention policy, or null. */
@@ -85,11 +132,23 @@ export class RaindropSession implements ExpiringConnection {
     return credentialExpiresAt(this.token()?.connectedAt);
   }
 
-  /** Drop the token if it has outlived the retention policy. */
+  /**
+   * Apply the local retention policy: lock if vaulted, disconnect otherwise.
+   *
+   * For a vaulted token this clears the plaintext and keeps the connection —
+   * the next {@link accessToken} pulls it back. See `VaultBridge.verdictFor`.
+   */
   enforceLifetime(): void {
     const token = this.token();
-    if (token && credentialExpired(token.connectedAt)) {
+    if (!token) {
+      return;
+    }
+    const verdict = this.bridge.verdictFor(TOKEN_KEY_BASE, token.connectedAt);
+    if (verdict.kind === 'disconnect') {
       this.disconnect();
+    } else if (verdict.kind === 'lock') {
+      this.forgetLocally();
+      this.needsFetch.set(true);
     }
   }
 
@@ -169,18 +228,34 @@ export class RaindropSession implements ExpiringConnection {
     );
   }
 
+  /**
+   * Disconnect here, and remove the stored copy too.
+   *
+   * The vault removal is the same reasoning as the legacy-key removal below:
+   * "Disconnect" must not be undone by the next read finding another copy.
+   */
   disconnect(): void {
+    void this.bridge.removeThrough(TOKEN_KEY_BASE);
+    this.forgetLocally();
+    this.connected.set(false);
+    this.needsFetch.set(false);
+  }
+
+  /** Clear every local copy. The vault copy, if any, survives. */
+  private forgetLocally(): void {
     localStorage.removeItem(this.tokenKey);
-    // Also clear the pre-unscoping copy, so "Disconnect" cannot be undone by a
-    // reload that finds the old key and adopts it again.
+    // Also clear the pre-unscoping copy, so a reload cannot find the old key and
+    // adopt it again.
     localStorage.removeItem(scopedKey(TOKEN_KEY_BASE));
     localStorage.removeItem(LEGACY_CREDENTIALS_KEY_BASE);
     this.token.set(null);
-    this.connected.set(false);
   }
 
   private async request(url: string, init: RequestInit, fallback: string): Promise<Response> {
-    const accessToken = this.token()?.accessToken;
+    // Through `accessToken()` rather than the signal, so a request made while
+    // the local copy is locked pulls the vault copy back instead of telling the
+    // user to connect something that is already connected.
+    const accessToken = this.accessToken();
     if (!accessToken) {
       throw new Error('Connect Raindrop.io in Settings → Connections first.');
     }
@@ -255,10 +330,11 @@ function readToken(key: string): StoredRaindropToken | null {
       accessToken: parsed.accessToken,
       connectedAt: parsed.connectedAt,
     });
-    if (credentialExpired(stored.connectedAt)) {
-      localStorage.removeItem(key);
-      return null;
-    }
+    // Expiry is *not* decided here any more. This function has no injector and
+    // so cannot ask whether the token is vaulted, and dropping it unconditionally
+    // would delete the plaintext of a vaulted token while reporting it as never
+    // connected — the resurrection bug from the other direction. `enforceLifetime`
+    // owns the decision, and it can tell lock from disconnect.
     return stored;
   } catch {
     localStorage.removeItem(key);

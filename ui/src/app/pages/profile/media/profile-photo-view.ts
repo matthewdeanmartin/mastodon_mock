@@ -11,6 +11,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Api } from '../../../api';
+import { Terminology } from '../../../terminology';
 import { Auth } from '../../../auth';
 import { FocusTrap } from '../../../a11y/focus-trap';
 import { Compose } from '../../../compose/compose';
@@ -57,6 +58,7 @@ export class ProfilePhotoView {
   private capabilities = inject(AnonymousCapabilities);
   private router = inject(Router);
   protected auth = inject(Auth);
+  protected words = inject(Terminology).words;
 
   /** Every image on the wall, so the viewer can page within it. */
   readonly items = input.required<ProfileMediaItem[]>();

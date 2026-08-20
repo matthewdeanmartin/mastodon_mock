@@ -78,12 +78,6 @@ export const VAULTED_KEYS: readonly VaultedKey[] = [
     note: 'Belongs to whoever pays for the API credits. Read-only, but a quota is money.',
   },
   {
-    base: 'mockingbird_raindrop_credentials',
-    scope: 'account',
-    connector: 'raindrop',
-    note: 'The OAuth-linked form of the same connector, which is per-persona where the pasted token is not.',
-  },
-  {
     base: 'mockingbird_mataroa_connection',
     scope: 'account',
     connector: 'mataroa',
@@ -129,6 +123,11 @@ export const NOT_VAULTED: readonly { base: string; reason: string }[] = [
   {
     base: 'mockingbird_bsky_credentials',
     reason: 'A Bluesky app password is re-issued in under a minute. Identity, not a purchase.',
+  },
+  {
+    base: 'mockingbird_raindrop_credentials',
+    reason:
+      'A dead key from the superseded Raindrop OAuth flow. `RaindropSession` deletes it on every construction and nothing writes it, so vaulting it would sync a credential the app is actively trying to forget — and would resurrect it on every device on the next read. The live Raindrop credential is mockingbird_raindrop_token.',
   },
   {
     base: 'mockingbird_bsky_identity_credentials',

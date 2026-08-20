@@ -722,8 +722,9 @@
             @if (suggestMoreAfterExclusion()) {
               <div class="thin-results">
                 <p class="muted small">
-                  Only {{ shownCount() }} {{ shownCount() === 1 ? 'post' : 'posts' }} left after
-                  excluding. The excluded
+                  Only {{ shownCount() }}
+                  {{ shownCount() === 1 ? words().post : words().posts }} left after excluding. The
+                  excluded
                   {{ excludedAuthors().size === 1 ? 'account' : 'accounts' }}
                   made up most of what was loaded — fetching more will find posts from other people.
                 </p>

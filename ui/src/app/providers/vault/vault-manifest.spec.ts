@@ -97,8 +97,12 @@ describe('the manifest is pinned to the registry', () => {
     }
   });
 
-  it('vaults the ten credentials the roadmap names', () => {
-    expect(VAULTED_KEYS).toHaveLength(10);
+  it('vaults the nine live credentials', () => {
+    // The roadmap named ten. `mockingbird_raindrop_credentials` was moved to
+    // NOT_VAULTED when wiring the connector showed that nothing writes it —
+    // `RaindropSession` only ever deletes it. Vaulting a key the app is trying
+    // to forget would resurrect it on every device on the next read.
+    expect(VAULTED_KEYS).toHaveLength(9);
     expect(isVaulted('mockingbird_openrouter_key')).toBe(true);
     expect(vaultedKey('mockingbird_openrouter_key')?.scope).toBe('browser');
     expect(vaultedKey('mockingbird_mataroa_connection')?.scope).toBe('account');

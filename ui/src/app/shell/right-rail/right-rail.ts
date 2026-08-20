@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Terminology } from '../../terminology';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { FeedCapability } from '../../feed-capability';
@@ -28,6 +29,7 @@ import { networkSources } from '../network-sources';
 export class RightRail implements OnInit {
   private api = inject(Api);
   protected auth = inject(Auth);
+  protected words = inject(Terminology).words;
   /** Template-facing: the rail hides trend rows this server doesn't serve. */
   protected feedCaps = inject(FeedCapability);
   private server = inject(Server);

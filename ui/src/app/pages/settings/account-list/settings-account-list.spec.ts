@@ -429,8 +429,13 @@ describe('SettingsAccountList domains tab', () => {
 
   it('never asks the account endpoints while on domains', () => {
     start();
-    // httpMock.verify() in afterEach fails on any unexpected /mutes or /blocks call.
-    expect(true).toBe(true);
+    // Asserted here rather than left to `httpMock.verify()` in afterEach. That
+    // verify does catch the regression, but only as "unexpected request" from a
+    // hook — which names neither this test nor the endpoints it is about. This
+    // states the claim where it can be read.
+    expect(httpMock.match((r) => r.url === '/api/v1/mutes' || r.url === '/api/v1/blocks')).toEqual(
+      [],
+    );
   });
 
   it('blocks a domain as form data and reloads the list', () => {
