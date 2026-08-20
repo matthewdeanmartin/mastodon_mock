@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import {
   appCallbackUrl,
   codeChallengeFor,
@@ -7,13 +7,13 @@ import {
   statesMatch,
 } from '../../pkce';
 import {
-  credentialExpired,
   credentialExpiresAt,
   ensureStamped,
   ExpiringConnection,
   ExpiringCredential,
   stampCredential,
 } from '../credential-lifetime';
+import { VaultBridge } from '../vault/vault-bridge';
 
 /**
  * A browser-only OpenRouter OAuth/PKCE session.
@@ -60,17 +60,46 @@ interface ExchangeResponse {
 
 @Injectable({ providedIn: 'root' })
 export class OpenRouterSession implements ExpiringConnection {
+  private bridge = inject(VaultBridge);
   private stored = signal<StoredOpenRouterKey | null>(readKey());
 
   readonly connected = signal(this.stored() !== null);
+
+  /**
+   * Connected, but the key is not in this browser right now.
+   *
+   * Reached when local retention expired a vaulted credential: the plaintext is
+   * gone and the encrypted copy is not. The connections page renders this as
+   * locked rather than disconnected, because telling someone to reconnect
+   * something that is still connected is how they end up pasting a key they did
+   * not need to.
+   */
+  readonly needsFetch = signal(false);
 
   constructor() {
     this.enforceLifetime();
   }
 
-  /** The API key for callers that need it, or null when not connected. */
+  /**
+   * The API key for callers that need it, or null when not connected.
+   *
+   * `localStorage` first; the vault only answers a miss. That ordering is what
+   * keeps this connector working with the vault locked, unavailable, or never
+   * set up — which it must, because it worked before the vault existed.
+   */
   apiKey(): string | null {
-    return this.stored()?.key ?? null;
+    const local = this.stored()?.key;
+    if (local) {
+      return local;
+    }
+    const fromVault = this.bridge.readThrough(KEY_KEY);
+    if (fromVault) {
+      // Repopulate, so the next call is local again and the retention clock
+      // restarts from this use rather than from the original connection.
+      this.store(stampCredential({ key: fromVault }));
+      this.needsFetch.set(false);
+    }
+    return fromVault;
   }
 
   /** Begin authorization. Navigates away; the callback page finishes the job. */
@@ -140,22 +169,50 @@ export class OpenRouterSession implements ExpiringConnection {
     }
   }
 
+  /**
+   * Disconnect, and remove the stored copy too.
+   *
+   * Deliberate disconnection has to reach the vault, or "disconnect" here is
+   * undone by the next sync from another device — the same resurrection problem
+   * local expiry had, and just as confusing.
+   */
   disconnect(): void {
+    void this.bridge.removeThrough(KEY_KEY);
+    this.forgetLocally();
+    this.connected.set(false);
+    this.needsFetch.set(false);
+  }
+
+  /**
+   * {@link ExpiringConnection}: apply the local retention policy.
+   *
+   * For a vaulted key this is a **lock**, not a disconnection: the plaintext
+   * goes, the connection stays, and the next `apiKey()` fetches it back. See
+   * `VaultBridge.verdictFor`.
+   */
+  enforceLifetime(): void {
+    const stored = this.stored();
+    if (!stored) {
+      return;
+    }
+    const verdict = this.bridge.verdictFor(KEY_KEY, stored.connectedAt);
+    if (verdict.kind === 'disconnect') {
+      this.disconnect();
+    } else if (verdict.kind === 'lock') {
+      this.forgetLocally();
+      // Still connected. The credential exists; it is simply not here.
+      this.needsFetch.set(true);
+    }
+  }
+
+  /** Clear the local plaintext without touching the vault or the connected flag. */
+  private forgetLocally(): void {
     try {
       localStorage.removeItem(KEY_KEY);
     } catch {
       // Nothing to do — the in-memory clear below still takes effect.
     }
     this.stored.set(null);
-    this.connected.set(false);
-  }
-
-  /** {@link ExpiringConnection}: drop the key when it outlives the policy. */
-  enforceLifetime(): void {
-    const stored = this.stored();
-    if (stored && credentialExpired(stored.connectedAt)) {
-      this.disconnect();
-    }
   }
 
   /** {@link ExpiringConnection}: when the key ages out, or null. */
@@ -163,6 +220,14 @@ export class OpenRouterSession implements ExpiringConnection {
     return credentialExpiresAt(this.stored()?.connectedAt);
   }
 
+  /**
+   * Persist a key locally, then push it to the vault.
+   *
+   * The vault write is not awaited: pasting a key should feel instant. It is
+   * still returned by {@link syncToVault} for the settings page to observe,
+   * because a silently swallowed failure is the bug where someone believes their
+   * key synced and finds nothing on their phone a week later.
+   */
   private store(value: StoredOpenRouterKey): void {
     try {
       localStorage.setItem(KEY_KEY, JSON.stringify(value));
@@ -171,6 +236,19 @@ export class OpenRouterSession implements ExpiringConnection {
     }
     this.stored.set(value);
     this.connected.set(true);
+    this.needsFetch.set(false);
+    void this.bridge.writeThrough(KEY_KEY, value.key);
+  }
+
+  /**
+   * Push the current key to the vault and report what happened.
+   *
+   * For the settings page, which offers "store this key with Mawkingbird" as an
+   * explicit per-connector act rather than a global switch.
+   */
+  async syncToVault(): Promise<import('../vault/vault-bridge').SyncOutcome> {
+    const key = this.stored()?.key;
+    return key ? this.bridge.writeThrough(KEY_KEY, key) : { kind: 'skipped' };
   }
 
   private clearPendingAuthorization(): void {

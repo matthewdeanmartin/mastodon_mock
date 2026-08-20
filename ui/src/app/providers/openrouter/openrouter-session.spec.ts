@@ -211,13 +211,24 @@ describe('OpenRouterSession', () => {
     expect(localStorage.getItem(KEY_KEY)).toBeNull();
   });
 
-  it('drops a key that has outlived the retention policy', () => {
+  it('locks rather than disconnects a key that outlived the retention policy', () => {
+    // Changed when the connection vault shipped, and the change is the point.
+    //
+    // The OpenRouter key is vaulted, so local expiry no longer means "there is
+    // no copy left" — it means "the plaintext is not in this browser". Reporting
+    // that as *disconnected* would tell the user to reconnect something that is
+    // still connected, and the next vault read would contradict them by bringing
+    // it straight back.
+    //
+    // So: plaintext gone, connection kept, `needsFetch` set. The local exposure
+    // window still shrinks, which was the original point of the policy.
     const longAgo = Date.now() - 400 * 24 * 60 * 60 * 1000;
     localStorage.setItem(KEY_KEY, JSON.stringify({ key: 'sk-or-v1-old', connectedAt: longAgo }));
 
-    // Construction enforces the policy, so the session starts disconnected.
-    expect(session().connected()).toBe(false);
+    const svc = session();
     expect(localStorage.getItem(KEY_KEY)).toBeNull();
+    expect(svc.connected()).toBe(true);
+    expect(svc.needsFetch()).toBe(true);
   });
 
   it('ignores a malformed stored key rather than throwing on boot', () => {

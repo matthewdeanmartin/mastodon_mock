@@ -781,6 +781,18 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'OpenRouter API key from the PKCE flow. Can spend the user’s OpenRouter credits. Shared by every account in this browser.',
   },
   {
+    // Not a credential, and deliberately coarse: the platform word from the user
+    // agent and nothing else. It exists so a vault conflict can say "your
+    // OpenRouter key was updated from Windows" rather than "from another
+    // device". Anything more precise would be a fingerprint, and would be no
+    // more useful in the one sentence it appears in.
+    base: 'mockingbird_vault_device',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'setting',
+    note: 'A coarse label for this browser, shown when a stored-connection conflict is resolved. Not a fingerprint and not derived from one.',
+  },
+  {
     base: 'mockingbird_openrouter_model',
     storage: 'local',
     suffix: 'none',

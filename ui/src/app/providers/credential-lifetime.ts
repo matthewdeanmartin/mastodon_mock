@@ -17,6 +17,12 @@ import { scopedKey } from '../account-scope';
  * client-side can — but it bounds the window in which there is one to read, and
  * it makes "I connected GitHub once in 2024" stop being true by default.
  *
+ * **"There is no server here" is no longer true.** The connection vault holds an
+ * encrypted copy of several of these credentials, which changes what expiry
+ * means for them without changing when it fires — see {@link expiryAction}. The
+ * paragraph above still describes every credential the vault does not cover, and
+ * still describes the local half of the ones it does.
+ *
  * Dropbox is deliberately not governed by this: it uses a real OAuth flow with
  * short-lived online tokens in sessionStorage, which already expire on their
  * own and never outlive the tab.
@@ -98,6 +104,53 @@ export function credentialExpired(
 ): boolean {
   const expiresAt = credentialExpiresAt(connectedAt, lifetime);
   return expiresAt !== null && now >= expiresAt;
+}
+
+/**
+ * What this policy actually means once a connection vault exists.
+ *
+ * The premise at the top of this file — *"There is no server here to hold
+ * those"* — stopped being true when the vault shipped. That changes what expiry
+ * should **do**, without changing when it happens.
+ *
+ * | | Not vaulted | Vaulted |
+ * |---|---|---|
+ * | What expiry removes | The only copy | The local plaintext |
+ * | What the user sees | Disconnected | Still connected, fetched on next use |
+ * | What they must do | Re-paste the credential | Nothing |
+ *
+ * Getting this wrong is not subtle from the user's side. If a vaulted
+ * credential is *disconnected* on local expiry, the connector says
+ * "disconnected" while the encrypted copy is still on the server — and the next
+ * vault read brings it straight back. The user watches a connection they were
+ * told was dropped return from the dead, and nothing they do makes it stick.
+ *
+ * So for a vaulted credential this is a **lock**, not a disconnection: clear the
+ * plaintext, keep the connection. That is strictly better than the old
+ * behaviour, because the window in which a live credential sits in
+ * `localStorage` shrinks and the user re-pastes nothing.
+ *
+ * The two clocks are now separate features and are named accordingly in the UI:
+ *
+ * - This one — *"Forget on this device after…"*
+ * - `mawkingbird_profile`'s retention policy — *"Delete my stored copy after…"*
+ */
+export type ExpiryAction =
+  /** Drop the credential. There is no other copy. */
+  | 'disconnect'
+  /** Clear the local plaintext; the vault still holds it. */
+  | 'lock';
+
+/**
+ * Whether an expired credential should be dropped or merely forgotten locally.
+ *
+ * `vaulted` is passed in rather than looked up, so this module stays free of any
+ * dependency on the vault. The direction matters: sessions already depend on
+ * these pure functions and must stay constructible outside an injection context,
+ * which their unit tests rely on.
+ */
+export function expiryAction(vaulted: boolean): ExpiryAction {
+  return vaulted ? 'lock' : 'disconnect';
 }
 
 /**

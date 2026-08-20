@@ -1,7 +1,8 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
+import { ProfileAccountKey } from '../account/profile-account-key';
+import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 import {
-  credentialExpired,
   credentialExpiresAt,
   ensureStamped,
   ExpiringConnection,
@@ -37,8 +38,18 @@ function load(key: string): MataroaConnection | null {
 /** One Mataroa blog linked to the current Mawkingbird account. */
 @Injectable({ providedIn: 'root' })
 export class MataroaSettings implements ExpiringConnection {
+  private bridge = inject(VaultBridge);
+  private accountKey = inject(ProfileAccountKey);
   private readonly storageKey = scopedKey(STORAGE_KEY_BASE);
   private readonly connection = signal<MataroaConnection | null>(load(this.storageKey));
+
+  /**
+   * Connected, but the credential is not in this browser right now.
+   *
+   * Set when local retention expired a vaulted connection. Rendered as locked
+   * rather than disconnected — see `VaultBridge.verdictFor`.
+   */
+  readonly needsFetch = signal(false);
 
   readonly connected = computed(() => this.connection() !== null);
   readonly blogUrl = computed(() => this.connection()?.blogUrl ?? null);
@@ -60,10 +71,39 @@ export class MataroaSettings implements ExpiringConnection {
     });
     localStorage.setItem(this.storageKey, JSON.stringify(next));
     this.connection.set(next);
+    this.needsFetch.set(false);
+    // The whole record, not just the key: the blog URL is part of what makes the
+    // credential usable, and re-pasting a key without it would still leave the
+    // connector unconfigured on the second device.
+    void this.bridge.writeThrough(
+      STORAGE_KEY_BASE,
+      JSON.stringify(next),
+      this.accountKey.current(),
+    );
   }
 
+  /**
+   * The connection, falling back to the vault on a local miss.
+   *
+   * `localStorage` first, always — this connector worked before the vault
+   * existed and must keep working with it locked or absent.
+   */
   resolve(): MataroaConnection | null {
-    return this.connection();
+    const local = this.connection();
+    if (local) {
+      return local;
+    }
+    const fromVault = this.bridge.readThrough(STORAGE_KEY_BASE, this.accountKey.current());
+    if (!fromVault) {
+      return null;
+    }
+    const parsed = parseConnection(fromVault);
+    if (parsed) {
+      localStorage.setItem(this.storageKey, JSON.stringify(parsed));
+      this.connection.set(parsed);
+      this.needsFetch.set(false);
+    }
+    return parsed;
   }
 
   setIncludeInProfile(include: boolean): void {
@@ -76,20 +116,62 @@ export class MataroaSettings implements ExpiringConnection {
     this.connection.set(next);
   }
 
+  /** Disconnect here and remove the stored copy, so it cannot come back. */
   disconnect(): void {
+    void this.bridge.removeThrough(STORAGE_KEY_BASE, this.accountKey.current());
+    this.forgetLocally();
+    this.needsFetch.set(false);
+  }
+
+  /** Clear the local plaintext only. The vault copy, if any, survives. */
+  private forgetLocally(): void {
     localStorage.removeItem(this.storageKey);
     this.connection.set(null);
+  }
+
+  /** Push the current connection to the vault and report what happened. */
+  async syncToVault(): Promise<SyncOutcome> {
+    const current = this.connection();
+    return current
+      ? this.bridge.writeThrough(
+          STORAGE_KEY_BASE,
+          JSON.stringify(current),
+          this.accountKey.current(),
+        )
+      : { kind: 'skipped' };
   }
 
   expiresAt(): number | null {
     return credentialExpiresAt(this.connection()?.connectedAt);
   }
 
+  /**
+   * Apply the local retention policy: lock if vaulted, disconnect otherwise.
+   */
   enforceLifetime(): void {
     const current = this.connection();
-    if (current && credentialExpired(current.connectedAt)) {
-      this.disconnect();
+    if (!current) {
+      return;
     }
+    const verdict = this.bridge.verdictFor(STORAGE_KEY_BASE, current.connectedAt);
+    if (verdict.kind === 'disconnect') {
+      this.disconnect();
+    } else if (verdict.kind === 'lock') {
+      this.forgetLocally();
+      this.needsFetch.set(true);
+    }
+  }
+}
+
+/** Parse a connection read back out of the vault. */
+function parseConnection(raw: string): MataroaConnection | null {
+  try {
+    const parsed = JSON.parse(raw) as MataroaConnection;
+    return typeof parsed?.apiKey === 'string' && typeof parsed?.blogUrl === 'string'
+      ? parsed
+      : null;
+  } catch {
+    return null;
   }
 }
 

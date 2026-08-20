@@ -1,6 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import {
-  credentialExpired,
   credentialExpiresAt,
   ensureStamped,
   ExpiringConnection,
@@ -14,6 +13,7 @@ import {
   corsProxyEntry,
 } from './cors-proxy-catalog';
 import { FeatureFlagId, FeatureFlags, proxyFeatureFlag } from '../../feature-flags';
+import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 import { SupporterStatus } from '../account/supporter-status';
 
 /**
@@ -89,7 +89,17 @@ export class CorsProxySettings implements ExpiringConnection {
   // "not a supporter", which resolves to the free tier — the safe default.
   private plus = inject(SupporterStatus, { optional: true });
   private config = signal<StoredCorsProxyConfig | null>(readConfig());
+  private bridge = inject(VaultBridge);
   private secret = signal<StoredCorsProxyKey | null>(readSecret());
+
+  /**
+   * Connected, but the key is not in this browser right now.
+   *
+   * Set when local retention expired a vaulted key. The connections page renders
+   * this as locked rather than disconnected — telling someone to reconnect
+   * something still connected is how they paste a key they did not need to.
+   */
+  readonly needsFetch = signal(false);
 
   /** Whether a proxy id is switched on, tolerating a missing flag service. */
   private proxyFlagEnabled = (flagId: string): boolean =>
@@ -312,19 +322,68 @@ export class CorsProxySettings implements ExpiringConnection {
       // Storage full or blocked: honour the key for this session anyway.
     }
     this.secret.set(value);
+    this.needsFetch.set(false);
+    // Not awaited: pasting a key should feel instant. Failures are observable
+    // via `syncToVault()`, which the settings page calls when the user opts in.
+    void this.bridge.writeThrough(SECRET_KEY, trimmed);
   }
 
+  /**
+   * The proxy key, falling back to the vault on a local miss.
+   *
+   * `localStorage` first, always. The proxy has to keep working with the vault
+   * locked, unavailable or never set up — it predates the vault and several
+   * other connectors depend on it.
+   */
+  apiKey(): string | null {
+    const local = this.secret()?.key;
+    if (local) {
+      return local;
+    }
+    const fromVault = this.bridge.readThrough(SECRET_KEY);
+    if (fromVault) {
+      this.setKey(fromVault);
+    }
+    return fromVault;
+  }
+
+  /** Forget the key here and remove the stored copy. */
   clearKey(): void {
+    void this.bridge.removeThrough(SECRET_KEY);
+    this.forgetKeyLocally();
+    this.needsFetch.set(false);
+  }
+
+  /** Clear the local plaintext only. The vault copy, if any, survives. */
+  private forgetKeyLocally(): void {
     remove(SECRET_KEY);
     this.secret.set(null);
   }
 
-  /** {@link ExpiringConnection}: drop the key when it outlives the policy. */
+  /**
+   * {@link ExpiringConnection}: apply the local retention policy.
+   *
+   * A **lock** for a vaulted key: the plaintext goes, the connection stays, and
+   * the next `apiKey()` fetches it back. See `VaultBridge.verdictFor`.
+   */
   enforceLifetime(): void {
     const stored = this.secret();
-    if (stored && credentialExpired(stored.connectedAt)) {
-      this.clearKey();
+    if (!stored) {
+      return;
     }
+    const verdict = this.bridge.verdictFor(SECRET_KEY, stored.connectedAt);
+    if (verdict.kind === 'disconnect') {
+      this.clearKey();
+    } else if (verdict.kind === 'lock') {
+      this.forgetKeyLocally();
+      this.needsFetch.set(true);
+    }
+  }
+
+  /** Push the current key to the vault and report what happened. */
+  async syncToVault(): Promise<SyncOutcome> {
+    const key = this.secret()?.key;
+    return key ? this.bridge.writeThrough(SECRET_KEY, key) : { kind: 'skipped' };
   }
 
   /** {@link ExpiringConnection}: when the key ages out, or null. */
