@@ -305,6 +305,18 @@
           </div>
         }
       }
+
+      <!-- The link preview the server already sent us and this app has ignored
+           since the Mastodon shapes were written. Shown only when there is no
+           media: an image attachment and a card image side by side is two
+           pictures competing for the same glance, and the author's own upload
+           wins that. Behind the images pref like every other picture here. -->
+      @if (!cwCollapsed() && !display.media_attachments.length && display.card; as card) {
+        <div class="status-card-preview" (click)="$event.stopPropagation()">
+          <app-preview-card [card]="card" [showImage]="imagesVisible()" />
+        </div>
+      }
+
       <div class="actions">
         @if (canReply) {
           <button

@@ -1854,3 +1854,76 @@ describe('StatusCard — AI translation', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.ai-translation')).toBeNull();
   });
 });
+
+/**
+ * The link preview the server has always sent and this app ignored.
+ *
+ * `Status.card` has been in `models.ts` since the Mastodon shapes were written
+ * and nothing rendered it until article expansion needed a card component.
+ */
+describe('StatusCard — link preview', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+  });
+
+  function setUpCard(status: Status): ComponentFixture<StatusCard> {
+    const fixture = TestBed.createComponent(StatusCard);
+    fixture.componentRef.setInput('status', status);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const card = {
+    url: 'https://blog.example/post',
+    title: 'A Linked Article',
+    description: 'What it is about.',
+    type: 'link' as const,
+    provider_name: 'Example Blog',
+    image: 'https://blog.example/cover.jpg',
+  };
+
+  it('renders a card the server supplied', () => {
+    const fixture = setUpCard(makeStatus({ card }));
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-preview-card')).not.toBeNull();
+    expect(el.textContent).toContain('A Linked Article');
+    expect(el.textContent).toContain('Example Blog');
+  });
+
+  it('renders nothing when there is no card', () => {
+    const fixture = setUpCard(makeStatus());
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-preview-card')).toBeNull();
+  });
+
+  it('yields to the author’s own media', () => {
+    // Two pictures competing for the same glance, and the upload wins.
+    const fixture = setUpCard(
+      makeStatus({
+        card,
+        media_attachments: [
+          {
+            id: 'm1',
+            type: 'image',
+            url: 'https://example.com/a.png',
+            preview_url: 'https://example.com/a.png',
+            description: null,
+          },
+        ] as Status['media_attachments'],
+      }),
+    );
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-preview-card')).toBeNull();
+  });
+
+  it('drops the card image when images are off but keeps the text', () => {
+    const fixture = setUpCard(makeStatus({ card }));
+    TestBed.inject(ClientPrefs).setShowImages(false);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.preview-card-image')).toBeNull();
+    expect(el.textContent).toContain('A Linked Article');
+  });
+});

@@ -99,6 +99,79 @@
           </div>
         </header>
       }
+      <!-- Article expansion. The post that links out stays above, because it is
+           the reader's context for why they are reading this at all — someone's
+           "here is my new piece" is part of the article, not noise before it.
+           The expanded document then follows and can be very long. -->
+      @if (canExpand()) {
+        <section class="reader-expand">
+          @if (expansion(); as result) {
+            @if (expansionNote(); as note) {
+              <p class="reader-expand-note" role="status">{{ note }}</p>
+            }
+            <!-- The fallback ladder, and it must never end in nothing: a card
+                 when metadata survived, a plain labelled link when it did not,
+                 and a way to try again either way. A message with no way
+                 forward is the dead end this feature promised to avoid. -->
+            @if (!result.article) {
+              @if (result.card) {
+                <app-preview-card [card]="result.card" />
+              } @else {
+                <a
+                  class="btn btn-outline btn-sm"
+                  [href]="result.finalUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  ↗ Open {{ expandedHost() }}
+                </a>
+              }
+              <!-- Disabled at zero quota rather than silently doing nothing:
+                   the failure spent nothing, but a retry is still a fetch. -->
+              <button
+                class="btn btn-outline btn-sm"
+                [disabled]="expanding() || !quota.allowed()"
+                (click)="expandArticle(true)"
+              >
+                Try again
+              </button>
+            }
+          } @else {
+            <button
+              class="btn btn-outline btn-sm"
+              [disabled]="expanding() || !quota.allowed()"
+              (click)="expandArticle()"
+            >
+              @if (expanding()) {
+                Fetching article…
+              } @else {
+                📄 Fetch article
+              }
+            </button>
+            <!-- Fetching a third-party page takes seconds. Without this a
+                 screen-reader user hears nothing between pressing the button
+                 and the article arriving, which reads as "nothing happened". -->
+            <span class="sr-only" role="status">
+              @if (expanding()) {
+                Fetching article, please wait.
+              }
+            </span>
+            <!-- Said plainly and without a countdown badge. The limit exists so
+                 someone can find out whether this works before paying for it,
+                 not to nag; the number is only worth showing once it is nearly
+                 spent. -->
+            @if (!quota.allowed()) {
+              <span class="muted reader-expand-quota">
+                That's both of today's free articles. Mawkingbird Plus lifts the limit — or come
+                back tomorrow.
+              </span>
+            } @else if (!quota.unlimited() && quota.remaining() === 1) {
+              <span class="muted reader-expand-quota">One free article left today</span>
+            }
+          }
+        </section>
+      }
+
       @for (post of chain(); track post.id) {
         <section class="reader-post" [innerHTML]="post.content"></section>
         @for (m of post.media_attachments; track m.id) {
@@ -186,6 +259,55 @@
             </div>
           }
         }
+      }
+
+      <!-- The expanded article itself, below the post that linked to it. Can be
+           very long, which is the point — this is the reading surface. -->
+      @if (expansion()?.article; as article) {
+        <section
+          #expandedArticle
+          class="reader-article"
+          [attr.aria-label]="'Expanded article: ' + article.title"
+          tabindex="-1"
+        >
+          <h2 class="reader-article-title">{{ article.title }}</h2>
+          <!-- Attribution, not decoration: the reader is looking at someone
+               else's writing reformatted by us, and should be able to see whose
+               and from where without hunting for the link. -->
+          <p class="muted reader-article-meta">
+            @if (article.byline) {
+              {{ article.byline }} ·
+            }
+            Expanded from {{ expandedHost() }}
+            @if (article.metrics.wordCount) {
+              · {{ article.metrics.wordCount }} words
+            }
+          </p>
+          <!-- Safe by construction rather than by trust: this HTML came from a
+               markdown renderer whose vocabulary has no script, no event
+               handler, and no attribute beyond a scheme-checked href/src. -->
+          <div class="reader-article-body" [innerHTML]="expandedHtml()"></div>
+          <div class="reader-article-actions">
+            <button class="btn btn-outline btn-sm" (click)="collapseArticle()">
+              Collapse article
+            </button>
+            <button
+              class="btn btn-outline btn-sm"
+              [disabled]="expanding() || !quota.allowed()"
+              (click)="expandArticle(true)"
+            >
+              Re-fetch
+            </button>
+            <a
+              class="btn btn-outline btn-sm"
+              [href]="expansion()!.finalUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ↗ Read on the original site
+            </a>
+          </div>
+        </section>
       }
 
       @if (comments().length) {

@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { NgOptimizedImage } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { AccountHoverCard } from '../account-hover-card/account-hover-card';
+import { PreviewCardComponent } from '../preview-card/preview-card';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
 import { Api } from '../api';
 import { Auth } from '../auth';
@@ -182,6 +183,7 @@ function compactContentLinks(content: string, embeddedPostUrl: string | null): s
     LocalCompose,
     ShareDialog,
     BookmarkProviderDialog,
+    PreviewCardComponent,
   ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',

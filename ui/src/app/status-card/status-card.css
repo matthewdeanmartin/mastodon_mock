@@ -746,3 +746,9 @@ a.open-original {
   font-size: 13px;
   cursor: pointer;
 }
+
+/* The server-supplied link preview. Indented to match the media block so a
+   card and an image gallery occupy the same column. */
+.status-card-preview {
+  margin: 10px 0 0;
+}

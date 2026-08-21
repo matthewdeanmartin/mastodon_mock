@@ -1,4 +1,13 @@
-import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  DestroyRef,
+  ElementRef,
+  inject,
+  OnInit,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
@@ -32,10 +41,24 @@ import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { isElizaId } from '../../eliza/eliza-identity';
 import { messageStatus, parseMessageStatusRouteRef } from '../../providers/paste/message-payload';
+import { ArticleFetch } from '../../providers/article/article-fetch';
+import { ArticleQuota } from '../../providers/article/article-quota';
+import { articleTarget } from '../../providers/article/article-target';
+import { ArticleDiagnosis, ArticleResult } from '../../providers/article/article-models';
+import { renderMarkdown } from '../../providers/article/markdown-render';
+import { PreviewCardComponent } from '../../preview-card/preview-card';
 
 @Component({
   selector: 'app-thread',
-  imports: [StatusCard, Compose, BskyReply, HumanTimePipe, RouterLink, LocalCompose],
+  imports: [
+    StatusCard,
+    Compose,
+    BskyReply,
+    HumanTimePipe,
+    RouterLink,
+    LocalCompose,
+    PreviewCardComponent,
+  ],
   templateUrl: './thread.html',
   styleUrl: './thread.css',
 })
@@ -106,6 +129,143 @@ export class Thread implements OnInit {
 
   /** The author chain reader mode renders (root post + same-author self-replies). */
   protected chain = computed<Status[]>(() => readerChain(this.thread()));
+
+  // ---- Article expansion -------------------------------------------------
+  //
+  // Reader mode can pull the linked article in and render it below the post, so
+  // a "here is my new blog post" link becomes something readable without
+  // leaving for a page of newsletter popups. Deliberately per-thread and
+  // manual: nobody wants their whole feed expanded, and each expansion is a
+  // fetch of a third-party page.
+
+  private articles = inject(ArticleFetch);
+  protected quota = inject(ArticleQuota);
+
+  /** The URL reader mode would expand, when the post names exactly one. */
+  protected articleUrl = computed(() => {
+    const root = this.chain()[0];
+    return root ? articleTarget(root) : null;
+  });
+
+  /** True while a fetch is in flight. */
+  protected expanding = signal(false);
+
+  /** The expanded-article region, so focus can be moved to it when it appears. */
+  private expandedArticleRef = viewChild<ElementRef<HTMLElement>>('expandedArticle');
+
+  /** The last expansion attempt's result, or null before the first. */
+  protected expansion = signal<ArticleResult | null>(null);
+
+  /** The host an expanded article came from, for the attribution line. */
+  protected expandedHost = computed(() => {
+    const result = this.expansion();
+    if (!result) {
+      return '';
+    }
+    try {
+      return new URL(result.finalUrl).hostname.replace(/^www\./, '');
+    } catch {
+      return result.finalUrl;
+    }
+  });
+
+  /** The expanded article as HTML, ready for `[innerHTML]`. */
+  protected expandedHtml = computed(() => {
+    const article = this.expansion()?.article;
+    return article ? renderMarkdown(article.markdown) : null;
+  });
+
+  /** Whether the button should be offered at all. */
+  protected canExpand = computed(() => this.articleUrl() !== null && this.articles.available());
+
+  /**
+   * What to say about a result that is not a clean article.
+   *
+   * Every diagnosis gets its own sentence. A generic "couldn't load" would be
+   * the one thing this feature promised not to ship: these pages fail for
+   * specific, nameable reasons, and "this publisher requires a subscription"
+   * is a different fact from "this page needs JavaScript".
+   */
+  protected expansionNote = computed<string | null>(() => {
+    const result = this.expansion();
+    if (!result) {
+      return null;
+    }
+    // Each of these names the actual cause and points somewhere. "Open it on
+    // the original site" is not filler: the link is right there, and for most
+    // of these it is genuinely the answer.
+    const notes: Record<ArticleDiagnosis, string | null> = {
+      ok: null,
+      partial: 'This may be only part of the article — open the original if it stops short.',
+      paywall: 'This publisher asks for a subscription, so only the opening is readable here.',
+      'bot-check': 'This site refuses automated requests. Opening it directly should work.',
+      'consent-wall': 'This site served a cookie notice instead of the article.',
+      'needs-js': 'This page builds itself with JavaScript, so there is nothing to read yet.',
+      junk: "Couldn't find an article on this page — it may be a homepage or an index.",
+      'not-html': 'This link is a file rather than a web page.',
+      'too-large': 'This page is too big to expand. Open it on the original site.',
+      'rate-limited': 'Too many requests just now. Try again in a minute.',
+      'redirect-loop': 'This link redirects in a loop and never arrives anywhere.',
+      network: "Couldn't reach this page. It may be down, or offline right now.",
+    };
+    return notes[result.diagnosis];
+  });
+
+  /**
+   * Fetch and render the linked article.
+   *
+   * Quota is spent here rather than in `ArticleFetch`, because only this point
+   * knows whether an article was actually rendered. A cache hit, a failure, and
+   * a page the quality gate rejected all cost nothing.
+   */
+  async expandArticle(force = false): Promise<void> {
+    const url = this.articleUrl();
+    if (!url || this.expanding()) {
+      return;
+    }
+    if (!this.quota.allowed()) {
+      return;
+    }
+    this.expanding.set(true);
+    try {
+      if (force) {
+        await this.articles.forget(url);
+      }
+      const result = await this.articles.expand(url, force);
+      this.expansion.set(result);
+      // Only a rendered article counts against the daily limit.
+      if (result.article) {
+        this.quota.consume();
+        this.focusExpandedArticle();
+      }
+    } finally {
+      this.expanding.set(false);
+    }
+  }
+
+  /**
+   * Move focus to the article that just appeared.
+   *
+   * Without this, a keyboard or screen-reader user presses "Fetch article",
+   * hears nothing, and is still on a button while several pages of new content
+   * have been inserted below them. The region is `tabindex="-1"` so it can take
+   * focus programmatically without joining the tab order, and its
+   * `aria-label` is what gets announced on arrival.
+   *
+   * `afterNextRender` is not used because the element does not exist until the
+   * signal write above has been flushed to the DOM; a microtask is the smallest
+   * thing that reliably lands after it.
+   */
+  private focusExpandedArticle(): void {
+    queueMicrotask(() => {
+      this.expandedArticleRef()?.nativeElement.focus({ preventScroll: false });
+    });
+  }
+
+  /** Put the article away, keeping it cached for a second look. */
+  collapseArticle(): void {
+    this.expansion.set(null);
+  }
 
   /**
    * Whether the focused post can be written to at all.

@@ -1,8 +1,45 @@
 # Reader 1 — Article expansion (readability)
 
-Status: **plan only, no code written**
+Status: **1a–1e implemented** (2026-08-21). Remaining: a fixture corpus built
+from real saved pages, and the measured pass-rate table that depends on it.
 Owner: matthewdeanmartin
 Written: 2026-08-20
+
+## Sprint 1e outcome (2026-08-21)
+
+Copy, a11y, attribution, and the `Status.card` win. Two things found while
+doing it that were not polish:
+
+- **The fallback ladder had a hole.** A failure where metadata *also* failed
+  rendered a diagnosis message and nothing else — no card, no link, no retry.
+  That is precisely the dead end this document said it would never ship, and it
+  survived 1d because the tests covered "card present" and "article present"
+  but not "neither". The ladder now terminates in a labelled link.
+- **Three buttons silently did nothing at zero quota.** "Try again" and
+  "Re-fetch" both call `expandArticle`, whose quota guard returns early, so at
+  zero remaining they were live buttons that did nothing when pressed. Now
+  disabled, matching the guard. A silent no-op reads as a bug in the app rather
+  than as a limit being enforced.
+
+`Status.card` now renders through the shared `preview-card/` component, but
+only when a post has no media of its own — a card image and an author's upload
+side by side are two pictures competing for one glance, and the upload wins.
+The mock server already serializes `card` (`serializers/statuses.py`), so this
+renders against real data rather than being speculative.
+
+## Calibration record (2026-08-21)
+
+Two thresholds were wrong on first contact with the test corpus, both in the
+*false junk* direction the plan warned about — rejecting real articles:
+
+| Threshold | Was | Now | Why |
+|---|---|---|---|
+| `THIN_WORDS` (`article-quality.ts`) | 400 | 200 | A 300-word post is an ordinary complete blog entry. Flagging it "may be only part of the article" would put a false caveat on a large share of the personal blogs this feature exists to read. |
+| Tier 1 empty-page floor (`article-diagnosis.ts`) | 200 | 60 | The real bug. It counts the **whole document** while the quality gate counts the **extracted body**, so at 200 it sat *above* `MIN_WORDS` and shadowed the gate entirely: a genuine 180-word post was rejected before the extractor ever ran, reported as `junk` with no metrics to explain why. Any document-level floor must stay well below the gate's body-level floor. |
+
+The second is the more instructive failure. It was not a mis-tuned number but a
+category error — two thresholds measuring different things, where one silently
+pre-empted the other. Worth remembering when adding any further pre-checks.
 
 ## The feature in one sentence
 
@@ -29,7 +66,7 @@ cookie-banner, sticky-header version of the same words.
 
 | Question | Decision |
 |---|---|
-| Where does extraction run? | **Pure client-side.** Reuse the existing `feeds` route to get the bytes; Readability-style extraction and HTML→markdown happen in the browser. No Worker change in v1. |
+| Where does extraction run? | **Pure client-side.** Reuse the existing `feeds` route to get the bytes; Readability-style extraction and HTML→markdown happen in the browser. The Worker gains redirect-following but never parses HTML. |
 | Paid gate | **Free 2 articles/day** (client-side day counter), Plus effectively unlimited (Worker rate limit only). |
 | Hostile-page UX | **Show what we got, plus an honest diagnosis banner** naming the specific failure (paywall / bot check / JS-only / too short), and the fallback link. Below a quality floor, show a **preview card** instead of a bad article. |
 | Caching | **Reuse the IndexedDB store** next to `RssCache`, with its own object store and TTL. |
@@ -45,10 +82,13 @@ Three reasons, and the third is the one that decides it:
 2. The `feeds` route already permits `text/html`, caps at 2 MB, rate-limits at
    60/min and edge-caches for 5 minutes. That is exactly the policy an article
    fetch wants, already deployed, already reviewed.
-3. Shipping without a Worker deploy means the whole feature can be turned off
-   with a feature flag and iterated on daily. Given the honest expectation that
-   **a large fraction of pages will fail**, the ability to iterate fast on the
-   extractor is worth more than the elegance of doing it once server-side.
+3. Keeping extraction in the client means the part that will need constant
+   tuning ships with the app, behind a feature flag, iterable daily. The Worker
+   change this sprint does need (redirect-following) is a one-time ~20-line
+   addition to existing machinery, not an ongoing dependency. Given the honest
+   expectation that **a large fraction of pages will fail**, the ability to
+   iterate fast on the extractor is worth more than the elegance of doing it
+   once server-side.
 
 Server-side markdown conversion for paid users stays a live option and is
 explicitly *not* foreclosed: the client boundary below (`ArticleSource`) is
@@ -92,56 +132,56 @@ A silent "couldn't load" is the one thing we will not ship.
 
 ## Redirects: followed, with per-hop validation
 
-The proxy currently sets no `redirect` option, so a `301` comes back to the
-caller as a `301`. That has to change, and it is the one Worker change this
-sprint needs.
+**Correction (2026-08-21): this was already implemented.** An earlier draft of
+this document claimed the Worker refused redirects. It does not — `handler.ts`
+resolves them itself in a `redirect: 'manual'` loop with `MAX_REDIRECTS`,
+re-running `parseDestination` and `routeAllowsHost` on every hop, resolving
+relative `Location` values, and applying browsers' 303/POST method-rewrite
+rules. The comment there records the same reasoning this section reached
+independently, including that a blanket refusal "was too strict to be usable".
 
-**Why refusing redirects is not viable.** Shorteners are ubiquitous — `bit.ly`,
-`t.co`, `lnkd.in`, `buff.ly` — and are exactly how a long blog post reaches a
-reader in the first place. Beyond shorteners, ordinary URLs redirect constantly:
-`http`→`https`, apex→`www`, trailing-slash normalization, CMS permalink
-migrations. A reader feature that fails on all of those fails on most real
-input.
+The only real gap is that the client is never told **where the chain ended**,
+which this feature needs — see below. Everything else in this section is a
+description of code that already exists.
 
-**The fix is `redirect: 'manual'` in a loop**, revalidating each hop:
+**Why refusing redirects would not be viable.** Shorteners are ubiquitous —
+`bit.ly`, `t.co`, `lnkd.in`, `buff.ly` — and are exactly how a long blog post
+reaches a reader in the first place. Beyond shorteners, ordinary URLs redirect
+constantly: `http`→`https`, apex→`www`, trailing-slash normalization, CMS
+permalink migrations. A reader feature that failed on all of those would fail on
+most real input.
 
-```js
-let url = target, hops = 0;
-while (hops++ < MAX_HOPS) {
-  const res = await fetch(url, { redirect: 'manual', headers: safeHeaders });
-  if (!isRedirect(res.status)) return { res, finalUrl: url };
-  const next = new URL(res.headers.get('location'), url);  // may be relative
-  assertDestinationAllowed(next, route);   // the same check hop zero got
-  url = next;
-}
-```
+### The one change needed: `finalUrl`
 
-This is strictly better than both alternatives. `redirect: 'follow'` hides the
-intermediate hops so the destination rules only ever see hop zero; refusing
-redirects outright breaks the common case. `manual` gives us every hop and
-re-runs the existing validation on each.
+Relative links and `<img src>` in an extracted article must resolve against the
+URL the content **actually came from**, not the one we asked for. Resolving
+against the requested URL breaks every image on every redirected blog, which is
+a large share of them.
 
-Details that matter:
+`buildDownstreamHeaders` already has the mechanism — `exposeResponseHeaders`,
+which `webmention-discover` uses for `Link`. But the final URL is not an
+upstream header; it is a fact the handler knows and nothing records. So:
 
-- **`MAX_HOPS` of 3–5.** A redirect loop is otherwise a free way to burn the
-  Worker's subrequest budget.
-- **Relative `Location`.** `new URL(location, url)` — a bare `/new-path` is
-  legal and common.
-- **The content-type gate stays on the final response only.** A 302's
-  `Content-Type` describes the little "moved here" body, not the destination,
-  so there is nothing useful to check mid-chain. The gate already runs before
-  any body is read, which is where it should be: a chain ending at a 2 MB mp3
-  is rejected for the cost of headers.
-- **`finalUrl` must reach the client.** Non-negotiable for this feature:
-  relative links and `<img src>` in the extracted article resolve against the
-  URL the content actually came from. Getting this wrong breaks every image on
-  every redirected blog. Return it in a response header and add it to the
-  route's `exposeResponseHeaders`, the way `webmention-discover` already
-  exposes `Link`.
+- Handler sets `X-Proxy-Final-Url` on the downstream response when the chain
+  moved (i.e. `hops > 0`).
+- The header is added to the `feeds` route's `exposeResponseHeaders` so the
+  browser will actually let the page read it. **Without this the client cannot
+  see the header at all**, regardless of the Worker setting it — that is the
+  CORS rule this field exists for.
+- Absent header means "no redirect happened", so the client falls back to the
+  requested URL. Backward compatible: existing callers ignore it.
+
+### Notes on what is already there
+
+- **`MAX_REDIRECTS`** is set to 3, with a comment explaining the choice.
+- **The content-type gate runs on the final response only**, which is correct.
+  A 302's `Content-Type` describes its little "moved here" body, not the
+  destination, so there is nothing useful to check mid-chain. A chain ending at
+  a 2 MB mp3 is rejected for the cost of headers.
 - **Cache key.** The `feeds` route caches 5 minutes keyed on the request URL,
   i.e. on hop zero. A shortener whose target changes within the window serves
-  the old target. Accepted deliberately — the window is short and the
-  alternative is not caching shortened URLs at all.
+  the old target. Accepted — the window is short and the alternative is not
+  caching shortened URLs at all.
 
 ### On SSRF, briefly
 
@@ -195,19 +235,29 @@ thread.html  "Expand article" button (reader mode only, when a target URL exists
    │
    ▼
 ArticleExpansion (component-facing facade, signals)
+   ├─ ArticleDiagnosis    ── Tier 0: URL shape + known-hostile host  (no fetch)
    ├─ ArticleQuota        ── free: 2/day localStorage counter; Plus: bypass
    ├─ ArticleCache        ── IndexedDB store, TTL, keyed by normalized URL
    └─ ArticleFetch
-        ├─ CorsProxy.proxyRequest(route='feeds', url)   [existing, unchanged]
-        └─ ArticleExtract  ── DOMParser → candidate scoring → sanitize
-             └─ HtmlToMarkdown ── sanitized DOM → markdown string
+        ├─ CorsProxy.proxyRequest(route='feeds', url) → { html, finalUrl }
+        ├─ ArticleDiagnosis  ── Tier 1: raw-HTML markers (bot/consent/paywall)
+        ├─ ArticleMetadata   ── OG / Twitter / JSON-LD → PreviewCard  [always]
+        └─ ArticleExtract    ── DOMParser → scoring → sanitize
+             ├─ HtmlToMarkdown  ── sanitized DOM → markdown string
+             └─ ArticleQuality  ── Tier 2 metrics → good | thin | junk
    │
    ▼
-ExtractedArticle { url, title, byline, siteName, markdown, wordCount,
-                   images[], quality, diagnosis, fetchedAt }
+ArticleResult {
+  card: PreviewCard,          // always present when metadata survived
+  article?: {                 // absent when quality === 'junk'
+    title, byline, siteName, markdown, wordCount, images[], quality
+  },
+  finalUrl, diagnosis, fetchedAt
+}
    │
    ▼
-reader renders it in the existing <article class="reader"> chrome
+good | thin → reader renders it in the existing <article class="reader"> chrome
+junk | fail → <app-preview-card> + diagnosis banner + fallback link
 ```
 
 ### New files (proposed)
@@ -218,16 +268,19 @@ is laid out (fetch / parser / adapter / cache, each with a spec):
 | File | Responsibility |
 |---|---|
 | `article-fetch.ts` | Orchestrates cache → quota → proxy → extract. The only thing the UI talks to for "get me this article". |
-| `article-extract.ts` | Pure function: `(html: string, baseUrl: string) => ExtractedArticle`. No Angular, no HTTP, no DOM globals beyond `DOMParser`. |
+| `article-extract.ts` | Pure function: `(html: string, finalUrl: string) => ExtractedArticle`. No Angular, no HTTP, no DOM globals beyond `DOMParser`. |
 | `article-scoring.ts` | The Readability-style candidate scoring, split out because it is the part that will be tuned repeatedly. |
-| `article-diagnosis.ts` | Pure function: `(html, extracted) => ArticleDiagnosis`. Paywall/botwall/JS-only/too-short detection. |
+| `article-metadata.ts` | OpenGraph / Twitter-card / JSON-LD → `PreviewCard`. Runs unconditionally on every fetch, independent of body extraction. |
+| `article-quality.ts` | The Tier 2 metrics and the `good`/`thin`/`junk` verdict. |
+| `article-diagnosis.ts` | Tier 0 and Tier 1 checks: known-hostile hosts, URL shape, challenge/consent/paywall markers. |
 | `html-to-markdown.ts` | Sanitized DOM → markdown. |
-| `article-cache.ts` | IndexedDB store + TTL, modeled on `rss-cache.ts`. |
+| `article-cache.ts` | IndexedDB store + TTL, modeled on `rss-cache.ts`. Also holds the per-host success record Tier 0 reads. |
 | `article-quota.ts` | The 2/day counter and the Plus bypass. |
-| `article-models.ts` | `ExtractedArticle`, `ArticleDiagnosis`, `ArticleQuality`, the failure enum. |
+| `article-models.ts` | `ExtractedArticle`, `ArticleDiagnosis`, `ArticleQuality`, the metrics interface. |
 
-Plus a `article-panel/` component under `pages/thread/` if the reader markup
-grows enough to want its own file — decide during implementation, not now.
+Plus a shared `preview-card/` component under `src/app/` (not under
+`pages/thread/`) — it renders the existing `PreviewCard` model, and its second
+consumer is Mastodon statuses whose `card` field the app currently ignores.
 
 ### Why no npm dependency
 
@@ -268,8 +321,10 @@ Deliberately small, in this order:
 4. **Score** otherwise: per-block-element score from text length, comma count,
    paragraph count, penalized by link density and junk classes, with parent
    score inheritance. Take the top scorer plus its siblings above a threshold.
-5. **Resolve URLs** — every `href` and `src` made absolute against the fetched
-   URL, so a relative link in the extracted body still works from our origin.
+5. **Resolve URLs** — every `href` and `src` made absolute against **`finalUrl`**
+   (the end of the redirect chain), not the URL we asked for. Resolving against
+   the requested URL breaks every relative link and image on any redirected
+   blog, which is most of them.
 6. **Sanitize** through the *existing* `sanitizeFeedHtml` in
    `providers/rss/rss-adapter.ts` if its tag allowlist is close enough, or a
    sibling function sharing its allowlist constants. This is the security
@@ -329,32 +384,171 @@ ArticleQuota
 - Gate the whole feature behind a new feature flag (`reader-article`, following
   the existing `feature-flags.ts` id convention) so it can be dark-shipped.
 
+## Catching the degenerate case
+
+The single most important quality decision in this feature: **knowing when not
+to render an article.** A confidently-rendered page of navigation links, cookie
+copy and "Subscribe to continue" is worse than no feature at all, because it
+teaches the user the button lies. The system needs a floor below which it stops
+trying and hands back a link or a card instead.
+
+There are three places to catch it, cheapest first.
+
+### Tier 0 — before fetching (free, no quota spent)
+
+Decide from the URL alone that expansion is pointless. Costs nothing, spends no
+quota, and can hide the button entirely rather than offering a failure.
+
+- **Known-hostile hosts.** A small, honestly-labelled list of sites that reliably
+  refuse: major news paywalls, `x.com`/`twitter.com`, `medium.com` behind its
+  meter, LinkedIn, Facebook. Recorded as *measured*, the way
+  `cors-proxy-catalog.ts` records which proxies were tested and failed — with
+  the date and the observed behaviour, not folklore.
+- **Non-article URL shapes.** A bare host with no path (`https://example.com/`)
+  is usually a homepage, not an article. File extensions we cannot read:
+  `.pdf`, `.zip`, `.mp3`, `.mp4`, `.jpg`.
+- **Known-good hosts** get the inverse treatment: a site previously extracted
+  successfully (recorded per-host in the cache) can show a more confident
+  button.
+
+Tier 0 is a *hint*, never a hard block — the button becomes "Try to expand"
+rather than disappearing, because a wrong entry in a static list should cost
+the user a click, not the feature.
+
+### Tier 1 — on the raw HTML, before extraction
+
+Cheap string and DOM checks on the fetched bytes.
+
+- **Body text length.** Under ~200 words of total text in the whole document:
+  nothing to extract regardless of how good the extractor is.
+- **Framework shell.** `<div id="root">` / `<div id="__next">` / `<div id="app">`
+  as effectively the only body content, plus near-zero text → `needs-js`.
+- **Challenge markers.** "Verify you are human", "Checking your browser",
+  `cf-browser-verification`, "Enable JavaScript and cookies to continue",
+  Turnstile/hCaptcha/reCAPTCHA script hosts → `bot-check`.
+- **Consent-wall markers.** The whole document is a consent dialog: body text
+  dominated by "we and our partners use cookies", "legitimate interest",
+  vendor-list boilerplate → `consent-wall`.
+- **Paywall markers.** `paywall`, `piano-`, `tp-modal`, `subscriber-only`,
+  `<meta name="article:content_tier" content="locked">`, JSON-LD
+  `isAccessibleForFree: false` → `paywall`. That last one is the good signal —
+  it is a machine-readable declaration by the publisher.
+
+### Tier 2 — on the extracted result (the real quality gate)
+
+The one that catches everything the first two miss. Compute a small set of
+metrics on the extraction and gate on them:
+
+| Metric | Meaning | Reject when |
+|---|---|---|
+| `wordCount` | words in extracted body | `< 150` |
+| `linkDensity` | linked words ÷ total words | `> 0.35` |
+| `textToMarkupRatio` | text chars ÷ HTML chars of the chosen subtree | very low |
+| `paragraphCount` | `<p>` with ≥ 25 words | `< 2` |
+| `topCandidateScore` | winning score from `article-scoring.ts` | below floor |
+| `titleInBody` | does the `<h1>`/OG title appear in the extraction | absent is a warning |
+| `boilerplateRatio` | share of text matching nav/footer/legal phrases | high |
+
+These collapse into one `ArticleQuality`:
+
+```ts
+type ArticleQuality = 'good' | 'thin' | 'junk';
+```
+
+- **`good`** — render the article.
+- **`thin`** — render it, with the "this may be only part of the article"
+  banner. Genuinely useful: a lede plus two paragraphs beats a link.
+- **`junk`** — do not render an article at all. Fall through to the card.
+
+`linkDensity` is the highest-value single metric — it is what distinguishes a
+nav-and-footer soup from prose, and it is what catches the homepage-instead-of-
+article case that Tier 0 missed.
+
+**Calibrating this is what the fixture corpus is for.** The thresholds above are
+starting guesses; the corpus turns them into measured values, and the measured
+pass/reject rates get written back into this document.
+
+### The fallback ladder
+
+Never a dead end. In order of preference, take the best available:
+
+1. **Full article** (`good`).
+2. **Partial article + banner** (`thin`).
+3. **Preview card** — title, description, lead image, site name, host. Built
+   from OpenGraph/Twitter-card/JSON-LD metadata, which is present on a large
+   share of pages *including* ones that refuse extraction. A paywalled news
+   article almost always has a perfectly good `og:title`, `og:description` and
+   `og:image` — the publisher wants it to look good when shared. So the
+   degenerate case usually still produces something worth looking at.
+4. **The RSS item's own summary**, when we came from a feed. Often the
+   publisher's own excerpt, and better than nothing.
+5. **A plain labelled hyperlink**, with the diagnosis.
+
+### The card is a real payoff, not a consolation prize
+
+Two things make this cheap and worth doing:
+
+- `PreviewCard` **already exists** in `src/app/models.ts` (`url`, `title`,
+  `description`, `image`, `provider_name`, …) and `Status.card` already
+  references it — but nothing in the app renders it today. So this sprint gets
+  to define that rendering, and a `<app-preview-card>` component immediately
+  has a second consumer: Mastodon statuses that carry a `card` and currently
+  drop it on the floor.
+- Metadata extraction is a **fraction of the work** of article extraction and
+  succeeds far more often. It should therefore be its own module
+  (`article-metadata.ts`), run *unconditionally* on every fetch, and be
+  independent of whether body extraction succeeds. Card-on-failure then costs
+  nothing extra.
+
+Worth being explicit about the resulting design: **metadata extraction is the
+thing that always works, and article extraction is the bonus on top.** That
+inversion is what makes the failure path acceptable — and it means the honest
+version of the feature is "expand this link", not "read this article".
+
+### Interaction with quota
+
+Restating, because it is what makes the degenerate case tolerable:
+
+- Tier 0 rejections spend **no** quota and involve no fetch.
+- A fetch that yields `junk` spends **no** quota — the user got a card, not an
+  article, and charging for that is how a paid feature earns a refund request.
+- Only a `good` or `thin` render consumes one of the two free daily articles.
+- Cache hits never consume quota.
+
 ## Failure taxonomy and UX
 
 ```ts
 type ArticleDiagnosis =
   | 'ok'
   | 'partial'          // extracted, but short or high link-density
-  | 'paywall'          // paywall markers, or truncation markers
+  | 'paywall'          // paywall markers, or isAccessibleForFree: false
   | 'bot-check'        // challenge markers, or 403
+  | 'consent-wall'     // document is a cookie/consent dialog
   | 'needs-js'         // near-empty body + framework root node
-  | 'redirected'       // proxy returned 3xx (it does not follow)
+  | 'junk'             // extracted something, quality gate rejected it
   | 'not-html'         // proxy refused the content type
   | 'too-large'        // over the route cap
   | 'rate-limited'     // 429 from the proxy
-  | 'network'          // everything else
+  | 'redirect-loop'    // exceeded MAX_HOPS
+  | 'network';         // everything else
 ```
+
+Note `redirected` is **gone** — a followed redirect is a success with a
+`finalUrl`, not an outcome. `redirect-loop` replaces it for the pathological
+case only.
 
 Rendering rules:
 
-- `ok` → article body, no banner beyond a small "Expanded from `<host>`" line
-  and the fallback link.
+- `ok` → article body, a small "Expanded from `<host>`" line, and the fallback
+  link.
 - `partial` → body **plus** a banner: "This looks like only part of the
   article." + fallback link.
-- `paywall` / `bot-check` / `needs-js` → whatever text was recovered (often the
-  lede, which is genuinely useful) + a banner naming the specific cause +
-  fallback link, styled as information rather than error.
-- everything else → no body, banner with the cause, fallback link.
+- `paywall` / `bot-check` / `consent-wall` / `needs-js` / `junk` → **the
+  preview card**, a banner naming the specific cause, and the fallback link.
+  Styled as information, not error — the user asked for something reasonable
+  and got the best available answer.
+- everything else → card if metadata survived, else a labelled link, with the
+  cause.
 
 This matches how `feed-doctor.ts` and the connector doctor pages already report
 failures in this codebase: name the actual cause, do not generalize to
@@ -399,42 +593,70 @@ In `thread.html`, inside the existing reader bar / reader article:
 
 - **Fixture corpus.** ~20 saved HTML files under `ui/src/app/providers/article/
   fixtures/`, covering: a Hugo blog, a Jekyll blog, WordPress, Substack, Ghost,
-  a news site with a paywall, a Cloudflare challenge page, a JS-only SPA shell,
-  a page with three `<article>` elements, a page with none. Each asserts
-  extracted title + expected diagnosis + a word-count range. This corpus **is**
-  the spec for the extractor, and the honest measurement record — pass rates go
-  in this file the way the proxy catalog records its per-service measurements.
+  a news site with a paywall, a Cloudflare challenge page, a cookie-consent
+  wall, a JS-only SPA shell, a site homepage (the classic `junk` case), a page
+  with three `<article>` elements, a page with none. Each asserts extracted
+  title + expected `ArticleQuality` + expected diagnosis + a word-count range.
+
+  This corpus **is** the spec for the extractor and the calibration set for the
+  Tier 2 thresholds. It is also the honest measurement record — the resulting
+  rates go back into this file the way `cors-proxy-catalog.ts` records its
+  per-service measurements, negative results included.
+- **Both error directions get counted**, and they are not symmetric:
+  *false junk* (a good article rejected) costs the user a feature that would
+  have worked; *false good* (junk rendered as an article) costs the user trust
+  in the button. Tune toward the first. Track both rates explicitly.
+- Metadata specs: a page with OG tags, with Twitter-card tags only, with JSON-LD
+  only, with none — the card must degrade cleanly to host + title + link.
 - Unit specs per module, matching the repo's one-spec-per-file convention.
 - Security specs: `<script>` in extracted body never survives sanitize; a
-  `javascript:` href is dropped; relative URLs resolve; a data-URI image is
-  handled per the existing feed rules.
-- Quota specs: cache hit does not consume; failure does not consume; day
-  rollover resets; Plus bypasses.
+  `javascript:` and a `data:` href are dropped at render; relative URLs resolve
+  against `finalUrl`, not the requested URL; a data-URI image is handled per the
+  existing feed rules.
+- Worker specs: a 2-hop chain succeeds and reports `finalUrl`; a relative
+  `Location` resolves; exceeding `MAX_HOPS` yields `redirect-loop`; a redirect
+  to a disallowed scheme or port is refused at that hop.
+- Quota specs: cache hit does not consume; `junk` does not consume; failure does
+  not consume; day rollover resets; Plus bypasses.
 - `make check` in `ui/` must pass. Note the memory record that this repo has
   **pre-existing `make check` failures** — establish the baseline before
   starting so new failures are distinguishable from inherited ones.
 
 ## Sprint breakdown
 
-**Reader 1a — extraction core (no UI).**
-`article-models.ts`, `article-extract.ts`, `article-scoring.ts`,
-`html-to-markdown.ts`, `article-diagnosis.ts`, the fixture corpus, specs.
-Deliverable: a pure function and a measured pass rate. Nothing user-visible.
-This is the sprint that decides whether the feature is viable at all — if the
-pass rate on plain blogs is poor, stop here and reconsider the dependency.
+**Reader 1a — Worker: follow redirects.**
+`redirect: 'manual'` loop with `MAX_HOPS`, per-hop `assertDestinationAllowed`,
+relative-`Location` resolution, `finalUrl` response header added to the `feeds`
+route's `exposeResponseHeaders`. Specs in `test/handler.spec.ts`. Deploys
+independently and breaks nothing — the client ignores the new header until 1c.
+First because everything downstream needs `finalUrl`.
 
-**Reader 1b — transport, cache, quota.**
+**Reader 1b — extraction core (no UI).**
+`article-models.ts`, `article-metadata.ts`, `article-extract.ts`,
+`article-scoring.ts`, `article-quality.ts`, `article-diagnosis.ts`,
+`html-to-markdown.ts`, the fixture corpus, specs. Deliverable: pure functions
+and a **measured** table of pass / thin / junk rates per site type.
+
+This is the go/no-go. Build `article-metadata.ts` **first** — it is small, it
+succeeds on most pages, and it is what makes every failure path acceptable. If
+body extraction then lands poorly on plain blogs, stop and reconsider
+`@mozilla/readability` before any UI exists.
+
+**Reader 1c — transport, cache, quota.**
 `article-fetch.ts`, `article-cache.ts`, `article-quota.ts`, storage-registry
-entries, feature flag. Deliverable: `expand(url)` works from a console.
+entries, feature flag, reading `finalUrl` from the Worker. Deliverable:
+`expand(url)` works from a console and returns article-or-card.
 
-**Reader 1c — reader UI.**
-The button, the states, the banners, the collapse/re-fetch, images pref,
-a11y (the expanded region is a landmark, focus moves to it, it is announced).
+**Reader 1d — UI.**
+The shared `preview-card/` component, the expand button and its states, the
+diagnosis banners, collapse/re-fetch, images pref, a11y (the expanded region is
+a landmark, focus moves to it, the state change is announced).
 
-**Reader 1d — polish and honesty pass.**
-Copy review on every diagnosis message, the Plus upsell wording, the
-"Expanded from `<host>`" attribution line, and a docs page recording the
-measured pass rate per site type.
+**Reader 1e — polish and honesty pass.**
+Copy review on every diagnosis message, the Plus upsell wording, the "Expanded
+from `<host>`" attribution, and writing the measured pass rates back into this
+document. Optionally: render `Status.card` for Mastodon statuses, now that a
+card component exists.
 
 ## Explicitly out of scope
 
@@ -443,7 +665,8 @@ measured pass rate per site type.
   answer is the fallback link. This is a product boundary, not just a technical
   one.
 - Multi-page article stitching ("read next page").
-- Server-side extraction.
+- Server-side extraction. (Redirect-following in the Worker is *in* scope — but
+  it relays bytes, it does not parse them.)
 - A dedicated `article` proxy route.
 - Archive.org / archive.today fallbacks. Tempting and cheap; deferred because
   it changes who the user's request goes to, and this app's whole posture is
