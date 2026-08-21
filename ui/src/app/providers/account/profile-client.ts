@@ -59,9 +59,22 @@ export interface SettingsDocument {
 }
 
 /** What `GET /manifest` reports. */
+export interface ProfileCollectionSummary {
+  revision: number;
+  count: number;
+}
+
+/** One persona beneath the global Mawkingbird Plus identity. */
+export interface ProfileAccountSummary {
+  accountKey: string;
+  collections: Record<string, ProfileCollectionSummary>;
+}
+
 export interface ProfileManifest {
   readOnly: boolean;
   settings?: { etag: string; revision: number; updatedAt: string; size: number };
+  /** Present only on the opt-in, user-triggered diagnostics request. */
+  accounts?: ProfileAccountSummary[];
   quota: { used: number; limit: number };
   conflicts: number;
 }
@@ -114,8 +127,11 @@ export class ProfileClient {
   private remoteStorage = inject(RemoteStorageUsage);
 
   /** What the account has stored, and whether writes are allowed. */
-  async manifest(): Promise<ProfileResult<ProfileManifest>> {
-    const result = await this.request<ProfileManifest>('/manifest', { method: 'GET' });
+  async manifest(
+    options: { includeAccounts?: boolean } = {},
+  ): Promise<ProfileResult<ProfileManifest>> {
+    const path = options.includeAccounts ? '/manifest?accounts=all' : '/manifest';
+    const result = await this.request<ProfileManifest>(path, { method: 'GET' });
     // Bank the quota on the way past. It is the service's own accounting —
     // a KV counter it keeps per user — so it is the only honest source for
     // "how much am I storing remotely", and it arrives free on a request the

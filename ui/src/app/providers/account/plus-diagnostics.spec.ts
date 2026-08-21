@@ -14,6 +14,7 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CollectionAdoptionRunner } from './collection-adoption-runner';
 import { PlusDiagnostics } from './plus-diagnostics';
+import { ProfileAccountKey } from './profile-account-key';
 import { ProfileClient } from './profile-client';
 import { ProfileFeeds } from './profile-feeds';
 import { ProfileLists } from './profile-lists';
@@ -32,6 +33,7 @@ function build(
     lists?: ReturnType<typeof remoteDouble>;
     localCounts?: Record<string, number>;
     dirty?: boolean;
+    activeAccount?: string | null;
   } = {},
 ) {
   const inspect = vi.fn();
@@ -61,6 +63,10 @@ function build(
       { provide: ProfileTrust, useValue: options.trust ?? remoteDouble(3) },
       { provide: ProfileFeeds, useValue: options.feeds ?? remoteDouble(2) },
       { provide: ProfileLists, useValue: options.lists ?? remoteDouble(1) },
+      {
+        provide: ProfileAccountKey,
+        useValue: { current: () => options.activeAccount ?? 'mastodon:example.social/alice' },
+      },
       {
         provide: ProfileSync,
         useValue: {
@@ -100,6 +106,59 @@ describe('what it reports', () => {
     expect(rows).toHaveLength(3);
     expect(rows.find((row) => row.collection === 'trust')).toMatchObject({ local: 5, remote: 3 });
     expect(rows.find((row) => row.collection === 'feeds')).toMatchObject({ local: 2, remote: 2 });
+  });
+
+  it('asks for the account-wide inventory only in user-triggered diagnostics', async () => {
+    const { diagnostics, client } = build();
+    await diagnostics.load();
+    expect(client.manifest).toHaveBeenCalledWith({ includeAccounts: true });
+  });
+
+  it('shows every stored Mastodon persona beneath one Plus identity', async () => {
+    const { diagnostics } = build({
+      activeAccount: 'mastodon:example.social/alt',
+      manifest: {
+        kind: 'ok',
+        value: {
+          readOnly: false,
+          quota: { used: 2048, limit: 1_000_000 },
+          conflicts: 0,
+          accounts: [
+            {
+              accountKey: 'mastodon:example.social/alice',
+              collections: {
+                trust: { revision: 2, count: 1 },
+                feeds: { revision: 3, count: 2 },
+                lists: { revision: 1, count: 1 },
+              },
+            },
+          ],
+        },
+      },
+    });
+    await diagnostics.load();
+
+    expect(diagnostics.accountRows()).toEqual([
+      {
+        accountKey: 'mastodon:example.social/alt',
+        label: '@alt@example.social',
+        active: true,
+        stored: false,
+        trust: 0,
+        feeds: 0,
+        lists: 0,
+      },
+      {
+        accountKey: 'mastodon:example.social/alice',
+        label: '@alice@example.social',
+        active: false,
+        stored: true,
+        trust: 1,
+        feeds: 2,
+        lists: 1,
+      },
+    ]);
+    expect(diagnostics.storedAccountCount()).toBe(1);
   });
 
   it('reports an unreadable collection as unknown, not as zero', async () => {

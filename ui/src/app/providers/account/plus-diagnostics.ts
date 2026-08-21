@@ -32,6 +32,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { exportPortableConfig, portableKeys } from '../../portable-config';
 import { CollectionAdoptionRunner, type AdoptableCollection } from './collection-adoption-runner';
 import { ProfileClient, type ProfileManifest } from './profile-client';
+import { ProfileAccountKey } from './profile-account-key';
 import { ProfileFeeds } from './profile-feeds';
 import { ProfileLists } from './profile-lists';
 import { ProfileSync } from './profile-sync';
@@ -69,6 +70,18 @@ export interface SettingsRow {
   dirty: boolean;
 }
 
+/** One social persona stored beneath the global Plus identity. */
+export interface AccountCollectionRow {
+  accountKey: string;
+  label: string;
+  active: boolean;
+  /** False when the active persona has not written any collection index yet. */
+  stored: boolean;
+  trust: number;
+  feeds: number;
+  lists: number;
+}
+
 export type LoadState = 'idle' | 'loading' | 'ready' | 'failed';
 
 const COLLECTION_LABELS: Record<AdoptableCollection, string> = {
@@ -85,6 +98,7 @@ export class PlusDiagnostics {
   private profileTrust = inject(ProfileTrust);
   private profileFeeds = inject(ProfileFeeds);
   private profileLists = inject(ProfileLists);
+  private accountKey = inject(ProfileAccountKey);
   /**
    * Console logging, the same as everywhere else in this module.
    *
@@ -100,6 +114,7 @@ export class PlusDiagnostics {
 
   private manifest = signal<ProfileManifest | null>(null);
   private collections = signal<CollectionRow[]>([]);
+  private activeAccount = signal<string | null>(null);
 
   /** The settings document, local against remote. */
   readonly settings = computed<SettingsRow>(() => {
@@ -119,6 +134,43 @@ export class PlusDiagnostics {
   });
 
   readonly collectionRows = computed(() => this.collections());
+
+  /** A recognisable name for the persona Sync now will affect. */
+  readonly activeAccountLabel = computed(() => accountLabel(this.activeAccount()));
+
+  /**
+   * All collection namespaces held by the Plus identity, plus the active
+   * persona when it has never saved anything yet.
+   */
+  readonly accountRows = computed<AccountCollectionRow[]>(() => {
+    const active = this.activeAccount();
+    const rows = (this.manifest()?.accounts ?? []).map((account) => ({
+      accountKey: account.accountKey,
+      label: accountLabel(account.accountKey),
+      active: account.accountKey === active,
+      stored: true,
+      trust: account.collections['trust']?.count ?? 0,
+      feeds: account.collections['feeds']?.count ?? 0,
+      lists: account.collections['lists']?.count ?? 0,
+    }));
+    if (active !== null && !rows.some((row) => row.accountKey === active)) {
+      rows.push({
+        accountKey: active,
+        label: accountLabel(active),
+        active: true,
+        stored: false,
+        trust: 0,
+        feeds: 0,
+        lists: 0,
+      });
+    }
+    return rows.sort(
+      (a, b) => Number(b.active) - Number(a.active) || a.label.localeCompare(b.label),
+    );
+  });
+
+  /** Personas that have actually written at least one remote collection index. */
+  readonly storedAccountCount = computed(() => (this.manifest()?.accounts ?? []).length);
 
   /** How many keys this browser considers portable at all. */
   readonly portableKeyCount = computed(() => portableKeys('private').length);
@@ -190,6 +242,7 @@ export class PlusDiagnostics {
   async load(): Promise<void> {
     this.state.set('loading');
     this.error.set(null);
+    this.activeAccount.set(this.accountKey.current());
 
     this.log.info('PlusDiagnostics', 'load:start', {
       syncState: this.sync.record().state,
@@ -199,7 +252,7 @@ export class PlusDiagnostics {
       etag: this.sync.record().etag ?? null,
     });
 
-    const manifest = await this.client.manifest();
+    const manifest = await this.client.manifest({ includeAccounts: true });
     if (manifest.kind === 'ok') {
       this.log.info('PlusDiagnostics', 'load:manifest', {
         hasSettings: manifest.value.settings !== undefined,
@@ -208,6 +261,10 @@ export class PlusDiagnostics {
         quotaUsed: manifest.value.quota.used,
         conflicts: manifest.value.conflicts,
         readOnly: manifest.value.readOnly,
+        accounts: (manifest.value.accounts ?? []).map((account) => ({
+          accountKey: account.accountKey,
+          collections: account.collections,
+        })),
       });
       this.manifest.set(manifest.value);
     } else if (manifest.kind === 'absent') {
@@ -276,4 +333,25 @@ export class PlusDiagnostics {
 
 function describe(result: { kind: string; message?: string }): string {
   return result.message ?? 'The account could not be reached.';
+}
+
+/** Human-readable without losing the stable key used by the service. */
+export function accountLabel(key: string | null): string {
+  if (key === null) {
+    return 'the current account';
+  }
+  if (key === 'anonymous') {
+    return 'Anonymous';
+  }
+  if (key.startsWith('mastodon:')) {
+    const identity = key.slice('mastodon:'.length);
+    const slash = identity.indexOf('/');
+    if (slash > 0 && slash < identity.length - 1) {
+      return `@${identity.slice(slash + 1)}@${identity.slice(0, slash)}`;
+    }
+  }
+  if (key.startsWith('bsky:')) {
+    return `Bluesky · ${key.slice('bsky:'.length)}`;
+  }
+  return key;
 }

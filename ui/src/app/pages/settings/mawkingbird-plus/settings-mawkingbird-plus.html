@@ -118,8 +118,8 @@
         <h3>What is stored</h3>
         @if (diagnostics.state() === 'idle') {
           <p class="muted small">
-            Compare what this browser holds with what your account holds. Nothing is changed by
-            looking.
+            See everything your Mawkingbird Plus account stores, including collections kept
+            separately for each Mastodon account. Nothing is changed by looking.
           </p>
           <button class="btn btn-outline" type="button" (click)="loadDiagnostics()">Check</button>
         } @else if (diagnostics.state() === 'loading') {
@@ -130,12 +130,19 @@
             Try again
           </button>
         } @else {
+          <p>
+            <strong>Mawkingbird Plus is one account.</strong> Settings are shared across it. Saved
+            collections stay separated by Mastodon account so an alt never receives your main
+            account's trust decisions, feeds or lists.
+          </p>
+
+          <h4>Shared settings</h4>
           <table class="plus-diag-table">
             <thead>
               <tr>
                 <th scope="col">Data</th>
                 <th scope="col">This browser</th>
-                <th scope="col">Your account</th>
+                <th scope="col">Mawkingbird Plus</th>
               </tr>
             </thead>
             <tbody>
@@ -155,6 +162,62 @@
                   }
                 </td>
               </tr>
+            </tbody>
+          </table>
+
+          <h4>Saved collections by account</h4>
+          @if (diagnostics.storedAccountCount() === 0) {
+            <p class="muted small">No Mastodon account has saved collections to Plus yet.</p>
+          } @else {
+            <p class="muted small">
+              Plus currently holds saved collections for
+              {{ diagnostics.storedAccountCount() }}
+              {{ diagnostics.storedAccountCount() === 1 ? 'account' : 'accounts' }}.
+            </p>
+          }
+          <table class="plus-diag-table">
+            <thead>
+              <tr>
+                <th scope="col">Mastodon account</th>
+                <th scope="col">Trusted</th>
+                <th scope="col">RSS feeds</th>
+                <th scope="col">Lists</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (account of diagnostics.accountRows(); track account.accountKey) {
+                <tr>
+                  <th scope="row">
+                    {{ account.label }}
+                    @if (account.active) {
+                      <span class="muted small">(current)</span>
+                    }
+                    @if (!account.stored) {
+                      <br /><span class="muted small">Nothing saved from this account yet</span>
+                    }
+                  </th>
+                  <td>{{ account.trust }}</td>
+                  <td>{{ account.feeds }}</td>
+                  <td>{{ account.lists }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          <h4>Current account comparison</h4>
+          <p class="muted small">
+            Sync now affects {{ diagnostics.activeAccountLabel() }}. Collections saved for your
+            other Mastodon accounts remain separate and unchanged.
+          </p>
+          <table class="plus-diag-table">
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                <th scope="col">This browser</th>
+                <th scope="col">Saved for {{ diagnostics.activeAccountLabel() }}</th>
+              </tr>
+            </thead>
+            <tbody>
               @for (row of diagnostics.collectionRows(); track row.collection) {
                 <tr>
                   <th scope="row">{{ row.label }}</th>
@@ -162,14 +225,8 @@
                   <td>
                     @if (row.remote === null) {
                       <!-- Not "0": a failed read is a fact about the network, not
-                           a claim that the account holds nothing. The reason is
-                           shown, not just the fact — a bare "could not read"
-                           sends people to guess. -->
+                           a claim that the account holds nothing. -->
                       @if (row.error; as reason) {
-                        <!-- The reason, not a generic phrase. "Could not read"
-                             points at the server for failures that are often
-                             decided entirely on this side — a missing account
-                             key never reaches the network at all. -->
                         <span class="config-error small">{{ reason }}</span>
                       } @else {
                         <span class="muted">Could not read</span>
@@ -203,8 +260,9 @@
           }
           @if (diagnostics.drifted()) {
             <p role="status">
-              This browser and your account do not match. Syncing sends this browser's enabled data
-              up.
+              This browser and the saved data for {{ diagnostics.activeAccountLabel() }} do not
+              match. Syncing uploads shared settings and this active account's enabled collections;
+              it does not change any other Mastodon account.
             </p>
             <!--
               The reason is shown *before* the press, not after it. A "Sync now"
