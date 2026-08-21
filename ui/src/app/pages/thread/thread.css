@@ -325,3 +325,27 @@
   gap: 8px;
   margin-top: 28px;
 }
+
+.reader-expand-debug {
+  flex-basis: 100%;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.reader-expand-debug summary {
+  cursor: pointer;
+  /* A quiet affordance: this is for the reader who wants it and must not
+     compete with the message above it. */
+  user-select: none;
+}
+
+.reader-expand-debug ul {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+}
+
+.reader-expand-debug li {
+  margin: 2px 0;
+  /* Long URLs must wrap rather than widening the article column. */
+  overflow-wrap: anywhere;
+}

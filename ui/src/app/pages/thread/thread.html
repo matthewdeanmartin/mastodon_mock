@@ -109,6 +109,20 @@
             @if (expansionNote(); as note) {
               <p class="reader-expand-note" role="status">{{ note }}</p>
             }
+            <!-- The why, in the page rather than only in the console. Folded
+                 away so it costs nothing to ignore, and available without
+                 devtools so that the people most likely to report a problem
+                 can actually say what happened. -->
+            @if (expansionDebug().length) {
+              <details class="reader-expand-debug">
+                <summary>What went wrong?</summary>
+                <ul>
+                  @for (line of expansionDebug(); track line) {
+                    <li>{{ line }}</li>
+                  }
+                </ul>
+              </details>
+            }
             <!-- The fallback ladder, and it must never end in nothing: a card
                  when metadata survived, a plain labelled link when it did not,
                  and a way to try again either way. A message with no way

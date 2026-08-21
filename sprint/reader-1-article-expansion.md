@@ -1,9 +1,55 @@
 # Reader 1 — Article expansion (readability)
 
-Status: **1a–1e implemented** (2026-08-21). Remaining: a fixture corpus built
+Status: **1a–1f implemented** (2026-08-21). Remaining: a fixture corpus built
 from real saved pages, and the measured pass-rate table that depends on it.
 Owner: matthewdeanmartin
 Written: 2026-08-20
+
+## Sprint 1f outcome (2026-08-21) — diagnostics, and a route of our own
+
+Triggered by a real failure: fetching a News Tribune article returned a raw
+Cloudflare `520` JSON blob, and the reader was told "Couldn't reach this page"
+— which was **false**. The page had been reached, and had deliberately refused.
+Finding that out required devtools.
+
+Three separate defects behind one symptom:
+
+1. **The 520 was the *upstream's* status, relayed verbatim.** The proxy passed
+   status and body straight through with nothing saying where it came from. The
+   proxy and the target draw from the same status space, so a relayed `520` and
+   a proxy-authored `502` are indistinguishable to a caller.
+2. **The failure was cached for five minutes.** `Cache-Control: max-age=300`
+   was set from `cacheable` alone, without checking the status — so the browser
+   refused to retry past a transient refusal. (The edge-cache *write* was
+   correctly gated on 200; only the downstream header was wrong.)
+3. **The client mapped every 5xx to `network`**, producing the untrue sentence.
+
+### The design question this raised
+
+Fixing (1) with headers exposed the underlying tension, which the operator
+named directly: *"when we are acting like a CORS proxy, we're hard core a CORS
+proxy"* — the relay contract means the body is never ours to shape, so error
+detail had to be smuggled through headers while the body stayed whatever the
+refusing party sent.
+
+The resolution: a dedicated **`article` route** with `bufferErrors: true`.
+Success stays a byte-for-byte relay — the article HTML is the article HTML, and
+nothing about a hostile source changes that. **Failure** stops being a relay,
+because a refused article has no bytes worth preserving verbatim, only *facts
+about* the refusal. The Worker writes those facts as one JSON document and
+quotes the upstream's own words inside it.
+
+`feeds` deliberately keeps working for article fetching, for known-friendly
+sources (Wikipedia and the like) where a plain relay is all that is wanted. The
+client asks for `article` and falls back to `feeds` on `No such route`, so the
+app can ship ahead of the Worker without breaking.
+
+### What this does not fix
+
+Paywalls, bot blocks and consent walls are still refusals by the publisher. No
+transport change makes thenewstribune.com serve that article. What changed is
+that the reader is now told *precisely what happened*, in the page, without
+devtools — including the site's own error text and which host refused.
 
 ## Sprint 1e outcome (2026-08-21)
 
@@ -95,7 +141,18 @@ explicitly *not* foreclosed: the client boundary below (`ArticleSource`) is
 shaped so a Worker that returns `{markdown, title, byline}` can be dropped in
 as a second implementation without touching the reader.
 
-### Why not a dedicated `article` proxy route (yet)
+### Why not a dedicated `article` proxy route (yet) — *superseded*
+
+> **Reversed 2026-08-21, in sprint 1f.** The route now exists.
+>
+> The original reasoning below was that a dedicated route "buys nothing the
+> `feeds` route does not already provide". That held right up until the first
+> real failure, and the thing it missed was not the quota or the content-type
+> list — both of which really were nice-to-haves — but **error shape**. A
+> relay cannot own its failure bodies, and a failed article fetch is exactly
+> the case where the body needs to be ours. That is a property of what the
+> route is *for*, not of how much traffic it carries, and it was visible in
+> principle on day one.
 
 It would be the tidier long-term home for a per-day quota and a tighter
 content-type list. It was rejected for v1 only because it costs a Worker deploy
@@ -667,7 +724,10 @@ card component exists.
 - Multi-page article stitching ("read next page").
 - Server-side extraction. (Redirect-following in the Worker is *in* scope — but
   it relays bytes, it does not parse them.)
-- A dedicated `article` proxy route.
+- ~~A dedicated `article` proxy route.~~ **Built 2026-08-21** — see the sprint
+  1f note above. The relay contract turned out to be the wrong fit for a
+  *failed* article fetch, which is a different observation from the one that
+  originally deferred this.
 - Archive.org / archive.today fallbacks. Tempting and cheap; deferred because
   it changes who the user's request goes to, and this app's whole posture is
   that such a change is a decision the user makes explicitly (see the per-feed

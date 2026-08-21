@@ -89,6 +89,11 @@ export type CorsProxyId =
  */
 export type CorsProxyRoute =
   | 'feeds'
+  // Reader article expansion. Unlike 'feeds' this route replaces a failed
+  // upstream's body with the proxy's own error document, because a refused
+  // article has no bytes worth relaying verbatim — only facts about the
+  // refusal. Success stays a byte-for-byte relay. See the Worker's config.ts.
+  | 'article'
   | 'webmention-discover'
   | 'webmention-send'
   | 'twitterapi'

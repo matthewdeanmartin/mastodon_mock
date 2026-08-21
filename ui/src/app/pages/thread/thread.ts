@@ -204,11 +204,63 @@ export class Thread implements OnInit {
       junk: "Couldn't find an article on this page — it may be a homepage or an index.",
       'not-html': 'This link is a file rather than a web page.',
       'too-large': 'This page is too big to expand. Open it on the original site.',
-      'rate-limited': 'Too many requests just now. Try again in a minute.',
+      'rate-limited': 'Too many requests through the shared proxy. Try again in a minute.',
+      // Distinguished from ours deliberately: waiting fixes our limit, and does
+      // not necessarily fix theirs.
+      'site-rate-limited': 'This site is limiting how often it will answer. Try again later.',
+      'site-error': 'This site answered with an error of its own. It may be having trouble.',
+      'not-found': 'This page is gone — the link may be broken or the post removed.',
+      'upstream-timeout': 'This site took too long to answer.',
+      'blocked-destination': "This address can't be fetched.",
+      // Should never reach a reader: the fetch retries on the older route when
+      // it sees this. Worded for the case where that retry also fails, which
+      // means the proxy is genuinely misconfigured rather than merely behind.
+      'route-unavailable': 'The article service is unavailable. Try again shortly.',
       'redirect-loop': 'This link redirects in a loop and never arrives anywhere.',
-      network: "Couldn't reach this page. It may be down, or offline right now.",
+      network: "Couldn't reach this page. It may be down, or you may be offline.",
     };
     return notes[result.diagnosis];
+  });
+
+  /**
+   * The technical detail behind a failure, as lines for the disclosure.
+   *
+   * Shown in the page rather than only logged to the console. "It didn't work"
+   * is not something anyone can act on, and requiring devtools to find out why
+   * puts the answer out of reach of exactly the people most likely to report
+   * the problem. Folded away by default so it costs nothing to ignore.
+   */
+  protected expansionDebug = computed<string[]>(() => {
+    const result = this.expansion();
+    const debug = result?.debug;
+    if (!result || !debug || result.article) {
+      return [];
+    }
+    const lines: string[] = [];
+    if (debug.source === 'upstream') {
+      lines.push(
+        `The site answered${debug.upstreamStatus ? ` (HTTP ${debug.upstreamStatus})` : ''}.`,
+      );
+    } else if (debug.source === 'proxy') {
+      lines.push('The proxy refused this before contacting the site.');
+    }
+    if (debug.status) {
+      lines.push(`HTTP status: ${debug.status}`);
+    }
+    if (debug.detail) {
+      lines.push(debug.detail);
+    }
+    if (debug.documentWords !== undefined) {
+      lines.push(`Text found on the page: ${debug.documentWords} words`);
+    }
+    if (debug.hadMetadata !== undefined) {
+      lines.push(debug.hadMetadata ? 'Link preview data was readable.' : 'No link preview data.');
+    }
+    if (debug.elapsedMs !== undefined) {
+      lines.push(`Took ${(debug.elapsedMs / 1000).toFixed(1)}s`);
+    }
+    lines.push(`URL: ${result.finalUrl}`);
+    return lines;
   });
 
   /**

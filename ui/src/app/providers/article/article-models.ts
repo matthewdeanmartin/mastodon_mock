@@ -38,11 +38,29 @@ export type ArticleDiagnosis =
   | 'not-html'
   /** Over the route's size cap. */
   | 'too-large'
-  /** The proxy rate-limited us. */
+  /** *Our* proxy rate-limited us — a shared budget, so waiting works. */
   | 'rate-limited'
+  /** The *site* rate-limited us. Waiting may not help; it throttles readers. */
+  | 'site-rate-limited'
+  /** The site answered, and answered with an error of its own. */
+  | 'site-error'
+  /** The page is gone (404/410). */
+  | 'not-found'
+  /** The site accepted the connection and then never answered. */
+  | 'upstream-timeout'
+  /** The proxy refused to fetch this destination at all. */
+  | 'blocked-destination'
+  /**
+   * The proxy does not know the route we asked for.
+   *
+   * A deploy-ordering fact rather than anything about the page: the app shipped
+   * ahead of the Worker. Never shown to a reader — the caller retries on the
+   * older route instead.
+   */
+  | 'route-unavailable'
   /** The upstream redirected more times than the proxy will follow. */
   | 'redirect-loop'
-  /** Everything else: DNS, TLS, timeout, offline. */
+  /** Everything else: DNS, TLS, offline, CORS. */
   | 'network';
 
 /**
@@ -106,4 +124,32 @@ export interface ArticleResult {
   diagnosis: ArticleDiagnosis;
   /** ISO timestamp, for cache expiry and for showing "fetched 2 hours ago". */
   fetchedAt: string;
+  /**
+   * The technical detail behind a failure, for the reader who wants it.
+   *
+   * Absent on success. Present on every failure, because "it didn't work" is
+   * not something anyone can act on — not the reader deciding whether to
+   * retry, and not the developer reading a bug report. Surfaced in the UI
+   * behind a disclosure rather than in the console, so that finding out *why*
+   * does not require opening devtools.
+   */
+  debug?: ArticleDebug;
+}
+
+/** What is known about a failure, beyond its name. */
+export interface ArticleDebug {
+  /** HTTP status the browser saw, when there was one. */
+  status?: number;
+  /** Whether the proxy wrote this response or relayed it from the target. */
+  source?: 'proxy' | 'upstream' | 'unknown';
+  /** The target's own status, when the proxy relayed a failure. */
+  upstreamStatus?: number;
+  /** The proxy's own explanation, when it wrote one. */
+  detail?: string;
+  /** How long the attempt took, in ms. Distinguishes a hang from a refusal. */
+  elapsedMs?: number;
+  /** Words of text found in the document, when one was fetched and parsed. */
+  documentWords?: number;
+  /** Whether metadata was recoverable, when extraction itself failed. */
+  hadMetadata?: boolean;
 }
