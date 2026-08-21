@@ -34,6 +34,7 @@
 import { inject, Injectable } from '@angular/core';
 import { credentialExpired, expiryAction } from '../credential-lifetime';
 import { isVaulted, vaultedKey } from './vault-manifest';
+import { VaultPreference } from './vault-preference';
 import { VaultService } from './vault-service';
 
 /** What happened when a credential was pushed to the vault. */
@@ -63,10 +64,11 @@ export type LifetimeVerdict =
 @Injectable({ providedIn: 'root' })
 export class VaultBridge {
   private vault = inject(VaultService);
+  private preference = inject(VaultPreference);
 
   /** Whether this credential participates in the vault at all. */
   syncs(base: string): boolean {
-    return isVaulted(base);
+    return this.preference.enabled() && isVaulted(base);
   }
 
   /** Whether the vault is currently open, so a read could succeed. */
@@ -82,7 +84,7 @@ export class VaultBridge {
    * is identical: carry on with whatever `localStorage` holds.
    */
   readThrough(base: string, accountKey: string | null = null): string | null {
-    if (!isVaulted(base) || !this.vault.unlocked()) {
+    if (!this.syncs(base) || !this.vault.unlocked()) {
       return null;
     }
     return this.vault.read(base, this.scopeFor(base, accountKey));
@@ -98,7 +100,7 @@ export class VaultBridge {
     value: string,
     accountKey: string | null = null,
   ): Promise<SyncOutcome> {
-    if (!isVaulted(base) || !this.vault.unlocked()) {
+    if (!this.syncs(base) || !this.vault.unlocked()) {
       return { kind: 'skipped' };
     }
     const outcome = await this.vault.write(base, value, this.scopeFor(base, accountKey));
@@ -115,7 +117,7 @@ export class VaultBridge {
    * another, which is the same resurrection problem local expiry had.
    */
   async removeThrough(base: string, accountKey: string | null = null): Promise<SyncOutcome> {
-    if (!isVaulted(base) || !this.vault.unlocked()) {
+    if (!this.syncs(base) || !this.vault.unlocked()) {
       return { kind: 'skipped' };
     }
     const outcome = await this.vault.remove(base, this.scopeFor(base, accountKey));
@@ -141,7 +143,7 @@ export class VaultBridge {
     // vault is open right now. A locked vault still holds the copy, so treating
     // this as a disconnection would delete the local plaintext and tell the user
     // they are disconnected while the server copy waits to contradict them.
-    return expiryAction(isVaulted(base)) === 'lock' ? { kind: 'lock' } : { kind: 'disconnect' };
+    return expiryAction(this.syncs(base)) === 'lock' ? { kind: 'lock' } : { kind: 'disconnect' };
   }
 
   /**

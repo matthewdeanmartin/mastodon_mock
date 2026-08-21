@@ -44,6 +44,7 @@ import {
   mergeBundles,
   readFromBundle,
   removeFromBundle,
+  VAULTED_KEYS,
   writeToBundle,
   type ConnectionBundle,
 } from './vault-manifest';
@@ -99,6 +100,20 @@ export class VaultService {
     const bundle = this.bundle();
     return bundle ? bundleCount(bundle) : 0;
   });
+  /** Connector names represented in the open bundle, without exposing values. */
+  readonly storedConnectors = computed(() => {
+    const bundle = this.bundle();
+    if (!bundle) {
+      return [] as string[];
+    }
+    const bases = new Set<string>(Object.keys(bundle.browser));
+    for (const values of Object.values(bundle.accounts)) {
+      for (const base of Object.keys(values)) {
+        bases.add(base);
+      }
+    }
+    return VAULTED_KEYS.filter((entry) => bases.has(entry.base)).map((entry) => entry.connector);
+  });
 
   /**
    * The decrypted bundle, held in memory only while unlocked.
@@ -144,9 +159,11 @@ export class VaultService {
       // route never returns. Both mean "nothing to open".
       this.state.set('absent');
       this.meta.set(null);
+      this.unavailableReason.set(null);
       return;
     }
 
+    this.unavailableReason.set(null);
     this.meta.set(meta.value);
     this.salt = meta.value.saltB64;
     this.kdf = meta.value.kdf;
@@ -328,6 +345,18 @@ export class VaultService {
     this.meta.set(stored.value.meta);
     await rememberVaultKey(key);
     return null;
+  }
+
+  /** Change how long the encrypted server copy is retained. */
+  async setPolicy(policy: VaultMeta['policy']): Promise<boolean> {
+    const result = await this.client.setPolicy(policy);
+    if (result.kind !== 'ok') {
+      this.notice.set(messageFor(result));
+      return false;
+    }
+    this.meta.set(result.value.meta);
+    this.notice.set(null);
+    return true;
   }
 
   /** Fetch and decrypt with the current key. False means the key is wrong. */

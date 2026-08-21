@@ -64,7 +64,13 @@ describe('SettingsMawkingbirdPlus collection sync', () => {
     diagnostics = { load: vi.fn().mockResolvedValue(undefined) };
     settingsSync = { on: signal(true), detail: () => '', set: vi.fn() };
     features = {
-      enabled: { corsProxy: true, trustSync: true, listsSync: true, feedsSync: true },
+      enabled: {
+        corsProxy: true,
+        trustSync: true,
+        listsSync: true,
+        feedsSync: true,
+        apiKeys: true,
+      },
       isOn(feature) {
         return this.enabled[feature];
       },

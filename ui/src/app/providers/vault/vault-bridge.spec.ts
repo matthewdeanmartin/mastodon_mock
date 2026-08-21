@@ -13,6 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CREDENTIAL_LIFETIME, expiryAction } from '../credential-lifetime';
 import { VaultBridge } from './vault-bridge';
 import { VaultService } from './vault-service';
+import { VAULT_TEST_ROLLOUT } from './vault-preference';
+import { PlusFeatures } from '../account/plus-features';
 
 /** A credential that syncs, and one that deliberately does not. */
 const VAULTED = 'mockingbird_openrouter_key';
@@ -35,7 +37,10 @@ type VaultDouble = Pick<VaultService, 'unlocked' | 'read' | 'write' | 'remove'>;
 function bridgeWith(vault: VaultDouble): VaultBridge {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    providers: [{ provide: VaultService, useValue: vault }],
+    providers: [
+      { provide: VaultService, useValue: vault },
+      { provide: VAULT_TEST_ROLLOUT, useValue: true },
+    ],
   });
   return TestBed.inject(VaultBridge);
 }
@@ -69,6 +74,14 @@ describe('which credentials participate', () => {
     const bridge = bridgeWith(openVault());
     expect(bridge.syncs(VAULTED)).toBe(true);
     expect(bridge.syncs(LOCAL_ONLY)).toBe(false);
+  });
+
+  it('stops every vault read and write when the Plus switch is off', () => {
+    const bridge = bridgeWith(openVault());
+    TestBed.inject(PlusFeatures).set('apiKeys', false);
+
+    expect(bridge.syncs(VAULTED)).toBe(false);
+    expect(bridge.readThrough(VAULTED)).toBeNull();
   });
 });
 

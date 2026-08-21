@@ -5,6 +5,7 @@ import { PlusFeatures, PLUS_FEATURES_KEY } from '../../../../providers/account/p
 import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import { SupporterStatus } from '../../../../providers/account/supporter-status';
 import { FeatureFlags } from '../../../../feature-flags';
+import { VAULT_TEST_ROLLOUT } from '../../../../providers/vault/vault-preference';
 
 /**
  * The click-wrap dialog.
@@ -69,6 +70,21 @@ describe('PlusWelcomeDialog', () => {
     expect(planned).toHaveLength(2);
     expect(planned.every((box) => box.disabled)).toBe(true);
     expect(html()).toContain('API key sync');
+  });
+
+  it('offers encrypted connection keys as an active choice on the test deployment', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [{ provide: VAULT_TEST_ROLLOUT, useValue: true }],
+    });
+    const testFixture = TestBed.createComponent(PlusWelcomeDialog);
+    testFixture.detectChanges();
+    const rows = [...(testFixture.nativeElement as HTMLElement).querySelectorAll('.pw-row')];
+    const apiKeys = rows.find((row) => row.textContent?.includes('Encrypted connection keys'));
+
+    expect(apiKeys).toBeDefined();
+    expect(apiKeys?.classList.contains('pw-row-planned')).toBe(false);
+    expect(apiKeys?.querySelector('input')?.disabled).toBe(false);
   });
 
   it('records the answer and asks to come down', () => {

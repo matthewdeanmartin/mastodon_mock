@@ -109,11 +109,14 @@ describe('PlusFeatures', () => {
 
     const rows = features.all();
 
-    // Four, not five: settings sync is no longer a stored preference. It is a
+    // Five: settings sync is no longer a stored preference, while the test
+    // vault is now a real preference rather than a grey roadmap row. Settings
+    // sync remains a
     // view of `ProfileSync` via `SettingsSyncToggle`, because two switches for
     // one thing is what let the Plus page and the Config page disagree.
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
     expect(rows.find((row) => row.feature === 'feedsSync')?.on).toBe(false);
     expect(rows.find((row) => row.feature === 'listsSync')?.on).toBe(true);
+    expect(rows.find((row) => row.feature === 'apiKeys')?.on).toBe(true);
   });
 });

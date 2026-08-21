@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, Injector, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { PlusSession } from '../../../providers/account/plus-session';
 import { authDebug } from '../../../providers/account/auth-debug';
@@ -17,6 +17,9 @@ import { AdoptionDialog } from './adoption-dialog/adoption-dialog';
 import { CollectionAdoptionRunner } from '../../../providers/account/collection-adoption-runner';
 import type { AdoptableCollection } from '../../../providers/account/collection-adoption-runner';
 import type { AdoptionChoice } from '../../../providers/account/collection-adoption';
+import { VaultService } from '../../../providers/vault/vault-service';
+import { VaultPreference } from '../../../providers/vault/vault-preference';
+import { VaultAdoption } from '../../../providers/vault/vault-adoption';
 
 /**
  * Settings → Mawkingbird Plus.
@@ -52,13 +55,26 @@ export class SettingsMawkingbirdPlus implements OnInit {
   private sync = inject(ProfileSync);
   private proxyUsageStore = inject(CorsProxyUsageStore);
   private log = inject(PageDiagnostics);
+  private injector = inject(Injector);
+  protected vault = inject(VaultService);
+  protected vaultPreference = inject(VaultPreference);
 
   /** Proxy counters, local and account-wide. */
   protected readonly proxyUsage = this.proxyUsageStore.usage;
   protected readonly formatBytes = formatBytes;
   protected readonly syncing = signal(false);
   protected readonly syncMessage = signal<string | null>(null);
+  protected readonly vaultBusy = signal(false);
+  protected readonly vaultMessage = signal<string | null>(null);
+  protected readonly vaultPassphrase = signal('');
+  protected readonly vaultPassphraseAgain = signal('');
+  protected readonly vaultNextPassphrase = signal('');
+  protected readonly vaultDeleteArmed = signal(false);
   private adoption = inject(CollectionAdoptionRunner);
+
+  protected readonly vaultConnectors = computed(() =>
+    this.vault.storedConnectors().map((id) => VAULT_CONNECTOR_LABELS[id] ?? id),
+  );
 
   /**
    * The collection waiting on a merge-or-replace answer, if any.
@@ -108,7 +124,10 @@ export class SettingsMawkingbirdPlus implements OnInit {
       on: this.settingsSync.on(),
       label: 'Settings sync',
     },
-    ...this.features.all().map((row) => ({ ...row, label: FEATURE_LABELS[row.feature] })),
+    ...this.features
+      .all()
+      .filter((row) => row.feature !== 'apiKeys')
+      .map((row) => ({ ...row, label: FEATURE_LABELS[row.feature] })),
   ]);
 
   protected async setFeature(feature: ToggleId, on: boolean): Promise<void> {
@@ -208,6 +227,13 @@ export class SettingsMawkingbirdPlus implements OnInit {
   protected async welcomeSaved(): Promise<void> {
     this.features.refresh();
     this.adoptionError.set('');
+    if (
+      this.vaultPreference.available &&
+      this.plus.isSupporter() &&
+      this.vaultPreference.enabled()
+    ) {
+      await this.refreshVault();
+    }
     const result = await this.reconcileCollections(this.enabledCollections(), true);
     if (result.errors.length > 0) {
       this.adoptionError.set(result.errors.join(' '));
@@ -264,6 +290,13 @@ export class SettingsMawkingbirdPlus implements OnInit {
       // entitlement was written seconds ago, and a stale token would show the
       // old tier for up to fifteen minutes.
       await this.plus.refresh();
+      if (
+        this.vaultPreference.available &&
+        this.plus.isSupporter() &&
+        this.vaultPreference.enabled()
+      ) {
+        await this.refreshVault();
+      }
     }
   }
 
@@ -279,6 +312,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
   }
 
   protected async signOut(): Promise<void> {
+    void this.vault.lock();
     this.plus.clear();
     await this.session.signOut();
     // `signOut()` clears the stored record; this re-reads it, so the next
@@ -286,6 +320,169 @@ export class SettingsMawkingbirdPlus implements OnInit {
     this.features.refresh();
     this.linkSent.set(false);
     this.email.set('');
+  }
+
+  /** Turn connection-key sync on for this account in test, or stop it locally. */
+  protected async setVaultEnabled(on: boolean): Promise<void> {
+    if (!this.vaultPreference.available || (on && !this.plus.isSupporter())) {
+      return;
+    }
+    this.vaultPreference.set(on);
+    this.vaultMessage.set(null);
+    this.vaultDeleteArmed.set(false);
+    if (!on) {
+      await this.vault.lock();
+      this.vaultMessage.set(
+        'Connection-key sync is off on this browser. The encrypted stored copy was not deleted.',
+      );
+      return;
+    }
+    await this.refreshVault();
+    if (this.vault.unlocked()) {
+      await this.syncExistingVaultKeys();
+    }
+  }
+
+  /** Re-check the remote state; this is also the diagnostics retry button. */
+  protected async refreshVault(): Promise<void> {
+    if (!this.vaultPreference.available || !this.vaultPreference.enabled()) {
+      return;
+    }
+    this.vaultBusy.set(true);
+    this.vaultMessage.set(null);
+    try {
+      await this.vault.refresh();
+    } finally {
+      this.vaultBusy.set(false);
+    }
+  }
+
+  /** Create the encrypted store, then import eligible keys already in this browser. */
+  protected async createVault(): Promise<void> {
+    if (this.vaultPassphrase() !== this.vaultPassphraseAgain()) {
+      this.vaultMessage.set('The two passphrases do not match.');
+      return;
+    }
+    this.vaultBusy.set(true);
+    this.vaultMessage.set(null);
+    try {
+      const problem = await this.vault.create(this.vaultPassphrase());
+      if (problem) {
+        this.vaultMessage.set(problem);
+        return;
+      }
+      this.vaultPassphrase.set('');
+      this.vaultPassphraseAgain.set('');
+      await this.syncExistingVaultKeys();
+    } finally {
+      this.vaultBusy.set(false);
+    }
+  }
+
+  protected async unlockVault(): Promise<void> {
+    this.vaultBusy.set(true);
+    this.vaultMessage.set(null);
+    try {
+      const opened = await this.vault.unlock(this.vaultPassphrase());
+      if (opened) {
+        this.vaultPassphrase.set('');
+        this.vaultMessage.set(
+          `Unlocked ${this.vault.count()} stored connection credential(s) on this browser.`,
+        );
+      } else {
+        this.vaultMessage.set(this.vault.notice() ?? 'That passphrase did not open the vault.');
+      }
+    } finally {
+      this.vaultBusy.set(false);
+    }
+  }
+
+  protected async lockVault(): Promise<void> {
+    await this.vault.lock();
+    this.vaultMessage.set('Locked on this browser. The encrypted copy remains stored.');
+  }
+
+  /** Import the low-churn credentials represented by the explicit vault allowlist. */
+  protected async syncExistingVaultKeys(): Promise<void> {
+    if (!this.vault.unlocked() || !this.vaultPreference.enabled()) {
+      this.vaultMessage.set('Unlock stored connections before syncing keys from this browser.');
+      return;
+    }
+    this.vaultBusy.set(true);
+    try {
+      const result = await this.injector.get(VaultAdoption).adoptExisting();
+      const messages: string[] = [];
+      if (result.stored.length > 0) {
+        messages.push(`Stored from this browser: ${result.stored.join(', ')}.`);
+      } else {
+        messages.push('No additional eligible connection keys were found in this browser.');
+      }
+      if (result.failed.length > 0) {
+        messages.push(
+          `Could not store ${result.failed.map((failure) => failure.connector).join(', ')}: ${result.failed
+            .map((failure) => failure.message)
+            .join(' ')}`,
+        );
+      }
+      this.vaultMessage.set(messages.join(' '));
+    } finally {
+      this.vaultBusy.set(false);
+    }
+  }
+
+  protected async changeVaultPassphrase(): Promise<void> {
+    this.vaultBusy.set(true);
+    this.vaultMessage.set(null);
+    try {
+      const problem = await this.vault.changePassphrase(this.vaultNextPassphrase());
+      this.vaultMessage.set(problem ?? 'Passphrase changed on this encrypted store.');
+      if (!problem) {
+        this.vaultNextPassphrase.set('');
+      }
+    } finally {
+      this.vaultBusy.set(false);
+    }
+  }
+
+  protected async setVaultPolicy(value: string): Promise<void> {
+    const policy = VAULT_POLICIES[value];
+    if (!policy) {
+      return;
+    }
+    this.vaultBusy.set(true);
+    try {
+      const result = await this.vault.setPolicy(policy);
+      this.vaultMessage.set(result ? 'Stored-copy retention updated.' : this.vault.notice());
+    } finally {
+      this.vaultBusy.set(false);
+    }
+  }
+
+  protected vaultPolicyValue(): string {
+    const policy = this.vault.meta()?.policy;
+    if (!policy) {
+      return 'idle-90';
+    }
+    return policy.kind === 'never' ? 'never' : `${policy.kind}-${policy.days}`;
+  }
+
+  protected async destroyVault(): Promise<void> {
+    if (!this.vaultDeleteArmed()) {
+      this.vaultDeleteArmed.set(true);
+      return;
+    }
+    this.vaultBusy.set(true);
+    try {
+      const destroyed = await this.vault.destroy();
+      this.vaultMessage.set(
+        destroyed
+          ? 'The encrypted stored copy was deleted. Connector keys in this browser were not changed.'
+          : this.vault.notice(),
+      );
+      this.vaultDeleteArmed.set(false);
+    } finally {
+      this.vaultBusy.set(false);
+    }
   }
 
   /** Read local and remote state. Changes nothing — see `plus-diagnostics.ts`. */
@@ -447,6 +644,7 @@ const FEATURE_LABELS: Record<PlusFeature, string> = {
   trustSync: 'Trusted accounts',
   listsSync: 'Client lists',
   feedsSync: 'RSS subscription list',
+  apiKeys: 'Encrypted connection keys',
 };
 
 /** Which collection a toggle governs. Toggles with no collection sync nothing. */
@@ -466,4 +664,27 @@ const COLLECTION_LABELS: Record<AdoptableCollection, string> = {
   trust: 'trusted accounts',
   feeds: 'RSS subscriptions',
   lists: 'client lists',
+};
+
+const VAULT_CONNECTOR_LABELS: Record<string, string> = {
+  openrouter: 'OpenRouter',
+  'cors-proxy': 'CORS proxy',
+  'link-shortener': 'Link shorteners',
+  raindrop: 'Raindrop',
+  twitter: 'Twitter',
+  mataroa: 'Mataroa',
+  hugo: 'Hugo',
+  github: 'GitHub',
+  gist: 'GitHub Gist',
+};
+
+const VAULT_POLICIES: Record<
+  string,
+  import('../../../providers/vault/vault-client').VaultMeta['policy']
+> = {
+  'idle-90': { kind: 'idle', days: 90 },
+  'idle-365': { kind: 'idle', days: 365 },
+  'absolute-90': { kind: 'absolute', days: 90 },
+  'absolute-365': { kind: 'absolute', days: 365 },
+  never: { kind: 'never' },
 };

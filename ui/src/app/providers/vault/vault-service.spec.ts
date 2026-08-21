@@ -199,6 +199,7 @@ describe('reading and writing', () => {
     await service.write('mockingbird_openrouter_key', 'sk-1');
     await service.write('mockingbird_hugo_credentials', 'A', 'mastodon:a/alice');
     expect(service.count()).toBe(2);
+    expect(service.storedConnectors()).toEqual(['openrouter', 'hugo']);
   });
 
   it('refuses to write while locked', async () => {

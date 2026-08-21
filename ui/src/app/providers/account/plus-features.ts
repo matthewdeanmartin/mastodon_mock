@@ -40,13 +40,12 @@ export const PLUS_FEATURES_KEY = 'mockingbird_plus_features';
 /**
  * The features a user can switch on.
  *
- * `apiKeys` and `chat` are listed but cannot be enabled: real secret storage
- * does not exist yet, and neither does end-to-end chat. They appear in the
- * dialog greyed out rather than being hidden, because a roadmap the user can see
- * is worth more than a shorter list — and it answers "is my API key synced?"
- * with a visible no.
+ * `apiKeys` is available only on the test deployment while the vault is being
+ * exercised. `chat` remains planned. Availability is kept separate from this
+ * stored preference: a copied production bundle must not be able to turn a
+ * test-only backend feature on.
  */
-export type PlusFeature = 'corsProxy' | 'trustSync' | 'listsSync' | 'feedsSync';
+export type PlusFeature = 'corsProxy' | 'trustSync' | 'listsSync' | 'feedsSync' | 'apiKeys';
 
 /** Features shown but not yet available. */
 export type PlannedFeature = 'apiKeys' | 'chat';
@@ -56,6 +55,7 @@ export const PLUS_FEATURES: readonly PlusFeature[] = [
   'trustSync',
   'listsSync',
   'feedsSync',
+  'apiKeys',
 ];
 
 export const PLANNED_FEATURES: readonly PlannedFeature[] = ['apiKeys', 'chat'];
@@ -129,7 +129,7 @@ export class PlusFeatures {
    * parts — saving each toggle as it is flipped would leave a half-answered
    * record behind if the page were closed mid-thought.
    */
-  save(choices: Record<PlusFeature, boolean>): void {
+  save(choices: Partial<Record<PlusFeature, boolean>>): void {
     this.write({ decided: true, enabled: { ...choices } });
   }
 

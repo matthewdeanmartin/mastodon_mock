@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ShortenerSettings } from './shortener-settings';
+import { VAULT_TEST_ROLLOUT } from '../vault/vault-preference';
 
 describe('ShortenerSettings', () => {
   let settings: ShortenerSettings;
@@ -14,14 +15,18 @@ describe('ShortenerSettings', () => {
    */
   function rebuild(): ShortenerSettings {
     TestBed.resetTestingModule();
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [{ provide: VAULT_TEST_ROLLOUT, useValue: true }],
+    });
     return TestBed.inject(ShortenerSettings);
   }
 
   beforeEach(() => {
     localStorage.clear();
     TestBed.resetTestingModule();
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [{ provide: VAULT_TEST_ROLLOUT, useValue: true }],
+    });
     settings = TestBed.inject(ShortenerSettings);
   });
 

@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsMawkingbirdPlus } from './settings-mawkingbird-plus';
 import { PlusSession } from '../../../providers/account/plus-session';
 import { MawkingbirdSession } from '../../../providers/account/mawkingbird-session';
+import { VaultService } from '../../../providers/vault/vault-service';
+import { VAULT_TEST_ROLLOUT } from '../../../providers/vault/vault-preference';
+import { PlusFeatures } from '../../../providers/account/plus-features';
 
 /**
  * A stand-in for the real session, so these specs exercise the page's rendering
@@ -379,5 +382,116 @@ describe('SettingsMawkingbirdPlus', () => {
     (button as HTMLButtonElement).click();
 
     expect(session.signOut).toHaveBeenCalled();
+  });
+});
+
+describe('SettingsMawkingbirdPlus test vault rollout', () => {
+  let fixture: ComponentFixture<SettingsMawkingbirdPlus>;
+  let session: FakeMawkingbirdSession;
+  let plus: FakePlusSession;
+  const vault = {
+    state: signal<'unknown' | 'absent' | 'locked' | 'unlocked' | 'unavailable'>('unlocked'),
+    unavailableReason: signal<'not-a-tester' | null>(null),
+    meta: signal({
+      version: 2,
+      saltB64: 'salt',
+      kdf: { name: 'pbkdf2-sha256', params: { iterations: 1 } },
+      policy: { kind: 'idle' as const, days: 90 as const },
+      createdAt: '2026-08-20T00:00:00.000Z',
+      updatedAt: '2026-08-20T00:00:00.000Z',
+      lastReadAt: '2026-08-20T00:00:00.000Z',
+      bytes: 512,
+      masterKeyVersion: 1,
+      expiresAt: null,
+      graceKind: 'none' as const,
+    }),
+    unlocked: signal(true),
+    count: signal(3),
+    storedConnectors: signal(['openrouter', 'mataroa', 'gist']),
+    notice: signal<string | null>(null),
+    refresh: vi.fn().mockResolvedValue(undefined),
+    lock: vi.fn().mockResolvedValue(undefined),
+    create: vi.fn(),
+    unlock: vi.fn(),
+    changePassphrase: vi.fn(),
+    setPolicy: vi.fn(),
+    destroy: vi.fn(),
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    vault.state.set('unlocked');
+    vault.unavailableReason.set(null);
+    vault.unlocked.set(true);
+    vault.refresh.mockClear();
+    vault.lock.mockClear();
+    session = new FakeMawkingbirdSession();
+    plus = new FakePlusSession();
+    TestBed.configureTestingModule({
+      imports: [SettingsMawkingbirdPlus],
+      providers: [
+        { provide: MawkingbirdSession, useValue: session },
+        { provide: PlusSession, useValue: plus },
+        { provide: VaultService, useValue: vault },
+        { provide: VAULT_TEST_ROLLOUT, useValue: true },
+      ],
+    });
+    fixture = TestBed.createComponent(SettingsMawkingbirdPlus);
+  });
+
+  async function renderPlus(): Promise<string> {
+    session.ready.set(true);
+    session.user.set({ auth: 'email', tier: 'plus' });
+    plus.tier.set('plus');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture.nativeElement.textContent as string;
+  }
+
+  it('shows the test vault, its gates, and the benefits being used', async () => {
+    const text = await renderPlus();
+
+    expect(text).toContain('Encrypted connection keys');
+    expect(text).toContain('Test rollout enabled');
+    expect(text).toContain('Plus entitlement');
+    expect(text).toContain('Recognized');
+    expect(text).toContain('3 connection credentials are encrypted');
+    expect(text).toContain('OpenRouter, Mataroa, GitHub Gist');
+  });
+
+  it('keeps diagnostics visible when Plus is the broken gate', async () => {
+    session.ready.set(true);
+    session.user.set({ auth: 'email', tier: 'free' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const section = fixture.nativeElement.querySelector('.plus-vault') as HTMLElement;
+    const toggle = section.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    expect(section.textContent).toContain('Not recognized');
+    expect(toggle.disabled).toBe(true);
+  });
+
+  it('names the tester gate when the profile Worker refuses it', async () => {
+    vault.state.set('unavailable');
+    vault.unavailableReason.set('not-a-tester');
+
+    const text = await renderPlus();
+
+    expect(text).toContain('did not recognize this account as a tester');
+  });
+
+  it('turning the switch off stops sync without deleting the encrypted copy', async () => {
+    await renderPlus();
+    const toggle = fixture.nativeElement.querySelector(
+      '.plus-vault input[type="checkbox"]',
+    ) as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    expect(TestBed.inject(PlusFeatures).isOn('apiKeys')).toBe(false);
+    expect(vault.lock).toHaveBeenCalled();
   });
 });

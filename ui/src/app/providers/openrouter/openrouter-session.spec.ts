@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenRouterSession } from './openrouter-session';
 import { stubLocation } from '../../testing/stub-location';
+import { VAULT_TEST_ROLLOUT } from '../vault/vault-preference';
 
 const KEY_KEY = 'mockingbird_openrouter_key';
 const VERIFIER_KEY = 'mockingbird_openrouter_pkce_verifier';
@@ -26,7 +27,9 @@ describe('OpenRouterSession', () => {
     // see docs/shared-jsdom-realm-in-tests.md and the stubLocation comment.
     navigatedTo = [];
     stubLocation({ onAssign: (url) => navigatedTo.push(url) });
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [{ provide: VAULT_TEST_ROLLOUT, useValue: true }],
+    });
   });
 
   afterEach(() => {

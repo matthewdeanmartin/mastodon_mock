@@ -816,7 +816,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     // travel with the rest of the settings, and someone who answered the dialog
     // on their desktop does not answer it again on their laptop.
     sensitivity: 'setting',
-    note: 'Which Mawkingbird Plus features are switched on (CORS proxy, settings sync, trust list, client lists, RSS OPML list), and whether the one-time post-sign-in dialog has been answered. Cleared on sign-out so the next account decides for itself.',
+    note: 'Which Mawkingbird Plus features are switched on (CORS proxy, settings sync, trust list, client lists, RSS OPML list, test-deployment connection-key sync), and whether the one-time post-sign-in dialog has been answered. Cleared on sign-out so the next account decides for itself.',
   },
   {
     base: 'mockingbird_config_sync',

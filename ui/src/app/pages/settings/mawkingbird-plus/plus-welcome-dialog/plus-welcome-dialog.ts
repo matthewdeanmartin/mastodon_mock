@@ -6,6 +6,7 @@ import {
   PlusFeatures,
 } from '../../../../providers/account/plus-features';
 import type { PlannedFeature, PlusFeature } from '../../../../providers/account/plus-features';
+import { VAULT_TEST_ROLLOUT } from '../../../../providers/vault/vault-preference';
 
 /**
  * The one-time "what do you want switched on?" dialog.
@@ -36,9 +37,8 @@ import type { PlannedFeature, PlusFeature } from '../../../../providers/account/
  *
  * ## Why the unavailable features are shown at all
  *
- * `apiKeys` and `chat` are rendered disabled rather than omitted. A visible,
- * greyed-out "API key sync" answers "are my API keys being synced?" with a plain
- * no — which a missing row does not.
+ * API key sync is active on the test deployment and remains a visible planned
+ * row elsewhere. Chat remains planned everywhere.
  */
 @Component({
   selector: 'app-plus-welcome-dialog',
@@ -48,11 +48,17 @@ import type { PlannedFeature, PlusFeature } from '../../../../providers/account/
 export class PlusWelcomeDialog {
   private features = inject(PlusFeatures);
   private proxy = inject(CorsProxySettings);
+  private vaultRollout = inject(VAULT_TEST_ROLLOUT);
 
   /** Emitted once the answer is saved and the dialog should come down. */
   readonly saved = output<void>();
 
-  protected readonly planned = PLANNED_FEATURES;
+  protected readonly activeFeatures = PLUS_FEATURES.filter(
+    (feature) => feature !== 'apiKeys' || this.vaultRollout,
+  );
+  protected readonly planned = PLANNED_FEATURES.filter(
+    (feature) => feature !== 'apiKeys' || !this.vaultRollout,
+  );
 
   /**
    * The pending answer, held locally until Save.
@@ -68,7 +74,7 @@ export class PlusWelcomeDialog {
   );
 
   protected readonly rows = computed(() =>
-    PLUS_FEATURES.map((feature) => ({
+    this.activeFeatures.map((feature) => ({
       feature,
       on: this.choices()[feature],
       label: LABELS[feature],
@@ -120,6 +126,7 @@ const LABELS: Record<PlusFeature, string> = {
   trustSync: 'Trusted accounts',
   listsSync: 'Client lists',
   feedsSync: 'RSS subscription list',
+  apiKeys: 'Encrypted connection keys',
 };
 
 const DETAILS: Record<PlusFeature, string> = {
@@ -127,6 +134,7 @@ const DETAILS: Record<PlusFeature, string> = {
   trustSync: 'Who you trust, kept per Mastodon account.',
   listsSync: 'Your lists, stored on your account instead of only in this browser.',
   feedsSync: 'The list of feeds you subscribe to — not the articles themselves.',
+  apiKeys: 'Keep low-churn connector credentials encrypted and available on your other devices.',
 };
 
 const PLANNED_LABELS: Record<PlannedFeature, string> = {
@@ -135,6 +143,6 @@ const PLANNED_LABELS: Record<PlannedFeature, string> = {
 };
 
 const PLANNED_DETAILS: Record<PlannedFeature, string> = {
-  apiKeys: 'Not yet. Keys need encrypted storage that does not exist yet.',
+  apiKeys: 'Being exercised on the test deployment before it is offered here.',
   chat: 'Not yet.',
 };
