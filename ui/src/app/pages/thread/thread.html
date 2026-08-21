@@ -105,7 +105,18 @@
            The expanded document then follows and can be very long. -->
       @if (canExpand()) {
         <section class="reader-expand">
-          @if (expansion(); as result) {
+          <!-- Checked first: this is about whether a fetch is possible at all,
+               so it must not sit behind "has a fetch already happened". -->
+          @if (expansionBlocker(); as blocker) {
+            <!-- The proxy selection lives in localStorage and does not travel
+                 between devices, so the same account on a second browser has
+                 none configured. Saying so beats rendering nothing, which is
+                 indistinguishable from the feature not existing. -->
+            <p class="reader-expand-note">{{ blocker }}</p>
+            <a class="btn btn-outline btn-sm" routerLink="/settings/connections/cors-proxy">
+              Choose a proxy
+            </a>
+          } @else if (expansion(); as result) {
             @if (expansionNote(); as note) {
               <p class="reader-expand-note" role="status">{{ note }}</p>
             }
@@ -142,13 +153,15 @@
               }
               <!-- Disabled at zero quota rather than silently doing nothing:
                    the failure spent nothing, but a retry is still a fetch. -->
-              <button
-                class="btn btn-outline btn-sm"
-                [disabled]="expanding() || !quota.allowed()"
-                (click)="expandArticle(true)"
-              >
-                Try again
-              </button>
+              @if (retriesLeft() > 0) {
+                <button
+                  class="btn btn-outline btn-sm"
+                  [disabled]="expanding() || !quota.allowed()"
+                  (click)="expandArticle(true)"
+                >
+                  Try again
+                </button>
+              }
             }
           } @else {
             <button

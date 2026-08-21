@@ -41,12 +41,22 @@ import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { isElizaId } from '../../eliza/eliza-identity';
 import { messageStatus, parseMessageStatusRouteRef } from '../../providers/paste/message-payload';
+
 import { ArticleFetch } from '../../providers/article/article-fetch';
 import { ArticleQuota } from '../../providers/article/article-quota';
 import { articleTarget } from '../../providers/article/article-target';
 import { ArticleDiagnosis, ArticleResult } from '../../providers/article/article-models';
 import { renderMarkdown } from '../../providers/article/markdown-render';
 import { PreviewCardComponent } from '../../preview-card/preview-card';
+/**
+ * How many times "Try again" may re-fetch one article.
+ *
+ * A failure is never edge-cached (a cached refusal would strand a reader past a
+ * transient one), so each forced retry is a full origin round trip. Two is
+ * enough for the genuinely intermittent case and few enough that a permanently
+ * refusing site stops being asked.
+ */
+const MAX_MANUAL_RETRIES = 2;
 
 @Component({
   selector: 'app-thread',
@@ -150,6 +160,9 @@ export class Thread implements OnInit {
   /** True while a fetch is in flight. */
   protected expanding = signal(false);
 
+  /** Forced retries spent on this post, bounded by `MAX_MANUAL_RETRIES`. */
+  private retries = signal(0);
+
   /** The expanded-article region, so focus can be moved to it when it appears. */
   private expandedArticleRef = viewChild<ElementRef<HTMLElement>>('expandedArticle');
 
@@ -176,7 +189,30 @@ export class Thread implements OnInit {
   });
 
   /** Whether the button should be offered at all. */
-  protected canExpand = computed(() => this.articleUrl() !== null && this.articles.available());
+  /**
+   * Whether this post has an article worth offering to expand.
+   *
+   * Deliberately **not** conditioned on a proxy being configured. It used to be,
+   * and that was a silent failure: the proxy selection lives in `localStorage`
+   * and does not travel between devices, so the same account on a phone simply
+   * had no button and no explanation — indistinguishable from the feature not
+   * existing. Now the section renders and {@link expansionBlocker} says what is
+   * missing.
+   */
+  protected canExpand = computed(() => this.articleUrl() !== null);
+
+  /**
+   * Why expansion cannot run right now, if it cannot.
+   *
+   * Separate from the diagnosis messages, which describe a *fetch* that already
+   * happened. This is about the state of the app before any fetch is possible.
+   */
+  protected expansionBlocker = computed<string | null>(() => {
+    if (!this.articles.available()) {
+      return 'Article expansion needs a CORS proxy. Choose one in Settings › Connections.';
+    }
+    return null;
+  });
 
   /**
    * What to say about a result that is not a clean article.
@@ -278,15 +314,26 @@ export class Thread implements OnInit {
     if (!this.quota.allowed()) {
       return;
     }
+    // A forced retry bypasses the cache, and therefore also bypasses the
+    // failure cooldown that exists to stop a permanently-refusing site being
+    // re-fetched forever. Bounded so that "Try again" stays a deliberate act:
+    // a failure on this route is never cached at the edge, so every retry is a
+    // full origin round trip that costs us and the publisher alike.
+    if (force && this.retries() >= MAX_MANUAL_RETRIES) {
+      return;
+    }
+
     this.expanding.set(true);
     try {
       if (force) {
+        this.retries.update((n) => n + 1);
         await this.articles.forget(url);
       }
       const result = await this.articles.expand(url, force);
       this.expansion.set(result);
       // Only a rendered article counts against the daily limit.
       if (result.article) {
+        this.retries.set(0);
         this.quota.consume();
         this.focusExpandedArticle();
       }
@@ -294,6 +341,9 @@ export class Thread implements OnInit {
       this.expanding.set(false);
     }
   }
+
+  /** Whether another manual retry is allowed for this post. */
+  protected retriesLeft = computed(() => MAX_MANUAL_RETRIES - this.retries());
 
   /**
    * Move focus to the article that just appeared.
