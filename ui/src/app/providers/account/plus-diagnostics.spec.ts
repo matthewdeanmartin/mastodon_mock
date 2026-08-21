@@ -65,7 +65,12 @@ function build(
       { provide: ProfileLists, useValue: options.lists ?? remoteDouble(1) },
       {
         provide: ProfileAccountKey,
-        useValue: { current: () => options.activeAccount ?? 'mastodon:example.social/alice' },
+        useValue: {
+          current: () =>
+            options.activeAccount === undefined
+              ? 'mastodon:example.social/alice'
+              : options.activeAccount,
+        },
       },
       {
         provide: ProfileSync,
@@ -159,6 +164,73 @@ describe('what it reports', () => {
       },
     ]);
     expect(diagnostics.storedAccountCount()).toBe(1);
+  });
+
+  it('marks an already-stored active persona without adding a duplicate row', async () => {
+    const { diagnostics } = build({
+      activeAccount: 'mastodon:example.social/alice',
+      manifest: {
+        kind: 'ok',
+        value: {
+          readOnly: false,
+          quota: { used: 2048, limit: 1_000_000 },
+          conflicts: 0,
+          accounts: [
+            {
+              accountKey: 'mastodon:example.social/alice',
+              collections: {
+                trust: { revision: 2, count: 1 },
+                feeds: { revision: 3, count: 2 },
+                lists: { revision: 1, count: 1 },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    await diagnostics.load();
+
+    expect(diagnostics.accountRows()).toEqual([
+      expect.objectContaining({
+        accountKey: 'mastodon:example.social/alice',
+        active: true,
+        stored: true,
+        trust: 1,
+        feeds: 2,
+        lists: 1,
+      }),
+    ]);
+  });
+
+  it('does not invent an active persona when no provider account is selected', async () => {
+    const { diagnostics } = build({
+      activeAccount: null,
+      manifest: {
+        kind: 'ok',
+        value: {
+          readOnly: false,
+          quota: { used: 2048, limit: 1_000_000 },
+          conflicts: 0,
+          accounts: [
+            {
+              accountKey: 'mastodon:example.social/alice',
+              collections: { trust: { revision: 2, count: 1 } },
+            },
+          ],
+        },
+      },
+    });
+
+    await diagnostics.load();
+
+    expect(diagnostics.accountRows()).toEqual([
+      expect.objectContaining({
+        accountKey: 'mastodon:example.social/alice',
+        active: false,
+        stored: true,
+      }),
+    ]);
   });
 
   it('reports an unreadable collection as unknown, not as zero', async () => {

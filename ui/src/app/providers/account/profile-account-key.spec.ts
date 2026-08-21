@@ -30,6 +30,12 @@ describe('mastodonAccountKey', () => {
     expect(first).toBe(second);
   });
 
+  it('gives two accounts on one Mastodon server different namespaces', () => {
+    expect(mastodonAccountKey('alice', 'https://example.social')).not.toBe(
+      mastodonAccountKey('alt', 'https://example.social'),
+    );
+  });
+
   it('lowercases both halves so case cannot fork a namespace', () => {
     expect(mastodonAccountKey('Alice', 'https://Example.Social')).toBe(
       'mastodon:example.social/alice',

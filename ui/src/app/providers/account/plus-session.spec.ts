@@ -179,6 +179,28 @@ describe('PlusSession', () => {
     expect(plus.subscription()).toBeNull();
   });
 
+  it('uses a confirmed Plus entitlement to refresh a stale free auth claim', async () => {
+    const pending = plus.token();
+    await settle();
+    respond({ tier: 'plus' });
+    await pending;
+
+    // The proxy entitlement is minted from the same billing row as the auth
+    // claim. This handoff is what prevents a fresh 24-hour free JWT from
+    // continuing to receive 402s after checkout succeeds.
+    expect(session.upgradeIfStale).toHaveBeenCalledOnce();
+    expect(session.upgradeIfStale).toHaveBeenCalledWith(true);
+  });
+
+  it('does not discard the auth token when billing still reports free', async () => {
+    const pending = plus.token();
+    await settle();
+    respond({ tier: 'free', subscription: null });
+    await pending;
+
+    expect(session.upgradeIfStale).not.toHaveBeenCalled();
+  });
+
   it('discards the held token on refresh', async () => {
     const first = plus.token();
     await settle();
