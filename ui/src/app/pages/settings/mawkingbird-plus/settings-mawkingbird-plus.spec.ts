@@ -460,6 +460,23 @@ describe('SettingsMawkingbirdPlus test vault rollout', () => {
     expect(text).toContain('OpenRouter, Mataroa, GitHub Gist');
   });
 
+  it('puts encrypted connection keys directly below what is switched on', async () => {
+    TestBed.inject(PlusFeatures).save({});
+    await renderPlus();
+
+    const sections = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('section'),
+    ];
+    const switches = sections.find((section) =>
+      section.querySelector('h2')?.textContent?.includes("What's switched on"),
+    );
+    const vaultSection = sections.find((section) => section.classList.contains('plus-vault'));
+
+    expect(switches).toBeDefined();
+    expect(vaultSection).toBeDefined();
+    expect(sections.indexOf(vaultSection!)).toBe(sections.indexOf(switches!) + 1);
+  });
+
   it('keeps diagnostics visible when Plus is the broken gate', async () => {
     session.ready.set(true);
     session.user.set({ auth: 'email', tier: 'free' });

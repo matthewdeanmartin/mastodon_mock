@@ -68,254 +68,260 @@
       <button class="btn btn-outline" type="button" (click)="signOut()">Sign out</button>
     </section>
 
-    @if (vaultPreference.available) {
-      <section class="plus-vault" aria-labelledby="plus-vault-heading">
-        <div class="plus-vault-title">
-          <div>
-            <h2 id="plus-vault-heading">Encrypted connection keys</h2>
-            <p class="muted small">
-              Test deployment. Mawkingbird stores only ciphertext; your passphrase and decrypted
-              keys stay in this browser.
-            </p>
+    <ng-template #vaultPanel>
+      @if (vaultPreference.available) {
+        <section class="plus-vault" aria-labelledby="plus-vault-heading">
+          <div class="plus-vault-title">
+            <div>
+              <h2 id="plus-vault-heading">Encrypted connection keys</h2>
+              <p class="muted small">
+                Test deployment. Mawkingbird stores only ciphertext; your passphrase and decrypted
+                keys stay in this browser.
+              </p>
+            </div>
+            <label class="plus-vault-toggle">
+              <input
+                type="checkbox"
+                [checked]="vaultPreference.enabled()"
+                [disabled]="!plus.isSupporter() || vaultBusy()"
+                (change)="setVaultEnabled($any($event.target).checked)"
+              />
+              <span>{{ vaultPreference.enabled() ? 'On' : 'Off' }}</span>
+            </label>
           </div>
-          <label class="plus-vault-toggle">
-            <input
-              type="checkbox"
-              [checked]="vaultPreference.enabled()"
-              [disabled]="!plus.isSupporter() || vaultBusy()"
-              (change)="setVaultEnabled($any($event.target).checked)"
-            />
-            <span>{{ vaultPreference.enabled() ? 'On' : 'Off' }}</span>
-          </label>
-        </div>
 
-        <h3>Why it is or is not working</h3>
-        <dl class="plus-vault-diagnostics">
-          <dt>Deployment</dt>
-          <dd class="connection-ok">Test rollout enabled</dd>
-          <dt>Plus entitlement</dt>
-          <dd [class.connection-ok]="plus.isSupporter()" [class.config-error]="!plus.isSupporter()">
-            {{ plus.isSupporter() ? 'Recognized' : 'Not recognized — the switch stays disabled' }}
-          </dd>
-          <dt>Sync switch</dt>
-          <dd>{{ vaultPreference.enabled() ? 'On' : 'Off on this browser' }}</dd>
-          <dt>Encrypted store</dt>
-          <dd>
+          <h3>Why it is or is not working</h3>
+          <dl class="plus-vault-diagnostics">
+            <dt>Deployment</dt>
+            <dd class="connection-ok">Test rollout enabled</dd>
+            <dt>Plus entitlement</dt>
+            <dd
+              [class.connection-ok]="plus.isSupporter()"
+              [class.config-error]="!plus.isSupporter()"
+            >
+              {{ plus.isSupporter() ? 'Recognized' : 'Not recognized — the switch stays disabled' }}
+            </dd>
+            <dt>Sync switch</dt>
+            <dd>{{ vaultPreference.enabled() ? 'On' : 'Off on this browser' }}</dd>
+            <dt>Encrypted store</dt>
+            <dd>
+              @switch (vault.state()) {
+                @case ('unknown') {
+                  Not checked yet
+                }
+                @case ('absent') {
+                  Ready, but no encrypted store has been created
+                }
+                @case ('locked') {
+                  Found and locked on this browser
+                }
+                @case ('unlocked') {
+                  <span class="connection-ok">Open and syncing</span>
+                }
+                @case ('unavailable') {
+                  <span class="config-error">
+                    @switch (vault.unavailableReason()) {
+                      @case ('needs-plus') {
+                        The profile Worker did not recognize Plus
+                      }
+                      @case ('needs-idp') {
+                        The Worker requires a stronger sign-in (unexpected on test)
+                      }
+                      @case ('not-a-tester') {
+                        The profile Worker did not recognize this account as a tester
+                      }
+                      @case ('offline') {
+                        The profile Worker or vault binding could not be reached
+                      }
+                      @default {
+                        The profile Worker did not recognize this sign-in
+                      }
+                    }
+                  </span>
+                }
+              }
+            </dd>
+            @if (vault.meta(); as meta) {
+              <dt>Encrypted bytes</dt>
+              <dd>{{ formatBytes(meta.bytes) }}</dd>
+              <dt>Stored-copy expiry</dt>
+              <dd>
+                {{
+                  meta.expiresAt ? (meta.expiresAt | date: 'medium') : 'No expiry while subscribed'
+                }}
+              </dd>
+            }
+          </dl>
+
+          <h3>What you are getting</h3>
+          @if (vault.unlocked()) {
+            <p class="plus-vault-benefit">
+              <strong>{{ vault.count() }}</strong>
+              {{ vault.count() === 1 ? 'connection credential is' : 'connection credentials are' }}
+              encrypted and available to your other devices.
+            </p>
+            @if (vaultConnectors().length > 0) {
+              <p class="muted small">Stored for: {{ vaultConnectors().join(', ') }}.</p>
+            } @else {
+              <p class="muted small">
+                The store is empty. Connect a supported low-churn service, or sync keys already in
+                this browser.
+              </p>
+            }
+          } @else if (vault.meta()) {
+            <p class="muted small">
+              A stored copy exists, but its credential count and connector names are encrypted.
+              Unlock it to see them — the server genuinely cannot.
+            </p>
+          } @else {
+            <p class="muted small">No connection credentials are stored yet.</p>
+          }
+
+          @if (!plus.isSupporter()) {
+            <p class="config-error" role="alert">
+              This test account is signed in, but its current token says Free. Refreshing the
+              account or fixing the test subscription should change “Plus entitlement” above to
+              Recognized.
+            </p>
+          } @else if (vaultPreference.enabled()) {
             @switch (vault.state()) {
               @case ('unknown') {
-                Not checked yet
-              }
-              @case ('absent') {
-                Ready, but no encrypted store has been created
-              }
-              @case ('locked') {
-                Found and locked on this browser
-              }
-              @case ('unlocked') {
-                <span class="connection-ok">Open and syncing</span>
+                <button
+                  class="btn btn-outline"
+                  type="button"
+                  [disabled]="vaultBusy()"
+                  (click)="refreshVault()"
+                >
+                  {{ vaultBusy() ? 'Checking…' : 'Check test vault' }}
+                </button>
               }
               @case ('unavailable') {
-                <span class="config-error">
-                  @switch (vault.unavailableReason()) {
-                    @case ('needs-plus') {
-                      The profile Worker did not recognize Plus
-                    }
-                    @case ('needs-idp') {
-                      The Worker requires a stronger sign-in (unexpected on test)
-                    }
-                    @case ('not-a-tester') {
-                      The profile Worker did not recognize this account as a tester
-                    }
-                    @case ('offline') {
-                      The profile Worker or vault binding could not be reached
-                    }
-                    @default {
-                      The profile Worker did not recognize this sign-in
-                    }
-                  }
-                </span>
+                <button
+                  class="btn btn-outline"
+                  type="button"
+                  [disabled]="vaultBusy()"
+                  (click)="refreshVault()"
+                >
+                  {{ vaultBusy() ? 'Checking…' : 'Retry diagnostics' }}
+                </button>
+              }
+              @case ('absent') {
+                <form class="plus-vault-form" (submit)="$event.preventDefault(); createVault()">
+                  <label for="vault-new-passphrase">New vault passphrase</label>
+                  <input
+                    id="vault-new-passphrase"
+                    type="password"
+                    autocomplete="new-password"
+                    required
+                    [value]="vaultPassphrase()"
+                    (input)="vaultPassphrase.set($any($event.target).value)"
+                  />
+                  <label for="vault-new-passphrase-again">Repeat passphrase</label>
+                  <input
+                    id="vault-new-passphrase-again"
+                    type="password"
+                    autocomplete="new-password"
+                    required
+                    [value]="vaultPassphraseAgain()"
+                    (input)="vaultPassphraseAgain.set($any($event.target).value)"
+                  />
+                  <button class="btn" type="submit" [disabled]="vaultBusy()">
+                    {{ vaultBusy() ? 'Creating…' : 'Create encrypted store' }}
+                  </button>
+                </form>
+              }
+              @case ('locked') {
+                <form class="plus-vault-form" (submit)="$event.preventDefault(); unlockVault()">
+                  <label for="vault-passphrase">Vault passphrase</label>
+                  <input
+                    id="vault-passphrase"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                    [value]="vaultPassphrase()"
+                    (input)="vaultPassphrase.set($any($event.target).value)"
+                  />
+                  <button class="btn" type="submit" [disabled]="vaultBusy()">
+                    {{ vaultBusy() ? 'Unlocking…' : 'Unlock on this browser' }}
+                  </button>
+                </form>
+              }
+              @case ('unlocked') {
+                <div class="plus-actions">
+                  <button
+                    class="btn btn-outline"
+                    type="button"
+                    [disabled]="vaultBusy()"
+                    (click)="syncExistingVaultKeys()"
+                  >
+                    Sync keys from this browser
+                  </button>
+                  <button
+                    class="btn btn-outline"
+                    type="button"
+                    [disabled]="vaultBusy()"
+                    (click)="lockVault()"
+                  >
+                    Lock now
+                  </button>
+                </div>
+
+                <label class="plus-vault-policy" for="vault-policy"
+                  >Delete the encrypted stored copy</label
+                >
+                <select
+                  id="vault-policy"
+                  [disabled]="vaultBusy()"
+                  [value]="vaultPolicyValue()"
+                  (change)="setVaultPolicy($any($event.target).value)"
+                >
+                  <option value="idle-90">After 90 days without use</option>
+                  <option value="idle-365">After 365 days without use</option>
+                  <option value="absolute-90">90 days after it was created</option>
+                  <option value="absolute-365">365 days after it was created</option>
+                  <option value="never">Never while Plus remains active</option>
+                </select>
+
+                <form
+                  class="plus-vault-form"
+                  (submit)="$event.preventDefault(); changeVaultPassphrase()"
+                >
+                  <label for="vault-next-passphrase">Change passphrase</label>
+                  <input
+                    id="vault-next-passphrase"
+                    type="password"
+                    autocomplete="new-password"
+                    required
+                    [value]="vaultNextPassphrase()"
+                    (input)="vaultNextPassphrase.set($any($event.target).value)"
+                  />
+                  <button class="btn btn-outline" type="submit" [disabled]="vaultBusy()">
+                    Change passphrase
+                  </button>
+                </form>
+
+                <button
+                  class="btn btn-outline plus-vault-delete"
+                  type="button"
+                  [disabled]="vaultBusy()"
+                  (click)="destroyVault()"
+                >
+                  {{
+                    vaultDeleteArmed()
+                      ? 'Confirm: delete encrypted stored copy'
+                      : 'Delete encrypted stored copy'
+                  }}
+                </button>
               }
             }
-          </dd>
-          @if (vault.meta(); as meta) {
-            <dt>Encrypted bytes</dt>
-            <dd>{{ formatBytes(meta.bytes) }}</dd>
-            <dt>Stored-copy expiry</dt>
-            <dd>
-              {{
-                meta.expiresAt ? (meta.expiresAt | date: 'medium') : 'No expiry while subscribed'
-              }}
-            </dd>
           }
-        </dl>
 
-        <h3>What you are getting</h3>
-        @if (vault.unlocked()) {
-          <p class="plus-vault-benefit">
-            <strong>{{ vault.count() }}</strong>
-            {{ vault.count() === 1 ? 'connection credential is' : 'connection credentials are' }}
-            encrypted and available to your other devices.
-          </p>
-          @if (vaultConnectors().length > 0) {
-            <p class="muted small">Stored for: {{ vaultConnectors().join(', ') }}.</p>
-          } @else {
-            <p class="muted small">
-              The store is empty. Connect a supported low-churn service, or sync keys already in
-              this browser.
-            </p>
+          @if (vaultMessage(); as message) {
+            <p class="muted small" role="status">{{ message }}</p>
           }
-        } @else if (vault.meta()) {
-          <p class="muted small">
-            A stored copy exists, but its credential count and connector names are encrypted. Unlock
-            it to see them — the server genuinely cannot.
-          </p>
-        } @else {
-          <p class="muted small">No connection credentials are stored yet.</p>
-        }
-
-        @if (!plus.isSupporter()) {
-          <p class="config-error" role="alert">
-            This test account is signed in, but its current token says Free. Refreshing the account
-            or fixing the test subscription should change “Plus entitlement” above to Recognized.
-          </p>
-        } @else if (vaultPreference.enabled()) {
-          @switch (vault.state()) {
-            @case ('unknown') {
-              <button
-                class="btn btn-outline"
-                type="button"
-                [disabled]="vaultBusy()"
-                (click)="refreshVault()"
-              >
-                {{ vaultBusy() ? 'Checking…' : 'Check test vault' }}
-              </button>
-            }
-            @case ('unavailable') {
-              <button
-                class="btn btn-outline"
-                type="button"
-                [disabled]="vaultBusy()"
-                (click)="refreshVault()"
-              >
-                {{ vaultBusy() ? 'Checking…' : 'Retry diagnostics' }}
-              </button>
-            }
-            @case ('absent') {
-              <form class="plus-vault-form" (submit)="$event.preventDefault(); createVault()">
-                <label for="vault-new-passphrase">New vault passphrase</label>
-                <input
-                  id="vault-new-passphrase"
-                  type="password"
-                  autocomplete="new-password"
-                  required
-                  [value]="vaultPassphrase()"
-                  (input)="vaultPassphrase.set($any($event.target).value)"
-                />
-                <label for="vault-new-passphrase-again">Repeat passphrase</label>
-                <input
-                  id="vault-new-passphrase-again"
-                  type="password"
-                  autocomplete="new-password"
-                  required
-                  [value]="vaultPassphraseAgain()"
-                  (input)="vaultPassphraseAgain.set($any($event.target).value)"
-                />
-                <button class="btn" type="submit" [disabled]="vaultBusy()">
-                  {{ vaultBusy() ? 'Creating…' : 'Create encrypted store' }}
-                </button>
-              </form>
-            }
-            @case ('locked') {
-              <form class="plus-vault-form" (submit)="$event.preventDefault(); unlockVault()">
-                <label for="vault-passphrase">Vault passphrase</label>
-                <input
-                  id="vault-passphrase"
-                  type="password"
-                  autocomplete="current-password"
-                  required
-                  [value]="vaultPassphrase()"
-                  (input)="vaultPassphrase.set($any($event.target).value)"
-                />
-                <button class="btn" type="submit" [disabled]="vaultBusy()">
-                  {{ vaultBusy() ? 'Unlocking…' : 'Unlock on this browser' }}
-                </button>
-              </form>
-            }
-            @case ('unlocked') {
-              <div class="plus-actions">
-                <button
-                  class="btn btn-outline"
-                  type="button"
-                  [disabled]="vaultBusy()"
-                  (click)="syncExistingVaultKeys()"
-                >
-                  Sync keys from this browser
-                </button>
-                <button
-                  class="btn btn-outline"
-                  type="button"
-                  [disabled]="vaultBusy()"
-                  (click)="lockVault()"
-                >
-                  Lock now
-                </button>
-              </div>
-
-              <label class="plus-vault-policy" for="vault-policy"
-                >Delete the encrypted stored copy</label
-              >
-              <select
-                id="vault-policy"
-                [disabled]="vaultBusy()"
-                [value]="vaultPolicyValue()"
-                (change)="setVaultPolicy($any($event.target).value)"
-              >
-                <option value="idle-90">After 90 days without use</option>
-                <option value="idle-365">After 365 days without use</option>
-                <option value="absolute-90">90 days after it was created</option>
-                <option value="absolute-365">365 days after it was created</option>
-                <option value="never">Never while Plus remains active</option>
-              </select>
-
-              <form
-                class="plus-vault-form"
-                (submit)="$event.preventDefault(); changeVaultPassphrase()"
-              >
-                <label for="vault-next-passphrase">Change passphrase</label>
-                <input
-                  id="vault-next-passphrase"
-                  type="password"
-                  autocomplete="new-password"
-                  required
-                  [value]="vaultNextPassphrase()"
-                  (input)="vaultNextPassphrase.set($any($event.target).value)"
-                />
-                <button class="btn btn-outline" type="submit" [disabled]="vaultBusy()">
-                  Change passphrase
-                </button>
-              </form>
-
-              <button
-                class="btn btn-outline plus-vault-delete"
-                type="button"
-                [disabled]="vaultBusy()"
-                (click)="destroyVault()"
-              >
-                {{
-                  vaultDeleteArmed()
-                    ? 'Confirm: delete encrypted stored copy'
-                    : 'Delete encrypted stored copy'
-                }}
-              </button>
-            }
-          }
-        }
-
-        @if (vaultMessage(); as message) {
-          <p class="muted small" role="status">{{ message }}</p>
-        }
-      </section>
-    }
+        </section>
+      }
+    </ng-template>
 
     @if (plus.isSupporter() && features.decided()) {
       <!--
@@ -349,6 +355,8 @@
         }
       </section>
     }
+
+    <ng-container [ngTemplateOutlet]="vaultPanel" />
 
     @if (plus.isSupporter()) {
       <!--

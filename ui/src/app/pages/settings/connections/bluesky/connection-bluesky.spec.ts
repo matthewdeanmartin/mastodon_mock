@@ -84,6 +84,7 @@ describe('ConnectionBluesky', () => {
     expect(el.textContent).toContain('Me!');
     expect(el.textContent).toContain('@me.bsky.social');
     expect(el.textContent).toContain('Unlink');
+    expect(el.textContent).toContain('Not stored with Mawkingbird');
   });
 
   it('shows a friendly error when Bluesky rejects the credentials', () => {

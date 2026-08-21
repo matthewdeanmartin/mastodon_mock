@@ -2,8 +2,9 @@
   <h1>Connections</h1>
   <p>
     Follow your people wherever they post. Mastodon is home — a connection is one account somewhere
-    else, merged in as a guest. Everything here stays in this browser (localStorage), like all
-    Mockingbird preferences.
+    else, merged in as a guest. Credentials work from this browser first; supported low-churn keys
+    can also be encrypted with Mawkingbird Plus and synced to your other devices. Each connected
+    card says which is true.
   </p>
   <p class="muted small">
     Subscribing to many feeds at once isn't a connection — that lives under
@@ -12,6 +13,13 @@
 </div>
 
 <div class="spage-body">
+  @if (vaultInventoryNeedsAttention()) {
+    <p class="muted small">
+      The encrypted inventory is closed, so some badges cannot be verified.
+      <a [routerLink]="['/settings/mawkingbird-plus']">Open Mawkingbird Plus</a> once to unlock it
+      or see why it is unavailable.
+    </p>
+  }
   <ul class="catalog" aria-label="Available connections">
     @for (row of rows(); track row.entry.id) {
       <li>
@@ -36,6 +44,9 @@
               <span class="pill pill-scope" [title]="scopeCopy[row.entry.scope].detail">
                 {{ scopeCopy[row.entry.scope].label }}
               </span>
+              @if (row.storage; as storage) {
+                <app-storage-badge [where]="storage" />
+              }
             </span>
             <span class="muted catalog-pitch">{{ row.entry.pitch }}</span>
             @if (row.unavailableReason; as reason) {
@@ -79,11 +90,13 @@
   <section class="conn-section">
     <h2>🔑 How long to keep credentials</h2>
     <p class="muted">
-      GitHub, Raindrop.io and Bluesky are connected by pasting a long-lived secret. There is no
-      server here to hold those, so they sit in this browser until something removes them. Pick how
-      long that should be — when a connection reaches its limit it is disconnected and the
-      credential is deleted from this browser. Reconnecting takes a few seconds and restarts the
-      clock.
+      GitHub and Raindrop.io use a pasted long-lived token. Bluesky exchanges the one-time login
+      secret you enter for rotating session tokens, then discards that secret. There is no
+      unencrypted server copy: credentials sit in this browser until something removes them.
+      Supported low-churn credentials may also have an end-to-end encrypted Mawkingbird Plus copy;
+      Bluesky's rotating session tokens do not. The badges above report the difference. Pick how
+      long the local copy should remain — a Plus-backed credential locks here at the limit, while a
+      browser-only credential disconnects. Reconnecting restarts the clock.
     </p>
     <p class="muted">
       This does not apply to Dropbox, which uses a proper OAuth flow with short-lived tokens that

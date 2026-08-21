@@ -115,6 +115,23 @@ export class VaultService {
     return VAULTED_KEYS.filter((entry) => bases.has(entry.base)).map((entry) => entry.connector);
   });
 
+  /** Whether the open vault actually holds this connector for the current scope. */
+  hasConnector(connector: string, accountKey: string | null): boolean {
+    const bundle = this.bundle();
+    if (!bundle) {
+      return false;
+    }
+    return VAULTED_KEYS.filter((entry) => entry.connector === connector).some((entry) => {
+      const values =
+        entry.scope === 'browser'
+          ? bundle.browser
+          : accountKey
+            ? bundle.accounts[accountKey]
+            : undefined;
+      return values ? Object.prototype.hasOwnProperty.call(values, entry.base) : false;
+    });
+  }
+
   /**
    * The decrypted bundle, held in memory only while unlocked.
    *

@@ -21,6 +21,7 @@
 }
 
 @if (bsky.session(); as session) {
+  <p><app-storage-badge [where]="'local'" /></p>
   <div class="bsky-linked">
     <img class="bsky-avatar" [src]="session.avatar || ''" alt="" decoding="async" />
     <span class="names">

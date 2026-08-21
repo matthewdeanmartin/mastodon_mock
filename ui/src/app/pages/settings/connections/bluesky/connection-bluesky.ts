@@ -6,11 +6,12 @@ import { BlueskySession } from '../../../../providers/bluesky/bluesky-session';
 import { AnonymousCapabilities } from '../../../../providers/anonymous/anonymous-capabilities';
 import { expiryLabel } from '../expiry-label';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
+import { StorageBadge } from '../storage-badge';
 
 /** Settings → Connections → Bluesky. App-password link; the only read/write connector. */
 @Component({
   selector: 'app-connection-bluesky',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, StorageBadge],
   templateUrl: './connection-bluesky.html',
   styleUrls: ['../connection-page.css', './connection-bluesky.css'],
 })

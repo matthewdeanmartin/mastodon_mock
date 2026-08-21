@@ -15,7 +15,7 @@
  * same reason `expiryLabel` is a free function: every connection answers the
  * same question about the same contract, and more connectors are coming.
  *
- * ## The three states, and the one that is easy to get wrong
+ * ## The states, and the one that is easy to get wrong
  *
  * `locked` is the state worth care. It means the vault holds the credential and
  * this browser does not — local retention expired the plaintext while the
@@ -29,12 +29,16 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /** Where a connection's credential currently lives. */
 export type CredentialLocation =
+  /** The connector works without a credential at all. */
+  | 'none'
   /** In this browser only. Nothing left the machine. */
   | 'local'
   /** Encrypted with Mawkingbird, and present here too. */
   | 'vaulted'
   /** Encrypted with Mawkingbird, but not in this browser right now. */
-  | 'locked';
+  | 'locked'
+  /** The vault is closed or unavailable, so its encrypted inventory cannot be inspected. */
+  | 'unknown';
 
 @Component({
   selector: 'app-storage-badge',
@@ -51,7 +55,7 @@ export type CredentialLocation =
       border: 1px solid currentColor;
       border-radius: 999px;
       font-size: 0.75rem;
-      /* Deliberately not colour alone: the three states must be distinguishable
+      /* Deliberately not colour alone: the states must be distinguishable
          without relying on hue, and the words already do that work. */
       opacity: 0.85;
     }
@@ -67,8 +71,12 @@ export class StorageBadge {
       case 'locked':
         // Not "disconnected", and not "missing". The connection is live.
         return 'Stored with Mawkingbird — locked here';
+      case 'unknown':
+        return 'Unlock Plus to check';
+      case 'none':
+        return 'No key to store';
       default:
-        return 'This browser only';
+        return 'Not stored with Mawkingbird';
     }
   }
 
@@ -84,8 +92,12 @@ export class StorageBadge {
           'The stored copy is still there; this browser just does not have it right now. ' +
           'Unlock your vault and it comes back — you do not need to reconnect.'
         );
+      case 'unknown':
+        return 'The encrypted vault is not open, so this browser cannot honestly say whether this connector is in it.';
+      case 'none':
+        return 'This connection does not currently use a credential that Mawkingbird could store.';
       default:
-        return 'This credential has never left this browser. It will not appear on your other devices.';
+        return 'This credential is not in your Mawkingbird Plus vault. It will not appear on your other devices.';
     }
   }
 }

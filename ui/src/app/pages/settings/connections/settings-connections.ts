@@ -21,17 +21,24 @@ import {
   CredentialLifetimeStore,
 } from '../../../providers/credential-lifetime';
 import { FeatureFlags } from '../../../feature-flags';
+import { ProfileAccountKey } from '../../../providers/account/profile-account-key';
+import { VAULTED_KEYS } from '../../../providers/vault/vault-manifest';
+import { VaultPreference } from '../../../providers/vault/vault-preference';
+import { VaultService } from '../../../providers/vault/vault-service';
 import {
   CONNECTION_CATALOG,
   CONNECTION_FLAGS,
   CONNECTION_SCOPE_COPY,
   ConnectionCatalogEntry,
 } from './connection-catalog';
+import { type CredentialLocation, StorageBadge } from './storage-badge';
 
 /** A catalog entry joined to the live state only the injector can supply. */
 export interface ConnectionCatalogRow {
   entry: ConnectionCatalogEntry;
   connected: boolean;
+  /** Where this connector's credential is kept, or null when none exists yet. */
+  storage: CredentialLocation | null;
   /**
    * Why this connector cannot be used in this build or by this account, or
    * null when it can. An unavailable entry still renders — greyed, with the
@@ -56,7 +63,7 @@ export interface ConnectionCatalogRow {
  */
 @Component({
   selector: 'app-settings-connections',
-  imports: [RouterLink],
+  imports: [RouterLink, StorageBadge],
   templateUrl: './settings-connections.html',
   styleUrl: './settings-connections.css',
 })
@@ -81,6 +88,9 @@ export class SettingsConnections implements OnInit {
   private pastepileKey = inject(PastepileKey);
   protected lifetimes = inject(CredentialLifetimeStore);
   private flags = inject(FeatureFlags);
+  private vault = inject(VaultService);
+  private vaultPreference = inject(VaultPreference);
+  private accountKey = inject(ProfileAccountKey);
 
   protected readonly lifetimeOptions = CREDENTIAL_LIFETIME_OPTIONS;
   protected readonly scopeCopy = CONNECTION_SCOPE_COPY;
@@ -99,14 +109,32 @@ export class SettingsConnections implements OnInit {
       // it is the one the card explains.
       const flagReason = this.flags.disabledReason(CONNECTION_FLAGS[entry.id]);
       if (flagReason) {
-        return { entry, connected: false, unavailableReason: flagReason, flagged: true };
+        return {
+          entry,
+          connected: false,
+          storage: null,
+          unavailableReason: flagReason,
+          flagged: true,
+        };
       }
-      return { ...this.liveRow(entry), flagged: false };
+      const live = this.liveRow(entry);
+      return {
+        ...live,
+        storage: this.credentialLocation(entry, live.connected),
+        flagged: false,
+      };
     }),
   );
 
+  /** One unlock replaces thirteen trips into child pages when inventory is opaque. */
+  protected readonly vaultInventoryNeedsAttention = computed(() =>
+    this.rows().some((row) => row.storage === 'unknown'),
+  );
+
   /** The catalog entry joined to its session state, ignoring rollout flags. */
-  private liveRow(entry: ConnectionCatalogEntry): Omit<ConnectionCatalogRow, 'flagged'> {
+  private liveRow(
+    entry: ConnectionCatalogEntry,
+  ): Omit<ConnectionCatalogRow, 'flagged' | 'storage'> {
     {
       switch (entry.id) {
         case 'mastodon':
@@ -149,12 +177,20 @@ export class SettingsConnections implements OnInit {
           // use — a proxy that needs a key and has none is configured, not
           // working, and saying otherwise would explain nothing when a feed
           // still fails.
-          return { entry, connected: this.corsProxy.usable(), unavailableReason: null };
+          return {
+            entry,
+            connected: this.corsProxy.usable() || this.corsProxy.needsFetch(),
+            unavailableReason: null,
+          };
         case 'link-shortener':
           // Same standard as the proxy: a stored key with no short domain (which
           // Short.io requires) is configured but not usable, and the card should
           // not claim otherwise.
-          return { entry, connected: this.shortener.usable(), unavailableReason: null };
+          return {
+            entry,
+            connected: this.shortener.usable() || this.needsVaultFetch(entry),
+            unavailableReason: null,
+          };
         case 'twitter':
           // Deliberately the weakest claim on this page: a key is stored and a
           // source is chosen. Unlike the others, that is genuinely not enough to
@@ -163,9 +199,17 @@ export class SettingsConnections implements OnInit {
           // check, and the connector's own page owns the five-stage setup state.
           // Reporting "not connected" to someone who has pasted a valid key
           // would send them looking for a key problem that does not exist.
-          return { entry, connected: this.twitter.usable(), unavailableReason: null };
+          return {
+            entry,
+            connected: this.twitter.usable() || this.needsVaultFetch(entry),
+            unavailableReason: null,
+          };
         case 'mataroa':
-          return { entry, connected: this.mataroa.connected(), unavailableReason: null };
+          return {
+            entry,
+            connected: this.mataroa.connected() || this.mataroa.needsFetch(),
+            unavailableReason: null,
+          };
         case 'blogger':
           // A build with no OAuth client id cannot offer this at all, which is
           // a fact about the build rather than something the user can fix —
@@ -182,14 +226,93 @@ export class SettingsConnections implements OnInit {
         case 'hugo':
           // Both halves: the repo can outlive the token, and in that state
           // nothing can be published.
-          return { entry, connected: this.hugo.connected(), unavailableReason: null };
+          return {
+            entry,
+            connected: this.hugo.connected() || this.hugo.needsFetch(),
+            unavailableReason: null,
+          };
         case 'gist':
           return { entry, connected: this.gist.connected(), unavailableReason: null };
       }
     }
   }
 
-  ngOnInit(): void {
+  /**
+   * Report actual encrypted inventory when it is open, and say when that fact
+   * cannot be inspected. Eligibility alone is not proof that a write succeeded.
+   */
+  private credentialLocation(
+    entry: ConnectionCatalogEntry,
+    connected: boolean,
+  ): CredentialLocation | null {
+    const needsFetch = this.needsVaultFetch(entry);
+    if (!connected && !needsFetch) {
+      return null;
+    }
+    if (!this.usesCredential(entry)) {
+      return 'none';
+    }
+    const vaultable = VAULTED_KEYS.some((key) => key.connector === entry.id);
+    if (!vaultable || !this.vaultPreference.available) {
+      return 'local';
+    }
+    if (this.vault.unlocked()) {
+      const stored = this.vault.hasConnector(entry.id, this.accountKey.current());
+      return stored ? (needsFetch ? 'locked' : 'vaulted') : 'local';
+    }
+    if (needsFetch) {
+      return 'locked';
+    }
+    return this.vault.state() === 'absent' ? 'local' : 'unknown';
+  }
+
+  /** Whether this connected entry has a credential, rather than configuration only. */
+  private usesCredential(entry: ConnectionCatalogEntry): boolean {
+    switch (entry.id) {
+      case 'mastodon':
+        return this.mastodon.signedIn();
+      case 'cors-proxy':
+        return this.corsProxy.hasKey();
+      case 'link-shortener': {
+        const id = this.shortener.activeId();
+        return id ? this.shortener.hasKey(id) : false;
+      }
+      default:
+        return true;
+    }
+  }
+
+  /** Whether local retention removed the plaintext while preserving the connection. */
+  private needsVaultFetch(entry: ConnectionCatalogEntry): boolean {
+    switch (entry.id) {
+      case 'openrouter':
+        return this.openrouter.needsFetch();
+      case 'raindrop':
+        return this.raindrop.needsFetch();
+      case 'github':
+        return this.github.needsFetch();
+      case 'cors-proxy':
+        return this.corsProxy.needsFetch();
+      case 'link-shortener': {
+        const id = this.shortener.activeId();
+        return id ? this.shortener.needsFetch().includes(id) : false;
+      }
+      case 'twitter': {
+        const id = this.twitter.activeId();
+        return id ? this.twitter.needsFetch().includes(id) : false;
+      }
+      case 'mataroa':
+        return this.mataroa.needsFetch();
+      case 'hugo':
+        return this.hugo.needsFetch();
+      case 'gist':
+        return this.gist.needsFetch();
+      default:
+        return false;
+    }
+  }
+
+  async ngOnInit(): Promise<void> {
     // Tell the policy store which connectors it governs, then apply the current
     // policy: each session already dropped an over-age credential when it was
     // constructed, but a session built before the user shortened the window (or
@@ -212,6 +335,9 @@ export class SettingsConnections implements OnInit {
       this.pastepileKey,
     ]);
     this.lifetimes.enforceAll();
+    if (this.vaultPreference.enabled()) {
+      await this.vault.refresh();
+    }
   }
 
   /**

@@ -13,6 +13,9 @@ import { MataroaSettings } from '../../../providers/mataroa/mataroa-settings';
 import { GistSettings } from '../../../providers/paste/gist-settings';
 import { CONNECTION_CATALOG } from './connection-catalog';
 import { SettingsConnections } from './settings-connections';
+import { VaultService, type VaultState } from '../../../providers/vault/vault-service';
+import { VaultPreference } from '../../../providers/vault/vault-preference';
+import { ProfileAccountKey } from '../../../providers/account/profile-account-key';
 
 describe('SettingsConnections (catalog)', () => {
   let bskySession: {
@@ -22,10 +25,13 @@ describe('SettingsConnections (catalog)', () => {
   };
   let githubSession: {
     connected: WritableSignal<boolean>;
+    needsFetch: WritableSignal<boolean>;
     expiresAt: ReturnType<typeof vi.fn>;
     enforceLifetime: ReturnType<typeof vi.fn>;
   };
   let dropboxSession: { connected: WritableSignal<boolean>; configured: boolean };
+  let vaultState: WritableSignal<VaultState>;
+  let vaultHasConnector: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     localStorage.clear();
@@ -38,10 +44,13 @@ describe('SettingsConnections (catalog)', () => {
     // the stub has to answer both halves of that contract.
     githubSession = {
       connected: signal(false),
+      needsFetch: signal(false),
       expiresAt: vi.fn(() => null),
       enforceLifetime: vi.fn(),
     };
     dropboxSession = { connected: signal(false), configured: true };
+    vaultState = signal<VaultState>('unlocked');
+    vaultHasConnector = vi.fn(() => false);
 
     TestBed.configureTestingModule({
       providers: [
@@ -49,6 +58,20 @@ describe('SettingsConnections (catalog)', () => {
         { provide: BlueskySession, useValue: bskySession },
         { provide: GitHubSession, useValue: githubSession },
         { provide: DropboxSession, useValue: dropboxSession },
+        {
+          provide: VaultService,
+          useValue: {
+            state: vaultState,
+            unlocked: () => vaultState() === 'unlocked',
+            hasConnector: vaultHasConnector,
+            refresh: vi.fn(async () => undefined),
+          },
+        },
+        {
+          provide: VaultPreference,
+          useValue: { available: true, enabled: signal(true) },
+        },
+        { provide: ProfileAccountKey, useValue: { current: () => 'mastodon:social/alice' } },
       ],
     });
   });
@@ -125,6 +148,37 @@ describe('SettingsConnections (catalog)', () => {
     expect(cardFor(fixture, 'GitHub').textContent).toContain('Connected');
     // Unrelated connectors are unmoved.
     expect(cardFor(fixture, 'Dropbox').textContent).toContain('Not connected');
+  });
+
+  it('shows Plus storage beside connected state and scope without opening each connector', () => {
+    bskySession.session.set({
+      service: 'https://bsky.social',
+      handle: 'me.bsky.social',
+      did: 'did:plc:me',
+      accessJwt: 'a',
+      refreshJwt: 'r',
+    });
+    githubSession.connected.set(true);
+    vaultHasConnector.mockImplementation((connector: string) => connector === 'github');
+
+    const fixture = setUp();
+    const bluesky = cardFor(fixture, 'Bluesky').textContent ?? '';
+    const github = cardFor(fixture, 'GitHub').textContent ?? '';
+
+    expect(bluesky).toContain('Connected');
+    expect(bluesky).toContain('One per account');
+    expect(bluesky).toContain('Not stored with Mawkingbird');
+    expect(github).toContain('Connected');
+    expect(github).toContain('One per account');
+    expect(github).toContain('Stored with Mawkingbird');
+  });
+
+  it('does not guess when the encrypted inventory is locked', () => {
+    githubSession.connected.set(true);
+    vaultState.set('locked');
+    const fixture = setUp();
+
+    expect(cardFor(fixture, 'GitHub').textContent).toContain('Unlock Plus to check');
   });
 
   it('renders an unavailable connector greyed with the reason rather than hiding it', () => {

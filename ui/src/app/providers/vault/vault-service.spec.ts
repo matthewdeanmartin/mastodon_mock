@@ -200,6 +200,10 @@ describe('reading and writing', () => {
     await service.write('mockingbird_hugo_credentials', 'A', 'mastodon:a/alice');
     expect(service.count()).toBe(2);
     expect(service.storedConnectors()).toEqual(['openrouter', 'hugo']);
+    expect(service.hasConnector('openrouter', 'mastodon:b/bob')).toBe(true);
+    expect(service.hasConnector('hugo', 'mastodon:a/alice')).toBe(true);
+    expect(service.hasConnector('hugo', 'mastodon:b/bob')).toBe(false);
+    expect(service.hasConnector('bluesky', 'mastodon:a/alice')).toBe(false);
   });
 
   it('refuses to write while locked', async () => {
