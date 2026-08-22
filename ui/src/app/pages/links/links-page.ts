@@ -13,6 +13,7 @@ import { ShortenerRegistry } from '../../providers/shortener/shortener-registry'
 import { ShortenerSettings } from '../../providers/shortener/shortener-settings';
 import { ProxyConsentRequired } from '../../providers/shortener/shortener-transport';
 import { assertValidDestination } from '../../providers/shortener/shortener-provider';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /**
  * The Links page: everything this browser has shortened, and a form to add more.
@@ -48,6 +49,7 @@ export class LinksPage implements OnInit {
   protected settings = inject(ShortenerSettings);
   private consent = inject(ShortenerProxyConsent);
   private proxy = inject(CorsProxy);
+  private diagnostics = inject(PageDiagnostics);
 
   protected readonly links = signal<ShortLinkRecord[]>([]);
   protected readonly loading = signal(false);
@@ -147,6 +149,7 @@ export class LinksPage implements OnInit {
     try {
       this.links.set(await firstValueFrom(this.registry.list({ search: this.search() })));
     } catch (error: unknown) {
+      this.diagnostics.error('Links', 'load:error', error);
       if (!this.offerConsent(error, () => this.reload())) {
         this.error.set(describeError(error, "Couldn't load your links."));
       }
@@ -163,6 +166,9 @@ export class LinksPage implements OnInit {
     try {
       assertValidDestination(destination);
     } catch (error: unknown) {
+      this.diagnostics.warn('Links', 'user:invalid-destination', {
+        reason: error instanceof Error ? error.message : 'invalid',
+      });
       this.error.set(describeError(error, 'That destination URL is not valid.'));
       return;
     }
@@ -189,6 +195,7 @@ export class LinksPage implements OnInit {
       this.notice.set(`Created ${link.shortUrl}`);
       await this.reload();
     } catch (error: unknown) {
+      this.diagnostics.error('Links', 'create:error', error);
       if (!this.offerConsent(error, () => this.create())) {
         this.error.set(describeError(error, "Couldn't create that link."));
       }
@@ -228,6 +235,7 @@ export class LinksPage implements OnInit {
       this.notice.set('Link updated.');
       await this.reload();
     } catch (error: unknown) {
+      this.diagnostics.error('Links', 'update:error', error);
       if (!this.offerConsent(error, () => this.saveEdit(record))) {
         this.error.set(describeError(error, "Couldn't update that link."));
       }
@@ -246,6 +254,7 @@ export class LinksPage implements OnInit {
       this.notice.set('Link deleted. It will stop redirecting immediately.');
       await this.reload();
     } catch (error: unknown) {
+      this.diagnostics.error('Links', 'delete:error', error);
       if (!this.offerConsent(error, () => this.remove(record))) {
         this.error.set(describeError(error, "Couldn't delete that link."));
       }

@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DropboxEntry, DropboxSession } from '../../../../providers/dropbox/dropbox-session';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /**
  * Settings → Connections → Dropbox. The OAuth round trip lands back here (see
@@ -17,6 +18,7 @@ export class ConnectionDropbox implements OnInit {
   protected dropbox = inject(DropboxSession);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private diagnostics = inject(PageDiagnostics);
 
   protected dropboxBusy = signal(false);
   protected dropboxError = signal<string | null>(null);
@@ -46,6 +48,7 @@ export class ConnectionDropbox implements OnInit {
     try {
       await this.dropbox.connect();
     } catch (error: unknown) {
+      this.diagnostics.error('Dropbox', 'connect:error', error);
       this.dropboxError.set(describeError(error, "Couldn't start Dropbox authorization."));
     }
   }
@@ -59,6 +62,7 @@ export class ConnectionDropbox implements OnInit {
     try {
       this.dropboxEntries.set(await this.dropbox.listRoot());
     } catch (error: unknown) {
+      this.diagnostics.error('Dropbox', 'list-root:error', error);
       this.dropboxError.set(describeError(error, "Couldn't list your Dropbox files."));
     } finally {
       this.dropboxBusy.set(false);

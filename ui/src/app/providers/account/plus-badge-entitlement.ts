@@ -1,5 +1,6 @@
 import { computed, inject, Injectable, Injector, signal } from '@angular/core';
 import { SupporterStatus } from './supporter-status';
+import { DiagnosticLog } from '../../diagnostic-log';
 
 export type PlusBadgeState = 'checking' | 'free' | 'plus' | 'unavailable';
 
@@ -34,6 +35,7 @@ export class PlusBadgeEntitlement {
   private checking = signal(true);
   private unavailable = signal(false);
   private pending: Promise<void> | null = null;
+  private log = inject(DiagnosticLog);
 
   readonly state = computed(() =>
     plusBadgeState(this.supporter.isSupporter(), this.checking(), this.unavailable()),
@@ -45,7 +47,7 @@ export class PlusBadgeEntitlement {
   }
 
   private async load(): Promise<void> {
-    console.info('[Mockingbird PlusBadge] entitlement:start', {
+    this.log.write('info', 'Mockingbird PlusBadge', 'entitlement:start', {
       cachedSupporter: this.supporter.isSupporter(),
     });
     try {
@@ -56,25 +58,29 @@ export class PlusBadgeEntitlement {
       const session = this.injector.get(MawkingbirdSession);
       await session.ensureReady();
       if (!session.user()) {
-        console.info('[Mockingbird PlusBadge] entitlement:account', { account: 'anonymous' });
+        this.log.write('info', 'Mockingbird PlusBadge', 'entitlement:account', {
+          account: 'anonymous',
+        });
         return;
       }
       const token = await this.injector.get(PlusSession).token();
       this.unavailable.set(token === null);
-      console.info('[Mockingbird PlusBadge] entitlement:account', {
+      this.log.write('info', 'Mockingbird PlusBadge', 'entitlement:account', {
         account: 'signed-in',
         tokenAvailable: token !== null,
         supporter: this.supporter.isSupporter(),
       });
     } catch (error) {
       this.unavailable.set(true);
-      console.warn('[Mockingbird PlusBadge] entitlement:error', {
+      this.log.write('warn', 'Mockingbird PlusBadge', 'entitlement:error', {
         name: error instanceof Error ? error.name : 'UnknownError',
         message: error instanceof Error ? error.message : String(error),
       });
     } finally {
       this.checking.set(false);
-      console.info('[Mockingbird PlusBadge] entitlement:settled', { state: this.state() });
+      this.log.write('info', 'Mockingbird PlusBadge', 'entitlement:settled', {
+        state: this.state(),
+      });
     }
   }
 }

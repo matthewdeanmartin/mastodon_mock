@@ -649,6 +649,15 @@ export const routes: Routes = [
       // Back-compat: the old top-level Lists/Tags entries now live under Feeds.
       { path: 'lists', pathMatch: 'full', redirectTo: 'feeds/lists' },
       { path: 'tags', pathMatch: 'full', redirectTo: 'feeds/tags' },
+      // The RSS *reading* surface — distinct from /settings/rss, which is feed
+      // management (add/remove, OPML, proxy). Primary nav, not a Feeds section:
+      // RSS has its own read/unread and headline/article postures that don't
+      // fit the Feeds hub's list-of-lists model. See sprint/rss-0-overview.md.
+      {
+        path: 'rss',
+        title: 'RSS',
+        loadComponent: () => import('./pages/rss/rss-page').then((m) => m.RssPage),
+      },
       {
         path: 'search',
         title: 'Search',

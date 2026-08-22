@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { DiagnosticLog } from './diagnostic-log';
 
 /**
  * The HTTP status behind a failure, for log details.
@@ -43,15 +44,18 @@ export function describeHttpError(err: unknown): string {
 /** Low-volume, production-visible console events for page loads and user actions. */
 @Injectable({ providedIn: 'root' })
 export class PageDiagnostics {
+  private readonly log = inject(DiagnosticLog);
+
   info(area: string, event: string, details: Record<string, unknown> = {}): void {
-    console.info(`[Mockingbird ${area}] ${event}`, details);
+    this.log.write('info', `Mockingbird ${area}`, event, details);
   }
 
   warn(area: string, event: string, details: Record<string, unknown> = {}): void {
-    console.warn(`[Mockingbird ${area}] ${event}`, details);
+    this.log.write('warn', `Mockingbird ${area}`, event, details);
   }
 
   error(area: string, event: string, error: unknown, details: Record<string, unknown> = {}): void {
-    console.error(`[Mockingbird ${area}] ${event}`, { ...details, error });
+    const payload = { ...details, error };
+    this.log.write('error', `Mockingbird ${area}`, event, payload, payload);
   }
 }

@@ -9,6 +9,7 @@ import { ApiMetrics } from './api-metrics';
 import { MawkingbirdMetrics } from './mawkingbird-metrics';
 import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
 import { metricsInterceptor } from './metrics.interceptor';
+import { DiagnosticLog } from '../diagnostic-log';
 
 describe('metricsInterceptor', () => {
   let http: HttpClient;
@@ -118,6 +119,11 @@ describe('metricsInterceptor', () => {
 
     expect(mawkingbird.totals().calls).toBe(1);
     expect(mawkingbird.totals().errors).toBe(1);
+    expect(TestBed.inject(DiagnosticLog).entries().at(-1)).toMatchObject({
+      level: 'error',
+      area: 'Mockingbird HTTP',
+      event: 'request:failed',
+    });
   });
 
   it('leaves an ordinary feed host out of the Mawkingbird counters', () => {

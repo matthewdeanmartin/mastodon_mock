@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ClientPrefs, RSS_CACHE_TTL_OPTIONS } from '../../../client-prefs';
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
+import { RssAddFeed } from '../../../providers/rss/rss-add-feed';
 import { RssCache } from '../../../providers/rss/rss-cache';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import {
@@ -13,6 +14,7 @@ import {
   RssSubscriptions,
 } from '../../../providers/rss/rss-subscriptions';
 import { buildOpml, opmlFilename, parseOpml } from '../../../providers/rss/opml';
+import { PageDiagnostics } from '../../../page-diagnostics';
 
 /**
  * What one OPML import did, reported in full.
@@ -51,7 +53,9 @@ interface ImportReport {
   styleUrl: './settings-rss.css',
 })
 export class SettingsRss implements OnInit {
+  private readonly diagnostics = inject(PageDiagnostics);
   private rssFetch = inject(RssFetch);
+  private addFeedService = inject(RssAddFeed);
   protected subs = inject(RssSubscriptions);
   protected proxySettings = inject(CorsProxySettings);
   protected prefs = inject(ClientPrefs);
@@ -134,14 +138,8 @@ export class SettingsRss implements OnInit {
     this.error.set(null);
     this.retryable.set(null);
 
-    this.rssFetch.fetchFeed(url, { useProxy }).subscribe({
-      next: (feed) => {
-        const limitError = this.subs.add(url, feed.title, useProxy, feed.items.length);
-        if (limitError) {
-          this.error.set(limitError);
-          this.adding.set(false);
-          return;
-        }
+    this.addFeedService.add(url, useProxy).subscribe({
+      next: () => {
         this.feedUrl.set('');
         this.adding.set(false);
       },
@@ -222,6 +220,7 @@ export class SettingsRss implements OnInit {
     try {
       feeds = parseOpml(await file.text()).feeds;
     } catch (err) {
+      this.diagnostics.error('RSS', 'opml:parse-error', err, { fileSize: file.size });
       this.importError.set((err as Error).message);
       return;
     }
@@ -283,6 +282,10 @@ export class SettingsRss implements OnInit {
         // Only the last attempt's failure is worth reporting.
         if (useProxy || !this.proxySettings.usable()) {
           report.failed.push({ url, reason: (err as Error).message });
+          this.diagnostics.warn('RSS', 'opml:feed-failed', {
+            viaProxy: useProxy,
+            reason: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     }

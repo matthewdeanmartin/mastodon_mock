@@ -184,6 +184,13 @@
           </svg>
           <span>Feeds</span>
         </a>
+        <a routerLink="/rss" routerLinkActive="active">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 4a16 16 0 0 1 16 16M4 4v6a10 10 0 0 1 10 10h6A16 16 0 0 0 4 4Z" />
+            <circle cx="6.5" cy="17.5" r="2" />
+          </svg>
+          <span>RSS</span>
+        </a>
         @if (auth.shouldOfferLogin) {
           <a class="login-nav" routerLink="/login" (click)="auth.exitAnonymous()">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -217,12 +224,13 @@
               <a routerLink="/favourites">Favourites</a>
             }
             <a routerLink="/bookmarks">Bookmarks</a>
-            <a routerLink="/feeds/lists">Lists</a>
-            <a routerLink="/feeds/tags">Tags</a>
-            <!-- Temporary home. RSS came out of Settings, where it was a page of
-                 feeds pretending to be a preference, and is on its way to being a
-                 miniapp of its own like Write. -->
-            <a routerLink="/settings/rss">RSS feeds</a>
+            <!-- Lists and Tags moved to the Feeds landing page's drill-down
+                 category list (2 clicks: Feeds -> Lists / Feeds -> Tags) — this
+                 menu had no room left. Their routes (/feeds/lists, /feeds/tags)
+                 are unchanged, only this shortcut row is gone. -->
+            <!-- RSS reading moved to its own primary-nav destination (/rss).
+                 This row is feed *management* only — add/remove, OPML, proxy. -->
+            <a routerLink="/settings/rss">Manage RSS feeds</a>
 
             <!-- Write / draft-likes -->
             <div class="menu-divider"></div>
@@ -261,8 +269,10 @@
                diagnostic nobody can find is a diagnostic nobody runs — it belongs
                where the symptom appears: the feed's own button bar, and the
                end-of-feed line. See sprint/anon-office-3-feed-doctor.md. -->
+            <!-- Storage Diagnostics has no row of its own here any more — this
+                 menu had no room left, and /observability already links to it
+                 prominently (page-menu-link, and the storage-summary card). -->
             <a routerLink="/observability">Observability</a>
-            <a routerLink="/storage-diagnostics">Storage Diagnostics</a>
 
             <!-- Docs & grab-bag -->
             <div class="menu-divider"></div>

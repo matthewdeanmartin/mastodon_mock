@@ -11,6 +11,7 @@ import {
 } from '../../providers/raindrop/raindrop-session';
 import { StatusCard } from '../../status-card/status-card';
 import { BookmarkGroup, groupByAuthor, groupByHashtag, withMedia } from './bookmark-groups';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 type BookmarkProvider = 'native' | 'raindrop';
 type LibraryView = 'all' | 'authors' | 'hashtags' | 'media';
@@ -29,6 +30,7 @@ export class Bookmarks implements OnInit {
   protected auth = inject(Auth);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   protected raindrop = inject(RaindropSession);
+  private diagnostics = inject(PageDiagnostics);
 
   protected provider = signal<BookmarkProvider>('native');
   protected statuses = signal<Status[]>([]);
@@ -182,6 +184,7 @@ export class Bookmarks implements OnInit {
       this.removeNative(status.id);
       this.message.set('Moved to Raindrop.io.');
     } catch (error) {
+      this.diagnostics.error('Bookmarks', 'move-to-raindrop:error', error);
       this.error.set(describeError(error, "Couldn't move that bookmark to Raindrop.io."));
     } finally {
       this.busy.set(null);
@@ -212,6 +215,7 @@ export class Bookmarks implements OnInit {
       this.prependNative(native);
       this.message.set('Moved to Native bookmarks.');
     } catch (error) {
+      this.diagnostics.error('Bookmarks', 'move-to-native:error', error);
       this.error.set(describeError(error, "Couldn't move that bookmark to Native."));
     } finally {
       this.busy.set(null);
@@ -273,6 +277,7 @@ export class Bookmarks implements OnInit {
     try {
       this.collections.set(await this.raindrop.collections(3));
     } catch (error) {
+      this.diagnostics.error('Bookmarks', 'load:raindrop-collections-error', error);
       this.error.set(describeError(error, "Couldn't load Raindrop.io folders."));
     }
   }
@@ -292,6 +297,7 @@ export class Bookmarks implements OnInit {
       this.raindropPage.set(page);
       this.raindropHasNext.set(bookmarks.length === PAGE_SIZE);
     } catch (error) {
+      this.diagnostics.error('Bookmarks', 'load:raindrop-page-error', error, { page });
       this.error.set(describeError(error, "Couldn't load Raindrop.io bookmarks."));
     } finally {
       this.raindropLoading.set(false);

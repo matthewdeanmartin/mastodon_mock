@@ -1,0 +1,51 @@
+<div class="spage-head">
+  <h1>📡 RSS</h1>
+  <p>
+    Your subscribed feeds, for reading — not mixed into Home. To add, remove, or route a feed
+    through a CORS proxy, see
+    <a routerLink="/settings/rss">Manage RSS feeds</a>.
+  </p>
+</div>
+
+<div class="spage-body">
+  <button class="btn" type="button" (click)="openAddDialog()">Add a feed</button>
+
+  @if (subs.feeds().length) {
+    <ul class="feed-list">
+      @for (f of subs.feeds(); track f.url) {
+        <li class="feed-row" [class.feed-row-off]="!f.enabled">
+          <span class="names">
+            <span class="name">
+              {{ f.title || f.url }}
+              @if (!f.enabled) {
+                <span class="muted small">· off</span>
+              }
+            </span>
+            @if (rssHost(f.url); as host) {
+              <span class="muted small">{{ host }}</span>
+            }
+          </span>
+          @if (f.itemCount !== undefined) {
+            <span class="muted small item-count">
+              {{ f.itemCount }} item{{ f.itemCount === 1 ? '' : 's' }}
+              @if (f.itemCount > perFeedCap) {
+                <span title="Home only shows the newest {{ perFeedCap }} of any one feed"
+                  >(showing newest {{ perFeedCap }})</span
+                >
+              }
+            </span>
+          }
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="muted">
+      No feeds yet. <a routerLink="/settings/rss">Manage RSS feeds</a> to import an OPML file, or
+      add one above.
+    </p>
+  }
+</div>
+
+@if (showAddDialog()) {
+  <app-add-feed-dialog (closed)="closeAddDialog()" />
+}

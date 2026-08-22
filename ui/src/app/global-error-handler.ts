@@ -2,6 +2,7 @@ import { ErrorHandler, Injectable, inject } from '@angular/core';
 import { ErrorLog } from './error-log';
 import { ApiMetrics } from './observability/api-metrics';
 import { UpdateRecovery } from './update-recovery';
+import { DiagnosticLog } from './diagnostic-log';
 
 /**
  * Root {@link ErrorHandler}. Beyond the default it does two things:
@@ -28,6 +29,7 @@ export class GlobalErrorHandler implements ErrorHandler {
   private readonly recovery = inject(UpdateRecovery);
   private readonly errorLog = inject(ErrorLog);
   private readonly metrics = inject(ApiMetrics);
+  private readonly diagnostics = inject(DiagnosticLog);
 
   handleError(error: unknown): void {
     this.errorLog.record('angular', error);
@@ -35,6 +37,6 @@ export class GlobalErrorHandler implements ErrorHandler {
     if (this.recovery.recover(error)) {
       return;
     }
-    console.error(error);
+    this.diagnostics.write('error', 'Mockingbird App', 'uncaught', { error }, error);
   }
 }

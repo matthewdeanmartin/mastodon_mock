@@ -5,6 +5,7 @@ import { Api } from '../../../api';
 import { Auth } from '../../../auth';
 import { AccountField } from '../../../models';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
+import { PageDiagnostics } from '../../../page-diagnostics';
 
 /** Public profile: display name, bio, metadata fields, avatar/header. */
 @Component({
@@ -17,6 +18,7 @@ export class SettingsProfile implements OnInit {
   private api = inject(Api);
   protected auth = inject(Auth);
   protected anonymous = inject(AnonymousAccount);
+  private diagnostics = inject(PageDiagnostics);
 
   protected displayName = signal('');
   protected username = signal('');
@@ -140,6 +142,7 @@ export class SettingsProfile implements OnInit {
       this.header.set(null);
       this.saved.set(true);
     } catch (error) {
+      this.diagnostics.error('ProfileSettings', 'save-local:error', error);
       this.saveError.set(
         error instanceof Error ? error.message : 'Could not save the local profile.',
       );

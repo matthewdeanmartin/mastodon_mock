@@ -314,6 +314,77 @@
     }
   </section>
 
+  <!-- ======================== Diagnostic timeline ======================= -->
+  <section class="obs-section">
+    <div class="section-head">
+      <div>
+        <h2>Recent diagnostics</h2>
+        <span class="muted small">
+          {{ diagnostics().length.toLocaleString() }} retained in this tab
+          @if (diagnostics().length > diagnosticRows().length) {
+            · showing latest {{ diagnosticRows().length }}
+          }
+        </span>
+      </div>
+      <div class="section-actions">
+        <button
+          class="btn btn-outline btn-sm"
+          type="button"
+          [disabled]="!diagnostics().length"
+          (click)="copyDiagnostics()"
+        >
+          Copy
+        </button>
+        <button
+          class="btn btn-outline btn-sm"
+          type="button"
+          [disabled]="!diagnostics().length"
+          (click)="downloadDiagnostics()"
+        >
+          Download
+        </button>
+        <button
+          class="btn btn-outline btn-sm danger"
+          type="button"
+          [disabled]="!diagnostics().length"
+          (click)="clearDiagnostics()"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+    <p class="muted small section-note">
+      User actions, workflow outcomes, warnings, and errors retained in sessionStorage for this tab.
+      The oldest entries roll off at 1,000 entries or 1 MB. Values, visible labels, credentials,
+      query strings, and external destinations are not captured. Nothing is sent automatically.
+    </p>
+    @if (diagnosticNotice()) {
+      <p class="diagnostic-notice small" role="status">{{ diagnosticNotice() }}</p>
+    }
+    @if (diagnosticRows().length) {
+      <ol class="diagnostic-list">
+        @for (entry of diagnosticRows(); track $index) {
+          <li
+            class="diagnostic-row"
+            [class.warn]="entry.level === 'warn'"
+            [class.error]="entry.level === 'error'"
+            [title]="diagnosticDetail(entry)"
+          >
+            <span class="diagnostic-level">{{ entry.level }}</span>
+            <span class="diagnostic-event">
+              <span class="diagnostic-area">[{{ entry.area }}]</span>
+              {{ entry.event }}
+            </span>
+            <code class="diagnostic-details">{{ entry.details }}</code>
+            <span class="diagnostic-time muted small">{{ stamp(entry.at) }}</span>
+          </li>
+        }
+      </ol>
+    } @else {
+      <p class="muted center">No diagnostics retained in this tab yet.</p>
+    }
+  </section>
+
   <!-- =========================== Client errors =========================== -->
   <section class="obs-section">
     <div class="section-head">

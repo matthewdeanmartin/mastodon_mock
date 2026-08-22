@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { BloggerSession } from '../../providers/blogger/blogger-session';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /** Completes Google's browser-only PKCE callback before returning to Connections. */
 @Component({
@@ -27,6 +28,7 @@ import { BloggerSession } from '../../providers/blogger/blogger-session';
 export class BloggerCallback implements OnInit {
   private blogger = inject(BloggerSession);
   private router = inject(Router);
+  private diagnostics = inject(PageDiagnostics);
   protected status = signal('Finishing authorization with Google.');
 
   async ngOnInit(): Promise<void> {
@@ -36,6 +38,7 @@ export class BloggerCallback implements OnInit {
         queryParams: { blogger: 'connected' },
       });
     } catch (error: unknown) {
+      this.diagnostics.error('Blogger', 'authorization:error', error);
       const message = error instanceof Error ? error.message : 'Blogger authorization failed.';
       await this.router.navigate(['/settings/connections/blogger'], {
         queryParams: { blogger: 'error', message },

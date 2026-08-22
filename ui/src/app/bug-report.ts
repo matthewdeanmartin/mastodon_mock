@@ -4,6 +4,7 @@ import { BUILD_INFO } from './build-info';
 import { ErrorLog } from './error-log';
 import { ProviderRegistry } from './providers/provider-registry';
 import { Server } from './server';
+import { DiagnosticLog, formatDiagnosticEntry } from './diagnostic-log';
 
 /** GitHub repo the "File on GitHub" link targets. */
 const REPO = 'matthewdeanmartin/mastodon_mock';
@@ -18,6 +19,7 @@ const MAX_BODY_LEN = 6_000;
 export interface BugReportInput {
   description: string;
   includeErrors: boolean;
+  includeDiagnostics?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -25,6 +27,7 @@ export class BugReport {
   private readonly server = inject(Server);
   private readonly providers = inject(ProviderRegistry);
   private readonly errorLog = inject(ErrorLog);
+  private readonly diagnosticLog = inject(DiagnosticLog);
 
   /** Build the Markdown body a user files or pastes. */
   buildMarkdown(input: BugReportInput): string {
@@ -39,6 +42,13 @@ export class BugReport {
       const errors = this.formatErrors();
       if (errors) {
         sections.push(`### Recent errors\n\n${errors}`);
+      }
+    }
+
+    if (input.includeDiagnostics) {
+      const diagnostics = this.formatDiagnostics();
+      if (diagnostics) {
+        sections.push(`### Recent diagnostics\n\n${diagnostics}`);
       }
     }
 
@@ -100,8 +110,16 @@ export class BugReport {
     return '```\n' + body + '\n```';
   }
 
-  /** Current path + hash, without any query string (query can carry tokens). */
+  private formatDiagnostics(): string {
+    const entries = this.diagnosticLog.entries().slice(-100);
+    if (entries.length === 0) {
+      return '';
+    }
+    return '```\n' + entries.map(formatDiagnosticEntry).join('\n') + '\n```';
+  }
+
+  /** Current path only; query strings and fragments can both carry tokens. */
   private safeLocation(): string {
-    return `${location.pathname}${location.hash}`;
+    return location.pathname;
   }
 }

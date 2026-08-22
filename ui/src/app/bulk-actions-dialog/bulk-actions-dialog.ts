@@ -8,6 +8,7 @@ import {
   needsList,
 } from '../bulk-actions';
 import { FocusTrap } from '../a11y/focus-trap';
+import { PageDiagnostics } from '../page-diagnostics';
 
 /**
  * "Here is exactly what is about to happen — do you still want it?" for a bulk
@@ -32,6 +33,7 @@ import { FocusTrap } from '../a11y/focus-trap';
 })
 export class BulkActionsDialog implements OnInit {
   private readonly bulk = inject(BulkActions);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   readonly action = input.required<BulkActionId>();
   /** Required by the list actions; ignored by the rest. */
@@ -208,7 +210,8 @@ export class BulkActionsDialog implements OnInit {
       link.click();
       URL.revokeObjectURL(url);
       this.backup.set({ saved: true, count });
-    } catch {
+    } catch (error: unknown) {
+      this.diagnostics.error('BulkActions', 'backup:error', error, { action: this.action() });
       this.backupError.set('Could not build the backup. You can still continue, or try again.');
     } finally {
       this.backupBusy.set(false);

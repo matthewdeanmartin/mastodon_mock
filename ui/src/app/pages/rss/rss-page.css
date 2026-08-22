@@ -1,0 +1,46 @@
+.feed-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.feed-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--col-bg-alt, transparent);
+}
+
+.feed-row-off {
+  opacity: 0.6;
+}
+
+.names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.item-count {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

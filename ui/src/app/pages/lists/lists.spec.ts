@@ -33,6 +33,7 @@ interface ListsInternals {
   removeCollection(c: Collection): void;
   askUnsubscribeRss(feed: RssFeedSub, event: Event): void;
   removeRss(feed: RssFeedSub): void;
+  section: WritableSignal<string>;
 }
 
 function makeCollection(id: string, name = `Collection ${id}`): Collection {
@@ -65,13 +66,18 @@ function internals(fixture: ComponentFixture<Lists>): ListsInternals {
   return fixture.componentInstance as unknown as ListsInternals;
 }
 
+/** The Lists section's own "New list name" input, or null when that section isn't rendered. */
+function newListInput(fixture: ComponentFixture<Lists>): HTMLInputElement | null {
+  return (fixture.nativeElement as HTMLElement).querySelector('input[placeholder="New list name"]');
+}
+
 function makeList(id: string, title = `List ${id}`): UserList {
   return { id, title };
 }
 
 describe('Lists', () => {
   let httpMock: HttpTestingController;
-  let routeOnly: 'tags' | undefined;
+  let routeOnly: 'tags' | 'lists' | undefined;
 
   beforeEach(() => {
     // RSS subscriptions persist to localStorage, so a feed added by one test
@@ -184,6 +190,63 @@ describe('Lists', () => {
     expect(internals(fixture).normalizedTagQuery()).toBe('');
   });
 
+  // -------------------------------------------------------------- landing
+  // /feeds now defaults to a drill-down category list rather than the full
+  // stack, so reaching one kind of feed costs one click instead of a scroll
+  // past the other fifteen.
+
+  it('defaults to the landing category list on /feeds', () => {
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    fixture.detectChanges();
+
+    expect(internals(fixture).section()).toBe('landing');
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('All feeds');
+    expect(text).toContain('RSS feeds');
+    expect(text).toContain('Bluesky feeds');
+    // The old full-stack content is not rendered until a category is chosen.
+    expect(newListInput(fixture)).toBeNull();
+  });
+
+  it('drilling into a category shows only that section', () => {
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    internals(fixture).section.set('rss');
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('RSS feeds');
+    // Lists' own create box belongs to a different section and must not
+    // leak into a view narrowed to one kind.
+    expect(newListInput(fixture)).toBeNull();
+  });
+
+  it('"All feeds" returns to the full stack', () => {
+    const fixture = setUp();
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    internals(fixture).section.set('all');
+    fixture.detectChanges();
+
+    expect(newListInput(fixture)).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('RSS feeds');
+  });
+
+  it('/feeds/lists and /feeds/tags skip the landing list entirely', () => {
+    routeOnly = 'lists';
+    const fixture = TestBed.createComponent(Lists);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/accounts/verify_credentials').error(new ProgressEvent('error'));
+    httpMock.expectOne('/api/v1/lists').flush([]);
+    flushServerFeedProbes();
+    flushDirectoryProbe();
+    flushPopularFeeds();
+    fixture.detectChanges();
+
+    expect(internals(fixture).section()).toBe('all');
+    expect(newListInput(fixture)).not.toBeNull();
+  });
+
   it('keeps Twitter accounts off the tags-only route', () => {
     routeOnly = 'tags';
     TestBed.inject(TwitterFollows).add({ username: 'NASA', displayName: 'NASA' });
@@ -206,6 +269,7 @@ describe('Lists', () => {
     subs.add('https://blog.example.com/feed.xml', 'Example Blog', false, 12);
     const fixture = setUp();
     httpMock.expectOne('/api/v1/lists').flush([]);
+    internals(fixture).section.set('rss');
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -228,6 +292,7 @@ describe('Lists', () => {
     subs.setEnabled('https://blog.example.com/feed.xml', false);
     const fixture = setUp();
     httpMock.expectOne('/api/v1/lists').flush([]);
+    internals(fixture).section.set('rss');
     fixture.detectChanges();
 
     // A disabled feed must stay visible, or it can never be found to re-enable.
@@ -241,6 +306,7 @@ describe('Lists', () => {
     subs.add('https://blog.example.com/feed.xml', 'Example Blog', true);
     const fixture = setUp();
     httpMock.expectOne('/api/v1/lists').flush([]);
+    internals(fixture).section.set('rss');
     fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('via proxy');
@@ -264,6 +330,7 @@ describe('Lists', () => {
   it('invites you to subscribe when there are no feeds', () => {
     const fixture = setUp();
     httpMock.expectOne('/api/v1/lists').flush([]);
+    internals(fixture).section.set('rss');
     fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('None yet');

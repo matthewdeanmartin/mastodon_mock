@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /**
  * Completes OpenRouter's browser-only PKCE callback before returning to the
@@ -34,6 +35,7 @@ import { OpenRouterSession } from '../../providers/openrouter/openrouter-session
 export class OpenRouterCallback implements OnInit {
   private openrouter = inject(OpenRouterSession);
   private router = inject(Router);
+  private diagnostics = inject(PageDiagnostics);
   protected status = signal('Finishing authorization with OpenRouter.');
 
   async ngOnInit(): Promise<void> {
@@ -43,6 +45,7 @@ export class OpenRouterCallback implements OnInit {
         queryParams: { openrouter: 'connected' },
       });
     } catch (error: unknown) {
+      this.diagnostics.error('OpenRouter', 'authorization:error', error);
       const message = error instanceof Error ? error.message : 'OpenRouter authorization failed.';
       await this.router.navigate(['/settings/connections/openrouter'], {
         queryParams: { openrouter: 'error', message },

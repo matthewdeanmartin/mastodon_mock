@@ -3,6 +3,7 @@ import { catchError, forkJoin, map, Observable, of } from 'rxjs';
 import { Account, Status } from '../../models';
 import { FeedProvider } from '../provider';
 import { commentAccount, feedAccount, feedToStatuses, itemToStatus } from './rss-adapter';
+import { qualifiesForHome } from './rss-home-eligibility';
 import { ParsedItem } from './rss-parser';
 import { RssFetch } from './rss-fetch';
 import { RssSubscriptions } from './rss-subscriptions';
@@ -43,6 +44,11 @@ export const PER_FEED_ITEM_CAP = 100;
  * per-feed failures) and returns their newest items — at most
  * {@link PER_FEED_ITEM_CAP} each — newest-first; the aggregator buffers them
  * and interleaves with Mastodon pages. Read-only by nature.
+ *
+ * Not every enabled feed contributes to Home: only ones that read like a
+ * social timeline do (see {@link qualifiesForHome}). A feed that doesn't
+ * qualify is still fetched (its title/count still get recorded for the RSS
+ * pages) but contributes zero items here — it lives on `/rss` instead.
  */
 @Injectable({ providedIn: 'root' })
 export class RssProvider implements FeedProvider {
@@ -83,6 +89,12 @@ export class RssProvider implements FeedProvider {
             // are showing the newest 100 of 4,052" gets said honestly, and it
             // cannot say it from a number that has already been trimmed.
             this.subs.recordFetch(sub.url, feed.title, feed.items.length);
+            // Home mixes in only feeds that read like a social timeline —
+            // frequent, short posts. Everything else stays /rss-only; see
+            // rss-home-eligibility.ts for why and the thresholds used.
+            if (!qualifiesForHome(feed)) {
+              return [];
+            }
             // Newest first, then capped — so the cap keeps the newest items
             // rather than whatever order the publisher happened to emit.
             return feedToStatuses(sub.url, feed, fetchedAt)

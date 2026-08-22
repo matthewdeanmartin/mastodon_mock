@@ -1,13 +1,15 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BugReport } from './bug-report';
 import { ErrorLog } from './error-log';
+import { DiagnosticLog } from './diagnostic-log';
 
 describe('BugReport', () => {
   let report: BugReport;
   let errorLog: ErrorLog;
+  let diagnosticLog: DiagnosticLog;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -15,6 +17,7 @@ describe('BugReport', () => {
     });
     report = TestBed.inject(BugReport);
     errorLog = TestBed.inject(ErrorLog);
+    diagnosticLog = TestBed.inject(DiagnosticLog);
   });
 
   it('includes the user description and an environment section', () => {
@@ -43,11 +46,39 @@ describe('BugReport', () => {
     expect(md).toContain('kaboom');
   });
 
+  it('includes recent diagnostics when asked', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    diagnosticLog.write('info', 'Mockingbird Action', 'user:activate', {
+      route: '/home',
+      target: 'app-home > button > retry',
+    });
+
+    const md = report.buildMarkdown({
+      description: 'x',
+      includeErrors: false,
+      includeDiagnostics: true,
+    });
+
+    expect(info).toHaveBeenCalled();
+    expect(md).toContain('### Recent diagnostics');
+    expect(md).toContain('user:activate');
+    expect(md).toContain('/home');
+  });
+
   it('never includes the query string of the current page', () => {
-    // safeLocation uses pathname + hash only; assert no leaked query markers.
-    const md = report.buildMarkdown({ description: 'x', includeErrors: false });
-    const pageLine = md.split('\n').find((l) => l.includes('**Page:**')) ?? '';
-    expect(pageLine).not.toContain('?');
+    const original = `${location.pathname}${location.search}${location.hash}`;
+    history.replaceState(null, '', '/private-path?access_token=secret#secret-fragment');
+
+    try {
+      const md = report.buildMarkdown({ description: 'x', includeErrors: false });
+      const pageLine = md.split('\n').find((l) => l.includes('**Page:**')) ?? '';
+      expect(pageLine).toContain('/private-path');
+      expect(pageLine).not.toContain('secret');
+      expect(pageLine).not.toContain('?');
+      expect(pageLine).not.toContain('#');
+    } finally {
+      history.replaceState(null, '', original);
+    }
   });
 
   it('derives a titled issue subject from the first line', () => {

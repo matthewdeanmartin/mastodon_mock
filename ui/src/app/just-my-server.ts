@@ -12,6 +12,7 @@ import {
   AnonymousMastodonProvider,
 } from './providers/anonymous/anonymous-mastodon-provider';
 import { Server } from './server';
+import { DiagnosticLog } from './diagnostic-log';
 
 const STORAGE_KEY_BASE = 'mockingbird_just_my_server';
 export const JUST_MY_SERVER_LIST_PREFIX = 'Mawkingbird: People on ';
@@ -95,6 +96,7 @@ export class JustMyServer {
   private anonymousFollows = inject(AnonymousFollows);
   private anonymousLists = inject(AnonymousLists);
   private anonymousProvider = inject(AnonymousMastodonProvider);
+  private diagnostics = inject(DiagnosticLog);
 
   readonly enabled = signal(false);
   readonly checking = signal(false);
@@ -259,7 +261,7 @@ export class JustMyServer {
     this.total.set(updatePlan.addIds.length + updatePlan.removeIds.length);
     this.error.set('');
     this.ready.set(false);
-    console.info('[Just My Server] Synchronization started.', {
+    this.diagnostics.write('info', 'Just My Server', 'Synchronization started.', {
       listId: updatePlan.listId,
       plannedAdds: updatePlan.addIds.length,
       plannedRemovals: updatePlan.removeIds.length,
@@ -281,9 +283,9 @@ export class JustMyServer {
       this.result.set(result);
       this.dialogOpen.set(false);
       this.plan.set(null);
-      console.info('[Just My Server] Synchronization finished.', result);
+      this.diagnostics.write('info', 'Just My Server', 'Synchronization finished.', result);
     } catch (cause: unknown) {
-      console.error('[Just My Server] Synchronization stopped.', {
+      this.diagnostics.write('error', 'Just My Server', 'Synchronization stopped.', {
         listId: updatePlan.listId,
         completed: this.completed(),
         total: this.total(),
@@ -498,7 +500,7 @@ export class JustMyServer {
     currentIds = new Set((await this.fetchAllListMembers(listId)).map((account) => account.id));
     const additions = addIds.filter((id) => !currentIds.has(id));
     const newlyPresent = addIds.length - additions.length;
-    console.info('[Just My Server] Reconciled current membership.', {
+    this.diagnostics.write('info', 'Just My Server', 'Reconciled current membership.', {
       currentMembers: currentIds.size,
       removals: removals.length,
       additions: additions.length,
@@ -532,10 +534,15 @@ export class JustMyServer {
         added += batch.length;
         this.completed.update((count) => count + batch.length);
       } catch (cause: unknown) {
-        console.warn('[Just My Server] Add batch rejected; reconciling individually.', {
-          batchSize: batch.length,
-          status: this.errorStatus(cause),
-        });
+        this.diagnostics.write(
+          'warn',
+          'Just My Server',
+          'Add batch rejected; reconciling individually.',
+          {
+            batchSize: batch.length,
+            status: this.errorStatus(cause),
+          },
+        );
         const current = new Set(
           (await this.fetchAllListMembers(listId)).map((account) => account.id),
         );
@@ -565,9 +572,14 @@ export class JustMyServer {
           }
         }
         if (rejectedAsPresent) {
-          console.info('[Just My Server] Mastodon reported accounts already on the list.', {
-            count: rejectedAsPresent,
-          });
+          this.diagnostics.write(
+            'info',
+            'Just My Server',
+            'Mastodon reported accounts already on the list.',
+            {
+              count: rejectedAsPresent,
+            },
+          );
         }
       }
     }

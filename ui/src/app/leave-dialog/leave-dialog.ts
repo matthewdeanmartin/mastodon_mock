@@ -2,6 +2,7 @@ import { Component, HostListener, computed, inject, input, output, signal } from
 import { Auth } from '../auth';
 import { SessionTeardown } from '../session-teardown';
 import { FocusTrap } from '../a11y/focus-trap';
+import { PageDiagnostics } from '../page-diagnostics';
 
 /** What the user chose on the way out. */
 export type LeaveChoice = 'leave' | 'anonymous-data' | 'all-data';
@@ -36,6 +37,7 @@ export type LeaveChoice = 'leave' | 'anonymous-data' | 'all-data';
 export class LeaveDialog {
   private auth = inject(Auth);
   private teardown = inject(SessionTeardown);
+  private diagnostics = inject(PageDiagnostics);
 
   readonly closed = output<void>();
   /** Emitted once the teardown has run; the shell owns the navigation and reload. */
@@ -95,7 +97,8 @@ export class LeaveDialog {
       URL.revokeObjectURL(url);
       this.exported.set(true);
       this.exportError.set(null);
-    } catch {
+    } catch (error: unknown) {
+      this.diagnostics.error('Leave', 'backup:error', error);
       // Never block the exit on a failed backup: the user asked to leave.
       this.exportError.set("Couldn't build a backup file. You can still leave.");
     }

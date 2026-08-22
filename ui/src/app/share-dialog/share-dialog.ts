@@ -1,6 +1,7 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { Status } from '../models';
 import { FocusTrap } from '../a11y/focus-trap';
+import { PageDiagnostics } from '../page-diagnostics';
 
 export interface ShareContext {
   url: string;
@@ -115,6 +116,7 @@ export const SHARE_DESTINATIONS: ShareDestination[] = [
   styleUrl: './share-dialog.css',
 })
 export class ShareDialog {
+  private diagnostics = inject(PageDiagnostics);
   readonly status = input.required<Status>();
   readonly closed = output<void>();
 
@@ -149,7 +151,11 @@ export class ShareDialog {
       await navigator.share(context);
       this.closed.emit();
     } catch (error: unknown) {
-      if (error instanceof DOMException && error.name === 'AbortError') this.closed.emit();
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        this.closed.emit();
+        return;
+      }
+      this.diagnostics.error('Share', 'native-share:error', error);
     }
   }
 
@@ -158,7 +164,8 @@ export class ShareDialog {
       await navigator.clipboard.writeText(this.targetUrl());
       this.copyFailed.set(false);
       this.copied.set(true);
-    } catch {
+    } catch (error: unknown) {
+      this.diagnostics.error('Share', 'clipboard:error', error);
       this.copyFailed.set(true);
       this.copied.set(false);
     }

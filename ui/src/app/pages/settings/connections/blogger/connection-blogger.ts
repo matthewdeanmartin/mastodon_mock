@@ -7,6 +7,7 @@ import {
 } from '../../../../providers/blogger/blogger-session';
 import { appCallbackUrl } from '../../../../pkce';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /**
  * Settings → Connections → Blog (Blogger).
@@ -27,6 +28,7 @@ export class ConnectionBlogger implements OnInit {
   protected readonly session = inject(BloggerSession);
   private readonly api = inject(BloggerApi);
   private readonly route = inject(ActivatedRoute);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   protected readonly blogs = signal<BloggerBlog[]>([]);
   protected readonly busy = signal(false);
@@ -64,6 +66,7 @@ export class ConnectionBlogger implements OnInit {
     try {
       await this.session.connect();
     } catch (error: unknown) {
+      this.diagnostics.error('Blogger', 'connect:error', error);
       this.error.set(error instanceof Error ? error.message : "Couldn't start Google sign-in.");
     }
   }
@@ -83,6 +86,7 @@ export class ConnectionBlogger implements OnInit {
         );
       }
     } catch (error: unknown) {
+      this.diagnostics.error('Blogger', 'load-blogs:error', error);
       this.error.set(error instanceof Error ? error.message : "Couldn't load your blogs.");
     } finally {
       this.busy.set(false);

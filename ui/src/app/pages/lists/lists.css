@@ -1,14 +1,46 @@
-/* Sits inside .page-head, which is 18px/800 — a control that inherited those
-   would read as a second title. Reset both explicitly. */
-.section-picker {
+/* Sits inside .page-head, which is 18px/800 — a button back that inherited
+   those would read as a second title. Reset both explicitly, plus the usual
+   <button> resets (border/background/font) since this is a button styled to
+   read as a text link, not a link. */
+.feeds-back {
   float: right;
-  font-size: 13px;
-  font-weight: 400;
-  padding: 4px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--col-bg);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
   color: var(--text);
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+}
+
+.feeds-back:hover {
+  text-decoration: underline;
+}
+
+/* The drill-down landing list: one row per FeedSection, so reaching any one
+   costs a single click and zero scrolling past the rest. Built on the shared
+   .list-row (styles.css) — block row, hover background — with its own flex
+   layout for the label + async count. Rows are <button>s (they narrow this
+   page rather than navigate), so the usual button resets apply too. */
+.feed-category-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feed-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 
 .new-list {

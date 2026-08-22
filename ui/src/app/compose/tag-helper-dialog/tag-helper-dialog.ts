@@ -1,6 +1,7 @@
 import { Component, HostListener, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { isLive, TagCheck, TagHelper, TagHelperResult } from '../tag-helper';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /**
  * 🤖#️⃣ — hashtag suggestions for the post being written.
@@ -18,6 +19,7 @@ import { isLive, TagCheck, TagHelper, TagHelperResult } from '../tag-helper';
 })
 export class TagHelperDialog {
   private helper = inject(TagHelper);
+  private diagnostics = inject(PageDiagnostics);
 
   /** The post text being tagged. */
   readonly post = input.required<string>();
@@ -49,6 +51,7 @@ export class TagHelperDialog {
       const seed = result.live.length ? result.live : result.checked.map((c) => c.tag);
       this.draft.set(seed.join(' '));
     } catch (error: unknown) {
+      this.diagnostics.error('TagHelper', 'suggest:error', error, { postLength: post.length });
       this.error.set(error instanceof Error ? error.message : "Couldn't reach the model.");
     } finally {
       this.busy.set(false);

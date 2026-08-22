@@ -7,6 +7,7 @@ import { PosseEntry, PosseQueue } from '../../providers/hugo/posse-queue';
 import { DeliveryState, WebmentionSend } from '../../providers/hugo/webmention-send';
 import { DeployState, isTerminal } from '../../providers/hugo/hugo-deploy';
 import { HugoDeployWatch } from '../../providers/hugo/hugo-deploy-watch';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /** One target's outcome, for the results list under the queue. */
 interface DeliveryReport {
@@ -37,6 +38,7 @@ export class PossePage {
   private readonly sender = inject(WebmentionSend);
   private readonly deployWatch = inject(HugoDeployWatch);
   private readonly injector = inject(Injector);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   protected readonly publishing = signal(false);
   /** Waiting for the site to rebuild, so the source pages exist. */
@@ -114,6 +116,7 @@ export class PossePage {
         await this.notifyTargets(published, result.sourceUrls);
       }
     } catch (error: unknown) {
+      this.diagnostics.error('POSSE', 'publish:error', error, { queued: published.length });
       this.error.set(
         error instanceof Error ? error.message : "Couldn't record these to your blog.",
       );

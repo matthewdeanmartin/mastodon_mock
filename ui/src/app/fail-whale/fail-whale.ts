@@ -8,6 +8,7 @@ import { InstanceStatus } from '../instance-status';
 import { ServerHealth } from '../server-health';
 import { ServerPicker } from '../server-picker/server-picker';
 import { Auth } from '../auth';
+import { PageDiagnostics } from '../page-diagnostics';
 
 /**
  * Full-screen overlay shown when the API server is unreachable. Recovery is on
@@ -39,6 +40,7 @@ export class FailWhale {
   protected status = inject(InstanceStatus);
   private auth = inject(Auth);
   private prefs = inject(ClientPrefs);
+  private diagnostics = inject(PageDiagnostics);
   /** The whale drawing and its shape — see {@link failWhaleArt}. */
   protected whale = computed(() => failWhaleArt(this.prefs.artStyle()));
   protected reporting = signal(false);
@@ -74,7 +76,8 @@ export class FailWhale {
       await navigator.clipboard.writeText(this.diagnosticsText());
       this.copied.set(true);
       setTimeout(() => this.copied.set(false), 2000);
-    } catch {
+    } catch (error: unknown) {
+      this.diagnostics.error('FailWhale', 'clipboard:error', error);
       // Clipboard denied (insecure context, permissions). The text is on screen
       // and selectable anyway, so there is nothing to recover from.
     }

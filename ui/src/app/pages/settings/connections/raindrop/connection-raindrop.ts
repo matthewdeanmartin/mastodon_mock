@@ -9,6 +9,7 @@ import { RouterLink } from '@angular/router';
 import { RaindropSession } from '../../../../providers/raindrop/raindrop-session';
 import { expiryLabel } from '../expiry-label';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /** Settings → Connections → Raindrop.io. Test-token paste; no OAuth (see the copy). */
 @Component({
@@ -20,6 +21,7 @@ import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 export class ConnectionRaindrop implements OnInit {
   protected raindrop = inject(RaindropSession);
   private bridge = inject(VaultBridge);
+  private diagnostics = inject(PageDiagnostics);
 
   protected raindropToken = signal('');
   protected raindropError = signal<string | null>(null);
@@ -43,6 +45,7 @@ export class ConnectionRaindrop implements OnInit {
       this.raindropToken.set('');
       this.raindropNotice.set('Raindrop.io connected. Bookmark buttons now offer both providers.');
     } catch (error: unknown) {
+      this.diagnostics.error('Raindrop', 'connect:error', error);
       this.raindropError.set(
         error instanceof Error ? error.message : "Couldn't connect Raindrop.io.",
       );

@@ -1,0 +1,51 @@
+<div
+  class="overlay"
+  role="presentation"
+  tabindex="-1"
+  (click)="closed.emit()"
+  (keyup.escape)="closed.emit()"
+>
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="add-feed-title"
+    appFocusTrap
+    (dismissed)="closed.emit()"
+    (click)="$event.stopPropagation()"
+    (keyup)="$event.stopPropagation()"
+  >
+    <h3 id="add-feed-title">Add a feed</h3>
+    <p class="muted small">
+      Paste an RSS or Atom feed URL. Mockingbird fetches it right away to prove this browser can
+      actually read it.
+    </p>
+
+    <form (ngSubmit)="submit()">
+      <input
+        type="url"
+        name="feedUrl"
+        placeholder="https://example.com/feed.xml"
+        [ngModel]="feedUrl()"
+        (ngModelChange)="feedUrl.set($event)"
+        [disabled]="adding()"
+      />
+      @if (error(); as msg) {
+        <p class="feed-error">{{ msg }}</p>
+      }
+      @if (retryable()) {
+        <p class="retry-line">
+          <button class="btn btn-outline btn-sm" type="button" (click)="retryViaProxy()">
+            Try again via {{ proxySettings.chosen()?.label }}
+          </button>
+        </p>
+      }
+      <div class="dialog-actions">
+        <button class="btn btn-outline" type="button" (click)="closed.emit()">Cancel</button>
+        <button class="btn" type="submit" [disabled]="!feedUrl().trim() || adding()">
+          {{ adding() ? 'Checking…' : 'Add feed' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

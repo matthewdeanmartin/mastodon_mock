@@ -27,6 +27,7 @@ import { TranslationPreference } from '../../../../translation-preference';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
 import { credentialLocation, StorageBadge } from '../storage-badge';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /**
  * Settings → Connections → OpenRouter. PKCE connect, model picker, credits.
@@ -41,6 +42,7 @@ import { credentialLocation, StorageBadge } from '../storage-badge';
   styleUrls: ['../connection-page.css', './connection-openrouter.css'],
 })
 export class ConnectionOpenRouter implements OnInit {
+  private diagnostics = inject(PageDiagnostics);
   protected openrouter = inject(OpenRouterSession);
   protected models = inject(OpenRouterModels);
   protected choice = inject(OpenRouterModelChoice);
@@ -113,6 +115,7 @@ export class ConnectionOpenRouter implements OnInit {
     try {
       await this.openrouter.connect();
     } catch (error: unknown) {
+      this.diagnostics.error('OpenRouter', 'connect:error', error);
       this.error.set(describeError(error, "Couldn't start OpenRouter authorization."));
     }
   }
@@ -143,6 +146,9 @@ export class ConnectionOpenRouter implements OnInit {
         await this.models.search(this.query(), { structuredOnly: this.structuredOnly() }),
       );
     } catch (error: unknown) {
+      this.diagnostics.error('OpenRouter', 'model-search:error', error, {
+        queryLength: this.query().length,
+      });
       this.results.set(null);
       this.searchError.set(describeError(error, "Couldn't search OpenRouter's models."));
     }

@@ -42,6 +42,7 @@ import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
 import { credentialLocation, StorageBadge } from '../storage-badge';
 import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /** The registry base this page's credentials are stored under. */
 const TWITTER_KEY = 'mockingbird_twitter_keys';
@@ -81,6 +82,7 @@ import { Terminology } from '../../../../terminology';
   styleUrls: ['../connection-page.css', './connection-twitter.css'],
 })
 export class ConnectionTwitter implements OnInit {
+  private diagnostics = inject(PageDiagnostics);
   /** post/tweet/florp vocabulary, per the Blue setting. */
   protected words = inject(Terminology).words;
 
@@ -358,6 +360,7 @@ export class ConnectionTwitter implements OnInit {
     try {
       this.lookupResult.set(await firstValueFrom(this.twitterApi.getProfile(handle)));
     } catch (error: unknown) {
+      this.diagnostics.error('Twitter', 'profile-lookup:error', error);
       this.followError.set(
         error instanceof Error ? error.message : `Could not find @${handle} on Twitter.`,
       );
@@ -510,6 +513,7 @@ export class ConnectionTwitter implements OnInit {
         );
       }
     } catch (error: unknown) {
+      this.diagnostics.error('Twitter', 'balance:error', error);
       this.balanceError.set(error instanceof Error ? error.message : 'Could not read the balance.');
     } finally {
       this.balanceLoading.set(false);

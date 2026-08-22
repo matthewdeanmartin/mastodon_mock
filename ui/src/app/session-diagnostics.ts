@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { DiagnosticLog } from './diagnostic-log';
 
 const PREFIX = '[Mawkingbird Session]';
 
@@ -30,6 +31,8 @@ const PREFIX = '[Mawkingbird Session]';
  */
 @Injectable({ providedIn: 'root' })
 export class SessionDiagnostics {
+  private readonly log = inject(DiagnosticLog);
+
   /**
    * A session-stable transition.
    *
@@ -47,17 +50,17 @@ export class SessionDiagnostics {
     if (after < before) {
       // Deliberate forgetting is rare and always user-initiated, so make it loud
       // enough to spot in a busy console rather than filing it under info.
-      console.warn(`${PREFIX} ${event} (forgot ${before - after})`, payload);
+      this.log.write('warn', PREFIX.slice(1, -1), `${event} (forgot ${before - after})`, payload);
       return;
     }
-    console.info(`${PREFIX} ${event}`, payload);
+    this.log.write('info', PREFIX.slice(1, -1), event, payload);
   }
 
   info(event: string, details: Record<string, unknown> = {}): void {
-    console.info(`${PREFIX} ${event}`, details);
+    this.log.write('info', PREFIX.slice(1, -1), event, details);
   }
 
   warn(event: string, details: Record<string, unknown> = {}): void {
-    console.warn(`${PREFIX} ${event}`, details);
+    this.log.write('warn', PREFIX.slice(1, -1), event, details);
   }
 }

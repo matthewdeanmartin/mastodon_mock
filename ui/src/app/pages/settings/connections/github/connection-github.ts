@@ -9,6 +9,7 @@ import { VaultBridge } from '../../../../providers/vault/vault-bridge';
 /** The registry base this page's credential is stored under. */
 const GITHUB_KEY = 'mockingbird_github_credentials';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /** Settings → Connections → GitHub. Token paste, validation, and the API proof. */
 @Component({
@@ -20,6 +21,7 @@ import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 export class ConnectionGitHub implements OnInit {
   protected github = inject(GitHubSession);
   private bridge = inject(VaultBridge);
+  private diagnostics = inject(PageDiagnostics);
 
   protected githubToken = signal('');
   protected githubBusy = signal(false);
@@ -60,6 +62,7 @@ export class ConnectionGitHub implements OnInit {
       this.githubToken.set('');
       this.githubNotice.set(`GitHub connected as @${user.login}.`);
     } catch (error: unknown) {
+      this.diagnostics.error('GitHub', 'connect:error', error);
       this.githubError.set(describeError(error, "Couldn't connect GitHub."));
     } finally {
       this.githubBusy.set(false);
@@ -77,6 +80,7 @@ export class ConnectionGitHub implements OnInit {
       await this.github.runProof();
       this.githubNotice.set('GitHub API proof completed in this browser.');
     } catch (error: unknown) {
+      this.diagnostics.error('GitHub', 'proof:error', error);
       this.githubError.set(describeError(error, "Couldn't call the GitHub API."));
     } finally {
       this.githubBusy.set(false);

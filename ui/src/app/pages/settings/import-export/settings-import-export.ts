@@ -27,6 +27,7 @@ import { BridgeFinder, BridgeRow } from './bridge-finder';
 import { BridgeNetwork } from './bridge-matching';
 import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
 import { MastodonConnector } from '../../../providers/mastodon/mastodon-connector';
+import { PageDiagnostics } from '../../../page-diagnostics';
 
 type CsvKind = 'following' | 'mutes' | 'blocks';
 
@@ -64,6 +65,7 @@ function saveCsv(csv: string, filename: string): void {
   styleUrl: './settings-import-export.css',
 })
 export class SettingsImportExport {
+  private readonly diagnostics = inject(PageDiagnostics);
   private api = inject(Api);
   private auth = inject(Auth);
   protected importer = inject(ImportFollows);
@@ -351,6 +353,7 @@ export class SettingsImportExport {
       this.twitterArchive.set(archive);
       this.twitterDiscovery.load(archive.people);
     } catch (error) {
+      this.diagnostics.error('ImportExport', 'twitter-archive:read-error', error);
       this.twitterArchiveError.set(
         error instanceof Error ? error.message : 'The Twitter archive could not be read.',
       );

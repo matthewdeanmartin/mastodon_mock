@@ -24,6 +24,7 @@ import { VaultBridge } from '../../../../providers/vault/vault-bridge';
 /** The registry base this page's credential is stored under. */
 const HUGO_KEY = 'mockingbird_hugo_credentials';
 import { Terminology } from '../../../../terminology';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /** Settings → Connections → Blog (Hugo). */
 @Component({
@@ -43,6 +44,7 @@ export class ConnectionHugo implements OnInit {
   private readonly github = inject(GitHubSession);
   private readonly hugoEdit = inject(HugoEditSession);
   private readonly drafts = inject(Drafts);
+  private readonly diagnostics = inject(PageDiagnostics);
   private readonly prefs = inject(ClientPrefs);
   private readonly router = inject(Router);
 
@@ -129,6 +131,9 @@ export class ConnectionHugo implements OnInit {
     try {
       siteUrl = normalizeSiteUrl(this.siteUrl());
     } catch (error: unknown) {
+      this.diagnostics.warn('Hugo', 'user:invalid-site-url', {
+        reason: error instanceof Error ? error.message : 'invalid',
+      });
       this.error.set(error instanceof Error ? error.message : 'Check the site address.');
       return;
     }
@@ -162,6 +167,7 @@ export class ConnectionHugo implements OnInit {
         );
       }
     } catch (error: unknown) {
+      this.diagnostics.error('Hugo', 'connect:error', error);
       this.error.set(error instanceof Error ? error.message : "Couldn't reach GitHub.");
     } finally {
       this.busy.set(false);
@@ -217,6 +223,7 @@ export class ConnectionHugo implements OnInit {
       });
       await this.router.navigate(['/home']);
     } catch (error: unknown) {
+      this.diagnostics.error('Hugo', 'open-post:error', error);
       this.openError.set(
         error instanceof Error ? error.message : 'Could not open that post for editing.',
       );
@@ -245,6 +252,7 @@ export class ConnectionHugo implements OnInit {
       const result = await this.feed.subscribe();
       (result.ok ? this.feedNotice : this.feedError).set(result.message);
     } catch (error: unknown) {
+      this.diagnostics.error('Hugo', 'feed-subscribe:error', error);
       this.feedError.set(
         error instanceof Error ? error.message : 'Could not reach your site to find its feed.',
       );

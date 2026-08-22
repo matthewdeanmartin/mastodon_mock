@@ -12,6 +12,7 @@ import { VaultBridge } from '../../../../providers/vault/vault-bridge';
 /** The registry base this page's credential is stored under. */
 const MATAROA_KEY = 'mockingbird_mataroa_connection';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /** Settings → Connections → Blog (Mataroa). */
 @Component({
@@ -26,6 +27,7 @@ export class ConnectionMataroa implements OnInit {
   private readonly api = inject(MataroaApi);
   private readonly proxy = inject(CorsProxy);
   private readonly consent = inject(ProxyConsent);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   protected readonly apiKey = signal('');
   protected readonly blogUrl = signal('');
@@ -72,6 +74,7 @@ export class ConnectionMataroa implements OnInit {
     try {
       this.settings.connect(this.apiKey(), this.blogUrl(), this.includeInProfile());
     } catch (error: unknown) {
+      this.diagnostics.error('Mataroa', 'save-connection:error', error);
       this.error.set(error instanceof Error ? error.message : "Couldn't save this connection.");
       return;
     }

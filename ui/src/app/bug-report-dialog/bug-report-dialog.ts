@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { BugReport } from '../bug-report';
 import { ErrorLog } from '../error-log';
 import { FocusTrap } from '../a11y/focus-trap';
+import { DiagnosticLog } from '../diagnostic-log';
+import { PageDiagnostics } from '../page-diagnostics';
 
 /**
  * "Report a bug" dialog. It assembles a Markdown report — the user's
@@ -21,21 +23,26 @@ import { FocusTrap } from '../a11y/focus-trap';
 export class BugReportDialog {
   private readonly report = inject(BugReport);
   protected readonly errorLog = inject(ErrorLog);
+  protected readonly diagnosticLog = inject(DiagnosticLog);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   readonly closed = output<void>();
 
   protected description = signal('');
   protected includeErrors = signal(true);
+  protected includeDiagnostics = signal(true);
   protected showDetails = signal(false);
   protected copied = signal(false);
 
   protected readonly hasErrors = computed(() => this.errorLog.entries().length > 0);
+  protected readonly hasDiagnostics = computed(() => this.diagnosticLog.entries().length > 0);
 
   /** Live preview of the exact Markdown that will be copied / filed. */
   protected readonly preview = computed(() =>
     this.report.buildMarkdown({
       description: this.description(),
       includeErrors: this.includeErrors(),
+      includeDiagnostics: this.includeDiagnostics(),
     }),
   );
 
@@ -44,7 +51,8 @@ export class BugReportDialog {
       await navigator.clipboard.writeText(this.preview());
       this.copied.set(true);
       setTimeout(() => this.copied.set(false), 2000);
-    } catch {
+    } catch (error: unknown) {
+      this.diagnostics.error('BugReport', 'clipboard:error', error);
       // Clipboard can be blocked (permissions, insecure context). The GitHub
       // button still works, and the preview text is selectable by hand.
       this.copied.set(false);
@@ -55,6 +63,7 @@ export class BugReportDialog {
     const url = this.report.buildGithubUrl({
       description: this.description(),
       includeErrors: this.includeErrors(),
+      includeDiagnostics: this.includeDiagnostics(),
     });
     window.open(url, '_blank', 'noopener,noreferrer');
   }

@@ -1,0 +1,53 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+  padding: 16px;
+}
+
+.dialog {
+  background: var(--col-bg);
+  border-radius: 16px;
+  padding: 24px;
+  width: 420px;
+  max-width: 100%;
+}
+
+h3 {
+  margin: 0 0 8px;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+form input[type='url'] {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0;
+}
+
+.feed-error {
+  color: #e0245e;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.retry-line {
+  margin: 0 0 8px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}

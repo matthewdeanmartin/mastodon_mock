@@ -7,6 +7,7 @@ import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
 import { credentialLocation, StorageBadge } from '../storage-badge';
 import { VaultBridge } from '../../../../providers/vault/vault-bridge';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /** The registry base this page's credential is stored under. */
 const GIST_KEY = 'mockingbird_gist_credentials';
@@ -29,6 +30,7 @@ export class ConnectionGist implements OnInit {
   protected readonly settings = inject(GistSettings);
   private readonly bridge = inject(VaultBridge);
   private readonly provider = inject(GistProvider);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   protected readonly token = signal('');
   protected readonly busy = signal(false);
@@ -75,6 +77,7 @@ export class ConnectionGist implements OnInit {
         try {
           this.settings.connect(token, { login: user.login });
         } catch (error: unknown) {
+          this.diagnostics.error('Gist', 'save-token:error', error);
           this.error.set(error instanceof Error ? error.message : "Couldn't save this token.");
           return;
         }

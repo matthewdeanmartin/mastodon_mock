@@ -292,6 +292,78 @@
   color: #d97706;
 }
 
+/* ------------------------------------------------------- diagnostic timeline */
+.diagnostic-notice {
+  color: var(--accent);
+  margin: 8px 0;
+}
+
+.diagnostic-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.diagnostic-row {
+  display: grid;
+  grid-template-columns: 52px minmax(180px, 0.8fr) minmax(220px, 1.4fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.diagnostic-row:last-child {
+  border-bottom: none;
+}
+
+.diagnostic-level {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.diagnostic-row.warn .diagnostic-level {
+  color: #d97706;
+}
+
+.diagnostic-row.error .diagnostic-level {
+  color: #e0245e;
+}
+
+.diagnostic-event,
+.diagnostic-details {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostic-area {
+  color: var(--muted);
+}
+
+.diagnostic-details {
+  font-size: 11px;
+}
+
+.diagnostic-time {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .diagnostic-row {
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+  }
+
+  .diagnostic-details {
+    grid-column: 2 / -1;
+  }
+}
+
 .err-endpoint {
   font-size: 13px;
   overflow: hidden;

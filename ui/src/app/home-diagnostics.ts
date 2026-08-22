@@ -1,21 +1,25 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { DiagnosticLog } from './diagnostic-log';
 
 const PREFIX = '[Mockingbird Home]';
 
 /** Token-safe browser-console diagnostics for the Home feed pipeline. */
 @Injectable({ providedIn: 'root' })
 export class HomeDiagnostics {
+  private readonly log = inject(DiagnosticLog);
+
   info(event: string, details: Record<string, unknown> = {}): void {
-    console.info(`${PREFIX} ${event}`, details);
+    this.log.write('info', PREFIX.slice(1, -1), event, details);
   }
 
   warn(event: string, details: Record<string, unknown> = {}): void {
-    console.warn(`${PREFIX} ${event}`, details);
+    this.log.write('warn', PREFIX.slice(1, -1), event, details);
   }
 
   error(event: string, error: unknown, details: Record<string, unknown> = {}): void {
-    console.error(`${PREFIX} ${event}`, { ...details, failure: this.describeFailure(error) });
+    const payload = { ...details, failure: this.describeFailure(error) };
+    this.log.write('error', PREFIX.slice(1, -1), event, payload);
   }
 
   /** Never include response bodies, request headers, tokens, account data, or post content. */

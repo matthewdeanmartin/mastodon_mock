@@ -41,6 +41,17 @@
       </label>
     }
 
+    @if (hasDiagnostics()) {
+      <label class="check">
+        <input
+          type="checkbox"
+          [ngModel]="includeDiagnostics()"
+          (ngModelChange)="includeDiagnostics.set($event)"
+        />
+        Include up to 100 recent diagnostic entries from this tab
+      </label>
+    }
+
     <button class="link-btn" type="button" (click)="showDetails.set(!showDetails())">
       {{ showDetails() ? 'Hide' : 'Show' }} exactly what will be included
     </button>

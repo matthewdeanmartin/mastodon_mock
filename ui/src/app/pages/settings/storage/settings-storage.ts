@@ -15,6 +15,7 @@ import {
   StorageReport,
 } from '../../../observability/local-storage-inspector';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
+import { PageDiagnostics } from '../../../page-diagnostics';
 
 interface StorageAccount {
   key: string;
@@ -34,6 +35,7 @@ interface StorageAccount {
 export class SettingsStorage {
   private readonly auth = inject(Auth);
   private readonly anonymous = inject(AnonymousAccount);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   protected readonly formatBytes = formatBytes;
   protected readonly accounts = computed<StorageAccount[]>(() => {
@@ -127,6 +129,10 @@ export class SettingsStorage {
       await clearIndexedDbStore(database.name, store.name);
       this.idb.set(await inspectIndexedDb());
     } catch (error: unknown) {
+      this.diagnostics.error('Storage', 'indexeddb-delete:error', error, {
+        database: database.name,
+        store: store.name,
+      });
       this.idbError.set(
         error instanceof Error ? error.message : 'IndexedDB data could not be deleted.',
       );

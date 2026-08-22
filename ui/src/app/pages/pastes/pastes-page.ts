@@ -13,6 +13,7 @@ import { PasteHistory, PasteRecord } from '../../providers/paste/paste-history';
 import { FeedPasteProvider } from '../../providers/paste/paste-provider';
 import { PasteProviderRegistry } from '../../providers/paste/paste-provider-registry';
 import { Terminology } from '../../terminology';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /** Which top-level section is showing. "My Pastes" is the default landing tab. */
 type PasteTab = 'mine' | 'feeds';
@@ -35,6 +36,7 @@ export class PastesPage {
   private drafts = inject(Drafts);
   private prefs = inject(ClientPrefs);
   private router = inject(Router);
+  private diagnostics = inject(PageDiagnostics);
 
   /** Transient "that worked, and your paste survived" confirmation. */
   protected notice = signal<string | null>(null);
@@ -137,6 +139,7 @@ export class PastesPage {
       await this.pastepileKey.mint();
       this.notice.set('Pastepile key created. Your new pastes will appear in "My pastes".');
     } catch (error: unknown) {
+      this.diagnostics.error('Pastes', 'key-mint:error', error);
       this.error.set(
         error instanceof Error ? error.message : 'Could not get a key from Pastepile.',
       );

@@ -1,6 +1,7 @@
 import { Component, HostListener, inject, input, effect, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { GradedQuery, SearchContext, SearchHelper, SearchHelperResult } from '../search-helper';
+import { PageDiagnostics } from '../../../page-diagnostics';
 
 /**
  * "Describe what you're looking for" → a runnable Mastodon query.
@@ -19,6 +20,7 @@ import { GradedQuery, SearchContext, SearchHelper, SearchHelperResult } from '..
 })
 export class SearchHelperDialog {
   private helper = inject(SearchHelper);
+  private diagnostics = inject(PageDiagnostics);
 
   /**
    * Whatever is in the search box, and the state of the widgets around it.
@@ -68,6 +70,9 @@ export class SearchHelperDialog {
       // user always has something to edit rather than an empty box.
       this.draft.set(result.winner ?? result.queries[0] ?? '');
     } catch (error: unknown) {
+      this.diagnostics.error('SearchHelper', 'run:error', error, {
+        requestLength: request.length,
+      });
       this.error.set(error instanceof Error ? error.message : "Couldn't reach the model.");
     } finally {
       this.busy.set(false);

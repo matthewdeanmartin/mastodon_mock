@@ -28,6 +28,7 @@ import {
   MawkingbirdService,
   ServiceStat,
 } from '../../observability/mawkingbird-metrics';
+import { DiagnosticEntry, DiagnosticLog } from '../../diagnostic-log';
 
 /** How the endpoint table is sorted. */
 type SortKey = 'count' | 'avg' | 'max' | 'errors';
@@ -169,6 +170,7 @@ export class Observability {
   protected twitterUsage = inject(TwitterUsage);
   private proxySettings = inject(CorsProxySettings);
   private rssSubs = inject(RssSubscriptions);
+  private diagnosticLog = inject(DiagnosticLog);
 
   protected readonly totals = this.metrics.totals;
   protected readonly errors = this.metrics.errors;
@@ -177,6 +179,9 @@ export class Observability {
   protected readonly serverLabel = this.metrics.serverLabel;
   protected readonly formatBytes = formatBytes;
   protected readonly formatDuration = formatDuration;
+  protected readonly diagnostics = this.diagnosticLog.entries;
+  protected readonly diagnosticNotice = signal<string | null>(null);
+  protected readonly diagnosticRows = computed(() => this.diagnostics().slice(-100).reverse());
 
   protected readonly proxyUsage = this.proxyUsageStore.usage;
   protected readonly proxyLabel = computed(() => this.proxySettings.chosen()?.label ?? null);
@@ -377,6 +382,69 @@ export class Observability {
     ]
       .filter((line): line is string => line !== null)
       .join('\n');
+  }
+
+  // ------------------------------------------------------ recent diagnostics
+
+  protected diagnosticDetail(entry: DiagnosticEntry): string {
+    return [
+      `${entry.level.toUpperCase()} [${entry.area}] ${entry.event}`,
+      entry.details,
+      new Date(entry.at).toLocaleString(),
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  protected async copyDiagnostics(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.diagnosticLog.toText());
+      this.showDiagnosticNotice('Copied diagnostics.');
+    } catch (error: unknown) {
+      this.diagnosticLog.write('error', 'Mockingbird Observability', 'diagnostics:copy-failed', {
+        error,
+      });
+      this.showDiagnosticNotice('Clipboard access failed. Use Download instead.');
+    }
+  }
+
+  protected downloadDiagnostics(): void {
+    try {
+      const blob = new Blob([this.diagnosticLog.toText()], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      link.href = url;
+      link.download = `mockingbird-diagnostics-${stamp}.log`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      this.showDiagnosticNotice('Downloaded diagnostics.');
+    } catch (error: unknown) {
+      this.diagnosticLog.write(
+        'error',
+        'Mockingbird Observability',
+        'diagnostics:download-failed',
+        {
+          error,
+        },
+      );
+      this.showDiagnosticNotice('The download could not be created.');
+    }
+  }
+
+  protected clearDiagnostics(): void {
+    if (!confirm('Clear the recent diagnostics retained for this tab?')) {
+      return;
+    }
+    this.diagnosticLog.clear();
+    this.showDiagnosticNotice('Cleared diagnostics.');
+  }
+
+  private showDiagnosticNotice(message: string): void {
+    this.diagnosticNotice.set(message);
+    setTimeout(() => this.diagnosticNotice.set(null), 3_000);
   }
 
   // --------------------------------------------------------------- route log

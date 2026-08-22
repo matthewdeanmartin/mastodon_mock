@@ -10,6 +10,7 @@ import { UpdateOverlay } from './update-overlay/update-overlay';
 import { UpdateRecovery } from './update-recovery';
 import { ConfigSync } from './config-sync';
 import { ProfileSyncStarter } from './providers/account/profile-sync-starter';
+import { ActionTracker } from './action-tracker';
 
 @Component({
   selector: 'app-root',
@@ -42,6 +43,8 @@ export class App {
    * the anonymous github.io deployment, where there are no accounts at all.
    */
   private readonly profileSync = inject(ProfileSyncStarter);
+  /** Privacy-scrubbed intent log for buttons, links, submits, and committed changes. */
+  private readonly actions = inject(ActionTracker);
 
   constructor() {
     // Count page views on every router navigation (GoatCounter, no_onload).
@@ -49,6 +52,7 @@ export class App {
     // The user's own copy of the same idea: per-route visits and time spent,
     // kept locally for the Observability page and never sent anywhere.
     this.routeLog.start();
+    this.actions.start();
     // Arm the deployment-recovery loop guard: if we got here after an
     // auto-reload, clear it once we've run cleanly for a bit.
     this.recovery.markApplicationStableAfterDelay();

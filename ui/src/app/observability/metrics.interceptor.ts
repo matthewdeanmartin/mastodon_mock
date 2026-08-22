@@ -6,6 +6,7 @@ import { Server } from '../server';
 import { ApiMetrics } from './api-metrics';
 import { BillingTier, MawkingbirdMetrics, mawkingbirdService } from './mawkingbird-metrics';
 import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
+import { DiagnosticLog } from '../diagnostic-log';
 
 /**
  * Times every instance API call and folds it into {@link ApiMetrics} for the
@@ -22,10 +23,22 @@ import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
  */
 export const metricsInterceptor: HttpInterceptorFn = (req, next) => {
   const server = inject(Server);
+  const diagnostics = inject(DiagnosticLog);
+  const target = requestTarget(req.url);
+  const logFailure = (error: unknown): void => {
+    const status = error instanceof HttpErrorResponse ? error.status : 0;
+    diagnostics.writeThrottled(
+      'error',
+      'Mockingbird HTTP',
+      'request:failed',
+      `${req.method} ${target} ${status}`,
+      { method: req.method, target, status, error },
+    );
+  };
   if (req.context.get(EXTERNAL_FETCH) && !targetsActiveServer(req.url, server.baseUrl())) {
     const service = mawkingbirdService(req.url);
     if (!service) {
-      return next(req);
+      return next(req).pipe(tap({ error: logFailure }));
     }
     // Which tier pays for this call is decided by the same condition
     // `plusTokenInterceptor` gates on — the *chosen* proxy entry, not the
@@ -48,8 +61,9 @@ export const metricsInterceptor: HttpInterceptorFn = (req, next) => {
             mawkingbird.record(service, tier, performance.now() - externalStart, true);
           }
         },
-        error: () => {
+        error: (error: unknown) => {
           mawkingbird.record(service, tier, performance.now() - externalStart, false);
+          logFailure(error);
         },
       }),
     );
@@ -67,10 +81,23 @@ export const metricsInterceptor: HttpInterceptorFn = (req, next) => {
         const status = err instanceof HttpErrorResponse ? err.status : 0;
         const ok = status >= 200 && status < 400;
         metrics.record(req.method, req.url, performance.now() - start, status, ok);
+        logFailure(err);
       },
     }),
   );
 };
+
+/** Query-free, credential-free request identity for diagnostics and flood suppression. */
+function requestTarget(url: string): string {
+  try {
+    const parsed = new URL(url, location.origin);
+    parsed.username = '';
+    parsed.password = '';
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return url.split(/[?#]/, 1)[0];
+  }
+}
 
 function targetsActiveServer(url: string, baseUrl: string): boolean {
   if (url.startsWith('/')) {

@@ -26,6 +26,7 @@ import { ShortenerSettings } from '../../../../providers/shortener/shortener-set
 import { ProxyConsentRequired } from '../../../../providers/shortener/shortener-transport';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { expiryLabel } from '../expiry-label';
+import { PageDiagnostics } from '../../../../page-diagnostics';
 
 /**
  * Settings → Connections → Link shortener.
@@ -60,6 +61,7 @@ import { expiryLabel } from '../expiry-label';
   styleUrls: ['../connection-page.css', './connection-link-shortener.css'],
 })
 export class ConnectionLinkShortener {
+  private readonly diagnostics = inject(PageDiagnostics);
   protected settings = inject(ShortenerSettings);
   protected registry = inject(ShortenerRegistry);
   protected consent = inject(ShortenerProxyConsent);
@@ -203,6 +205,7 @@ export class ConnectionLinkShortener {
         this.handleProxyNeeded(error, entry);
         return;
       }
+      this.diagnostics.error('Shortener', 'connect:error', error, { provider: entry.id });
       if (options.rollbackTo === 'clear') {
         // A key that does not work is not kept. See the class note.
         this.settings.clearKey(entry.id);

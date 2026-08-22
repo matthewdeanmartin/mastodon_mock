@@ -25,6 +25,20 @@ function feed(title: string, dates: string[]): ParsedFeed {
   };
 }
 
+/**
+ * Dates spaced an hour apart, newest first — comfortably past
+ * `qualifiesForHome`'s frequency floor (rss-home-eligibility.ts) so a test
+ * fixture built with this reads as "chatty" without having to restate the
+ * threshold in every test. Most of this file's fixtures use short `<p>x</p>`
+ * bodies already, which is the other half of qualifying.
+ */
+function hourlyDatesFrom(latest: string, count: number): string[] {
+  const start = Date.parse(latest);
+  return Array.from({ length: count }, (_, i) =>
+    new Date(start - i * 60 * 60 * 1000).toISOString(),
+  );
+}
+
 describe('RssProvider', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -53,8 +67,8 @@ describe('RssProvider', () => {
     const provider = setUp((url) =>
       of(
         url.includes('a.example')
-          ? feed('a', ['2026-07-10T00:00:00.000Z', '2026-07-14T00:00:00.000Z'])
-          : feed('b', ['2026-07-12T00:00:00.000Z']),
+          ? feed('a', hourlyDatesFrom('2026-07-14T00:00:00.000Z', 2))
+          : feed('b', hourlyDatesFrom('2026-07-12T00:00:00.000Z', 2)),
       ),
     );
     const subs = TestBed.inject(RssSubscriptions);
@@ -65,11 +79,24 @@ describe('RssProvider', () => {
     const page = await firstValueFrom(provider.fetchPage());
     expect(page.map((s) => s.created_at)).toEqual([
       '2026-07-14T00:00:00.000Z',
+      '2026-07-13T23:00:00.000Z',
       '2026-07-12T00:00:00.000Z',
-      '2026-07-10T00:00:00.000Z',
+      '2026-07-11T23:00:00.000Z',
     ]);
     expect(page.every((s) => s.provider === 'rss')).toBe(true);
 
+    expect(await firstValueFrom(provider.fetchPage())).toEqual([]);
+  });
+
+  it('excludes a feed that reads like an article site, not a timeline', async () => {
+    // Two items four days apart: infrequent, so it stays /rss-only. Real
+    // exclusion behaviour (long items too) is covered in rss-home-eligibility.spec.ts.
+    const provider = setUp(() =>
+      of(feed('news', ['2026-07-10T00:00:00.000Z', '2026-07-14T00:00:00.000Z'])),
+    );
+    TestBed.inject(RssSubscriptions).add('https://news.example/feed', 'News');
+
+    provider.reset();
     expect(await firstValueFrom(provider.fetchPage())).toEqual([]);
   });
 
@@ -77,7 +104,7 @@ describe('RssProvider', () => {
     const provider = setUp((url) =>
       url.includes('bad')
         ? throwError(() => new Error('no CORS for you'))
-        : of(feed('good', ['2026-07-12T00:00:00.000Z'])),
+        : of(feed('good', hourlyDatesFrom('2026-07-12T00:00:00.000Z', 2))),
     );
     const subs = TestBed.inject(RssSubscriptions);
     subs.add('https://good.example/feed', 'Good');
@@ -85,11 +112,11 @@ describe('RssProvider', () => {
 
     provider.reset();
     const page = await firstValueFrom(provider.fetchPage());
-    expect(page).toHaveLength(1);
+    expect(page).toHaveLength(2);
     expect(provider.errors()).toEqual(['Bad: no CORS for you']);
   });
 
-  it('getFeed returns the feed account plus every item, newest first', async () => {
+  it('getFeed returns the feed account plus every item, newest first (unfiltered by Home eligibility)', async () => {
     const provider = setUp(() =>
       of(feed('a', ['2026-07-10T00:00:00.000Z', '2026-07-14T00:00:00.000Z'])),
     );

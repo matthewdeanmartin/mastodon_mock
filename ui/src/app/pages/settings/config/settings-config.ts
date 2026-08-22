@@ -7,6 +7,7 @@ import { ProfileSync } from '../../../providers/account/profile-sync';
 import type { PushOutcome } from '../../../providers/account/profile-sync';
 import { SupporterStatus } from '../../../providers/account/supporter-status';
 import { formatBytes } from '../../../observability/local-storage-inspector';
+import { PageDiagnostics } from '../../../page-diagnostics';
 import {
   configChanges,
   ConfigChange,
@@ -37,6 +38,7 @@ export class SettingsConfig {
    */
   protected readonly profile = inject(ProfileSync);
   private readonly supporter = inject(SupporterStatus);
+  private readonly diagnostics = inject(PageDiagnostics);
 
   /** The upload preview shown before enabling sync for the first time. */
   protected readonly syncPreview = signal<ConfigChange[] | null>(null);
@@ -167,6 +169,7 @@ export class SettingsConfig {
       URL.revokeObjectURL(url);
       this.exportMessage.set('Configuration downloaded.');
     } catch (error: unknown) {
+      this.diagnostics.error('Config', 'download:error', error);
       this.showError(error);
     }
   }
@@ -177,6 +180,7 @@ export class SettingsConfig {
       await navigator.clipboard.writeText(this.exportText());
       this.exportMessage.set('Configuration copied to the clipboard.');
     } catch (error: unknown) {
+      this.diagnostics.error('Config', 'clipboard:error', error);
       this.showError(error);
     }
   }
@@ -228,6 +232,7 @@ export class SettingsConfig {
       this.message.set('Permanent unlisted Pastepile created and verified.');
       this.publishPrepared.set(false);
     } catch (error: unknown) {
+      this.diagnostics.error('Config', 'publish:error', error);
       this.showError(error);
     } finally {
       this.busy.set(false);
@@ -240,6 +245,9 @@ export class SettingsConfig {
     try {
       this.previewConfig(parsePortableConfig(this.importText()));
     } catch (error: unknown) {
+      this.diagnostics.warn('Config', 'import:parse-error', {
+        reason: error instanceof Error ? error.message : String(error),
+      });
       this.preview.set(null);
       this.changes.set([]);
       this.showError(error);
@@ -264,6 +272,7 @@ export class SettingsConfig {
       this.previewConfig(result.config);
       this.message.set(result.warning ?? 'Remote configuration fetched twice and verified stable.');
     } catch (error: unknown) {
+      this.diagnostics.error('Config', 'remote:fetch-error', error);
       this.remoteResult.set(null);
       this.preview.set(null);
       this.changes.set([]);

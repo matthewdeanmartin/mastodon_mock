@@ -205,8 +205,23 @@ export class Lists implements OnInit {
 
   protected readonly sectionOptions = FEED_SECTIONS;
 
-  /** Which single kind of feed to show, or `all`. Only offered on `/feeds`. */
-  protected section = signal<FeedSection>('all');
+  /**
+   * Which single kind of feed to show, `all` for the full stack, or `landing`
+   * for the drill-down category list.
+   *
+   * `landing` is `/feeds`'s actual default now — a vertical list of ~16
+   * category rows, each a link to its own filtered view, so reaching any one
+   * of them costs one click and zero scrolling past the others. `all` is the
+   * previous default, kept reachable via the landing list's "All feeds" row
+   * for anyone who wants the single-scroll view back. Read from `?section=`
+   * so a specific section is directly linkable (part of "3 clicks to a
+   * specific Bluesky feed": Feeds -> Bluesky feeds -> the feed).
+   */
+  protected section = signal<FeedSection | 'landing'>(
+    this.filter === 'all'
+      ? ((this.route.snapshot.queryParamMap?.get('section') as FeedSection | null) ?? 'landing')
+      : 'all',
+  );
 
   /** The picker is pointless on a route that already shows one kind. */
   protected readonly showSectionPicker = this.filter === 'all';
@@ -217,7 +232,58 @@ export class Lists implements OnInit {
   }
 
   protected setSection(value: string): void {
-    this.section.set(value as FeedSection);
+    this.section.set(value as FeedSection | 'landing');
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { section: value === 'landing' ? null : value },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  /**
+   * A rough count for one category row on the landing list, or null while its
+   * data hasn't resolved yet — the row still renders immediately (see
+   * rss-1-nav-and-page-skeleton.md: "counts fill in over time"), just without
+   * a number until then. Reads off signals this page already populates on
+   * `ngOnInit` for every section; nothing here triggers a new fetch, so a
+   * section whose data isn't loaded until it's opened (there are none of
+   * those today) would simply show no count rather than an eager fetch.
+   */
+  protected sectionCount(section: FeedSection): number | null {
+    switch (section) {
+      case 'lists':
+        return this.loading() ? null : this.lists().length;
+      case 'client-lists':
+        return this.clientLists.count();
+      case 'searches':
+        return this.saved.count();
+      case 'server':
+        return this.serverFeeds().length;
+      case 'tags':
+        return this.followedTags().length;
+      case 'tag-bundles':
+        return this.tagBundles.bundles().length;
+      case 'featured-tags':
+        return this.featuredTags().length;
+      case 'collections':
+        return this.collectionsLoading() ? null : this.collections().length;
+      case 'endorsements':
+        return this.myEndorsedCount();
+      case 'rss':
+        return this.rssFeeds().length;
+      case 'twitter':
+        return this.twitterFollows().length;
+      case 'bsky-pinned':
+        return this.bskySession.linked() ? this.bskyPinned().length : null;
+      case 'bsky-feeds':
+        return this.bskySession.linked() ? this.bskyUnpinnedFeeds().length : null;
+      case 'bsky-lists':
+        return this.bskySession.linked() ? this.bskyUnpinnedLists().length : null;
+      case 'bsky-popular':
+        return this.bskyPopular().length;
+      default:
+        return null;
+    }
   }
 
   // Followed / featured hashtags, surfaced here as feed rows (the old /tags page).

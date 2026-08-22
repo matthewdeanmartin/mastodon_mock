@@ -2,6 +2,7 @@ import { Component, computed, HostListener, inject, input, output, signal } from
 import { AiTranslate } from '../../ai-translate';
 import { POSTING_LANGUAGE_OPTIONS } from '../../language-detect';
 import { ClientPrefs } from '../../client-prefs';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /** What to do with the translation once it comes back. */
 export type TranslateApply = 'replace' | 'append';
@@ -34,6 +35,7 @@ export interface TranslateResult {
 export class TranslateDialog {
   private translator = inject(AiTranslate);
   private prefs = inject(ClientPrefs);
+  private diagnostics = inject(PageDiagnostics);
 
   /** The text currently in the composer. */
   readonly post = input.required<string>();
@@ -81,6 +83,10 @@ export class TranslateDialog {
       this.draft.set(result.text);
       this.model.set(result.model);
     } catch (error: unknown) {
+      this.diagnostics.error('Translate', 'translate:error', error, {
+        sourceLength: source.length,
+        target: this.target(),
+      });
       this.error.set(error instanceof Error ? error.message : "Couldn't reach the model.");
     } finally {
       this.busy.set(false);
