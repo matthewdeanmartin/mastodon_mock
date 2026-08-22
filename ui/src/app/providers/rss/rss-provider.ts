@@ -136,6 +136,47 @@ export class RssProvider implements FeedProvider {
   }
 
   /**
+   * Several feeds merged into one newest-first list, for the `/rss` reading
+   * pane's folder and "All items" rows.
+   *
+   * Deliberately *not* `fetchPage()`: that one is Home's, and it filters through
+   * {@link qualifiesForHome} — correct there, wrong here. The whole premise of
+   * the reading surface is that it shows the long-form feeds Home excludes, so a
+   * folder that contained nothing but newsletters would come back empty from the
+   * Home path. This shows everything in the folder, Home-eligible or not.
+   *
+   * Per-feed failures are tolerated the way `fetchPage()` tolerates them — one
+   * dead feed in a folder of eight must not blank the pane — and are reported
+   * separately so the pane can say which ones did not load. Each feed is still
+   * capped at {@link PER_FEED_ITEM_CAP}, so the merged list is bounded by the
+   * folder's size and needs no cap of its own.
+   */
+  getFeeds(feedUrls: readonly string[]): Observable<{ statuses: Status[]; failed: string[] }> {
+    if (!feedUrls.length) {
+      return of({ statuses: [], failed: [] });
+    }
+    const failed: string[] = [];
+    return forkJoin(
+      feedUrls.map((url) =>
+        this.getFeed(url).pipe(
+          map(({ statuses }) => statuses.slice(0, PER_FEED_ITEM_CAP)),
+          catchError(() => {
+            failed.push(url);
+            return of([] as Status[]);
+          }),
+        ),
+      ),
+    ).pipe(
+      map((perFeed) => ({
+        statuses: perFeed
+          .flat()
+          .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)),
+        failed,
+      })),
+    );
+  }
+
+  /**
    * One item of a feed, resolved by guid, for the thread/reader view. Feeds have
    * no per-item endpoint, so this re-fetches the feed and finds the item — cheap
    * enough for a click-through, and the browser's HTTP cache usually serves it.

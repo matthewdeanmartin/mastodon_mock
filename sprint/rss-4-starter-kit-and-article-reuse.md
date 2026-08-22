@@ -1,7 +1,13 @@
-# RSS Sprint 3 — Starter kit, friend-link extraction, article-view reuse
+# RSS Sprint 4 — Starter kit, friend-link extraction, article-view reuse
 
 Status: PLANNED
-Depends on: [[rss-2-read-tracking-and-filters]]
+Depends on: [[rss-3-read-tracking-and-filters]]
+
+Renumbered 2026-08-23 from the original Sprint 3 — [[rss-2-split-pane-shell]] was inserted ahead of
+it once the split-pane layout requirement was clarified. No content below changed as a result,
+except references to "Sprint 2" and "/rss's Articles mode," which now mean
+[[rss-3-read-tracking-and-filters]]'s headline-density work rather than the old single-column
+toggle.
 
 ## Goal
 
@@ -9,7 +15,7 @@ Solve cold-start (nobody has RSS subscriptions on day one), grow subscriptions f
 already in the app (friends' links), and give `/rss` a real long-form reading view by reusing
 already-built machinery instead of writing a second article extractor.
 
-## 3a. First RSS starter kit: 5 news links
+## 4a. First RSS starter kit: 5 news links
 
 - Reuses the existing starter-kit pattern — check `bundled-starter-kits` (`pages/bundled-
   starter-kits/`) for the current shape of a starter kit (it already exists for account-follow
@@ -26,7 +32,7 @@ already-built machinery instead of writing a second article extractor.
 - One-click subscribe-to-all, using `RssSubscriptions.adoptAll` (already built for exactly this:
   bulk-adopt while preserving any existing per-feed flags) rather than looping `add`.
 
-## 3b. Friend-link RSS/Atom extraction
+## 4b. Friend-link RSS/Atom extraction
 
 - Source: links already posted by accounts the user follows (statuses' `card`/link content —
   `PreviewCard` per [[project-mimb-readability]] notes that `Status.card` exists in `models.ts` and
@@ -38,7 +44,7 @@ already-built machinery instead of writing a second article extractor.
   plumbing from [[project-mimb-readability]] (`ArticleFetch`) for the fetch itself — do not build a
   second HTTP-fetch-through-proxy path.
 - Surface: a "Feeds from people you follow" section, likely on `/rss`'s empty/discovery state
-  alongside the starter kit (3a) — a suggested-feeds list the user can one-click subscribe from,
+  alongside the starter kit (4a) — a suggested-feeds list the user can one-click subscribe from,
   not an automatic subscription. Nothing subscribes on the user's behalf; extraction only produces
   suggestions.
 - Rate/scope limits: this is a per-request client-side fetch against arbitrary third-party sites,
@@ -47,10 +53,11 @@ already-built machinery instead of writing a second article extractor.
   quota-spending pattern noted in [[project-mimb-readability]]) so this doesn't burn a free CORS
   proxy's quota silently in the background.
 
-## 3c. Article view: reuse the readability pipeline
+## 4c. Article view: reuse the readability pipeline
 
-- `/rss`'s "Articles" mode (built in Sprint 2 as a card-style renderer) gets real long-form reading:
-  when an item is opened, call the same `ArticleFetch`/extraction path reader mode already uses
+- The split pane's right-side rendering ([[rss-2-split-pane-shell]], densified in
+  [[rss-3-read-tracking-and-filters]]'s 3d) gets real long-form reading: when an item is opened,
+  call the same `ArticleFetch`/extraction path reader mode already uses
   (per [[project-mimb-readability]] — client-side extraction, `article-metadata.ts` as the
   load-bearing fallback, `PreviewCard` on failure) rather than writing an RSS-specific extractor.
 - **Long-text pagination** ("split into pages," from the original list): this is new on top of the
@@ -65,16 +72,16 @@ already-built machinery instead of writing a second article extractor.
   Status" using the existing bookmarks feature, since RSS items are already synthesized into
   `Status` objects (`feedToStatuses`). Confirm before treating this as new work.
 
-## Out of scope for Sprint 3
+## Out of scope for Sprint 4
 
 In-app search-based discovery beyond the external-search-tab button (deep site-scraping discovery
-beyond 3b's specific friend-link case stays deferred per the overview). Comments, share-to-
+beyond 4b's specific friend-link case stays deferred per the overview). Comments, share-to-
 Mastodon, friends'-shared-items synthetic feed, folders, 90-day auto-wipe job, reader
 harmonization across long-post/tweet-storm/RSS (explicitly "not now" per the boss).
 
 ## Test/verify notes
 
-- 3b's site-fetch-and-parse path touches the CORS proxy same as article expansion — the
+- 4b's site-fetch-and-parse path touches the CORS proxy same as article expansion — the
   `X-Proxy-Source`/`X-Proxy-Upstream-Status` header handling from [[project-mimb-readability]]
   applies here too if errors need to be distinguishable (proxy failure vs. site has no feed).
 - Runtime verification per `.claude/skills/verify`, same conventions as prior sprints.

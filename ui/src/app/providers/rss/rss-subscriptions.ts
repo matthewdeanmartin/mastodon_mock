@@ -32,11 +32,74 @@ export function normalizeLimit(value: unknown): number {
   return Math.min(n, RSS_SUBSCRIPTION_LIMIT_MAX);
 }
 
+/**
+ * The separator between levels of a nested folder path.
+ *
+ * Folders are stored as a single display string rather than a tree of ids (see
+ * {@link RssFeedSub.folder}), so a nested OPML path becomes `Tech / Rust`. The
+ * spaces are part of it: `Tech/Rust` would be ambiguous against a folder someone
+ * legitimately named with a slash, and this way the stored string is exactly
+ * what the UI shows.
+ */
+export const FOLDER_SEPARATOR = ' / ';
+
+/**
+ * How deep a nested OPML path is allowed to be before the remainder is joined
+ * into the last segment.
+ *
+ * Three, per `spec/ui/folders_for_all.md`: OPML nests arbitrarily and an import
+ * must not lose data, but a tree deep enough to get lost in is a tree nobody
+ * maintains. Deeper paths keep every name — `A / B / C / D` becomes
+ * `A / B / C — D` — so this is lossy in the display name only.
+ */
+export const MAX_FOLDER_DEPTH = 3;
+
+/**
+ * Normalize an OPML folder path into the stored `folder` string.
+ *
+ * Empty segments are dropped (some exporters nest under titleless outlines),
+ * and a path past {@link MAX_FOLDER_DEPTH} folds its tail into the last
+ * segment rather than being truncated.
+ */
+export function folderPathToName(path: readonly string[]): string | undefined {
+  const parts = path.map((p) => p.trim()).filter(Boolean);
+  if (!parts.length) {
+    return undefined;
+  }
+  if (parts.length <= MAX_FOLDER_DEPTH) {
+    return parts.join(FOLDER_SEPARATOR);
+  }
+  const head = parts.slice(0, MAX_FOLDER_DEPTH - 1);
+  const tail = parts.slice(MAX_FOLDER_DEPTH - 1).join(' — ');
+  return [...head, tail].join(FOLDER_SEPARATOR);
+}
+
 /** One subscribed feed. `title` is captured when the feed is first fetched. */
 export interface RssFeedSub {
   url: string;
   title: string;
   enabled: boolean;
+  /**
+   * The folder this feed is filed under, or absent when it is unfiled.
+   *
+   * The folder's *name* is the identity — there is no id, no ordering, and no
+   * folder record anywhere else. That is deliberate for this sprint: it makes a
+   * folder come into existence by being typed and vanish by having nothing left
+   * in it, which is the whole of what the reading rail needs, and it keeps the
+   * shared `Folder{id,name,parentId,position}` primitive in
+   * `spec/ui/folders_for_all.md` a proposal rather than a dependency. The cost
+   * is that a rename is a bulk reassignment (see {@link renameFolder}) instead
+   * of a one-field write; the name is the natural join key if this is ever
+   * migrated to that model.
+   *
+   * Populated from OPML on import — the one place a user's own organisation of
+   * their own subscriptions actually comes from. A feed added by pasting a URL
+   * is unfiled: RSS and Atom documents carry publisher-assigned `<category>`
+   * labels, but those are a topic taxonomy, not a statement about how this
+   * reader wants their list arranged, and filing a new subscription under a
+   * label nobody chose is worse than leaving it visibly in "Unsorted".
+   */
+  folder?: string;
   /**
    * Fetch this feed through the configured CORS proxy instead of directly.
    *
@@ -135,19 +198,27 @@ export class RssSubscriptions {
    * fetches this feed, so a subscription never claims a route that has not
    * worked at least once.
    */
-  add(url: string, title: string, useProxy = false, itemCount?: number): string | null {
+  add(
+    url: string,
+    title: string,
+    useProxy = false,
+    itemCount?: number,
+    folder?: string,
+  ): string | null {
     if (this.has(url)) {
       return null;
     }
     if (this.feeds().length >= this.limit()) {
       return `You have reached your limit of ${this.limit()} RSS feeds. Raise it on the RSS feeds settings page.`;
     }
+    const filed = folder?.trim();
     this.persist([
       ...this.feeds(),
       {
         url,
         title,
         enabled: true,
+        ...(filed ? { folder: filed } : {}),
         ...(useProxy ? { useProxy } : {}),
         ...(typeof itemCount === 'number' ? { itemCount } : {}),
       },
@@ -177,6 +248,7 @@ export class RssSubscriptions {
           url: feed.url,
           title: feed.title,
           enabled: previous?.enabled ?? true,
+          ...(previous?.folder ? { folder: previous.folder } : {}),
           ...(previous?.useProxy ? { useProxy: true } : {}),
           ...(previous?.itemCount === undefined ? {} : { itemCount: previous.itemCount }),
         };
@@ -190,6 +262,51 @@ export class RssSubscriptions {
 
   setEnabled(url: string, enabled: boolean): void {
     this.persist(this.feeds().map((f) => (f.url === url ? { ...f, enabled } : f)));
+  }
+
+  /**
+   * Every folder currently in use, sorted for display.
+   *
+   * Derived from the feeds rather than stored: a folder exists exactly as long
+   * as something is filed under it, so there is no empty-folder state to clean
+   * up and no way for the rail to disagree with the list it is describing.
+   * Sorted case-insensitively — a rail ordered by ASCII would put `Zines` above
+   * `apps`, which reads as broken rather than as sorted.
+   */
+  readonly folders = computed(() =>
+    [...new Set(this.feeds().flatMap((f) => (f.folder ? [f.folder] : [])))].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' }),
+    ),
+  );
+
+  /** File a feed under a folder, or pass an empty name to unfile it. */
+  setFolder(url: string, folder: string | undefined): void {
+    const filed = folder?.trim();
+    this.persist(
+      this.feeds().map((f) => {
+        if (f.url !== url) {
+          return f;
+        }
+        const { folder: _dropped, ...rest } = f;
+        return filed ? { ...rest, folder: filed } : rest;
+      }),
+    );
+  }
+
+  /**
+   * Rename a folder, moving every feed in it.
+   *
+   * A bulk reassignment because the name *is* the identity in this model — see
+   * {@link RssFeedSub.folder}. Renaming onto a name already in use merges the
+   * two, which is the same thing the user would get by moving the feeds one at
+   * a time and is the only sensible reading of the request.
+   */
+  renameFolder(from: string, to: string): void {
+    const target = to.trim();
+    if (!target || target === from) {
+      return;
+    }
+    this.persist(this.feeds().map((f) => (f.folder === from ? { ...f, folder: target } : f)));
   }
 
   /**

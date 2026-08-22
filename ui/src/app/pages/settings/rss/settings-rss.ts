@@ -8,6 +8,7 @@ import { RssAddFeed } from '../../../providers/rss/rss-add-feed';
 import { RssCache } from '../../../providers/rss/rss-cache';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import {
+  folderPathToName,
   RSS_SUBSCRIPTION_LIMIT,
   RSS_SUBSCRIPTION_LIMIT_MAX,
   RssFeedSub,
@@ -210,8 +211,11 @@ export class SettingsRss implements OnInit {
    * burst that free CORS proxies rate-limit outright, which would fail feeds
    * that are actually fine.
    *
-   * Nested folders are flattened — Mawkingbird has no folders yet, and the
-   * parser preserves the paths for when it does.
+   * Folders are preserved: each feed is filed under the folder path it sat in,
+   * which is the organisation the person exporting the file already built and
+   * the one thing an importer has no business inventing or discarding. Paths
+   * deeper than `MAX_FOLDER_DEPTH` fold their tail into the last name rather
+   * than losing it.
    */
   async importOpml(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
@@ -255,7 +259,7 @@ export class SettingsRss implements OnInit {
         // than breaking, so the report can say how many were left behind.
         report.skippedForLimit += 1;
       } else {
-        await this.importOne(feed.url, report);
+        await this.importOne(feed.url, folderPathToName(feed.folders), report);
       }
       this.importProgress.update((p) => (p ? { ...p, done: p.done + 1 } : p));
     }
@@ -276,11 +280,15 @@ export class SettingsRss implements OnInit {
    * was asked for. The subscription still records `useProxy` only when the
    * proxy is what actually worked.
    */
-  private async importOne(url: string, report: ImportReport): Promise<void> {
+  private async importOne(
+    url: string,
+    folder: string | undefined,
+    report: ImportReport,
+  ): Promise<void> {
     for (const useProxy of this.proxySettings.usable() ? [false, true] : [false]) {
       try {
         const parsed = await firstValueFrom(this.rssFetch.fetchFeed(url, { useProxy }));
-        const limitError = this.subs.add(url, parsed.title, useProxy, parsed.items.length);
+        const limitError = this.subs.add(url, parsed.title, useProxy, parsed.items.length, folder);
         if (limitError) {
           report.skippedForLimit += 1;
         } else {

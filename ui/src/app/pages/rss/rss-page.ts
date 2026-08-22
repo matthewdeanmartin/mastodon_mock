@@ -1,8 +1,12 @@
-import { Component, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
-import { PER_FEED_ITEM_CAP } from '../../providers/rss/rss-provider';
+import { Component, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs';
+import { Status } from '../../models';
+import { RssSubscriptions, RssFeedSub } from '../../providers/rss/rss-subscriptions';
+import { PER_FEED_ITEM_CAP, RssProvider } from '../../providers/rss/rss-provider';
 import { PageDiagnostics } from '../../page-diagnostics';
+import { StatusCard } from '../../status-card/status-card';
 import { AddFeedDialog } from './add-feed-dialog/add-feed-dialog';
 
 /** A URL's hostname, or null when it isn't a parseable absolute URL. */
@@ -15,26 +19,237 @@ function hostOf(url: string): string | null {
 }
 
 /**
+ * What the right pane is showing.
+ *
+ * `all` is the default rather than an empty "choose a feed" state: someone who
+ * opened the reader wants to read, and a folder rail with nothing beside it
+ * makes the page look like it failed to load. It is also what Sprint 1's flat
+ * list becomes, so nothing that used to be on `/rss` has gone away.
+ */
+type Selection =
+  | { kind: 'all' }
+  | { kind: 'folder'; name: string }
+  | { kind: 'feed'; url: string }
+  | { kind: 'unfiled' };
+
+/**
+ * The query key for the unfiled group, e.g. `/rss?unfiled=1`.
+ *
+ * Its own key rather than a reserved `?folder=` value: folder names are typed by
+ * users and imported from arbitrary OPML files, so any sentinel string is a name
+ * somebody's folder could genuinely have, and the collision would silently show
+ * them the wrong list.
+ */
+const UNFILED_PARAM = 'unfiled';
+
+/** One group of feeds in the left rail. `name` is null for the unfiled group. */
+interface RailGroup {
+  name: string | null;
+  feeds: RssFeedSub[];
+}
+
+/**
  * `/rss` — the RSS *reading* surface, separate from `/settings/rss` (feed
  * management: add/remove, OPML, proxy, cache).
  *
- * Sprint 1 scope only: list subscriptions, add a feed. No read/unread,
- * starring, or headline/article toggle yet — those land in Sprint 2, and this
- * page's feed-row list is expected to grow those affordances in place rather
- * than being replaced. See sprint/rss-1-nav-and-page-skeleton.md.
+ * Sprint 2 turned this from a flat list into the Google-Reader split pane: a
+ * left rail of subscriptions grouped by OPML folder, and a right pane that
+ * updates in place. Selecting anything rewrites the query string rather than
+ * navigating, so the pane is linkable and survives a reload while the page
+ * itself never unmounts.
+ *
+ * This is one of *two* RSS experiences and does not replace the other: an RSS
+ * item reached from Home still opens the ordinary profile (`/accounts/rss:<url>`)
+ * and thread pages, which this sprint does not touch. See
+ * sprint/rss-2-split-pane-shell.md.
  */
 @Component({
   selector: 'app-rss-page',
-  imports: [RouterLink, AddFeedDialog],
+  imports: [RouterLink, AddFeedDialog, StatusCard],
   templateUrl: './rss-page.html',
   styleUrl: './rss-page.css',
 })
 export class RssPage {
   private diagnostics = inject(PageDiagnostics);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private rss = inject(RssProvider);
   protected subs = inject(RssSubscriptions);
   protected readonly perFeedCap = PER_FEED_ITEM_CAP;
 
   protected showAddDialog = signal(false);
+
+  /** Which pane content the URL is asking for. */
+  private readonly selection = toSignal(
+    this.route.queryParamMap.pipe(
+      map((params) =>
+        readSelection(params.get('feed'), params.get('folder'), params.get(UNFILED_PARAM)),
+      ),
+    ),
+    { initialValue: readSelection(null, null, null) as Selection },
+  );
+
+  /**
+   * The rail: unfiled feeds first, then one group per folder.
+   *
+   * Unfiled leads because a list with no folders at all — the common case for
+   * anyone who has never imported OPML — should read as a plain list of feeds,
+   * not as a group header with everything hidden under it.
+   */
+  protected readonly groups = computed<RailGroup[]>(() => {
+    const feeds = this.subs.feeds();
+    const unfiled = feeds.filter((f) => !f.folder);
+    return [
+      ...(unfiled.length ? [{ name: null, feeds: unfiled }] : []),
+      ...this.subs
+        .folders()
+        .map((name) => ({ name, feeds: feeds.filter((f) => f.folder === name) })),
+    ];
+  });
+
+  /** Whether the rail has any folder at all — drives the "Unsorted" header. */
+  protected readonly hasFolders = computed(() => this.subs.folders().length > 0);
+
+  protected readonly loading = signal(false);
+  protected readonly statuses = signal<Status[]>([]);
+  /** Feeds in the current selection that would not load, by URL. */
+  protected readonly failed = signal<string[]>([]);
+
+  /** The heading above the right pane. */
+  protected readonly paneTitle = computed(() => {
+    const sel = this.selection();
+    switch (sel.kind) {
+      case 'all':
+        return 'All items';
+      case 'unfiled':
+        return 'Unsorted';
+      case 'folder':
+        return sel.name;
+      case 'feed':
+        return this.subs.feeds().find((f) => f.url === sel.url)?.title || sel.url;
+    }
+  });
+
+  /** The feed URL when a single feed is selected — the pane's "open in profile" link. */
+  protected readonly selectedFeedUrl = computed(() => {
+    const sel = this.selection();
+    return sel.kind === 'feed' ? sel.url : null;
+  });
+
+  private loadSeq = 0;
+
+  constructor() {
+    // The pane follows the URL, so one effect covers first paint, rail clicks,
+    // back/forward, and a reload on a deep link alike.
+    effect(() => {
+      const sel = this.selection();
+      const urls = this.feedUrlsFor(sel);
+      this.load(urls);
+    });
+  }
+
+  /** Which subscriptions a selection covers. Disabled feeds are excluded. */
+  private feedUrlsFor(sel: Selection): string[] {
+    const enabled = this.subs.feeds().filter((f) => f.enabled);
+    switch (sel.kind) {
+      case 'all':
+        return enabled.map((f) => f.url);
+      case 'unfiled':
+        return enabled.filter((f) => !f.folder).map((f) => f.url);
+      case 'folder':
+        return enabled.filter((f) => f.folder === sel.name).map((f) => f.url);
+      case 'feed':
+        // By URL, not by `enabled`: clicking a switched-off feed in the rail is
+        // an explicit request to read that one thing, and refusing to show it
+        // while its own row sits highlighted would just look broken.
+        return [sel.url];
+    }
+  }
+
+  private load(feedUrls: string[]): void {
+    const seq = ++this.loadSeq;
+    if (!feedUrls.length) {
+      this.statuses.set([]);
+      this.failed.set([]);
+      this.loading.set(false);
+      return;
+    }
+    this.loading.set(true);
+    this.rss.getFeeds(feedUrls).subscribe({
+      next: ({ statuses, failed }) => {
+        if (seq !== this.loadSeq) {
+          return;
+        }
+        this.statuses.set(statuses);
+        this.failed.set(failed);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        if (seq !== this.loadSeq) {
+          return;
+        }
+        this.diagnostics.error('RssPage', 'pane:load-failed', err, { feeds: feedUrls.length });
+        this.statuses.set([]);
+        this.failed.set(feedUrls);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Point the pane at something.
+   *
+   * A query-param navigation, not a route change: the page component stays
+   * mounted (so the rail does not flicker or lose scroll) while the URL still
+   * describes what is on screen, which is what makes a pane linkable.
+   */
+  protected select(sel: Selection): void {
+    this.diagnostics.info('RssPage', 'user:select', { kind: sel.kind });
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: selectionParams(sel),
+      replaceUrl: false,
+    });
+  }
+
+  protected selectAll(): void {
+    this.select({ kind: 'all' });
+  }
+
+  protected selectFolder(name: string | null): void {
+    this.select(name === null ? { kind: 'unfiled' } : { kind: 'folder', name });
+  }
+
+  protected selectFeed(url: string): void {
+    this.select({ kind: 'feed', url });
+  }
+
+  /** Whether a rail row is the current selection, for highlighting. */
+  protected isActive(sel: Selection): boolean {
+    const current = this.selection();
+    if (current.kind !== sel.kind) {
+      return false;
+    }
+    if (current.kind === 'feed' && sel.kind === 'feed') {
+      return current.url === sel.url;
+    }
+    if (current.kind === 'folder' && sel.kind === 'folder') {
+      return current.name === sel.name;
+    }
+    return true;
+  }
+
+  protected isFolderActive(name: string | null): boolean {
+    return this.isActive(name === null ? { kind: 'unfiled' } : { kind: 'folder', name });
+  }
+
+  protected isFeedActive(url: string): boolean {
+    return this.isActive({ kind: 'feed', url });
+  }
+
+  protected isAllActive(): boolean {
+    return this.isActive({ kind: 'all' });
+  }
 
   openAddDialog(): void {
     this.diagnostics.info('RssPage', 'user:open-add-dialog', {});
@@ -47,5 +262,42 @@ export class RssPage {
 
   rssHost(url: string): string | null {
     return hostOf(url);
+  }
+
+  /** The title to show for a failed feed, falling back to its URL. */
+  protected feedTitle(url: string): string {
+    return this.subs.feeds().find((f) => f.url === url)?.title || url;
+  }
+}
+
+/** Read the pane selection out of the query string. */
+function readSelection(
+  feed: string | null,
+  folder: string | null,
+  unfiled: string | null,
+): Selection {
+  if (feed) {
+    return { kind: 'feed', url: feed };
+  }
+  if (unfiled) {
+    return { kind: 'unfiled' };
+  }
+  if (folder) {
+    return { kind: 'folder', name: folder };
+  }
+  return { kind: 'all' };
+}
+
+/** The query params for a selection — nulls clear the keys it does not use. */
+function selectionParams(sel: Selection): Record<string, string | null> {
+  switch (sel.kind) {
+    case 'all':
+      return { feed: null, folder: null, [UNFILED_PARAM]: null };
+    case 'unfiled':
+      return { feed: null, folder: null, [UNFILED_PARAM]: '1' };
+    case 'folder':
+      return { feed: null, folder: sel.name, [UNFILED_PARAM]: null };
+    case 'feed':
+      return { feed: sel.url, folder: null, [UNFILED_PARAM]: null };
   }
 }

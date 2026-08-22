@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  folderPathToName,
   RSS_SUBSCRIPTION_LIMIT,
   RSS_SUBSCRIPTION_LIMIT_MAX,
   RssSubscriptions,
@@ -87,5 +88,81 @@ describe('RssSubscriptions', () => {
     expect(subs.feeds()).toHaveLength(15);
     expect(subs.remaining()).toBe(0);
     expect(subs.add('https://new.example/feed', 'New')).toContain('limit of 5');
+  });
+
+  it('files a feed under a folder and lists the folders in use', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://a.example/feed', 'A', false, undefined, 'Tech');
+    subs.add('https://b.example/feed', 'B', false, undefined, 'news');
+    subs.add('https://c.example/feed', 'C');
+
+    // Case-insensitive sort: an ASCII sort would put "Tech" above "news".
+    expect(subs.folders()).toEqual(['news', 'Tech']);
+    expect(subs.feeds().find((f) => f.url === 'https://c.example/feed')?.folder).toBeUndefined();
+  });
+
+  it('unfiles a feed when the folder is cleared, dropping the key entirely', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://a.example/feed', 'A', false, undefined, 'Tech');
+
+    subs.setFolder('https://a.example/feed', '');
+
+    expect(subs.folders()).toEqual([]);
+    expect('folder' in subs.feeds()[0]).toBe(false);
+  });
+
+  it('a folder stops existing once nothing is filed under it', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://a.example/feed', 'A', false, undefined, 'Tech');
+    subs.remove('https://a.example/feed');
+
+    expect(subs.folders()).toEqual([]);
+  });
+
+  it('renames a folder by moving every feed in it', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://a.example/feed', 'A', false, undefined, 'Tech');
+    subs.add('https://b.example/feed', 'B', false, undefined, 'Tech');
+    subs.add('https://c.example/feed', 'C', false, undefined, 'News');
+
+    subs.renameFolder('Tech', 'Technology');
+
+    expect(subs.folders()).toEqual(['News', 'Technology']);
+    expect(subs.feeds().filter((f) => f.folder === 'Technology')).toHaveLength(2);
+  });
+
+  it('renaming onto an existing folder merges them', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://a.example/feed', 'A', false, undefined, 'Tech');
+    subs.add('https://b.example/feed', 'B', false, undefined, 'News');
+
+    subs.renameFolder('Tech', 'News');
+
+    expect(subs.folders()).toEqual(['News']);
+    expect(subs.feeds().filter((f) => f.folder === 'News')).toHaveLength(2);
+  });
+
+  it('preserves folders across adoptAll', () => {
+    const subs = TestBed.inject(RssSubscriptions);
+    subs.add('https://a.example/feed', 'A', false, undefined, 'Tech');
+
+    subs.adoptAll([{ url: 'https://a.example/feed', title: 'A renamed' }]);
+
+    expect(subs.feeds()[0].folder).toBe('Tech');
+  });
+});
+
+describe('folderPathToName', () => {
+  it('is undefined for a top-level feed', () => {
+    expect(folderPathToName([])).toBeUndefined();
+    expect(folderPathToName(['  '])).toBeUndefined();
+  });
+
+  it('joins a nested path for display', () => {
+    expect(folderPathToName(['Tech', 'Rust'])).toBe('Tech / Rust');
+  });
+
+  it('folds a path past the depth cap into the last name rather than losing it', () => {
+    expect(folderPathToName(['A', 'B', 'C', 'D'])).toBe('A / B / C — D');
   });
 });

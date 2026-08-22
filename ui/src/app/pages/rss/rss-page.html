@@ -1,20 +1,45 @@
-<div class="spage-head">
-  <h1>📡 RSS</h1>
-  <p>
-    Your subscribed feeds, for reading — not mixed into Home. To add, remove, or route a feed
-    through a CORS proxy, see
-    <a routerLink="/settings/rss">Manage RSS feeds</a>.
-  </p>
-</div>
+<div class="rss-page">
+  <aside class="rss-rail" aria-label="Subscriptions">
+    <div class="rss-rail-head">
+      <h1>📡 RSS</h1>
+      <button class="btn btn-small" type="button" (click)="openAddDialog()">Add a feed</button>
+    </div>
 
-<div class="spage-body">
-  <button class="btn" type="button" (click)="openAddDialog()">Add a feed</button>
+    <nav class="rss-rail-body">
+      <button
+        class="rail-row rail-all"
+        type="button"
+        [class.active]="isAllActive()"
+        [attr.aria-current]="isAllActive() ? 'true' : null"
+        (click)="selectAll()"
+      >
+        <span class="name">All items</span>
+      </button>
 
-  @if (subs.feeds().length) {
-    <ul class="feed-list">
-      @for (f of subs.feeds(); track f.url) {
-        <li class="feed-row" [class.feed-row-off]="!f.enabled">
-          <a class="feed-row-link" [routerLink]="['/accounts', 'rss:' + f.url]">
+      @for (group of groups(); track group.name) {
+        @if (group.name !== null || hasFolders()) {
+          <button
+            class="rail-row rail-folder"
+            type="button"
+            [class.active]="isFolderActive(group.name)"
+            [attr.aria-current]="isFolderActive(group.name) ? 'true' : null"
+            (click)="selectFolder(group.name)"
+          >
+            <span class="name">{{ group.name ?? 'Unsorted' }}</span>
+            <span class="muted small">{{ group.feeds.length }}</span>
+          </button>
+        }
+
+        @for (f of group.feeds; track f.url) {
+          <button
+            class="rail-row rail-feed"
+            type="button"
+            [class.nested]="group.name !== null || hasFolders()"
+            [class.off]="!f.enabled"
+            [class.active]="isFeedActive(f.url)"
+            [attr.aria-current]="isFeedActive(f.url) ? 'true' : null"
+            (click)="selectFeed(f.url)"
+          >
             <span class="names">
               <span class="name">
                 {{ f.title || f.url }}
@@ -22,30 +47,63 @@
                   <span class="muted small">· off</span>
                 }
               </span>
-              @if (rssHost(f.url); as host) {
-                <span class="muted small">{{ host }}</span>
-              }
-            </span>
-            @if (f.itemCount !== undefined) {
-              <span class="muted small item-count">
-                {{ f.itemCount }} item{{ f.itemCount === 1 ? '' : 's' }}
-                @if (f.itemCount > perFeedCap) {
-                  <span title="Home only shows the newest {{ perFeedCap }} of any one feed"
-                    >(showing newest {{ perFeedCap }})</span
-                  >
+              <span class="muted small">
+                {{ rssHost(f.url) }}
+                @if (f.itemCount !== undefined) {
+                  · {{ f.itemCount }} item{{ f.itemCount === 1 ? '' : 's' }}
                 }
               </span>
-            }
-          </a>
-        </li>
+            </span>
+          </button>
+        }
+      } @empty {
+        <p class="muted rail-empty">
+          No feeds yet. <a routerLink="/settings/rss">Manage RSS feeds</a> to import an OPML file,
+          or add one above.
+        </p>
       }
-    </ul>
-  } @else {
-    <p class="muted">
-      No feeds yet. <a routerLink="/settings/rss">Manage RSS feeds</a> to import an OPML file, or
-      add one above.
+    </nav>
+
+    <p class="muted small rail-foot">
+      To remove feeds, import OPML, or route one through a proxy, see
+      <a routerLink="/settings/rss">Manage RSS feeds</a>.
     </p>
-  }
+  </aside>
+
+  <section class="rss-pane" aria-live="polite">
+    <div class="rss-pane-head">
+      <h2>{{ paneTitle() }}</h2>
+      @if (selectedFeedUrl(); as feedUrl) {
+        <a class="muted small" [routerLink]="['/accounts', 'rss:' + feedUrl]">Open as profile</a>
+      }
+    </div>
+
+    @if (failed().length) {
+      <p class="pane-warning">
+        @if (failed().length === 1) {
+          Couldn't load {{ feedTitle(failed()[0]) }}.
+        } @else {
+          Couldn't load {{ failed().length }} feeds.
+        }
+        <a routerLink="/settings/rss">Check them in settings</a> — a feed that fails here usually
+        needs a CORS proxy.
+      </p>
+    }
+
+    @if (loading()) {
+      <p class="muted center">Loading items…</p>
+    } @else {
+      @for (s of statuses(); track s.id) {
+        <app-status-card [status]="s" filterContext="account" />
+      } @empty {
+        @if (!subs.feeds().length) {
+          <p class="muted center">Subscribe to a feed to start reading.</p>
+        } @else {
+          <p class="muted center">Nothing to read here.</p>
+        }
+      }
+    }
+  </section>
 </div>
 
 @if (showAddDialog()) {

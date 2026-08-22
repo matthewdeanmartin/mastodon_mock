@@ -29,11 +29,14 @@ function isWideUrl(url: string): boolean {
   // /search goes rails-off wide so facets have room to live beside results.
   // /write does too, and for the mirror-image reason: it spends the width on
   // drafts and notes instead of on trending tags and people to follow.
+  // /rss is a two-pane reader: its own left rail of subscriptions would be
+  // competing with the shell's rails for the same edge of the screen.
   return (
     url.startsWith('/settings') ||
     url.startsWith('/conversations') ||
     url.startsWith('/search') ||
-    url.startsWith('/write')
+    url.startsWith('/write') ||
+    url.startsWith('/rss')
   );
 }
 

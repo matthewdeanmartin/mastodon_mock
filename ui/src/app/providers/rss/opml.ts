@@ -8,11 +8,10 @@ export interface OpmlFeed {
    * The folder path this feed sat under, outermost first, or empty when it sat
    * at the top level.
    *
-   * Captured even though nothing consumes it yet. Categories are the core of
-   * how people actually organise a reader, and an importer that silently
-   * discards them loses information the file will not have again — see
-   * `spec/ui/folders_for_all.md`. Flattening is what the *UI* does today, not
-   * what the parser is allowed to assume forever.
+   * Consumed since RSS Sprint 2: the importer turns this into `RssFeedSub.folder`
+   * via `folderPathToName`, and the left rail on `/rss` groups by it. Kept as the
+   * full path here rather than pre-joined, because the parser's job is to report
+   * what the file said and the depth cap is a display decision.
    */
   folders: string[];
 }
@@ -110,13 +109,27 @@ function escapeXml(value: string): string {
     .replaceAll("'", '&apos;');
 }
 
+/** One `<outline type="rss">` line, indented to its depth in the tree. */
+function feedOutline(feed: RssFeedSub, indent: string): string {
+  const text = escapeXml(feed.title || feed.url);
+  return `${indent}<outline type="rss" text="${text}" title="${text}" xmlUrl="${escapeXml(feed.url)}" />`;
+}
+
 /**
- * Write the subscriptions out as OPML, flat.
+ * Write the subscriptions out as OPML, nesting filed feeds under their folder.
  *
- * Flat because Mawkingbird has no folders to export yet. The file is still a
- * legitimate OPML document that any reader will import — that is the whole
- * point of exporting, and it is what makes this list portable rather than
- * hostage to one browser's localStorage.
+ * The export is what makes this list portable rather than hostage to one
+ * browser's localStorage, so it has to carry the user's own organisation too —
+ * an export that flattened the tree would quietly undo the import that built it,
+ * and a round trip through Mawkingbird would cost someone their folders. Unfiled
+ * feeds stay at the top level, which is also the entire file for anyone who has
+ * never used a folder.
+ *
+ * Folder names are written back as the stored display string, `Tech / Rust`
+ * included: re-importing re-derives the same single folder from it. Reconstructing
+ * real nested `<outline>` levels would round-trip more prettily into *other*
+ * readers, but it would also silently split one folder someone named with a slash
+ * into two, and this model has no way to tell those cases apart.
  *
  * Disabled feeds are included. "Disabled" is a Mawkingbird display state, not a
  * statement that you are no longer subscribed, and dropping them would make an
@@ -132,12 +145,29 @@ export function buildOpml(feeds: readonly RssFeedSub[], now = new Date()): strin
     '  </head>',
     '  <body>',
   ];
-  for (const feed of feeds) {
-    const text = escapeXml(feed.title || feed.url);
-    lines.push(
-      `    <outline type="rss" text="${text}" title="${text}" xmlUrl="${escapeXml(feed.url)}" />`,
-    );
+
+  // Unfiled feeds first, at the top level, then one <outline> per folder. Order
+  // within each group follows the subscription list, so an export reads in the
+  // order the app shows.
+  for (const feed of feeds.filter((f) => !f.folder)) {
+    lines.push(feedOutline(feed, '    '));
   }
+
+  const byFolder = new Map<string, RssFeedSub[]>();
+  for (const feed of feeds) {
+    if (feed.folder) {
+      byFolder.set(feed.folder, [...(byFolder.get(feed.folder) ?? []), feed]);
+    }
+  }
+  for (const [folder, filed] of byFolder) {
+    const text = escapeXml(folder);
+    lines.push(`    <outline text="${text}" title="${text}">`);
+    for (const feed of filed) {
+      lines.push(feedOutline(feed, '      '));
+    }
+    lines.push('    </outline>');
+  }
+
   lines.push('  </body>', '</opml>', '');
   return lines.join('\n');
 }

@@ -129,6 +129,27 @@ describe('buildOpml', () => {
   it('writes a valid document for an empty list', () => {
     expect(parseOpml(buildOpml([])).feeds).toEqual([]);
   });
+
+  it('round-trips folders, so an export does not undo the import that built it', () => {
+    const xml = buildOpml([
+      { url: 'https://a.test/f.xml', title: 'Filed', enabled: true, folder: 'Tech' },
+      { url: 'https://b.test/f.xml', title: 'Also filed', enabled: true, folder: 'Tech' },
+      { url: 'https://c.test/f.xml', title: 'Loose', enabled: true },
+    ]);
+
+    const parsed = parseOpml(xml);
+    const byUrl = new Map(parsed.feeds.map((f) => [f.url, f.folders]));
+    expect(byUrl.get('https://a.test/f.xml')).toEqual(['Tech']);
+    expect(byUrl.get('https://b.test/f.xml')).toEqual(['Tech']);
+    expect(byUrl.get('https://c.test/f.xml')).toEqual([]);
+  });
+
+  it('escapes folder names', () => {
+    const xml = buildOpml([
+      { url: 'https://a.test/f.xml', title: 'Filed', enabled: true, folder: 'R&D <x>' },
+    ]);
+    expect(parseOpml(xml).feeds[0].folders).toEqual(['R&D <x>']);
+  });
 });
 
 describe('opmlFilename', () => {

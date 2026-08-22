@@ -42,6 +42,27 @@ they read like short-form posts, not articles. Long-form/low-frequency feeds (th
 newsletters, blogs, daily-or-less news sites) are excluded from Home and live only on `/rss`. See
 Sprint 1's classification heuristic.
 
+## Two RSS experiences, not one (clarified 2026-08-23)
+
+Sprints 2-4 were re-planned once it became clear the epic actually needs **two distinct reading
+surfaces**, not a single page with view-mode toggles:
+
+1. **Twitter-like** — the per-feed profile page (`/accounts/rss:<url>`) and per-item thread/reader
+   view. Already built (Sprint 1 wired reader-mode-by-default for RSS items; the profile page
+   predates this epic). Reached whenever an RSS item surfaces in a social context: Home (for
+   chatty/qualifying feeds), a click-through from anywhere else. **Untouched by Sprints 2-4** — this
+   is the explicit guarantee that clicking an RSS item from Home always still works the old way.
+2. **Google-Reader-like** — `/rss` itself, rebuilt as a full-screen split pane (left rail:
+   categorized subscriptions; right pane: content, updated in place without navigating away).
+   Reached only via its own top-level nav icon, never as a side effect of browsing Home. This is
+   Sprint 2 ([[rss-2-split-pane-shell]]) onward.
+
+The left rail's subscriber list is RSS-only for the sprints currently planned. A later, unplanned
+extension the boss named explicitly: Home's own long-form posts (megatweets, tweet-storms) could
+someday appear in the same left rail — but a feed/account that "just posts shorts" never would,
+because those already have a home in surface (1). Not sized, not scheduled — noted here so it isn't
+lost.
+
 ## Menu pressure this epic resolves
 
 The `…More` menu (`shell/shell.html`) is out of room. Four rows move or disappear as this epic
@@ -58,25 +79,37 @@ Lists and Tags already redirect from bare `/lists` and `/tags` (back-compat rout
 route changes needed there, only where the menu points and how the destination page presents
 itself.
 
-## Sprint sequence (this doc covers 1–3; the roadmap continues past it)
+## Sprint sequence (updated 2026-08-23 — Sprint 1 shipped; 2-4 re-planned around the split pane)
 
-1. **Sprint 1 — Feeds nav rework + `/rss` page skeleton + Home/RSS un-mixing.** Drill-down category
-   list with async counts on `/feeds`. New `/rss` route with "All feeds" list, "Add a feed" dialog.
-   Menu rows move. Auto-classification heuristic ships so Home stops showing article-length feeds.
-2. **Sprint 2 — Read/unread + filters + headline view.** localStorage read-state store. All/Starred
-   filter. Headlines (condensed) vs. article (expanded) list modes. Mark-all-read. Scroll-tracking
-   setting.
-3. **Sprint 3 — Starter kit + friend-link extraction + article view reuse.** First starter kit (5
-   news links). Extract RSS/Atom feed references from links posted by people you follow. Article
-   view on `/rss` reuses the Sprint reader-1 extraction pipeline (`ArticleFetch`) instead of
-   building a second one.
+1. **Sprint 1 — DONE.** Feeds nav rework (drill-down category list on `/feeds`), `/rss` page
+   skeleton (flat list + "Add a feed"), Home/RSS un-mixing (chatty-feed auto-classifier). Plus two
+   bug-fix passes landed the same day: automatic Plus-proxy adoption on a failed direct fetch, and
+   RSS-aware reader-mode fixes (suppress/relabel "Fetch article" when the feed already gave the full
+   body; hide the dead "Open in chat" control on read-only threads).
+2. **Sprint 2 — DONE (2026-08-22).** [[rss-2-split-pane-shell]]. Rebuilds `/rss` into the two-pane
+   Google-Reader layout: left rail (subscriptions grouped by OPML folder), right pane (content,
+   updated in place). Feed click and folder click (merged list) both land in the right pane without
+   leaving `/rss`. The "what does categorized mean" question is **settled** (2026-08-22): OPML
+   folders, minimal `folder?: string` on `RssFeedSub` — import stops discarding the tree it already
+   parses, export round-trips it, and a feed subscribed by bare URL is unfiled rather than being
+   filed under a publisher's own `<category>` labels. Deferred-folders is therefore partly reopened,
+   in the narrow form only; `spec/ui/folders_for_all.md`'s shared primitive remains a proposal.
+3. **Sprint 3 — PLANNED.** [[rss-3-read-tracking-and-filters]]. Read/unread store, starring,
+   All/Starred filter, scroll-tracking, mark-all-read (scoped correctly to feed vs. category vs.
+   all — flagged as the sprint's most embarrassing possible bug), and a headline-density row
+   renderer for the right pane (a new lightweight component, not a repurposed `app-status-card`).
+4. **Sprint 4 — PLANNED.** [[rss-4-starter-kit-and-article-reuse]]. First starter kit (5 news
+   links, URLs not yet chosen). Extract RSS/Atom feed references from links posted by people you
+   follow. Long-form article view in the right pane reuses the reader-1 extraction pipeline
+   (`ArticleFetch`) instead of building a second one; adds pagination on top of it.
 
-**Deferred past Sprint 3** (explicitly out of scope until re-planned): in-app feed discovery via
-site-HTML link-rel scraping (Sprint 3 ships only the external-search-tab version; the
-scrape-the-page version reuses `article` route plumbing but needs its own design pass), RSS
-comments, share-to-Mastodon-with-highlight, "friends shared items" synthetic feed, feed folders,
-90-day read-state wipe, reader harmonization across long-post/tweet-storm/RSS-article (explicitly
-named as *not now* by the boss).
+**Deferred past Sprint 4** (explicitly out of scope until re-planned): in-app feed discovery via
+site-HTML link-rel scraping beyond the friend-link case (Sprint 4 ships only the
+external-search-tab version plus friend-link discovery; general "paste any site, find its feeds"
+needs its own design pass), RSS comments, share-to-Mastodon-with-highlight, "friends shared items"
+synthetic feed, 90-day read-state wipe, reader harmonization across long-post/tweet-storm/RSS-article
+(explicitly named as *not now* by the boss), Home megatweets/tweet-storms appearing in the split
+pane's left rail (named as "someday," not scheduled).
 
 ## Why RSS gets primary nav and the other ~15 feed kinds don't (2026-08-22)
 
