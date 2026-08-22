@@ -1,13 +1,18 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlusSession } from '../account/plus-session';
+import { PLUS_BENEFITS } from '../../plus-benefits';
 import { ARTICLE_QUOTA_KEY, ArticleQuota, FREE_DAILY_ARTICLES } from './article-quota';
 
 /** Enough of PlusSession to answer the one question the quota asks. */
 class FakePlusSession {
   tier = signal<'free' | 'plus'>('free');
   isSupporter = () => this.tier() === 'plus';
+  token = vi.fn().mockResolvedValue(null);
+  refresh = vi.fn(async () => {
+    await this.token();
+  });
 }
 
 function today(): string {
@@ -15,8 +20,7 @@ function today(): string {
   return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}-${`${now.getDate()}`.padStart(2, '0')}`;
 }
 
-function build(): { quota: ArticleQuota; plus: FakePlusSession } {
-  const plus = new FakePlusSession();
+function build(plus = new FakePlusSession()): { quota: ArticleQuota; plus: FakePlusSession } {
   TestBed.configureTestingModule({
     providers: [ArticleQuota, { provide: PlusSession, useValue: plus }],
   });
@@ -33,6 +37,13 @@ describe('ArticleQuota', () => {
     const { quota } = build();
     expect(quota.remaining()).toBe(FREE_DAILY_ARTICLES);
     expect(quota.allowed()).toBe(true);
+  });
+
+  it('keeps the subscription page aligned with the enforced article benefit', () => {
+    const benefit = PLUS_BENEFITS.find((row) => row.id === 'article-reader');
+
+    expect(benefit?.free).toContain(String(FREE_DAILY_ARTICLES));
+    expect(benefit?.plus).toContain('Unlimited');
   });
 
   it('counts down and then refuses', () => {
@@ -67,6 +78,58 @@ describe('ArticleQuota', () => {
     // Nothing was written: a supporter's reading is not counted at all.
     expect(localStorage.getItem(ARTICLE_QUOTA_KEY)).toBeNull();
     expect(quota.allowed()).toBe(true);
+  });
+
+  it('unlocks an exhausted subscriber without making them visit Settings', async () => {
+    localStorage.setItem(
+      ARTICLE_QUOTA_KEY,
+      JSON.stringify({ day: today(), count: FREE_DAILY_ARTICLES }),
+    );
+    const plus = new FakePlusSession();
+    let answerEntitlement!: () => void;
+    plus.token.mockImplementation(
+      () =>
+        new Promise<null>((resolve) => {
+          answerEntitlement = () => {
+            plus.tier.set('plus');
+            resolve(null);
+          };
+        }),
+    );
+
+    const { quota } = build(plus);
+
+    // The stale local counter must not disable the only control that can cause
+    // the account lookup. This was the production deadlock.
+    expect(plus.refresh).toHaveBeenCalledOnce();
+    expect(plus.token).toHaveBeenCalledOnce();
+    expect(quota.checkingEntitlement()).toBe(true);
+    expect(quota.allowed()).toBe(true);
+
+    answerEntitlement();
+    await expect(quota.authorize()).resolves.toBe(true);
+
+    expect(quota.checkingEntitlement()).toBe(false);
+    expect(quota.unlimited()).toBe(true);
+    expect(quota.remaining()).toBe(Infinity);
+    expect(quota.allowed()).toBe(true);
+    expect(plus.refresh).toHaveBeenCalledOnce();
+    expect(plus.token).toHaveBeenCalledOnce();
+  });
+
+  it('still enforces an exhausted counter after a free entitlement answer', async () => {
+    localStorage.setItem(
+      ARTICLE_QUOTA_KEY,
+      JSON.stringify({ day: today(), count: FREE_DAILY_ARTICLES }),
+    );
+    const { quota, plus } = build();
+
+    await expect(quota.authorize()).resolves.toBe(false);
+
+    expect(plus.refresh).toHaveBeenCalledOnce();
+    expect(plus.token).toHaveBeenCalledOnce();
+    expect(quota.checkingEntitlement()).toBe(false);
+    expect(quota.allowed()).toBe(false);
   });
 
   it('treats corrupt stored data as a fresh day', () => {

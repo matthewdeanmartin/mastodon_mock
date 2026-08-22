@@ -79,6 +79,12 @@ export const PLUS_BENEFITS: readonly PlusBenefit[] = [
     flag: 'proxy-mawkingbird-plus',
   },
   {
+    id: 'article-reader',
+    label: 'Article reader expansions',
+    free: '2 fetched articles each day; cached articles remain free to reopen',
+    plus: 'Unlimited article expansions',
+  },
+  {
     id: 'lists-sync',
     label: 'Lists on your account',
     free: 'Unlimited lists, kept in this browser',

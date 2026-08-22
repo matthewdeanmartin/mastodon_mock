@@ -1,5 +1,5 @@
 {
-  "testCount": 4954,
+  "testCount": 4957,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -3086,12 +3086,15 @@
     "src/app/providers/article/article-quality.spec.ts :: measure counts words from the markdown, not the markup",
     "src/app/providers/article/article-quality.spec.ts :: measure reports zero density for text with no links",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota counts down and then refuses",
+    "src/app/providers/article/article-quota.spec.ts :: ArticleQuota keeps the subscription page aligned with the enforced article benefit",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota never limits a supporter",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota persists the count under today’s date",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota re-reads storage on refresh",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota resets when the stored day is not today",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota starts with the full free allowance",
+    "src/app/providers/article/article-quota.spec.ts :: ArticleQuota still enforces an exhausted counter after a free entitlement answer",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota treats corrupt stored data as a fresh day",
+    "src/app/providers/article/article-quota.spec.ts :: ArticleQuota unlocks an exhausted subscriber without making them visit Settings",
     "src/app/providers/article/article-target.spec.ts :: articleTarget refuses to guess between several links",
     "src/app/providers/article/article-target.spec.ts :: articleTarget returns null when there is no link at all",
     "src/app/providers/article/article-target.spec.ts :: articleTarget takes the single outbound link from an ordinary post",

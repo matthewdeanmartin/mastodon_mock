@@ -329,6 +329,13 @@ export class Thread implements OnInit {
 
     this.expanding.set(true);
     try {
+      // `isSupporter()` starts at false on every reload because entitlement is
+      // deliberately not persisted. Settle it before enforcing the local
+      // counter; otherwise an exhausted subscriber is disabled before the
+      // request that could discover their subscription is ever made.
+      if (!(await this.quota.authorize())) {
+        return;
+      }
       if (force) {
         this.retries.update((n) => n + 1);
         await this.articles.forget(url);
