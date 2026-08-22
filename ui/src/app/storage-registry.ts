@@ -961,6 +961,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     sensitivity: 'cache',
     note: 'Reload-attempt bookkeeping for post-deployment chunk recovery.',
   },
+  {
+    base: 'mockingbird_diagnostic_log',
+    storage: 'session',
+    suffix: 'none',
+    sensitivity: 'cache',
+    note: 'Privacy-scrubbed diagnostic timeline for this tab (DiagnosticLog). Credentials and tokens are redacted before anything is written; retained only for the session.',
+  },
 ];
 
 /** Which sensitivities each export profile includes. */
