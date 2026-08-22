@@ -423,6 +423,194 @@ a.tab:hover {
   color: var(--text);
 }
 
+/* Plan badge/popover is global to keep the already-large Shell component below
+   Angular's per-component CSS budget. The class names are intentionally unique. */
+.deployment-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.plan-badge-wrap {
+  position: relative;
+}
+
+.plan-badge {
+  min-height: 28px;
+  padding: 3px 9px 3px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--col-bg);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.plan-badge:hover,
+.plan-badge:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.plan-badge-plus {
+  border-color: color-mix(in srgb, #d89b00 45%, var(--border));
+  background: color-mix(in srgb, #f4b400 12%, var(--col-bg));
+  color: color-mix(in srgb, #b57900 88%, var(--text));
+}
+
+.plan-badge-unavailable {
+  border-style: dashed;
+}
+
+.plan-badge svg,
+.plan-popover svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.plan-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 50;
+  width: min(580px, calc(100vw - 32px));
+  max-height: calc(100vh - 88px);
+  padding: 18px;
+  overflow: auto;
+  visibility: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--col-bg);
+  box-shadow: 0 14px 44px rgb(15 20 25 / 22%);
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    visibility 120ms;
+}
+
+.plan-badge-wrap:hover .plan-popover,
+.plan-badge-wrap:focus-within .plan-popover {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* Keep hover alive across the visual gap between the badge and card. */
+.plan-popover::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  right: 0;
+  left: 0;
+  height: 10px;
+}
+
+.plan-popover header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.plan-popover header > svg {
+  width: 26px;
+  height: 26px;
+  color: #b57900;
+}
+
+.plan-popover header strong,
+.plan-popover header span {
+  display: block;
+}
+
+.plan-popover header strong {
+  font-size: 18px;
+}
+
+.plan-popover header span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.plan-benefits {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plan-benefit {
+  padding: 10px;
+  display: grid;
+  gap: 3px;
+  border-radius: 10px;
+  background: var(--hover);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.plan-benefit > strong {
+  font-size: 13px;
+}
+
+.plan-benefit > span {
+  color: var(--muted);
+}
+
+.plan-benefit-upgrade {
+  color: var(--text) !important;
+}
+
+.plan-popover footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .brand-lockup {
+    gap: 5px;
+  }
+
+  .brand {
+    gap: 6px;
+  }
+
+  .brand-name {
+    font-size: 15px;
+  }
+
+  .plan-badge {
+    padding-right: 7px;
+  }
+
+  .plan-popover {
+    display: none;
+  }
+}
+
 /* Internationalization settings: known-language chips + inference list. */
 .lang-chips {
   display: flex;

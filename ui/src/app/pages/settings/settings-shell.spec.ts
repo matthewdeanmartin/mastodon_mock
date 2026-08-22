@@ -22,6 +22,7 @@ describe('SettingsShell', () => {
       n.textContent?.trim(),
     );
     expect(labels).toContain('Public profile');
+    expect(labels.filter((label) => label === 'Public profile')).toHaveLength(1);
     expect(labels).toContain('Filters');
     expect(labels).toContain('Muted & Blocked');
     expect(labels).toContain('Bulk moderation');

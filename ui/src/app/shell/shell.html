@@ -19,19 +19,117 @@
 
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
-        <img
-          class="brand-mark"
-          [src]="logoSrc()"
-          alt=""
-          aria-hidden="true"
-          width="36"
-          height="36"
-          loading="eager"
-          fetchpriority="high"
-        />
-        <span class="brand-name">{{ brand }}</span>
-      </a>
+      <div class="brand-lockup">
+        <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
+          <img
+            class="brand-mark"
+            [src]="logoSrc()"
+            alt=""
+            aria-hidden="true"
+            width="36"
+            height="36"
+            loading="eager"
+            fetchpriority="high"
+          />
+          <span class="brand-name">{{ brand }}</span>
+        </a>
+
+        @if (deploymentLabel; as deployment) {
+          <span class="deployment-label">{{ deployment }}</span>
+        }
+
+        <div class="plan-badge-wrap">
+          <a
+            class="plan-badge"
+            [class.plan-badge-plus]="plusBadge.state() === 'plus'"
+            [class.plan-badge-unavailable]="plusBadge.state() === 'unavailable'"
+            routerLink="/settings/mawkingbird-plus"
+            [attr.aria-label]="
+              plusBadge.state() === 'plus'
+                ? 'Mawkingbird Plus active — view plan details'
+                : plusBadge.state() === 'checking'
+                  ? 'Checking Mawkingbird plan'
+                  : plusBadge.state() === 'unavailable'
+                    ? 'Could not check Mawkingbird plan — open account settings'
+                    : 'Mawkingbird Free — see Plus benefits and upgrade'
+            "
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                class="plan-rosette"
+                d="M12 3.5 14.4 6l3.4-.2.2 3.4 2.5 2.3-2.5 2.3-.2 3.4-3.4-.2-2.4 2.5-2.4-2.5-3.4.2-.2-3.4-2.5-2.3L6 9.2l.2-3.4 3.4.2Z"
+              />
+              <path d="M12 8.5v7M8.5 12h7" />
+            </svg>
+            <span>
+              @switch (plusBadge.state()) {
+                @case ('checking') {
+                  Checking…
+                }
+                @case ('plus') {
+                  Plus
+                }
+                @case ('unavailable') {
+                  Plan?
+                }
+                @default {
+                  Free
+                }
+              }
+            </span>
+          </a>
+
+          <section class="plan-popover" aria-label="Mawkingbird plan benefits">
+            <header>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  class="plan-rosette"
+                  d="M12 3.5 14.4 6l3.4-.2.2 3.4 2.5 2.3-2.5 2.3-.2 3.4-3.4-.2-2.4 2.5-2.4-2.5-3.4.2-.2-3.4-2.5-2.3L6 9.2l.2-3.4 3.4.2Z"
+                />
+                <path d="M12 8.5v7M8.5 12h7" />
+              </svg>
+              <div>
+                <strong>
+                  {{ plusBadge.state() === 'plus' ? 'Mawkingbird Plus' : 'Mawkingbird Free' }}
+                </strong>
+                <span>
+                  @if (plusBadge.state() === 'plus') {
+                    Your paid Plus benefits are active.
+                  } @else if (plusBadge.state() === 'checking') {
+                    Checking your account before deciding which plan is active…
+                  } @else if (plusBadge.state() === 'unavailable') {
+                    The account service could not confirm your plan. Open the Plus page to retry.
+                  } @else {
+                    Free works without a subscription. Here is what Plus adds.
+                  }
+                </span>
+              </div>
+            </header>
+
+            <div class="plan-benefits">
+              @for (benefit of plusBenefits(); track benefit.id) {
+                <div class="plan-benefit">
+                  <strong>{{ benefit.label }}</strong>
+                  @if (plusBadge.state() === 'plus') {
+                    <span>{{ benefit.plus }}</span>
+                  } @else {
+                    <span><b>Free:</b> {{ benefit.free }}</span>
+                    <span class="plan-benefit-upgrade"><b>Plus:</b> {{ benefit.plus }}</span>
+                  }
+                </div>
+              }
+            </div>
+
+            <footer>
+              @if (plusBadge.state() === 'plus') {
+                Click Plus for your subscription details and diagnostics.
+              } @else {
+                Mawkingbird Plus is ${{ plusPriceUsd }} a year. Click Free to see the upgrade page.
+              }
+            </footer>
+          </section>
+        </div>
+      </div>
 
       <nav class="primary-nav" aria-label="Primary navigation">
         <a routerLink="/home" routerLinkActive="active">

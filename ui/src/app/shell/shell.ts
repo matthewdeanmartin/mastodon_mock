@@ -22,6 +22,8 @@ import { WritingZen } from '../writing-zen';
 import { ReadingZen } from '../reading-zen';
 import { FirstRunChoice, FirstRunModal } from '../first-run/first-run-modal';
 import { PreviewSeed } from '../first-run/preview-seed';
+import { PlusBadgeEntitlement } from '../providers/account/plus-badge-entitlement';
+import { PLUS_PRICE_USD_PER_YEAR, visiblePlusBenefits } from '../plus-benefits';
 
 function isWideUrl(url: string): boolean {
   // /search goes rails-off wide so facets have room to live beside results.
@@ -106,9 +108,17 @@ export class Shell implements OnInit {
    * there is real, so it must never be mistakable for the app that takes money.
    */
   protected isTest = isTestBuild();
-  protected brand = this.isCanary ? 'Canary' : this.isTest ? 'Mawkingbird Test' : environment.brand;
+  protected brand = environment.brand;
+  protected deploymentLabel = this.isCanary ? 'Canary' : this.isTest ? 'Test' : null;
   /** Recomputed so switching illustration sets repaints the mark without a reload. */
   protected logoSrc = computed(() => brandLogoSrc(this.prefs.artStyle()));
+  /** The header's account plan badge, settled without eagerly bundling account services. */
+  protected plusBadge = inject(PlusBadgeEntitlement);
+  /** Same source of truth as the Plus settings page; feature-flagged rows stay honest. */
+  protected plusBenefits = computed(() =>
+    visiblePlusBenefits((flag) => this.featureFlags.enabled(flag)),
+  );
+  protected readonly plusPriceUsd = PLUS_PRICE_USD_PER_YEAR;
 
   /** Whether the current account holds a staff role (drives the Admin nav link). */
   protected isStaff = computed(() => {
@@ -309,6 +319,10 @@ export class Shell implements OnInit {
   }
 
   ngOnInit(): void {
+    // Independent of the Mastodon identity below. A Mawkingbird subscription
+    // can exist while browsing anonymously or through Bluesky, and the header
+    // must still settle its own account tier before claiming it is Free.
+    void this.plusBadge.check();
     // Not while the first-run modal is blocking. The shortcuts are global and
     // navigational — "g" then "h" would move the app *behind* a modal the
     // visitor cannot dismiss, leaving them looking at a question about a page

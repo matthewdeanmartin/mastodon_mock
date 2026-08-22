@@ -232,9 +232,151 @@
         />
         Florps &amp; reflorps (nobody else's word)
       </label>
-      <span class="hint"
-        >Sick of new words per platform? Bring the old ones back — or make one up.</span
-      >
+      <label class="radioline">
+        <input
+          type="radio"
+          value="skeet"
+          [ngModel]="prefs.postNoun()"
+          (ngModelChange)="prefs.setPostNoun($event)"
+          name="post_noun"
+        />
+        Skeets &amp; reskeets (Bluesky)
+      </label>
+      <label class="radioline">
+        <input
+          type="radio"
+          value="toot"
+          [ngModel]="prefs.postNoun()"
+          (ngModelChange)="prefs.setPostNoun($event)"
+          name="post_noun"
+        />
+        Toots &amp; boosts (classic Mastodon)
+      </label>
+      <label class="radioline custom-choice">
+        <input
+          type="radio"
+          value="custom"
+          [ngModel]="prefs.postNoun()"
+          (ngModelChange)="prefs.setPostNoun($event)"
+          name="post_noun"
+        />
+        <span><strong>Your words</strong> — call them whatever you want</span>
+      </label>
+
+      @if (prefs.postNoun() === 'custom') {
+        <div class="terminology-custom" aria-label="Custom vocabulary">
+          <div class="terminology-intro">
+            <span>
+              Mawkingbird uses these forms throughout buttons, menus, notices, and sentences.
+              Changes apply instantly.
+            </span>
+            <button
+              type="button"
+              class="terminology-reset"
+              (click)="prefs.resetCustomTerminology()"
+            >
+              Reset example
+            </button>
+          </div>
+
+          <div class="terminology-fields">
+            <label>
+              <span>One item</span>
+              <input
+                type="text"
+                maxlength="40"
+                autocomplete="off"
+                [ngModel]="prefs.customTerminology().post"
+                (ngModelChange)="setCustomWord('post', $event)"
+                name="custom_post"
+                placeholder="chirp"
+              />
+            </label>
+            <label>
+              <span>Many items</span>
+              <input
+                type="text"
+                maxlength="40"
+                autocomplete="off"
+                [ngModel]="prefs.customTerminology().posts"
+                (ngModelChange)="setCustomWord('posts', $event)"
+                name="custom_posts"
+                placeholder="chirps"
+              />
+            </label>
+            <label>
+              <span>Person</span>
+              <input
+                type="text"
+                maxlength="40"
+                autocomplete="off"
+                [ngModel]="prefs.customTerminology().poster"
+                (ngModelChange)="setCustomWord('poster', $event)"
+                name="custom_poster"
+                placeholder="chirper"
+              />
+            </label>
+            <label>
+              <span>Published, past tense</span>
+              <input
+                type="text"
+                maxlength="40"
+                autocomplete="off"
+                [ngModel]="prefs.customTerminology().posted"
+                (ngModelChange)="setCustomWord('posted', $event)"
+                name="custom_posted"
+                placeholder="chirped"
+              />
+            </label>
+            <label>
+              <span>Share again</span>
+              <input
+                type="text"
+                maxlength="40"
+                autocomplete="off"
+                [ngModel]="prefs.customTerminology().boost"
+                (ngModelChange)="setCustomWord('boost', $event)"
+                name="custom_boost"
+                placeholder="echo"
+              />
+            </label>
+            <label>
+              <span>Many re-shares</span>
+              <input
+                type="text"
+                maxlength="40"
+                autocomplete="off"
+                [ngModel]="prefs.customTerminology().boosts"
+                (ngModelChange)="setCustomWord('boosts', $event)"
+                name="custom_boosts"
+                placeholder="echoes"
+              />
+            </label>
+            <label>
+              <span>Re-shared, past tense</span>
+              <input
+                type="text"
+                maxlength="40"
+                autocomplete="off"
+                [ngModel]="prefs.customTerminology().boosted"
+                (ngModelChange)="setCustomWord('boosted', $event)"
+                name="custom_boosted"
+                placeholder="echoed"
+              />
+            </label>
+          </div>
+
+          <div class="terminology-preview" aria-live="polite">
+            <span class="terminology-preview-label">Live preview</span>
+            <strong>{{ words().Posts }}</strong> · {{ words().PostAll }} ·
+            {{ words().BoostedBy }} Riley · Undo {{ words().boost }}
+          </div>
+        </div>
+      } @else {
+        <span class="hint">
+          Sick of new words per platform? Bring the old ones back — or make your own.
+        </span>
+      }
     </div>
   </div>
 

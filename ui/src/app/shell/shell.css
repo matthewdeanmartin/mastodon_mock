@@ -22,9 +22,16 @@
   gap: 16px;
 }
 
-.brand {
+.brand-lockup {
   grid-column: 1;
-  width: fit-content;
+  width: max-content;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -455,7 +462,7 @@
 
 /* Independent of the column layout: below this the labels crowd, so drop them. */
 @media (max-width: 1320px) {
-  .brand-name,
+  .deployment-label,
   .account-pill > span,
   .account-pill .caret,
   .more-menu summary span {

@@ -72,6 +72,25 @@ describe('ClientPrefs', () => {
     expect(stored.verifiedMode).toBe('everyone');
   });
 
+  it('persists custom terminology and preserves it while another preset is selected', () => {
+    const prefs = create();
+    prefs.setCustomTerminologyField('post', 'notelet');
+    prefs.setCustomTerminologyField('posts', 'notelets');
+    prefs.setPostNoun('custom');
+    TestBed.tick();
+
+    const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+    expect(stored.postNoun).toBe('custom');
+    expect(stored.customTerminology.post).toBe('notelet');
+
+    TestBed.resetTestingModule();
+    const restored = create();
+    expect(restored.postNoun()).toBe('custom');
+    expect(restored.customTerminology().posts).toBe('notelets');
+    restored.setPostNoun('toot');
+    expect(restored.customTerminology().post).toBe('notelet');
+  });
+
   it('restores persisted prefs on construction', () => {
     localStorage.setItem(
       PREFS_KEY,

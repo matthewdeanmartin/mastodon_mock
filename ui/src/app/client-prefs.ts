@@ -177,11 +177,77 @@ export type AlgoAudience = 'all' | 'friends';
 /** Whether the favourite action renders as a star or a heart. */
 export type FavStyle = 'star' | 'heart';
 
-/** What a post is called across the UI: fediverse "post" or bird-site "tweet". */
-export type PostNoun = 'post' | 'tweet' | 'florp';
+/** Which complete post/re-share vocabulary the English UI uses. */
+export type PostNoun = 'post' | 'tweet' | 'florp' | 'skeet' | 'toot' | 'custom';
 
 /** Every accepted value, so validation and the settings picker agree. */
-export const POST_NOUNS: readonly PostNoun[] = ['post', 'tweet', 'florp'];
+export const POST_NOUNS: readonly PostNoun[] = [
+  'post',
+  'tweet',
+  'florp',
+  'skeet',
+  'toot',
+  'custom',
+];
+
+/**
+ * The seven forms Mawkingbird needs to put user-defined terminology into real
+ * sentences. Keeping them explicit is a little more work in Settings, but it
+ * means an irregular word or a non-English vocabulary is never "helpfully"
+ * conjugated into nonsense.
+ */
+export interface CustomTerminology {
+  post: string;
+  posts: string;
+  poster: string;
+  posted: string;
+  boost: string;
+  boosts: string;
+  boosted: string;
+}
+
+export type CustomTerminologyKey = keyof CustomTerminology;
+
+export const DEFAULT_CUSTOM_TERMINOLOGY: Readonly<CustomTerminology> = {
+  post: 'chirp',
+  posts: 'chirps',
+  poster: 'chirper',
+  posted: 'chirped',
+  boost: 'echo',
+  boosts: 'echoes',
+  boosted: 'echoed',
+};
+
+const CUSTOM_TERMINOLOGY_KEYS: readonly CustomTerminologyKey[] = [
+  'post',
+  'posts',
+  'poster',
+  'posted',
+  'boost',
+  'boosts',
+  'boosted',
+];
+
+/** Keep custom words compact and printable while allowing Unicode and emoji. */
+export function normalizeCustomTerminology(value: unknown): CustomTerminology {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const normalized = { ...DEFAULT_CUSTOM_TERMINOLOGY };
+  for (const key of CUSTOM_TERMINOLOGY_KEYS) {
+    const raw = (source as Record<string, unknown>)[key];
+    if (typeof raw !== 'string') {
+      continue;
+    }
+    const clean = raw
+      .replace(/\p{Cc}/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 40);
+    if (clean) {
+      normalized[key] = clean;
+    }
+  }
+  return normalized;
+}
 
 /**
  * Whether a stored value is a noun we still ship.
@@ -275,6 +341,7 @@ interface StoredPrefs {
   algoTags?: boolean;
   favStyle?: FavStyle;
   postNoun?: PostNoun;
+  customTerminology?: Partial<CustomTerminology>;
   zenMode?: boolean;
   analytics?: boolean;
   requireAltText?: boolean;
@@ -498,8 +565,10 @@ export class ClientPrefs {
 
   /** Favourite buttons render as ⭐ (Mastodon-style) or ❤️ (Twitter-style). */
   readonly favStyle = signal<FavStyle>('star');
-  /** "post"/"boost" (Mastodon-style) or "tweet"/"retweet" (bird-site nostalgia). */
+  /** The selected built-in vocabulary, or the user's custom one. */
   readonly postNoun = signal<PostNoun>('post');
+  /** User-defined vocabulary; retained while a built-in preset is selected. */
+  readonly customTerminology = signal<CustomTerminology>({ ...DEFAULT_CUSTOM_TERMINOLOGY });
   /** Zen mode: both sidebars disappear, leaving just the feed column. */
   readonly zenMode = signal<boolean>(false);
   /**
@@ -872,6 +941,19 @@ export class ClientPrefs {
     }
   }
 
+  setCustomTerminologyField(key: CustomTerminologyKey, value: string): void {
+    if (!CUSTOM_TERMINOLOGY_KEYS.includes(key)) {
+      return;
+    }
+    this.customTerminology.update((current) =>
+      normalizeCustomTerminology({ ...current, [key]: value }),
+    );
+  }
+
+  resetCustomTerminology(): void {
+    this.customTerminology.set({ ...DEFAULT_CUSTOM_TERMINOLOGY });
+  }
+
   setZenMode(on: boolean): void {
     this.zenMode.set(on);
   }
@@ -1149,6 +1231,7 @@ export class ClientPrefs {
     if (isPostNoun(stored.postNoun)) {
       this.postNoun.set(stored.postNoun);
     }
+    this.customTerminology.set(normalizeCustomTerminology(stored.customTerminology));
     this.loadBool(stored.zenMode, this.zenMode);
     this.loadBool(stored.analytics, this.analytics);
     this.loadBool(stored.requireAltText, this.requireAltText);
@@ -1212,6 +1295,7 @@ export class ClientPrefs {
       algoTags: this.algoTags(),
       favStyle: this.favStyle(),
       postNoun: this.postNoun(),
+      customTerminology: this.customTerminology(),
       zenMode: this.zenMode(),
       analytics: this.analytics(),
       requireAltText: this.requireAltText(),

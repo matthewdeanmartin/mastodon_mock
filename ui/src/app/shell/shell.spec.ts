@@ -1,5 +1,6 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,15 @@ import { Server } from '../server';
 import { serverInterceptor } from '../server.interceptor';
 import { WritingZen } from '../writing-zen';
 import { Shell } from './shell';
+import {
+  PlusBadgeEntitlement,
+  type PlusBadgeState,
+} from '../providers/account/plus-badge-entitlement';
+
+class FakePlusBadgeEntitlement {
+  readonly state = signal<PlusBadgeState>('free');
+  readonly check = vi.fn().mockResolvedValue(undefined);
+}
 
 describe('Shell account switching', () => {
   let httpMock: HttpTestingController;
@@ -27,6 +37,7 @@ describe('Shell account switching', () => {
         provideHttpClient(withInterceptors([serverInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
+        { provide: PlusBadgeEntitlement, useValue: new FakePlusBadgeEntitlement() },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);
@@ -205,6 +216,29 @@ describe('Shell account switching', () => {
     expect(banner?.querySelector('a')?.getAttribute('href')).toBe('https://mawkingbird.com/');
   });
 
+  it('links the Free and Plus plan badges to an accurate benefits popover', () => {
+    const fixture = createShell();
+    const plan = TestBed.inject(PlusBadgeEntitlement) as unknown as FakePlusBadgeEntitlement;
+    const badge = () => fixture.nativeElement.querySelector('.plan-badge') as HTMLAnchorElement;
+    const popover = fixture.nativeElement.querySelector('.plan-popover') as HTMLElement;
+
+    expect(badge().textContent).toContain('Free');
+    expect(badge().getAttribute('href')).toBe('/settings/mawkingbird-plus');
+    expect(popover.textContent).toContain('Mawkingbird Free');
+    expect(popover.textContent).toContain('2 fetched articles each day');
+    expect(popover.textContent).toContain('Unlimited article expansions');
+    expect(popover.textContent).toContain('$30 a year');
+
+    plan.state.set('plus');
+    fixture.detectChanges();
+
+    expect(badge().textContent).toContain('Plus');
+    expect(popover.textContent).toContain('Your paid Plus benefits are active');
+    expect(popover.textContent).not.toContain('2 fetched articles each day');
+    expect(popover.textContent).toContain('Unlimited article expansions');
+    drainRailRequests();
+  });
+
   it('shows no such banner on production or canary', () => {
     const fixture = createShell();
     fixture.detectChanges();
@@ -245,6 +279,7 @@ describe('Shell zen modes', () => {
         provideHttpClient(withInterceptors([serverInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
+        { provide: PlusBadgeEntitlement, useValue: new FakePlusBadgeEntitlement() },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);
@@ -358,6 +393,7 @@ describe('Shell first-run modal', () => {
         provideHttpClient(withInterceptors([serverInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
+        { provide: PlusBadgeEntitlement, useValue: new FakePlusBadgeEntitlement() },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);

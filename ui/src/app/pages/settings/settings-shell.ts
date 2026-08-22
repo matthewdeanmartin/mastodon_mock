@@ -55,7 +55,9 @@ const NAV_GROUPS: SettingsNavGroup[] = [
     // Second, and 'mawkingbird-plus' first within it: an account page nobody
     // scrolls to is an account page nobody upgrades from.
     title: 'Accounts',
-    paths: ['mawkingbird-plus', 'accounts', 'account', 'connections', 'server', 'profile'],
+    // Public profile already leads Basic. Repeating the same subgroup under
+    // Accounts made the sidebar look like it contained two different editors.
+    paths: ['mawkingbird-plus', 'accounts', 'account', 'connections', 'server'],
   },
   {
     // What gets shown to you and what gets shown about you — the filtering and
