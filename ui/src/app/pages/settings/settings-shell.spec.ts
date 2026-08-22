@@ -24,6 +24,10 @@ describe('SettingsShell', () => {
     expect(labels).toContain('Public profile');
     expect(labels).toContain('Filters');
     expect(labels).toContain('Muted & Blocked');
+    expect(labels).toContain('Bulk moderation');
+    // Blue's controls all live on Appearance; RSS moved to the More menu.
+    expect(labels).not.toContain('Mockingbird Blue');
+    expect(labels).not.toContain('RSS feeds');
     expect(labels).toContain('Privacy');
     expect(labels).not.toContain('Posting defaults');
     expect(labels).not.toContain('Posting & Privacy');
@@ -50,20 +54,18 @@ describe('SettingsShell', () => {
       new Set([
         'Public profile',
         'Server',
-        'Mockingbird Blue',
         'Connections',
-        'RSS feeds',
         // Anonymous-capable: a note can be a browser-local draft, so the PKM tag
         // vocabulary is configurable without a server identity.
         'Writing',
         'Appearance',
         'Internationalization',
         'Local storage',
-        'Ads',
+        'Endorsements',
         'Signed-in accounts',
         // Trusted accounts and the CW/sensitive switches are client-side, so they
         // work anonymously even though 'Muted & Blocked' beside them does not.
-        'Content warnings',
+        'Trust: CW/Sensitive',
         'Import/Export Config',
         'Feature flags',
       ]),

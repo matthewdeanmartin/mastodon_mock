@@ -49,7 +49,7 @@ export class AiAvailability {
       return null;
     }
     if (this.prefs.aiMode() === 'off') {
-      return 'AI features are turned off in Mockingbird Blue settings.';
+      return 'AI features are turned off in Appearance settings.';
     }
     return this.flags.disabledReason('connector-openrouter');
   });

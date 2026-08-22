@@ -593,6 +593,21 @@ a.tab:hover {
   font-size: 13px;
 }
 
+/* A write that did not happen, next to the control that did not change. Uses a
+   red that clears AAA on both themes rather than the usual #e0245e, which is a
+   badge colour and only reaches 4.6:1 on white — see docs/contributing.md.
+   #a41037 is 7.76:1 on --col-bg and 7.34:1 on --bg. */
+.save-error {
+  display: block;
+  margin-top: 4px;
+  color: #a41037;
+  font-size: 13px;
+}
+
+:root[data-theme='dark'] .save-error {
+  color: #ff9db4;
+}
+
 .accent-swatches {
   display: flex;
   gap: 10px;

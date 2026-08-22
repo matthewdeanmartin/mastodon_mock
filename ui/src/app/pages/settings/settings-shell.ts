@@ -28,7 +28,7 @@ interface SettingsNavGroup {
 }
 
 /**
- * The four shelves the settings pages sit on.
+ * The shelves the settings pages sit on.
  *
  * A page may appear under more than one heading, and several do. There is no
  * one true partition of settings into categories — ours would not match the
@@ -37,9 +37,11 @@ interface SettingsNavGroup {
  * cost is a duplicated row in a list; the alternative is a user who cannot find
  * a setting that is definitely there.
  *
- * "Basic" is the catch-all and is listed first: anything not deliberately filed
- * elsewhere still appears there, so no page can fall out of the sidebar by
- * being forgotten here.
+ * Order matters more than it looks: this list is what the user sees before
+ * scrolling, so the groups worth reaching are near the top. "Basic" is the
+ * catch-all and is listed first — anything not deliberately filed elsewhere
+ * still appears there, so no page can fall out of the sidebar by being
+ * forgotten here.
  */
 const NAV_GROUPS: SettingsNavGroup[] = [
   {
@@ -50,21 +52,20 @@ const NAV_GROUPS: SettingsNavGroup[] = [
     paths: ['profile', 'writing', 'privacy', 'appearance'],
   },
   {
-    title: 'People',
-    paths: [
-      'moderation',
-      'follows',
-      'filters',
-      'content',
-      'bulk-actions',
-      'import-export',
-      'invites',
-      'privacy',
-    ],
+    // Second, and 'mawkingbird-plus' first within it: an account page nobody
+    // scrolls to is an account page nobody upgrades from.
+    title: 'Accounts',
+    paths: ['mawkingbird-plus', 'accounts', 'account', 'connections', 'server', 'profile'],
   },
   {
-    title: 'Accounts',
-    paths: ['accounts', 'account', 'mawkingbird-plus', 'connections', 'rss', 'server', 'profile'],
+    // What gets shown to you and what gets shown about you — the filtering and
+    // labelling rules, as opposed to the people they apply to.
+    title: 'Content',
+    paths: ['filters', 'spotlight', 'content'],
+  },
+  {
+    title: 'People',
+    paths: ['moderation', 'follows', 'bulk-actions', 'import-export', 'invites', 'privacy'],
   },
   {
     title: 'Advanced',
@@ -102,8 +103,10 @@ export class SettingsShell {
     [
       { label: 'Public profile', path: 'profile', exact: true, anonymous: true },
       { label: 'Server', path: 'server', exact: true, anonymous: true, anonymousOnly: true },
-      // Client-side premium-style features; the same controls also live in Appearance.
-      { label: 'Mockingbird Blue', path: 'blue', exact: true, anonymous: true },
+      // 'blue' is deliberately absent. Appearance embeds the whole
+      // <app-blue-controls> cluster, so every setting the Blue page showed is
+      // already one click away under a heading that describes it — and the
+      // sidebar is short on room. The route still resolves for old bookmarks.
       // A Mawkingbird account. `anonymous: true` because the account belongs to
       // the human, not to a Mastodon persona — the same reasoning that makes the
       // CORS proxy key account-unscoped in `cors-proxy-settings.ts`.
@@ -117,8 +120,8 @@ export class SettingsShell {
       // Client-side (localStorage) accounts on other services: Bluesky, GitHub,
       // Raindrop.io, Dropbox. Not exact — the catalog's child pages live under it.
       { label: 'Connections', path: 'connections', exact: false, anonymous: true },
-      // Many feeds rather than one account, so deliberately not a "connection".
-      { label: 'RSS feeds', path: 'rss', exact: true, anonymous: true },
+      // 'rss' is deliberately absent: RSS moved to the More menu, on its way to
+      // becoming a miniapp of its own like Write. The route still resolves.
       { label: 'Privacy', path: 'privacy', exact: true },
       { label: 'Writing', path: 'writing', exact: true, anonymous: true },
       // Appearance is client-side (theme/accent/undo-send in localStorage) and works
@@ -127,20 +130,23 @@ export class SettingsShell {
       { label: 'Internationalization', path: 'i18n', exact: true, anonymous: true },
       { label: 'Local storage', path: 'storage', exact: true, anonymous: true },
       // Path is 'spotlight' on purpose — see the route's comment in app.routes.ts.
-      { label: 'Ads', path: 'spotlight', exact: true, anonymous: true },
+      { label: 'Endorsements', path: 'spotlight', exact: true, anonymous: true },
       { label: 'Signed-in accounts', path: 'accounts', exact: true, anonymous: true },
       { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
       { label: 'Approve follow requests', path: 'follows', exact: true },
       { label: 'Muted & Blocked', path: 'moderation', exact: true },
       // The flipside of the line above — accounts you want *without* a doorway in
       // front of them — so it sits next to it. Client-side, hence anonymous: true.
-      { label: 'Content warnings', path: 'content', exact: true, anonymous: true },
+      { label: 'Trust: CW/Sensitive', path: 'content', exact: true, anonymous: true },
       // Sits under the two lists it can empty, and next to the follow-wide
       // retweet switches, because that is what all four of them operate on.
-      { label: 'Bulk actions', path: 'bulk-actions', exact: true },
+      { label: 'Bulk moderation', path: 'bulk-actions', exact: true },
       { label: 'Filters', path: 'filters', exact: false },
       { label: 'Automatic post deletion', path: 'deletion', exact: true, mockOnly: true },
-      { label: 'Account', path: 'account', exact: true },
+      // mockOnly: against a real server the page is a read-only username row —
+      // password changes and session revocation are not in the public API. An
+      // entry that leads somewhere nothing can be done is worse than no entry.
+      { label: 'Account', path: 'account', exact: true, mockOnly: true },
       { label: 'Import/Export Friends', path: 'import-export', exact: true },
       { label: 'Import/Export Config', path: 'config', exact: true, anonymous: true },
       // "Invite links", not "Invite people": /invites is the page that invites

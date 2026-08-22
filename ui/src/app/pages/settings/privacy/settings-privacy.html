@@ -1,9 +1,10 @@
 <div class="spage-head">
   <h1>🔒 Privacy</h1>
   <p>Who can see you, who can reach you, and what this app counts while you use it.</p>
+  <p class="hint">Every setting on this page applies the moment you change it.</p>
 </div>
 
-<form class="spage-body" (ngSubmit)="save()">
+<div class="spage-body">
   <div class="ssection">
     <h2>Who can see you</h2>
     <div class="srow">
@@ -13,21 +14,36 @@
           <input
             type="checkbox"
             [ngModel]="locked()"
-            (ngModelChange)="locked.set($event)"
+            (ngModelChange)="commit('locked', $event)"
+            [disabled]="saving() === 'locked'"
             name="locked"
           />
           Require follow requests
+          @if (saved() === 'locked') {
+            <span class="saved-note" role="status">Saved ✓</span>
+          }
         </label>
         <span class="hint">Manually approve who can follow you.</span>
+        @if (errorFor('locked'); as message) {
+          <span class="save-error" role="alert">⚠ {{ message }}</span>
+        }
+
         <label class="checkline">
           <input
             type="checkbox"
             [ngModel]="discoverable()"
-            (ngModelChange)="discoverable.set($event)"
+            (ngModelChange)="commit('discoverable', $event)"
+            [disabled]="saving() === 'discoverable'"
             name="discoverable"
           />
           Feature profile and posts in discovery algorithms
+          @if (saved() === 'discoverable') {
+            <span class="saved-note" role="status">Saved ✓</span>
+          }
         </label>
+        @if (errorFor('discoverable'); as message) {
+          <span class="save-error" role="alert">⚠ {{ message }}</span>
+        }
       </div>
     </div>
 
@@ -35,12 +51,24 @@
       <span class="slabel">Automation</span>
       <div class="scontrol">
         <label class="checkline">
-          <input type="checkbox" [ngModel]="bot()" (ngModelChange)="bot.set($event)" name="bot" />
+          <input
+            type="checkbox"
+            [ngModel]="bot()"
+            (ngModelChange)="commit('bot', $event)"
+            [disabled]="saving() === 'bot'"
+            name="bot"
+          />
           This is an automated account
+          @if (saved() === 'bot') {
+            <span class="saved-note" role="status">Saved ✓</span>
+          }
         </label>
         <span class="hint">
           Signals to others that the account mainly performs automated actions.
         </span>
+        @if (errorFor('bot'); as message) {
+          <span class="save-error" role="alert">⚠ {{ message }}</span>
+        }
       </div>
     </div>
   </div>
@@ -56,12 +84,23 @@
     <div class="srow">
       <span class="slabel">Post visibility</span>
       <div class="scontrol">
-        <select [ngModel]="privacy()" (ngModelChange)="privacy.set($event)" name="privacy">
+        <select
+          [ngModel]="privacy()"
+          (ngModelChange)="commit('privacy', $event)"
+          [disabled]="saving() === 'privacy'"
+          name="privacy"
+        >
           <option value="public">Public</option>
           <option value="unlisted">Quiet public</option>
           <option value="private">Followers only</option>
         </select>
+        @if (saved() === 'privacy') {
+          <span class="saved-note" role="status">Saved ✓</span>
+        }
         <span class="hint">Default visibility for new posts. You can change it per post.</span>
+        @if (errorFor('privacy'); as message) {
+          <span class="save-error" role="alert">⚠ {{ message }}</span>
+        }
       </div>
     </div>
 
@@ -72,43 +111,48 @@
           <input
             type="checkbox"
             [ngModel]="sensitive()"
-            (ngModelChange)="sensitive.set($event)"
+            (ngModelChange)="commit('sensitive', $event)"
+            [disabled]="saving() === 'sensitive'"
             name="sensitive"
           />
           Mark media as sensitive by default
+          @if (saved() === 'sensitive') {
+            <span class="saved-note" role="status">Saved ✓</span>
+          }
         </label>
+        @if (errorFor('sensitive'); as message) {
+          <span class="save-error" role="alert">⚠ {{ message }}</span>
+        }
       </div>
     </div>
 
     <div class="srow">
       <span class="slabel">Posting language</span>
       <div class="scontrol">
-        <select [ngModel]="language()" (ngModelChange)="language.set($event)" name="language">
+        <select
+          [ngModel]="language()"
+          (ngModelChange)="commit('language', $event)"
+          [disabled]="saving() === 'language'"
+          name="language"
+        >
           <option value="">Not specified</option>
           @for (option of postingLanguageOptions; track option.code) {
             <option [value]="option.code">{{ option.name }}</option>
           }
         </select>
+        @if (saved() === 'language') {
+          <span class="saved-note" role="status">Saved ✓</span>
+        }
         <span class="hint">
           Default language attached to new posts. You can change it per post.
         </span>
+        @if (errorFor('language'); as message) {
+          <span class="save-error" role="alert">⚠ {{ message }}</span>
+        }
       </div>
     </div>
   </div>
 
-  <div class="sactions">
-    @if (saved()) {
-      <span class="saved-note">Saved ✓</span>
-    }
-    <button class="btn" type="submit" [disabled]="saving()">
-      {{ saving() ? 'Saving…' : 'Save changes' }}
-    </button>
-  </div>
-</form>
-
-<!-- Outside the credentials form on purpose: this is a browser-local pref that
-     applies instantly, and putting it inside would imply it needs saving. -->
-<div class="spage-body">
   <div class="ssection">
     <h2>What this app counts</h2>
     <div class="srow">
@@ -127,7 +171,8 @@
           Anonymous page counts only — which kinds of page get used, never which account, post or
           tag you looked at, and never a query string. Turn this off and the analytics script is
           never loaded at all: nothing is fetched, counted or sent. The script is served from this
-          site, not from a third party.
+          site, not from a third party. This one is stored in your browser, so there is nothing to
+          save and nothing to fail.
         </span>
       </div>
     </div>

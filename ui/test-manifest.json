@@ -1,5 +1,5 @@
 {
-  "testCount": 4957,
+  "testCount": 4961,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -2347,8 +2347,12 @@
     "src/app/pages/settings/mawkingbird-plus/settings-mawkingbird-plus.sync.spec.ts :: SettingsMawkingbirdPlus collection sync syncs every enabled collection when Sync now is pressed",
     "src/app/pages/settings/notifications/settings-notifications.spec.ts :: SettingsNotifications loads the email_notifications section from mock settings",
     "src/app/pages/settings/notifications/settings-notifications.spec.ts :: SettingsNotifications save() PUTs only the email_notifications section",
+    "src/app/pages/settings/privacy/settings-privacy.spec.ts :: SettingsPrivacy PATCHes immediately, sending only the field that changed",
+    "src/app/pages/settings/privacy/settings-privacy.spec.ts :: SettingsPrivacy blames the connection, not the reader, when the server is unreachable",
+    "src/app/pages/settings/privacy/settings-privacy.spec.ts :: SettingsPrivacy keeps an error on the row that caused it",
     "src/app/pages/settings/privacy/settings-privacy.spec.ts :: SettingsPrivacy loads flags from verify_credentials",
-    "src/app/pages/settings/privacy/settings-privacy.spec.ts :: SettingsPrivacy save() PATCHes update_credentials with string booleans",
+    "src/app/pages/settings/privacy/settings-privacy.spec.ts :: SettingsPrivacy maps posting defaults onto their source[...] keys",
+    "src/app/pages/settings/privacy/settings-privacy.spec.ts :: SettingsPrivacy reverts the control and says why when the write fails",
     "src/app/pages/settings/profile/settings-profile.spec.ts :: SettingsProfile loads and saves Anonymous profiles locally without authenticated API calls",
     "src/app/pages/settings/profile/settings-profile.spec.ts :: SettingsProfile loads the profile from source fields",
     "src/app/pages/settings/profile/settings-profile.spec.ts :: SettingsProfile saves via PATCH update_credentials with form data",

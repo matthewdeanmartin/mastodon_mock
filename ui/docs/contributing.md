@@ -66,6 +66,30 @@ mis-filed row costs the user the belief that the setting exists.
 When you cross-list, both copies must read and write the same underlying pref,
 and each should say where the other one is.
 
+### One save pattern per page
+
+**A settings page either saves everything on change, or saves everything behind
+one button. Never both.**
+
+The Privacy page used to do both: server-backed rows sat inside a form with a
+"Save changes" button, while the browser-local analytics checkbox applied
+instantly. The two kinds of row looked identical and neither said which it was,
+so the only way to find out whether your change had stuck was to leave and come
+back.
+
+Instant-apply is the default for new work. When you use it:
+
+- Show a transient "Saved ✓" **next to the control that saved**, not in a
+  page-level status area. Which thing saved is the whole content of the message.
+- Send only the field that changed. Mastodon's `update_credentials` writes every
+  key in the `FormData` it receives, so posting the whole form lets a stale value
+  from an untouched row overwrite the server's copy.
+- **On failure, revert the control and say why, inline.** A control left showing
+  a value the server refused is a lie, and on a privacy page it is the dangerous
+  direction of lie: believing you are locked when you are public. Name the status
+  code when you have one — 401, 403 and a dead network need three different next
+  actions from the reader.
+
 ### Friction is a feature
 
 The mini composer on Home is off by default, behind a "Quick post" button. The

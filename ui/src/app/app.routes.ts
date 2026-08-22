@@ -368,7 +368,7 @@ export const routes: Routes = [
             // 'spotlight', not 'ads': the rail's markup already dodges `ad-*`
             // class names because blockers hide them (right-rail.spec pins it),
             // and a deep-linked path containing /ads is the same hazard one
-            // layer out. The page is titled "Ads" where it counts.
+            // layer out. The page is titled "Endorsements" where it counts.
             path: 'spotlight',
             title: 'Spotlight',
             data: { preloadSettings: true },
@@ -441,7 +441,7 @@ export const routes: Routes = [
             // and the two CW/sensitive switches are entirely client-side, so
             // they work while browsing anonymously.
             path: 'content',
-            title: 'Content warnings',
+            title: 'Trust: CW/Sensitive',
             data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/content/settings-content').then((m) => m.SettingsContent),
@@ -472,7 +472,7 @@ export const routes: Routes = [
             // Whole-account operations (retweets for every follow, mute/block
             // amnesty). Server-backed throughout, so Anonymous can't use it.
             path: 'bulk-actions',
-            title: 'Bulk actions',
+            title: 'Bulk moderation',
             canActivate: [anonymousUnavailableGuard],
             data: { anonymousFeature: 'Bulk actions', preloadSettings: true },
             loadComponent: () =>

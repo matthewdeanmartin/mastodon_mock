@@ -26,7 +26,7 @@ describe('AiAvailability', () => {
     prefs.setAiMode('off');
 
     expect(ai.enabled()).toBe(false);
-    expect(ai.disabledReason()).toContain('Mockingbird Blue');
+    expect(ai.disabledReason()).toContain('Appearance');
   });
 
   it('is off when the operator flag is off, even with the user switch on', () => {
@@ -44,7 +44,7 @@ describe('AiAvailability', () => {
     prefs.setAiMode('off');
     flags.setState('connector-openrouter', 'off');
 
-    expect(ai.disabledReason()).toContain('Mockingbird Blue');
+    expect(ai.disabledReason()).toContain('Appearance');
   });
 
   it('comes back on when the preference is restored', () => {
