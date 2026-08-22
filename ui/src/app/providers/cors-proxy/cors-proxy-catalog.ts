@@ -1,5 +1,6 @@
 import { corsProxyOrigin } from '../../build-flavor';
 import { proxyFeatureFlag } from '../../feature-flags';
+import { PROXY_RATE_FREE_PER_MINUTE, PROXY_RATE_PLUS_PER_MINUTE } from '../../plus-benefits';
 
 /**
  * Which Mawkingbird proxy deployment this build talks to.
@@ -219,7 +220,8 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
     // That is more than AllOrigins can do and is the point of running our own.
     forwardsCustomHeaders: true,
     limits:
-      'Feeds: 60 requests per minute, 2 MB per response, cached 5 minutes. Webmentions and the ' +
+      `Feeds: ${PROXY_RATE_FREE_PER_MINUTE} requests per minute, 2 MB per response, cached 5 ` +
+      'minutes. Webmentions and the ' +
       'API connectors are tighter. Only the destinations this app actually uses are reachable, ' +
       'and video and audio are refused outright — it is not a general-purpose proxy.',
     // The service's own terms page, not the source repository — the repo is
@@ -247,8 +249,8 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
     // paste. The token is minted from the signed-in account by `PlusSession`
     // and refreshed automatically, so the settings page shows no key field.
     limits:
-      'Feeds and every other route: 300 requests per minute, counted per account rather than ' +
-      'per address. The same destinations, size caps and content-type rules as the free proxy — ' +
+      `Feeds and every other route: ${PROXY_RATE_PLUS_PER_MINUTE} requests per minute, counted ` +
+      'per account rather than per address. The same destinations, size caps and content-type rules as the free proxy — ' +
       'a subscription raises the ceiling, it does not widen what the proxy will reach.',
     homepage: `${MAWKINGBIRD_PROXY}/`,
   },

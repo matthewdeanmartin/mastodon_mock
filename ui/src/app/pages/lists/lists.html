@@ -137,8 +137,7 @@
     </div>
   } @else {
     <p class="muted small section-note">
-      Your subscription has lapsed, so these are read-only. Nothing has been deleted, and you can
-      still remove or export anything here.
+      {{ listWriteBlockMessage() ?? 'These are read-only right now.' }}
     </p>
   }
 

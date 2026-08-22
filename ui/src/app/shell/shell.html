@@ -266,10 +266,10 @@
 <div
   class="layout"
   [class.layout-wide]="wide()"
-  [class.layout-zen]="!wide() && prefs.zenMode()"
+  [class.layout-zen]="!wide() && railsHidden()"
   [class.layout-writing-zen]="writingZen.active()"
 >
-  @if (!wide() && !prefs.zenMode() && !writingZen.active()) {
+  @if (!wide() && !railsHidden() && !writingZen.active()) {
     <aside class="rail rail-left">
       <app-left-rail />
     </aside>
@@ -280,7 +280,7 @@
       <app-app-footer />
     }
   </main>
-  @if (!wide() && !prefs.zenMode() && !writingZen.active()) {
+  @if (!wide() && !railsHidden() && !writingZen.active()) {
     <aside class="rail rail-right">
       <app-right-rail />
     </aside>

@@ -4,6 +4,7 @@ import { ArticleBody, ArticleResult } from './article-models';
 import { judge, measure } from './article-quality';
 import { findArticleRoot, stripFurniture } from './article-scoring';
 import { htmlToMarkdown } from './html-to-markdown';
+import { readabilityExtract } from './article-readability';
 
 /**
  * Raw HTML → a renderable result.
@@ -58,18 +59,42 @@ export function extractArticle(
     return { ...base(), article: null, diagnosis: preVerdict };
   }
 
+  // Readability must see the document **as fetched**, so the clone is taken
+  // here — eagerly, before `stripFurniture` runs.
+  //
+  // This ordering is the whole correctness of the fallback. `stripFurniture`
+  // destructively removes `<header>`, `<nav>`, `<aside>` and anything matching
+  // the junk pattern from `doc` itself; Readability scores exactly those
+  // elements to decide where the body is. Handing it the stripped document
+  // would ask it to judge a page whose evidence had already been thrown away —
+  // it would agree with our heuristic by construction and rescue nothing.
+  //
+  // Deliberately *not* deferred behind a closure. A lazy `() => doc.cloneNode()`
+  // reads like a free optimisation and is silently wrong: it captures `doc` by
+  // reference, so by the time the fallback calls it the strip has already
+  // happened and the "pristine" copy is the mutilated one. Paying for a clone
+  // on every expansion is the honest price of having a fallback that works.
+  const pristine = doc.cloneNode(true) as Document;
+
   stripFurniture(doc);
 
   const root = findArticleRoot(doc);
-  if (!root) {
-    return { ...base(), article: null, diagnosis: 'junk' };
-  }
 
-  const { markdown, images } = htmlToMarkdown(root.element, finalUrl);
-  const metrics = measure(root.element, markdown);
-  const quality = judge(metrics);
+  // Tier 2: our own heuristic. Kept first — it is tuned to this pipeline, and
+  // the quality gate below is calibrated against the metrics it produces.
+  const own = root ? attempt(root.element, finalUrl) : null;
 
-  if (quality === 'junk') {
+  // Tier 3: Mozilla Readability, when ours declined or produced junk.
+  //
+  // The gate is applied to both candidates identically. Readability is better
+  // than our heuristic on the long tail, but "better on average" is not
+  // "trustworthy unreviewed" — a page it reads as navigation soup is still
+  // navigation soup, and rendering that would break the same promise the gate
+  // exists to keep.
+  const best =
+    own?.quality === 'good' ? own : bestOf(own, attempt(readabilityBody(pristine), finalUrl));
+
+  if (!best) {
     return { ...base(), article: null, diagnosis: 'junk' };
   }
 
@@ -83,15 +108,66 @@ export function extractArticle(
     title,
     byline: card?.author_name ?? null,
     siteName: card?.provider_name || null,
-    markdown,
-    images,
-    quality,
-    metrics,
+    markdown: best.markdown,
+    images: best.images,
+    quality: best.quality,
+    metrics: best.metrics,
   };
 
   return {
     ...base(),
     article,
-    diagnosis: quality === 'thin' ? 'partial' : 'ok',
+    diagnosis: best.quality === 'thin' ? 'partial' : 'ok',
   };
+}
+
+/** One extraction candidate, measured and judged but not yet chosen. */
+interface Candidate {
+  markdown: string;
+  images: string[];
+  metrics: ReturnType<typeof measure>;
+  quality: ReturnType<typeof judge>;
+}
+
+/**
+ * Convert and score one candidate root.
+ *
+ * Returns null for a root the gate rejects, so a caller can treat "no
+ * candidate" and "rejected candidate" the same way — which is correct here,
+ * because a junk extraction is worth exactly as much as none.
+ */
+function attempt(element: Element | null, baseUrl: string): Candidate | null {
+  if (!element) {
+    return null;
+  }
+  const { markdown, images } = htmlToMarkdown(element, baseUrl);
+  const metrics = measure(element, markdown);
+  const quality = judge(metrics);
+  return quality === 'junk' ? null : { markdown, images, metrics, quality };
+}
+
+/** Readability's body element for a document, or null when it declines. */
+function readabilityBody(doc: Document): Element | null {
+  return readabilityExtract(doc)?.element ?? null;
+}
+
+/**
+ * Pick between two surviving candidates.
+ *
+ * `good` beats `thin`; between equals, the longer one wins. Word count is a
+ * crude tiebreak, but the failure it guards against is concrete: a truncated
+ * extraction that happens to be clean enough to pass the gate would otherwise
+ * be preferred over a complete one purely by running first.
+ */
+function bestOf(a: Candidate | null, b: Candidate | null): Candidate | null {
+  if (!a) {
+    return b;
+  }
+  if (!b) {
+    return a;
+  }
+  if (a.quality !== b.quality) {
+    return a.quality === 'good' ? a : b;
+  }
+  return b.metrics.wordCount > a.metrics.wordCount ? b : a;
 }

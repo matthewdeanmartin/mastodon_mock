@@ -19,6 +19,7 @@ import { FeatureFlags } from '../feature-flags';
 import { PosseQueue } from '../providers/hugo/posse-queue';
 import { LeaveChoice, LeaveDialog } from '../leave-dialog/leave-dialog';
 import { WritingZen } from '../writing-zen';
+import { ReadingZen } from '../reading-zen';
 import { FirstRunChoice, FirstRunModal } from '../first-run/first-run-modal';
 import { PreviewSeed } from '../first-run/preview-seed';
 
@@ -79,6 +80,15 @@ export class Shell implements OnInit {
    * zen hides a strict superset, so the two are safe to have on at once.
    */
   protected writingZen = inject(WritingZen);
+  /**
+   * Reading zen: reader mode's transient hold on the rails. ORed with the saved
+   * preference below rather than writing it, so opening an article never
+   * reconfigures the app for someone who had zen on — or off — already.
+   */
+  protected readingZen = inject(ReadingZen);
+
+  /** Rails hidden: the saved preference, or a reader-mode hold. */
+  protected readonly railsHidden = computed(() => this.prefs.zenMode() || this.readingZen.active());
   protected serverAbout = inject(ServerAbout);
   protected featureFlags = inject(FeatureFlags);
   /** POSSE queue depth, for the "Waiting to publish" row and its count. */

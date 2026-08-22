@@ -138,9 +138,17 @@
         }
 
         @if (profile.readOnly()) {
+          <!--
+            `profile.readOnly()` is 402-driven and cross-checked against
+            `isSupporter()`, so this one really is an entitlement statement —
+            but it covers "never subscribed" as well as "lapsed", and saying
+            "lapsed" to someone who never subscribed accuses them of letting
+            something run out.
+          -->
           <span class="hint">
-            Your subscription has lapsed, so settings are no longer being saved. Everything already
-            stored stays readable and can be exported at any time.
+            Settings are no longer being saved to your account, because storing them there is part
+            of Mawkingbird Plus. Everything already stored stays readable and can be exported at any
+            time.
           </span>
         }
         @if (syncMessage()) {

@@ -24,6 +24,7 @@ import { ProfileAccountKey } from '../../providers/account/profile-account-key';
 import { ProfileList, ProfileLists } from '../../providers/account/profile-lists';
 import { CopyPreview, ProfileListCopy } from '../../providers/account/profile-list-copy';
 import { SupporterStatus } from '../../providers/account/supporter-status';
+import { writeBlockMessage } from '../../providers/account/write-block';
 
 /**
  * Which sections the Feeds page shows. `/feeds` shows everything; `/feeds/lists`
@@ -297,6 +298,18 @@ export class Lists implements OnInit {
    * already lazily routed, so the cost lands only on someone who opened it.
    */
   protected profileLists = inject(ProfileLists);
+
+  /**
+   * Why account lists are read-only, in words, or null.
+   *
+   * Was a hardcoded "Your subscription has lapsed" — printed for an expired
+   * sign-in and an unreachable service as readily as for a real lapse. The
+   * service now reports which of those happened and this says so.
+   */
+  protected readonly listWriteBlockMessage = computed(() => {
+    const block = this.profileLists.writeBlock();
+    return block ? writeBlockMessage(block, 'your account lists') : null;
+  });
   protected profileAccountKey = inject(ProfileAccountKey);
   protected listCopy = inject(ProfileListCopy);
   protected supporter = inject(SupporterStatus);

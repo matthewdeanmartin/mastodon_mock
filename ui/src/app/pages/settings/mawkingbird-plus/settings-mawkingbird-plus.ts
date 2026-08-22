@@ -20,6 +20,8 @@ import type { AdoptionChoice } from '../../../providers/account/collection-adopt
 import { VaultService } from '../../../providers/vault/vault-service';
 import { VaultPreference } from '../../../providers/vault/vault-preference';
 import { VaultAdoption } from '../../../providers/vault/vault-adoption';
+import { FeatureFlags } from '../../../feature-flags';
+import { PLUS_PRICE_USD_PER_YEAR, visiblePlusBenefits } from '../../../plus-benefits';
 
 /**
  * Settings → Mawkingbird Plus.
@@ -60,6 +62,20 @@ export class SettingsMawkingbirdPlus implements OnInit {
   protected vaultPreference = inject(VaultPreference);
 
   /** Proxy counters, local and account-wide. */
+  private flags = inject(FeatureFlags);
+
+  /**
+   * What the subscription buys, from `plus-benefits.ts` rather than from prose.
+   *
+   * Filtered by flag so the page never advertises a capability this build has
+   * switched off — the previous hand-written copy could not do that, and said
+   * the proxy tier existed whether or not the proxy flag was on.
+   */
+  protected readonly benefits = computed(() =>
+    visiblePlusBenefits((flag) => this.flags.enabled(flag)),
+  );
+  protected readonly priceUsd = PLUS_PRICE_USD_PER_YEAR;
+
   protected readonly proxyUsage = this.proxyUsageStore.usage;
   protected readonly formatBytes = formatBytes;
   protected readonly syncing = signal(false);
@@ -524,7 +540,11 @@ export class SettingsMawkingbirdPlus implements OnInit {
       return 'All sync features are off. Turn on at least one above and this will start working.';
     }
     if (this.sync.readOnly()) {
-      return 'Your subscription has lapsed, so settings are not being saved.';
+      // Not "your subscription has lapsed": this state is reached by anyone
+      // without an active subscription, which includes everyone who never had
+      // one. Telling them something of theirs ran out is an accusation about an
+      // event that did not happen.
+      return 'Settings are not being saved to your account, because storing them there is part of Mawkingbird Plus.';
     }
     return null;
   }

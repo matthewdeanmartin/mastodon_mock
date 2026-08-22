@@ -7,6 +7,7 @@ import { MawkingbirdSession } from '../../../providers/account/mawkingbird-sessi
 import { VaultService } from '../../../providers/vault/vault-service';
 import { VAULT_TEST_ROLLOUT } from '../../../providers/vault/vault-preference';
 import { PlusFeatures } from '../../../providers/account/plus-features';
+import { PLUS_BENEFITS, PLUS_PRICE_USD_PER_YEAR } from '../../../plus-benefits';
 
 /**
  * A stand-in for the real session, so these specs exercise the page's rendering
@@ -132,9 +133,20 @@ describe('SettingsMawkingbirdPlus', () => {
     const text = render();
 
     expect(text).toContain('Support Mawkingbird');
-    expect(text).toContain('$30');
-    // Honest framing: the free tier is unaffected either way.
-    expect(text).toContain('free and stays free');
+    expect(text).toContain(`$${PLUS_PRICE_USD_PER_YEAR}`);
+    // Honest framing: the app stays usable without paying. Asserted on the
+    // narrower claim that is actually true, because the copy this replaced said
+    // "everything in it works exactly the same whether you pay or not" while
+    // the same page refused unsubscribed writes to profile storage.
+    expect(text).toContain('Mawkingbird itself stays free');
+
+    // The pitch is rendered from PLUS_BENEFITS, so it cannot drift from the
+    // entitlements. Every unflagged row must appear with both of its columns.
+    for (const benefit of PLUS_BENEFITS.filter((row) => !row.flag)) {
+      expect(text).toContain(benefit.label);
+      expect(text).toContain(benefit.free);
+      expect(text).toContain(benefit.plus);
+    }
   });
 
   it('does not tell a supporter their account is free', () => {
@@ -167,7 +179,7 @@ describe('SettingsMawkingbirdPlus', () => {
     render();
 
     const button = Array.from(fixture.nativeElement.querySelectorAll('button')).find((element) =>
-      (element as HTMLButtonElement).textContent?.includes('$30/year'),
+      (element as HTMLButtonElement).textContent?.includes(`$${PLUS_PRICE_USD_PER_YEAR}/year`),
     ) as HTMLButtonElement | undefined;
     button?.click();
 

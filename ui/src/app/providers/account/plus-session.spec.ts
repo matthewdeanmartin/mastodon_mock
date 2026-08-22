@@ -70,6 +70,124 @@ describe('PlusSession', () => {
     return request;
   };
 
+  /**
+   * The races. Each of these reproduces a way a stale mint could publish an
+   * answer to a question that had already been asked again.
+   */
+  describe('concurrent mints', () => {
+    it('does not let a pre-checkout mint overwrite the tier after refresh()', async () => {
+      // The "I subscribed and it does not know it" bug. A mint starts before
+      // checkout, the user pays, `refresh()` runs — and the old mint settles
+      // afterwards carrying `tier: 'free'`.
+      const stale = plus.token();
+      await settle();
+      const staleRequest = httpMock.expectOne(TOKEN_URL);
+
+      // Checkout happened. refresh() must start its own mint, not join the
+      // one already in flight.
+      const refreshed = plus.refresh();
+      await settle();
+      const freshRequest = httpMock.expectOne(TOKEN_URL);
+
+      // The fresh mint answers first, correctly: this account is a supporter.
+      freshRequest.flush({
+        token: 'supporter-token',
+        expiresAt: nowSeconds() + 900,
+        tier: 'plus',
+        subscription: { renewsAt: 2_000_000_000, cancelAtPeriodEnd: false },
+      });
+      await refreshed;
+      expect(plus.tier()).toBe('plus');
+
+      // Now the pre-checkout mint lands with its obsolete answer.
+      staleRequest.flush({
+        token: 'free-token',
+        expiresAt: nowSeconds() + 900,
+        tier: 'free',
+        subscription: null,
+      });
+      await stale;
+
+      // It must have been dropped, not published.
+      expect(plus.tier()).toBe('plus');
+      expect(plus.isSupporter()).toBe(true);
+      expect(plus.subscription()).not.toBeNull();
+    });
+
+    it('refresh() issues a new request instead of joining the in-flight mint', async () => {
+      const pending = plus.token();
+      await settle();
+
+      const refreshed = plus.refresh();
+      await settle();
+
+      // Two requests in flight, not one shared. Joining the existing mint —
+      // which is what `refresh()` used to do — would leave exactly one, and the
+      // post-checkout answer would be whatever the older mint happened to say.
+      const requests = httpMock.match(TOKEN_URL);
+      expect(requests.length).toBe(2);
+
+      for (const request of requests) {
+        request.flush({
+          token: 'supporter-token',
+          expiresAt: nowSeconds() + 900,
+          tier: 'plus',
+          subscription: null,
+        });
+      }
+      await Promise.all([pending, refreshed]);
+      expect(plus.tier()).toBe('plus');
+    });
+
+    it('does not re-entitle an account that signed out mid-mint', async () => {
+      const pending = plus.token();
+      await settle();
+      const request = httpMock.expectOne(TOKEN_URL);
+
+      plus.clear();
+
+      // The mint that was already in flight comes back saying "supporter".
+      request.flush({
+        token: 'supporter-token',
+        expiresAt: nowSeconds() + 900,
+        tier: 'plus',
+        subscription: { renewsAt: 2_000_000_000, cancelAtPeriodEnd: false },
+      });
+      await pending;
+
+      // Signed out is signed out. Publishing here would restore a session the
+      // user just ended.
+      expect(plus.tier()).toBe('free');
+      expect(plus.isSupporter()).toBe(false);
+      expect(plus.subscription()).toBeNull();
+    });
+
+    it('announces entitlement only after the auth token can back it up', async () => {
+      // Ordering, not just atomicity: while `upgradeIfStale` is in flight the
+      // app must not yet claim to be a supporter, because the credential a
+      // profile write would use still carries the stale free-tier claim and the
+      // service would correctly answer 402.
+      let releaseUpgrade!: () => void;
+      const upgraded = new Promise<boolean>((resolve) => {
+        releaseUpgrade = () => resolve(true);
+      });
+      session.upgradeIfStale.mockReturnValue(upgraded);
+
+      const pending = plus.token();
+      await settle();
+      respond();
+      await settle();
+
+      expect(session.upgradeIfStale).toHaveBeenCalled();
+      expect(plus.isSupporter()).toBe(false);
+
+      releaseUpgrade();
+      await pending;
+
+      expect(plus.isSupporter()).toBe(true);
+    });
+  });
+
   it('mints a token and records the tier', async () => {
     const pending = plus.token();
     await settle();

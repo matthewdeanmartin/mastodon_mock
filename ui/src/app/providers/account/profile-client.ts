@@ -104,6 +104,8 @@ export type ProfileResult<T> =
   /** Not entitled: free tier, or a lapsed subscription. Reads still work. */
   | { kind: 'payment-required'; message: string }
   /** Signed out, anonymous, or not on the tester list. */
+  /** 401: the credential was not accepted. Says nothing about entitlement. */
+  | { kind: 'unauthenticated'; message: string }
   | { kind: 'forbidden'; message: string }
   /** Anything else: offline, CORS, 5xx, a malformed body. */
   | { kind: 'failed'; message: string };
@@ -316,10 +318,13 @@ export class ProfileClient {
   /**
    * Turn a non-OK response into the matching refusal, or null if it was fine.
    *
-   * 402 is kept distinct from 403 because they mean opposite things to the UI:
-   * one says "your subscription lapsed, your data is safe and readable", the
-   * other says "you are not signed in". Collapsing them would produce a message
-   * that is wrong half the time.
+   * All three refusals stay distinct because they mean different things to the
+   * UI: 402 is "not entitled, your data is safe and readable", 401 is "we do not
+   * know who you are", 403 is "we know, and no". The comment here used to claim
+   * this while the code below still collapsed 401 into 403 — so an expired
+   * sign-in was reported as a permissions problem, and callers that treated
+   * `forbidden` as an entitlement signal went on to call it a lapsed
+   * subscription.
    */
   private async refusalFor(response: Response): Promise<ProfileResult<never> | null> {
     if (response.ok) {
@@ -332,8 +337,18 @@ export class ProfileClient {
         message: message ?? 'Profile storage is part of Mawkingbird Plus.',
       };
     }
-    if (response.status === 401 || response.status === 403) {
-      return { kind: 'forbidden', message: message ?? 'Sign in to use your Mawkingbird profile.' };
+    if (response.status === 401) {
+      return {
+        kind: 'unauthenticated',
+        message:
+          message ?? 'Your sign-in has expired. Sign in again to use your Mawkingbird profile.',
+      };
+    }
+    if (response.status === 403) {
+      return {
+        kind: 'forbidden',
+        message: message ?? 'This account is not allowed to use Mawkingbird profile storage.',
+      };
     }
     return {
       kind: 'failed',

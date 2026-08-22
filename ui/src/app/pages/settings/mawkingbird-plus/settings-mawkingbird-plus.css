@@ -176,3 +176,39 @@
   cursor: pointer;
   font-size: 14px;
 }
+
+/*
+  The benefits table, rendered from PLUS_BENEFITS.
+
+  Scrolls inside its own box rather than widening the settings column: three
+  columns of prose is the one thing on this page that cannot be made to fit a
+  narrow viewport, and a page that scrolls sideways is worse than a table that
+  does.
+*/
+.plus-benefits {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 14px;
+  display: block;
+  overflow-x: auto;
+}
+
+.plus-benefits th,
+.plus-benefits td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.plus-benefits thead th {
+  background: var(--hover);
+  font-weight: 600;
+}
+
+/* The row heading is the capability; the two value cells carry the comparison. */
+.plus-benefits tbody th {
+  font-weight: 600;
+  white-space: nowrap;
+}

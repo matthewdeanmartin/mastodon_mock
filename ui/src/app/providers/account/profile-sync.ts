@@ -612,7 +612,10 @@ export class ProfileSync {
       this.diagnostics.info('ProfileSync', 'push:skipped', { reason: 'read-only' });
       return {
         kind: 'read-only',
-        message: 'Your subscription has lapsed, so settings are no longer being saved.',
+        // Covers "never subscribed" as much as "lapsed", and only the second
+        // of those is something the reader let happen.
+        message:
+          'Settings are not being saved to your account, because storing them there is part of Mawkingbird Plus.',
       };
     }
     this.cancelPush();

@@ -19,6 +19,7 @@ import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { readerChain } from './reader-chain';
+import { ReadingZen } from '../../reading-zen';
 import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
 import { adaptPost } from '../../providers/bluesky/bluesky-adapter';
 import { BskyThreadNode } from '../../providers/bluesky/bluesky-types';
@@ -87,6 +88,7 @@ export class Thread implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private readingZen = inject(ReadingZen);
   private loadSub = new Subscription();
 
   protected readonly prefs = inject(ClientPrefs);
@@ -107,6 +109,8 @@ export class Thread implements OnInit {
 
   /** Reader mode: distraction-free article view of the author's own chain. */
   protected readerMode = signal(false);
+  /** Releases this page's hold on the rails. Non-null exactly while reader mode is on. */
+  private releaseZen: (() => void) | null = null;
 
   /** True while viewing an RSS article: interactions are read-only, comments come from a feed. */
   protected isRss = signal(false);
@@ -529,6 +533,12 @@ export class Thread implements OnInit {
   private readerParam: string | null = null;
 
   ngOnInit(): void {
+    // Navigating away from an article must give the rails back, including the
+    // routes that leave reader mode on (an in-reader link to another page).
+    this.destroyRef.onDestroy(() => {
+      this.releaseZen?.();
+      this.releaseZen = null;
+    });
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id');
       if (id) {
@@ -548,7 +558,31 @@ export class Thread implements OnInit {
 
   private applyReaderMode(): void {
     const rssDefault = this.currentId.startsWith('rss:') && this.readerParam !== '0';
-    this.readerMode.set(this.readerParam === '1' || rssDefault);
+    this.setReaderMode(this.readerParam === '1' || rssDefault);
+  }
+
+  /**
+   * The only place `readerMode` is written, so the rails can never get out of
+   * step with it.
+   *
+   * Reader mode is a reading surface, so it hides the rails for as long as it is
+   * open — the same effect as zen mode, taken as a hold rather than by setting
+   * the preference. Setting `prefs.setZenMode()` here would persist, and exiting
+   * would then switch zen *off* for someone who arrived with it on. A hold has
+   * no such state to restore: dropping it returns the rails to whatever the
+   * preference always said.
+   */
+  private setReaderMode(on: boolean): void {
+    if (this.readerMode() === on) {
+      return;
+    }
+    this.readerMode.set(on);
+    if (on) {
+      this.releaseZen = this.readingZen.hold();
+    } else {
+      this.releaseZen?.();
+      this.releaseZen = null;
+    }
   }
 
   load(id: string): void {
@@ -834,7 +868,7 @@ export class Thread implements OnInit {
   }
 
   toggleReader(): void {
-    this.readerMode.update((v) => !v);
+    this.setReaderMode(!this.readerMode());
   }
 
   bumpReaderFont(delta: number): void {

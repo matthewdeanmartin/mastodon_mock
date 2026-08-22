@@ -60,7 +60,17 @@ export type CollectionResult<T> =
   | { kind: 'unchanged' }
   /** Not entitled: free tier, or a lapsed subscription. Reads still work. */
   | { kind: 'payment-required'; message: string }
-  /** Signed out, anonymous, or not on the tester list. */
+  /**
+   * The credential was not accepted (401). Says nothing about entitlement.
+   *
+   * Split from `forbidden` because they call for opposite messages and were
+   * previously collapsed into one: an expired sign-in was reported to the user
+   * as a lapsed subscription, which is both wrong and an accusation. A 401 means
+   * the service does not know who is asking, so the only honest thing to say is
+   * "sign in again".
+   */
+  | { kind: 'unauthenticated'; message: string }
+  /** Known, but not allowed: anonymous, or not on the tester list (403). */
   | { kind: 'forbidden'; message: string }
   /** No account key could be determined. Never a default bucket. */
   | { kind: 'no-account'; message: string }
@@ -262,8 +272,18 @@ export class ProfileCollections {
         message: message ?? 'Mawkingbird lists are part of Mawkingbird Plus.',
       };
     }
-    if (response.status === 401 || response.status === 403) {
-      return { kind: 'forbidden', message: message ?? 'Sign in to use your Mawkingbird profile.' };
+    if (response.status === 401) {
+      return {
+        kind: 'unauthenticated',
+        message:
+          message ?? 'Your sign-in has expired. Sign in again to use your Mawkingbird profile.',
+      };
+    }
+    if (response.status === 403) {
+      return {
+        kind: 'forbidden',
+        message: message ?? 'This account is not allowed to use Mawkingbird profile storage.',
+      };
     }
     if (response.status === 400) {
       // The service refusing an account key. Reported distinctly because the

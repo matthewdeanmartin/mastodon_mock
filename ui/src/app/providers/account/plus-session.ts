@@ -152,6 +152,17 @@ export class PlusSession {
   private minting: Promise<string | null> | null = null;
 
   /**
+   * Which mint the in-flight one is, so a settling mint only clears its own
+   * handle.
+   *
+   * Without this, the `finally` that resets `minting` could null out a *newer*
+   * mint's handle: an old request settling after {@link refresh} started a
+   * fresh one would clear the field, and the next caller would start a third
+   * mint against an endpoint that already had one in flight.
+   */
+  private mintSeq = 0;
+
+  /**
    * A usable proxy token, minting or refreshing as needed.
    *
    * Returns null whenever one cannot be had — signed out, endpoint down,
@@ -164,27 +175,58 @@ export class PlusSession {
     }
     // Deduplicated: several proxied requests can start at once, and each
     // minting its own token would spend the endpoint's rate limit on itself.
-    this.minting ??= this.mint().finally(() => {
-      this.minting = null;
-    });
-    return this.minting;
+    return (this.minting ??= this.startMint());
   }
 
   /**
-   * Re-mint now, discarding any held token.
+   * Begin a mint and own the `minting` handle for its lifetime.
+   *
+   * The sequence check is what makes this safe to call while another mint is
+   * still settling: only the mint that currently owns the handle may clear it.
+   */
+  private startMint(): Promise<string | null> {
+    const seq = ++this.mintSeq;
+    return this.mint(seq).finally(() => {
+      if (this.mintSeq === seq) {
+        this.minting = null;
+      }
+    });
+  }
+
+  /**
+   * Re-mint now, discarding any held token **and any mint already in flight**.
    *
    * Called after returning from checkout, so a new supporter sees their tier
-   * immediately rather than waiting up to fifteen minutes for the next
-   * refresh.
+   * immediately rather than waiting up to fifteen minutes for the next refresh.
+   *
+   * Abandoning the in-flight mint is the whole point, and dropping it was a real
+   * bug. `refresh()` used to clear `held` and call `token()`, which joined
+   * whatever mint was already running — and after checkout that mint is very
+   * likely one that *started before the subscription existed*. It resolves with
+   * `tier: 'free'`, writes that over the account that has just paid, and the app
+   * settles into "I subscribed and it does not know it" until something else
+   * forces a mint fifteen minutes later.
+   *
+   * The abandoned mint is not cancelled — it cannot be, the request is already
+   * out — but {@link mint} refuses to publish a result once it has been
+   * superseded, so its stale answer lands nowhere.
    */
   async refresh(): Promise<void> {
     this.held = null;
-    await this.token();
+    this.minting = this.startMint();
+    await this.minting;
   }
 
   /** Forget everything. Called on sign-out. */
   clear(): void {
     this.held = null;
+    // Invalidate any mint still in flight. One that started while signed in
+    // would otherwise settle a moment later and publish `tier: 'plus'` for an
+    // account that has just signed out — re-entitling a session that no longer
+    // exists. Bumping the sequence makes that attempt superseded, so it drops
+    // its answer instead of writing it.
+    this.mintSeq++;
+    this.minting = null;
     this.tier.set('free');
     this.status.isSupporter.set(false);
     this.subscription.set(null);
@@ -237,14 +279,31 @@ export class PlusSession {
     }
   }
 
-  private async mint(): Promise<string | null> {
+  /**
+   * Mint one token and publish what it says about the account.
+   *
+   * `seq` identifies this attempt. Every write to shared state is guarded on it
+   * still being the current one, because a mint is a sequence of awaits and the
+   * world can move underneath it: {@link refresh} can supersede this attempt
+   * while its request is in flight, and sign-out can happen at any await point.
+   * Publishing regardless is how a pre-checkout mint overwrote a fresh
+   * subscription with `tier: 'free'`.
+   */
+  private async mint(seq: number): Promise<string | null> {
+    /** Whether this attempt is still the one whose answer counts. */
+    const current = () => this.mintSeq === seq;
+
     authDebug('mint:start');
     const accessToken = await this.session.token();
     authDebug('mint:have-access-token', { present: accessToken !== null });
     if (!accessToken) {
-      this.tier.set('free');
-      this.subscription.set(null);
-      this.status.isSupporter.set(false);
+      // Still guarded: "signed out" is an answer about the account like any
+      // other, and a superseded attempt must not assert it either.
+      if (current()) {
+        this.tier.set('free');
+        this.subscription.set(null);
+        this.status.isSupporter.set(false);
+      }
       return null;
     }
 
@@ -273,8 +332,15 @@ export class PlusSession {
         tier: response.tier,
         hasSubscription: response.subscription !== null,
       });
-      this.tier.set(response.tier);
-      this.status.isSupporter.set(response.tier === 'plus');
+      if (!current()) {
+        // Superseded while the request was in flight — by `refresh()` after a
+        // checkout, or by a sign-out. Whatever this says about the account is
+        // an answer to a question that has since been asked again, so it is
+        // dropped rather than published over the newer one.
+        authDebug('mint:superseded');
+        return null;
+      }
+
       // The auth token and this proxy token are separate credentials, minted by
       // separate Workers. This call is the moment the app first *learns* the
       // account is entitled — and on a cold load the auth token was very likely
@@ -285,9 +351,24 @@ export class PlusSession {
       // anyone asks. Left alone, every profile write authenticates with the
       // stale free-tier claim and the service correctly answers 402 — a paying
       // account that cannot save, with both halves individually behaving.
+      //
+      // Awaited *before* `tier`/`isSupporter` are published, which is the second
+      // half of this fix. Publishing first opened a window where the app
+      // believed it was entitled while the auth token still carried the stale
+      // free-tier claim, so a profile write landing in that window authenticated
+      // as free and drew a correct 402 — a self-inflicted refusal that then had
+      // to be explained away downstream. Announcing entitlement only once the
+      // credential can actually back it up closes the window instead.
       if (response.tier === 'plus') {
         await this.session.upgradeIfStale(true);
+        if (!current()) {
+          authDebug('mint:superseded');
+          return null;
+        }
       }
+
+      this.tier.set(response.tier);
+      this.status.isSupporter.set(response.tier === 'plus');
       this.subscription.set(
         response.subscription
           ? {

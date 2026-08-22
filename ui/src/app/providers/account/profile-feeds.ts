@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { ProfileCollections } from './profile-collections';
+import { isDurableBlock, WriteBlock, writeBlockFor } from './write-block';
 import type { CollectionResult } from './profile-collections';
 
 /**
@@ -56,6 +57,7 @@ export class ProfileFeeds {
   private ready = signal(false);
   private failure = signal<string | null>(null);
   private writable = signal(true);
+  private block = signal<WriteBlock | null>(null);
 
   readonly feeds = computed(() => this.state());
   readonly count = computed(() => this.state().length);
@@ -63,6 +65,15 @@ export class ProfileFeeds {
   readonly loaded = computed(() => this.ready());
   readonly error = computed(() => this.failure());
   readonly canWrite = computed(() => this.writable());
+
+  /**
+   * Why writes are blocked, or null.
+   *
+   * Exposed alongside `canWrite` so the UI can say what actually happened. A
+   * bare boolean is what let three screens describe every refusal as a lapsed
+   * subscription — the reason was thrown away before the template saw it.
+   */
+  readonly writeBlock = computed(() => this.block());
 
   async load(): Promise<void> {
     const result = await this.collections.index<ProfileFeed>(COLLECTION);
@@ -75,6 +86,7 @@ export class ProfileFeeds {
       this.ready.set(true);
       this.failure.set(null);
       this.writable.set(true);
+      this.block.set(null);
       return;
     }
     if (result.kind === 'unchanged') {
@@ -156,8 +168,15 @@ export class ProfileFeeds {
     if (result.kind === 'ok' || result.kind === 'unchanged') {
       return;
     }
-    if (result.kind === 'payment-required' || result.kind === 'forbidden') {
-      this.writable.set(false);
+    const blocked = writeBlockFor(result);
+    if (blocked) {
+      this.block.set(blocked);
+      // Only a durable refusal latches read-only. A transport failure that
+      // flipped this would leave the UI making a claim about the account long
+      // after the network came back.
+      if (isDurableBlock(blocked)) {
+        this.writable.set(false);
+      }
     }
     if (result.kind === 'absent') {
       // Nothing stored is not a failure; it is an empty collection.
@@ -175,6 +194,7 @@ export class ProfileFeeds {
     this.ready.set(false);
     this.failure.set(null);
     this.writable.set(true);
+    this.block.set(null);
   }
 }
 

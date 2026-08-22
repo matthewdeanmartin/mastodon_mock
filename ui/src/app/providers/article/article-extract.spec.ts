@@ -160,6 +160,80 @@ describe('extractArticle', () => {
     expect(result.finalUrl).toBe('https://blog.example/posts/pictures');
     expect(result.requestedUrl).toBe('https://bit.ly/abc');
   });
+
+  /**
+   * The Readability fallback.
+   *
+   * Each case is a page the in-house scorer gets wrong, and the assertion is
+   * that the reader still gets an article. These are the pages behind "it
+   * succeeds sometimes, but often fails and is frustrating".
+   */
+  describe('Readability fallback', () => {
+    it('rescues an article whose container has a junk-sounding class', () => {
+      // `stripFurniture` deletes anything matching JUNK_PATTERN, and both
+      // "sidebar" and "comment" match. The real article is inside, so our own
+      // pass removes the body it was looking for and finds nothing.
+      // Readability scores the untouched document and finds the prose.
+      const html = page(
+        `<div id="sidebar-wrapper">
+           <div class="comment-body"><h1>Real Article</h1>${prose(8)}</div>
+         </div>`,
+      );
+      const result = extractArticle(html, 'https://blog.example/rescued');
+
+      expect(result.article).not.toBeNull();
+      expect(result.article!.markdown).toContain('quick brown fox');
+      expect(result.diagnosis).not.toBe('junk');
+    });
+
+    it('rescues prose that sits directly in the body with no container', () => {
+      // No element to elect as the root, so `findArticleRoot` has nothing to
+      // return and the in-house path exits at `junk`.
+      const html = page(`<h1>Bare</h1>${prose(8)}`);
+      const result = extractArticle(html, 'https://blog.example/bare');
+
+      expect(result.article).not.toBeNull();
+      expect(result.article!.markdown).toContain('quick brown fox');
+    });
+
+    it('still refuses a page that is genuinely navigation soup', () => {
+      // The gate applies to Readability's output too. Being better on average
+      // does not earn it the right to bypass the check that keeps the button
+      // honest — a false "good" costs more than a false "junk".
+      const links = Array.from(
+        { length: 60 },
+        (_, i) => `<li><a href="/p/${i}">Some link number ${i}</a></li>`,
+      ).join('');
+      const html = page(`<div class="listing"><ul>${links}</ul></div>`);
+      const result = extractArticle(html, 'https://blog.example/index');
+
+      expect(result.article).toBeNull();
+      expect(result.diagnosis).toBe('junk');
+    });
+
+    it('leaves a page our own extractor already reads well alone', () => {
+      // The fallback is a fallback. A clean semantic article must not be routed
+      // through it, because that would pay a document clone on the common case.
+      const html = page(`<article><h1>On Writing</h1>${prose(5)}</article>`);
+      const result = extractArticle(html, 'https://blog.example/on-writing');
+
+      expect(result.diagnosis).toBe('ok');
+      expect(result.article!.markdown).toContain('quick brown fox');
+    });
+
+    it('does not let the fallback corrupt the metadata card', () => {
+      // Readability has its own title and byline guesses, and they are weaker
+      // than the page's own metadata. The card must still win.
+      const html = page(
+        `<div class="comment-body"><h1>Inner Heading</h1>${prose(8)}</div>`,
+        '<meta property="og:title" content="Canonical Title">',
+      );
+      const result = extractArticle(html, 'https://blog.example/meta');
+
+      expect(result.article).not.toBeNull();
+      expect(result.article!.title).toBe('Canonical Title');
+    });
+  });
 });
 
 describe('extraction is not a script vector', () => {

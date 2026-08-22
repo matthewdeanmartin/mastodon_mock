@@ -575,14 +575,42 @@
       <section class="plus-offer">
         <h2>Support Mawkingbird</h2>
         <p>
-          <strong>$30 a year.</strong> This is patronage, not a feature unlock. Mawkingbird is free
-          and stays free — the app, the proxy, and everything in it work exactly the same whether
-          you pay or not.
+          <strong>${{ priceUsd }} a year.</strong> Mawkingbird itself stays free: every feed,
+          timeline, list and post works without an account, and nothing you have made is taken away
+          if you never subscribe or if you stop.
         </p>
         <p>
-          What it does buy: a much higher CORS proxy rate limit (300 requests a minute rather than
-          60), counted per account instead of per address. More supporter features may follow; none
-          are promised.
+          What a subscription buys is a raised proxy limit and somewhere on your account to keep
+          things, so they follow you between browsers. The free column is what you keep either way.
+        </p>
+        <!--
+          Rendered from PLUS_BENEFITS rather than written out, because the prose
+          that used to sit here claimed "everything works exactly the same
+          whether you pay or not" while this same page rendered a read-only
+          banner for unsubscribed profile storage. A table generated from the
+          entitlements cannot drift from them that way.
+        -->
+        <table class="plus-benefits">
+          <thead>
+            <tr>
+              <th scope="col">What</th>
+              <th scope="col">Free</th>
+              <th scope="col">Plus</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (benefit of benefits(); track benefit.id) {
+              <tr>
+                <th scope="row">{{ benefit.label }}</th>
+                <td>{{ benefit.free }}</td>
+                <td>{{ benefit.plus }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <p class="muted small">
+          More may follow; none of it is promised. Anything already stored on your account stays
+          readable and exportable whether or not you keep subscribing.
         </p>
         <div class="plus-actions">
           <button
@@ -591,7 +619,11 @@
             [disabled]="plus.startingCheckout()"
             (click)="plus.startCheckout()"
           >
-            {{ plus.startingCheckout() ? 'Starting checkout…' : 'Support Mawkingbird — $30/year' }}
+            {{
+              plus.startingCheckout()
+                ? 'Starting checkout…'
+                : 'Support Mawkingbird — $' + priceUsd + '/year'
+            }}
           </button>
         </div>
         <!--
@@ -621,10 +653,17 @@
   } @else {
     <section class="plus-signin">
       <h2>Not signed in</h2>
+      <!--
+        This paragraph used to say signing in "mainly raises your proxy rate
+        limit" and that the rest was for "later". Both were false at the time it
+        was written: lists, feeds, trust and settings sync were already stored
+        per account and already refused writes without one.
+      -->
       <p>
-        Signing in is optional. It exists so that settings sync, saved connections and a paid proxy
-        tier have somewhere to live later; right now it mainly raises your proxy rate limit if you
-        choose to support the project.
+        Signing in is optional — Mawkingbird works without an account. What it adds is a place on
+        your account to keep lists, feeds, your trust list and settings, so they follow you to your
+        other browsers, and a raised proxy rate limit if you subscribe. Everything kept in this
+        browser stays here either way.
       </p>
 
       @if (linkSent()) {
