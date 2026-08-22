@@ -15,6 +15,7 @@ import {
 import { FeatureFlagId, FeatureFlags, proxyFeatureFlag } from '../../feature-flags';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 import { SupporterStatus } from '../account/supporter-status';
+import { storedOutcome, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 
 /**
  * Which CORS proxy this browser uses, and the key for it.
@@ -65,6 +66,13 @@ interface StoredCorsProxyKey extends ExpiringCredential {
   key: string;
   /** For `custom` only: the header name the user's proxy expects. */
   customHeader?: string;
+}
+
+/** The encrypted record needed to make a restored custom/keyed proxy usable. */
+interface VaultedCorsProxySettings {
+  v: 1;
+  secret: StoredCorsProxyKey;
+  config: StoredCorsProxyConfig | null;
 }
 
 /** Everything a request builder needs, resolved from both halves. */
@@ -291,6 +299,7 @@ export class CorsProxySettings implements ExpiringConnection {
       next.customEncodeTarget = options?.encodeTarget ?? this.customEncodeTarget();
     }
     this.writeConfig(next);
+    void this.syncToVault();
   }
 
   /** Stop using any proxy. Also clears the key: nothing is left to leak. */
@@ -316,16 +325,10 @@ export class CorsProxySettings implements ExpiringConnection {
       key: trimmed,
       ...(customHeader?.trim() ? { customHeader: customHeader.trim() } : {}),
     });
-    try {
-      localStorage.setItem(SECRET_KEY, JSON.stringify(value));
-    } catch {
-      // Storage full or blocked: honour the key for this session anyway.
-    }
-    this.secret.set(value);
-    this.needsFetch.set(false);
+    this.writeSecret(value);
     // Not awaited: pasting a key should feel instant. Failures are observable
     // via `syncToVault()`, which the settings page calls when the user opts in.
-    void this.bridge.writeThrough(SECRET_KEY, trimmed);
+    void this.bridge.writeThrough(SECRET_KEY, serializeVaulted(value, this.config()));
   }
 
   /**
@@ -340,11 +343,19 @@ export class CorsProxySettings implements ExpiringConnection {
     if (local) {
       return local;
     }
-    const fromVault = this.bridge.readThrough(SECRET_KEY);
-    if (fromVault) {
-      this.setKey(fromVault);
+    const raw = this.bridge.readThrough(SECRET_KEY);
+    if (!raw) {
+      return null;
     }
-    return fromVault;
+    const fromVault = parseVaulted(raw);
+    if (!fromVault) {
+      return null;
+    }
+    this.writeSecret(fromVault.secret);
+    if (!this.config() && fromVault.config) {
+      this.writeConfig(fromVault.config);
+    }
+    return fromVault.secret.key;
   }
 
   /** Forget the key here and remove the stored copy. */
@@ -382,8 +393,61 @@ export class CorsProxySettings implements ExpiringConnection {
 
   /** Push the current key to the vault and report what happened. */
   async syncToVault(): Promise<SyncOutcome> {
-    const key = this.secret()?.key;
-    return key ? this.bridge.writeThrough(SECRET_KEY, key) : { kind: 'skipped' };
+    const secret = this.secret();
+    return secret
+      ? this.bridge.writeThrough(SECRET_KEY, serializeVaulted(secret, this.config()))
+      : { kind: 'skipped' };
+  }
+
+  /** Restore missing proxy state in either direction without choosing between conflicts. */
+  async reconcileVault(): Promise<VaultReconcileOutcome> {
+    const localSecret = this.secret();
+    const localConfig = this.config();
+    const remoteRaw = this.bridge.readThrough(SECRET_KEY);
+    if (!remoteRaw) {
+      return localSecret ? storedOutcome(await this.syncToVault()) : { kind: 'skipped' };
+    }
+    const remote = parseVaulted(remoteRaw);
+    if (!remote) {
+      return { kind: 'failed', message: 'The encrypted CORS proxy record is unreadable.' };
+    }
+    const sameSecret =
+      !localSecret ||
+      (localSecret.key === remote.secret.key &&
+        (localSecret.customHeader ?? '') === (remote.secret.customHeader ?? ''));
+    if (!sameSecret) {
+      return {
+        kind: 'conflict',
+        message:
+          'The CORS proxy has different non-empty keys here and in Mawkingbird; neither copy was replaced.',
+      };
+    }
+
+    if (!localSecret) {
+      this.writeSecret(remote.secret);
+    }
+    if (!localConfig && remote.config) {
+      this.writeConfig(remote.config);
+    }
+
+    const nextVaultConfig = remote.config ?? localConfig;
+    const remoteChanged = remote.legacy || (!remote.config && nextVaultConfig !== null);
+    if (remoteChanged) {
+      const stored = await this.bridge.writeThrough(
+        SECRET_KEY,
+        serializeVaulted(remote.secret, nextVaultConfig),
+      );
+      if (stored.kind === 'failed') {
+        return stored;
+      }
+    }
+
+    if (!localSecret) {
+      return { kind: 'restored' };
+    }
+    return remoteChanged || (!localConfig && remote.config)
+      ? { kind: 'merged' }
+      : { kind: 'unchanged' };
   }
 
   /** {@link ExpiringConnection}: when the key ages out, or null. */
@@ -424,6 +488,48 @@ export class CorsProxySettings implements ExpiringConnection {
     }
     this.config.set(next);
   }
+
+  private writeSecret(next: StoredCorsProxyKey): void {
+    try {
+      localStorage.setItem(SECRET_KEY, JSON.stringify(next));
+    } catch {
+      // Storage full or blocked: honour the key for this session anyway.
+    }
+    this.secret.set(next);
+    this.needsFetch.set(false);
+  }
+}
+
+function parseVaulted(raw: string): (VaultedCorsProxySettings & { legacy: boolean }) | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<VaultedCorsProxySettings>;
+    if (parsed?.v === 1 && typeof parsed.secret?.key === 'string' && parsed.secret.key) {
+      const config = parsed.config && corsProxyEntry(parsed.config.id) ? parsed.config : null;
+      return {
+        v: 1,
+        secret: parsed.secret,
+        config,
+        legacy: false,
+      };
+    }
+    if (raw.trimStart().startsWith('{')) {
+      return null;
+    }
+  } catch {
+    if (raw.trimStart().startsWith('{')) {
+      return null;
+    }
+    // A legacy record is the raw key, so non-JSON is expected here.
+  }
+  return raw ? { v: 1, secret: stampCredential({ key: raw }), config: null, legacy: true } : null;
+}
+
+function serializeVaulted(
+  secret: StoredCorsProxyKey,
+  config: StoredCorsProxyConfig | null,
+): string {
+  const record: VaultedCorsProxySettings = { v: 1, secret, config };
+  return JSON.stringify(record);
 }
 
 function remove(key: string): void {

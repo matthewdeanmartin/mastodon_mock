@@ -1,4 +1,4 @@
-/** Import low-churn connector credentials already present in this browser. */
+/** Reconcile low-churn connector credentials between this browser and the open vault. */
 
 import { inject, Injectable } from '@angular/core';
 import { CorsProxySettings } from '../cors-proxy/cors-proxy-settings';
@@ -10,10 +10,13 @@ import { GistSettings } from '../paste/gist-settings';
 import { RaindropSession } from '../raindrop/raindrop-session';
 import { ShortenerSettings } from '../shortener/shortener-settings';
 import { TwitterSettings } from '../twitter/twitter-settings';
-import type { SyncOutcome } from './vault-bridge';
+import type { VaultReconcileOutcome } from './vault-reconcile';
 
 export interface VaultAdoptionResult {
+  restored: string[];
   stored: string[];
+  merged: string[];
+  conflicts: { connector: string; message: string }[];
   failed: { connector: string; message: string }[];
 }
 
@@ -34,28 +37,43 @@ export class VaultAdoption {
    * version. Parallel writes would manufacture conflicts between credentials
    * being imported by the same click.
    */
-  async adoptExisting(): Promise<VaultAdoptionResult> {
-    const sources: readonly [string, () => Promise<SyncOutcome>][] = [
-      ['OpenRouter', () => this.openRouter.syncToVault()],
-      ['CORS proxy', () => this.corsProxy.syncToVault()],
-      ['Link shorteners', () => this.shorteners.syncToVault()],
-      ['Raindrop', () => this.raindrop.syncToVault()],
-      ['Twitter', () => this.twitter.syncToVault()],
-      ['Mataroa', () => this.mataroa.syncToVault()],
-      ['Hugo', () => this.hugo.syncToVault()],
-      ['GitHub', () => this.github.syncToVault()],
-      ['GitHub Gist', () => this.gist.syncToVault()],
+  async reconcileExisting(): Promise<VaultAdoptionResult> {
+    const sources: readonly [string, () => Promise<VaultReconcileOutcome>][] = [
+      ['OpenRouter', () => this.openRouter.reconcileVault()],
+      ['CORS proxy', () => this.corsProxy.reconcileVault()],
+      ['Link shorteners', () => this.shorteners.reconcileVault()],
+      ['Raindrop', () => this.raindrop.reconcileVault()],
+      ['Twitter', () => this.twitter.reconcileVault()],
+      ['Mataroa', () => this.mataroa.reconcileVault()],
+      ['Hugo', () => this.hugo.reconcileVault()],
+      ['GitHub', () => this.github.reconcileVault()],
+      ['GitHub Gist', () => this.gist.reconcileVault()],
     ];
+    const restored: string[] = [];
     const stored: string[] = [];
+    const merged: string[] = [];
+    const conflicts: VaultAdoptionResult['conflicts'] = [];
     const failed: VaultAdoptionResult['failed'] = [];
 
     for (const [connector, sync] of sources) {
       try {
         const outcome = await sync();
-        if (outcome.kind === 'stored') {
-          stored.push(connector);
-        } else if (outcome.kind === 'failed') {
-          failed.push({ connector, message: outcome.message });
+        switch (outcome.kind) {
+          case 'restored':
+            restored.push(connector);
+            break;
+          case 'stored':
+            stored.push(connector);
+            break;
+          case 'merged':
+            merged.push(connector);
+            break;
+          case 'conflict':
+            conflicts.push({ connector, message: outcome.message });
+            break;
+          case 'failed':
+            failed.push({ connector, message: outcome.message });
+            break;
         }
       } catch (error) {
         failed.push({
@@ -64,6 +82,6 @@ export class VaultAdoption {
         });
       }
     }
-    return { stored, failed };
+    return { restored, stored, merged, conflicts, failed };
   }
 }

@@ -6,6 +6,7 @@ import {
   stampCredential,
 } from '../credential-lifetime';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { storedOutcome, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 import { TwitterSourceEntry, TwitterSourceId, twitterSourceEntry } from './twitter-source';
 
 /**
@@ -77,6 +78,13 @@ interface StoredTwitterKey extends ExpiringCredential {
 }
 
 type StoredKeys = Partial<Record<TwitterSourceId, StoredTwitterKey>>;
+
+/** The encrypted cross-device record. Reachability remains device-local. */
+interface VaultedTwitterSettings {
+  v: 1;
+  keys: StoredKeys;
+  active: TwitterSourceId | null;
+}
 
 /** Everything the transport needs to build a request. */
 export interface TwitterConfig {
@@ -184,11 +192,13 @@ export class TwitterSettings implements ExpiringConnection {
   /** Make a source the active one. Leaves every stored key in place. */
   activate(id: TwitterSourceId): void {
     this.writeConfig({ ...this.config(), active: id });
+    void this.syncToVault();
   }
 
   /** Stop using any source, keeping keys so switching back is cheap. */
   deactivate(): void {
     this.writeConfig({ ...this.config(), active: null });
+    void this.syncToVault();
   }
 
   /**
@@ -208,7 +218,7 @@ export class TwitterSettings implements ExpiringConnection {
     this.needsFetch.update((ids) => ids.filter((pending) => pending !== id));
     // Not awaited: pasting a key should feel instant. Failures are observable
     // via `syncToVault()`, which the settings page calls when the user opts in.
-    void this.bridge.writeThrough(SECRET_KEY, JSON.stringify(next));
+    void this.bridge.writeThrough(SECRET_KEY, serializeVaulted(next, this.activeId()));
   }
 
   /**
@@ -229,13 +239,13 @@ export class TwitterSettings implements ExpiringConnection {
     if (!fromVault) {
       return '';
     }
-    const remote = parseKeys(fromVault);
+    const remote = parseVaulted(fromVault);
     if (!remote) {
       return '';
     }
     // Merge rather than replace: a key added on this device seconds ago must not
     // be discarded by a stale remote map.
-    const merged = mergeKeys(this.keys(), remote);
+    const merged = mergeKeys(this.keys(), remote.keys);
     this.writeKeys(merged);
     this.needsFetch.set([]);
     return merged[id]?.key ?? '';
@@ -246,12 +256,12 @@ export class TwitterSettings implements ExpiringConnection {
     delete next[id];
     this.writeKeys(next);
     this.needsFetch.update((ids) => ids.filter((pending) => pending !== id));
+    if (this.config().active === id) {
+      this.writeConfig({ ...this.config(), active: null });
+    }
     // The stored copy follows the local one, or clearing a key here is undone by
     // the next sync from another device.
     void this.pushOrRemove(next);
-    if (this.config().active === id) {
-      this.deactivate();
-    }
   }
 
   /**
@@ -321,8 +331,71 @@ export class TwitterSettings implements ExpiringConnection {
   async syncToVault(): Promise<SyncOutcome> {
     const keys = this.keys();
     return Object.keys(keys).length
-      ? this.bridge.writeThrough(SECRET_KEY, JSON.stringify(keys))
+      ? this.bridge.writeThrough(SECRET_KEY, serializeVaulted(keys, this.activeId()))
       : { kind: 'skipped' };
+  }
+
+  /**
+   * Reconcile the whole provider-key map.
+   *
+   * Keys union per provider. An empty local provider choice adopts the remote
+   * one; two explicit choices remain different rather than one silently
+   * replacing the other. Old key-map-only vault records are upgraded here.
+   */
+  async reconcileVault(): Promise<VaultReconcileOutcome> {
+    const localKeys = this.keys();
+    const localActive = this.activeId();
+    const remoteRaw = this.bridge.readThrough(SECRET_KEY);
+    if (!remoteRaw) {
+      return Object.keys(localKeys).length
+        ? storedOutcome(await this.syncToVault())
+        : { kind: 'skipped' };
+    }
+    const remote = parseVaulted(remoteRaw);
+    if (!remote) {
+      return { kind: 'failed', message: 'The encrypted Twitter record is unreadable.' };
+    }
+    const keyConflicts = conflictingSources(localKeys, remote.keys);
+    if (keyConflicts.length > 0) {
+      return {
+        kind: 'conflict',
+        message: `Twitter has different non-empty keys for ${keyConflicts.join(', ')} here and in Mawkingbird; neither copy was replaced.`,
+      };
+    }
+
+    const mergedKeys = mergeKeys(localKeys, remote.keys);
+    const inferred = inferSingleSource(mergedKeys);
+    const nextLocalActive = localActive ?? remote.active ?? inferred;
+    const nextVaultActive = remote.active ?? localActive ?? inferred;
+    const localChanged =
+      JSON.stringify(mergedKeys) !== JSON.stringify(localKeys) || nextLocalActive !== localActive;
+
+    if (JSON.stringify(mergedKeys) !== JSON.stringify(localKeys)) {
+      this.writeKeys(mergedKeys);
+      this.needsFetch.set([]);
+    }
+    if (nextLocalActive !== localActive && nextLocalActive) {
+      this.writeConfig({ ...this.config(), active: nextLocalActive });
+    }
+
+    const remoteChanged =
+      remote.legacy ||
+      JSON.stringify(mergedKeys) !== JSON.stringify(remote.keys) ||
+      nextVaultActive !== remote.active;
+    if (remoteChanged) {
+      const stored = await this.bridge.writeThrough(
+        SECRET_KEY,
+        serializeVaulted(mergedKeys, nextVaultActive),
+      );
+      if (stored.kind === 'failed') {
+        return stored;
+      }
+    }
+
+    if (Object.keys(localKeys).length === 0 && Object.keys(mergedKeys).length > 0) {
+      return { kind: 'restored' };
+    }
+    return localChanged || remoteChanged ? { kind: 'merged' } : { kind: 'unchanged' };
   }
 
   /**
@@ -334,7 +407,7 @@ export class TwitterSettings implements ExpiringConnection {
    */
   private pushOrRemove(next: StoredKeys): Promise<SyncOutcome> {
     return Object.keys(next).length
-      ? this.bridge.writeThrough(SECRET_KEY, JSON.stringify(next))
+      ? this.bridge.writeThrough(SECRET_KEY, serializeVaulted(next, this.activeId()))
       : this.bridge.removeThrough(SECRET_KEY);
   }
 
@@ -415,6 +488,49 @@ function parseKeys(raw: string): StoredKeys | null {
   } catch {
     return null;
   }
+}
+
+function parseVaulted(raw: string): (VaultedTwitterSettings & { legacy: boolean }) | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<VaultedTwitterSettings>;
+    if (parsed?.v === 1 && parsed.keys && typeof parsed.keys === 'object') {
+      const keys = parseKeys(JSON.stringify(parsed.keys));
+      if (!keys) {
+        return null;
+      }
+      const active = twitterSourceEntry(parsed.active as TwitterSourceId)
+        ? (parsed.active as TwitterSourceId)
+        : null;
+      return { v: 1, keys, active, legacy: false };
+    }
+    if (raw.trimStart().startsWith('{') && 'v' in parsed) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  const keys = parseKeys(raw);
+  return keys ? { v: 1, keys, active: null, legacy: true } : null;
+}
+
+function serializeVaulted(keys: StoredKeys, active: TwitterSourceId | null): string {
+  const record: VaultedTwitterSettings = {
+    v: 1,
+    keys,
+    active: active && keys[active] ? active : null,
+  };
+  return JSON.stringify(record);
+}
+
+function inferSingleSource(keys: StoredKeys): TwitterSourceId | null {
+  const ids = Object.keys(keys) as TwitterSourceId[];
+  return ids.length === 1 ? ids[0] : null;
+}
+
+function conflictingSources(mine: StoredKeys, theirs: StoredKeys): TwitterSourceId[] {
+  return (Object.keys(mine) as TwitterSourceId[]).filter(
+    (id) => mine[id]?.key && theirs[id]?.key && mine[id]?.key !== theirs[id]?.key,
+  );
 }
 
 /**

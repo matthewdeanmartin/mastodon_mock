@@ -6,6 +6,7 @@ import {
   stampCredential,
 } from '../credential-lifetime';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { storedOutcome, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 import { ShortenerCatalogEntry, shortenerEntry } from './shortener-catalog';
 import { ShortenerId } from './shortener-provider';
 
@@ -77,6 +78,14 @@ interface StoredShortenerKey extends ExpiringCredential {
 }
 
 type StoredKeys = Partial<Record<ShortenerId, StoredShortenerKey>>;
+
+/** The encrypted cross-device record required to make a restored key usable. */
+interface VaultedShortenerSettings {
+  v: 1;
+  keys: StoredKeys;
+  active: ShortenerId | null;
+  domains: Partial<Record<ShortenerId, string>>;
+}
 
 /** Everything an adapter needs to build a request. */
 export interface ShortenerConfig {
@@ -196,16 +205,19 @@ export class ShortenerSettings implements ExpiringConnection {
   /** Make a provider the active one. Leaves every stored key in place. */
   activate(id: ShortenerId): void {
     this.writeConfig({ ...this.config(), active: id });
+    void this.syncToVault();
   }
 
   /** Stop using any shortener, keeping keys so switching back is cheap. */
   deactivate(): void {
     this.writeConfig({ ...this.config(), active: null });
+    void this.syncToVault();
   }
 
   setDomain(id: ShortenerId, domain: string): void {
     const domains = { ...this.config().domains, [id]: domain.trim() };
     this.writeConfig({ ...this.config(), domains });
+    void this.syncToVault();
   }
 
   /**
@@ -225,7 +237,10 @@ export class ShortenerSettings implements ExpiringConnection {
     this.needsFetch.update((ids) => ids.filter((pending) => pending !== id));
     // Not awaited: pasting a key should feel instant. Failures are observable
     // via `syncToVault()`, which the settings page calls when the user opts in.
-    void this.bridge.writeThrough(SECRET_KEY, JSON.stringify(next));
+    void this.bridge.writeThrough(
+      SECRET_KEY,
+      serializeVaulted(next, this.activeId(), this.config().domains ?? {}),
+    );
   }
 
   /**
@@ -248,13 +263,13 @@ export class ShortenerSettings implements ExpiringConnection {
     if (!fromVault) {
       return '';
     }
-    const remote = parseKeys(fromVault);
+    const remote = parseVaulted(fromVault);
     if (!remote) {
       return '';
     }
     // Merge rather than replace: a key added on this device seconds ago must not
     // be discarded by a stale remote map.
-    const merged = mergeKeys(this.keys(), remote);
+    const merged = mergeKeys(this.keys(), remote.keys);
     this.writeKeys(merged);
     this.needsFetch.set([]);
     return merged[id]?.key ?? '';
@@ -265,12 +280,12 @@ export class ShortenerSettings implements ExpiringConnection {
     delete next[id];
     this.writeKeys(next);
     this.needsFetch.update((ids) => ids.filter((pending) => pending !== id));
+    if (this.config().active === id) {
+      this.writeConfig({ ...this.config(), active: null });
+    }
     // The stored copy follows the local one. Otherwise clearing a key here is
     // undone by the next sync from another device.
     void this.pushOrRemove(next);
-    if (this.config().active === id) {
-      this.deactivate();
-    }
   }
 
   /** Forget a provider entirely: its key and its domain. */
@@ -337,8 +352,78 @@ export class ShortenerSettings implements ExpiringConnection {
   async syncToVault(): Promise<SyncOutcome> {
     const keys = this.keys();
     return Object.keys(keys).length
-      ? this.bridge.writeThrough(SECRET_KEY, JSON.stringify(keys))
+      ? this.bridge.writeThrough(
+          SECRET_KEY,
+          serializeVaulted(keys, this.activeId(), this.config().domains ?? {}),
+        )
       : { kind: 'skipped' };
+  }
+
+  /** Reconcile provider keys plus the non-secret choice/domain needed to use them. */
+  async reconcileVault(): Promise<VaultReconcileOutcome> {
+    const localKeys = this.keys();
+    const localConfig = this.config();
+    const remoteRaw = this.bridge.readThrough(SECRET_KEY);
+    if (!remoteRaw) {
+      return Object.keys(localKeys).length
+        ? storedOutcome(await this.syncToVault())
+        : { kind: 'skipped' };
+    }
+    const remote = parseVaulted(remoteRaw);
+    if (!remote) {
+      return { kind: 'failed', message: 'The encrypted link-shortener record is unreadable.' };
+    }
+    const keyConflicts = conflictingProviders(localKeys, remote.keys);
+    if (keyConflicts.length > 0) {
+      return {
+        kind: 'conflict',
+        message: `Link shorteners have different non-empty keys for ${keyConflicts.join(', ')} here and in Mawkingbird; neither copy was replaced.`,
+      };
+    }
+
+    const mergedKeys = mergeKeys(localKeys, remote.keys);
+    const inferred = inferSingleProvider(mergedKeys);
+    const nextLocalActive = localConfig.active ?? remote.active ?? inferred;
+    const nextVaultActive = remote.active ?? localConfig.active ?? inferred;
+    // Remote fills missing local domains; an explicit local value remains local.
+    const nextLocalDomains = { ...remote.domains, ...localConfig.domains };
+    // Local fills missing remote domains; an explicit remote value remains remote.
+    const nextVaultDomains = { ...localConfig.domains, ...remote.domains };
+    const localChanged =
+      JSON.stringify(mergedKeys) !== JSON.stringify(localKeys) ||
+      nextLocalActive !== localConfig.active ||
+      JSON.stringify(nextLocalDomains) !== JSON.stringify(localConfig.domains ?? {});
+
+    if (JSON.stringify(mergedKeys) !== JSON.stringify(localKeys)) {
+      this.writeKeys(mergedKeys);
+      this.needsFetch.set([]);
+    }
+    if (
+      nextLocalActive !== localConfig.active ||
+      JSON.stringify(nextLocalDomains) !== JSON.stringify(localConfig.domains ?? {})
+    ) {
+      this.writeConfig({ active: nextLocalActive, domains: nextLocalDomains });
+    }
+
+    const remoteChanged =
+      remote.legacy ||
+      JSON.stringify(mergedKeys) !== JSON.stringify(remote.keys) ||
+      nextVaultActive !== remote.active ||
+      JSON.stringify(nextVaultDomains) !== JSON.stringify(remote.domains);
+    if (remoteChanged) {
+      const stored = await this.bridge.writeThrough(
+        SECRET_KEY,
+        serializeVaulted(mergedKeys, nextVaultActive, nextVaultDomains),
+      );
+      if (stored.kind === 'failed') {
+        return stored;
+      }
+    }
+
+    if (Object.keys(localKeys).length === 0 && Object.keys(mergedKeys).length > 0) {
+      return { kind: 'restored' };
+    }
+    return localChanged || remoteChanged ? { kind: 'merged' } : { kind: 'unchanged' };
   }
 
   /**
@@ -350,7 +435,10 @@ export class ShortenerSettings implements ExpiringConnection {
    */
   private pushOrRemove(next: StoredKeys): Promise<SyncOutcome> {
     return Object.keys(next).length
-      ? this.bridge.writeThrough(SECRET_KEY, JSON.stringify(next))
+      ? this.bridge.writeThrough(
+          SECRET_KEY,
+          serializeVaulted(next, this.activeId(), this.config().domains ?? {}),
+        )
       : this.bridge.removeThrough(SECRET_KEY);
   }
 
@@ -433,6 +521,55 @@ function parseKeys(raw: string): StoredKeys | null {
   } catch {
     return null;
   }
+}
+
+function parseVaulted(raw: string): (VaultedShortenerSettings & { legacy: boolean }) | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<VaultedShortenerSettings>;
+    if (parsed?.v === 1 && parsed.keys && typeof parsed.keys === 'object') {
+      const keys = parseKeys(JSON.stringify(parsed.keys));
+      if (!keys) {
+        return null;
+      }
+      const active = shortenerEntry(parsed.active as ShortenerId)
+        ? (parsed.active as ShortenerId)
+        : null;
+      const domains = parsed.domains && typeof parsed.domains === 'object' ? parsed.domains : {};
+      return { v: 1, keys, active, domains, legacy: false };
+    }
+    if (raw.trimStart().startsWith('{') && 'v' in parsed) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  const keys = parseKeys(raw);
+  return keys ? { v: 1, keys, active: null, domains: {}, legacy: true } : null;
+}
+
+function serializeVaulted(
+  keys: StoredKeys,
+  active: ShortenerId | null,
+  domains: Partial<Record<ShortenerId, string>>,
+): string {
+  const record: VaultedShortenerSettings = {
+    v: 1,
+    keys,
+    active: active && keys[active] ? active : null,
+    domains,
+  };
+  return JSON.stringify(record);
+}
+
+function inferSingleProvider(keys: StoredKeys): ShortenerId | null {
+  const ids = Object.keys(keys) as ShortenerId[];
+  return ids.length === 1 ? ids[0] : null;
+}
+
+function conflictingProviders(mine: StoredKeys, theirs: StoredKeys): ShortenerId[] {
+  return (Object.keys(mine) as ShortenerId[]).filter(
+    (id) => mine[id]?.key && theirs[id]?.key && mine[id]?.key !== theirs[id]?.key,
+  );
 }
 
 /**

@@ -25,6 +25,7 @@ import { ProfileAccountKey } from '../../../providers/account/profile-account-ke
 import { VAULTED_KEYS } from '../../../providers/vault/vault-manifest';
 import { VaultPreference } from '../../../providers/vault/vault-preference';
 import { VaultService } from '../../../providers/vault/vault-service';
+import { VaultAdoption } from '../../../providers/vault/vault-adoption';
 import {
   CONNECTION_CATALOG,
   CONNECTION_FLAGS,
@@ -91,6 +92,7 @@ export class SettingsConnections implements OnInit {
   private vault = inject(VaultService);
   private vaultPreference = inject(VaultPreference);
   private accountKey = inject(ProfileAccountKey);
+  private vaultReconciliation = inject(VaultAdoption);
 
   protected readonly lifetimeOptions = CREDENTIAL_LIFETIME_OPTIONS;
   protected readonly scopeCopy = CONNECTION_SCOPE_COPY;
@@ -246,13 +248,23 @@ export class SettingsConnections implements OnInit {
     connected: boolean,
   ): CredentialLocation | null {
     const needsFetch = this.needsVaultFetch(entry);
+    const vaultable = VAULTED_KEYS.some((key) => key.connector === entry.id);
+    if (
+      vaultable &&
+      this.vaultPreference.available &&
+      this.vault.unlocked() &&
+      this.vault.hasConnector(entry.id, this.accountKey.current()) &&
+      !connected &&
+      !needsFetch
+    ) {
+      return 'available';
+    }
     if (!connected && !needsFetch) {
       return null;
     }
     if (!this.usesCredential(entry)) {
       return 'none';
     }
-    const vaultable = VAULTED_KEYS.some((key) => key.connector === entry.id);
     if (!vaultable || !this.vaultPreference.available) {
       return 'local';
     }
@@ -337,6 +349,9 @@ export class SettingsConnections implements OnInit {
     this.lifetimes.enforceAll();
     if (this.vaultPreference.enabled()) {
       await this.vault.refresh();
+      if (this.vault.unlocked()) {
+        await this.vaultReconciliation.reconcileExisting();
+      }
     }
   }
 

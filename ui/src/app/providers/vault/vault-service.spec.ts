@@ -180,6 +180,33 @@ describe('reading and writing', () => {
     expect(service.read('mockingbird_openrouter_key')).toBe('sk-1');
   });
 
+  it('applies adjacent writes to one connector in call order', async () => {
+    const client = TestBed.inject(VaultClient);
+    const store = client.store.bind(client);
+    let releaseFirst: (() => void) | null = null;
+    let calls = 0;
+    client.store = async (...args) => {
+      calls++;
+      if (calls === 1) {
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        });
+      }
+      return store(...args);
+    };
+
+    const first = service.write('mockingbird_twitter_keys', 'key without final provider');
+    await vi.waitFor(() => expect(releaseFirst).not.toBeNull());
+    const second = service.write('mockingbird_twitter_keys', 'key plus final provider');
+    releaseFirst!();
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { ok: true, overwritten: [] },
+      { ok: true, overwritten: [] },
+    ]);
+    expect(service.read('mockingbird_twitter_keys')).toBe('key plus final provider');
+  });
+
   it('keeps personas apart', async () => {
     await service.write('mockingbird_hugo_credentials', 'A', 'mastodon:a/alice');
     await service.write('mockingbird_hugo_credentials', 'B', 'mastodon:b/bob');

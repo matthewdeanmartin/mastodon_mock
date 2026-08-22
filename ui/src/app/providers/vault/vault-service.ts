@@ -143,6 +143,8 @@ export class VaultService {
   private salt: string | null = null;
   private kdf: KdfParams = CURRENT_KDF;
   private version: number | null = null;
+  /** Keep adjacent connector writes in user-action order within this browser. */
+  private mutationTail: Promise<void> = Promise.resolve();
 
   /**
    * Bring the vault up to date without asking for a passphrase.
@@ -405,7 +407,17 @@ export class VaultService {
     return true;
   }
 
-  private async mutate(
+  private mutate(change: (bundle: ConnectionBundle) => ConnectionBundle): Promise<WriteOutcome> {
+    const result = this.mutationTail.then(() => this.performMutation(change));
+    // A refused write must not poison every later mutation in this browser.
+    this.mutationTail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private async performMutation(
     change: (bundle: ConnectionBundle) => ConnectionBundle,
   ): Promise<WriteOutcome> {
     const current = this.bundle();

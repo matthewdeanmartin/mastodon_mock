@@ -13,7 +13,8 @@ import {
   ExpiringCredential,
   stampCredential,
 } from '../credential-lifetime';
-import { VaultBridge } from '../vault/vault-bridge';
+import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { reconcileScalar, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 
 /**
  * A browser-only OpenRouter OAuth/PKCE session.
@@ -96,7 +97,7 @@ export class OpenRouterSession implements ExpiringConnection {
     if (fromVault) {
       // Repopulate, so the next call is local again and the retention clock
       // restarts from this use rather than from the original connection.
-      this.store(stampCredential({ key: fromVault }));
+      this.store(stampCredential({ key: fromVault }), false);
       this.needsFetch.set(false);
     }
     return fromVault;
@@ -228,7 +229,7 @@ export class OpenRouterSession implements ExpiringConnection {
    * because a silently swallowed failure is the bug where someone believes their
    * key synced and finds nothing on their phone a week later.
    */
-  private store(value: StoredOpenRouterKey): void {
+  private store(value: StoredOpenRouterKey, sync = true): void {
     try {
       localStorage.setItem(KEY_KEY, JSON.stringify(value));
     } catch {
@@ -237,7 +238,9 @@ export class OpenRouterSession implements ExpiringConnection {
     this.stored.set(value);
     this.connected.set(true);
     this.needsFetch.set(false);
-    void this.bridge.writeThrough(KEY_KEY, value.key);
+    if (sync) {
+      void this.bridge.writeThrough(KEY_KEY, value.key);
+    }
   }
 
   /**
@@ -246,9 +249,27 @@ export class OpenRouterSession implements ExpiringConnection {
    * For the settings page, which offers "store this key with Mawkingbird" as an
    * explicit per-connector act rather than a global switch.
    */
-  async syncToVault(): Promise<import('../vault/vault-bridge').SyncOutcome> {
+  async syncToVault(): Promise<SyncOutcome> {
     const key = this.stored()?.key;
     return key ? this.bridge.writeThrough(KEY_KEY, key) : { kind: 'skipped' };
+  }
+
+  /** Fill an empty browser from the vault, or an empty vault from this browser. */
+  reconcileVault(): Promise<VaultReconcileOutcome> {
+    return reconcileScalar({
+      local: this.stored()?.key ?? null,
+      remote: this.bridge.readThrough(KEY_KEY),
+      restore: (key) => {
+        if (!key) {
+          return false;
+        }
+        this.store(stampCredential({ key }), false);
+        return true;
+      },
+      store: () => this.syncToVault(),
+      conflictMessage:
+        'OpenRouter has different non-empty keys here and in Mawkingbird; neither copy was replaced.',
+    });
   }
 
   private clearPendingAuthorization(): void {

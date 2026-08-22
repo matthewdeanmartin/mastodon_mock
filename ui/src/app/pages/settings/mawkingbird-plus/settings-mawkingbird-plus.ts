@@ -296,6 +296,9 @@ export class SettingsMawkingbirdPlus implements OnInit {
         this.vaultPreference.enabled()
       ) {
         await this.refreshVault();
+        if (this.vault.unlocked()) {
+          await this.syncExistingVaultKeys();
+        }
       }
     }
   }
@@ -386,9 +389,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
       const opened = await this.vault.unlock(this.vaultPassphrase());
       if (opened) {
         this.vaultPassphrase.set('');
-        this.vaultMessage.set(
-          `Unlocked ${this.vault.count()} stored connection credential(s) on this browser.`,
-        );
+        await this.syncExistingVaultKeys();
       } else {
         this.vaultMessage.set(this.vault.notice() ?? 'That passphrase did not open the vault.');
       }
@@ -402,7 +403,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
     this.vaultMessage.set('Locked on this browser. The encrypted copy remains stored.');
   }
 
-  /** Import the low-churn credentials represented by the explicit vault allowlist. */
+  /** Reconcile low-churn credentials in both directions, with empty losing to present. */
   protected async syncExistingVaultKeys(): Promise<void> {
     if (!this.vault.unlocked() || !this.vaultPreference.enabled()) {
       this.vaultMessage.set('Unlock stored connections before syncing keys from this browser.');
@@ -410,12 +411,23 @@ export class SettingsMawkingbirdPlus implements OnInit {
     }
     this.vaultBusy.set(true);
     try {
-      const result = await this.injector.get(VaultAdoption).adoptExisting();
-      const messages: string[] = [];
+      const result = await this.injector.get(VaultAdoption).reconcileExisting();
+      const messages: string[] = [`Opened ${this.vault.count()} stored connection credential(s).`];
+      if (result.restored.length > 0) {
+        messages.push(`Restored to this browser: ${result.restored.join(', ')}.`);
+      }
       if (result.stored.length > 0) {
         messages.push(`Stored from this browser: ${result.stored.join(', ')}.`);
-      } else {
-        messages.push('No additional eligible connection keys were found in this browser.');
+      }
+      if (result.merged.length > 0) {
+        messages.push(`Safely merged missing data for: ${result.merged.join(', ')}.`);
+      }
+      if (result.conflicts.length > 0) {
+        messages.push(
+          `Left conflicting non-empty copies unchanged for ${result.conflicts
+            .map((failure) => failure.connector)
+            .join(', ')}.`,
+        );
       }
       if (result.failed.length > 0) {
         messages.push(
@@ -423,6 +435,15 @@ export class SettingsMawkingbirdPlus implements OnInit {
             .map((failure) => failure.message)
             .join(' ')}`,
         );
+      }
+      if (
+        result.restored.length === 0 &&
+        result.stored.length === 0 &&
+        result.merged.length === 0 &&
+        result.conflicts.length === 0 &&
+        result.failed.length === 0
+      ) {
+        messages.push('This browser and the encrypted copy are already reconciled.');
       }
       this.vaultMessage.set(messages.join(' '));
     } finally {

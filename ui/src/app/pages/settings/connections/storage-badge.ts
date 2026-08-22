@@ -37,6 +37,8 @@ export type CredentialLocation =
   | 'vaulted'
   /** Encrypted with Mawkingbird, but not in this browser right now. */
   | 'locked'
+  /** Encrypted with Mawkingbird and ready to restore into this otherwise-empty browser. */
+  | 'available'
   /** The vault is closed or unavailable, so its encrypted inventory cannot be inspected. */
   | 'unknown';
 
@@ -71,6 +73,8 @@ export class StorageBadge {
       case 'locked':
         // Not "disconnected", and not "missing". The connection is live.
         return 'Stored with Mawkingbird — locked here';
+      case 'available':
+        return 'Available from Mawkingbird';
       case 'unknown':
         return 'Unlock Plus to check';
       case 'none':
@@ -92,6 +96,8 @@ export class StorageBadge {
           'The stored copy is still there; this browser just does not have it right now. ' +
           'Unlock your vault and it comes back — you do not need to reconnect.'
         );
+      case 'available':
+        return 'An encrypted credential exists for this connector and can fill this browser without replacing local data.';
       case 'unknown':
         return 'The encrypted vault is not open, so this browser cannot honestly say whether this connector is in it.';
       case 'none':

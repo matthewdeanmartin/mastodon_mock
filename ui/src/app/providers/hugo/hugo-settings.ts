@@ -2,6 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
 import { ProfileAccountKey } from '../account/profile-account-key';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { storedOutcome, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 import {
   credentialExpiresAt,
   ensureStamped,
@@ -28,12 +29,11 @@ import { normalizeContentPath, predictedPermalink } from './hugo-post';
  *
  * ## What the vault stores
  *
- * The **token only**. The repo coordinates already travel in the ordinary
- * settings document, which is the right store for them: they are not a secret,
- * and duplicating them into the vault would mean two places to disagree about
- * which branch a blog builds from. That split is also why local expiry here has
- * always dropped the token and kept the repo — the vault inherits that shape
- * rather than changing it.
+ * The token and repo coordinates travel together inside the encrypted record.
+ * Ordinary settings sync carries global preferences only; this repo is
+ * account-scoped private data, so a fresh phone otherwise receives a token it
+ * cannot use. Reconciliation fills a missing repo but never replaces two
+ * explicit, different repos.
  */
 const REPO_KEY_BASE = 'mockingbird_hugo_repo';
 const CREDENTIALS_KEY_BASE = 'mockingbird_hugo_credentials';
@@ -83,6 +83,12 @@ export interface HugoRepo {
 
 interface StoredCredentials extends ExpiringCredential {
   accessToken: string;
+}
+
+interface VaultedHugoSettings {
+  v: 1;
+  credentials: StoredCredentials;
+  repo: HugoRepo | null;
 }
 
 function loadRepo(key: string): HugoRepo | null {
@@ -225,13 +231,15 @@ export class HugoSettings implements ExpiringConnection {
     if (local) {
       return local;
     }
-    const fromVault = this.bridge.readThrough(CREDENTIALS_KEY_BASE, this.accountKey.current());
+    const raw = this.bridge.readThrough(CREDENTIALS_KEY_BASE, this.accountKey.current());
+    const fromVault = raw ? parseVaulted(raw) : null;
     if (fromVault) {
-      // Repopulate, so the next call is local and the retention clock restarts
-      // from this use rather than from the original connection.
-      this.writeCredentials(stampCredential({ accessToken: fromVault }));
+      this.writeCredentials(fromVault.credentials);
+      if (!this.repoState() && fromVault.repo) {
+        this.writeRepo(fromVault.repo);
+      }
     }
-    return fromVault;
+    return fromVault?.credentials.accessToken ?? null;
   }
 
   /**
@@ -258,12 +266,16 @@ export class HugoSettings implements ExpiringConnection {
       throw new Error('Paste a GitHub token with write access to your blog repository.');
     }
     const normalized: HugoRepo = { ...repo, contentPath: normalizeContentPath(repo.contentPath) };
-    localStorage.setItem(this.repoKey, JSON.stringify(normalized));
-    this.repoState.set(normalized);
-    this.writeCredentials(stampCredential({ accessToken: trimmed }));
+    this.writeRepo(normalized);
+    const credentials = stampCredential({ accessToken: trimmed });
+    this.writeCredentials(credentials);
     // Not awaited: connecting should feel instant. Failures are observable via
     // `syncToVault()`, which the settings page calls when the user opts in.
-    void this.bridge.writeThrough(CREDENTIALS_KEY_BASE, trimmed, this.accountKey.current());
+    void this.bridge.writeThrough(
+      CREDENTIALS_KEY_BASE,
+      serializeVaulted(credentials, normalized),
+      this.accountKey.current(),
+    );
   }
 
   /** Persist the token locally and clear the locked flag. */
@@ -273,12 +285,69 @@ export class HugoSettings implements ExpiringConnection {
     this.needsFetch.set(false);
   }
 
+  private writeRepo(repo: HugoRepo): void {
+    localStorage.setItem(this.repoKey, JSON.stringify(repo));
+    this.repoState.set(repo);
+  }
+
   /** Push the current token to the vault and report what happened. */
   async syncToVault(): Promise<SyncOutcome> {
-    const token = this.credentials()?.accessToken;
-    return token
-      ? this.bridge.writeThrough(CREDENTIALS_KEY_BASE, token, this.accountKey.current())
+    const credentials = this.credentials();
+    return credentials
+      ? this.bridge.writeThrough(
+          CREDENTIALS_KEY_BASE,
+          serializeVaulted(credentials, this.repoState()),
+          this.accountKey.current(),
+        )
       : { kind: 'skipped' };
+  }
+
+  /** Restore missing token/repo halves in either direction without clobbering conflicts. */
+  async reconcileVault(): Promise<VaultReconcileOutcome> {
+    const localCredentials = this.credentials();
+    const localRepo = this.repoState();
+    const remoteRaw = this.bridge.readThrough(CREDENTIALS_KEY_BASE, this.accountKey.current());
+    if (!remoteRaw) {
+      return localCredentials ? storedOutcome(await this.syncToVault()) : { kind: 'skipped' };
+    }
+    const remote = parseVaulted(remoteRaw);
+    if (!remote) {
+      return { kind: 'failed', message: 'The encrypted Hugo record is unreadable.' };
+    }
+    if (localCredentials && localCredentials.accessToken !== remote.credentials.accessToken) {
+      return {
+        kind: 'conflict',
+        message:
+          'Hugo has different non-empty tokens here and in Mawkingbird; neither copy was replaced.',
+      };
+    }
+
+    if (!localCredentials) {
+      this.writeCredentials(remote.credentials);
+    }
+    if (!localRepo && remote.repo) {
+      this.writeRepo(remote.repo);
+    }
+
+    const nextVaultRepo = remote.repo ?? localRepo;
+    const remoteChanged = remote.legacy || (!remote.repo && nextVaultRepo !== null);
+    if (remoteChanged) {
+      const stored = await this.bridge.writeThrough(
+        CREDENTIALS_KEY_BASE,
+        serializeVaulted(remote.credentials, nextVaultRepo),
+        this.accountKey.current(),
+      );
+      if (stored.kind === 'failed') {
+        return stored;
+      }
+    }
+
+    if (!localCredentials) {
+      return { kind: 'restored' };
+    }
+    return remoteChanged || (!localRepo && remote.repo)
+      ? { kind: 'merged' }
+      : { kind: 'unchanged' };
   }
 
   setIncludeInProfile(include: boolean): void {
@@ -289,6 +358,7 @@ export class HugoSettings implements ExpiringConnection {
     const next = { ...current, includeInProfile: include };
     localStorage.setItem(this.repoKey, JSON.stringify(next));
     this.repoState.set(next);
+    void this.syncToVault();
   }
 
   setPosse(enabled: boolean): void {
@@ -299,6 +369,7 @@ export class HugoSettings implements ExpiringConnection {
     const next = { ...current, posse: enabled };
     localStorage.setItem(this.repoKey, JSON.stringify(next));
     this.repoState.set(next);
+    void this.syncToVault();
   }
 
   /** Remember the feed URL a probe actually found on this site. */
@@ -310,6 +381,7 @@ export class HugoSettings implements ExpiringConnection {
     const next = { ...current, feedUrl: url };
     localStorage.setItem(this.repoKey, JSON.stringify(next));
     this.repoState.set(next);
+    void this.syncToVault();
   }
 
   /** Disconnect here, and remove the stored copy so it cannot come back. */
@@ -351,6 +423,68 @@ export class HugoSettings implements ExpiringConnection {
     this.forgetTokenLocally();
     this.needsFetch.set(verdict.kind === 'lock');
   }
+}
+
+function parseVaulted(raw: string): (VaultedHugoSettings & { legacy: boolean }) | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<VaultedHugoSettings>;
+    if (
+      parsed?.v === 1 &&
+      typeof parsed.credentials?.accessToken === 'string' &&
+      parsed.credentials.accessToken
+    ) {
+      return {
+        v: 1,
+        credentials: parsed.credentials,
+        repo: normalizeVaultedRepo(parsed.repo),
+        legacy: false,
+      };
+    }
+    if (raw.trimStart().startsWith('{')) {
+      return null;
+    }
+  } catch {
+    // Legacy records are raw GitHub tokens, so non-JSON is expected.
+  }
+  return raw
+    ? {
+        v: 1,
+        credentials: stampCredential({ accessToken: raw }),
+        repo: null,
+        legacy: true,
+      }
+    : null;
+}
+
+function serializeVaulted(credentials: StoredCredentials, repo: HugoRepo | null): string {
+  const record: VaultedHugoSettings = { v: 1, credentials, repo };
+  return JSON.stringify(record);
+}
+
+function normalizeVaultedRepo(value: unknown): HugoRepo | null {
+  const repo = value as Partial<HugoRepo> | null;
+  if (
+    !repo ||
+    typeof repo.owner !== 'string' ||
+    !repo.owner ||
+    typeof repo.repo !== 'string' ||
+    !repo.repo
+  ) {
+    return null;
+  }
+  return {
+    owner: repo.owner,
+    repo: repo.repo,
+    branch: typeof repo.branch === 'string' && repo.branch ? repo.branch : 'main',
+    contentPath:
+      typeof repo.contentPath === 'string' && repo.contentPath
+        ? normalizeContentPath(repo.contentPath)
+        : DEFAULT_CONTENT_PATH,
+    siteUrl: typeof repo.siteUrl === 'string' && repo.siteUrl ? repo.siteUrl : null,
+    feedUrl: typeof repo.feedUrl === 'string' && repo.feedUrl ? repo.feedUrl : null,
+    includeInProfile: repo.includeInProfile === true,
+    posse: repo.posse === true,
+  };
 }
 
 /**

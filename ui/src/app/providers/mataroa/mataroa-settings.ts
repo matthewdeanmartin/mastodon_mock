@@ -2,6 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
 import { ProfileAccountKey } from '../account/profile-account-key';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { reconcileScalar, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 import {
   credentialExpiresAt,
   ensureStamped,
@@ -139,6 +140,28 @@ export class MataroaSettings implements ExpiringConnection {
           this.accountKey.current(),
         )
       : { kind: 'skipped' };
+  }
+
+  /** Reconcile the self-contained blog record without replacing two non-empty copies. */
+  reconcileVault(): Promise<VaultReconcileOutcome> {
+    const current = this.connection();
+    return reconcileScalar({
+      local: current ? JSON.stringify(current) : null,
+      remote: this.bridge.readThrough(STORAGE_KEY_BASE, this.accountKey.current()),
+      restore: (raw) => {
+        const parsed = parseConnection(raw);
+        if (!parsed) {
+          return false;
+        }
+        localStorage.setItem(this.storageKey, JSON.stringify(parsed));
+        this.connection.set(parsed);
+        this.needsFetch.set(false);
+        return true;
+      },
+      store: () => this.syncToVault(),
+      conflictMessage:
+        'Mataroa has different non-empty connections here and in Mawkingbird; neither copy was replaced.',
+    });
   }
 
   expiresAt(): number | null {

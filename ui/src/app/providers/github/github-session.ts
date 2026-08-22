@@ -2,6 +2,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
 import { ProfileAccountKey } from '../account/profile-account-key';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { reconcileScalar, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 import {
   credentialExpiresAt,
   ensureStamped,
@@ -216,6 +217,26 @@ export class GitHubSession implements ExpiringConnection {
           this.accountKey.current(),
         )
       : { kind: 'skipped' };
+  }
+
+  /** Reconcile the token-plus-profile record without silently choosing a conflict winner. */
+  reconcileVault(): Promise<VaultReconcileOutcome> {
+    const current = this.token();
+    return reconcileScalar({
+      local: current ? serialize(current.accessToken, current.user) : null,
+      remote: this.bridge.readThrough(CREDENTIALS_KEY_BASE, this.accountKey.current()),
+      restore: (raw) => {
+        const parsed = parseVaulted(raw);
+        if (!parsed) {
+          return false;
+        }
+        this.persist(stampCredential({ accessToken: parsed.accessToken }), parsed.user);
+        return true;
+      },
+      store: () => this.syncToVault(),
+      conflictMessage:
+        'GitHub has different non-empty credentials here and in Mawkingbird; neither copy was replaced.',
+    });
   }
 
   /** When this token ages out under the retention policy, or null. */

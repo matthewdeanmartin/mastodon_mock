@@ -13,15 +13,10 @@ import { VaultAdoption } from './vault-adoption';
 
 describe('VaultAdoption', () => {
   const order: string[] = [];
-  const stored = (name: string) =>
+  const outcome = (name: string, kind: 'stored' | 'restored' | 'merged' | 'skipped') =>
     vi.fn(async () => {
       order.push(name);
-      return { kind: 'stored' as const, overwritten: [] };
-    });
-  const skipped = (name: string) =>
-    vi.fn(async () => {
-      order.push(name);
-      return { kind: 'skipped' as const };
+      return { kind };
     });
 
   beforeEach(() => {
@@ -29,16 +24,25 @@ describe('VaultAdoption', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
-        { provide: OpenRouterSession, useValue: { syncToVault: stored('OpenRouter') } },
-        { provide: CorsProxySettings, useValue: { syncToVault: skipped('CORS proxy') } },
-        { provide: ShortenerSettings, useValue: { syncToVault: stored('Link shorteners') } },
-        { provide: RaindropSession, useValue: { syncToVault: skipped('Raindrop') } },
-        { provide: TwitterSettings, useValue: { syncToVault: skipped('Twitter') } },
-        { provide: MataroaSettings, useValue: { syncToVault: stored('Mataroa') } },
+        {
+          provide: OpenRouterSession,
+          useValue: { reconcileVault: outcome('OpenRouter', 'restored') },
+        },
+        {
+          provide: CorsProxySettings,
+          useValue: { reconcileVault: outcome('CORS proxy', 'skipped') },
+        },
+        {
+          provide: ShortenerSettings,
+          useValue: { reconcileVault: outcome('Link shorteners', 'merged') },
+        },
+        { provide: RaindropSession, useValue: { reconcileVault: outcome('Raindrop', 'skipped') } },
+        { provide: TwitterSettings, useValue: { reconcileVault: outcome('Twitter', 'stored') } },
+        { provide: MataroaSettings, useValue: { reconcileVault: outcome('Mataroa', 'stored') } },
         {
           provide: HugoSettings,
           useValue: {
-            syncToVault: vi.fn(async () => {
+            reconcileVault: vi.fn(async () => {
               order.push('Hugo');
               throw new Error('storage unavailable');
             }),
@@ -47,19 +51,19 @@ describe('VaultAdoption', () => {
         {
           provide: GitHubSession,
           useValue: {
-            syncToVault: vi.fn(async () => {
+            reconcileVault: vi.fn(async () => {
               order.push('GitHub');
-              return { kind: 'failed' as const, message: 'conflict' };
+              return { kind: 'conflict' as const, message: 'different keys' };
             }),
           },
         },
-        { provide: GistSettings, useValue: { syncToVault: skipped('GitHub Gist') } },
+        { provide: GistSettings, useValue: { reconcileVault: outcome('GitHub Gist', 'skipped') } },
       ],
     });
   });
 
   it('imports each connector sequentially and reports stored and failed entries', async () => {
-    const result = await TestBed.inject(VaultAdoption).adoptExisting();
+    const result = await TestBed.inject(VaultAdoption).reconcileExisting();
 
     expect(order).toEqual([
       'OpenRouter',
@@ -72,10 +76,10 @@ describe('VaultAdoption', () => {
       'GitHub',
       'GitHub Gist',
     ]);
-    expect(result.stored).toEqual(['OpenRouter', 'Link shorteners', 'Mataroa']);
-    expect(result.failed).toEqual([
-      { connector: 'Hugo', message: 'storage unavailable' },
-      { connector: 'GitHub', message: 'conflict' },
-    ]);
+    expect(result.restored).toEqual(['OpenRouter']);
+    expect(result.stored).toEqual(['Twitter', 'Mataroa']);
+    expect(result.merged).toEqual(['Link shorteners']);
+    expect(result.conflicts).toEqual([{ connector: 'GitHub', message: 'different keys' }]);
+    expect(result.failed).toEqual([{ connector: 'Hugo', message: 'storage unavailable' }]);
   });
 });

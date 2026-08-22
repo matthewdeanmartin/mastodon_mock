@@ -9,6 +9,7 @@ import {
   stampCredential,
 } from '../credential-lifetime';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { reconcileScalar, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 
 const TOKEN_KEY_BASE = 'mockingbird_raindrop_token';
 const LEGACY_CREDENTIALS_KEY_BASE = 'mockingbird_raindrop_credentials';
@@ -105,26 +106,46 @@ export class RaindropSession implements ExpiringConnection {
     if (fromVault) {
       // Repopulate, so the next call is local and the retention clock restarts
       // from this use rather than from the original connection.
-      this.store(stampCredential({ accessToken: fromVault }));
+      this.store(stampCredential({ accessToken: fromVault }), false);
     }
     return fromVault;
   }
 
   /** Persist locally, then push to the vault. */
-  private store(token: StoredRaindropToken): void {
+  private store(token: StoredRaindropToken, sync = true): void {
     localStorage.setItem(this.tokenKey, JSON.stringify(token));
     this.token.set(token);
     this.connected.set(true);
     this.needsFetch.set(false);
     // Not awaited: pasting a token should feel instant. Failures are observable
     // via `syncToVault()`, which the settings page calls when the user opts in.
-    void this.bridge.writeThrough(TOKEN_KEY_BASE, token.accessToken);
+    if (sync) {
+      void this.bridge.writeThrough(TOKEN_KEY_BASE, token.accessToken);
+    }
   }
 
   /** Push the current token to the vault and report what happened. */
   async syncToVault(): Promise<SyncOutcome> {
     const token = this.token()?.accessToken;
     return token ? this.bridge.writeThrough(TOKEN_KEY_BASE, token) : { kind: 'skipped' };
+  }
+
+  /** Fill an empty browser from the vault, or an empty vault from this browser. */
+  reconcileVault(): Promise<VaultReconcileOutcome> {
+    return reconcileScalar({
+      local: this.token()?.accessToken ?? null,
+      remote: this.bridge.readThrough(TOKEN_KEY_BASE),
+      restore: (accessToken) => {
+        if (!accessToken) {
+          return false;
+        }
+        this.store(stampCredential({ accessToken }), false);
+        return true;
+      },
+      store: () => this.syncToVault(),
+      conflictMessage:
+        'Raindrop has different non-empty tokens here and in Mawkingbird; neither copy was replaced.',
+    });
   }
 
   /** When this token ages out under the retention policy, or null. */

@@ -2,6 +2,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { scopedKey } from '../../account-scope';
 import { ProfileAccountKey } from '../account/profile-account-key';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { reconcileScalar, type VaultReconcileOutcome } from '../vault/vault-reconcile';
 import { ExpiringConnection, credentialExpiresAt, stampCredential } from '../credential-lifetime';
 
 /**
@@ -162,6 +163,32 @@ export class GistSettings implements ExpiringConnection {
           this.accountKey.current(),
         )
       : { kind: 'skipped' };
+  }
+
+  /** Reconcile the token-plus-profile record without silently choosing a conflict winner. */
+  reconcileVault(): Promise<VaultReconcileOutcome> {
+    const current = this.credentials();
+    return reconcileScalar({
+      local: current ? serialize(current, this.profile()) : null,
+      remote: this.bridge.readThrough(CREDENTIALS_KEY_BASE, this.accountKey.current()),
+      restore: (raw) => {
+        const parsed = parseVaulted(raw);
+        if (!parsed) {
+          return false;
+        }
+        this.persist(
+          stampCredential({
+            accessToken: parsed.accessToken,
+            ...(parsed.connectedAt === undefined ? {} : { connectedAt: parsed.connectedAt }),
+          }),
+          parsed.profile,
+        );
+        return true;
+      },
+      store: () => this.syncToVault(),
+      conflictMessage:
+        'GitHub Gist has different non-empty credentials here and in Mawkingbird; neither copy was replaced.',
+    });
   }
 
   /** When this token ages out under the retention policy, or null. */
