@@ -606,7 +606,7 @@
 }
 
 .dead-session-note {
-  color: var(--muted, #657786);
+  color: var(--muted);
 }
 
 .dead-session-actions {

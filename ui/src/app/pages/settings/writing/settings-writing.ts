@@ -1,7 +1,10 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Api } from '../../../api';
+import { Auth } from '../../../auth';
 import { ClientPrefs } from '../../../client-prefs';
+import { POSTING_LANGUAGE_OPTIONS } from '../../../language-detect';
 import {
   DEFAULT_PKM_VOCABULARY,
   PKM_KINDS,
@@ -13,22 +16,79 @@ import {
 import { WIZARD_STEPS, WizardStep, activeSteps, stepTitle } from '../../../publish-wizard';
 
 /**
- * Writing settings: the words that mark a post as a note, a to-do or a calendar
- * item.
+ * Writing settings: everything about getting words out — where writing starts,
+ * what gets asked at the moment you publish, and the drafts/notes workflow.
  *
- * A settings page of its own rather than a row in the Blue/Appearance control
- * cluster, which is a column of switches — this is three text fields plus an
- * explanation, and it needs the room. It is anonymous-capable because the whole
- * PKM feature is: a note can be a browser-local draft, and that path needs no
- * server at all.
+ * Absorbed the old "Posting & Privacy" page's posting defaults, which were the
+ * same subject reached from the other side. Those rows still appear on Privacy
+ * too, deliberately: "what visibility do I publish at" and "who can see me" are
+ * one setting seen through two different questions, and making the user guess
+ * which category we filed it under is worse than showing it twice. Both pages
+ * write the same credentials, so whichever one they find is the right one.
+ *
+ * Mixed client- and server-side as a result: the vocabulary, wizard and Home
+ * composer prefs are localStorage and work anonymously, while posting defaults
+ * need a server and hide themselves when there isn't one.
  */
 @Component({
   selector: 'app-settings-writing',
   imports: [FormsModule, RouterLink],
   templateUrl: './settings-writing.html',
 })
-export class SettingsWriting {
+export class SettingsWriting implements OnInit {
   protected prefs = inject(ClientPrefs);
+  private api = inject(Api);
+  protected auth = inject(Auth);
+
+  // ---- server-backed posting defaults (also shown on the Privacy page) ----
+  protected privacy = signal('public');
+  protected sensitive = signal(false);
+  protected language = signal('');
+  protected readonly postingLanguageOptions = POSTING_LANGUAGE_OPTIONS;
+  protected postingSaving = signal(false);
+  protected postingSaved = signal(false);
+
+  ngOnInit(): void {
+    if (this.auth.isAnonymous) {
+      return;
+    }
+    this.api.verifyCredentials().subscribe((acc) => {
+      this.privacy.set(acc.source?.privacy ?? 'public');
+      this.sensitive.set(acc.source?.sensitive ?? false);
+      this.language.set(acc.source?.language ?? '');
+    });
+  }
+
+  /**
+   * Save only the posting fields.
+   *
+   * Deliberately does not send `locked`/`discoverable`/`bot`: this page never
+   * loaded them, and a FormData update writes whatever it names. Sending them
+   * from stale defaults would silently unlock an account whose owner came here
+   * to change their default language.
+   */
+  protected savePosting(): void {
+    if (this.postingSaving()) {
+      return;
+    }
+    this.postingSaving.set(true);
+    this.postingSaved.set(false);
+
+    const form = new FormData();
+    form.append('source[privacy]', this.privacy());
+    form.append('source[sensitive]', String(this.sensitive()));
+    form.append('source[language]', this.language().trim());
+
+    this.api.updateCredentials(form).subscribe({
+      next: () => {
+        this.postingSaving.set(false);
+        this.postingSaved.set(true);
+        this.prefs.setDefaultVisibility(this.privacy());
+        if (this.language()) this.prefs.addKnownLanguage(this.language());
+      },
+      error: () => this.postingSaving.set(false),
+    });
+  }
 
   protected readonly kinds = PKM_KINDS;
   protected readonly noun = pkmNoun;

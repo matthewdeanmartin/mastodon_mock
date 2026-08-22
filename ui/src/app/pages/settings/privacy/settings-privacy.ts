@@ -1,18 +1,26 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Api } from '../../../api';
 import { ClientPrefs } from '../../../client-prefs';
 import { POSTING_LANGUAGE_OPTIONS } from '../../../language-detect';
 
-/** Account privacy and posting defaults, saved as one credentials update. */
+/**
+ * Privacy: who can see the account, who sees each post, and what gets counted.
+ *
+ * The posting rows here are the same settings the Writing page shows, on
+ * purpose — "default visibility" is a privacy question and a publishing
+ * question at once, and there is no reason to make the user guess which shelf
+ * we put it on. Both pages PATCH the same credentials fields.
+ */
 @Component({
   selector: 'app-settings-privacy',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './settings-privacy.html',
 })
 export class SettingsPrivacy implements OnInit {
   private api = inject(Api);
-  private prefs = inject(ClientPrefs);
+  protected prefs = inject(ClientPrefs);
 
   protected locked = signal(false);
   protected discoverable = signal(false);

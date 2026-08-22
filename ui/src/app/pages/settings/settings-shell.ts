@@ -20,10 +20,63 @@ interface SettingsNavItem {
   featureFlag?: FeatureFlagId;
 }
 
+/** A heading in the sidebar, and the pages filed under it. */
+interface SettingsNavGroup {
+  title: string;
+  /** Item paths, in the order they should appear under the heading. */
+  paths: string[];
+}
+
+/**
+ * The four shelves the settings pages sit on.
+ *
+ * A page may appear under more than one heading, and several do. There is no
+ * one true partition of settings into categories — ours would not match the
+ * user's anyway — so when a page has a real claim to two shelves it goes on
+ * both, and whichever one the user looked under first is the right one. The
+ * cost is a duplicated row in a list; the alternative is a user who cannot find
+ * a setting that is definitely there.
+ *
+ * "Basic" is the catch-all and is listed first: anything not deliberately filed
+ * elsewhere still appears there, so no page can fall out of the sidebar by
+ * being forgotten here.
+ */
+const NAV_GROUPS: SettingsNavGroup[] = [
+  {
+    title: 'Basic',
+    // Pages that belong here *as well as* under a more specific heading. Anything
+    // not named in any group lands here too — see `groups` below — so this list
+    // is only for deliberate cross-listing, not for the ordinary case.
+    paths: ['profile', 'writing', 'privacy', 'appearance'],
+  },
+  {
+    title: 'People',
+    paths: [
+      'moderation',
+      'follows',
+      'filters',
+      'content',
+      'bulk-actions',
+      'import-export',
+      'invites',
+      'privacy',
+    ],
+  },
+  {
+    title: 'Accounts',
+    paths: ['accounts', 'account', 'mawkingbird-plus', 'connections', 'rss', 'server', 'profile'],
+  },
+  {
+    title: 'Advanced',
+    paths: ['storage', 'feature-flags', 'development', 'config', 'deletion'],
+  },
+];
+
 /**
  * Full-width settings area: 2018-Twitter-style boxed sidebar on the left
- * (profile card + category list), routed content pane on the right. Category
- * grouping mirrors mastodon.social's settings.
+ * (profile card + category list), routed content pane on the right. The
+ * category headings are always expanded — the list is long, and a collapsed
+ * group is a place for a setting to hide.
  */
 @Component({
   selector: 'app-settings-shell',
@@ -66,7 +119,7 @@ export class SettingsShell {
       { label: 'Connections', path: 'connections', exact: false, anonymous: true },
       // Many feeds rather than one account, so deliberately not a "connection".
       { label: 'RSS feeds', path: 'rss', exact: true, anonymous: true },
-      { label: 'Posting & Privacy', path: 'privacy', exact: true },
+      { label: 'Privacy', path: 'privacy', exact: true },
       { label: 'Writing', path: 'writing', exact: true, anonymous: true },
       // Appearance is client-side (theme/accent/undo-send in localStorage) and works
       // against any instance; the page hides its server-backed rows off-mock itself.
@@ -103,4 +156,36 @@ export class SettingsShell {
       (this.auth.isAnonymous || !item.anonymousOnly) &&
       (!item.featureFlag || this.flags.enabled(item.featureFlag)),
   );
+
+  /**
+   * The visible nav, bucketed under headings.
+   *
+   * Built from {@link nav} rather than from the group lists, so a page hidden by
+   * a feature flag, the mock-tooling check or the anonymous guards stays hidden
+   * in every group it is named in. Empty groups drop out entirely, which is what
+   * keeps the Anonymous account from staring at a "People" heading with nothing
+   * under it.
+   */
+  protected readonly groups: { title: string; items: SettingsNavItem[] }[] = (() => {
+    const byPath = new Map(this.nav.map((item) => [item.path, item]));
+    const filed = new Set(NAV_GROUPS.flatMap((g) => g.paths));
+    return NAV_GROUPS.map((group) => ({
+      title: group.title,
+      items:
+        group.title === 'Basic'
+          ? // Its own cross-listed pages first, then every page nobody filed
+            // anywhere — a page left out of the lists is still a page the user
+            // needs to reach, and silently dropping it is the one outcome this
+            // whole arrangement must not have.
+            [
+              ...group.paths
+                .map((path) => byPath.get(path))
+                .filter((item): item is SettingsNavItem => !!item),
+              ...this.nav.filter((item) => !filed.has(item.path)),
+            ]
+          : group.paths
+              .map((path) => byPath.get(path))
+              .filter((item): item is SettingsNavItem => !!item),
+    })).filter((group) => group.items.length > 0);
+  })();
 }

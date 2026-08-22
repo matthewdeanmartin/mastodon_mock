@@ -90,8 +90,7 @@ export class SettingsSyncToggle {
     // a reason the user needs to hear — a stale token answered 402, the service
     // was unreachable — and a toggle that flips back with no message is the
     // worst version of that: indistinguishable from a dead button.
-    const outcome =
-      detail === 'never-asked' ? await this.sync.enable() : await this.sync.resume();
+    const outcome = detail === 'never-asked' ? await this.sync.enable() : await this.sync.resume();
     switch (outcome.kind) {
       case 'read-only':
       case 'failed':

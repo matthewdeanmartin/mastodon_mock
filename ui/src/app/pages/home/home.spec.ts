@@ -2,10 +2,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../../client-prefs';
-import { Drafts } from '../../drafts';
+import { Drafts, emptyDraftSnapshot } from '../../drafts';
 import { HomeDiagnostics } from '../../home-diagnostics';
 import { Status } from '../../models';
 import { Streaming } from '../../streaming';
@@ -32,6 +32,8 @@ interface HomeInternals {
   toggleReplies(): void;
   view: WritableSignal<'feed' | 'members' | 'analytics'>;
   setView(view: 'feed' | 'members' | 'analytics'): void;
+  onPosted(status: Status): void;
+  startWriting(): void;
 }
 
 function internals(fixture: ComponentFixture<Home>): HomeInternals {
@@ -494,16 +496,98 @@ describe('Home', () => {
     expect(home.visible().some((s) => s.id.startsWith('eliza:'))).toBe(false);
   });
 
-  // --------------------------------------------------------- thoughtful posting
+  // ------------------------------------------------- the way in to writing
 
-  it('replaces the writing box with a Write button when thoughtful posting is on', () => {
-    TestBed.inject(ClientPrefs).setThoughtfulPosting(true);
+  it('offers Write and Quick post instead of an open composer by default', () => {
     const fixture = setUp();
 
     expect(fixture.nativeElement.querySelector('app-compose')).toBeNull();
-    const write = fixture.nativeElement.querySelector('.write-btn');
-    expect(write).not.toBeNull();
-    expect(write.getAttribute('href')).toContain('/drafts');
+    const buttons = fixture.nativeElement.querySelectorAll('.write-btn');
+    expect(buttons.length).toBe(2);
+    expect(buttons[0].textContent).toContain('Write');
+    expect(buttons[1].textContent).toContain('Quick post');
+  });
+
+  it('opens the mini composer on demand, without persisting the choice', () => {
+    const prefs = TestBed.inject(ClientPrefs);
+    const fixture = setUp();
+
+    fixture.nativeElement.querySelectorAll('.write-btn')[1].click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
+    // The click bought this visit a composer, not a new default.
+    expect(prefs.autoShowMiniComposer()).toBe(false);
+  });
+
+  it('collapses the mini composer back to buttons after publishing', () => {
+    const fixture = setUp();
+    const home = internals(fixture);
+
+    fixture.nativeElement.querySelectorAll('.write-btn')[1].click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
+
+    home.onPosted(makeStatus('fresh'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-compose')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.write-btn').length).toBe(2);
+  });
+
+  it('starts open, and stays open after publishing, when the pref asks for it', () => {
+    TestBed.inject(ClientPrefs).setAutoShowMiniComposer(true);
+    const fixture = setUp();
+    const home = internals(fixture);
+
+    expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
+
+    home.onPosted(makeStatus('fresh'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
+  });
+
+  // Thoughtful posting is about the publish step, but a button that opens a
+  // posting box is the thing it exists to remove — so it wins over the mini
+  // composer outright, auto-show pref included.
+  it('offers no Quick post button under thoughtful posting', () => {
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.setThoughtfulPosting(true);
+    const fixture = setUp();
+
+    expect(fixture.nativeElement.querySelector('app-compose')).toBeNull();
+    const buttons = fixture.nativeElement.querySelectorAll('.write-btn');
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].textContent).toContain('Write');
+  });
+
+  it('resumes an empty draft rather than leaving blank ones behind', () => {
+    const drafts = TestBed.inject(Drafts);
+    const existing = drafts.save(emptyDraftSnapshot('public'));
+    const fixture = setUp();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    internals(fixture).startWriting();
+
+    expect(navigate).toHaveBeenCalledWith(['/write'], { queryParams: { draft: existing } });
+    expect(drafts.drafts().length).toBe(1);
+  });
+
+  it('starts a new draft when every existing one has content', () => {
+    const drafts = TestBed.inject(Drafts);
+    drafts.save({ ...emptyDraftSnapshot('public'), segments: ['already written'] });
+    const fixture = setUp();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    internals(fixture).startWriting();
+
+    expect(drafts.drafts().length).toBe(2);
+    expect(navigate).toHaveBeenCalledWith(['/write'], {
+      queryParams: { draft: drafts.drafts()[0].id },
+    });
   });
 
   // The publish step of write -> draft -> edit -> publish happens here. Hiding
@@ -521,12 +605,6 @@ describe('Home', () => {
 
     const fixture = setUp();
 
-    expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('.write-btn')).toBeNull();
-  });
-
-  it('leaves Home alone when the pref is off', () => {
-    const fixture = setUp();
     expect(fixture.nativeElement.querySelector('app-compose')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.write-btn')).toBeNull();
   });

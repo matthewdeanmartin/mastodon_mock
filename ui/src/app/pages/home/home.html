@@ -39,13 +39,20 @@
   </a>
 }
 
-<!-- Thoughtful posting replaces the writing box with a way in to the
-     write → draft → edit → publish cycle. Home is still where you land; only
-     the shortcut from "urge to write" to "published" is removed. -->
-@if (prefs.thoughtfulPosting() && !fromDraft() && !openedDraft()) {
+<!-- What sits at the top of the feed: a way in to writing, not a box already
+     open. The box is one click away and stays gone until asked for, because the
+     distance between "landed on Home" and "posted" is the thing worth lengthening.
+     Arriving with a draft skips all of it — that IS the deliberate publish step. -->
+@if (!fromDraft() && !openedDraft() && !miniComposerOpen()) {
   <div class="write-cta">
-    <a class="btn write-btn" routerLink="/drafts" [queryParams]="{ write: 1 }">✍ Write</a>
-    <span class="write-note">Posts go through Drafts first.</span>
+    <button class="btn write-btn" type="button" (click)="startWriting()">✍ Write</button>
+    @if (offersMiniComposer()) {
+      <button class="btn btn-outline write-btn" type="button" (click)="openMiniComposer()">
+        💬 Quick post
+      </button>
+    } @else {
+      <span class="write-note">Posts go through Drafts first.</span>
+    }
   </div>
 } @else {
   <!-- Un-gated when finishing a draft: that IS the deliberate publish step. -->
@@ -54,10 +61,12 @@
     [initialDraft]="openedDraft()"
     (posted)="onPosted($event)"
   />
+}
 
-  @if (auth.isAnonymous && eliza.following()) {
-    <app-local-compose (posted)="onLocalPosted()" />
-  }
+<!-- Outside the block above on purpose: this is the Eliza practice box, not a
+     way to post, so collapsing the real composer must not take it away. -->
+@if (auth.isAnonymous && eliza.following()) {
+  <app-local-compose (posted)="onLocalPosted()" />
 }
 
 <app-command-bar

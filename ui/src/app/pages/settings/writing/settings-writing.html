@@ -1,99 +1,217 @@
 <div class="spage-head">
   <h1>✍ Writing</h1>
   <p>
-    Tag a draft or a private post <code>#NOTE</code> or <code>#TODO</code> and it becomes a
-    productivity object: it shows up beside the editor in <a routerLink="/write">Write</a>, instead
-    of you having to go looking for it.
-  </p>
-  <p class="muted">
-    A <strong>note</strong> is something you wrote down to keep. A <strong>to-do</strong> is
-    something you owe a reply to — "answer this later", "write about this later". Both live either
-    in this browser as drafts, or on the server as posts only you can see.
+    Everything about getting words out: where writing starts, what gets asked at the moment you
+    publish, and the workflow around drafts and notes.
   </p>
 </div>
 
 <div class="spage-body">
-  <h2>Your words</h2>
-  <p class="muted small">
-    <code>#TODO</code> is English, and this feature is useless if the word isn't yours. Set your own
-    — comma-separated, and any of them will match. Tags are matched whole and case-insensitively, so
-    <code>#TODO</code> and <code>#todo</code> are the same tag but <code>#todos</code> is not.
-  </p>
-
-  @for (kind of kinds; track kind) {
-    <label class="pkm-field">
-      <span class="pkm-field-label">Words that mean "{{ noun(kind) }}"</span>
-      <input
-        type="text"
-        [ngModel]="fields()[kind]"
-        (ngModelChange)="setField(kind, $event)"
-        [attr.placeholder]="defaultsFor(kind)"
-        [attr.name]="'pkm-' + kind"
-      />
-    </label>
-  }
-
-  @if (disabledKinds().length) {
-    <p class="muted small" role="status">
-      ⚠ Left empty, so switched off:
-      @for (kind of disabledKinds(); track kind) {
-        <strong>{{ noun(kind) }}</strong>
-        @if (!$last) {
-          ,
-        }
-      }
-      . Nothing will be filed under {{ disabledKinds().length === 1 ? 'it' : 'them' }} until you
-      give {{ disabledKinds().length === 1 ? 'it a word' : 'them words' }}.
-    </p>
-  }
-
-  <div class="pkm-actions">
-    <button class="btn" type="button" (click)="save()">Save words</button>
-    <button class="btn btn-outline" type="button" (click)="reset()">Restore defaults</button>
-    @if (saved()) {
-      <span class="muted small" role="status">✓ Saved</span>
-    }
+  <div class="ssection">
+    <h2>Where writing starts</h2>
+    <div class="srow">
+      <span class="slabel">On Home</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="prefs.autoShowMiniComposer()"
+            (ngModelChange)="prefs.setAutoShowMiniComposer($event)"
+            name="auto_show_mini_composer"
+          />
+          Open the mini composer automatically
+        </label>
+        <span class="hint">
+          Off by default. Home shows a <strong>Write</strong> button, which opens the full editor,
+          next to a <strong>Quick post</strong> button that expands the small box for that visit
+          only. Turn this on to have the box already open every time, the way it used to be.
+        </span>
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="prefs.thoughtfulPosting()"
+            (ngModelChange)="prefs.setThoughtfulPosting($event)"
+            name="thoughtful_posting"
+          />
+          Thoughtful posting: nothing publishes straight from a box
+        </label>
+        <span class="hint">
+          Stronger than the setting above, and it wins over it: Home offers no Quick post at all,
+          and the editor only saves. You post later, from Drafts. Replies, chats and paste shares
+          are never held back — they're urgent, or already deliberate.
+        </span>
+      </div>
+    </div>
   </div>
 
-  <h2>The publish wizard</h2>
-  <p class="muted small">
-    What <a routerLink="/write">Write</a> shows you between hitting Publish and the post going out.
-    Turn off the steps you don't want; the ones left run in this order.
-  </p>
+  <!-- Posting defaults live on the server; the browser-local Anonymous account
+       has none to read or write, so the whole section stands down. -->
+  @if (!auth.isAnonymous) {
+    <div class="ssection">
+      <h2>Asked at the moment you publish</h2>
+      <p class="hint">
+        Also on <a routerLink="/settings/privacy">Privacy</a>, which is the same settings from the
+        other direction — who ends up seeing this.
+      </p>
 
-  @for (step of wizardSteps; track step) {
+      <form (ngSubmit)="savePosting()">
+        <div class="srow">
+          <span class="slabel">Posting privacy</span>
+          <div class="scontrol">
+            <select [ngModel]="privacy()" (ngModelChange)="privacy.set($event)" name="privacy">
+              <option value="public">Public</option>
+              <option value="unlisted">Quiet public</option>
+              <option value="private">Followers only</option>
+            </select>
+            <span class="hint">Default visibility for new posts. You can change it per post.</span>
+          </div>
+        </div>
+
+        <div class="srow">
+          <span class="slabel">Media</span>
+          <div class="scontrol">
+            <label class="checkline">
+              <input
+                type="checkbox"
+                [ngModel]="sensitive()"
+                (ngModelChange)="sensitive.set($event)"
+                name="sensitive"
+              />
+              Mark media as sensitive by default
+            </label>
+            <label class="checkline">
+              <input
+                type="checkbox"
+                [ngModel]="prefs.requireAltText()"
+                (ngModelChange)="prefs.setRequireAltText($event)"
+                name="require_alt_text"
+              />
+              Require alt text on every image before posting
+            </label>
+          </div>
+        </div>
+
+        <div class="srow">
+          <span class="slabel">Posting language</span>
+          <div class="scontrol">
+            <select [ngModel]="language()" (ngModelChange)="language.set($event)" name="language">
+              <option value="">Not specified</option>
+              @for (option of postingLanguageOptions; track option.code) {
+                <option [value]="option.code">{{ option.name }}</option>
+              }
+            </select>
+            <span class="hint">
+              Default language attached to new posts. You can change it per post.
+            </span>
+          </div>
+        </div>
+
+        <div class="sactions">
+          @if (postingSaved()) {
+            <span class="saved-note">Saved ✓</span>
+          }
+          <button class="btn" type="submit" [disabled]="postingSaving()">
+            {{ postingSaving() ? 'Saving…' : 'Save posting defaults' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  <div class="ssection">
+    <h2>The publish wizard</h2>
+    <p class="hint">
+      What <a routerLink="/write">Write</a> shows you between hitting Publish and the post going
+      out. Turn off the steps you don't want; the ones left run in this order.
+    </p>
+
+    @for (step of wizardSteps; track step) {
+      <label class="pkm-toggle">
+        <input
+          type="checkbox"
+          [ngModel]="stepOn(step)"
+          (ngModelChange)="toggleStep(step, $event)"
+          [attr.name]="'wizard-' + step"
+        />
+        <span>{{ stepTitle(step) }}</span>
+      </label>
+    }
+
+    @if (wizardOff()) {
+      <p class="hint" role="status">
+        ⚠ Every step is off, so Publish goes straight to the composer — which is exactly how it
+        behaved before this wizard existed.
+      </p>
+    }
+
     <label class="pkm-toggle">
       <input
         type="checkbox"
-        [ngModel]="stepOn(step)"
-        (ngModelChange)="toggleStep(step, $event)"
-        [attr.name]="'wizard-' + step"
+        [ngModel]="prefs.warnOnPkmPublish()"
+        (ngModelChange)="toggleWarn($event)"
+        name="warnOnPkmPublish"
       />
-      <span>{{ stepTitle(step) }}</span>
-    </label>
-  }
-
-  @if (wizardOff()) {
-    <p class="muted small" role="status">
-      ⚠ Every step is off, so Publish goes straight to the composer — which is exactly how it
-      behaved before this wizard existed.
-    </p>
-  }
-
-  <h2>Publishing</h2>
-  <label class="pkm-toggle">
-    <input
-      type="checkbox"
-      [ngModel]="prefs.warnOnPkmPublish()"
-      (ngModelChange)="toggleWarn($event)"
-      name="warnOnPkmPublish"
-    />
-    <span>
-      Warn me before publishing something tagged as a note or a to-do
-      <span class="muted small">
-        A note to yourself and a post to your followers look identical in the composer. This is the
-        one thing standing between them.
+      <span>
+        Warn me before publishing something tagged as a note or a to-do
+        <span class="hint">
+          A note to yourself and a post to your followers look identical in the composer. This is
+          the one thing standing between them.
+        </span>
       </span>
-    </span>
-  </label>
+    </label>
+  </div>
+
+  <div class="ssection">
+    <h2>Notes and to-dos</h2>
+    <p class="hint">
+      Tag a draft or a private post <code>#NOTE</code> or <code>#TODO</code> and it becomes a
+      productivity object: it shows up beside the editor in <a routerLink="/write">Write</a>,
+      instead of you having to go looking for it. A <strong>note</strong> is something you wrote
+      down to keep. A <strong>to-do</strong> is something you owe a reply to. Both live either in
+      this browser as drafts, or on the server as posts only you can see.
+    </p>
+
+    <h3>Your words</h3>
+    <p class="hint">
+      <code>#TODO</code> is English, and this feature is useless if the word isn't yours. Set your
+      own — comma-separated, and any of them will match. Tags are matched whole and
+      case-insensitively, so <code>#TODO</code> and <code>#todo</code> are the same tag but
+      <code>#todos</code> is not.
+    </p>
+
+    @for (kind of kinds; track kind) {
+      <label class="pkm-field">
+        <span class="pkm-field-label">Words that mean "{{ noun(kind) }}"</span>
+        <input
+          type="text"
+          [ngModel]="fields()[kind]"
+          (ngModelChange)="setField(kind, $event)"
+          [attr.placeholder]="defaultsFor(kind)"
+          [attr.name]="'pkm-' + kind"
+        />
+      </label>
+    }
+
+    @if (disabledKinds().length) {
+      <p class="hint" role="status">
+        ⚠ Left empty, so switched off:
+        @for (kind of disabledKinds(); track kind) {
+          <strong>{{ noun(kind) }}</strong>
+          @if (!$last) {
+            ,
+          }
+        }
+        . Nothing will be filed under {{ disabledKinds().length === 1 ? 'it' : 'them' }} until you
+        give {{ disabledKinds().length === 1 ? 'it a word' : 'them words' }}.
+      </p>
+    }
+
+    <div class="pkm-actions">
+      <button class="btn" type="button" (click)="save()">Save words</button>
+      <button class="btn btn-outline" type="button" (click)="reset()">Restore defaults</button>
+      @if (saved()) {
+        <span class="hint" role="status">✓ Saved</span>
+      }
+    </div>
+  </div>
 </div>

@@ -19,15 +19,20 @@
     }
 
     <nav class="settings-nav" aria-label="Settings sections">
-      @for (item of nav; track item.path) {
-        <a
-          [routerLink]="item.path"
-          routerLinkActive="active"
-          [routerLinkActiveOptions]="{ exact: item.exact }"
-        >
-          <span>{{ item.label }}</span>
-          <span class="chev" aria-hidden="true">›</span>
-        </a>
+      @for (group of groups; track group.title) {
+        <h2 class="settings-nav-heading">{{ group.title }}</h2>
+        <!-- Tracked by path *within* a group: a page filed under two headings
+             appears twice, so path alone is not unique across the whole nav. -->
+        @for (item of group.items; track item.path) {
+          <a
+            [routerLink]="item.path"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: item.exact }"
+          >
+            <span>{{ item.label }}</span>
+            <span class="chev" aria-hidden="true">›</span>
+          </a>
+        }
       }
     </nav>
   </aside>

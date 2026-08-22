@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ACCENT_PRESETS, ClientPrefs } from '../../../client-prefs';
 import { Terminology } from '../../../terminology';
 
@@ -11,7 +12,7 @@ import { Terminology } from '../../../terminology';
  */
 @Component({
   selector: 'app-blue-controls',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './blue-controls.html',
 })
 export class BlueControls {

@@ -279,6 +279,7 @@ interface StoredPrefs {
   analytics?: boolean;
   requireAltText?: boolean;
   thoughtfulPosting?: boolean;
+  autoShowMiniComposer?: boolean;
   warnOnPkmPublish?: boolean;
   wizardSteps?: Partial<Record<WizardStep, boolean>>;
   customBg?: CustomColor;
@@ -526,6 +527,22 @@ export class ClientPrefs {
    * `gateable` input for which surfaces opt in.
    */
   readonly thoughtfulPosting = signal<boolean>(false);
+
+  /**
+   * Whether Home opens with the mini composer already expanded.
+   *
+   * Off by default, and deliberately so: the box at the top of the feed is the
+   * shortest path from "landed on Home" to "posted something", and that path is
+   * the one worth making the user ask for. With this off, Home offers two
+   * buttons — Write, which leaves for the full editor, and Quick post, which
+   * expands the box for that visit only. Turning this on restores the box on
+   * every visit for anyone who wants the old behaviour back.
+   *
+   * Independent of {@link thoughtfulPosting}, which is about the *publish* step
+   * rather than the box: when that is on there is no Quick post button at all,
+   * so this pref has nothing to act on.
+   */
+  readonly autoShowMiniComposer = signal<boolean>(false);
 
   /**
    * The words that mark a post as a note, a to-do or a calendar item.
@@ -872,6 +889,11 @@ export class ClientPrefs {
     this.thoughtfulPosting.set(on);
   }
 
+  /** Show or hide the mini composer on Home without a click each visit. */
+  setAutoShowMiniComposer(on: boolean): void {
+    this.autoShowMiniComposer.set(on);
+  }
+
   setCustomBg(color: CustomColor): void {
     this.customBg.set(normalizeColor(color));
   }
@@ -1131,6 +1153,7 @@ export class ClientPrefs {
     this.loadBool(stored.analytics, this.analytics);
     this.loadBool(stored.requireAltText, this.requireAltText);
     this.loadBool(stored.thoughtfulPosting, this.thoughtfulPosting);
+    this.loadBool(stored.autoShowMiniComposer, this.autoShowMiniComposer);
     this.customBg.set(normalizeColor(stored.customBg ?? null));
     this.customLink.set(normalizeColor(stored.customLink ?? null));
     this.customSidebar.set(normalizeColor(stored.customSidebar ?? null));
@@ -1193,6 +1216,7 @@ export class ClientPrefs {
       analytics: this.analytics(),
       requireAltText: this.requireAltText(),
       thoughtfulPosting: this.thoughtfulPosting(),
+      autoShowMiniComposer: this.autoShowMiniComposer(),
       warnOnPkmPublish: this.warnOnPkmPublish(),
       wizardSteps: this.wizardSteps(),
       customBg: this.customBg(),

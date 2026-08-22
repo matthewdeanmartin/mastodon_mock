@@ -3,7 +3,12 @@
   --col-bg: #ffffff;
   --border: #e1e8ed;
   --text: #14171a;
-  --muted: #657786;
+  /* Secondary text. Held to WCAG AAA (7:1) against BOTH --col-bg and --bg, not
+     the 4.5:1 AA floor: the old #657786 technically passed AA on white and
+     still measured 4.38:1 on the page background, which is how "secondary"
+     turned into "unreadable". If text is worth rendering it is worth reading —
+     see docs/contributing.md. */
+  --muted: #46535e;
   --accent: #1da1f2;
   --accent-hover: #1a91da;
   --accent-soft: #e8f5fe;
@@ -18,7 +23,8 @@
   --col-bg: #15202b;
   --border: #38444d;
   --text: #f7f9f9;
-  --muted: #8899a6;
+  /* AAA against both dark backgrounds, matching the light theme's floor. */
+  --muted: #a8b8c4;
   --hover: #1c2732;
   --accent-soft: color-mix(in srgb, var(--accent) 18%, var(--col-bg));
   color-scheme: dark;

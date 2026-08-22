@@ -1,10 +1,10 @@
 import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map, Observable, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
-import { Drafts } from '../../drafts';
+import { Drafts, draftHasContent, emptyDraftSnapshot } from '../../drafts';
 import { ClientPrefs, FEED_MAX_COOLDOWN_MS, HomeWindow } from '../../client-prefs';
 import { Status } from '../../models';
 import { CalmVerdicts } from '../../calm-verdicts';
@@ -42,6 +42,7 @@ import { LocalCompose } from '../../eliza/local-compose';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
 import { JustMyServer } from '../../just-my-server';
 import { Terminology } from '../../terminology';
+import { FeatureFlags } from '../../feature-flags';
 
 /** Below this many follows, nudge toward /find-friends (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -127,6 +128,8 @@ export class Home implements OnInit, OnDestroy {
   protected localPosts = inject(LocalPostStore);
   private route = inject(ActivatedRoute);
   private drafts = inject(Drafts);
+  private router = inject(Router);
+  private flags = inject(FeatureFlags);
   private pasteFeeds = inject(PasteFeedSubscriptions);
 
   /** A draft opened from /drafts (?draft=<id>), handed to the composer. */
@@ -154,6 +157,28 @@ export class Home implements OnInit, OnDestroy {
    * out from under the user mid-edit.
    */
   protected readonly fromDraft = signal(this.drafts.hasHandoff());
+
+  /**
+   * Whether the mini composer is showing right now.
+   *
+   * Seeded from {@link ClientPrefs.autoShowMiniComposer} and *not* written back
+   * to it: clicking "Quick post" opens the box for this visit only. The friction
+   * being added is one click per visit, which is small enough to never block a
+   * thought and large enough that the box is no longer the thing you land on.
+   */
+  protected readonly miniComposerOpen = signal(this.prefs.autoShowMiniComposer());
+
+  /**
+   * Whether Home offers the mini composer at all.
+   *
+   * Thoughtful posting wins outright: its whole claim is that nothing publishes
+   * straight from a text box, and a button that opens one contradicts that even
+   * when the box itself is gated. Under it Home offers only Write.
+   */
+  protected readonly offersMiniComposer = computed(() => !this.prefs.thoughtfulPosting());
+
+  /** The full writing workspace is behind a flag; without it, Write goes to /drafts. */
+  protected readonly hasWritePage = computed(() => this.flags.enabled('write'));
 
   protected statuses = signal<Status[]>([]);
   protected loading = signal(true);
@@ -835,8 +860,41 @@ export class Home implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Open the mini composer for this visit. Deliberately does not persist —
+   * see {@link miniComposerOpen}.
+   */
+  protected openMiniComposer(): void {
+    this.miniComposerOpen.set(true);
+  }
+
+  /**
+   * Leave for the writing workspace, on a draft that is ready to type into.
+   *
+   * Reuses the newest empty draft rather than always starting a new one, so
+   * clicking Write twice does not leave a blank row behind on /drafts. "Empty"
+   * is {@link draftHasContent}'s definition — the same one the composer uses to
+   * decide a draft is worth saving — so a draft holding only a content warning
+   * still counts as yours and is left alone.
+   */
+  protected startWriting(): void {
+    if (!this.hasWritePage()) {
+      void this.router.navigate(['/drafts'], { queryParams: { write: 1 } });
+      return;
+    }
+    const resumable = this.drafts.drafts().find((d) => !draftHasContent(d));
+    const id =
+      resumable?.id ?? this.drafts.save(emptyDraftSnapshot(this.prefs.defaultVisibility()));
+    void this.router.navigate(['/write'], { queryParams: { draft: id } });
+  }
+
   onPosted(status: Status): void {
     this.statuses.update((s) => [status, ...s]);
+    // Publishing ends the visit's reason for the box being open: it collapses
+    // back to the buttons, so the next post is another deliberate choice.
+    if (!this.prefs.autoShowMiniComposer()) {
+      this.miniComposerOpen.set(false);
+    }
   }
 
   /** A local practice post was made: it (and Eliza's reply) live in the store,

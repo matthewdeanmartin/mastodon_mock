@@ -295,9 +295,23 @@
         Thoughtful posting: nothing publishes straight from a box
       </label>
       <span class="hint">
-        Home gets a Write button instead of a writing box, and that editor only saves. You post
+        Home drops the Quick post button, leaving only Write, and that editor only saves. You post
         later, from Drafts. Replies, chats and paste shares are never held back — they're urgent, or
         already deliberate.
+      </span>
+      <label class="checkline">
+        <input
+          type="checkbox"
+          [ngModel]="prefs.autoShowMiniComposer()"
+          (ngModelChange)="prefs.setAutoShowMiniComposer($event)"
+          name="auto_show_mini_composer"
+        />
+        Open the mini composer on Home automatically
+      </label>
+      <span class="hint">
+        Off by default: Home offers Write and Quick post, and the small box appears when you ask for
+        it. Turn this on to have it open on arrival. Thoughtful posting, above, overrides this.
+        These also live on <a routerLink="/settings/writing">Writing</a>.
       </span>
     </div>
   </div>

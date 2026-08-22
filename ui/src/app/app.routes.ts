@@ -344,7 +344,7 @@ export const routes: Routes = [
             path: 'privacy',
             title: 'Privacy',
             canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Posting and privacy settings', preloadSettings: true },
+            data: { anonymousFeature: 'Privacy settings', preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/privacy/settings-privacy').then((m) => m.SettingsPrivacy),
           },
@@ -387,6 +387,9 @@ export const routes: Routes = [
               import('./pages/settings/accounts/settings-accounts').then((m) => m.SettingsAccounts),
           },
           {
+            // The old "Posting defaults" page. Its rows now live on both
+            // Writing and Privacy; Privacy is the closer match for a bookmark
+            // saved when the page was called "Posting & Privacy".
             path: 'posting',
             title: 'Posting',
             pathMatch: 'full',

@@ -1,11 +1,11 @@
 <div class="spage-head">
-  <h1>Posting & Privacy</h1>
-  <p>Control who sees your account and choose the defaults applied to new posts.</p>
+  <h1>🔒 Privacy</h1>
+  <p>Who can see you, who can reach you, and what this app counts while you use it.</p>
 </div>
 
 <form class="spage-body" (ngSubmit)="save()">
   <div class="ssection">
-    <h2>Privacy and reach</h2>
+    <h2>Who can see you</h2>
     <div class="srow">
       <span class="slabel">Reach</span>
       <div class="scontrol">
@@ -38,17 +38,23 @@
           <input type="checkbox" [ngModel]="bot()" (ngModelChange)="bot.set($event)" name="bot" />
           This is an automated account
         </label>
-        <span class="hint"
-          >Signals to others that the account mainly performs automated actions.</span
-        >
+        <span class="hint">
+          Signals to others that the account mainly performs automated actions.
+        </span>
       </div>
     </div>
   </div>
 
   <div class="ssection">
-    <h2>Posting defaults</h2>
+    <h2>Who sees what you post</h2>
+    <p class="hint">
+      The same controls are on <a routerLink="/settings/writing">Writing</a>, where they read as
+      "what am I being asked at the moment I publish" rather than "who ends up seeing this". Either
+      page saves the same thing.
+    </p>
+
     <div class="srow">
-      <span class="slabel">Posting privacy</span>
+      <span class="slabel">Post visibility</span>
       <div class="scontrol">
         <select [ngModel]="privacy()" (ngModelChange)="privacy.set($event)" name="privacy">
           <option value="public">Public</option>
@@ -83,9 +89,9 @@
             <option [value]="option.code">{{ option.name }}</option>
           }
         </select>
-        <span class="hint"
-          >Default language attached to new posts. You can change it per post.</span
-        >
+        <span class="hint">
+          Default language attached to new posts. You can change it per post.
+        </span>
       </div>
     </div>
   </div>
@@ -99,3 +105,31 @@
     </button>
   </div>
 </form>
+
+<!-- Outside the credentials form on purpose: this is a browser-local pref that
+     applies instantly, and putting it inside would imply it needs saving. -->
+<div class="spage-body">
+  <div class="ssection">
+    <h2>What this app counts</h2>
+    <div class="srow">
+      <span class="slabel">Analytics</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="prefs.analytics()"
+            (ngModelChange)="prefs.setAnalytics($event)"
+            name="analytics"
+          />
+          Count my page views
+        </label>
+        <span class="hint">
+          Anonymous page counts only — which kinds of page get used, never which account, post or
+          tag you looked at, and never a query string. Turn this off and the analytics script is
+          never loaded at all: nothing is fetched, counted or sent. The script is served from this
+          site, not from a third party.
+        </span>
+      </div>
+    </div>
+  </div>
+</div>

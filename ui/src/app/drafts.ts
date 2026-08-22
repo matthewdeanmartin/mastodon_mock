@@ -62,6 +62,25 @@ export function draftHasContent(d: DraftSnapshot): boolean {
 }
 
 /**
+ * A blank draft, ready to be typed into.
+ *
+ * Exists so "start writing" has one definition of empty rather than one per
+ * caller: a snapshot built field-by-field at each call site drifts the moment
+ * {@link Draft} grows a field, and the drift shows up as a draft that silently
+ * loses a setting. Visibility is a parameter because the only sensible default
+ * is the user's, which this module has no business reaching for.
+ */
+export function emptyDraftSnapshot(visibility: string): DraftSnapshot {
+  return {
+    segments: [''],
+    spoilerText: '',
+    sensitive: false,
+    visibility,
+    poll: null,
+  };
+}
+
+/**
  * Drafts live in localStorage only — mainline Mastodon has no drafts API, and
  * Mockingbird must work unchanged against mastodon.social.
  *
