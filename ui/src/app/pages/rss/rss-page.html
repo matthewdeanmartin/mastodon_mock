@@ -14,27 +14,29 @@
     <ul class="feed-list">
       @for (f of subs.feeds(); track f.url) {
         <li class="feed-row" [class.feed-row-off]="!f.enabled">
-          <span class="names">
-            <span class="name">
-              {{ f.title || f.url }}
-              @if (!f.enabled) {
-                <span class="muted small">· off</span>
+          <a class="feed-row-link" [routerLink]="['/accounts', 'rss:' + f.url]">
+            <span class="names">
+              <span class="name">
+                {{ f.title || f.url }}
+                @if (!f.enabled) {
+                  <span class="muted small">· off</span>
+                }
+              </span>
+              @if (rssHost(f.url); as host) {
+                <span class="muted small">{{ host }}</span>
               }
             </span>
-            @if (rssHost(f.url); as host) {
-              <span class="muted small">{{ host }}</span>
+            @if (f.itemCount !== undefined) {
+              <span class="muted small item-count">
+                {{ f.itemCount }} item{{ f.itemCount === 1 ? '' : 's' }}
+                @if (f.itemCount > perFeedCap) {
+                  <span title="Home only shows the newest {{ perFeedCap }} of any one feed"
+                    >(showing newest {{ perFeedCap }})</span
+                  >
+                }
+              </span>
             }
-          </span>
-          @if (f.itemCount !== undefined) {
-            <span class="muted small item-count">
-              {{ f.itemCount }} item{{ f.itemCount === 1 ? '' : 's' }}
-              @if (f.itemCount > perFeedCap) {
-                <span title="Home only shows the newest {{ perFeedCap }} of any one feed"
-                  >(showing newest {{ perFeedCap }})</span
-                >
-              }
-            </span>
-          }
+          </a>
         </li>
       }
     </ul>

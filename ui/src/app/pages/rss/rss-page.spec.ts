@@ -40,6 +40,16 @@ describe('RssPage', () => {
     expect(text).toContain('12 items');
   });
 
+  it('links a feed row to its feed profile', () => {
+    TestBed.inject(RssSubscriptions).add('https://blog.example.com/feed.xml', 'Example Blog');
+    const fixture = setUp();
+
+    const href = (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLAnchorElement>('a.feed-row-link')
+      ?.getAttribute('href');
+    expect(href).toBe('/accounts/rss:https:%2F%2Fblog.example.com%2Ffeed.xml');
+  });
+
   it('marks a disabled feed as off', () => {
     const subs = TestBed.inject(RssSubscriptions);
     subs.add('https://blog.example.com/feed.xml', 'Example Blog');

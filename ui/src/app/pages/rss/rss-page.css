@@ -8,17 +8,27 @@
 }
 
 .feed-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
   border-radius: 10px;
   background: var(--col-bg-alt, transparent);
 }
 
 .feed-row-off {
   opacity: 0.6;
+}
+
+.feed-row-link {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  color: inherit;
+}
+
+.feed-row-link:hover {
+  text-decoration: none;
+  background: var(--bg);
+  border-radius: 10px;
 }
 
 .names {

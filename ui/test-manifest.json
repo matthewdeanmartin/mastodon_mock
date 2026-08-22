@@ -1,5 +1,5 @@
 {
-  "testCount": 5010,
+  "testCount": 5011,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -1731,6 +1731,7 @@
     "src/app/pages/rss/add-feed-dialog/add-feed-dialog.spec.ts :: AddFeedDialog shows an error and does not emit on a failed fetch",
     "src/app/pages/rss/add-feed-dialog/add-feed-dialog.spec.ts :: AddFeedDialog subscribes and emits (added) + (closed) on success",
     "src/app/pages/rss/rss-page.spec.ts :: RssPage invites you to add a feed when there are none",
+    "src/app/pages/rss/rss-page.spec.ts :: RssPage links a feed row to its feed profile",
     "src/app/pages/rss/rss-page.spec.ts :: RssPage lists subscribed feeds with host and item count",
     "src/app/pages/rss/rss-page.spec.ts :: RssPage marks a disabled feed as off",
     "src/app/pages/rss/rss-page.spec.ts :: RssPage opens the add-feed dialog on click, closes it on (closed)",

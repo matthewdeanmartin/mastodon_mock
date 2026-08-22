@@ -9,6 +9,28 @@ Turn the Sprint 1 `/rss` skeleton (a flat list of feeds you can add to) into an 
 surface with the postures the boss described: track what's read, filter to starred/unread, and
 switch between a dense headline list and an expanded article list.
 
+## 2a-pre. Smart "Add a feed" (moved up from a future sprint, 2026-08-22)
+
+Sprint 1 shipped a plain paste-a-feed-URL dialog (`AddFeedDialog` / `RssAddFeed`). The boss wants a
+fallback ladder instead of a single fetch-or-fail attempt:
+
+1. **Direct fetch** — today's behavior, unchanged.
+2. **Mawkingbird Plus proxy** — if direct fails and the user's proxy is Mawkingbird Plus, retry
+   through it automatically rather than making the user click "try via proxy" themselves. (The
+   existing manual retry button stays for every *other* configured proxy — this step is specifically
+   about not making a paying Plus user do a step their subscription should skip. Confirm with the
+   boss whether "automatically" means genuinely no click, or one fewer click than today.)
+3. **Not a feed at all — discover one** — if the URL parses as HTML rather than RSS/Atom, look for
+   `<link rel="alternate" type="application/rss+xml">` / `atom+xml` references on that page (reusing
+   the `article`-route/CORS-proxy fetch plumbing already used for read-mode article expansion —
+   see [[project-mimb-readability]]). If exactly one feed is found, offer to subscribe to it
+   directly. If several, show a picker instead of guessing.
+
+This is a superset of what `RssAddFeed.add()` does today — extend that service (or wrap it) rather
+than duplicating the fetch/subscribe logic a second time. Step 3's discovery logic is the same
+capability Sprint 3's 3b (friend-link extraction) needs, so build the parser once and have both
+consumers call it, rather than writing it twice on two different sprints.
+
 ## 2a. Read-state store
 
 New service, same shape as `RssSubscriptions` (`providers/rss/rss-subscriptions.ts`):

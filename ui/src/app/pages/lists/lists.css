@@ -1,9 +1,13 @@
 /* Sits inside .page-head, which is 18px/800 — a button back that inherited
    those would read as a second title. Reset both explicitly, plus the usual
    <button> resets (border/background/font) since this is a button styled to
-   read as a text link, not a link. */
+   read as a text link, not a link. No float: unlike the old .section-picker
+   this replaced, it is .page-head's only content in this branch, not
+   something sitting beside a title — a float here pulled it out of flow
+   while .page-head's border-bottom (normal flow) stayed put, drawing a line
+   straight through the button. */
 .feeds-back {
-  float: right;
+  display: inline-block;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;

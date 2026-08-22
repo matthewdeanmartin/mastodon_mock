@@ -78,6 +78,15 @@ comments, share-to-Mastodon-with-highlight, "friends shared items" synthetic fee
 90-day read-state wipe, reader harmonization across long-post/tweet-storm/RSS-article (explicitly
 named as *not now* by the boss).
 
+## Why RSS gets primary nav and the other ~15 feed kinds don't (2026-08-22)
+
+Lists, tags, tag bundles, collections, endorsements, Twitter, four flavors of Bluesky feed — the
+Feeds hub has 15-20 kinds of feed by now, all sharing similar UI, and history here is that giving
+each one its own top-level nav slot doesn't scale (that's exactly the clutter this epic's Sprint 1
+fixed). RSS is the deliberate exception, not a precedent for un-collapsing the rest: it is a
+Mawkingbird Plus feature, and a paid feature earns the prominence a `…More` row or a Feeds-hub
+category can't give it. The other feed kinds stay inside the Feeds drill-down.
+
 ## Design decisions settled with the boss (2026-08-22)
 
 - **Feeds nav is a drill-down list, not an accordion and not the current dropdown-plus-scroll.**
