@@ -1,5 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { PlusSession } from '../account/plus-session';
+import { PageDiagnostics } from '../../page-diagnostics';
 
 /**
  * How many articles a free reader may expand per day.
@@ -43,7 +44,12 @@ export const FREE_DAILY_ARTICLES = 2;
 interface StoredQuota {
   /** Local calendar day, `YYYY-MM-DD`. */
   day: string;
+  /** Successful rendered articles charged against the free allowance. */
   count: number;
+  /** Fetch actions started after a free-tier entitlement decision. */
+  freeFetches: number;
+  /** Fetch actions started after a Plus entitlement decision. */
+  plusFetches: number;
 }
 
 /** Today, in the reader's own timezone. */
@@ -57,9 +63,17 @@ function today(): string {
 @Injectable({ providedIn: 'root' })
 export class ArticleQuota {
   private plus = inject(PlusSession);
+  private log = inject(PageDiagnostics);
 
-  /** Today's count, as a signal so the UI updates when it is spent. */
-  private used = signal(this.read().count);
+  /** Today's quota and fetch diagnostics, as one atomic stored record. */
+  private stored = signal(this.read());
+
+  /** Successful free-tier articles charged today. */
+  private used = computed(() => this.stored().count);
+
+  /** Fetch actions started on each tier today, including failed attempts. */
+  readonly freeFetches = computed(() => this.stored().freeFetches);
+  readonly plusFetches = computed(() => this.stored().plusFetches);
 
   /** True after the supporter service has answered for this page load. */
   private entitlementChecked = signal(false);
@@ -78,10 +92,11 @@ export class ArticleQuota {
    */
   readonly unlimited = computed(() => this.plus.isSupporter());
 
+  /** Free-tier expansions left, even while Plus makes the effective limit unlimited. */
+  readonly freeRemaining = computed(() => Math.max(0, FREE_DAILY_ARTICLES - this.used()));
+
   /** Expansions left today. `Infinity` for supporters. */
-  readonly remaining = computed(() =>
-    this.unlimited() ? Infinity : Math.max(0, FREE_DAILY_ARTICLES - this.used()),
-  );
+  readonly remaining = computed(() => (this.unlimited() ? Infinity : this.freeRemaining()));
 
   /**
    * Whether the fetch control should remain available.
@@ -97,7 +112,7 @@ export class ArticleQuota {
     // today's local counter already exhausted. Start the lookup immediately so
     // a returning subscriber is unlocked without having to visit Settings.
     if (this.remaining() === 0) {
-      void this.checkEntitlement();
+      void this.checkEntitlement('exhausted-on-load');
     }
   }
 
@@ -112,24 +127,46 @@ export class ArticleQuota {
    * needs no second lookup.
    */
   async authorize(): Promise<boolean> {
-    await this.checkEntitlement();
-    return this.remaining() > 0;
+    await this.checkEntitlement('article-fetch');
+    const allowed = this.remaining() > 0;
+    this.log.info('ArticleEntitlement', 'decision', {
+      tier: this.unlimited() ? 'plus' : 'free',
+      allowed,
+      remaining: this.unlimited() ? 'unlimited' : this.remaining(),
+      freeFetchesToday: this.freeFetches(),
+      plusFetchesToday: this.plusFetches(),
+    });
+    return allowed;
   }
 
   /** Perform the entitlement lookup once for this instance. */
-  private checkEntitlement(): Promise<void> {
+  private checkEntitlement(
+    trigger: 'article-fetch' | 'exhausted-on-load' | 'storage-refresh',
+  ): Promise<void> {
     if (this.entitlementChecked()) {
+      this.log.info('ArticleEntitlement', 'check:already-settled', {
+        trigger,
+        tier: this.unlimited() ? 'plus' : 'free',
+      });
       return Promise.resolve();
     }
     if (this.plus.isSupporter()) {
       this.entitlementChecked.set(true);
+      this.log.info('ArticleEntitlement', 'check:known-plus', { trigger });
       return Promise.resolve();
     }
     if (this.entitlementCheck) {
+      this.log.info('ArticleEntitlement', 'check:joined', { trigger });
       return this.entitlementCheck;
     }
 
+    this.log.info('ArticleEntitlement', 'check:start', {
+      trigger,
+      usedToday: this.used(),
+      remaining: this.remaining(),
+    });
     this.checkingEntitlement.set(true);
+    let failed = false;
     this.entitlementCheck = this.plus
       // `refresh()`, not `token()`: a fresh held free token can predate a
       // subscription bought in another tab. Reusing it would make this lookup
@@ -139,18 +176,26 @@ export class ArticleQuota {
       // PlusSession normally resolves failures to null. Keep the quota gate
       // defensive too: an account-service outage must settle to the free
       // posture, not become an unhandled rejection from the constructor.
-      .catch(() => undefined)
+      .catch(() => {
+        failed = true;
+      })
       .finally(() => {
         this.entitlementChecked.set(true);
         this.checkingEntitlement.set(false);
         this.entitlementCheck = null;
+        this.log.info('ArticleEntitlement', 'check:complete', {
+          trigger,
+          tier: this.unlimited() ? 'plus' : 'free',
+          failed,
+          remaining: this.unlimited() ? 'unlimited' : this.remaining(),
+        });
       });
     return this.entitlementCheck;
   }
 
   /** Today's stored counter, resetting a stale day on read. */
   private read(): StoredQuota {
-    const fresh: StoredQuota = { day: today(), count: 0 };
+    const fresh: StoredQuota = { day: today(), count: 0, freeFetches: 0, plusFetches: 0 };
     let raw: string | null;
     try {
       raw = localStorage.getItem(ARTICLE_QUOTA_KEY);
@@ -167,10 +212,34 @@ export class ArticleQuota {
       if (parsed.day !== today() || typeof parsed.count !== 'number') {
         return fresh;
       }
-      return { day: parsed.day, count: parsed.count };
+      const count = nonNegative(parsed.count);
+      return {
+        day: parsed.day,
+        count,
+        // Before fetch counters existed, `count` is the closest truthful lower
+        // bound: every charged article necessarily began as a free fetch.
+        freeFetches:
+          typeof parsed.freeFetches === 'number' ? nonNegative(parsed.freeFetches) : count,
+        plusFetches: nonNegative(parsed.plusFetches),
+      };
     } catch {
       return fresh;
     }
+  }
+
+  /** Record one click that is about to reach the article fetcher. */
+  recordFetch(): void {
+    const current = this.read();
+    const next: StoredQuota = this.unlimited()
+      ? { ...current, plusFetches: current.plusFetches + 1 }
+      : { ...current, freeFetches: current.freeFetches + 1 };
+    this.persist(next);
+    this.log.info('ArticleQuota', 'fetch:recorded', {
+      tier: this.unlimited() ? 'plus' : 'free',
+      freeFetchesToday: next.freeFetches,
+      plusFetchesToday: next.plusFetches,
+      remaining: this.unlimited() ? 'unlimited' : this.remaining(),
+    });
   }
 
   /**
@@ -183,22 +252,33 @@ export class ArticleQuota {
     if (this.unlimited()) {
       return Infinity;
     }
-    const next = this.read().count + 1;
-    this.used.set(next);
+    const current = this.read();
+    const next = { ...current, count: current.count + 1 };
+    this.persist(next);
+    return Math.max(0, FREE_DAILY_ARTICLES - next.count);
+  }
+
+  /** Publish and persist one complete daily record. */
+  private persist(next: StoredQuota): void {
+    this.stored.set(next);
     try {
-      localStorage.setItem(ARTICLE_QUOTA_KEY, JSON.stringify({ day: today(), count: next }));
+      localStorage.setItem(ARTICLE_QUOTA_KEY, JSON.stringify(next));
     } catch {
       // A counter we cannot persist is a counter that resets on reload. Not
       // worth failing the read the user already paid for.
     }
-    return Math.max(0, FREE_DAILY_ARTICLES - next);
   }
 
   /** Re-read from storage, for a browser that changed it in another tab. */
   refresh(): void {
-    this.used.set(this.read().count);
+    this.stored.set(this.read());
     if (this.remaining() === 0) {
-      void this.checkEntitlement();
+      void this.checkEntitlement('storage-refresh');
     }
   }
+}
+
+/** A finite, non-negative diagnostic counter, or zero for old/corrupt data. */
+function nonNegative(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
 }

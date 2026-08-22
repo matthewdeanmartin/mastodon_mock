@@ -679,12 +679,12 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     base: 'mockingbird_article_quota',
     storage: 'local',
     suffix: 'none',
-    // A count and a date, nothing else. Deliberately *not* a list of what was
+    // Counts and a date, nothing else. Deliberately *not* a list of what was
     // expanded: which articles someone read is exactly the kind of fact the
     // `private` tier exists for, and not recording it at all is better than
     // classifying it correctly.
     sensitivity: 'cache',
-    note: "Daily count of reader article expansions against the free limit, bucketed by local calendar day. A counter and a date — resetting it loses nothing but today's tally.",
+    note: "Daily counts of reader article fetches by free/Plus tier and successful expansions against the free limit, bucketed by local calendar day. Counters and a date only — resetting them loses nothing but today's tally.",
   },
   {
     base: 'mockingbird_first_run_preview',

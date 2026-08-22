@@ -22,6 +22,7 @@ import { VaultPreference } from '../../../providers/vault/vault-preference';
 import { VaultAdoption } from '../../../providers/vault/vault-adoption';
 import { FeatureFlags } from '../../../feature-flags';
 import { PLUS_PRICE_USD_PER_YEAR, visiblePlusBenefits } from '../../../plus-benefits';
+import { ArticleQuota, FREE_DAILY_ARTICLES } from '../../../providers/article/article-quota';
 
 /**
  * Settings → Mawkingbird Plus.
@@ -56,6 +57,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
   protected diagnostics = inject(PlusDiagnostics);
   private sync = inject(ProfileSync);
   private proxyUsageStore = inject(CorsProxyUsageStore);
+  protected articleQuota = inject(ArticleQuota);
   private log = inject(PageDiagnostics);
   private injector = inject(Injector);
   protected vault = inject(VaultService);
@@ -75,6 +77,7 @@ export class SettingsMawkingbirdPlus implements OnInit {
     visiblePlusBenefits((flag) => this.flags.enabled(flag)),
   );
   protected readonly priceUsd = PLUS_PRICE_USD_PER_YEAR;
+  protected readonly freeDailyArticles = FREE_DAILY_ARTICLES;
 
   protected readonly proxyUsage = this.proxyUsageStore.usage;
   protected readonly formatBytes = formatBytes;

@@ -25,6 +25,13 @@ describe('outboundLinks', () => {
     expect(outboundLinks('<a href="https://bsky.app/profile/x">post</a>')).toEqual([]);
   });
 
+  it('does not hide an unknown host merely because its article path starts with an at-sign', () => {
+    // Production regression: this exact shape made the whole fetch section
+    // disappear on a post whose one visible link was otherwise valid.
+    const url = 'https://famichiki.jp/@rmcauley/117133691283455910';
+    expect(outboundLinks(`<a href="${url}">article</a>`)).toEqual([url]);
+  });
+
   it('deduplicates a repeated link', () => {
     const html = '<a href="https://e.com/a">one</a><a href="https://e.com/a">two</a>';
     expect(outboundLinks(html)).toHaveLength(1);

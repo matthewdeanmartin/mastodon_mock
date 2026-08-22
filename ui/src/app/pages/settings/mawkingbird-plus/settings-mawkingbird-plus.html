@@ -560,6 +560,19 @@
           }
           <dt>Proxy requests, this browser</dt>
           <dd>{{ proxyUsage().requests | number }}</dd>
+          <dt>Free article fetches today</dt>
+          <dd>{{ articleQuota.freeFetches() | number }}</dd>
+          <dt>Plus article fetches today</dt>
+          <dd>{{ articleQuota.plusFetches() | number }}</dd>
+          <dt>Free article quota today</dt>
+          <dd>
+            @if (articleQuota.unlimited()) {
+              Unlimited while Plus is active ({{ articleQuota.freeRemaining() | number }} free-tier
+              reads remain today)
+            } @else {
+              {{ articleQuota.remaining() | number }} of {{ freeDailyArticles }} remaining
+            }
+          </dd>
           @for (row of diagnostics.collectionRows(); track row.collection) {
             <dt>{{ row.label }}</dt>
             <dd>{{ row.local | number }}</dd>

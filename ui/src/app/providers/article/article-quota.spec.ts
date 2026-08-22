@@ -3,6 +3,7 @@ import { signal } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlusSession } from '../account/plus-session';
 import { PLUS_BENEFITS } from '../../plus-benefits';
+import { PageDiagnostics } from '../../page-diagnostics';
 import { ARTICLE_QUOTA_KEY, ArticleQuota, FREE_DAILY_ARTICLES } from './article-quota';
 
 /** Enough of PlusSession to answer the one question the quota asks. */
@@ -20,11 +21,16 @@ function today(): string {
   return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}-${`${now.getDate()}`.padStart(2, '0')}`;
 }
 
-function build(plus = new FakePlusSession()): { quota: ArticleQuota; plus: FakePlusSession } {
+function build(plus = new FakePlusSession()) {
+  const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   TestBed.configureTestingModule({
-    providers: [ArticleQuota, { provide: PlusSession, useValue: plus }],
+    providers: [
+      ArticleQuota,
+      { provide: PlusSession, useValue: plus },
+      { provide: PageDiagnostics, useValue: log },
+    ],
   });
-  return { quota: TestBed.inject(ArticleQuota), plus };
+  return { quota: TestBed.inject(ArticleQuota), plus, log };
 }
 
 describe('ArticleQuota', () => {
@@ -66,7 +72,26 @@ describe('ArticleQuota', () => {
     const { quota } = build();
     quota.consume();
     const stored = JSON.parse(localStorage.getItem(ARTICLE_QUOTA_KEY) ?? '{}');
-    expect(stored).toEqual({ day: today(), count: 1 });
+    expect(stored).toEqual({
+      day: today(),
+      count: 1,
+      freeFetches: 0,
+      plusFetches: 0,
+    });
+  });
+
+  it('records free and Plus fetch actions separately without spending quota', () => {
+    const { quota, plus } = build();
+
+    quota.recordFetch();
+    quota.recordFetch();
+    plus.tier.set('plus');
+    quota.recordFetch();
+
+    expect(quota.freeFetches()).toBe(2);
+    expect(quota.plusFetches()).toBe(1);
+    expect(quota.freeRemaining()).toBe(FREE_DAILY_ARTICLES);
+    expect(quota.remaining()).toBe(Infinity);
   });
 
   it('never limits a supporter', () => {
@@ -122,7 +147,7 @@ describe('ArticleQuota', () => {
       ARTICLE_QUOTA_KEY,
       JSON.stringify({ day: today(), count: FREE_DAILY_ARTICLES }),
     );
-    const { quota, plus } = build();
+    const { quota, plus, log } = build();
 
     await expect(quota.authorize()).resolves.toBe(false);
 
@@ -130,6 +155,16 @@ describe('ArticleQuota', () => {
     expect(plus.token).toHaveBeenCalledOnce();
     expect(quota.checkingEntitlement()).toBe(false);
     expect(quota.allowed()).toBe(false);
+    expect(log.info).toHaveBeenCalledWith(
+      'ArticleEntitlement',
+      'check:complete',
+      expect.objectContaining({ tier: 'free', failed: false, remaining: 0 }),
+    );
+    expect(log.info).toHaveBeenCalledWith(
+      'ArticleEntitlement',
+      'decision',
+      expect.objectContaining({ tier: 'free', allowed: false, remaining: 0 }),
+    );
   });
 
   it('treats corrupt stored data as a fresh day', () => {

@@ -25,10 +25,12 @@ function isSocialNavigation(anchor: HTMLAnchorElement, url: URL): boolean {
   if (/\b(mention|hashtag|u-url)\b/.test(classes)) {
     return true;
   }
-  // A bare `/tags/foo` or `/@user` path on any host is fediverse navigation.
-  if (/^\/(tags|@)/.test(url.pathname)) {
-    return true;
-  }
+  // Do not infer a social link from the path alone. `/@author/article` is also
+  // a normal publishing shape, and even a link to an unfamiliar Fediverse host
+  // may be exactly what the reader asked to fetch. Known social hosts and links
+  // Mastodon explicitly classed as mentions/hashtags are enough evidence;
+  // rejecting every unknown host with an `/@` path made the fetch control
+  // silently disappear for perfectly usable links.
   return SOCIAL_LINK_PATTERN.test(url.hostname);
 }
 

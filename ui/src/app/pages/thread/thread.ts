@@ -3,6 +3,7 @@ import {
   computed,
   DestroyRef,
   ElementRef,
+  effect,
   inject,
   OnInit,
   signal,
@@ -45,10 +46,11 @@ import { messageStatus, parseMessageStatusRouteRef } from '../../providers/paste
 
 import { ArticleFetch } from '../../providers/article/article-fetch';
 import { ArticleQuota } from '../../providers/article/article-quota';
-import { articleTarget } from '../../providers/article/article-target';
+import { articleTarget, outboundLinks } from '../../providers/article/article-target';
 import { ArticleDiagnosis, ArticleResult } from '../../providers/article/article-models';
 import { renderMarkdown } from '../../providers/article/markdown-render';
 import { PreviewCardComponent } from '../../preview-card/preview-card';
+import { PageDiagnostics } from '../../page-diagnostics';
 /**
  * How many times "Try again" may re-fetch one article.
  *
@@ -58,6 +60,15 @@ import { PreviewCardComponent } from '../../preview-card/preview-card';
  * refusing site stops being asked.
  */
 const MAX_MANUAL_RETRIES = 2;
+
+/** A hostname safe for diagnostics even when an RSS item carries a malformed URL. */
+function hostname(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
 
 @Component({
   selector: 'app-thread',
@@ -88,6 +99,7 @@ export class Thread implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private log = inject(PageDiagnostics);
   private readingZen = inject(ReadingZen);
   private loadSub = new Subscription();
 
@@ -159,6 +171,39 @@ export class Thread implements OnInit {
   protected articleUrl = computed(() => {
     const root = this.chain()[0];
     return root ? articleTarget(root) : null;
+  });
+
+  /**
+   * Explain why the expansion control exists or disappeared.
+   *
+   * Target selection is heuristic and sits before every visible error state.
+   * Without this event, a false negative produces literally nothing: no
+   * button, no request, and no later entitlement/fetch logs.
+   */
+  private articleTargetDiagnostics = effect(() => {
+    if (!this.readerMode()) {
+      return;
+    }
+    const root = this.chain()[0];
+    if (!root) {
+      return;
+    }
+    const candidates = outboundLinks(root.content ?? '');
+    const target = this.articleUrl();
+    this.log.info('Article', 'target:decided', {
+      statusId: root.id,
+      provider: root.provider ?? 'mastodon',
+      candidateCount: candidates.length,
+      selected: target !== null,
+      selectedHost: target ? hostname(target) : null,
+      reason: target
+        ? root.provider === 'rss'
+          ? 'rss-item-url'
+          : 'single-outbound-link'
+        : candidates.length === 0
+          ? 'no-outbound-link'
+          : 'ambiguous-outbound-links',
+    });
   });
 
   /** True while a fetch is in flight. */
@@ -340,6 +385,7 @@ export class Thread implements OnInit {
         this.retries.update((n) => n + 1);
         await this.articles.forget(url);
       }
+      this.quota.recordFetch();
       const result = await this.articles.expand(url, force);
       this.expansion.set(result);
       // Only a rendered article counts against the daily limit.

@@ -8,6 +8,7 @@ import { VaultService } from '../../../providers/vault/vault-service';
 import { VAULT_TEST_ROLLOUT } from '../../../providers/vault/vault-preference';
 import { PlusFeatures } from '../../../providers/account/plus-features';
 import { PLUS_BENEFITS, PLUS_PRICE_USD_PER_YEAR } from '../../../plus-benefits';
+import { ArticleQuota } from '../../../providers/article/article-quota';
 
 /**
  * A stand-in for the real session, so these specs exercise the page's rendering
@@ -198,6 +199,31 @@ describe('SettingsMawkingbirdPlus', () => {
     expect(text).toContain('renews');
     expect(text).toContain('2027');
     expect(text).not.toContain('Support Mawkingbird —');
+  });
+
+  it('shows free and Plus article fetches with the remaining daily allowance', () => {
+    const quota = TestBed.inject(ArticleQuota);
+    quota.recordFetch();
+    quota.consume();
+    plus.tier.set('plus');
+    quota.recordFetch();
+    session.ready.set(true);
+    signedIn();
+
+    render();
+    const rows = new Map(
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('dt')).map(
+        (term) => [
+          (term.textContent ?? '').trim(),
+          (term.nextElementSibling?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        ],
+      ),
+    );
+
+    expect(rows.get('Free article fetches today')).toBe('1');
+    expect(rows.get('Plus article fetches today')).toBe('1');
+    expect(rows.get('Free article quota today')).toContain('Unlimited while Plus is active');
+    expect(rows.get('Free article quota today')).toContain('1 free-tier reads remain today');
   });
 
   it('tells a cancelled supporter when their support ends', () => {
