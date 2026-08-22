@@ -56,24 +56,32 @@
     <!-- Open this thread as a 1:1 chat. Enabled only when the whole thread is
          exactly you and one other person — group threads stay disabled (chat's
          multi-person experience isn't ready, and we'd rather not tempt anyone
-         into it). -->
-    @if (chatQueryParams(); as params) {
-      <a
-        class="btn btn-outline"
-        [routerLink]="['/conversations']"
-        [queryParams]="params"
-        title="Continue this conversation in chat"
-      >
-        💬 Open in chat
-      </a>
-    } @else {
-      <button
-        class="btn btn-outline"
-        disabled
-        title="Chat is only available for a two-person thread (you and one other)"
-      >
-        💬 Open in chat
-      </button>
+         into it), and shown that way with an explanation: a signed-in Mastodon
+         reader in a growing group thread can plausibly wonder why the button
+         went away. A read-only post (RSS, Bluesky, anonymous, Twitter) never
+         has a Mastodon DM to open at all — chatPartner() returns null on every
+         single view of one, not just sometimes — so there the disabled button
+         is not a state to explain, only permanent noise. Omitted entirely
+         there rather than rendered inert. -->
+    @if (!readOnlyPost()) {
+      @if (chatQueryParams(); as params) {
+        <a
+          class="btn btn-outline"
+          [routerLink]="['/conversations']"
+          [queryParams]="params"
+          title="Continue this conversation in chat"
+        >
+          💬 Open in chat
+        </a>
+      } @else {
+        <button
+          class="btn btn-outline"
+          disabled
+          title="Chat is only available for a two-person thread (you and one other)"
+        >
+          💬 Open in chat
+        </button>
+      }
     }
   </div>
 
@@ -171,6 +179,8 @@
             >
               @if (expanding()) {
                 Fetching article…
+              } @else if (expandsRssTeaser()) {
+                📄 Fetch rest of article
               } @else {
                 📄 Fetch article
               }

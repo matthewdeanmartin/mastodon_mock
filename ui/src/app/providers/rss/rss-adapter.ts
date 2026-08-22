@@ -258,6 +258,7 @@ export function itemToStatus(
     poll: null,
     quote_approval_policy: null,
     media_attachments: media,
+    rssFullContent: item.isFullContent,
   };
 }
 

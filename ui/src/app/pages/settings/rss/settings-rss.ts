@@ -144,6 +144,15 @@ export class SettingsRss implements OnInit {
         this.adding.set(false);
       },
       error: (err: Error) => {
+        // A Plus subscriber with no proxy configured yet is entitled to one
+        // right now — adopt it and retry silently rather than surfacing a
+        // failure for something their subscription should have prevented.
+        // See add-feed-dialog.ts for the fuller rationale.
+        if (!useProxy && this.proxySettings.missingEntitledProxy()) {
+          this.proxySettings.adoptSupporterProxy();
+          this.attemptAdd(url, true);
+          return;
+        }
         this.error.set(err.message);
         // Only offer the retry when it could plausibly help: a direct attempt
         // that failed, with a working proxy standing by.

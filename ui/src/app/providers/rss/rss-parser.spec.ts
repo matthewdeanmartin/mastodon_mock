@@ -61,6 +61,7 @@ describe('parseFeed', () => {
     expect(first.publishedAt).toBe('2026-07-13T10:00:00.000Z');
     // content:encoded (full body) wins over description.
     expect(first.html).toBe('<p>Full <b>HTML</b> body</p>');
+    expect(first.isFullContent).toBe(true);
     expect(first.enclosures).toEqual([
       { url: 'https://blog.example.com/pic.jpg', type: 'image/jpeg' },
     ]);
@@ -87,6 +88,11 @@ describe('parseFeed', () => {
     expect(second.html).toBe('plain text');
   });
 
+  it('marks a description-only item as not full content', () => {
+    // No content:encoded on this one — description is a teaser, not the piece.
+    expect(parseFeed(RSS2).items[1].isFullContent).toBe(false);
+  });
+
   it('parses Atom, preferring the rel="alternate" link', () => {
     const feed = parseFeed(ATOM);
     expect(feed.title).toBe('Atom Feed');
@@ -96,6 +102,23 @@ describe('parseFeed', () => {
     expect(entry.link).toBe('https://atom.example.com/one');
     expect(entry.publishedAt).toBe('2026-07-12T08:30:00Z'.replace('Z', '.000Z'));
     expect(entry.html).toBe('<p>Atom body</p>');
+    expect(entry.isFullContent).toBe(true);
+  });
+
+  it('marks a summary-only Atom entry as not full content', () => {
+    const summaryOnly = `<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom Feed</title>
+  <entry>
+    <title>Entry two</title>
+    <id>urn:uuid:2</id>
+    <link rel="alternate" href="https://atom.example.com/two"/>
+    <summary>Just a teaser</summary>
+  </entry>
+</feed>`;
+    const entry = parseFeed(summaryOnly).items[0];
+    expect(entry.html).toBe('Just a teaser');
+    expect(entry.isFullContent).toBe(false);
   });
 
   it('reads Atom threading: rel="replies", thr:total and category term', () => {

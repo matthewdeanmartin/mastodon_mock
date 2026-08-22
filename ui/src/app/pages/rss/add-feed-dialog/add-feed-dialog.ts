@@ -64,6 +64,20 @@ export class AddFeedDialog {
       },
       error: (err: Error) => {
         this.diagnostics.warn('RSS', 'add-feed-dialog:error', { message: err.message });
+        // A direct fetch just failed — almost always CORS. A Plus subscriber
+        // who has never configured a proxy is entitled to one right now, and
+        // asking them to find Settings -> Connections -> CORS proxy before a
+        // feed they just tried to add can work is exactly the "still being
+        // rate-limited at the free tier until they stumble across the right
+        // screen" problem CorsProxySettings.adoptSupporterProxy already exists
+        // to fix elsewhere (see the Plus welcome dialog and Plus settings
+        // page). Adopt it here too, then retry immediately and silently —
+        // no separate "try via proxy?" click for something already paid for.
+        if (!useProxy && this.proxySettings.missingEntitledProxy()) {
+          this.proxySettings.adoptSupporterProxy();
+          this.attempt(url, true);
+          return;
+        }
         this.error.set(err.message);
         if (!useProxy && this.proxySettings.usable()) {
           this.retryable.set(url);

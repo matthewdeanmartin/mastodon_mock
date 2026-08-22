@@ -496,6 +496,47 @@ describe('Thread', () => {
     expect(el.querySelector('.reader-original')).not.toBeNull();
   });
 
+  it('offers "Fetch rest of article" for a teaser-only RSS item', async () => {
+    // RSS_FEED's item has only <description>, no <content:encoded> — a
+    // publisher that expects the reader to click through for the rest.
+    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
+
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
+    await settleRssCache();
+    fixture.detectChanges();
+
+    const instance = fixture.componentInstance as unknown as {
+      canExpand(): boolean;
+      expandsRssTeaser(): boolean;
+    };
+    expect(instance.canExpand()).toBe(true);
+    expect(instance.expandsRssTeaser()).toBe(true);
+  });
+
+  it('suppresses expansion entirely for a full-content RSS item', async () => {
+    const fullFeed = `<?xml version="1.0"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel><title>B</title>
+  <item><title>Post</title><link>https://c.example/p</link><guid>g10</guid>
+  <description>&lt;p&gt;teaser&lt;/p&gt;</description>
+  <content:encoded>&lt;![CDATA[&lt;p&gt;the whole article, already here&lt;/p&gt;]]&gt;</content:encoded>
+  </item>
+</channel></rss>`;
+    const fixture = setUpWithId('rss:https://c.example/feed::g10');
+
+    await settleRssCache();
+    httpMock.expectOne('https://c.example/feed').flush(fullFeed);
+    await settleRssCache();
+    fixture.detectChanges();
+
+    const instance = fixture.componentInstance as unknown as { canExpand(): boolean };
+    expect(instance.canExpand()).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('.reader-expand')).toBeNull();
+  });
+
   it('shows the no-comment-feed note for RSS items without one', async () => {
     const feedNoComments = `<?xml version="1.0"?>
 <rss version="2.0"><channel><title>B</title>
@@ -570,6 +611,23 @@ describe('Thread', () => {
     fixture.detectChanges();
 
     expect(chatInternals(fixture).chatKey()).toBeNull();
+  });
+
+  it('hides "open in chat" entirely for a read-only RSS thread, rather than showing it disabled', async () => {
+    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
+
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
+    await settleRssCache();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('a.btn[href*="/conversations"]')).toBeNull();
+    // The disabled variant must be gone too, not just the enabled one — a
+    // permanently-inert control on every RSS view is noise, not information.
+    expect(el.querySelector('button[disabled][title*="two-person"]')).toBeNull();
   });
 
   it('does not offer chat for a Bluesky thread', () => {

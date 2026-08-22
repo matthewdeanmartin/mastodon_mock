@@ -17,6 +17,7 @@ function makeItem(overrides: Partial<ParsedItem> = {}): ParsedItem {
     link: 'https://blog.example.com/post',
     publishedAt: '2026-07-13T10:00:00.000Z',
     html: '<p>Body text</p>',
+    isFullContent: true,
     enclosures: [],
     categories: [],
     author: null,
@@ -73,6 +74,24 @@ describe('itemToStatus', () => {
     expect(status.visibility).toBe('public');
     expect(status.account.display_name).toBe('My Blog');
     expect(status.account.acct).toBe('blog.example.com');
+  });
+
+  it('carries the parsed item’s full-content flag onto the status', () => {
+    const full = itemToStatus(
+      makeItem({ isFullContent: true }),
+      'https://blog.example.com/feed.xml',
+      account,
+      FETCHED_AT,
+    );
+    expect(full.rssFullContent).toBe(true);
+
+    const teaser = itemToStatus(
+      makeItem({ isFullContent: false }),
+      'https://blog.example.com/feed.xml',
+      account,
+      FETCHED_AT,
+    );
+    expect(teaser.rssFullContent).toBe(false);
   });
 
   it('leads with the bold title when the body does not start with it', () => {

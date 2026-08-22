@@ -3,6 +3,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableProxyFlags } from '../../../testing/enable-proxy-flags';
+import { FeatureFlags } from '../../../feature-flags';
+import { SupporterStatus } from '../../../providers/account/supporter-status';
+import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import { RssCache } from '../../../providers/rss/rss-cache';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
@@ -90,6 +94,24 @@ describe('SettingsRss', () => {
     expect(
       (fixture.nativeElement as HTMLElement).querySelector('.feed-error')?.textContent,
     ).toContain("Couldn't reach this feed");
+  });
+
+  it('adopts a Plus subscriber onto the entitled proxy and retries silently', () => {
+    enableProxyFlags();
+    TestBed.inject(FeatureFlags).setState('proxy-mawkingbird-plus', 'production');
+    TestBed.inject(SupporterStatus).isSupporter.set(true);
+
+    fetchFeed.mockReturnValueOnce(throwError(() => new Error('CORS blocked')));
+    fetchFeed.mockReturnValueOnce(of({ title: 'Vox', link: null, items: [] }));
+
+    const fixture = setUp();
+    typeUrl(fixture, 'https://www.vox.com/rss/index.xml');
+    submit(fixture);
+
+    expect(fetchFeed).toHaveBeenCalledTimes(2);
+    expect(TestBed.inject(CorsProxySettings).currentId()).toBe('mawkingbird');
+    expect(TestBed.inject(RssSubscriptions).has('https://www.vox.com/rss/index.xml')).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('.feed-error')).toBeNull();
   });
 
   it('rejects non-http URLs and duplicates without fetching', () => {

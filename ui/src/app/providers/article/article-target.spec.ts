@@ -44,13 +44,26 @@ describe('outboundLinks', () => {
 });
 
 describe('articleTarget', () => {
-  it('uses an RSS item’s own URL', () => {
-    // The item *is* the article; this is the case the feature exists for.
+  it('uses an RSS item’s own URL when the feed only gave a teaser', () => {
+    // The item *is* the article, and the feed did not already hand over the
+    // full text — so there is genuinely more to fetch.
     const post = status('<p>summary</p>', {
       provider: 'rss',
       url: 'https://blog.example/post',
+      rssFullContent: false,
     });
     expect(articleTarget(post)).toBe('https://blog.example/post');
+  });
+
+  it('refuses to offer expansion for an RSS item that already has the full body', () => {
+    // Re-fetching the same URL the feed already gave us in full would spend
+    // quota and a request to redownload text already on screen.
+    const post = status('<p>the whole piece, already here</p>', {
+      provider: 'rss',
+      url: 'https://blog.example/post',
+      rssFullContent: true,
+    });
+    expect(articleTarget(post)).toBeNull();
   });
 
   it('takes the single outbound link from an ordinary post', () => {

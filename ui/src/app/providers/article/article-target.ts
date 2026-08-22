@@ -61,16 +61,24 @@ export function outboundLinks(contentHtml: string): string[] {
 }
 
 /**
- * The URL to expand for a post, or `null` when there is no unambiguous one.
+ * The URL to expand for a post, or `null` when there is nothing left to fetch.
  *
  * For an RSS item this is the item's own link — the item *is* the article, and
  * the whole point of the feature is bringing that article into the reader.
+ * But only when the feed did NOT already publish the full body: `content` for
+ * a full-content item (`rssFullContent: true`) already *is* the article, so
+ * expanding would spend a fetch and quota to re-download the same text the
+ * reader is already looking at. `null` here suppresses the button entirely for
+ * those items; a teaser-only item still resolves to its link, and the caller
+ * is expected to label that control "fetch rest of article" rather than
+ * "fetch article" — there IS more, just not here yet.
+ *
  * For everything else it is the single outbound link, when there is exactly
  * one.
  */
 export function articleTarget(post: Status): string | null {
   if (post.provider === 'rss') {
-    return post.url ?? null;
+    return post.rssFullContent ? null : (post.url ?? null);
   }
   const links = outboundLinks(post.content ?? '');
   return links.length === 1 ? links[0] : null;

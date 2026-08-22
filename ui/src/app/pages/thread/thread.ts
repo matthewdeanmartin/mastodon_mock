@@ -251,6 +251,22 @@ export class Thread implements OnInit {
   protected canExpand = computed(() => this.articleUrl() !== null);
 
   /**
+   * Whether the offered fetch is filling in the *rest* of an already-partial
+   * RSS item, rather than fetching an article from scratch. Purely a label
+   * decision — `articleTarget()` already refuses to offer expansion at all for
+   * a full-content RSS item, so by the time this is read the button is either
+   * a normal "Fetch article" (non-RSS, or an RSS teaser with nothing shown
+   * yet — same label works because nothing of the article is visible) or a
+   * teaser continuation, which reads as "Fetch article" too until you notice
+   * you already have half of it. Rendered as its own boolean rather than
+   * folding the string into the template, to keep the copy in one place.
+   */
+  protected expandsRssTeaser = computed(() => {
+    const root = this.chain()[0];
+    return root?.provider === 'rss' && root.rssFullContent === false;
+  });
+
+  /**
    * Why expansion cannot run right now, if it cannot.
    *
    * Separate from the diagnosis messages, which describe a *fetch* that already

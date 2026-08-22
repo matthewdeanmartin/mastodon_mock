@@ -16,6 +16,7 @@ function feed(title: string, itemCount = 3): ParsedFeed {
       link: null,
       publishedAt: null,
       html: '<p>x</p>',
+      isFullContent: true,
       enclosures: [],
       categories: [],
       author: null,

@@ -3,6 +3,10 @@ import { WritableSignal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableProxyFlags } from '../../../testing/enable-proxy-flags';
+import { FeatureFlags } from '../../../feature-flags';
+import { SupporterStatus } from '../../../providers/account/supporter-status';
+import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
 import { RssFetch } from '../../../providers/rss/rss-fetch';
 import { RssSubscriptions } from '../../../providers/rss/rss-subscriptions';
 import { AddFeedDialog } from './add-feed-dialog';
@@ -21,6 +25,7 @@ function feed(title: string, itemCount = 3) {
       link: null,
       publishedAt: null,
       html: '<p>x</p>',
+      isFullContent: true,
       enclosures: [],
       categories: [],
       author: null,
@@ -96,6 +101,31 @@ describe('AddFeedDialog', () => {
 
     expect(fetchFeed).not.toHaveBeenCalled();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('http://');
+  });
+
+  it('a Plus subscriber with no proxy configured is adopted onto one and retried silently', () => {
+    enableProxyFlags();
+    TestBed.inject(FeatureFlags).setState('proxy-mawkingbird-plus', 'production');
+    TestBed.inject(SupporterStatus).isSupporter.set(true);
+    expect(TestBed.inject(CorsProxySettings).currentId()).toBeNull();
+
+    // First (direct) call fails as CORS typically does; second (proxied) succeeds.
+    fetchFeed.mockReturnValueOnce(throwError(() => new Error('CORS blocked')));
+    fetchFeed.mockReturnValueOnce(of(feed('Vox', 20)));
+
+    const fixture = setUp();
+    const added = vi.fn();
+    fixture.componentInstance.added.subscribe(added);
+
+    typeUrl(fixture, 'https://www.vox.com/rss/index.xml');
+    submit(fixture);
+
+    expect(fetchFeed).toHaveBeenCalledTimes(2);
+    expect(TestBed.inject(CorsProxySettings).currentId()).toBe('mawkingbird');
+    expect(TestBed.inject(RssSubscriptions).has('https://www.vox.com/rss/index.xml')).toBe(true);
+    expect(added).toHaveBeenCalledTimes(1);
+    // No manual "try again" prompt shown — the retry already happened.
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Try again via');
   });
 
   it('emits (closed) on Cancel without subscribing', () => {

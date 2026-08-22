@@ -9,6 +9,7 @@ function item(publishedAt: string | null, html: string): ParsedItem {
     link: null,
     publishedAt,
     html,
+    isFullContent: true,
     enclosures: [],
     categories: [],
     author: null,

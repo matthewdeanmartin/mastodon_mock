@@ -9,6 +9,16 @@ export interface ParsedItem {
   publishedAt: string | null;
   /** Raw item HTML (content:encoded / description / atom:content) — NOT yet sanitized. */
   html: string;
+  /**
+   * Whether `html` came from a full-content field (RSS `content:encoded`, Atom
+   * `<content>`) rather than a summary field (`<description>`, Atom
+   * `<summary>`). Feeds are not required to publish full content — many
+   * publish only a teaser and expect the reader to click through — so this is
+   * what lets the reader tell "the whole piece is already here" from "there is
+   * more on the original page" instead of assuming one or the other for every
+   * RSS item alike.
+   */
+  isFullContent: boolean;
   /** Enclosure/media URLs with their MIME type when declared. */
   enclosures: { url: string; type: string | null }[];
   /** Category/tag labels (RSS <category>, Atom <category term>). */
@@ -110,7 +120,8 @@ function parseRssItem(item: Element): ParsedItem {
   const title = childText(item, 'title');
   const link = childText(item, 'link') || null;
   // content:encoded (full HTML) beats description (often a summary).
-  const html = childText(item, 'encoded') || childText(item, 'description');
+  const encoded = childText(item, 'encoded');
+  const html = encoded || childText(item, 'description');
   // Mastodon profile feeds use Media RSS <media:content>, while many classic
   // feeds use <enclosure>. Treat both as attachments.
   const enclosures = [...children(item, 'enclosure'), ...children(item, 'content')]
@@ -122,6 +133,7 @@ function parseRssItem(item: Element): ParsedItem {
     link,
     publishedAt: toIso(childText(item, 'pubDate')) ?? toIso(childText(item, 'date')),
     html,
+    isFullContent: encoded !== '',
     enclosures,
     categories: categories(item),
     author: rssAuthor(item),
@@ -134,13 +146,15 @@ function parseRssItem(item: Element): ParsedItem {
 function parseAtomEntry(entry: Element): ParsedItem {
   const title = childText(entry, 'title');
   const link = atomLink(entry);
-  const html = childText(entry, 'content') || childText(entry, 'summary');
+  const content = childText(entry, 'content');
+  const html = content || childText(entry, 'summary');
   return {
     guid: childText(entry, 'id') || link || hash(title + html),
     title,
     link,
     publishedAt: toIso(childText(entry, 'published')) ?? toIso(childText(entry, 'updated')),
     html,
+    isFullContent: content !== '',
     enclosures: [],
     categories: categories(entry),
     author: atomAuthor(entry),

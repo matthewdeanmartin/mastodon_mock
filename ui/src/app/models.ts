@@ -186,6 +186,14 @@ export interface Status {
    * `hide` drops it. Absent on foreign providers and older servers.
    */
   filtered?: FilterResult[];
+  /**
+   * RSS only: whether `content` is the feed's full article body
+   * (`content:encoded` / Atom `<content>`) rather than a teaser
+   * (`<description>` / `<summary>`). Reader mode uses this to suppress or
+   * relabel "Fetch article" — see `providers/article/article-target.ts`.
+   * Undefined on every non-RSS provider.
+   */
+  rssFullContent?: boolean;
 }
 
 /** One matched filter on a status (`Status.filtered[]`). */
