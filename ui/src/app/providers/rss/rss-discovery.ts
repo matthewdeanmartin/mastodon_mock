@@ -105,9 +105,11 @@ export function feedLinksIn(html: string, baseUrl: string): { url: string; title
  * nothing subscribes on the user's behalf, because a reading list somebody did
  * not choose is not a reading list.
  *
- * It is not general feed discovery ("paste any URL, find its feeds"), which the
- * epic defers: that needs its own design pass around caching, rate limiting and
- * what to do with sites that declare twenty feeds.
+ * It is not general feed discovery ("paste any URL, find its feeds") — that is
+ * {@link PasteResolve}, which handles the caching, the rate limiting and the
+ * sites that declare twenty feeds. The two share {@link feedLinksIn} and differ
+ * in what starts them: this one sweeps a timeline nobody curated, so it only
+ * ever suggests; the resolver acts on a URL somebody deliberately pasted.
  *
  * ## Cost
  *

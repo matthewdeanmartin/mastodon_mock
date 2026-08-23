@@ -1,6 +1,6 @@
 # RSS — Epic overview: the reading page
 
-Status: COMPLETE (written 2026-08-22; all four sprints shipped 2026-08-22)
+Status: Sprints 1-4 COMPLETE (2026-08-22). Second wave begun: Sprint 5 shipped 2026-08-23.
 
 Builds on the existing RSS foundation: `RssSubscriptions`, `RssFetch`, `RssCache`, `RssProvider`,
 OPML import/export, and per-feed CORS-proxy opt-in all already exist and work
@@ -103,13 +103,37 @@ itself.
    follow. Long-form article view in the right pane reuses the reader-1 extraction pipeline
    (`ArticleFetch`) instead of building a second one; adds pagination on top of it.
 
-**Deferred past Sprint 4** (explicitly out of scope until re-planned): in-app feed discovery via
-site-HTML link-rel scraping beyond the friend-link case (Sprint 4 ships only the
-external-search-tab version plus friend-link discovery; general "paste any site, find its feeds"
-needs its own design pass), RSS comments, share-to-Mastodon-with-highlight, "friends shared items"
-synthetic feed, 90-day read-state wipe, reader harmonization across long-post/tweet-storm/RSS-article
-(explicitly named as *not now* by the boss), Home megatweets/tweet-storms appearing in the split
-pane's left rail (named as "someday," not scheduled).
+5. **Sprint 5 — DONE (2026-08-23).** [[rss-5-paste-any-url]]. General feed discovery: one box that
+   takes a site URL, a feed URL, a fediverse handle or a bare domain and works out what was meant.
+   Removes the view-source step that gated every RSS feature behind being a developer — named by the
+   boss as the top priority of the second wave ("my total addressable market for subs drops 99% as
+   long as features like that exist"). A site declaring several feeds shows all of them with the
+   best pre-picked; **a fediverse handle offers Follow first**, with RSS as a deliberately
+   de-emphasised secondary option.
+
+**Deferred past Sprint 5** (explicitly out of scope until re-planned): RSS comments (see below),
+"friends shared items" synthetic feed, reader harmonization across long-post/tweet-storm/RSS-article
+(explicitly named as *not now* by the boss, and reaffirmed 2026-08-23), Home megatweets/tweet-storms
+appearing in the split pane's left rail (named as "someday," not scheduled).
+
+**Planned next**: share-to-any-ecosystem (over `compose/post-targets.ts`, not Mastodon-only) and the
+90-day read-state prune (client-side — read state lives only in `localStorage`, so there is no
+server job to write).
+
+### RSS comments — the options, for whenever this is picked up
+
+Nothing in `spec/` covers this; the formats offer three routes, only one of which carries content:
+
+| Option | What it gives | Verdict |
+| --- | --- | --- |
+| `<comments>` (RSS 2.0) | A URL to the comment *page* | Trivial, but it is only a link out |
+| `slash:comments` | A comment *count* | Trivial; useful as a ranking/filter signal, no content |
+| `wfw:commentRss` | A whole *second feed* of the comments | The only one with real content — and `RssFetch` already parses it, so it is the same code path rendered as a thread |
+
+`wfw:commentRss` is the real answer. Note the hard limit both [[posse-0-overview]] and
+[[hugo-0-overview]] already establish: **receiving** anything requires a listening server, which
+this app will never be. So RSS comments are strictly read-only, and only where the publisher
+chooses to publish them. Low value density; deferred rather than dropped.
 
 ## Why RSS gets primary nav and the other ~15 feed kinds don't (2026-08-22)
 
@@ -134,7 +158,14 @@ category can't give it. The other feed kinds stay inside the Feeds drill-down.
 - **Feed discovery is two features, both roadmapped, both simple**: (a) a button that opens an
   external search engine in a new tab (zero backend, ships Sprint 3), and (b) paste a *site* URL
   (not a feed URL) and reuse the existing article-fetch machinery to pull the HTML and find
-  `<link rel=alternate>` feed references client-side. (b) needs its own sizing — not committed to a
-  sprint number yet.
+  `<link rel=alternate>` feed references client-side. **(b) shipped in Sprint 5**, generalised well
+  past a site URL: the same box also takes feed URLs, fediverse handles and bare domains.
+- **A fediverse handle offers Follow, not RSS** (settled 2026-08-23, correcting Sprint 4a). Sprint
+  4a noticed that any Mastodon `.rss` sends `ACAO: *` and treated needing no proxy as a reason to
+  reach for it. That optimises our convenience, not the user's: following gets replies, boosts and
+  notifications, where the feed gets public top-level posts in a reader. RSS stays available as a
+  secondary option — high-volume accounts you want to read rather than follow, or accounts on a
+  defederated server are real cases — but it must never be the default. As the boss put it: "stop
+  over indexing on using RSS to subscribe to mastodon."
 - **Article view reuses the readability pipeline**, not a second extractor. One extraction path,
   two entry points (reader-mode expansion, `/rss` article view).
