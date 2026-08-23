@@ -48,6 +48,61 @@
   </div>
 }
 
+<div class="kits discovery">
+  <h3>Feeds from people you follow</h3>
+  <p class="muted small">
+    Checks the sites linked in your timeline for an RSS or Atom feed. Nothing is subscribed until
+    you say so.
+  </p>
+
+  @if (!discovery.available()) {
+    <p class="muted small">
+      This needs a <a routerLink="/settings/rss">CORS proxy</a> — the sites have to be fetched from
+      your browser.
+    </p>
+  } @else {
+    <button class="btn" type="button" [disabled]="discovery.running()" (click)="findFriendFeeds()">
+      @if (discovery.running()) {
+        Checking sites…
+      } @else {
+        Look for feeds
+      }
+    </button>
+  }
+
+  @if (discovery.error(); as error) {
+    <p class="muted small">{{ error }}</p>
+  }
+
+  @if (discovery.found().length) {
+    <ul class="kit-list">
+      @for (feed of discovery.found(); track feed.url) {
+        <li class="kit">
+          <span class="kit-icon" aria-hidden="true">📡</span>
+          <span class="kit-text">
+            <span class="kit-title">{{ feed.title }}</span>
+            <span class="muted small">{{ feed.siteUrl }}</span>
+            <span class="muted small">linked by &commat;{{ feed.via }}</span>
+          </span>
+          <button
+            class="btn"
+            type="button"
+            [disabled]="adding() !== null"
+            (click)="addDiscovered(feed)"
+          >
+            {{ adding() === feed.url ? 'Adding…' : 'Add' }}
+          </button>
+        </li>
+      }
+    </ul>
+  } @else if (searched() && !discovery.running()) {
+    <p class="muted small">
+      No feeds found on the {{ discovery.checked() }} site{{ discovery.checked() === 1 ? '' : 's' }}
+      checked. Many sites don't declare one, and some block being read this way.
+    </p>
+  }
+</div>
+
 @if (installer.report(); as report) {
   <p class="kit-report" role="status">
     @if (report.added) {

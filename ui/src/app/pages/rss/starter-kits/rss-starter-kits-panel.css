@@ -102,3 +102,10 @@
     white-space: normal;
   }
 }
+
+/* Discovery reuses the kit card layout — a suggested feed and an offered kit
+   are the same shape of thing (an icon, a name, a source, one Add button), and
+   inventing a second row style for them would be noise. */
+.discovery {
+  margin-top: 16px;
+}

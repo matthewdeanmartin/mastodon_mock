@@ -1,0 +1,84 @@
+.rss-article {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.btn-sm {
+  font-size: 13px;
+  padding: 4px 10px;
+  align-self: flex-start;
+}
+
+/* Reading measure, not pane width: a 900px line is hard to track back from.
+   The article is the one thing in this pane meant to be read continuously. */
+.article-body {
+  max-width: 68ch;
+  line-height: 1.6;
+}
+
+.article-body :is(h1, h2, h3) {
+  line-height: 1.25;
+  margin: 1.2em 0 0.4em;
+}
+
+.article-body p {
+  margin: 0 0 1em;
+}
+
+.article-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* Code and tables get their own scroller so a wide listing cannot make the
+   whole pane scroll sideways. */
+.article-body pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.article-body blockquote {
+  margin: 0 0 1em;
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.pager .btn-sm {
+  align-self: auto;
+}
+
+.quota {
+  margin-left: 8px;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+/* Available to assistive tech, invisible on screen. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

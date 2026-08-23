@@ -14,6 +14,7 @@ import { RssReadState } from '../../providers/rss/rss-read-state';
 import { ClientPrefs, RssDensity } from '../../client-prefs';
 import { HeadlineRow } from './headline-row/headline-row';
 import { SeenWhenScrolled } from './seen-when-scrolled';
+import { RssArticle } from './rss-article/rss-article';
 
 /** A URL's hostname, or null when it isn't a parseable absolute URL. */
 function hostOf(url: string): string | null {
@@ -78,6 +79,7 @@ interface RailGroup {
     RssStarterKitsPanel,
     HeadlineRow,
     SeenWhenScrolled,
+    RssArticle,
   ],
   templateUrl: './rss-page.html',
   styleUrl: './rss-page.css',
