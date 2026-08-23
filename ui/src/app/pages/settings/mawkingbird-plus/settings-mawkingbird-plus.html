@@ -593,8 +593,9 @@
           if you never subscribe or if you stop.
         </p>
         <p>
-          What a subscription buys is a raised proxy limit and somewhere on your account to keep
-          things, so they follow you between browsers. The free column is what you keep either way.
+          A subscription buys two things: articles open here instead of in another tab, and
+          everything you set up shows up on your other devices. The free column is what you keep
+          either way.
         </p>
         <!--
           Rendered from PLUS_BENEFITS rather than written out, because the prose
@@ -621,6 +622,16 @@
             }
           </tbody>
         </table>
+        <!--
+          The exact numbers deliberately are not above. "60 requests a minute"
+          tells a reader nothing about whether it is enough for them, and it cost
+          the table two rows of jargon to say. It lives on /plans instead, in
+          full, for the reader who wants it.
+        -->
+        <p class="muted small">
+          <a routerLink="/plans">See exactly what free and Plus include</a> — every limit, and what
+          changes when you sign in.
+        </p>
         <p class="muted small">
           More may follow; none of it is promised. Anything already stored on your account stays
           readable and exportable whether or not you keep subscribing.
@@ -673,10 +684,10 @@
         per account and already refused writes without one.
       -->
       <p>
-        Signing in is optional — Mawkingbird works without an account. What it adds is a place on
-        your account to keep lists, feeds, your trust list and settings, so they follow you to your
-        other browsers, and a raised proxy rate limit if you subscribe. Everything kept in this
-        browser stays here either way.
+        Signing in is optional — Mawkingbird works without an account. What it adds is somewhere to
+        keep what you set up, so it is waiting for you on your phone and your other computers
+        instead of only here. Everything already in this browser stays here either way.
+        <a routerLink="/plans">See what free and Plus each include.</a>
       </p>
 
       @if (linkSent()) {

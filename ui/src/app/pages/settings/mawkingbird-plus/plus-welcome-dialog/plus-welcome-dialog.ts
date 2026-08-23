@@ -77,7 +77,7 @@ export class PlusWelcomeDialog {
     this.activeFeatures.map((feature) => ({
       feature,
       on: this.choices()[feature],
-      label: LABELS[feature],
+      label: PLUS_FEATURE_LABELS[feature],
       detail: DETAILS[feature],
     })),
   );
@@ -121,20 +121,32 @@ export class PlusWelcomeDialog {
   }
 }
 
-const LABELS: Record<PlusFeature, string> = {
-  corsProxy: 'Mawkingbird CORS proxy',
-  trustSync: 'Trusted accounts',
-  listsSync: 'Client lists',
-  feedsSync: 'RSS subscription list',
-  apiKeys: 'Encrypted connection keys',
+/**
+ * These stay itemized while the pitch in `plus-benefits.ts` does not, and that
+ * is not an inconsistency.
+ *
+ * The offer table answers "why would I pay for this", where four rows saying
+ * the same thing about different nouns is noise. This dialog answers "which of
+ * these do you want switched on", and each row here *is* a separate switch. A
+ * merged row would be a checkbox that silently controls four things.
+ *
+ * What both share is the vocabulary: these say what shows up on the other
+ * device, not which store the bytes land in.
+ */
+export const PLUS_FEATURE_LABELS: Record<PlusFeature, string> = {
+  corsProxy: 'Open articles in the app',
+  trustSync: 'Who you trust',
+  listsSync: 'Your lists',
+  feedsSync: 'Your feeds',
+  apiKeys: 'Your saved connection keys',
 };
 
 const DETAILS: Record<PlusFeature, string> = {
-  corsProxy: 'Fetch feeds and pages that block browsers directly. Uses your Plus rate limit.',
-  trustSync: 'Who you trust, kept per Mastodon account.',
-  listsSync: 'Your lists, stored on your account instead of only in this browser.',
-  feedsSync: 'The list of feeds you subscribe to — not the articles themselves.',
-  apiKeys: 'Keep low-churn connector credentials encrypted and available on your other devices.',
+  corsProxy: 'Read the whole article here instead of opening it in another tab.',
+  trustSync: 'Follows you to your other devices. Kept separate for each Mastodon account.',
+  listsSync: 'The lists you make here show up on your phone and your other computers.',
+  feedsSync: 'The feeds you subscribe to — the list itself, not the articles in it.',
+  apiKeys: 'Connect a service once and it stays connected on your other devices. Encrypted.',
 };
 
 const PLANNED_LABELS: Record<PlannedFeature, string> = {

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { PlusWelcomeDialog } from './plus-welcome-dialog';
+import { PLUS_FEATURE_LABELS, PlusWelcomeDialog } from './plus-welcome-dialog';
 import { PlusFeatures, PLUS_FEATURES_KEY } from '../../../../providers/account/plus-features';
 import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import { SupporterStatus } from '../../../../providers/account/supporter-status';
@@ -80,7 +80,10 @@ describe('PlusWelcomeDialog', () => {
     const testFixture = TestBed.createComponent(PlusWelcomeDialog);
     testFixture.detectChanges();
     const rows = [...(testFixture.nativeElement as HTMLElement).querySelectorAll('.pw-row')];
-    const apiKeys = rows.find((row) => row.textContent?.includes('Encrypted connection keys'));
+    // Found by the label the dialog actually renders, not a copy of it typed
+    // here. This test used to hard-code the wording and broke the first time the
+    // row was reworded — which told us nothing about the behaviour it guards.
+    const apiKeys = rows.find((row) => row.textContent?.includes(PLUS_FEATURE_LABELS.apiKeys));
 
     expect(apiKeys).toBeDefined();
     expect(apiKeys?.classList.contains('pw-row-planned')).toBe(false);

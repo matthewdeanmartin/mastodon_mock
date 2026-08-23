@@ -3173,7 +3173,7 @@
     "src/app/providers/article/article-quality.spec.ts :: measure counts words from the markdown, not the markup",
     "src/app/providers/article/article-quality.spec.ts :: measure reports zero density for text with no links",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota counts down and then refuses",
-    "src/app/providers/article/article-quota.spec.ts :: ArticleQuota keeps the subscription page aligned with the enforced article benefit",
+    "src/app/providers/article/article-quota.spec.ts :: ArticleQuota keeps the subscription pitch aligned with the enforced article benefit",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota never limits a supporter",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota persists the count under today’s date",
     "src/app/providers/article/article-quota.spec.ts :: ArticleQuota re-reads storage on refresh",

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsMawkingbirdPlus } from './settings-mawkingbird-plus';
 import { PlusSession } from '../../../providers/account/plus-session';
@@ -54,6 +55,9 @@ describe('SettingsMawkingbirdPlus', () => {
     TestBed.configureTestingModule({
       imports: [SettingsMawkingbirdPlus],
       providers: [
+        // The page links to /plans for the numbers its pitch deliberately
+        // leaves out, so rendering it needs a router.
+        provideRouter([]),
         { provide: MawkingbirdSession, useValue: session },
         { provide: PlusSession, useValue: plus },
       ],
@@ -468,6 +472,7 @@ describe('SettingsMawkingbirdPlus test vault rollout', () => {
     TestBed.configureTestingModule({
       imports: [SettingsMawkingbirdPlus],
       providers: [
+        provideRouter([]),
         { provide: MawkingbirdSession, useValue: session },
         { provide: PlusSession, useValue: plus },
         { provide: VaultService, useValue: vault },

@@ -225,17 +225,22 @@ describe('Shell account switching', () => {
     expect(badge().textContent).toContain('Free');
     expect(badge().getAttribute('href')).toBe('/settings/mawkingbird-plus');
     expect(popover.textContent).toContain('Mawkingbird Free');
-    expect(popover.textContent).toContain('2 fetched articles each day');
-    expect(popover.textContent).toContain('Unlimited article expansions');
+    // The free column is shown to a free reader and the Plus column beside it,
+    // so the badge is a comparison. No numbers: the popover has no room to say
+    // what "60 a minute" means, and a number nobody can scale is worse than a
+    // plain sentence. They live on /plans.
+    expect(popover.textContent).toContain('A couple of full articles a day');
+    expect(popover.textContent).toContain('Open as many as you like');
     expect(popover.textContent).toContain('$30 a year');
 
     plan.state.set('plus');
     fixture.detectChanges();
 
     expect(badge().textContent).toContain('Plus');
-    expect(popover.textContent).toContain('Your paid Plus benefits are active');
-    expect(popover.textContent).not.toContain('2 fetched articles each day');
-    expect(popover.textContent).toContain('Unlimited article expansions');
+    expect(popover.textContent).toContain('your subscription is active');
+    // A subscriber is told what they have, not what they are missing.
+    expect(popover.textContent).not.toContain('A couple of full articles a day');
+    expect(popover.textContent).toContain('Open as many as you like');
     drainRailRequests();
   });
 

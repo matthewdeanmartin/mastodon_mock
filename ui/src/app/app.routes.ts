@@ -739,6 +739,15 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/funding/funding').then((m) => m.Funding),
       },
       {
+        // "Plans" — the exhaustive free/signed-in/Plus reference. Deliberately
+        // outside `/settings`, and reachable signed out: it is the page the
+        // upgrade pitch links to for its numbers, and someone weighing whether
+        // to sign up at all must be able to read it without an account.
+        path: 'plans',
+        title: 'Plans',
+        loadComponent: () => import('./pages/plans/plans').then((m) => m.Plans),
+      },
+      {
         path: 'server-rules',
         title: 'Server rules',
         loadComponent: () => import('./pages/server-rules/server-rules').then((m) => m.ServerRules),

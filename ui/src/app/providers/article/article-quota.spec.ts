@@ -45,11 +45,27 @@ describe('ArticleQuota', () => {
     expect(quota.allowed()).toBe(true);
   });
 
-  it('keeps the subscription page aligned with the enforced article benefit', () => {
-    const benefit = PLUS_BENEFITS.find((row) => row.id === 'article-reader');
+  // The pitch used to quote FREE_DAILY_ARTICLES directly and this test held the
+  // two together. It no longer does: "a couple of full articles a day" is
+  // deliberately soft, because the number told a reader nothing about whether
+  // it was enough for them. The exact figure moved to the /plans page, which
+  // imports the constant rather than typing it — so drift is now prevented by
+  // construction there instead of by assertion here.
+  //
+  // What still needs guarding is the claim, not the digit: the row must not
+  // promise a free tier the quota does not grant, or an unlimited paid tier the
+  // quota does not honour.
+  it('keeps the subscription pitch aligned with the enforced article benefit', () => {
+    const benefit = PLUS_BENEFITS.find((row) => row.id === 'read-here');
 
-    expect(benefit?.free).toContain(String(FREE_DAILY_ARTICLES));
-    expect(benefit?.plus).toContain('Unlimited');
+    expect(benefit).toBeDefined();
+    // A free allowance is advertised, so there must be one.
+    expect(FREE_DAILY_ARTICLES).toBeGreaterThan(0);
+
+    const { quota, plus } = build();
+    plus.tier.set('plus');
+    expect(quota.unlimited()).toBe(true);
+    expect(benefit?.plus.toLowerCase()).toContain('as many as you like');
   });
 
   it('counts down and then refuses', () => {
