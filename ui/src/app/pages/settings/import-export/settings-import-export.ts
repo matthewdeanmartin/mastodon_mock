@@ -8,6 +8,7 @@ import { ImportFollows, parseHandles } from '../../../import-follows';
 import { Account, ImportReport } from '../../../models';
 import { environment } from '../../../../environments/environment';
 import { ContactDiscovery } from './contact-discovery';
+import { contactPickerAvailable, pickContacts } from './contact-picker';
 import { GitHubSession } from '../../../providers/github/github-session';
 import { GitHubFriendDiscovery, GitHubFriendStatus } from './github-friend-discovery';
 import {
@@ -415,8 +416,51 @@ export class SettingsImportExport {
     const file = input.files?.[0];
     if (!file) return;
     this.contactFileName.set(file.name);
+    this.contactPickerError.set(null);
     file.text().then((text) => this.contactDiscovery.load(text));
     input.value = '';
+  }
+
+  /**
+   * Whether to offer the phone's own contact picker.
+   *
+   * Read once at construction rather than per-render: the answer is a property
+   * of the browser and cannot change while the page is open.
+   */
+  protected readonly canPickContacts = contactPickerAvailable();
+
+  /** A picker failure worth showing, or null. Cleared by the next attempt. */
+  protected readonly contactPickerError = signal<string | null>(null);
+
+  /**
+   * Open the phone's contact picker and search for whoever was chosen.
+   *
+   * Everything downstream is the CSV path's code — the picker only supplies the
+   * contacts. Deliberately does **not** start searching on its own: the budget
+   * control sits right there and spending someone's API calls without a second
+   * tap would be the app deciding how much to spend on their behalf.
+   */
+  protected async pickPhoneContacts(): Promise<void> {
+    this.contactPickerError.set(null);
+    const outcome = await pickContacts();
+    switch (outcome.kind) {
+      case 'picked':
+        // Replaces whatever a CSV had loaded, exactly as choosing a second CSV
+        // would. Two contact sets merged into one list would make the counts on
+        // screen unexplainable.
+        this.contactFileName.set(null);
+        this.contactDiscovery.loadContacts(outcome.result);
+        break;
+      case 'failed':
+        this.contactPickerError.set(outcome.message);
+        break;
+      case 'unsupported':
+        this.contactPickerError.set('This browser cannot open a contact picker.');
+        break;
+      case 'cancelled':
+        // Nothing chosen, nothing to say.
+        break;
+    }
   }
 
   protected startContactSearch(): void {
@@ -432,6 +476,7 @@ export class SettingsImportExport {
 
   protected clearContactSearch(): void {
     this.contactFileName.set(null);
+    this.contactPickerError.set(null);
     this.contactDiscovery.reset();
   }
 

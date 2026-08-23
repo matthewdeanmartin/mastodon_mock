@@ -920,14 +920,39 @@
     </fieldset>
   </section>
 
-  <section class="friend-section contact-section">
+  <!-- `id` so /find-friends can link straight here: this page is long, and a
+       reader sent from the hub should not have to scroll past four other
+       importers to reach the one they were promised. -->
+  <section id="contacts" class="friend-section contact-section">
     <h2>Find contacts on Mastodon</h2>
     <p class="muted small">
-      Upload a Google Contacts CSV to look for possible matches through your home server. The file
-      stays in this browser; only derived search terms are sent to your server. Nobody is followed
-      automatically. Names, usernames, domains, and profile links are clues—not proof of identity.
+      Look for the people in your contacts through your home server. Your contacts stay in this
+      browser; only derived search terms are sent to your server. Nobody is followed automatically.
+      Names, usernames, domains, and profile links are clues—not proof of identity.
     </p>
+    <!--
+      Only where it can work. The Contact Picker API is Chrome-on-Android only,
+      and a button that does nothing on this device is noise beside a CSV
+      importer that works everywhere. Not disabled-with-a-reason: the reason
+      would be about browsers, which is not the reader's problem to solve.
+    -->
+    @if (canPickContacts) {
+      <p class="muted small">
+        On this phone you can pick contacts directly — no export, no file. Your browser shows the
+        picker and this page only ever sees the people you tap.
+      </p>
+    }
     <div class="contact-controls">
+      @if (canPickContacts) {
+        <button
+          type="button"
+          class="btn"
+          (click)="pickPhoneContacts()"
+          [disabled]="contactDiscovery.running()"
+        >
+          Pick from my contacts…
+        </button>
+      }
       <label class="btn btn-outline file-btn">
         Choose contacts CSV…
         <input
@@ -970,6 +995,10 @@
       }
     </div>
 
+    @if (contactPickerError(); as message) {
+      <p class="config-error" role="alert">{{ message }}</p>
+    }
+
     @if (contactDiscovery.parseResult(); as parsed) {
       <div class="contact-summary" aria-live="polite">
         <strong>{{ parsed.contacts.length }} contacts ready to search</strong>
@@ -982,6 +1011,12 @@
           <span class="muted small"
             >Loaded <code>{{ name }}</code> only in this browser.</span
           >
+        } @else {
+          <!-- The picked-contacts case. Says where they came from and, more
+               importantly, that they are not being kept. -->
+          <span class="muted small">
+            Picked from your contacts. Nothing was saved — closing this page forgets them.
+          </span>
         }
       </div>
     }

@@ -1,13 +1,58 @@
 # UX Sprint — Finding people from phone contacts
 
-Status: **RESEARCH DONE, NOT APPROVED TO BUILD** (written 2026-08-23)
+Status: **SHIPPED** (researched and built 2026-08-23)
 
 Raised as part of the first-five-minutes batch:
 
 > "Some way to integrate with phone contacts from website?"
 
-Researched rather than built, on request. This document exists so whoever picks it up does
-not have to rediscover why the obvious version does not work.
+The research below recommended deferring. **That recommendation was overruled, correctly:**
+
+> "This is going to be name matching. We have done this before, see other attempts at
+> account correlation. The poor user with a friend named John Doe is going to get bad
+> matches, but if their friend is Freedbling Flingerblam, then this will be great. So
+> we're not going to give up because it won't work for all contacts. This was true for
+> phone number matching too. The user has to click follow, nothing is automatic."
+
+That is the right call and the research had weighted the wrong thing. A match that is
+*shown, explained, and acted on only by the reader's own click* does not need to be
+reliable to be valuable — it needs to be honest about its confidence. This repo had
+already solved that problem four times over in `bridge-matching.ts`,
+`contact-discovery.ts`, `github-friend-discovery.ts` and `twitter-friend-discovery.ts`,
+all of which rank by explained signals and never follow anyone automatically.
+
+## What shipped
+
+**Almost nothing new.** `contact-discovery.ts` already contained the entire engine — CSV
+parsing, multi-signal ranking, an API budget, rate-limit handling, sequential search with
+courtesy delays, and a results UI with per-account Follow buttons. It only lacked a second
+way to get contacts *into* it.
+
+- **`contact-picker.ts`** (new) — wraps `navigator.contacts.select`, converts the
+  selection into the same `SearchableContact` shape the CSV path produces, caps a run at
+  `MAX_PICKED_CONTACTS` (20).
+- **`buildSearchableContact()`** (extracted from `contactFromRecord`) — the shared seam,
+  so the CSV importer and the picker cannot drift on what counts as a usable contact or
+  how search terms are derived from one.
+- **`ContactDiscovery.loadContacts()`** — accepts already-parsed contacts; `load(text)`
+  now delegates to it.
+- One button on the import/export page, rendered only where the API exists, plus a
+  `#contacts` anchor and a **"Look for your contacts"** row on `/find-friends`.
+
+Everything downstream — budget, ranking, signals, Follow — is the code that was already
+there.
+
+### The John Doe case, as a test
+
+`rankMatch` already grades a bare display-name match as `weak` on purpose, with the
+comment "the world has many people called Alex". `contact-picker.spec.ts` pins both ends:
+"Freedbling Flingerblam" produces an explained match, "John Doe" produces `weak`. Neither
+is followed without a click.
+
+## The original research
+
+Kept below, because the constraints it documents are all still true — they are why the
+shipped version is name-only, and why it must never grow a server component.
 
 ## The short answer
 
@@ -138,15 +183,26 @@ the Twitter connector prices its own work.
 - Real-device check on Chrome/Android is the only way to confirm the picker; note that
   `.claude/skills/verify` drives desktop and cannot.
 
-## Recommendation
+## Recommendation (superseded — see Status)
 
-**Defer.** The addressable users are Chrome-on-Android only, the match quality is poor for
-reasons no amount of code fixes, and the version that works well requires a server this
-project should not run. The same effort spent on starter kits and interest search — both
-of which just shipped — reaches every user on every browser.
+The original recommendation was **defer**, on the grounds that the addressable users are
+Chrome-on-Android only and the match quality is poor for names that are not distinctive.
 
-Revisit only if a privacy-preserving discovery mechanism appears in the fediverse itself.
-Matrix has one worth reading if so.
+That reasoning was wrong in one specific way, and it is worth naming so the mistake is not
+repeated: it judged the feature by its *worst* case rather than by what the worst case
+costs. A wrong match here is shown with its evidence, ranked `weak`, and acted on only if
+the reader clicks Follow — so a bad guess costs a glance. Meanwhile the good case (a
+distinctive name, or a fediverse handle saved in the contact) is genuinely a person found.
+A feature that helps sometimes and wastes a glance otherwise is worth shipping; the bar
+"works for every contact" was never the right one, and this repo's four other correlation
+sources all clear the real bar the same way.
+
+What *does* stand from the research: the version that works well for common names requires
+a server that ingests address books, and this project should not run one. The shipped
+feature is name-only and client-only, and must stay that way.
+
+Revisit the server question only if a privacy-preserving discovery mechanism appears in the
+fediverse itself. Matrix has one worth reading if so.
 
 ## Sources
 

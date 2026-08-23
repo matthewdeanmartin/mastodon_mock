@@ -105,7 +105,6 @@ function contactFromRecord(record: CsvRecord, id: number): SearchableContact | n
   const firstName = record['First Name'] ?? '';
   const middleName = record['Middle Name'] ?? '';
   const lastName = record['Last Name'] ?? '';
-  const name = [firstName, middleName, lastName].filter(Boolean).join(' ');
   const organization = record['Organization Name'] ?? '';
   const emails = numberedValues(record, 'E-mail', 'Value');
   const websites = numberedValues(record, 'Website', 'Value');
@@ -113,7 +112,57 @@ function contactFromRecord(record: CsvRecord, id: number): SearchableContact | n
   // unambiguous @user@host values and profile URLs. Ordinary email addresses do not
   // match the handle pattern because it requires the leading @.
   const clueText = Object.values(record).join(' ');
-  const handles = extractHandles(clueText);
+  return buildSearchableContact({
+    id,
+    firstName,
+    middleName,
+    lastName,
+    organization,
+    emails,
+    websites,
+    clueText,
+  });
+}
+
+/** The raw fields any contact source can supply, before clues are derived. */
+export interface RawContact {
+  id: number;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  organization?: string;
+  emails: string[];
+  websites?: string[];
+  /**
+   * Free text to scan for handles and profile URLs.
+   *
+   * The CSV path passes every cell, because Google exports custom fields under
+   * user-defined headers and a fediverse handle is as likely to be in one of
+   * those as anywhere. Sources with no free-text fields pass nothing.
+   */
+  clueText?: string;
+}
+
+/**
+ * Turn raw contact fields into something worth searching for, or nothing.
+ *
+ * Shared by every contact source — the Google CSV importer and the phone's
+ * contact picker both end up here, so the two cannot drift on what counts as a
+ * usable contact or on how search terms are built from one. That mattered the
+ * moment a second source existed: a contact skipped by one path and searched by
+ * the other would be a bug nobody could see.
+ *
+ * Returns null for a contact with neither a handle nor a plausible first *and*
+ * last name. A lone first name ("Mum") produces a search for a common word
+ * against every account on the server, which spends a call to return noise.
+ */
+export function buildSearchableContact(raw: RawContact): SearchableContact | null {
+  const { id, firstName, lastName } = raw;
+  const name = [firstName, raw.middleName ?? '', lastName].filter(Boolean).join(' ');
+  const organization = raw.organization ?? '';
+  const emails = raw.emails.filter(Boolean);
+  const websites = (raw.websites ?? []).filter(Boolean);
+  const handles = extractHandles(raw.clueText ?? '');
   const hasPersonName = plausibleName(firstName) && plausibleName(lastName);
   if (!handles.length && !hasPersonName) return null;
 
@@ -298,7 +347,20 @@ export class ContactDiscovery {
   delayMs = 350;
 
   load(text: string): void {
-    const result = parseContacts(text);
+    this.loadContacts(parseContacts(text));
+  }
+
+  /**
+   * Load contacts that some other source already parsed.
+   *
+   * The seam between "where did these contacts come from" and "search for
+   * them". A Google CSV goes through {@link load}; the phone's contact picker
+   * builds the same {@link ContactParseResult} and arrives here. Everything
+   * downstream — budgeting, ranking, the results list, the follow buttons — is
+   * shared, which is the point: the picker is a second door into one feature,
+   * not a second feature.
+   */
+  loadContacts(result: ContactParseResult): void {
     this.stopRequested = false;
     this.running.set(false);
     this.callCount.set(0);

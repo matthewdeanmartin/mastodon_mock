@@ -88,7 +88,21 @@
 </a>
 
 @if (!auth.isAnonymous) {
-  <!-- Anonymous accounts have no follow list on a server to import into. -->
+  <!-- Anonymous accounts have no follow list on a server to import into, and
+       contact matching searches through the authenticated home server. -->
+  <a class="doc-row" routerLink="/settings/import-export" fragment="contacts">
+    <span class="doc-title">Look for your contacts</span>
+    <span class="muted small">
+      @if (canPickContacts) {
+        Pick people from your phone's contacts and see who has an account. Distinctive names work
+        best; common ones will need a second look.
+      } @else {
+        Upload a contacts export and see who has an account. Distinctive names work best; common
+        ones will need a second look.
+      }
+    </span>
+  </a>
+
   <a class="doc-row" routerLink="/settings/import-export">
     <span class="doc-title">Import a follow list</span>
     <span class="muted small">

@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../../auth';
+import { contactPickerAvailable } from '../settings/import-export/contact-picker';
 
 /**
  * Find Friends: a hub for every route in the app that ends in "…and now you
@@ -36,6 +37,15 @@ import { Auth } from '../../auth';
 })
 export class FindFriends {
   protected auth = inject(Auth);
+
+  /**
+   * Whether this device can offer the phone's own contact picker.
+   *
+   * Only changes the wording of one row — the destination works either way, via
+   * a contacts export. Read once: it is a property of the browser and cannot
+   * change while the page is open.
+   */
+  protected readonly canPickContacts = contactPickerAvailable();
 
   /**
    * Suggested subjects, as links into post search.
