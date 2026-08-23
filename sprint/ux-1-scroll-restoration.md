@@ -1,6 +1,64 @@
 # UX Sprint — Global scroll restoration
 
-Status: **PLANNED** (written 2026-08-23, not started)
+Status: **PART 1 DONE** (2026-08-23) — Load more no longer jumps.
+Part 2 (back-navigation restore) still **PLANNED**, and see the correction below
+before starting it.
+
+---
+
+## Correction, after reading the code (2026-08-23)
+
+This plan bundled two problems that turned out to have different causes. Written
+before the code was read, it assumed both were scroll restoration. Only one is.
+
+### "I click More and then I'm like… where am I?" — was not a scroll problem
+
+The reader's scroll offset never changed on Load more. The *content under it* did.
+
+`home.html` rendered reactive notices **above** the feed list:
+
+- the "Older posts are hidden" offer, gated on `olderAvailable()` →
+  `droppedByWindow()`, which `feed-aggregator.ts:227` **increments while paging**;
+- the anonymous provider's error list;
+- the Twitter connector's `unloaded()` / `errorSummary()` asides.
+
+So: click Load more → the new page crosses the window cutoff → the counter goes
+from 0 to non-zero → a paragraph *appears above everything on screen* → the whole
+list shifts down by its height. Nothing restored the position because nothing had
+lost it; the page moved out from under the reader.
+
+**Fixed** by moving every reactive notice below the list, and stating
+`overflow-anchor: auto` on `body` as the backstop for whatever we miss. The
+"Older posts are hidden" note was simply deleted — `feed-window-end` at the
+bottom of the feed already made the same offer, at the same moment, with more
+words. No JS scroll math was added, deliberately.
+
+The invariant is now locked by a test in `home.spec.ts` ("inserts nothing above
+the feed when a provider warning turns on mid-session"), which counts the DOM
+nodes preceding the first status card and asserts the count is unchanged when a
+provider starts complaining. Verified to fail against the old markup (3 extra
+nodes) before being committed green.
+
+**The rule this establishes, for every list page:** nothing above a long list may
+appear or resize after first paint. Anything reactive goes below the list. This
+is cheaper and safer than restoring a position after the fact, and it is where
+the remaining "feed jumped" reports should be looked for first.
+
+### Two facts in the plan below are stale
+
+1. `app.config.ts:48` **already sets** `scrollPositionRestoration: 'top'` — added
+   later, for a real Settings bug. So the router does not merely fail to restore;
+   it *actively scrolls to top* on every navigation. Part 2 has to beat that, not
+   just arrive after it.
+2. `search.ts:1292-1341` already records `scrollTop` into its snapshot and
+   deliberately declines to use it, with a comment reporting that racing the
+   router "proved unreliable". That is a prior attempt at Part 2, and the next
+   attempt should start by reading it.
+
+Part 2 was deferred on the reader's call: ship the anchoring fix, feel it on a
+real phone, then decide whether back-navigation restore is still worth its risk.
+
+---
 
 Deferred deliberately from the first-five-minutes batch, on the reader's own call:
 

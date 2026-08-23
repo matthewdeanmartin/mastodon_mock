@@ -258,8 +258,11 @@ a.eliza-invite:hover {
   cursor: pointer;
 }
 
-.older-note {
-  margin: 6px 0 0;
+/* Provider warnings, below the feed. `.older-note` used to sit here for a note
+   above the list; that note is gone (see home.html) because anything above the
+   list that can appear mid-session displaces what the reader is reading. */
+.feed-warning {
+  margin: 12px 0 0;
 }
 
 /* The window stopped the fetch, not the timeline: older posts are one click

@@ -117,6 +117,23 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /*
+    Hold the reader's place when content is inserted above the viewport.
+
+    This is the browser's own scroll anchoring: it picks a node in view and
+    keeps *it* still, adjusting the scroll offset when something above it grows
+    or appears. It is the default in Chrome and Firefox, but it is the kind of
+    default a later reset turns off by accident, and this app depends on it —
+    feeds insert asynchronously and a shift of a few hundred pixels mid-read is
+    the thing readers notice most. Stated here so switching it off has to be a
+    decision. See sprint/ux-1-scroll-restoration.md.
+
+    It is not a substitute for keeping reactive content below the list: Safari
+    does not implement it at all, and anchoring cannot save a reader when the
+    element being anchored to is itself removed. Layout discipline first, this
+    as the backstop.
+  */
+  overflow-anchor: auto;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;

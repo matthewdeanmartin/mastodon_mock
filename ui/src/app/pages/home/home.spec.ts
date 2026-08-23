@@ -16,6 +16,7 @@ import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
 import { JustMyServer } from '../../just-my-server';
 import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
+import { TwitterProvider } from '../../providers/twitter/twitter-provider';
 
 /** Exposes Home's protected signals for white-box testing. */
 interface HomeInternals {
@@ -217,6 +218,61 @@ describe('Home', () => {
     expect(
       [...el.querySelectorAll('button')].some((b) => b.textContent?.includes('Load more')),
     ).toBe(true);
+  });
+
+  /**
+   * The reader's complaint was "I click More and then I'm like… where am I?".
+   *
+   * The cause was not scroll restoration. Home rendered reactive notices *above*
+   * the feed list — the "Older posts are hidden" offer, driven by
+   * `droppedByWindow()`, which the aggregator increments while paging, plus the
+   * anonymous and Twitter provider warnings. Any of them could turn on partway
+   * through a session, insert itself above the post being read, and push the
+   * whole list down by its own height. The scroll offset never changed; the
+   * content under it did.
+   *
+   * The invariant, stated structurally so it survives rewording: whatever
+   * renders above the first status card at first paint must still be exactly
+   * what renders above it after the feed has paged and a provider has started
+   * complaining. Nothing may be inserted into that region after first paint.
+   *
+   * jsdom has no layout, so this cannot assert pixels. It does not need to —
+   * counting the nodes ahead of the first card catches the insertion itself,
+   * which is the bug. Whether the browser then holds position is
+   * `overflow-anchor` in styles.css, and that is a real-device check.
+   */
+  it('inserts nothing above the feed when a provider warning turns on mid-session', () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock
+      .expectOne('/api/v1/timelines/home?limit=20')
+      .flush([makeStatus('a'), makeStatus('b')]);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    /** Every element rendered before the first post, as a stable shape. */
+    const above = (): string[] => {
+      const first = el.querySelector('app-status-card');
+      expect(first).not.toBeNull();
+      const all = [...el.querySelectorAll('*')];
+      return all.slice(0, all.indexOf(first as Element)).map((n) => n.tagName);
+    };
+
+    const before = above();
+    expect(before.length).toBeGreaterThan(0);
+
+    // The Twitter connector resolves saved accounts asynchronously and can start
+    // reporting partway through a session — exactly the mid-read arrival that
+    // used to displace the feed.
+    TestBed.inject(TwitterProvider).unloaded.set(3);
+    fixture.detectChanges();
+
+    // The warning must render (it is not being suppressed, just relocated)…
+    expect(el.textContent).toContain('nothing');
+    expect(el.querySelector('.feed-warning')).not.toBeNull();
+    // …and it must render below the feed, leaving the region above untouched.
+    expect(above()).toEqual(before);
   });
 
   it('toggling a filter chip fetches nothing', () => {
