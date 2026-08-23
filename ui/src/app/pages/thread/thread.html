@@ -42,16 +42,33 @@
         </select>
       </div>
     }
+    <!-- An RSS article opens in reader mode by default, so "Exit reader" was the
+         only way out — and it dropped the reader on a page that looks like a
+         timeline, with no route back to /rss. For a feed item the toggle says
+         what it actually does (swap to the thread view) and the way back to the
+         reading list is its own button below. -->
     <button class="btn btn-outline" [class.active]="readerMode()" (click)="toggleReader()">
       📖
       {{
         readerMode()
-          ? 'Exit reader'
+          ? isRss()
+            ? 'View as thread'
+            : 'Exit reader'
           : chain().length > 1
             ? 'Reader (' + chain().length + ' ' + words().posts + ')'
             : 'Reader'
       }}
     </button>
+
+    @if (isRss()) {
+      <a
+        class="btn btn-outline"
+        [routerLink]="['/rss']"
+        [queryParams]="rssFeedUrl() ? { feed: rssFeedUrl() } : {}"
+      >
+        ← Return to RSS reader
+      </a>
+    }
 
     <!-- Open this thread as a 1:1 chat. Enabled only when the whole thread is
          exactly you and one other person — group threads stay disabled (chat's

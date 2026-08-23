@@ -126,6 +126,14 @@ export class Thread implements OnInit {
 
   /** True while viewing an RSS article: interactions are read-only, comments come from a feed. */
   protected isRss = signal(false);
+  /**
+   * The feed this RSS item came from, so the reader can go back to it.
+   *
+   * Without this, leaving an article stranded the reader on the thread page —
+   * which looks like a timeline and has no route back to `/rss`. Returning to
+   * the *specific* feed rather than the pane's default keeps their place.
+   */
+  protected rssFeedUrl = signal<string | null>(null);
   /** True when this thread is a tweet and its replies. */
   protected isTwitter = signal(false);
   /** Why the X replies could not be loaded, if they could not. */
@@ -663,6 +671,7 @@ export class Thread implements OnInit {
     this.ancestors.set([]);
     this.descendants.set([]);
     this.isRss.set(false);
+    this.rssFeedUrl.set(null);
     this.isTwitter.set(false);
     this.twitterError.set(null);
     this.isAnonymousPublic.set(false);
@@ -890,6 +899,7 @@ export class Thread implements OnInit {
     }
     const feedUrl = body.slice(0, sep);
     const guid = body.slice(sep + 2);
+    this.rssFeedUrl.set(feedUrl);
     this.ancestors.set([]);
     this.descendants.set([]);
     this.loadSub.add(

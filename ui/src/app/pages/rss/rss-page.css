@@ -274,6 +274,29 @@
 
 /* ── Items ─────────────────────────────────────────────────────────────── */
 
+/* An item carries the column background, the way a post does everywhere else.
+   `app-status-card` paints nothing itself — on Home it sits inside `main.column`,
+   which supplies `--col-bg`. The split pane has no such wrapper, so without this
+   an RSS item fell through to the page background: grey behind the text in light
+   mode, and the darker page colour instead of the lighter column colour in dark.
+   Same variable as the column, so the two surfaces stay in step by construction. */
+.full-item,
+.expanded-item {
+  background: var(--col-bg);
+}
+
+/* The separator belongs between items, not between a card and its own tools.
+   `app-status-card` draws its own bottom border for timelines, where each card
+   *is* the item; here the item is the card plus the star/mark-read row, so that
+   border is moved out to the wrapper. */
+.full-item app-status-card {
+  border-bottom: none;
+}
+
+.full-item {
+  border-bottom: 1px solid var(--border);
+}
+
 /* A read item recedes rather than disappearing: still there to go back to,
    visibly behind you. Opacity alone, so it survives any theme. */
 .full-item.read app-status-card {
@@ -284,11 +307,14 @@
   opacity: 1;
 }
 
+/* No negative margin here. It used to pull the tools up 6px into the card, which
+   put `app-status-card`'s 1px bottom border straight through the ascenders of
+   "Star" and "Mark read" — a hairline slicing the t, k and d. The card's own
+   border is the separator between items, so the tools sit below it. */
 .item-tools {
   display: flex;
   gap: 14px;
-  padding: 0 12px 10px;
-  margin-top: -6px;
+  padding: 8px 12px 10px;
 }
 
 /* The inline expansion in headline mode, indented under its own row so the

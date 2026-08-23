@@ -496,6 +496,59 @@ describe('Thread', () => {
     expect(el.querySelector('.reader-original')).not.toBeNull();
   });
 
+  it('offers a way back to the RSS reader, pointing at the feed it came from', async () => {
+    // Leaving an article used to strand the reader on a page that looks like a
+    // timeline, with no route back to /rss.
+    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
+
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
+    await settleRssCache();
+    fixture.detectChanges();
+
+    const back = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('a.btn'),
+    ).find((a) => a.textContent?.includes('Return to RSS reader'));
+
+    expect(back).toBeTruthy();
+    // The specific feed, not the pane's default, so the reader keeps their place.
+    expect(back!.getAttribute('href')).toContain('/rss');
+    expect(decodeURIComponent(back!.getAttribute('href')!)).toContain(
+      'feed=https://blog.example.com/feed.xml',
+    );
+  });
+
+  it('calls the reader toggle "View as thread" on an RSS item', async () => {
+    // "Exit reader" described leaving a mode; on a feed item what it actually
+    // does is swap to the thread view, and it is not the way back to /rss.
+    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
+
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
+    await settleRssCache();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('View as thread');
+    expect(text).not.toContain('Exit reader');
+  });
+
+  it('leaves an ordinary post saying "Exit reader", with no RSS return link', () => {
+    const fixture = setUpWithId('1');
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+    fixture.componentInstance['readerMode'].set(true);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Exit reader');
+    expect(element.textContent).not.toContain('Return to RSS reader');
+  });
+
   it('offers "Fetch rest of article" for a teaser-only RSS item', async () => {
     // RSS_FEED's item has only <description>, no <content:encoded> — a
     // publisher that expects the reader to click through for the rest.

@@ -1,5 +1,5 @@
 {
-  "testCount": 5188,
+  "testCount": 5191,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -2488,6 +2488,7 @@
     "src/app/pages/thread/reader-chain.spec.ts :: readerChain stops when a different account continues the thread",
     "src/app/pages/thread/thread.spec.ts :: Thread ?reader=1 opens the thread directly in reader mode",
     "src/app/pages/thread/thread.spec.ts :: Thread A+/A− buttons adjust the persisted reader font size",
+    "src/app/pages/thread/thread.spec.ts :: Thread calls the reader toggle \"View as thread\" on an RSS item",
     "src/app/pages/thread/thread.spec.ts :: Thread cross-server dead end stops loading and explains a 404 rather than spinning forever",
     "src/app/pages/thread/thread.spec.ts :: Thread disables \"open in chat\" for a solo thread (only me)",
     "src/app/pages/thread/thread.spec.ts :: Thread disables \"open in chat\" once a third voice joins the thread",
@@ -2495,9 +2496,11 @@
     "src/app/pages/thread/thread.spec.ts :: Thread fetches the status and its context on init",
     "src/app/pages/thread/thread.spec.ts :: Thread hides \"open in chat\" entirely for a read-only RSS thread, rather than showing it disabled",
     "src/app/pages/thread/thread.spec.ts :: Thread keeps an anonymous public post readable when its context endpoint rejects anonymous access",
+    "src/app/pages/thread/thread.spec.ts :: Thread leaves an ordinary post saying \"Exit reader\", with no RSS return link",
     "src/app/pages/thread/thread.spec.ts :: Thread loads an anonymous public thread from the source instance",
     "src/app/pages/thread/thread.spec.ts :: Thread offers \"Fetch rest of article\" for a teaser-only RSS item",
     "src/app/pages/thread/thread.spec.ts :: Thread offers \"open in chat\" for a two-person thread (me + one other)",
+    "src/app/pages/thread/thread.spec.ts :: Thread offers a way back to the RSS reader, pointing at the feed it came from",
     "src/app/pages/thread/thread.spec.ts :: Thread onChanged: updates the focused status",
     "src/app/pages/thread/thread.spec.ts :: Thread onContextChanged: patches a matching status in both ancestors and descendants",
     "src/app/pages/thread/thread.spec.ts :: Thread onContextDeleted: removes the status from both ancestors and descendants",

@@ -125,6 +125,27 @@ appearing in the split pane's left rail (named as "someday," not scheduled).
 **Planned next**: the 90-day read-state prune (client-side — read state lives only in
 `localStorage`, so there is no server job to write).
 
+### Testing-feedback fixes (2026-08-23, after Sprint 6)
+
+Three bugs found in `test`, all fixed and runtime-verified.
+
+1. **RSS items had no background.** `app-status-card` paints nothing itself — on Home it sits
+   inside `main.column`, which supplies `--col-bg`. The split pane has no such wrapper, so items
+   fell through to the page `--bg`: grey behind the text in light mode, and the *darker* page
+   colour instead of the *lighter* column colour in dark. `.full-item`/`.expanded-item` now carry
+   `var(--col-bg)`, the same variable the column uses, so the two surfaces stay in step by
+   construction. Verified identical in both themes (`#ffffff` / `#15202b`).
+2. **A hairline sliced the ascenders of "Star" and "Mark read".** `.item-tools` had
+   `margin-top: -6px`, pulling the row up into `app-status-card`'s 1px `border-bottom`. The card's
+   border is the separator *between items*, but here an item is the card **plus** its tools — so
+   the border moved out to `.full-item` and the negative margin went away. Measured overlap 6px →
+   0px.
+3. **Leaving reader mode stranded the reader on the thread page**, which looks like a timeline and
+   had no route back to `/rss`. On a feed item the toggle now says **"View as thread"** (what it
+   actually does) and a separate **"← Return to RSS reader"** links to `/rss?feed=<url>` — the
+   specific feed, so the reader keeps their place. Ordinary posts still say "Exit reader" and get
+   no return link. Three specs guard this.
+
 ### RSS comments — the options, for whenever this is picked up
 
 Nothing in `spec/` covers this; the formats offer three routes, only one of which carries content:
