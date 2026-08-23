@@ -46,6 +46,7 @@ import { messageStatus, parseMessageStatusRouteRef } from '../../providers/paste
 
 import { ArticleFetch } from '../../providers/article/article-fetch';
 import { ArticleQuota } from '../../providers/article/article-quota';
+import { ArticleReadingTally } from '../../providers/article/article-reading-tally';
 import { articleTarget, outboundLinks } from '../../providers/article/article-target';
 import { ArticleDiagnosis, ArticleResult } from '../../providers/article/article-models';
 import { renderMarkdown } from '../../providers/article/markdown-render';
@@ -174,6 +175,7 @@ export class Thread implements OnInit {
 
   private articles = inject(ArticleFetch);
   protected quota = inject(ArticleQuota);
+  private tally = inject(ArticleReadingTally);
 
   /** The URL reader mode would expand, when the post names exactly one. */
   protected articleUrl = computed(() => {
@@ -415,7 +417,9 @@ export class Thread implements OnInit {
       // Only a rendered article counts against the daily limit.
       if (result.article) {
         this.retries.set(0);
-        this.quota.consume();
+        // Through the tally rather than the quota directly, so a supporter's
+        // running total also reaches their account. See `article-reading-tally`.
+        this.tally.recordOne();
         this.focusExpandedArticle();
       }
     } finally {

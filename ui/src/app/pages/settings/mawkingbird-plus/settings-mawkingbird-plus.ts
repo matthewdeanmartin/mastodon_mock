@@ -24,6 +24,7 @@ import { VaultAdoption } from '../../../providers/vault/vault-adoption';
 import { FeatureFlags } from '../../../feature-flags';
 import { PLUS_PRICE_USD_PER_YEAR, visiblePlusBenefits } from '../../../plus-benefits';
 import { ArticleQuota, FREE_DAILY_ARTICLES } from '../../../providers/article/article-quota';
+import { ArticleReadingTally } from '../../../providers/article/article-reading-tally';
 
 /**
  * Settings → Mawkingbird Plus.
@@ -59,6 +60,8 @@ export class SettingsMawkingbirdPlus implements OnInit {
   private sync = inject(ProfileSync);
   private proxyUsageStore = inject(CorsProxyUsageStore);
   protected articleQuota = inject(ArticleQuota);
+  /** The account-wide article total, so a new laptop is not told 'zero'. */
+  protected tally = inject(ArticleReadingTally);
   private log = inject(PageDiagnostics);
   private injector = inject(Injector);
   protected vault = inject(VaultService);
@@ -310,6 +313,11 @@ export class SettingsMawkingbirdPlus implements OnInit {
       // entitlement was written seconds ago, and a stale token would show the
       // old tier for up to fifteen minutes.
       await this.plus.refresh();
+      // After the tier is settled, because a supporter is the only account with
+      // a server-side total to fetch. Not awaited into the vault work below —
+      // this is one number on one panel, and it must not delay the rest of the
+      // page if the profile service is slow.
+      void this.tally.load();
       if (
         this.vaultPreference.available &&
         this.plus.isSupporter() &&
@@ -420,7 +428,9 @@ export class SettingsMawkingbirdPlus implements OnInit {
 
   protected async lockVault(): Promise<void> {
     await this.vault.lock();
-    this.vaultMessage.set('Locked on this browser. The encrypted copy remains stored.');
+    this.vaultMessage.set(
+      'Closed on this browser. Your saved connections are untouched — type your passphrase to open them here again.',
+    );
   }
 
   /** Reconcile low-churn credentials in both directions, with empty losing to present. */

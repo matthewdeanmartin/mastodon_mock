@@ -6,6 +6,7 @@ import { selectionWithin } from '../../../share-dialog/share-selection';
 import { Drafts } from '../../../drafts';
 import { ArticleFetch } from '../../../providers/article/article-fetch';
 import { ArticleQuota } from '../../../providers/article/article-quota';
+import { ArticleReadingTally } from '../../../providers/article/article-reading-tally';
 import { ArticleResult } from '../../../providers/article/article-models';
 import { articleTarget } from '../../../providers/article/article-target';
 import { renderMarkdown } from '../../../providers/article/markdown-render';
@@ -49,6 +50,7 @@ export class RssArticle {
   private drafts = inject(Drafts);
   private router = inject(Router);
   protected quota = inject(ArticleQuota);
+  private tally = inject(ArticleReadingTally);
 
   protected showShare = signal(false);
   protected shareQuote = signal('');
@@ -144,8 +146,10 @@ export class RssArticle {
       this.result.set(result);
       this.page.set(0);
       if (result.article) {
-        // Only a rendered article costs one of the day's free fetches.
-        this.quota.consume();
+        // Only a rendered article costs one of the day's free fetches. Through
+        // the tally rather than the quota directly, so a supporter's running
+        // total also reaches their account and is the same on their phone.
+        this.tally.recordOne();
       }
       this.diagnostics.info('RssPage', 'article:expanded', {
         diagnosis: result.diagnosis,

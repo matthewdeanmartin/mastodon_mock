@@ -50,6 +50,18 @@ interface StoredQuota {
   freeFetches: number;
   /** Fetch actions started after a Plus entitlement decision. */
   plusFetches: number;
+  /**
+   * Articles opened in the reader on this browser, ever. Never reset by the day
+   * rollover.
+   *
+   * Every other number here is a *quota* number, and a quota is only meaningful
+   * for today. But the Plus page also has to answer "what has my subscription
+   * done for me", and answering that with today's counters told a subscriber who
+   * had not read anything since midnight that they had got nothing — on a page
+   * whose next button is "cancel". A running total is the honest answer to that
+   * question, and it is the only number on the panel that grows.
+   */
+  lifetime: number;
 }
 
 /** Today, in the reader's own timezone. */
@@ -74,6 +86,14 @@ export class ArticleQuota {
   /** Fetch actions started on each tier today, including failed attempts. */
   readonly freeFetches = computed(() => this.stored().freeFetches);
   readonly plusFetches = computed(() => this.stored().plusFetches);
+
+  /**
+   * Articles opened in the reader on this browser, ever.
+   *
+   * The one number on the Plus page that answers "was this worth it" rather than
+   * "how much is left today".
+   */
+  readonly lifetime = computed(() => this.stored().lifetime);
 
   /** True after the supporter service has answered for this page load. */
   private entitlementChecked = signal(false);
@@ -195,7 +215,13 @@ export class ArticleQuota {
 
   /** Today's stored counter, resetting a stale day on read. */
   private read(): StoredQuota {
-    const fresh: StoredQuota = { day: today(), count: 0, freeFetches: 0, plusFetches: 0 };
+    const fresh: StoredQuota = {
+      day: today(),
+      count: 0,
+      freeFetches: 0,
+      plusFetches: 0,
+      lifetime: 0,
+    };
     let raw: string | null;
     try {
       raw = localStorage.getItem(ARTICLE_QUOTA_KEY);
@@ -209,8 +235,13 @@ export class ArticleQuota {
     }
     try {
       const parsed = JSON.parse(raw) as Partial<StoredQuota>;
+      // Carried across the day boundary and across a damaged daily record,
+      // because it is not a quota number. Losing a reader's running total at
+      // midnight would make the one growing number on the Plus page reset to
+      // zero every night — the exact failure this field exists to fix.
+      const lifetime = nonNegative(parsed.lifetime);
       if (parsed.day !== today() || typeof parsed.count !== 'number') {
-        return fresh;
+        return { ...fresh, lifetime };
       }
       const count = nonNegative(parsed.count);
       return {
@@ -221,6 +252,10 @@ export class ArticleQuota {
         freeFetches:
           typeof parsed.freeFetches === 'number' ? nonNegative(parsed.freeFetches) : count,
         plusFetches: nonNegative(parsed.plusFetches),
+        // Same reasoning for a record written before this field existed: today's
+        // reads are the only ones we can prove happened, so start there rather
+        // than claiming zero.
+        lifetime: typeof parsed.lifetime === 'number' ? lifetime : count,
       };
     } catch {
       return fresh;
@@ -249,11 +284,16 @@ export class ArticleQuota {
    * count so a caller can message it without a second read.
    */
   consume(): number {
+    const current = this.read();
     if (this.unlimited()) {
+      // A supporter is charged nothing, but is still *counted*. This used to
+      // return before touching storage, which meant the only reader whose total
+      // the Plus page wanted to show was the one reader never counted — their
+      // running total sat at zero no matter how much they read.
+      this.persist({ ...current, lifetime: current.lifetime + 1 });
       return Infinity;
     }
-    const current = this.read();
-    const next = { ...current, count: current.count + 1 };
+    const next = { ...current, count: current.count + 1, lifetime: current.lifetime + 1 };
     this.persist(next);
     return Math.max(0, FREE_DAILY_ARTICLES - next.count);
   }

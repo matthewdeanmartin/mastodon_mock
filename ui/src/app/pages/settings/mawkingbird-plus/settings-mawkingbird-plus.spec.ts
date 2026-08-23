@@ -205,29 +205,49 @@ describe('SettingsMawkingbirdPlus', () => {
     expect(text).not.toContain('Support Mawkingbird —');
   });
 
-  it('shows free and Plus article fetches with the remaining daily allowance', () => {
+  it('leads with a running total rather than counters that reset at midnight', () => {
     const quota = TestBed.inject(ArticleQuota);
     quota.recordFetch();
     quota.consume();
     plus.tier.set('plus');
     quota.recordFetch();
+    quota.consume();
     session.ready.set(true);
     signedIn();
 
     render();
     const rows = new Map(
-      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('dt')).map(
-        (term) => [
-          (term.textContent ?? '').trim(),
-          (term.nextElementSibling?.textContent ?? '').replace(/\s+/g, ' ').trim(),
-        ],
-      ),
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          '.plus-usage-table tbody tr',
+        ),
+      ).map((row) => [
+        (row.querySelector('th')?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        (row.querySelector('td')?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      ]),
     );
 
-    expect(rows.get('Free article fetches today')).toBe('1');
-    expect(rows.get('Plus article fetches today')).toBe('1');
-    expect(rows.get('Free article quota today')).toContain('Unlimited while Plus is active');
-    expect(rows.get('Free article quota today')).toContain('1 free-tier reads remain today');
+    // Both reads counted, including the one made as a supporter.
+    expect(rows.get("Articles you've read in Mawkingbird — counted on this browser")).toBe('2');
+    expect(rows.get('Your daily reading limit')).toBe('None');
+  });
+
+  it('never shows a supporter what their free-tier allowance would have been', () => {
+    // The panel used to say "Unlimited while Plus is active (2 free-tier reads
+    // remain today)". The parenthesis is internal accounting about a limit this
+    // reader does not have, and the only thing a paying customer can reasonably
+    // do with it is read it as a restriction.
+    const quota = TestBed.inject(ArticleQuota);
+    plus.tier.set('plus');
+    quota.recordFetch();
+    session.ready.set(true);
+    signedIn();
+
+    const text = render();
+
+    expect(text).not.toContain('free-tier');
+    expect(text).not.toContain('Unlimited while Plus is active');
+    expect(text).not.toContain('remaining');
   });
 
   it('tells a cancelled supporter when their support ends', () => {

@@ -65,8 +65,19 @@
   font-size: 13px;
 }
 
+/* A column, not a right-aligned row: the decline button now carries a line
+   saying what declining actually does, and that sentence belongs under the
+   button rather than beside it. */
 .ad-actions {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.ad-actions p {
+  margin: 0;
 }

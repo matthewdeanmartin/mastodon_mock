@@ -3,30 +3,45 @@
      on the spot is how people lose things. -->
 <button class="ad-backdrop" type="button" aria-label="Cancel" (click)="cancel()"></button>
 <section class="ad-dialog" role="dialog" aria-modal="true" aria-labelledby="ad-title">
-  <h2 id="ad-title">Your {{ noun() }} are in two places</h2>
+  <!--
+    Names both places, in the user's terms, in the heading.
+
+    It used to read "Your feed subscriptions are in two places", which raises
+    three questions and answers none: which two, is that bad, and what am I
+    being asked. A reader who cannot tell whether they are looking at a problem
+    or a routine choice assumes the worst and cancels.
+  -->
+  <h2 id="ad-title">You have {{ noun() }} here and on your account</h2>
 
   <p class="ad-summary">
-    This browser has <strong>{{ localCount() }}</strong> and your account has
-    <strong>{{ remoteCount() }}</strong
-    >. Which should this browser end up with?
+    You're switching this on for the first time, so there are two sets to combine: the
+    <strong>{{ localCount() }}</strong> already in this browser, and the
+    <strong>{{ remoteCount() }}</strong> saved to your Mawkingbird account by another device.
+  </p>
+  <!-- Says plainly that nothing is wrong. This dialog appears at a moment the
+       user chose, doing something ordinary, and should not read like an alert. -->
+  <p class="ad-summary muted small">
+    Nothing has gone wrong, and you can't lose anything by picking either one — this only decides
+    what this browser shows from now on.
   </p>
 
   <div class="ad-choices">
     <div class="ad-choice">
       <button class="btn" type="button" [disabled]="busy()" (click)="choose('merge')">
-        Keep both
+        Keep all {{ localCount() + remoteCount() }}
       </button>
       <p class="ad-detail">
-        Everything from both, and anything in both places keeps your account's version.
+        Everything from both. If the same thing is in both places, your account's copy is the one
+        kept. This is what most people want.
       </p>
     </div>
 
     <div class="ad-choice">
       <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="choose('replace')">
-        Use my account's
+        Just the {{ remoteCount() }} from my account
       </button>
       <p class="ad-detail">
-        Take the {{ remoteCount() }} on your account. This browser's {{ localCount() }} are dropped.
+        This browser's {{ localCount() }} are dropped and it matches your other devices exactly.
       </p>
     </div>
   </div>
@@ -35,14 +50,25 @@
        "upload mine and overwrite theirs" should find out here that it does not
        exist, and why. -->
   <p class="ad-note">
-    There's no option to overwrite your account with this browser's copy — that would delete data
-    from your other browsers, and sorting out which edit came first isn't something this app tries
-    to do.
+    There's no option to replace your account's copy with this browser's — that would delete things
+    from your other devices, and working out which change came first isn't something this app tries
+    to guess.
   </p>
 
   <div class="ad-actions">
+    <!--
+      "Not now" told the user nothing about what declining costs them. It reads
+      as postponing a chore, when what it actually does is leave the feature off
+      — so the line beneath says exactly that, and the button names the outcome
+      rather than the timing.
+    -->
     <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="cancel()">
-      Not now
+      Leave it off for now
     </button>
+    <p class="muted small">
+      Keeps this browser's {{ localCount() }} exactly as they are and changes nothing on your
+      account. You can switch this on again whenever you like, and you'll be asked this same
+      question.
+    </p>
   </div>
 </section>

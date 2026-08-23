@@ -247,23 +247,46 @@
                 </form>
               }
               @case ('unlocked') {
-                <div class="plus-actions">
-                  <button
-                    class="btn btn-outline"
-                    type="button"
-                    [disabled]="vaultBusy()"
-                    (click)="syncExistingVaultKeys()"
-                  >
-                    Sync both ways
-                  </button>
-                  <button
-                    class="btn btn-outline"
-                    type="button"
-                    [disabled]="vaultBusy()"
-                    (click)="lockVault()"
-                  >
-                    Lock now
-                  </button>
+                <!--
+                  Both buttons say what they do to something the reader can see,
+                  and each has a line under it saying what happens after.
+
+                  "Lock now" said neither. A button whose meaning you cannot
+                  guess reads as a threat — the safe assumption about an unknown
+                  verb next to your stored passwords is that clicking it breaks
+                  something — so the honest ones go unclicked and the feature
+                  goes unused.
+                -->
+                <div class="plus-vault-buttons">
+                  <div class="plus-vault-action">
+                    <button
+                      class="btn btn-outline"
+                      type="button"
+                      [disabled]="vaultBusy()"
+                      (click)="syncExistingVaultKeys()"
+                    >
+                      Copy keys to my other devices
+                    </button>
+                    <p class="muted small">
+                      Sends any connections saved only in this browser up, and brings down any saved
+                      only on your other devices. Nothing is overwritten.
+                    </p>
+                  </div>
+                  <div class="plus-vault-action">
+                    <button
+                      class="btn btn-outline"
+                      type="button"
+                      [disabled]="vaultBusy()"
+                      (click)="lockVault()"
+                    >
+                      Close on this browser
+                    </button>
+                    <p class="muted small">
+                      Forgets your passphrase here until you type it again. Your connections keep
+                      working; nothing is deleted and your other devices are unaffected. Worth doing
+                      on a shared computer.
+                    </p>
+                  </div>
                 </div>
 
                 <label class="plus-vault-policy" for="vault-policy"
@@ -550,34 +573,68 @@
           }
         }
 
+        <!--
+          A table, and a running total rather than today's counters.
+
+          This panel used to be a <dl> of four numbers that all reset at
+          midnight, which meant it greeted a subscriber who had not read
+          anything since breakfast with a column of zeros — on the page whose
+          other button cancels the subscription. Worse, the quota row said
+          "Unlimited while Plus is active (2 free-tier reads remain today)":
+          the parenthesis is an internal accounting detail about a limit this
+          reader does not have, and reading it as a *restriction* is the only
+          reasonable thing a paying customer can do with it.
+
+          So the free-tier remainder is not rendered for a supporter at all,
+          and the headline number is one that only ever grows.
+        -->
         <h3>What you are getting</h3>
-        <dl class="plus-usage">
-          @if (proxyUsage().accountTotal; as total) {
-            <dt>Proxy requests, all devices</dt>
-            <!-- Reported by the proxy on traffic that was happening anyway, so
-                 knowing it costs no extra request. -->
-            <dd>{{ total | number }}</dd>
-          }
-          <dt>Proxy requests, this browser</dt>
-          <dd>{{ proxyUsage().requests | number }}</dd>
-          <dt>Free article fetches today</dt>
-          <dd>{{ articleQuota.freeFetches() | number }}</dd>
-          <dt>Plus article fetches today</dt>
-          <dd>{{ articleQuota.plusFetches() | number }}</dd>
-          <dt>Free article quota today</dt>
-          <dd>
-            @if (articleQuota.unlimited()) {
-              Unlimited while Plus is active ({{ articleQuota.freeRemaining() | number }} free-tier
-              reads remain today)
-            } @else {
-              {{ articleQuota.remaining() | number }} of {{ freeDailyArticles }} remaining
+        <table class="plus-usage-table">
+          <tbody>
+            <tr>
+              <th scope="row">
+                Articles you've read in Mawkingbird
+                @if (tally.localOnly()) {
+                  <span class="muted small">— counted on this browser</span>
+                } @else if (tally.since(); as since) {
+                  <span class="muted small">— since {{ since | date: 'longDate' }}</span>
+                }
+              </th>
+              <td>{{ tally.total() | number }}</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                Of those, opened today
+                <span class="muted small">— resets at midnight</span>
+              </th>
+              <td>{{ articleQuota.plusFetches() + articleQuota.freeFetches() | number }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Your daily reading limit</th>
+              <!-- Full stop. A subscriber has no limit, so there is no number
+                   here to qualify, and nothing in parentheses to misread. -->
+              <td>None</td>
+            </tr>
+            @if (proxyUsage().accountTotal; as total) {
+              <tr>
+                <th scope="row">Times we fetched something for you, all devices</th>
+                <!-- Reported by the proxy on traffic that was happening anyway,
+                     so knowing it costs no extra request. -->
+                <td>{{ total | number }}</td>
+              </tr>
             }
-          </dd>
-          @for (row of diagnostics.collectionRows(); track row.collection) {
-            <dt>{{ row.label }}</dt>
-            <dd>{{ row.local | number }}</dd>
-          }
-        </dl>
+            <tr>
+              <th scope="row">Times we fetched something for you, this browser</th>
+              <td>{{ proxyUsage().requests | number }}</td>
+            </tr>
+            @for (row of diagnostics.collectionRows(); track row.collection) {
+              <tr>
+                <th scope="row">{{ row.label }} kept on your account</th>
+                <td>{{ row.local | number }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
         @if (diagnostics.state() === 'idle') {
           <p class="muted small">Check above to include what your account holds.</p>
         }

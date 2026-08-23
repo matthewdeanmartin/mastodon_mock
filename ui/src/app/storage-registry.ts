@@ -698,7 +698,19 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     // `private` tier exists for, and not recording it at all is better than
     // classifying it correctly.
     sensitivity: 'cache',
-    note: "Daily counts of reader article fetches by free/Plus tier and successful expansions against the free limit, bucketed by local calendar day. Counters and a date only — resetting them loses nothing but today's tally.",
+    note: "Daily counts of reader article fetches by free/Plus tier and successful expansions against the free limit, bucketed by local calendar day, plus a lifetime total of articles opened that survives the daily reset. Counters and a date only — resetting them loses today's tally and this browser's running total, not any record of what was read.",
+  },
+  {
+    // The count of local reads a supporter's account has not accepted yet.
+    //
+    // One integer, never a list. There is nothing to retry individually — the
+    // service takes a count — and a queue of what someone read is precisely the
+    // reading history this feature refuses to build.
+    base: 'mockingbird_reading_tally_unsent',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'cache',
+    note: 'How many article reads this browser has not yet reported to a Mawkingbird Plus account. A single number — resetting it loses at most a few reads from the account-wide total and nothing else.',
   },
   {
     base: 'mockingbird_first_run_preview',

@@ -86,6 +86,21 @@ export interface FetchedSettings {
 }
 
 /**
+ * What a subscription has done, in the only terms a subscriber cares about.
+ *
+ * Deliberately just a total and a start date. No per-article history: this
+ * Worker turns off invocation logs so that a person's reading is not recorded,
+ * and building a reading list in the response body would undo that at the back
+ * door.
+ */
+export interface ReadingStats {
+  /** Articles opened in the reader, across every device, ever. */
+  articles: number;
+  /** ISO-8601 date counting began, or '' before the first article. */
+  since: string;
+}
+
+/**
  * Every way a profile request can end.
  *
  * A discriminated union rather than exceptions, because most of these are
@@ -275,6 +290,32 @@ export class ProfileClient {
    */
   async exportAll(): Promise<ProfileResult<unknown>> {
     return this.request<unknown>('/export', { method: 'GET' });
+  }
+
+  /**
+   * The running total of articles read, across every device.
+   *
+   * Readable on a lapsed account for the same reason `exportAll` is: the person
+   * deciding whether to resubscribe is exactly the one who benefits from seeing
+   * what the subscription did. Only the write is entitled.
+   */
+  async readingStats(): Promise<ProfileResult<ReadingStats>> {
+    return this.request<ReadingStats>('/reading-stats', { method: 'GET' });
+  }
+
+  /**
+   * Add to that total.
+   *
+   * Batched by the caller rather than sent per article — see
+   * `ArticleReadingTally`. The service caps how much one call may add, so a
+   * client loop cannot inflate the number arbitrarily.
+   */
+  async recordArticlesRead(articles: number): Promise<ProfileResult<ReadingStats>> {
+    return this.request<ReadingStats>('/reading-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ articles }),
+    });
   }
 
   /**

@@ -20,14 +20,19 @@ describe('AdoptionDialog', () => {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  function button(label: string): HTMLButtonElement {
-    const match = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
-      (candidate) => candidate.textContent?.trim() === label,
+  /**
+   * The dialog's answer buttons, in order: merge, replace, decline.
+   *
+   * Found by position rather than by their words. These labels name counts
+   * ("Keep all 8") and get reworded whenever the dialog is made clearer, and a
+   * test that pins the prose fails on every such edit while telling us nothing
+   * about the behaviour it guards — which is only ever *which answer each
+   * button emits*.
+   */
+  function answers(): HTMLButtonElement[] {
+    return [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].filter(
+      (candidate) => candidate.getAttribute('aria-label') !== 'Cancel',
     );
-    if (!match) {
-      throw new Error(`no "${label}" button`);
-    }
-    return match;
   }
 
   it('says how much is on each side', () => {
@@ -44,26 +49,22 @@ describe('AdoptionDialog', () => {
   });
 
   it('offers merge and replace, and no third answer', () => {
-    const labels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')]
-      .map((candidate) => candidate.textContent?.trim())
-      .filter((label) => label && label !== 'Cancel');
-
-    // Keep both, use the account's, not now — and nothing that would overwrite
-    // the account with this browser's copy.
-    expect(labels).toEqual(['Keep both', "Use my account's", 'Not now']);
+    // Exactly three: keep both, take the account's, and decline — and nothing
+    // that would overwrite the account with this browser's copy.
+    expect(answers()).toHaveLength(3);
   });
 
   it('says out loud that overwriting the account is not offered', () => {
     // Someone looking for that option should find out here that it does not
     // exist, rather than hunting for it.
-    expect(text()).toContain("There's no option to overwrite your account");
+    expect(text()).toContain("There's no option to replace your account's copy");
   });
 
   it('emits the chosen answer', () => {
     const chosen: AdoptionChoice[] = [];
     fixture.componentInstance.chose.subscribe((choice) => chosen.push(choice));
 
-    button('Keep both').click();
+    answers()[0].click();
 
     expect(chosen).toEqual(['merge']);
   });
@@ -72,7 +73,7 @@ describe('AdoptionDialog', () => {
     const chosen: AdoptionChoice[] = [];
     fixture.componentInstance.chose.subscribe((choice) => chosen.push(choice));
 
-    button("Use my account's").click();
+    answers()[1].click();
 
     expect(chosen).toEqual(['replace']);
   });
@@ -83,7 +84,7 @@ describe('AdoptionDialog', () => {
     let cancelled = 0;
     fixture.componentInstance.cancelled.subscribe(() => cancelled++);
 
-    button('Not now').click();
+    answers()[2].click();
 
     expect(cancelled).toBe(1);
   });
@@ -101,10 +102,10 @@ describe('AdoptionDialog', () => {
 
   it('locks the choices once one is taken', () => {
     // The write is in flight; a second answer would race the first.
-    button('Keep both').click();
+    answers()[0].click();
     fixture.detectChanges();
 
-    expect(button('Keep both').disabled).toBe(true);
-    expect(button("Use my account's").disabled).toBe(true);
+    expect(answers()[0].disabled).toBe(true);
+    expect(answers()[1].disabled).toBe(true);
   });
 });

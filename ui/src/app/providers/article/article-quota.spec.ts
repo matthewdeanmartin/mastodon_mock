@@ -93,6 +93,7 @@ describe('ArticleQuota', () => {
       count: 1,
       freeFetches: 0,
       plusFetches: 0,
+      lifetime: 1,
     });
   });
 
@@ -110,15 +111,37 @@ describe('ArticleQuota', () => {
     expect(quota.remaining()).toBe(Infinity);
   });
 
-  it('never limits a supporter', () => {
+  it('never limits a supporter, but does still count their reading', () => {
     const { quota, plus } = build();
     plus.tier.set('plus');
     expect(quota.unlimited()).toBe(true);
     expect(quota.remaining()).toBe(Infinity);
     quota.consume();
-    // Nothing was written: a supporter's reading is not counted at all.
-    expect(localStorage.getItem(ARTICLE_QUOTA_KEY)).toBeNull();
+
+    // Charged nothing against the free allowance...
+    const stored = JSON.parse(localStorage.getItem(ARTICLE_QUOTA_KEY) ?? '{}');
+    expect(stored.count).toBe(0);
     expect(quota.allowed()).toBe(true);
+
+    // ...but counted. This used to write nothing at all, which meant the only
+    // reader whose total the Plus page wants to show was the one reader never
+    // counted — their "what you are getting" panel sat at zero forever.
+    expect(stored.lifetime).toBe(1);
+    expect(quota.lifetime()).toBe(1);
+  });
+
+  it('carries the lifetime total across the day rollover', () => {
+    // Every other counter here is a quota number and resets. This one is the
+    // answer to "was my subscription worth it", and resetting it nightly would
+    // make it useless for that.
+    localStorage.setItem(
+      ARTICLE_QUOTA_KEY,
+      JSON.stringify({ day: '2020-01-01', count: 2, freeFetches: 2, plusFetches: 0, lifetime: 91 }),
+    );
+    const { quota } = build();
+
+    expect(quota.lifetime()).toBe(91);
+    expect(quota.remaining()).toBe(FREE_DAILY_ARTICLES);
   });
 
   it('unlocks an exhausted subscriber without making them visit Settings', async () => {

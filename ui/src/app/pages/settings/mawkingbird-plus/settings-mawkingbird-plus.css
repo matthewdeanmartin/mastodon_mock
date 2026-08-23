@@ -154,6 +154,50 @@
   margin: 12px 0 6px;
 }
 
+/* The vault's two verbs, each with a line saying what happens after it. Stacked
+   rather than a button row, because the explanation is the point — see the
+   comment in the template. */
+.plus-vault-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 12px 0 6px;
+}
+
+.plus-vault-action p {
+  margin: 6px 0 0;
+  max-width: 60ch;
+}
+
+/* "What you are getting": two columns, label and number, right-aligned figures
+   so they can be compared down the column. Replaced a <dl> that rendered as a
+   ragged indented list. */
+.plus-usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.plus-usage-table th,
+.plus-usage-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.plus-usage-table tbody th {
+  font-weight: 500;
+}
+
+.plus-usage-table td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .plus-feature-list {
   margin: 10px 0 0;
   padding: 0;
