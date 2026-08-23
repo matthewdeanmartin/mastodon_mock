@@ -54,10 +54,15 @@ must keep category-2 (client filter) visually honest and never fake it as catego
 | 2 | `search-2-serializer-and-explain.md` | `MastodonQuerySerializer` + advanced post form + anonymous-transform explanation + Explain panel | DSL trust risk lives here; contained by unit tests + Explain |
 | 3 | `search-3-budget-and-pagination.md` | Max-API-calls selector, request counter/ceiling, budget-capped "Load more", execution status line | none new — counting existing calls |
 | 4 | `search-4-saved-and-shareable.md` | Saved searches (account-scoped localStorage) + shareable URL encoding of the rich object | none |
+| 5 | `search-5-account-corpus.md` | Search one account's posts, from a profile tab: build the corpus from `/accounts/:id/statuses` and feed the existing widget | none new — reuses the analytics paging pattern |
 
 Sprints 1→4 are ordered so each ships something visible and the risky DSL work (2) is
 insulated by the Explain panel it ships with. 3 and 4 are independent of each other once 1+2
 land.
+
+Sprint 5 answers "why does `from:user` return two posts when the profile has hundreds?" —
+the full-text index and the account timeline are different stores, and the fix is a second
+*source* for the corpus rather than a second search engine. It depends on 1 and 3.
 
 ## Files that will change (map for all sprints)
 

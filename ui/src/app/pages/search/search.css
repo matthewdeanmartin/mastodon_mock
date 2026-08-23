@@ -146,6 +146,82 @@
   color: #e0245e;
 }
 
+/* Recent searches: a wrapping row of chips under the search bar.
+
+   Chips rather than the dropdown "Saved" uses, because these are meant to be
+   glanced at and re-pressed without opening anything — the whole value is that
+   the query you want is already visible when you arrive at an empty box. */
+.recent-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.recent-label {
+  flex: 0 0 auto;
+}
+
+/* The chip is a pair of buttons sharing one pill, so "run" and "forget" are
+   separate targets without looking like two chips. */
+.recent-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 9999px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.recent-run {
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  /* Comfortably past the ~44px minimum touch target in height, since this row
+     exists mostly to be tapped on a phone. */
+  padding: 8px 6px 8px 12px;
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-run:hover {
+  background: var(--hover, var(--bg));
+}
+
+.recent-type {
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.recent-del {
+  border: none;
+  background: none;
+  color: var(--muted, #888);
+  cursor: pointer;
+  padding: 8px 10px 8px 4px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.recent-del:hover {
+  color: #e0245e;
+}
+
+.recent-clear {
+  border: none;
+  background: none;
+  color: var(--muted, #888);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 8px;
+}
+
 .save-dialog {
   display: flex;
   flex-wrap: wrap;

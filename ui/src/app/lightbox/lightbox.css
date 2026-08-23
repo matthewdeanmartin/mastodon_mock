@@ -77,3 +77,50 @@
 .lightbox-nav:hover {
   background: rgba(0, 0, 0, 0.7);
 }
+
+/*
+  On a narrow screen the arrows cannot sit beside the image.
+
+  The overlay is a flex row — [‹] [figure] [›] — and the image claims
+  `min(90vw, 1100px)`. On a phone that is 90vw plus two 52px buttons and their
+  margins, ~120px more than the viewport: the arrows were crushed to unusable
+  slivers or pushed off-screen entirely, so a four-image post had images two
+  through four with no way to reach them. (Swipe now works too — see
+  lightbox.ts — but a visible control should not vanish.)
+
+  Overlaying them on the image keeps both affordances at full size. Slightly
+  inset from the edges rather than flush, so they do not collide with the
+  browser's own edge-swipe gesture areas.
+*/
+@media (max-width: 700px) {
+  .lightbox-overlay {
+    padding: 12px;
+  }
+
+  .lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    /* Smaller than the desktop 52px, but still comfortably over the ~44px
+       minimum touch target. */
+    width: 48px;
+    height: 48px;
+    font-size: 34px;
+    background: rgba(0, 0, 0, 0.55);
+  }
+
+  .lightbox-nav.prev {
+    left: 8px;
+  }
+
+  .lightbox-nav.next {
+    right: 8px;
+  }
+
+  /* The image no longer shares the row with the arrows, so it can have the
+     width back. */
+  .lightbox-img {
+    max-width: 100%;
+  }
+}

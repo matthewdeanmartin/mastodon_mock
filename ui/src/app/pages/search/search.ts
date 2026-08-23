@@ -17,7 +17,7 @@ import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, Relationship, SearchResults, Status, Tag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
-import { OffsiteDirectories } from '../offsite-directories/offsite-directories';
+import { AccountSearchHelp } from './account-search-help/account-search-help';
 import { AnonymousCapabilities } from '../../providers/anonymous/anonymous-capabilities';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
@@ -88,6 +88,7 @@ import {
 import { serializeMastodonQuery } from './mastodon-query-serializer';
 import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-explain';
 import { isBlueskySaved, isMastodonSaved, SavedSearches } from './saved-searches';
+import { RecentSearches, RecentSearch } from './recent-searches';
 import { BlueskyPostSearch } from '../../providers/bluesky/bluesky-post-search';
 import { decodeSearchFromParams, encodeSearchToParams } from './search-url';
 import { PageDiagnostics } from '../../page-diagnostics';
@@ -159,7 +160,7 @@ const SEARCH_TIMEOUT_MS = 20000;
     FormsModule,
     RouterLink,
     StatusCard,
-    OffsiteDirectories,
+    AccountSearchHelp,
     AccountResultCard,
     SearchHelperDialog,
     SearchSyntaxHelp,
@@ -189,6 +190,7 @@ export class Search implements OnInit, OnDestroy {
   /** For the "mute everywhere" escalation on an excluded author. */
   private localMod = inject(LocalModeration);
   protected saved = inject(SavedSearches);
+  protected recent = inject(RecentSearches);
   protected searchServer = inject(SearchServer);
   /** Which network owns this account, for the landing-panel default. */
   private auth = inject(Auth);
@@ -1590,6 +1592,28 @@ export class Search implements OnInit, OnDestroy {
     this.saveDialogOpen.set(true);
   }
 
+  /**
+   * Re-run a query from the recent list.
+   *
+   * Sets the box and the tab, then goes through {@link run} like any typed
+   * search rather than calling `fetch` directly — so the URL updates, the
+   * Bluesky branch still applies, and re-running from history is indistinguish-
+   * able from typing it again. `record` then moves it to the front of the list.
+   */
+  runRecent(entry: RecentSearch): void {
+    this.diagnostics.info('Search', 'user:run-recent', { type: entry.type });
+    this.query.set(entry.query);
+    this.type.set(entry.type);
+    this.run();
+  }
+
+  /** Forget one recent query, from its ✕. */
+  forgetRecent(entry: RecentSearch, event: Event): void {
+    // The row is a button; without this the click re-runs what it just removed.
+    event.stopPropagation();
+    this.recent.remove(entry.query, entry.type);
+  }
+
   // --- search server ---
   // Search can be pointed at a *different* instance than everything else, because
   // plenty of servers disable anonymous search outright. Only the search call moves;
@@ -1889,6 +1913,11 @@ export class Search implements OnInit, OnDestroy {
     this.oldestId = '';
     this.executedQuery = q;
     this.executedType = type;
+    // Recorded here rather than at the input, because this is the one place a
+    // search is definitely *run*. Keystrokes are not searches, and restoring an
+    // account snapshot on back-navigation returns before this point, so
+    // returning to a result set does not shuffle the history you came back to.
+    this.recent.record(q, type);
 
     // Accounts have their own orchestration (bio / posts→authors / both).
     if (type === 'accounts') {

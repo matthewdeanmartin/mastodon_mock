@@ -1,6 +1,8 @@
 <div
   class="lightbox-overlay"
   (click)="onOverlayClick($event)"
+  (touchstart)="onTouchStart($event)"
+  (touchend)="onTouchEnd($event)"
   (keydown.escape)="close()"
   role="dialog"
   aria-modal="true"

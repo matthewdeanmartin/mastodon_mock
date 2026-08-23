@@ -144,6 +144,51 @@
     </button>
   </div>
 
+  <!-- Recent searches: the queries you actually typed, remembered automatically.
+
+       Separate from "Saved" above on purpose. Saved is curation — named, full
+       structured definitions, capped at 20, kept until deleted. This is history:
+       unnamed, just the words and the tab, ten of them, rolling off the end.
+       Folding them together would either bury a hand-built list under every
+       typo, or require naming a search before you may repeat it.
+
+       Shown only with an empty box and nothing on screen: a reader looking at
+       results is not looking for their history, and this is exactly the blank
+       moment the list answers. -->
+  @if (recent.count() && !query().trim() && !results() && !loadedAccountCount()) {
+    <div class="recent-row">
+      <span class="muted small recent-label">Recent</span>
+      @for (item of recent.all(); track item.query + item.type) {
+        <span class="recent-chip">
+          <button
+            type="button"
+            class="recent-run"
+            (click)="runRecent(item)"
+            [title]="'Search ' + item.query + ' again'"
+          >
+            {{ item.query }}
+            <!-- Which tab it ran on. The same words as posts and as accounts are
+                 different searches, so the list keeps them apart and has to say
+                 which is which. -->
+            <span class="muted recent-type">{{
+              item.type === 'statuses' ? 'posts' : item.type === 'accounts' ? 'people' : 'tags'
+            }}</span>
+          </button>
+          <button
+            type="button"
+            class="recent-del"
+            (click)="forgetRecent(item, $event)"
+            [attr.aria-label]="'Forget search ' + item.query"
+            title="Forget"
+          >
+            ✕
+          </button>
+        </span>
+      }
+      <button type="button" class="recent-clear muted small" (click)="recent.clear()">Clear</button>
+    </div>
+  }
+
   <!-- Why an option in the type select is greyed out. Sits under the bar rather
        than in a tooltip: the reader who needs it is the one who just tried to
        click it. -->
@@ -927,12 +972,16 @@
 
       <div class="search-results-box">
         @if (type() === 'accounts' && !accountResultsRan && !accountSearchRan() && !searching()) {
-          <!-- Nothing searched yet and looking for people: offer follow-list import &
-           directories. Once a search has run (even to zero results) we show the
-           results block's empty state instead, so the button never looks inert. -->
+          <!-- Nothing searched yet and looking for people: answer "what can I type
+           here?", the same question the posts tab answers with its operator
+           reference. This used to list offsite directories, which is a fine
+           answer to "where do I find people" but not to the question an empty
+           search box poses — and /find-friends is that hub, linked from the foot
+           of the help rather than competing with the search the reader came to
+           run. Once a search has run (even to zero results) we show the results
+           block's empty state instead, so the button never looks inert. -->
           <div class="search-idle">
-            <div class="page-head">Find people to follow</div>
-            <app-offsite-directories [embedded]="true" />
+            <app-account-search-help />
           </div>
         }
 

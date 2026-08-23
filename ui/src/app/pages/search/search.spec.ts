@@ -15,6 +15,7 @@ import { Account, Relationship, SearchResults, Status, Tag } from '../../models'
 import { Search } from './search';
 import { Auth } from '../../auth';
 import { SearchServer } from '../../search-server';
+import { RecentSearches } from './recent-searches';
 
 /** Exposes Search's protected signals for white-box testing. */
 interface SearchInternals {
@@ -261,21 +262,81 @@ describe('Search', () => {
     expect(internals(fixture).query()).toBe('');
   });
 
-  // The empty account tab used to push the universal starter pack at anyone with
-  // no follows. Bundled collections live on their own page now, reached on
-  // purpose from Find Friends, so this offers directories instead.
-  it('offers offsite directories on the empty account tab, without a page title of its own', () => {
+  // The empty account tab has been through three answers to "what goes here?":
+  // the universal starter pack, then a list of offsite directories, and now the
+  // account-search reference.
+  //
+  // Directories answered "where do I find people", which is a real question but
+  // not the one an empty *search box* poses — and /find-friends is that hub
+  // already. The posts tab answers "what can I type here?" with its operator
+  // reference; this is the same answer for people, and it is linked to
+  // /find-friends at the foot rather than competing with it.
+  it('explains what you can type on the empty account tab', () => {
     const auth = TestBed.inject(Auth);
     auth.setToken('zero-follow-token');
     auth.setAccount({ id: 'me', username: 'me', following_count: 0 } as Account);
     const fixture = setUp();
     const el = fixture.nativeElement as HTMLElement;
 
-    expect(el.querySelector('app-offsite-directories')).not.toBeNull();
-    expect(el.textContent).toContain('Followgraph');
-    // Embedded: the host page already has a heading.
-    expect(el.querySelector('app-offsite-directories .page-title')).toBeNull();
+    expect(el.querySelector('app-account-search-help')).not.toBeNull();
+    // The load-bearing claim: a full address resolves even when the server has
+    // never seen the account, which is the fix for "I searched and found
+    // nothing".
+    expect(el.textContent).toContain('@name@server.social');
+    // Finding people is still offered, as a footnote rather than the headline.
+    expect(el.querySelector('a[href="/find-friends"]')).not.toBeNull();
+    // The two states it replaced are gone.
+    expect(el.querySelector('app-offsite-directories')).toBeNull();
     expect(el.querySelector('.starter-pack-card')).toBeNull();
+  });
+
+  /**
+   * Recent searches, recorded automatically.
+   *
+   * Recording happens in `fetch`, the one place a search is definitely *run* —
+   * not on keystrokes (typing is not searching) and not on the snapshot restore
+   * path (returning to results you already had must not reshuffle the history
+   * you came back to).
+   */
+  describe('recent searches', () => {
+    it('records a query that actually ran', () => {
+      const fixture = setUp();
+      search(fixture, 'birds');
+      httpMock.expectOne((r) => r.url.includes('/api/v2/search'));
+
+      const recent = TestBed.inject(RecentSearches);
+      expect(recent.all().map((r) => r.query)).toEqual(['birds']);
+      expect(recent.all()[0].type).toBe('statuses');
+    });
+
+    it('records nothing for typing alone', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('half a thought');
+      fixture.detectChanges();
+
+      expect(TestBed.inject(RecentSearches).count()).toBe(0);
+    });
+
+    it('offers recents under the box when it is empty, and hides them once results are up', () => {
+      const fixture = setUp();
+      search(fixture, 'birds');
+      httpMock
+        .expectOne((r) => r.url.includes('/api/v2/search'))
+        .flush({ accounts: [], statuses: [], hashtags: [] });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      // A reader looking at results is not looking for their history.
+      expect(el.querySelector('.recent-row')).toBeNull();
+
+      // Back to an empty box: the list is the answer to the blank moment.
+      internals(fixture).query.set('');
+      internals(fixture).results.set(null);
+      fixture.detectChanges();
+      const row = el.querySelector('.recent-row');
+      expect(row).not.toBeNull();
+      expect(row?.textContent).toContain('birds');
+    });
   });
 
   it('keeps optional idle trends empty when the trends request fails', () => {

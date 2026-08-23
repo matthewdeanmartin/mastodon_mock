@@ -304,13 +304,38 @@ a.eliza-invite:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  /* Wider gap under a bigger lead, so the two read as one unit rather than
+     crowding each other. */
+  gap: 20px;
   padding: 48px 16px;
   text-align: center;
 }
 
+/* The button keeps pace with the lead above it. Left at default size it became
+   the quiet element on the page, which inverts the point — the sentence exists
+   to get this pressed. */
+.home-empty .btn {
+  font-size: 17px;
+  padding: 12px 22px;
+}
+
+/*
+  Sized to be the thing on the page, not a caption.
+
+  This was 15px body text in `--muted` grey — a whisper, for the one sentence a
+  first-time visitor most needs to read, above the only button that helps them.
+  Now ~2x body and in full-strength text colour, because muting it was the other
+  half of what made it disappear.
+
+  26px rather than a display size: this is a sentence to be read and acted on,
+  and past roughly this point type stops reading as confident and starts reading
+  as alarmed. `clamp` keeps it from crowding a narrow phone.
+*/
 .home-empty-lead {
   margin: 0;
-  max-width: 42ch;
-  color: var(--muted);
+  max-width: 24ch;
+  color: var(--text);
+  font-size: clamp(21px, 5.5vw, 26px);
+  font-weight: 600;
+  line-height: 1.25;
 }
