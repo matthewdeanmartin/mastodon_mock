@@ -10,6 +10,10 @@ import { StatusCard } from '../../status-card/status-card';
 import { AddFeedDialog } from './add-feed-dialog/add-feed-dialog';
 import { RssStarterKitsPanel } from './starter-kits/rss-starter-kits-panel';
 import { RssStarterKitInstall } from '../../providers/rss/rss-starter-kit-install';
+import { RssReadState } from '../../providers/rss/rss-read-state';
+import { ClientPrefs, RssDensity } from '../../client-prefs';
+import { HeadlineRow } from './headline-row/headline-row';
+import { SeenWhenScrolled } from './seen-when-scrolled';
 
 /** A URL's hostname, or null when it isn't a parseable absolute URL. */
 function hostOf(url: string): string | null {
@@ -67,7 +71,14 @@ interface RailGroup {
  */
 @Component({
   selector: 'app-rss-page',
-  imports: [RouterLink, AddFeedDialog, StatusCard, RssStarterKitsPanel],
+  imports: [
+    RouterLink,
+    AddFeedDialog,
+    StatusCard,
+    RssStarterKitsPanel,
+    HeadlineRow,
+    SeenWhenScrolled,
+  ],
   templateUrl: './rss-page.html',
   styleUrl: './rss-page.css',
 })
@@ -78,6 +89,8 @@ export class RssPage {
   private rss = inject(RssProvider);
   private kitInstall = inject(RssStarterKitInstall);
   protected subs = inject(RssSubscriptions);
+  protected readState = inject(RssReadState);
+  protected prefs = inject(ClientPrefs);
   protected readonly perFeedCap = PER_FEED_ITEM_CAP;
 
   protected showAddDialog = signal(false);
@@ -133,15 +146,51 @@ export class RssPage {
     }
   });
 
+  /**
+   * The items actually rendered, after the All/Starred filter.
+   *
+   * Client-side over what the pane already loaded — starring does not change
+   * which feeds are fetched, so there is nothing to re-request.
+   */
+  protected readonly visibleStatuses = computed(() =>
+    this.filter() === 'starred'
+      ? this.statuses().filter((s) => this.readState.isStarred(s.id))
+      : this.statuses(),
+  );
+
+  /** How many loaded items in this pane are unread — for the mark-all affordance. */
+  protected readonly unreadCount = computed(
+    () => this.statuses().filter((s) => !this.readState.isRead(s.id)).length,
+  );
+
   /** The feed URL when a single feed is selected — the pane's "open in profile" link. */
   protected readonly selectedFeedUrl = computed(() => {
     const sel = this.selection();
     return sel.kind === 'feed' ? sel.url : null;
   });
 
+  /** All vs. Starred. Per-visit, not persisted: a filter is a momentary intent. */
+  protected readonly filter = signal<'all' | 'starred'>('all');
+
+  /**
+   * Whether the pane is showing starter kits instead of the reading list.
+   *
+   * Starts open for someone with no subscriptions — there is nothing to read, so
+   * the kits *are* the content — and is a plain toggle after that, so the offer
+   * stays reachable once feeds exist without ever displacing the list it would
+   * otherwise sit on top of. Set once at construction rather than computed from
+   * the feed count, so installing a kit does not yank the panel away mid-click.
+   */
+  protected readonly showKits = signal(false);
+
+  /** Which item is expanded in headline mode, by `Status.id`. */
+  protected readonly expandedId = signal<string | null>(null);
+
   private loadSeq = 0;
 
   constructor() {
+    this.showKits.set(this.subs.feeds().length === 0);
+
     // The pane follows the URL *and* the subscription list, so one effect covers
     // first paint, rail clicks, back/forward, a reload on a deep link, and a
     // starter kit finishing — all of which change what belongs in the pane.
@@ -259,6 +308,93 @@ export class RssPage {
 
   protected isAllActive(): boolean {
     return this.isActive({ kind: 'all' });
+  }
+
+  /**
+   * Expand or collapse an item in headline mode, marking it read on open.
+   *
+   * Opening always marks read, regardless of the scroll-tracking preference —
+   * the preference governs the *implicit* path (things you merely scrolled
+   * past), and an item you deliberately opened is read by any definition.
+   */
+  protected toggleExpanded(status: Status): void {
+    const next = this.expandedId() === status.id ? null : status.id;
+    this.expandedId.set(next);
+    if (next !== null) {
+      this.readState.markRead(status.id);
+      this.diagnostics.info('RssPage', 'user:open-item', { density: this.prefs.rssDensity() });
+    }
+  }
+
+  /** Flip one item's read state by hand — the undo for everything automatic. */
+  protected toggleRead(status: Status): void {
+    if (this.readState.isRead(status.id)) {
+      this.readState.markUnread(status.id);
+    } else {
+      this.readState.markRead(status.id);
+    }
+  }
+
+  protected setDensity(density: RssDensity): void {
+    this.prefs.setRssDensity(density);
+    // A collapsed-by-default full view has nothing to expand into; leaving a
+    // stale expansion behind would show an item as open in a mode that has no
+    // expanded state.
+    this.expandedId.set(null);
+  }
+
+  protected toggleKits(): void {
+    const next = !this.showKits();
+    this.showKits.set(next);
+    this.diagnostics.info('RssPage', 'user:toggle-kits', { open: next });
+  }
+
+  protected setFilter(filter: 'all' | 'starred'): void {
+    this.filter.set(filter);
+  }
+
+  /**
+   * Mark every item **currently in this pane** read.
+   *
+   * Scoped by construction rather than by a scope argument: it passes the ids of
+   * the statuses the pane has loaded, which are exactly the ones the heading
+   * above the button names. There is no code path here that can widen from one
+   * feed to a folder, or from a folder to everything — the sprint doc flags that
+   * mistake as the most embarrassing bug this work could ship, and the fix is
+   * not to be careful, it is to make the wrong scope unrepresentable.
+   *
+   * Note it uses `statuses()`, not `visibleStatuses()`: with the Starred filter
+   * on, "mark all as read" still means the pane's items, not the four starred
+   * ones you can currently see. The button is hidden while filtering to keep
+   * that from being a surprise.
+   *
+   * ## Why this lives in the pane and not on the rail row
+   *
+   * The sprint doc put it on the left rail, following Google Reader. That needs
+   * the items of a feed/folder you have *not* selected, and the pane only ever
+   * holds the current selection — so a rail button would have to fetch every
+   * folder in the background just to know what it was about to mark, or mark by
+   * feed URL and quietly cover items nobody has ever seen listed.
+   *
+   * Selecting the row first and marking from the pane costs one extra click and
+   * buys the guarantee that what gets marked is precisely what the heading above
+   * the button says. Given this is the mistake the doc singles out as the worst
+   * one available here, that trade is worth making.
+   */
+  protected markAllRead(): void {
+    const ids = this.statuses().map((s) => s.id);
+    this.readState.markManyRead(ids);
+    this.diagnostics.info('RssPage', 'user:mark-all-read', {
+      scope: this.selection().kind,
+      items: ids.length,
+    });
+  }
+
+  /** Scroll-tracking: called by the row observer once an item has been seen. */
+  protected onSeen(status: Status): void {
+    if (this.prefs.rssScrollMarksRead()) {
+      this.readState.markRead(status.id);
+    }
   }
 
   openAddDialog(): void {

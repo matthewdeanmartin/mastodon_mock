@@ -2,7 +2,18 @@
   <aside class="rss-rail" aria-label="Subscriptions">
     <div class="rss-rail-head">
       <h1>📡 RSS</h1>
-      <button class="btn btn-small" type="button" (click)="openAddDialog()">Add a feed</button>
+      <span class="head-actions">
+        <button class="btn btn-small" type="button" (click)="openAddDialog()">Add a feed</button>
+        <button
+          class="btn btn-small btn-outline"
+          type="button"
+          [class.active]="showKits()"
+          [attr.aria-pressed]="showKits()"
+          (click)="toggleKits()"
+        >
+          {{ showKits() ? 'Done' : 'Starter kits' }}
+        </button>
+      </span>
     </div>
 
     <nav class="rss-rail-body">
@@ -58,8 +69,9 @@
         }
       } @empty {
         <p class="muted rail-empty">
-          No feeds yet — pick a starter kit on the right, add one above, or
-          <a routerLink="/settings/rss">import an OPML file</a>.
+          No feeds yet — try
+          <button class="link-btn" type="button" (click)="toggleKits()">a starter kit</button>, add
+          one above, or <a routerLink="/settings/rss">import an OPML file</a>.
         </p>
       }
     </nav>
@@ -78,6 +90,57 @@
       }
     </div>
 
+    @if (statuses().length && !showKits()) {
+      <div class="pane-tools">
+        <span class="seg" role="group" aria-label="Filter">
+          <button
+            type="button"
+            [class.active]="filter() === 'all'"
+            [attr.aria-pressed]="filter() === 'all'"
+            (click)="setFilter('all')"
+          >
+            All
+          </button>
+          <button
+            type="button"
+            [class.active]="filter() === 'starred'"
+            [attr.aria-pressed]="filter() === 'starred'"
+            (click)="setFilter('starred')"
+          >
+            Starred
+          </button>
+        </span>
+
+        <span class="seg" role="group" aria-label="Density">
+          <button
+            type="button"
+            [class.active]="prefs.rssDensity() === 'full'"
+            [attr.aria-pressed]="prefs.rssDensity() === 'full'"
+            (click)="setDensity('full')"
+          >
+            Full
+          </button>
+          <button
+            type="button"
+            [class.active]="prefs.rssDensity() === 'headlines'"
+            [attr.aria-pressed]="prefs.rssDensity() === 'headlines'"
+            (click)="setDensity('headlines')"
+          >
+            Headlines
+          </button>
+        </span>
+
+        <!-- Hidden while filtering: "mark all as read" means this pane's items,
+             not the subset currently on screen, and offering it next to a
+             Starred filter invites exactly that misreading. -->
+        @if (filter() === 'all' && unreadCount()) {
+          <button class="link-btn mark-all" type="button" (click)="markAllRead()">
+            Mark {{ unreadCount() }} read
+          </button>
+        }
+      </div>
+    }
+
     @if (failed().length) {
       <p class="pane-warning">
         @if (failed().length === 1) {
@@ -90,19 +153,58 @@
       </p>
     }
 
-    <!-- Kits sit above the items, and only on the "All items" view: they are a
-         cold-start offer, not something to re-read past on every folder. -->
-    @if (isAllActive()) {
+    <!-- The pane shows one thing at a time: the kits, or what you are reading.
+         Toggled from the rail so browsing kits never costs you your place, and
+         so the offer is reachable later rather than only while the list is
+         empty. -->
+    @if (showKits()) {
       <app-rss-starter-kits-panel />
-    }
-
-    @if (loading()) {
+    } @else if (loading()) {
       <p class="muted center">Loading items…</p>
     } @else {
-      @for (s of statuses(); track s.id) {
-        <app-status-card [status]="s" filterContext="account" />
+      @for (s of visibleStatuses(); track s.id) {
+        @if (prefs.rssDensity() === 'headlines') {
+          <app-headline-row
+            [status]="s"
+            [expanded]="expandedId() === s.id"
+            [appSeenWhenScrolled]="prefs.rssScrollMarksRead()"
+            (seen)="onSeen(s)"
+            (opened)="toggleExpanded(s)"
+          />
+          @if (expandedId() === s.id) {
+            <div class="expanded-item">
+              <app-status-card [status]="s" filterContext="account" />
+            </div>
+          }
+        } @else {
+          <div
+            class="full-item"
+            [class.read]="readState.isRead(s.id)"
+            [appSeenWhenScrolled]="prefs.rssScrollMarksRead()"
+            (seen)="onSeen(s)"
+          >
+            <app-status-card [status]="s" filterContext="account" />
+            <!-- Full mode gets the same two controls headline rows carry, so
+                 switching density never costs you an affordance. -->
+            <div class="item-tools">
+              <button
+                class="link-btn"
+                type="button"
+                [attr.aria-pressed]="readState.isStarred(s.id)"
+                (click)="readState.toggleStarred(s.id)"
+              >
+                {{ readState.isStarred(s.id) ? '★ Starred' : '☆ Star' }}
+              </button>
+              <button class="link-btn" type="button" (click)="toggleRead(s)">
+                {{ readState.isRead(s.id) ? 'Mark unread' : 'Mark read' }}
+              </button>
+            </div>
+          </div>
+        }
       } @empty {
-        @if (subs.feeds().length) {
+        @if (filter() === 'starred') {
+          <p class="muted center">Nothing starred here yet.</p>
+        } @else if (subs.feeds().length) {
           <p class="muted center">Nothing to read here.</p>
         } @else if (!isAllActive()) {
           <p class="muted center">Subscribe to a feed to start reading.</p>

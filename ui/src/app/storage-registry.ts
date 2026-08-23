@@ -326,6 +326,20 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Subscribed feed URLs — what the user reads. Private feed URLs (Feedbin, Miniflux, Google Alerts) routinely embed an API key in the URL itself; by a decided business rule these are stored as-is and NOT treated as secrets, and no warning is shown — see mawkingbird_profile/docs/01-data-model.md. Real secret storage is future work. Each feed also carries its opt-in flag for the CORS proxy.',
   },
   {
+    base: 'mockingbird_rss_read',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Which RSS items have been read, as item id → timestamp. Private for the same reason the subscription list is: it is a record of what the user actually read, item by item, which is more revealing than the feed list it derives from. The timestamp exists for a future 90-day prune.',
+  },
+  {
+    base: 'mockingbird_rss_starred',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Starred RSS items, as item id → timestamp. Kept apart from mockingbird_rss_read because starring is a deliberate keep and must not age out with read state.',
+  },
+  {
     base: 'mockingbird_cors_proxy',
     storage: 'local',
     suffix: 'none',

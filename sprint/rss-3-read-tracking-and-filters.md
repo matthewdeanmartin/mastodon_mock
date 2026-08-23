@@ -1,6 +1,6 @@
 # RSS Sprint 3 — Read/unread, starring, headline density in the split pane
 
-Status: PLANNED (renumbered 2026-08-23 from the original Sprint 2 — see [[rss-2-split-pane-shell]]
+Status: DONE (shipped 2026-08-22; renumbered 2026-08-23 from the original Sprint 2 — see [[rss-2-split-pane-shell]]
 for why; this sprint's content is the original Sprint 2's read-tracking work, adapted to sit inside
 the split-pane shell instead of a single-column list with a mode toggle)
 
@@ -99,3 +99,46 @@ this sprint; the prune job itself is not built yet — later).
   silently mark everything read — a Google Reader UI puts this control right next to several
   adjacent scopes (a feed, a folder, "all"), and picking the wrong scope by accident is the
   single most embarrassing bug this sprint could ship.
+
+## What shipped (2026-08-22)
+
+- **3a. Read-state store** — `providers/rss/rss-read-state.ts`. Keyed by `Status.id`
+  (`rss:<feedUrl>::<guid>`), which the adapter already builds, so read-state ids cannot drift from
+  rendered-item ids. Timestamps stored for the future prune. Read and starred are two flat maps, not
+  one enum — they are independent booleans, and a star should not age out with read state. Both keys
+  registered in `storage-registry.ts` (113 keys, gate green).
+- **3b. Starring + All/Starred** — segmented filter in the pane toolbar, client-side over the loaded
+  list. Star affordance on both renderers: the `☆` on a headline row, a `Star` action under a full
+  card, so switching density never costs an affordance.
+- **3c. Scroll tracking + explicit mark-read** — opt-in `ClientPrefs.rssScrollMarksRead`, off by
+  default, with a settings checkbox and a "clear reading history" control. Opening an item always
+  marks it read regardless. See the scroll-tracking note below.
+- **3d. Headline density** — new `app-headline-row` (dot, title, source, time, star), toggled by the
+  persisted `ClientPrefs.rssDensity`, defaulting to `full`. Opening a headline expands the item
+  **inline** in the pane (boss's call), and the full card inside the expansion keeps its own "View
+  thread" link out to the untouched reader route.
+
+### Decisions taken during implementation
+
+- **Mark-all-read lives in the pane, not on the rail row.** The doc put it on the rail, following
+  Google Reader. That needs the items of a feed/folder that is *not* selected, and the pane only
+  holds the current selection — so a rail button would have to background-fetch every folder just to
+  know what it was about to mark. Selecting first and marking from the pane costs one click and
+  makes the wrong scope unrepresentable: `markAllRead()` passes the ids the pane loaded, which the
+  heading above the button names. Verified at runtime — marking the Tech folder left 0 News items
+  touched. It also deliberately uses `statuses()` not `visibleStatuses()`, and hides itself while the
+  Starred filter is on, so "mark all" never silently means "mark the four you can see".
+- **Scroll tracking means "scrolled past", not "on screen".** The obvious version — fire after an
+  element has been visible a moment — is wrong in a dense list and was caught at runtime: headline
+  rows are ~34px, a 700px pane holds twenty, they all clear the visibility threshold at once, and a
+  single flick marked all 12 test items read. The rule is now: visible, *then* left the top edge,
+  then a dwell. Runtime after the fix — off: 0 marked; at rest: 0; slow scroll: 23; fast flick over
+  more ground: 20 (fewer, which is the dwell gate working). Regression-tested in
+  `seen-when-scrolled.spec.ts`.
+- **Starter kits became a rail toggle** (boss's call, mid-sprint): a "Starter kits" button beside
+  "Add a feed" swaps the pane between kits and the reading list, rather than kits sitting above the
+  items. Opens showing kits when there are no subscriptions; set once at construction so installing
+  a kit does not yank the panel away mid-click.
+
+Tests: 250 pass across the RSS provider/page/settings/shell/prefs specs. `check:static` green.
+

@@ -94,7 +94,7 @@ itself.
    parses, export round-trips it, and a feed subscribed by bare URL is unfiled rather than being
    filed under a publisher's own `<category>` labels. Deferred-folders is therefore partly reopened,
    in the narrow form only; `spec/ui/folders_for_all.md`'s shared primitive remains a proposal.
-3. **Sprint 3 — PLANNED.** [[rss-3-read-tracking-and-filters]]. Read/unread store, starring,
+3. **Sprint 3 — DONE (2026-08-22).** [[rss-3-read-tracking-and-filters]]. Read/unread store, starring,
    All/Starred filter, scroll-tracking, mark-all-read (scoped correctly to feed vs. category vs.
    all — flagged as the sprint's most embarrassing possible bug), and a headline-density row
    renderer for the right pane (a new lightweight component, not a repurposed `app-status-card`).

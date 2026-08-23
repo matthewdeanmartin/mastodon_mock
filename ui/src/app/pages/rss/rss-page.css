@@ -38,6 +38,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
@@ -52,6 +53,35 @@
   font-size: 13px;
   padding: 4px 10px;
   white-space: nowrap;
+}
+
+/* Two buttons under a heading in a 300px rail: let them wrap rather than
+   squeezing the labels. */
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* `btn-outline` is defined per-page in this codebase rather than globally, so
+   the rail's secondary button carries its own quiet styling here — otherwise it
+   inherits the filled `.btn` and competes with "Add a feed" for the eye. */
+.head-actions .btn-outline {
+  background: none;
+  border: 1px solid var(--border);
+  color: inherit;
+}
+
+.head-actions .btn-outline:hover {
+  background: var(--bg);
+}
+
+/* The kits toggle is a mode, so it reads as pressed while the pane is showing
+   them — the same treatment the segmented controls use. */
+.head-actions .btn-outline.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  font-weight: 700;
 }
 
 /* `flex: 0 1 auto` not `flex: 1`: the rail should be as tall as its list, and
@@ -183,4 +213,87 @@
     position: static;
     max-height: 60vh;
   }
+}
+
+/* ── Pane tools: filter, density, mark-all ─────────────────────────────── */
+
+.pane-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* Segmented control, matching the one /conversations already uses so the two
+   reading surfaces do not invent separate vocabularies for the same idea. */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.seg button {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--border);
+}
+
+.seg button.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  font-weight: 700;
+}
+
+.mark-all {
+  margin-left: auto;
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+/* ── Items ─────────────────────────────────────────────────────────────── */
+
+/* A read item recedes rather than disappearing: still there to go back to,
+   visibly behind you. Opacity alone, so it survives any theme. */
+.full-item.read app-status-card {
+  opacity: 0.6;
+}
+
+.full-item.read:hover app-status-card {
+  opacity: 1;
+}
+
+.item-tools {
+  display: flex;
+  gap: 14px;
+  padding: 0 12px 10px;
+  margin-top: -6px;
+}
+
+/* The inline expansion in headline mode, indented under its own row so the
+   relationship reads as containment rather than as the next item. */
+.expanded-item {
+  border-bottom: 1px solid var(--border);
+  padding-left: 17px;
 }

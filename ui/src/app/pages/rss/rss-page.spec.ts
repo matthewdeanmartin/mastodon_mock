@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ParsedFeed } from '../../providers/rss/rss-parser';
 import { RssFetch } from '../../providers/rss/rss-fetch';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
+import { RssReadState } from '../../providers/rss/rss-read-state';
+import { ClientPrefs } from '../../client-prefs';
 import { RssPage } from './rss-page';
 import { StatusCard } from '../../status-card/status-card';
 import { Status } from '../../models';
@@ -227,5 +229,210 @@ describe('RssPage', () => {
     (fixture.componentInstance as unknown as { closeAddDialog(): void }).closeAddDialog();
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).querySelector('app-add-feed-dialog')).toBeNull();
+  });
+
+  describe('read state, starring and density', () => {
+    const URL_A = 'https://a.example.com/f.xml';
+    const URL_B = 'https://b.example.com/f.xml';
+
+    /** Two feeds in different folders, each with one item. */
+    async function twoFolders() {
+      feeds.set(URL_A, feed('A', 'Alpha item', '2026-08-20T00:00:00Z'));
+      feeds.set(URL_B, feed('B', 'Beta item', '2026-08-21T00:00:00Z'));
+      const subs = TestBed.inject(RssSubscriptions);
+      subs.add(URL_A, 'A', false, undefined, 'Tech');
+      subs.add(URL_B, 'B', false, undefined, 'News');
+      const fixture = setUp();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    const idOf = (url: string, guid: string) => `rss:${url}::${guid}`;
+
+    it('marks an item read when it is opened in headline mode', async () => {
+      feeds.set(URL_A, feed('A', 'Alpha item', '2026-08-20T00:00:00Z'));
+      TestBed.inject(RssSubscriptions).add(URL_A, 'A');
+      TestBed.inject(ClientPrefs).setRssDensity('headlines');
+      const readState = TestBed.inject(RssReadState);
+      const fixture = setUp();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const id = idOf(URL_A, 'A-Alpha item');
+      expect(readState.isRead(id)).toBe(false);
+
+      fixture.componentInstance['toggleExpanded'](fixture.componentInstance['statuses']()[0]);
+      expect(readState.isRead(id)).toBe(true);
+    });
+
+    it('does not mark anything read merely by rendering', async () => {
+      // Scroll tracking is opt-in; with it off, loading a pane must not touch
+      // read state at all.
+      await twoFolders();
+      expect(TestBed.inject(RssReadState).readCount()).toBe(0);
+    });
+
+    it('mark-all-read covers only the selected folder', async () => {
+      const fixture = await twoFolders();
+      const readState = TestBed.inject(RssReadState);
+
+      fixture.componentInstance['selectFolder']('Tech');
+      await fixture.whenStable();
+      fixture.detectChanges();
+      fixture.componentInstance['markAllRead']();
+
+      // The single most embarrassing bug this sprint could ship: marking the
+      // other folder's items read too.
+      expect(readState.isRead(idOf(URL_A, 'A-Alpha item'))).toBe(true);
+      expect(readState.isRead(idOf(URL_B, 'B-Beta item'))).toBe(false);
+      expect(readState.readCount()).toBe(1);
+    });
+
+    it('mark-all-read on a single feed covers only that feed', async () => {
+      const fixture = await twoFolders();
+      const readState = TestBed.inject(RssReadState);
+
+      fixture.componentInstance['selectFeed'](URL_B);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      fixture.componentInstance['markAllRead']();
+
+      expect(readState.isRead(idOf(URL_B, 'B-Beta item'))).toBe(true);
+      expect(readState.isRead(idOf(URL_A, 'A-Alpha item'))).toBe(false);
+    });
+
+    it('mark-all-read on All items covers everything loaded', async () => {
+      const fixture = await twoFolders();
+      fixture.componentInstance['markAllRead']();
+      expect(TestBed.inject(RssReadState).readCount()).toBe(2);
+    });
+
+    it('mark-all-read ignores the Starred filter and marks the whole pane', async () => {
+      const fixture = await twoFolders();
+      const readState = TestBed.inject(RssReadState);
+      readState.setStarred(idOf(URL_A, 'A-Alpha item'), true);
+
+      fixture.componentInstance['setFilter']('starred');
+      fixture.detectChanges();
+      fixture.componentInstance['markAllRead']();
+
+      // Not just the one visible starred item.
+      expect(readState.readCount()).toBe(2);
+    });
+
+    it('the Starred filter shows only starred items', async () => {
+      const fixture = await twoFolders();
+      TestBed.inject(RssReadState).setStarred(idOf(URL_A, 'A-Alpha item'), true);
+
+      fixture.componentInstance['setFilter']('starred');
+      fixture.detectChanges();
+
+      const text = textOf(fixture);
+      expect(text).toContain('Alpha item');
+      expect(text).not.toContain('Beta item');
+    });
+
+    it('persists the density preference', async () => {
+      await twoFolders();
+      const prefs = TestBed.inject(ClientPrefs);
+      expect(prefs.rssDensity()).toBe('full');
+
+      prefs.setRssDensity('headlines');
+      expect(prefs.rssDensity()).toBe('headlines');
+      prefs.setRssDensity('nonsense' as never);
+      expect(prefs.rssDensity()).toBe('headlines');
+    });
+
+    it('collapses any expansion when density changes', async () => {
+      feeds.set(URL_A, feed('A', 'Alpha item', '2026-08-20T00:00:00Z'));
+      TestBed.inject(RssSubscriptions).add(URL_A, 'A');
+      const fixture = setUp();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      fixture.componentInstance['toggleExpanded'](fixture.componentInstance['statuses']()[0]);
+      expect(fixture.componentInstance['expandedId']()).not.toBeNull();
+
+      fixture.componentInstance['setDensity']('headlines');
+      expect(fixture.componentInstance['expandedId']()).toBeNull();
+    });
+
+    it('toggles one item read by hand', async () => {
+      const fixture = await twoFolders();
+      const readState = TestBed.inject(RssReadState);
+      const status = fixture.componentInstance['statuses']()[0];
+
+      fixture.componentInstance['toggleRead'](status);
+      expect(readState.isRead(status.id)).toBe(true);
+      fixture.componentInstance['toggleRead'](status);
+      expect(readState.isRead(status.id)).toBe(false);
+    });
+
+    it('only marks read on scroll when the preference is on', async () => {
+      const fixture = await twoFolders();
+      const readState = TestBed.inject(RssReadState);
+      const status = fixture.componentInstance['statuses']()[0];
+
+      fixture.componentInstance['onSeen'](status);
+      expect(readState.isRead(status.id)).toBe(false);
+
+      TestBed.inject(ClientPrefs).setRssScrollMarksRead(true);
+      fixture.componentInstance['onSeen'](status);
+      expect(readState.isRead(status.id)).toBe(true);
+    });
+  });
+
+  describe('starter kit toggle', () => {
+    it('opens showing kits when there are no feeds at all', () => {
+      const fixture = setUp();
+      expect(fixture.componentInstance['showKits']()).toBe(true);
+      expect(textOf(fixture)).toContain('Start with a kit');
+    });
+
+    it('opens showing the reading list once feeds exist', async () => {
+      const url = 'https://a.example.com/f.xml';
+      feeds.set(url, feed('A', 'Alpha item', '2026-08-20T00:00:00Z'));
+      TestBed.inject(RssSubscriptions).add(url, 'A');
+      const fixture = setUp();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance['showKits']()).toBe(false);
+      expect(textOf(fixture)).toContain('Alpha item');
+      expect(textOf(fixture)).not.toContain('Start with a kit');
+    });
+
+    it('swaps the pane between kits and the reading list', async () => {
+      const url = 'https://a.example.com/f.xml';
+      feeds.set(url, feed('A', 'Alpha item', '2026-08-20T00:00:00Z'));
+      TestBed.inject(RssSubscriptions).add(url, 'A');
+      const fixture = setUp();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      fixture.componentInstance['toggleKits']();
+      fixture.detectChanges();
+      // One thing at a time: kits replace the list rather than pushing it down.
+      expect(textOf(fixture)).toContain('Start with a kit');
+      expect(textOf(fixture)).not.toContain('Alpha item');
+
+      fixture.componentInstance['toggleKits']();
+      fixture.detectChanges();
+      expect(textOf(fixture)).toContain('Alpha item');
+      expect(textOf(fixture)).not.toContain('Start with a kit');
+    });
+
+    it('does not close itself when a kit install adds feeds', async () => {
+      const fixture = setUp();
+      expect(fixture.componentInstance['showKits']()).toBe(true);
+
+      TestBed.inject(RssSubscriptions).add('https://a.example.com/f.xml', 'A');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // Derived-from-feed-count would yank the panel away mid-click.
+      expect(fixture.componentInstance['showKits']()).toBe(true);
+    });
   });
 });

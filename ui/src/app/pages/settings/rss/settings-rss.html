@@ -28,6 +28,32 @@
     </a>
   </p>
 
+  <div class="reading-controls">
+    <label class="check">
+      <input
+        type="checkbox"
+        [checked]="prefs.rssScrollMarksRead()"
+        (change)="setScrollMarksRead($event)"
+        name="rssScrollMarksRead"
+      />
+      <span>Mark items read as I scroll past them</span>
+    </label>
+    <p class="muted small">
+      Off by default. Opening an item always marks it read regardless of this setting; this only
+      covers items you scrolled past without opening, and waits until one has been on screen for a
+      moment so a fast scroll to the bottom does not mark everything on the way.
+    </p>
+    @if (readState.readCount() || readState.starredCount()) {
+      <p class="muted small">
+        {{ readState.readCount() }} item{{ readState.readCount() === 1 ? '' : 's' }} marked read,
+        {{ readState.starredCount() }} starred.
+        <button class="btn btn-outline btn-sm" type="button" (click)="clearReadState()">
+          Clear reading history
+        </button>
+      </p>
+    }
+  </div>
+
   <div class="cache-controls">
     <label class="cache-ttl">
       <span>Reuse a fetched feed for</span>

@@ -160,6 +160,12 @@ const ART_STYLES: readonly ArtStyle[] = ['hand', 'ai'];
  * Offered as a fixed list rather than a free number so the stored value is
  * always one the UI can name back to the user.
  */
+/** How the `/rss` reading pane renders items. */
+export type RssDensity = 'full' | 'headlines';
+
+/** Every valid {@link RssDensity}, for validating stored/typed input. */
+export const RSS_DENSITIES: readonly RssDensity[] = ['full', 'headlines'];
+
 export const RSS_CACHE_TTL_OPTIONS: readonly { hours: number; label: string }[] = [
   { hours: 0, label: 'Always refetch (not recommended)' },
   { hours: 1, label: '1 hour' },
@@ -333,6 +339,8 @@ interface StoredPrefs {
   aiMode?: AiMode;
   artStyle?: ArtStyle;
   rssCacheTtlHours?: number;
+  rssDensity?: RssDensity;
+  rssScrollMarksRead?: boolean;
   chatKind?: ChatKindFilter;
   feedMin?: number;
   feedMax?: number;
@@ -545,6 +553,27 @@ export class ClientPrefs {
    * hatch for someone debugging their own feed.
    */
   readonly rssCacheTtlHours = signal<number>(24);
+
+  /**
+   * How the `/rss` reading pane renders items.
+   *
+   * `full` (the default) is the `app-status-card` rendering the pane has always
+   * used — unchanged for anyone already reading there, and the right thing for
+   * someone who has just installed a starter kit and wants to see content
+   * rather than a spreadsheet. `headlines` is the dense one-line-per-item scan
+   * view for people who go looking for it.
+   */
+  readonly rssDensity = signal<RssDensity>('full');
+
+  /**
+   * Mark RSS items read as they scroll past in the reading pane.
+   *
+   * Off by default and deliberately opt-in: silently marking things read is the
+   * kind of behaviour that feels like data loss when you did not ask for it.
+   * Opening an item always marks it read regardless of this setting.
+   */
+  readonly rssScrollMarksRead = signal<boolean>(false);
+
   readonly chatKind = signal<ChatKindFilter>('all');
 
   // Algo-feed filters.
@@ -892,6 +921,16 @@ export class ClientPrefs {
     }
   }
 
+  setRssDensity(density: RssDensity): void {
+    if (RSS_DENSITIES.includes(density)) {
+      this.rssDensity.set(density);
+    }
+  }
+
+  setRssScrollMarksRead(enabled: boolean): void {
+    this.rssScrollMarksRead.set(enabled);
+  }
+
   setChatKind(kind: ChatKindFilter): void {
     if (CHAT_KINDS.includes(kind)) {
       this.chatKind.set(kind);
@@ -1209,6 +1248,12 @@ export class ClientPrefs {
     ) {
       this.rssCacheTtlHours.set(stored.rssCacheTtlHours);
     }
+    if (typeof stored.rssDensity === 'string' && RSS_DENSITIES.includes(stored.rssDensity)) {
+      this.rssDensity.set(stored.rssDensity);
+    }
+    if (typeof stored.rssScrollMarksRead === 'boolean') {
+      this.rssScrollMarksRead.set(stored.rssScrollMarksRead);
+    }
     if (stored.chatKind && CHAT_KINDS.includes(stored.chatKind)) {
       this.chatKind.set(stored.chatKind);
     }
@@ -1287,6 +1332,8 @@ export class ClientPrefs {
       aiMode: this.aiMode(),
       artStyle: this.artStyle(),
       rssCacheTtlHours: this.rssCacheTtlHours(),
+      rssDensity: this.rssDensity(),
+      rssScrollMarksRead: this.rssScrollMarksRead(),
       chatKind: this.chatKind(),
       feedMin: this.feedMin(),
       feedMax: this.feedMax(),

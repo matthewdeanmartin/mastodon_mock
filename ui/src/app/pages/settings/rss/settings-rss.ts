@@ -16,6 +16,7 @@ import {
 } from '../../../providers/rss/rss-subscriptions';
 import { buildOpml, opmlFilename, parseOpml } from '../../../providers/rss/opml';
 import { PageDiagnostics } from '../../../page-diagnostics';
+import { RssReadState } from '../../../providers/rss/rss-read-state';
 
 /**
  * What one OPML import did, reported in full.
@@ -60,6 +61,7 @@ export class SettingsRss implements OnInit {
   protected subs = inject(RssSubscriptions);
   protected proxySettings = inject(CorsProxySettings);
   protected prefs = inject(ClientPrefs);
+  protected readState = inject(RssReadState);
   private cache = inject(RssCache);
 
   protected readonly ttlOptions = RSS_CACHE_TTL_OPTIONS;
@@ -321,6 +323,19 @@ export class SettingsRss implements OnInit {
 
   toggleProxy(feed: RssFeedSub): void {
     this.subs.setUseProxy(feed.url, feed.useProxy !== true);
+  }
+
+  /** Turn scroll-tracking on or off. */
+  setScrollMarksRead(event: Event): void {
+    const enabled = (event.target as HTMLInputElement).checked;
+    this.prefs.setRssScrollMarksRead(enabled);
+    this.diagnostics.info('RSS', 'settings:scroll-marks-read', { enabled });
+  }
+
+  /** Forget every read and starred mark. Subscriptions are untouched. */
+  clearReadState(): void {
+    this.readState.clear();
+    this.diagnostics.info('RSS', 'settings:clear-read-state', {});
   }
 
   /** The select hands back a string; the preference is a number of hours. */
