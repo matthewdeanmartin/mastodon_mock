@@ -1,5 +1,9 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, ElementRef, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
+import { ComposeShareRequest, ShareDialog } from '../../../share-dialog/share-dialog';
+import { selectionWithin } from '../../../share-dialog/share-selection';
+import { Drafts } from '../../../drafts';
 import { ArticleFetch } from '../../../providers/article/article-fetch';
 import { ArticleQuota } from '../../../providers/article/article-quota';
 import { ArticleResult } from '../../../providers/article/article-models';
@@ -34,14 +38,55 @@ import { paginateMarkdown } from '../article-pages';
  */
 @Component({
   selector: 'app-rss-article',
-  imports: [RouterLink],
+  imports: [RouterLink, ShareDialog],
   templateUrl: './rss-article.html',
   styleUrl: './rss-article.css',
 })
 export class RssArticle {
   private articles = inject(ArticleFetch);
   private diagnostics = inject(PageDiagnostics);
+  private host = inject(ElementRef<HTMLElement>);
+  private drafts = inject(Drafts);
+  private router = inject(Router);
   protected quota = inject(ArticleQuota);
+
+  protected showShare = signal(false);
+  protected shareQuote = signal('');
+
+  /**
+   * Share what was just read, quoting any highlighted passage.
+   *
+   * The selection is captured here rather than inside the dialog: opening a
+   * modal moves focus and collapses it. This is also the most likely place
+   * anyone highlights anything — they have the full article in front of them.
+   */
+  protected openShare(): void {
+    this.shareQuote.set(selectionWithin(this.host.nativeElement));
+    this.showShare.set(true);
+  }
+
+  /**
+   * Park a prefilled draft and send the reader to the composer.
+   *
+   * There is no composer on this page to open inline, and dropping the request
+   * would leave the user with a closed dialog and nothing to show for the
+   * destination they just picked. `Drafts.handoff` is the existing mechanism for
+   * exactly this — it seeds once and is already filtered through
+   * `restorableTarget`, so a target that stopped being usable in between falls
+   * back rather than opening an empty picker.
+   */
+  protected composeShare(request: ComposeShareRequest): void {
+    this.drafts.handoff({
+      segments: [request.text],
+      spoilerText: '',
+      sensitive: false,
+      visibility: '',
+      poll: null,
+      target: request.target === 'both' ? 'fedi' : request.target,
+    });
+    this.showShare.set(false);
+    void this.router.navigate(['/write']);
+  }
 
   readonly status = input.required<Status>();
 

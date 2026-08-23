@@ -752,3 +752,50 @@ a.open-original {
 .status-card-preview {
   margin: 10px 0 0;
 }
+
+/* --- unified share menu (feature-flagged) --- */
+
+.share-menu-host {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Anchored to its button and lifted above neighbouring cards. Opens upward on
+   small viewports would need measurement; a bottom-anchored menu inside a
+   scrolling timeline is fine because the card scrolls with it. */
+.share-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 172px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--col-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+}
+
+.share-menu button {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.share-menu button:hover:not(:disabled),
+.share-menu button:focus-visible {
+  background: var(--col-hover, rgba(127, 127, 127, 0.12));
+}
+
+.share-menu button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

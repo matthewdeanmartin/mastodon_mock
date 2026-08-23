@@ -9,6 +9,7 @@ export type FeatureFlagId =
   | 'pastebin'
   | 'links'
   | 'write'
+  | 'unified-share'
   | 'mawkingbird-plus'
   | 'connector-mastodon'
   | 'connector-bluesky'
@@ -83,6 +84,20 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
     description:
       'The writing workspace at /write — drafts, editor and notes side by side, plus zen mode.',
     defaultState: 'production',
+    group: 'features',
+  },
+  {
+    id: 'unified-share',
+    label: 'Unified share menu',
+    // Says what turning it on changes, since this one is off by default and the
+    // question a reader has is "what will this do to my posts".
+    description:
+      'Collapse Boost, Quote and Share into one button on every post, opening a menu instead. ' +
+      'Frees a slot on an action bar that already wraps on narrow screens.',
+    // `test`, not `production`: this changes the action bar on every post in the
+    // app, which is the most-used surface there is. It earns its way up rather
+    // than starting at the top.
+    defaultState: 'test',
     group: 'features',
   },
   {

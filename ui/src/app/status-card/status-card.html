@@ -357,7 +357,61 @@
             📖 <span>View thread</span>
           </a>
         }
-        @if (caps.reblog) {
+        @if (unifiedShare()) {
+          <!-- One control instead of three. The bar is already out of horizontal
+               space and wraps on narrow screens, so Boost/Quote/Share collapse
+               into a menu rather than Share becoming a sixth icon. Boost stays
+               one press: the menu opens with it focused. -->
+          <div class="share-menu-host">
+            <button
+              class="action"
+              type="button"
+              [class.on]="display.reblogged"
+              [disabled]="actionBusy()"
+              [attr.aria-expanded]="shareMenuOpen()"
+              aria-haspopup="menu"
+              title="Boost, quote or share"
+              aria-label="Boost, quote or share"
+              (click)="toggleShareMenu($event)"
+            >
+              <span aria-hidden="true">🔁</span>
+              @if (display.reblogged) {
+                <span class="did" aria-hidden="true">{{ words().Boosted }}</span>
+              }
+            </button>
+            @if (shareMenuOpen()) {
+              <!-- Focus moves to the first item on open (see focusShareMenu) so
+                   Boost stays one press for keyboard users. Done in code rather
+                   than with `autofocus`, which the a11y lint rightly rejects. -->
+              <div class="share-menu" role="menu" (click)="$event.stopPropagation()">
+                @if (caps.reblog) {
+                  <button
+                    type="button"
+                    role="menuitem"
+                    [disabled]="actionBusy()"
+                    (click)="shareMenuOpen.set(false); toggleReblog($event)"
+                  >
+                    {{ display.reblogged ? words().UndoBoost : words().Boost }}
+                  </button>
+                }
+                @if (!foreign && capabilities.canCompose) {
+                  <button
+                    type="button"
+                    role="menuitem"
+                    (click)="shareMenuOpen.set(false); toggleQuote($event)"
+                  >
+                    Quote
+                  </button>
+                }
+                @if (display.url) {
+                  <button type="button" role="menuitem" (click)="openShare($event)">
+                    Share elsewhere…
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        } @else if (caps.reblog) {
           <button
             class="action"
             [class.on]="display.reblogged"
@@ -373,14 +427,17 @@
             }
           </button>
         }
-        @if (auth.isAnonymous) {
+        @if (unifiedShare()) {
+          <!-- The menu above already carries boost, quote and share; the
+               per-audience branches below would duplicate all three. -->
+        } @else if (auth.isAnonymous) {
           @if (display.url) {
             <button
               type="button"
               class="action"
               title="Share elsewhere"
               aria-label="Share elsewhere"
-              (click)="showShare.set(true); $event.stopPropagation()"
+              (click)="openShare($event)"
             >
               <span aria-hidden="true">🔁</span>
               <span>{{ display.reblogs_count }}</span>
@@ -886,6 +943,20 @@
         </div>
       }
 
+      @if (shareCompose(); as request) {
+        <div class="inline-compose" (click)="$event.stopPropagation()">
+          <!-- The share dialog prefills text and names a target, but never posts:
+               the user sees what is about to go out and presses Post themselves. -->
+          <app-compose
+            [initialText]="request.text"
+            [initialTarget]="request.target"
+            [gateable]="true"
+            placeholder="Add a comment"
+            (posted)="shareCompose.set(null)"
+          />
+        </div>
+      }
+
       <ng-content select="[status-footer]" />
     </div>
   </article>
@@ -925,7 +996,12 @@
   }
 
   @if (showShare()) {
-    <app-share-dialog [status]="display" (closed)="showShare.set(false)" />
+    <app-share-dialog
+      [status]="display"
+      [quote]="shareQuote()"
+      (compose)="onShareCompose($event)"
+      (closed)="showShare.set(false)"
+    />
   }
 
   @if (showBookmarkProviders()) {

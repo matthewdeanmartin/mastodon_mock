@@ -1,6 +1,6 @@
 # RSS — Epic overview: the reading page
 
-Status: Sprints 1-4 COMPLETE (2026-08-22). Second wave begun: Sprint 5 shipped 2026-08-23.
+Status: Sprints 1-4 COMPLETE (2026-08-22). Second wave: Sprints 5-6 shipped 2026-08-23.
 
 Builds on the existing RSS foundation: `RssSubscriptions`, `RssFetch`, `RssCache`, `RssProvider`,
 OPML import/export, and per-feed CORS-proxy opt-in all already exist and work
@@ -111,14 +111,19 @@ itself.
    best pre-picked; **a fediverse handle offers Follow first**, with RSS as a deliberately
    de-emphasised secondary option.
 
-**Deferred past Sprint 5** (explicitly out of scope until re-planned): RSS comments (see below),
+**Deferred past Sprint 6** (explicitly out of scope until re-planned): RSS comments (see below),
 "friends shared items" synthetic feed, reader harmonization across long-post/tweet-storm/RSS-article
 (explicitly named as *not now* by the boss, and reaffirmed 2026-08-23), Home megatweets/tweet-storms
 appearing in the split pane's left rail (named as "someday," not scheduled).
 
-**Planned next**: share-to-any-ecosystem (over `compose/post-targets.ts`, not Mastodon-only) and the
-90-day read-state prune (client-side — read state lives only in `localStorage`, so there is no
-server job to write).
+6. **Sprint 6 — DONE (2026-08-23).** [[rss-6-share-any-ecosystem]]. One share dialog with two
+   sections: **post it** through a configured connector, or **send it to** a destination via web
+   intent — a destination appears in exactly one, decided per session. Highlight-to-quote included.
+   Adds the `unified-share` flag (default off), which collapses Boost/Quote/Share into one menu and
+   *frees* a slot on an action bar that was already wrapping.
+
+**Planned next**: the 90-day read-state prune (client-side — read state lives only in
+`localStorage`, so there is no server job to write).
 
 ### RSS comments — the options, for whenever this is picked up
 

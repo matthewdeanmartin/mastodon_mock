@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { FeatureFlags } from '../feature-flags';
 import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -323,7 +324,99 @@ describe('StatusCard', () => {
     f.detectChanges();
 
     expect((f.nativeElement as HTMLElement).querySelector('app-share-dialog')).not.toBeNull();
-    expect((f.nativeElement as HTMLElement).textContent).toContain('Share post elsewhere');
+    expect((f.nativeElement as HTMLElement).textContent).toContain('Share elsewhere');
+  });
+
+  describe('unified share menu', () => {
+    function boostButton(f: ComponentFixture<StatusCard>): HTMLButtonElement | null {
+      return (f.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        '[aria-label="Boost"], [aria-label="Boost, quote or share"]',
+      );
+    }
+
+    it('leaves the action bar untouched while the flag is off', () => {
+      // The default. Boost is its own button and there is no menu — this is the
+      // guarantee that turning the flag on is the only thing that moves anything.
+      const f = setUp(makeStatus({ url: 'https://social.example/@alice/1' }));
+      const element = f.nativeElement as HTMLElement;
+
+      expect(element.querySelector('[aria-label="Boost"]')).not.toBeNull();
+      expect(element.querySelector('.share-menu-host')).toBeNull();
+      expect(element.querySelector('[aria-haspopup="menu"]')).toBeNull();
+    });
+
+    it('collapses boost, quote and share into one control when on', () => {
+      TestBed.inject(FeatureFlags).setState('unified-share', 'production');
+      const f = setUp(makeStatus({ url: 'https://social.example/@alice/1' }));
+      const element = f.nativeElement as HTMLElement;
+
+      // One control where there were up to three.
+      expect(element.querySelector('.share-menu-host')).not.toBeNull();
+      expect(element.querySelector('[aria-label="Boost"]')).toBeNull();
+      expect(element.querySelector('.share-menu')).toBeNull();
+
+      boostButton(f)!.click();
+      f.detectChanges();
+
+      const items = Array.from(
+        element.querySelectorAll<HTMLButtonElement>('.share-menu [role="menuitem"]'),
+      ).map((button) => button.textContent?.trim());
+      expect(items).toContain('Boost');
+      expect(items).toContain('Quote');
+      expect(items).toContain('Share elsewhere…');
+    });
+
+    it('boosts from the menu without reimplementing boosting', () => {
+      TestBed.inject(FeatureFlags).setState('unified-share', 'production');
+      const f = setUp(makeStatus({ url: 'https://social.example/@alice/1' }));
+      const element = f.nativeElement as HTMLElement;
+
+      boostButton(f)!.click();
+      f.detectChanges();
+      const boost = Array.from(
+        element.querySelectorAll<HTMLButtonElement>('.share-menu [role="menuitem"]'),
+      ).find((button) => button.textContent?.trim() === 'Boost')!;
+      boost.click();
+      f.detectChanges();
+
+      // The menu delegates to the existing boost path rather than owning a
+      // second one, so the ordinary reblog request is what goes out.
+      httpMock.expectOne('/api/v1/statuses/1/reblog').flush(makeStatus({ reblogged: true }));
+      f.detectChanges();
+
+      expect(element.querySelector('.share-menu')).toBeNull();
+    });
+
+    it('opens the share dialog from the menu', () => {
+      TestBed.inject(FeatureFlags).setState('unified-share', 'production');
+      const f = setUp(makeStatus({ url: 'https://social.example/@alice/1' }));
+      const element = f.nativeElement as HTMLElement;
+
+      boostButton(f)!.click();
+      f.detectChanges();
+      Array.from(element.querySelectorAll<HTMLButtonElement>('.share-menu [role="menuitem"]'))
+        .find((button) => button.textContent?.trim() === 'Share elsewhere…')!
+        .click();
+      f.detectChanges();
+
+      expect(element.querySelector('app-share-dialog')).not.toBeNull();
+    });
+
+    it('keeps the b and q keyboard shortcuts off the menu', () => {
+      // They call toggleReblog/toggleQuote directly, so the menu must not become
+      // a required step for anyone using the keyboard.
+      TestBed.inject(FeatureFlags).setState('unified-share', 'production');
+      const f = setUp(makeStatus({ url: 'https://social.example/@alice/1' }));
+      const element = f.nativeElement as HTMLElement;
+
+      element
+        .querySelector('article')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'q', bubbles: true }));
+      f.detectChanges();
+
+      expect(element.querySelector('.share-menu')).toBeNull();
+      expect(element.querySelector('app-compose')).not.toBeNull();
+    });
   });
 
   it('loads public edit history from the post server in Anonymous', () => {

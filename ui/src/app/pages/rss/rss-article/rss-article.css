@@ -82,3 +82,15 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* Sits under the article, after the pager — the point at which someone has
+   actually finished reading and might want to pass it on. */
+.share-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}

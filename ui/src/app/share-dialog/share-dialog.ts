@@ -1,7 +1,12 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { PostTarget } from '../compose/compose';
+import { targetLabel } from '../compose/post-targets';
+import { TargetAvailabilitySource } from '../compose/target-availability';
 import { Status } from '../models';
 import { FocusTrap } from '../a11y/focus-trap';
 import { PageDiagnostics } from '../page-diagnostics';
+import { shareBody } from './share-selection';
+import { intentIdsFor, postTargetsFor } from './share-targets';
 
 export interface ShareContext {
   url: string;
@@ -13,6 +18,12 @@ export interface ShareDestination {
   id: string;
   label: string;
   buildUrl(context: ShareContext): string;
+}
+
+/** What the host should open the composer with. */
+export interface ComposeShareRequest {
+  target: PostTarget;
+  text: string;
 }
 
 function plainText(html: string): string {
@@ -56,17 +67,52 @@ export function shareableContentLinks(status: Status): string[] {
   return [...new Set(links)];
 }
 
-export function shareContext(status: Status, url: string): ShareContext {
+/**
+ * Whether this status came from a feed rather than an account.
+ *
+ * The adapter builds RSS ids and account handles as `rss:<feedUrl>`, so the
+ * account is synthetic. It has no `@handle` worth showing a human, and its
+ * "post" is an article on somebody's site — both of which change what a share
+ * should say.
+ */
+function isFeedItem(status: Status): boolean {
+  return status.id.startsWith('rss:') || (status.account.acct ?? '').startsWith('rss:');
+}
+
+export function shareContext(status: Status, url: string, quote = ''): ShareContext {
+  const body = plainText(status.content);
+
+  if (isFeedItem(status)) {
+    // An article, not a post: the feed's title is the publisher and the link is
+    // the article itself. `From @rss:https://…` would be nonsense.
+    const title = status.account.display_name || 'Article';
+    return {
+      url,
+      title,
+      text: shareBody({ quote: quote || undefined, title: shortened(body, 180), url }),
+    };
+  }
+
   const account = status.account.acct || status.account.username;
-  const text = plainText(status.content);
+  if (quote) {
+    return {
+      url,
+      title: `Post by @${account}`,
+      text: shareBody({ quote, title: `From @${account}`, url }),
+    };
+  }
   return {
     url,
     title: `Post by @${account}`,
-    text: shortened(text ? `From @${account}: ${text}` : `From @${account}`, 220),
+    text: shortened(body ? `From @${account}: ${body}` : `From @${account}`, 220),
   };
 }
 
 function blueskyText(text: string, url: string): string {
+  // The URL is already in `text` when a quote built it; don't append it twice.
+  if (text.includes(url)) {
+    return shortened(text, 300);
+  }
   const suffix = `\n\n${url}`;
   return `${shortened(text, Math.max(1, 300 - Array.from(suffix).length))}${suffix}`;
 }
@@ -109,6 +155,16 @@ export const SHARE_DESTINATIONS: ShareDestination[] = [
   },
 ];
 
+/**
+ * Destinations that carry a quote through, and those that cannot.
+ *
+ * Reddit, LinkedIn and Hacker News take a URL and a title — there is no field a
+ * highlighted passage could go in. The dialog says so rather than letting the
+ * quote vanish silently, because a user who highlighted a paragraph and pressed
+ * Reddit is owed the information that it did not travel.
+ */
+const QUOTE_CARRYING_INTENTS = new Set(['bluesky', 'tumblr']);
+
 @Component({
   selector: 'app-share-dialog',
   imports: [FocusTrap],
@@ -117,15 +173,49 @@ export const SHARE_DESTINATIONS: ShareDestination[] = [
 })
 export class ShareDialog {
   private diagnostics = inject(PageDiagnostics);
-  readonly status = input.required<Status>();
-  readonly closed = output<void>();
+  private availability = inject(TargetAvailabilitySource);
 
-  protected readonly destinations = SHARE_DESTINATIONS;
+  readonly status = input.required<Status>();
+  /**
+   * Text the user had highlighted when they pressed Share.
+   *
+   * Passed in rather than read here: opening a modal moves focus and collapses
+   * the selection, so by the time this component exists there is nothing left to
+   * read. See `share-selection.ts`.
+   */
+  readonly quote = input('');
+  readonly closed = output<void>();
+  /** Asks the host to open a composer — the dialog never posts anything itself. */
+  readonly compose = output<ComposeShareRequest>();
+
   protected readonly contentLinks = computed(() => shareableContentLinks(this.status()));
   protected selectedUrl = signal('');
   protected copied = signal(false);
   protected copyFailed = signal(false);
   protected readonly canShareUsingDevice = typeof navigator.share === 'function';
+
+  /** Everywhere a real post can be made right now, in section order. */
+  protected readonly postTargets = computed(() => postTargetsFor(this.availability.current()));
+
+  /** The hand-off destinations left after connectors claimed theirs. */
+  protected readonly intents = computed(() => {
+    const ids = new Set(
+      intentIdsFor(
+        SHARE_DESTINATIONS.map((d) => d.id),
+        this.availability.current(),
+      ),
+    );
+    return SHARE_DESTINATIONS.filter((destination) => ids.has(destination.id));
+  });
+
+  /** True when a quote exists but some destination on screen cannot carry it. */
+  protected readonly quoteMayBeDropped = computed(
+    () => !!this.quote() && this.intents().some((d) => !QUOTE_CARRYING_INTENTS.has(d.id)),
+  );
+
+  protected label(target: PostTarget): string {
+    return targetLabel(target);
+  }
 
   protected targetUrl(): string {
     return this.selectedUrl() || this.status().url || '';
@@ -139,14 +229,33 @@ export class ShareDialog {
     }
   }
 
+  /**
+   * Hand a prefilled composer to the host.
+   *
+   * Deliberately not a post: one press must never publish. The composer is where
+   * the user sees what is about to go out and presses Post themselves.
+   */
+  protected postTo(target: PostTarget): void {
+    const url = this.targetUrl();
+    const context = shareContext(this.status(), url, this.quote());
+    // The intent destinations take a URL as their own parameter, so the legacy
+    // context text does not have to carry one. A composer has only this string —
+    // a post that mentions an article without linking it is the whole point
+    // missed, so make sure the link is in the body.
+    const text = context.text.includes(url) ? context.text : `${context.text}\n\n${url}`;
+    this.diagnostics.info('Share', 'compose', { target });
+    this.compose.emit({ target, text });
+    this.closed.emit();
+  }
+
   protected open(destination: ShareDestination): void {
-    const url = destination.buildUrl(shareContext(this.status(), this.targetUrl()));
+    const url = destination.buildUrl(shareContext(this.status(), this.targetUrl(), this.quote()));
     window.open(url, '_blank', 'noopener,noreferrer');
     this.closed.emit();
   }
 
   protected async shareUsingDevice(): Promise<void> {
-    const context = shareContext(this.status(), this.targetUrl());
+    const context = shareContext(this.status(), this.targetUrl(), this.quote());
     try {
       await navigator.share(context);
       this.closed.emit();

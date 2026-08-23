@@ -108,10 +108,125 @@ describe('ShareDialog', () => {
     const element = fixture.nativeElement as HTMLElement;
     const linkedPage = element.querySelectorAll<HTMLInputElement>('input[name="share-target"]')[1];
     linkedPage.click();
-    element.querySelectorAll<HTMLButtonElement>('.destination')[0].click();
+    // Specifically an intent button: `.destination` now also covers the "Post it"
+    // section, whose buttons open a composer rather than a new tab.
+    const reddit = Array.from(
+      element.querySelectorAll<HTMLButtonElement>('.destination:not(.post)'),
+    ).find((button) => button.textContent?.trim() === 'Reddit')!;
+    reddit.click();
 
     const opened = new URL(String(open.mock.calls[0][0]));
     expect(opened.searchParams.get('url')).toBe('https://example.com/story');
     open.mockRestore();
+  });
+
+  /** Buttons in the "Post it" section. */
+  function postButtons(element: HTMLElement): string[] {
+    return Array.from(element.querySelectorAll<HTMLButtonElement>('.destination.post')).map(
+      (button) => button.textContent?.trim() ?? '',
+    );
+  }
+
+  /** Buttons in the "Send it to" section. */
+  function intentButtons(element: HTMLElement): string[] {
+    return Array.from(
+      element.querySelectorAll<HTMLButtonElement>('.destination:not(.post):not(.native)'),
+    ).map((button) => button.textContent?.trim() ?? '');
+  }
+
+  function open(quote = ''): ReturnType<typeof TestBed.createComponent<ShareDialog>> {
+    const fixture = TestBed.createComponent(ShareDialog);
+    fixture.componentRef.setInput('status', status());
+    fixture.componentRef.setInput('quote', quote);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('offers Mastodon in the post section for a signed-in user', () => {
+    expect(postButtons(open().nativeElement)).toContain('Mastodon');
+  });
+
+  it('keeps Bluesky as an intent while it is unlinked', () => {
+    // Not linked in this TestBed, so the hand-off is the only thing that works.
+    const element = open().nativeElement as HTMLElement;
+    expect(intentButtons(element)).toContain('Bluesky');
+    expect(postButtons(element)).not.toContain('Bluesky');
+  });
+
+  it('never lists a service in both sections', () => {
+    const element = open().nativeElement as HTMLElement;
+    const overlap = postButtons(element).filter((label) => intentButtons(element).includes(label));
+    expect(overlap).toEqual([]);
+  });
+
+  it('emits a compose request rather than posting anything itself', () => {
+    const fixture = open();
+    const requests: { target: string; text: string }[] = [];
+    fixture.componentInstance.compose.subscribe((request) => requests.push(request));
+
+    const mastodon = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        '.destination.post',
+      ),
+    ).find((button) => button.textContent?.trim() === 'Mastodon')!;
+    mastodon.click();
+
+    // One press must never publish: the composer is where the user presses Post.
+    expect(requests).toHaveLength(1);
+    expect(requests[0].target).toBe('fedi');
+    expect(requests[0].text).toContain('https://social.example/@alice/1');
+  });
+
+  it('shows a highlighted passage and carries it into the compose text', () => {
+    const fixture = open('the highlighted passage');
+    const requests: { text: string }[] = [];
+    fixture.componentInstance.compose.subscribe((request) => requests.push(request));
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('the highlighted passage');
+
+    Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        '.destination.post',
+      ),
+    )
+      .find((button) => button.textContent?.trim() === 'Mastodon')!
+      .click();
+
+    expect(requests[0].text).toContain('> the highlighted passage');
+  });
+
+  it('warns that a highlight will not reach link-only destinations', () => {
+    // Reddit, LinkedIn and Hacker News take a URL and a title; someone who
+    // highlighted a paragraph is owed that fact.
+    expect((open('a passage').nativeElement as HTMLElement).textContent).toContain('won’t travel');
+  });
+
+  it('says nothing about highlights when there is no highlight', () => {
+    expect((open().nativeElement as HTMLElement).textContent).not.toContain('won’t travel');
+  });
+
+  it('builds an article-shaped context for a feed item, with no synthetic handle', () => {
+    const article = status('<p>The article body</p>');
+    article.id = 'rss:https://blog.test/feed.xml::1';
+    article.account.acct = 'rss:https://blog.test/feed.xml';
+    article.account.display_name = 'The Blog';
+    article.url = 'https://blog.test/post';
+
+    const context = shareContext(article, article.url!, 'a quoted line');
+
+    expect(context.title).toBe('The Blog');
+    // `From @rss:https://…` is not something to show a human.
+    expect(context.text).not.toContain('rss:');
+    expect(context.text).toContain('> a quoted line');
+    expect(context.text).toContain('https://blog.test/post');
+  });
+
+  it('does not repeat the url when a quote already carried it into Bluesky text', () => {
+    const bluesky = SHARE_DESTINATIONS.find((d) => d.id === 'bluesky')!;
+    const url = 'https://social.example/@alice/1';
+    const built = new URL(bluesky.buildUrl(shareContext(status(), url, 'a passage')));
+    const text = built.searchParams.get('text')!;
+
+    expect(text.split(url).length - 1).toBe(1);
   });
 });

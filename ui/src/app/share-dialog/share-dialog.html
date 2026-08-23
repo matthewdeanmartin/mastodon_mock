@@ -15,13 +15,17 @@
   >
     <div class="dialog-heading">
       <div>
-        <h3 id="share-heading">Share post elsewhere</h3>
+        <h3 id="share-heading">Share elsewhere</h3>
         <p class="muted small">Choose what to share, then where to send it.</p>
       </div>
       <button class="close" type="button" aria-label="Close share dialog" (click)="closed.emit()">
         ×
       </button>
     </div>
+
+    @if (quote(); as highlighted) {
+      <blockquote class="quote">{{ highlighted }}</blockquote>
+    }
 
     @if (contentLinks().length) {
       <fieldset class="targets">
@@ -56,21 +60,50 @@
       </fieldset>
     }
 
-    <div class="destinations">
-      @if (canShareUsingDevice) {
-        <button type="button" class="destination native" (click)="shareUsingDevice()">
-          Share using device…
+    <!-- Two sections, and a destination is in exactly one of them: posting
+         through a connector when there is one, handing off when there is not.
+         See share-targets.ts for why that is not a preference. -->
+    @if (postTargets().length) {
+      <section class="section">
+        <h4>Post it</h4>
+        <p class="muted small">Opens a composer. Nothing is posted until you press Post.</p>
+        <div class="destinations">
+          @for (target of postTargets(); track target) {
+            <button type="button" class="destination post" (click)="postTo(target)">
+              {{ label(target) }}
+            </button>
+          }
+        </div>
+      </section>
+    }
+
+    <section class="section">
+      <h4>Send it to</h4>
+      <p class="muted small">Opens the destination in a new tab.</p>
+      <div class="destinations">
+        @if (canShareUsingDevice) {
+          <button type="button" class="destination native" (click)="shareUsingDevice()">
+            Share using device…
+          </button>
+        }
+        @for (destination of intents(); track destination.id) {
+          <button type="button" class="destination" (click)="open(destination)">
+            {{ destination.label }}
+          </button>
+        }
+        <button type="button" class="destination" (click)="copyLink()">
+          {{ copied() ? 'Link copied!' : 'Copy link' }}
         </button>
+      </div>
+      <!-- Reddit, LinkedIn and Hacker News take a URL and a title; there is no
+           field a highlighted passage could go in. Someone who highlighted a
+           paragraph is owed that fact rather than watching it vanish. -->
+      @if (quoteMayBeDropped()) {
+        <p class="muted small note">
+          Some of these take only a link — your highlight won’t travel.
+        </p>
       }
-      @for (destination of destinations; track destination.id) {
-        <button type="button" class="destination" (click)="open(destination)">
-          {{ destination.label }}
-        </button>
-      }
-      <button type="button" class="destination" (click)="copyLink()">
-        {{ copied() ? 'Link copied!' : 'Copy link' }}
-      </button>
-    </div>
+    </section>
 
     @if (copyFailed()) {
       <p class="copy-error" role="alert">Couldn’t copy the link. Please try again.</p>

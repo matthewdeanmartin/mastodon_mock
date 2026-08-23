@@ -58,6 +58,7 @@ import { BloggerApi } from '../providers/blogger/blogger-api';
 import { BloggerSession } from '../providers/blogger/blogger-session';
 import { bloggerStatus } from '../providers/blogger/blogger-status';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
+import { TargetAvailabilitySource } from './target-availability';
 import { HugoPublish } from '../providers/hugo/hugo-publish';
 import { HugoEditSession } from '../providers/hugo/hugo-edit-session';
 import { HugoDeployWatch } from '../providers/hugo/hugo-deploy-watch';
@@ -332,6 +333,7 @@ export class Compose implements OnDestroy {
   protected blogger = inject(BloggerSession);
   private bloggerApi = inject(BloggerApi);
   protected hugo = inject(HugoSettings);
+  private availability = inject(TargetAvailabilitySource);
   private hugoPublish = inject(HugoPublish);
   protected hugoEdit = inject(HugoEditSession);
   protected deployWatch = inject(HugoDeployWatch);
@@ -371,6 +373,14 @@ export class Compose implements OnDestroy {
    * default (`ClientPrefs.defaultVisibility`), which is what a top-level compose
    * wants. A caller that passes a value is always obeyed.
    */
+  /**
+   * Open on a specific post target, when the caller already asked the user.
+   *
+   * Set by the share dialog, which offers exactly the targets this composer
+   * would accept (both read `post-targets.ts`). Empty means "no opinion" and the
+   * usual default applies.
+   */
+  readonly initialTarget = input<PostTarget | ''>('');
   readonly initialVisibility = input('');
   /** Pin visibility to initialVisibility (no picker) — e.g. private chats stay direct. */
   readonly lockVisibility = input(false);
@@ -762,9 +772,16 @@ export class Compose implements OnDestroy {
     // their blog post as a toot.
     this.hugoEdit.editing()
       ? 'hugo'
-      : this.auth.isAnonymous && this.featureFlags.enabled('pastebin')
-        ? 'paste'
-        : 'fedi',
+      : // A caller that named a target picked it deliberately — the share dialog
+        // asked "post it where?" and the user answered. Opening on anything else
+        // would discard an answer they already gave. Validated through
+        // `restorableTarget` so a target that stopped being usable between the
+        // two screens falls back rather than showing an empty picker.
+        this.initialTarget()
+        ? restorableTarget(this.initialTarget() as PostTarget, this.availability.current())
+        : this.auth.isAnonymous && this.featureFlags.enabled('pastebin')
+          ? 'paste'
+          : 'fedi',
   );
   protected showTargetPicker = computed(() => !this.inReplyToId() && !this.quotedStatusId());
   protected targetIncludesBsky = computed(
@@ -1542,17 +1559,10 @@ export class Compose implements OnDestroy {
    * to the point, so it cannot offer a destination this composer would refuse.
    */
   targetAvailability(): TargetAvailability {
-    return {
-      anonymous: this.auth.isAnonymous,
-      bskyLinked: this.bskySession.linked(),
-      mataroaConnected: this.mataroa.connected(),
-      bloggerReady: this.blogger.ready(),
-      hugoConnected: this.hugo.connected(),
-      pastebinEnabled: this.featureFlags.enabled('pastebin'),
-      mataroaEnabled: this.featureFlags.enabled('connector-mataroa'),
-      bloggerEnabled: this.featureFlags.enabled('connector-blogger'),
-      hugoEnabled: this.featureFlags.enabled('connector-hugo'),
-    };
+    // Gathered by TargetAvailabilitySource so the share dialog asks the same
+    // question of the same state — two snapshots would drift, and the dialog
+    // would offer a destination this composer then refuses.
+    return this.availability.current();
   }
 
   /** See {@link restorableTarget} — the rule itself is shared, not duplicated. */

@@ -48,6 +48,22 @@
           </button>
         </nav>
       }
+
+      <!-- Offered after the article, where someone has actually read the thing.
+           Highlight a passage first and it travels as a quote. -->
+      <p class="share-line">
+        <button class="btn btn-sm" type="button" (click)="openShare()">Share this ↗</button>
+        <span class="muted small">Highlight a passage first to quote it.</span>
+      </p>
     }
   </div>
+
+  @if (showShare()) {
+    <app-share-dialog
+      [status]="status()"
+      [quote]="shareQuote()"
+      (compose)="composeShare($event)"
+      (closed)="showShare.set(false)"
+    />
+  }
 }

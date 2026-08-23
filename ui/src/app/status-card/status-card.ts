@@ -1,10 +1,12 @@
 import {
+  afterNextRender,
   Component,
   computed,
   DestroyRef,
   effect,
   ElementRef,
   inject,
+  Injector,
   input,
   linkedSignal,
   output,
@@ -65,7 +67,9 @@ import { AnonymousProviderRef } from '../providers/anonymous/anonymous-mastodon-
 import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
 import { isElizaId } from '../eliza/eliza-identity';
 import { LocalCompose } from '../eliza/local-compose';
-import { ShareDialog } from '../share-dialog/share-dialog';
+import { ComposeShareRequest, ShareDialog } from '../share-dialog/share-dialog';
+import { selectionWithin } from '../share-dialog/share-selection';
+import { FeatureFlags } from '../feature-flags';
 import {
   BookmarkChoice,
   BookmarkProviderDialog,
@@ -298,6 +302,21 @@ export class StatusCard {
   protected replying = signal(false);
   protected quoting = signal(false);
   protected showShare = signal(false);
+  /** Text highlighted when Share was pressed; see {@link openShare}. */
+  protected shareQuote = signal('');
+  /** Open state of the unified Boost/Quote/Share menu (flagged). */
+  protected shareMenuOpen = signal(false);
+  /** A composer the share dialog asked for, rendered inline beneath the post. */
+  protected shareCompose = signal<ComposeShareRequest | null>(null);
+
+  /**
+   * Whether the action bar collapses Boost, Quote and Share into one button.
+   *
+   * Off by default. The bar is already out of horizontal space and wraps on
+   * narrow screens, so this trades three controls for one rather than adding a
+   * fourth — see the `unified-share` flag.
+   */
+  protected readonly unifiedShare = computed(() => this.featureFlags.enabled('unified-share'));
 
   // --- content warnings ---
 
@@ -1219,6 +1238,52 @@ export class StatusCard {
     });
   }
 
+  /**
+   * Open the share dialog, capturing any highlighted text first.
+   *
+   * The capture has to happen here, in the click handler: opening the dialog
+   * moves focus into it and collapses the selection, so reading it inside the
+   * dialog would always find nothing. `selectionWithin` also refuses a selection
+   * made in a *different* card, which would otherwise quote the wrong post
+   * silently.
+   */
+  openShare(event: Event): void {
+    event.stopPropagation();
+    this.shareQuote.set(selectionWithin(this.host.nativeElement));
+    this.shareMenuOpen.set(false);
+    this.showShare.set(true);
+  }
+
+  /**
+   * Open the unified menu with Boost focused.
+   *
+   * Boost is the most-used action on this bar, and a menu that turns it into two
+   * presses would be a regression however tidy the bar looks. Focusing the first
+   * item means `Enter` still boosts — one press, as before. Done here rather
+   * than with an `autofocus` attribute, which the a11y lint rejects for good
+   * reasons that do not apply to a menu the user just opened.
+   */
+  toggleShareMenu(event: Event): void {
+    event.stopPropagation();
+    const opening = !this.shareMenuOpen();
+    this.shareMenuOpen.set(opening);
+    if (!opening) {
+      return;
+    }
+    afterNextRender(
+      () => {
+        const host = this.host.nativeElement as HTMLElement;
+        host.querySelector<HTMLButtonElement>('.share-menu [role="menuitem"]')?.focus();
+      },
+      { injector: this.injector },
+    );
+  }
+
+  /** Open a composer prefilled by the share dialog. */
+  onShareCompose(request: ComposeShareRequest): void {
+    this.shareCompose.set(request);
+  }
+
   toggleReblog(event: Event): void {
     event.stopPropagation();
     if (!this.caps.reblog) {
@@ -1596,6 +1661,8 @@ export class StatusCard {
 
   private eligibility = inject(AutoTranslateEligibility);
   private host = inject(ElementRef<HTMLElement>);
+  private featureFlags = inject(FeatureFlags);
+  private injector = inject(Injector);
 
   /**
    * True once this card has tried to auto-translate, successfully or not.
