@@ -129,6 +129,25 @@ describe('ArticleReadingTally', () => {
     expect(next.tally.total()).toBe(6);
   });
 
+  it('never rejects, even when the client throws outright', async () => {
+    // Both are called fire-and-forget — `void tally.load()` from the Plus page's
+    // ngOnInit, and `void this.flush()` from recordOne — so a rejection escaping
+    // either is an *unhandled* one with nowhere downstream to catch it. That
+    // failed the whole suite with 10 unhandled errors while every test passed.
+    const { tally, plus, client } = build();
+    plus.tier.set('plus');
+    client.readingStats.mockRejectedValue(new TypeError('session.token is not a function'));
+    client.recordArticlesRead.mockRejectedValue(new TypeError('nope'));
+
+    await expect(tally.load()).resolves.toBeUndefined();
+    tally.recordOne();
+    await expect(tally.flush()).resolves.toBeUndefined();
+
+    // And the figure still falls back to this browser's own count.
+    expect(tally.localOnly()).toBe(true);
+    expect(tally.total()).toBe(1);
+  });
+
   it('never shows a total that dips while a read is pending', async () => {
     // The displayed figure is the account's total plus anything unsent, so
     // reading an article always makes the number go up immediately even though

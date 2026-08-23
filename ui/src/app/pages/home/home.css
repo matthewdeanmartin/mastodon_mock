@@ -291,3 +291,23 @@ a.eliza-invite:hover {
 .linklike:hover {
   text-decoration: underline;
 }
+
+/* The first-run empty state: one sentence and one button, centred.
+
+   Distinct from the "nothing new" empty state, which is a muted line — this one
+   is the visitor's only useful move on a fresh browser and is sized to be
+   found rather than skimmed past. */
+.home-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.home-empty-lead {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--muted);
+}

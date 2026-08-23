@@ -133,6 +133,26 @@ const LOAD_MORE_HARD_CAP = 30;
  */
 const THIN_RESULTS = 10;
 
+/**
+ * When a search stops looking normal and starts looking stuck.
+ *
+ * Five seconds because that is roughly where an unchanging spinner stops
+ * reading as "working" and starts reading as "broken". Federated search across a
+ * slow instance genuinely does take this long, so the message says the server is
+ * slow rather than implying a failure.
+ */
+const SLOW_SEARCH_MS = 5000;
+
+/**
+ * When to give up.
+ *
+ * Twenty seconds is far longer than any search that is going to succeed, and
+ * short enough that a reader has not yet concluded the app is dead. The
+ * alternative is what this replaced: no timeout at all, and a "Searching…" that
+ * never ended.
+ */
+const SEARCH_TIMEOUT_MS = 20000;
+
 @Component({
   selector: 'app-search',
   imports: [
@@ -407,6 +427,67 @@ export class Search implements OnInit, OnDestroy {
   protected results = signal<SearchResults | null>(null);
   protected searching = signal(false);
   protected type = signal<SearchType>('accounts');
+
+  /**
+   * Progressive feedback for a search that is taking too long.
+   *
+   * ## Why this exists
+   *
+   * A search against an unreachable or overloaded server had no ending. The
+   * request was subscribed with no timeout, so "Searching…" stayed on screen
+   * forever and the only way out was the browser's back button — which lands
+   * somewhere else entirely and loses the query. From the reader's side the app
+   * simply stopped.
+   *
+   * Three states, because "slow" and "never" want different answers:
+   *
+   * - immediately: `Searching…`, which already existed;
+   * - after {@link SLOW_SEARCH_MS}: also say the server is being slow, so a long
+   *   wait reads as a known condition rather than a hang;
+   * - after {@link SEARCH_TIMEOUT_MS}: stop, say so plainly, and offer Retry.
+   *
+   * The middle state matters more than it looks. Federated servers really are
+   * sometimes this slow, and a reader who has been told so will wait; a reader
+   * staring at an unchanging spinner assumes it is broken and leaves.
+   */
+  protected searchSlow = signal(false);
+  /** Set when a search was abandoned on the clock. Cleared by the next attempt. */
+  protected searchTimedOut = signal(false);
+  private slowTimer: ReturnType<typeof setTimeout> | null = null;
+  private timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Begin the slow/timeout clock for a search that is starting.
+   *
+   * `onTimeout` cancels the in-flight request; the caller owns the subscription,
+   * so it does the unsubscribing.
+   */
+  private startSearchClock(onTimeout: () => void): void {
+    this.stopSearchClock();
+    this.searchSlow.set(false);
+    this.searchTimedOut.set(false);
+    this.slowTimer = setTimeout(() => this.searchSlow.set(true), SLOW_SEARCH_MS);
+    this.timeoutTimer = setTimeout(() => {
+      this.diagnostics.warn('Search', 'load:timeout', { afterMs: SEARCH_TIMEOUT_MS });
+      this.searching.set(false);
+      this.searchSlow.set(false);
+      this.searchTimedOut.set(true);
+      onTimeout();
+    }, SEARCH_TIMEOUT_MS);
+  }
+
+  /** Stop the clock. Called on success, on error, and when a search is replaced. */
+  private stopSearchClock(): void {
+    if (this.slowTimer !== null) {
+      clearTimeout(this.slowTimer);
+      this.slowTimer = null;
+    }
+    if (this.timeoutTimer !== null) {
+      clearTimeout(this.timeoutTimer);
+      this.timeoutTimer = null;
+    }
+    this.searchSlow.set(false);
+  }
 
   /**
    * Whether the Bluesky panel has taken over the page.
@@ -1201,6 +1282,10 @@ export class Search implements OnInit, OnDestroy {
 
   /** Save the current account result set so returning here restores it. */
   ngOnDestroy(): void {
+    // Both timers hold a closure over this component. Left running, a 20-second
+    // timeout fires against a page the reader navigated away from 19 seconds
+    // ago and writes state nothing is rendering.
+    this.stopSearchClock();
     this.saveAccountSnapshot();
   }
 
@@ -1291,6 +1376,19 @@ export class Search implements OnInit, OnDestroy {
   /** Sum of a tag's recent-history `uses` for the "N recent uses" line. */
   tagUses(tag: Tag): number {
     return (tag.history ?? []).reduce((sum, h) => sum + Number(h.uses || 0), 0);
+  }
+
+  /**
+   * Run the same search again after it was abandoned on the clock.
+   *
+   * Delegates to {@link run} rather than re-issuing the request directly, so a
+   * retry goes through exactly the path a fresh search does — `run()` already
+   * handles the case this needs, where the query params are identical and the
+   * router would otherwise emit nothing.
+   */
+  protected retrySearch(): void {
+    this.searchTimedOut.set(false);
+    this.run();
   }
 
   run(): void {
@@ -1829,8 +1927,10 @@ export class Search implements OnInit, OnDestroy {
           })
         : this.anonymousPublic.search(this.searchHost(), q, type)
       : this.api.search(q, type, type === 'statuses' ? { limit: PAGE_SIZE } : undefined);
+    this.startSearchClock(() => this.activeSearch?.unsubscribe());
     this.activeSearch = request.subscribe({
       next: (r) => {
+        this.stopSearchClock();
         this.results.set(r);
         this.callsUsed.update((c) => c + cost);
         this.rememberCursors(r);
@@ -1849,6 +1949,7 @@ export class Search implements OnInit, OnDestroy {
         }
       },
       error: (error: unknown) => {
+        this.stopSearchClock();
         this.searching.set(false);
         this.diagnostics.error('Search', 'load:error', error, { type });
         // A failed search is the other way to end up with an empty page, and the
@@ -1955,6 +2056,7 @@ export class Search implements OnInit, OnDestroy {
     let pending = (bioReq ? 1 : 0) + (postsReq ? 1 : 0);
     const settle = (): void => {
       if (--pending <= 0) {
+        this.stopSearchClock();
         this.searching.set(false);
         this.accountSearchRan.set(true);
         this.diagnostics.info('Search', 'load:accounts-complete', {
@@ -1975,6 +2077,10 @@ export class Search implements OnInit, OnDestroy {
     };
 
     const subs = new Subscription();
+    // Both branches are under one clock: the reader is waiting for a page, not
+    // for a branch, and `settle()` only clears the spinner once both land — so
+    // one hung branch hangs the whole page without this.
+    this.startSearchClock(() => subs.unsubscribe());
     if (bioReq) {
       subs.add(
         bioReq.subscribe((page) => {

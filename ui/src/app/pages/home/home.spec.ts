@@ -15,6 +15,7 @@ import { Auth } from '../../auth';
 import { AnonymousHomeFeedCache } from '../../providers/anonymous/anonymous-home-feed-cache';
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
 import { JustMyServer } from '../../just-my-server';
+import { AnonymousTags } from '../../providers/anonymous/anonymous-tags';
 
 /** Exposes Home's protected signals for white-box testing. */
 interface HomeInternals {
@@ -269,7 +270,10 @@ describe('Home', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     const link = el.querySelector('a[href="/find-friends"]');
-    expect(link?.textContent).toContain('Find friends');
+    // "Find people to follow" since the first-run empty state replaced the bare
+    // link; the assertion is that exactly one route out of an empty feed is
+    // offered, not what it is worded as.
+    expect(link?.textContent).toContain('Find people');
     // Nothing else fills the empty feed on its own any more.
     expect(el.querySelectorAll('app-starter-kit-post')).toHaveLength(0);
     expect(el.querySelector('.starter-pack-universal')).toBeNull();
@@ -713,5 +717,82 @@ describe('Home', () => {
     fixture.detectChanges();
     expect(internals(fixture).view()).toBe('feed');
     expect((fixture.nativeElement as HTMLElement).querySelector('.home-filters')).not.toBeNull();
+  });
+});
+
+/**
+ * The first five minutes.
+ *
+ * An anonymous visitor with nothing followed is the state a stranger lands in
+ * once the first-run preview ends, and it was the least considered screen in the
+ * app: six filter controls above an empty column, and preview posts that
+ * vanished later at some unrelated navigation.
+ */
+describe('Home, first run', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: Streaming, useValue: new FakeStreaming() },
+        {
+          provide: HomeDiagnostics,
+          useValue: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        },
+      ],
+    });
+    TestBed.inject(Auth).enterAnonymous();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  function render(): ComponentFixture<Home> {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('hides the filter bar and offers one next step when nothing is followed', () => {
+    const fixture = render();
+    const root = fixture.nativeElement as HTMLElement;
+
+    // Every control in that bar narrows a feed, and there is nothing to narrow.
+    expect(root.querySelector('.home-filters')).toBeNull();
+
+    const empty = root.querySelector('.home-empty');
+    expect(empty).not.toBeNull();
+    expect(empty?.textContent).toContain("you're not following anyone yet");
+    expect(empty?.querySelector('a')?.getAttribute('href')).toBe('/find-friends');
+  });
+
+  it('brings the filter bar back once something is followed', () => {
+    const fixture = render();
+    TestBed.inject(AnonymousTags).follow('birds');
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.home-filters')).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.home-empty')).toBeNull();
+  });
+
+  it('reloads the feed when the preview follows are cleared underneath it', () => {
+    // The first-run preview follows three accounts so a stranger sees a working
+    // timeline instead of a login wall. Answering the modal unfollows them —
+    // which used to empty storage while leaving the rendered posts on screen,
+    // so they disappeared later at some unrelated navigation. From the
+    // visitor's side that is posts vanishing at random.
+    const tags = TestBed.inject(AnonymousTags);
+    tags.follow('birds');
+
+    const fixture = render();
+    const home = fixture.componentInstance as unknown as { load(force?: boolean): void };
+    const reload = vi.spyOn(home, 'load');
+
+    tags.unfollow('birds');
+    fixture.detectChanges();
+
+    expect(reload).toHaveBeenCalled();
   });
 });

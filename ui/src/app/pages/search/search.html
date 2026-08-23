@@ -964,7 +964,11 @@
             <div class="page-head">
               People
               @if (searching()) {
-                <span class="muted small">· searching posts…</span>
+                <!-- Results are already on screen here, so the slow notice is a
+                     footnote rather than the main message. -->
+                <span class="muted small">
+                  · searching posts…{{ searchSlow() ? ' (this server is being slow)' : '' }}
+                </span>
               }
             </div>
             @for (item of visibleAccounts(); track item.account.id) {
@@ -984,7 +988,26 @@
               <p class="muted center">No loaded people match the current filters.</p>
             }
           } @else if (searching()) {
-            <p class="muted center">Searching…</p>
+            <p class="muted center" role="status">
+              Searching…
+              @if (searchSlow()) {
+                <!-- Named rather than left to a spinner that stopped reading as
+                     "working" several seconds ago. Federated servers are
+                     genuinely this slow sometimes, and someone told so will
+                     wait; someone staring at a frozen spinner leaves. -->
+                <br />
+                <span class="small">This server is being slow. Still waiting…</span>
+              }
+            </p>
+          } @else if (searchTimedOut()) {
+            <p class="search-unavailable" role="alert">
+              This search took too long and was stopped. The server may be down or overloaded.
+            </p>
+            <p class="muted center">
+              <button type="button" class="btn btn-outline" (click)="retrySearch()">
+                Try again
+              </button>
+            </p>
           } @else {
             <p class="muted center">No people found.</p>
             <!-- "No people found" is only the truth when search actually ran. -->
@@ -996,6 +1019,30 @@
               Or <a routerLink="/directory">browse the server directory</a> instead of searching.
             </p>
           }
+        }
+
+        <!--
+          Posts and hashtags render only once `results()` exists, so before the
+          first answer arrives this column was simply blank — no spinner, no
+          explanation, and on a hung server no ending either. The accounts tab
+          above had a "Searching…"; these did not.
+        -->
+        @if (type() !== 'accounts' && !results() && searching()) {
+          <p class="muted center" role="status">
+            Searching…
+            @if (searchSlow()) {
+              <br />
+              <span class="small">This server is being slow. Still waiting…</span>
+            }
+          </p>
+        }
+        @if (type() !== 'accounts' && searchTimedOut()) {
+          <p class="search-unavailable" role="alert">
+            This search took too long and was stopped. The server may be down or overloaded.
+          </p>
+          <p class="muted center">
+            <button type="button" class="btn btn-outline" (click)="retrySearch()">Try again</button>
+          </p>
         }
 
         @if (results(); as r) {

@@ -103,6 +103,20 @@ export class ArticleReadingTally {
         // browser's own total rather than a zero.
         this.log.info('ReadingTally', 'load:unavailable', { kind: result.kind });
       }
+    } catch (cause) {
+      // Never rethrows.
+      //
+      // Callers invoke this as fire-and-forget (`void tally.load()` in the Plus
+      // page's ngOnInit), because one diagnostics number must not delay a page
+      // or block anything else on it. That makes an escaping rejection an
+      // *unhandled* one — it cannot be caught anywhere downstream, so it
+      // surfaces as a global error rather than as a missing number.
+      //
+      // A `try/finally` was not enough: it restored `busy` and re-raised. The
+      // whole contract of this method is "populate a figure if you can", and
+      // failing to populate it is already fully expressed by leaving `remote`
+      // null, which falls back to this browser's own total.
+      this.log.warn('ReadingTally', 'load:failed', { message: String(cause) });
     } finally {
       this.busy.set(false);
     }
@@ -144,14 +158,23 @@ export class ArticleReadingTally {
    * Overlapping callers join the run already going rather than starting a
    * second, and that run re-checks the count when it finishes, so nothing
    * recorded mid-flight is lost.
+   *
+   * Like {@link load}, this never rejects: `recordOne` fires it as
+   * fire-and-forget straight after an article rendered, so a rejection here has
+   * nowhere to be caught. Unsent reads stay counted in `unsent` for the next
+   * attempt, which is the whole recovery story.
    */
   async flush(): Promise<void> {
     if (this.inFlight) {
       return this.inFlight;
     }
-    this.inFlight = this.runFlush().finally(() => {
-      this.inFlight = null;
-    });
+    this.inFlight = this.runFlush()
+      .catch((cause: unknown) => {
+        this.log.warn('ReadingTally', 'flush:failed', { message: String(cause) });
+      })
+      .finally(() => {
+        this.inFlight = null;
+      });
     return this.inFlight;
   }
 

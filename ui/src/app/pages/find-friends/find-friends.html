@@ -4,15 +4,21 @@
   Every way this app can help you find people to follow, in one place.
 </p>
 
-<a class="doc-row" routerLink="/search">
-  <span class="doc-title">Search for people</span>
-  <span class="muted small"> Find accounts by name, bio or the things they post about. </span>
-</a>
+<!--
+  Ordered by how well each one serves someone in their first five minutes.
 
+  Starter kits lead because they are the only option that works with no prior
+  knowledge and no leaving: press one thing, get a working timeline. What used
+  to lead was "Search for people", which asks the visitor to already know a
+  name — and the off-site directories below it are worse on a first run, since
+  finding a handle elsewhere means coming back here and searching for it by
+  hand. That is a fine tool for someone who knows what they are doing and a
+  dead end for someone who does not, so it moved under Advanced.
+-->
 <a class="doc-row" routerLink="/bundled-starter-kits">
-  <span class="doc-title">Bundled starter kits</span>
+  <span class="doc-title">Starter kits</span>
   <span class="muted small">
-    Curated sets of accounts assembled by the developer of Mawkingbird — follow a whole set at once.
+    Follow a whole set of accounts at once — the fastest way to get a timeline worth reading.
   </span>
 </a>
 
@@ -24,17 +30,60 @@
   </span>
 </a>
 
-<a class="doc-row" routerLink="/offsite-directories">
-  <span class="doc-title">Offsite directories</span>
-  <span class="muted small">
-    Directories other people run — follow graphs, topic lists, and hand-curated picks.
-  </span>
+<!--
+  Interest links, not a search box.
+
+  These are ordinary links into /search with the mode preset — no new search UI
+  and no second code path to keep working. Their whole job is to answer "what
+  would I even type", which is the question that stops people at an empty
+  search field.
+-->
+<h2 class="ff-heading">Search for something you're interested in</h2>
+<p class="muted small ff-sub">
+  Posts mentioning a topic, so you can follow whoever is actually talking about it.
+</p>
+
+<div class="ff-interests">
+  @for (interest of interests; track interest) {
+    <a class="ff-interest" routerLink="/search" [queryParams]="{ type: 'statuses', q: interest }">
+      {{ interest }}
+    </a>
+  }
+</div>
+
+<a class="doc-row" routerLink="/search" [queryParams]="{ type: 'statuses' }">
+  <span class="doc-title">Search posts for anything else</span>
+  <span class="muted small">Type your own subject and see who is posting about it.</span>
+</a>
+
+<!--
+  Everything below needs the visitor to already know a name, or to leave the
+  site and come back with one. Grouped and labelled rather than hidden: it is
+  the right set of tools for someone who knows what they want, and a wall for
+  someone who does not.
+-->
+<h2 class="ff-heading">Advanced</h2>
+<p class="muted small ff-sub">
+  Useful once you know who you're looking for, or you're bringing follows from somewhere else.
+</p>
+
+<a class="doc-row" routerLink="/search">
+  <span class="doc-title">Search for people by name</span>
+  <span class="muted small">Find accounts by name, bio or the things they post about.</span>
 </a>
 
 <a class="doc-row" routerLink="/directory">
   <span class="doc-title">Profile directory</span>
   <span class="muted small">
     Browse the accounts your instance publishes in its opt-in directory.
+  </span>
+</a>
+
+<a class="doc-row" routerLink="/offsite-directories">
+  <span class="doc-title">Offsite directories</span>
+  <span class="muted small">
+    Directories other people run. These open elsewhere — you'll need to come back and search for any
+    handle you find.
   </span>
 </a>
 

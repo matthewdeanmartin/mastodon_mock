@@ -42,6 +42,13 @@ class FakePlusSession {
   refresh = vi.fn().mockResolvedValue(undefined);
   clear = vi.fn();
   startCheckout = vi.fn().mockResolvedValue(undefined);
+  /**
+   * Present because `ProfileClient` asks for a bearer token on every call, and
+   * the page now reads the account-wide reading total on init. Answering null
+   * means "signed out": the client declines to make the request rather than
+   * sending an unauthenticated one.
+   */
+  token = vi.fn().mockResolvedValue(null);
 }
 
 describe('SettingsMawkingbirdPlus', () => {

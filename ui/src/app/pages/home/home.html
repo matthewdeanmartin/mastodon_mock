@@ -92,68 +92,73 @@
 } @else if (view() === 'analytics') {
   <app-feed-analytics [source]="feedSource()" />
 } @else {
-  <div class="home-filters" role="group" aria-label="Timeline filters">
-    <button
-      type="button"
-      class="btn btn-outline btn-sm"
-      [class.active]="showBoosts()"
-      [attr.aria-pressed]="showBoosts()"
-      (click)="toggleBoosts()"
-    >
-      🔁 Retweets
-    </button>
-    <button
-      type="button"
-      class="btn btn-outline btn-sm"
-      [class.active]="showReplies()"
-      [attr.aria-pressed]="showReplies()"
-      (click)="toggleReplies()"
-    >
-      💬 Replies
-    </button>
-    <!-- How far back the feed reaches. A select rather than three chips: these
-         choices are mutually exclusive and need to stay compact. -->
-    <label class="home-window">
-      📅
-      <select
-        [ngModel]="prefs.homeWindow()"
-        (ngModelChange)="setHomeWindow($event)"
-        aria-label="How far back to load"
+  <!-- Hidden until there is something to filter. Six controls that narrow a
+       feed, above a feed with nothing in it, are six things a first-time
+       visitor has to rule out before finding the one link that helps. -->
+  @if (!nothingFollowed()) {
+    <div class="home-filters" role="group" aria-label="Timeline filters">
+      <button
+        type="button"
+        class="btn btn-outline btn-sm"
+        [class.active]="showBoosts()"
+        [attr.aria-pressed]="showBoosts()"
+        (click)="toggleBoosts()"
       >
-        <option value="today">Today</option>
-        <option value="week">This week</option>
-        <option value="all">Everything</option>
-      </select>
-    </label>
-    <button
-      type="button"
-      class="btn btn-outline btn-sm feed-filter"
-      [class.active]="prefs.algoCalm()"
-      [attr.aria-pressed]="prefs.algoCalm()"
-      (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
-      [title]="
-        'Calm mode: hide ' +
-        words().posts +
-        ' that read as inflammatory — heated wording, quote-dunks, and ratioed ' +
-        words().posts +
-        ' (all detected on-device)'
-      "
-    >
-      😌 Calm
-    </button>
-    <button
-      type="button"
-      class="btn btn-outline btn-sm feed-filter"
-      [class.active]="imagesHidden()"
-      [attr.aria-pressed]="imagesHidden()"
-      (click)="toggleImages()"
-      [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
-      [attr.aria-label]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
-    >
-      <span aria-hidden="true">🖼️</span> {{ imagesHidden() ? 'No images' : 'Images' }}
-    </button>
-    <app-feed-language-picker />
-  </div>
+        🔁 Retweets
+      </button>
+      <button
+        type="button"
+        class="btn btn-outline btn-sm"
+        [class.active]="showReplies()"
+        [attr.aria-pressed]="showReplies()"
+        (click)="toggleReplies()"
+      >
+        💬 Replies
+      </button>
+      <!-- How far back the feed reaches. A select rather than three chips: these
+         choices are mutually exclusive and need to stay compact. -->
+      <label class="home-window">
+        📅
+        <select
+          [ngModel]="prefs.homeWindow()"
+          (ngModelChange)="setHomeWindow($event)"
+          aria-label="How far back to load"
+        >
+          <option value="today">Today</option>
+          <option value="week">This week</option>
+          <option value="all">Everything</option>
+        </select>
+      </label>
+      <button
+        type="button"
+        class="btn btn-outline btn-sm feed-filter"
+        [class.active]="prefs.algoCalm()"
+        [attr.aria-pressed]="prefs.algoCalm()"
+        (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
+        [title]="
+          'Calm mode: hide ' +
+          words().posts +
+          ' that read as inflammatory — heated wording, quote-dunks, and ratioed ' +
+          words().posts +
+          ' (all detected on-device)'
+        "
+      >
+        😌 Calm
+      </button>
+      <button
+        type="button"
+        class="btn btn-outline btn-sm feed-filter"
+        [class.active]="imagesHidden()"
+        [attr.aria-pressed]="imagesHidden()"
+        (click)="toggleImages()"
+        [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
+        [attr.aria-label]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
+      >
+        <span aria-hidden="true">🖼️</span> {{ imagesHidden() ? 'No images' : 'Images' }}
+      </button>
+      <app-feed-language-picker />
+    </div>
+  }
 
   <!-- Only shown when something was actually left out, so it is an offer
        rather than a permanent disclaimer. -->
@@ -214,6 +219,20 @@
     <p class="muted center">
       {{ waitingForServerList() ? 'Preparing Just My Server…' : 'Loading…' }}
     </p>
+  } @else if (nothingFollowed()) {
+    <!--
+      The first-run destination, once the preview posts are gone.
+
+      One heading and one button, because at this moment the visitor has
+      exactly one useful move and every additional choice competes with it.
+      Kept distinct from the empty state below: "you have not followed anyone
+      yet" and "the people you follow have not posted" are different facts and
+      want different answers.
+    -->
+    <div class="home-empty">
+      <p class="home-empty-lead">Your timeline is empty — you're not following anyone yet.</p>
+      <a class="btn" routerLink="/find-friends">Find people to follow</a>
+    </div>
   } @else if (!visible().length) {
     <p class="muted center">
       <a routerLink="/find-friends">Find friends to follow →</a>

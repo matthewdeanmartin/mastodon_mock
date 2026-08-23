@@ -384,6 +384,8 @@ export class Home implements OnInit, OnDestroy {
   private anonymousCacheGeneration = 0;
   private initialized = false;
   private lastHomeSource: 'normal' | 'waiting' | 'server' = 'normal';
+  /** The follow/tag set the currently rendered feed was built from. */
+  private lastAnonymousSourceKey: string | null = null;
 
   /** Follow Blue → "Auto-refresh timeline" for as long as this page is open. */
   private readonly liveEffect = effect(() => this.syncLive());
@@ -400,12 +402,48 @@ export class Home implements OnInit, OnDestroy {
     }
   });
 
+  /**
+   * Reload when an anonymous visitor's follows or tags change underneath us.
+   *
+   * The case this exists for is the end of the first-run preview. Three accounts
+   * are followed so a stranger sees a working timeline instead of a login wall;
+   * answering the modal calls `PreviewSeed.clear()`, which unfollows them. That
+   * correctly empties storage — but nothing told the rendered feed, so the
+   * preview posts stayed on screen and then vanished later at some unrelated
+   * navigation. From the visitor's side that is posts disappearing at random,
+   * long after the moment that explained them.
+   *
+   * Reacting to the source set rather than to a preview-specific signal keeps
+   * this honest for every other cause too: unfollowing from a profile, removing
+   * a tag, or clearing a paste feed all change what Home should be showing.
+   *
+   * `anonymousSourceKey()` reads signals, so this effect re-runs on its own
+   * whenever any of them change.
+   */
+  private readonly anonymousSourceEffect = effect(() => {
+    if (!this.auth.isAnonymous) {
+      return;
+    }
+    const key = this.anonymousSourceKey();
+    if (!this.initialized) {
+      this.lastAnonymousSourceKey = key;
+      return;
+    }
+    if (key !== this.lastAnonymousSourceKey) {
+      this.lastAnonymousSourceKey = key;
+      this.load();
+    }
+  });
+
   ngOnInit(): void {
     this.diagnostics.info('page:open', {
       mode: this.auth.mode() ?? 'unauthenticated',
       server: this.server.baseUrl() || 'same-origin',
     });
     this.lastHomeSource = this.homeSourceState();
+    // Recorded before `initialized`, so the effect below has a baseline to
+    // compare against and does not treat the first render as a change.
+    this.lastAnonymousSourceKey = this.anonymousSourceKey();
     this.initialized = true;
     this.load();
     // Re-tick every 30s so the cap message / cooldown updates on its own.
@@ -844,6 +882,34 @@ export class Home implements OnInit, OnDestroy {
       );
     }
   }
+
+  /**
+   * True when an anonymous visitor has chosen nothing at all.
+   *
+   * Drives hiding the filter bar. Every control in it — retweets, replies, calm
+   * mode, images, the date window, the language picker — narrows a feed, and
+   * narrowing nothing is nothing. On a first run that bar is a row of six
+   * controls above an empty column, none of which can do anything, and the one
+   * thing the visitor actually needs is a single link to go find someone.
+   *
+   * Deliberately anonymous-only. A signed-in account with a quiet timeline still
+   * has real follows, and its filters still mean something the moment a post
+   * arrives; hiding them there would be hiding working controls over a temporary
+   * emptiness.
+   *
+   * Checks the same three sources as {@link anonymousSourceKey}, plus Eliza —
+   * she is browser-local and so never appears in that key, but following her
+   * fills the timeline with her posts, and an empty state above a feed full of
+   * posts would be plainly wrong.
+   */
+  protected readonly nothingFollowed = computed(
+    () =>
+      this.auth.isAnonymous &&
+      this.anonymousFollows.follows().length === 0 &&
+      this.anonymousTags.tags().length === 0 &&
+      this.pasteFeeds.enabledFeeds().length === 0 &&
+      !this.eliza.following(),
+  );
 
   private anonymousSourceKey(): string {
     const pasteFeeds = this.pasteFeeds

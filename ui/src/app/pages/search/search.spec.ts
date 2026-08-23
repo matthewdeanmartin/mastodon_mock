@@ -34,6 +34,9 @@ interface SearchInternals {
   searchServerPostHits: WritableSignal<number | null>;
   searchServerTagsOnly: WritableSignal<boolean>;
   emptyExplanation(): string | null;
+  searchSlow: WritableSignal<boolean>;
+  searchTimedOut: WritableSignal<boolean>;
+  retrySearch(): void;
   applySearchServer(): Promise<void>;
   clearSearchServer(): void;
   searchHost(): string;
@@ -165,6 +168,91 @@ describe('Search', () => {
     internals(fixture).run();
     fixture.detectChanges();
   }
+
+  /**
+   * A search that never answers.
+   *
+   * The request was subscribed with no timeout, so an unreachable or overloaded
+   * server left "Searching…" on screen forever with no way out but the browser's
+   * back button — which lands somewhere else and loses the query.
+   */
+  describe('slow and hung searches', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('says the server is being slow before giving up on it', () => {
+      vi.useFakeTimers();
+      const fixture = setUp();
+      search(fixture, 'birds');
+      httpMock.expectOne((r) => r.url.includes('/api/v2/search'));
+
+      // Immediately: just the spinner. Saying "slow" at once would be a lie
+      // about a search that has been running for 40ms.
+      expect(internals(fixture).searching()).toBe(true);
+      expect(internals(fixture).searchSlow()).toBe(false);
+
+      vi.advanceTimersByTime(5000);
+      fixture.detectChanges();
+
+      expect(internals(fixture).searchSlow()).toBe(true);
+      // Still running: slow is not failed.
+      expect(internals(fixture).searching()).toBe(true);
+      expect(internals(fixture).searchTimedOut()).toBe(false);
+    });
+
+    it('gives up rather than spinning forever, and offers a retry', () => {
+      vi.useFakeTimers();
+      const fixture = setUp();
+      search(fixture, 'birds');
+      httpMock.expectOne((r) => r.url.includes('/api/v2/search'));
+
+      vi.advanceTimersByTime(20000);
+      fixture.detectChanges();
+
+      expect(internals(fixture).searching()).toBe(false);
+      expect(internals(fixture).searchTimedOut()).toBe(true);
+      // The slow notice is replaced by the timeout, not shown alongside it.
+      expect(internals(fixture).searchSlow()).toBe(false);
+
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.textContent).toContain('took too long');
+    });
+
+    it('clears the timeout notice when the reader retries', () => {
+      vi.useFakeTimers();
+      const fixture = setUp();
+      search(fixture, 'birds');
+      httpMock.expectOne((r) => r.url.includes('/api/v2/search'));
+      vi.advanceTimersByTime(20000);
+      fixture.detectChanges();
+      expect(internals(fixture).searchTimedOut()).toBe(true);
+
+      internals(fixture).retrySearch();
+      fixture.detectChanges();
+
+      expect(internals(fixture).searchTimedOut()).toBe(false);
+      httpMock.expectOne((r) => r.url.includes('/api/v2/search'));
+    });
+
+    it('stops the clock when results arrive in time', () => {
+      vi.useFakeTimers();
+      const fixture = setUp();
+      search(fixture, 'birds');
+      httpMock
+        .expectOne((r) => r.url.includes('/api/v2/search'))
+        .flush({ accounts: [], statuses: [], hashtags: [] });
+      fixture.detectChanges();
+
+      // Past both thresholds: a settled search must not later declare itself
+      // slow or timed out against a page showing results.
+      vi.advanceTimersByTime(60000);
+      fixture.detectChanges();
+
+      expect(internals(fixture).searchSlow()).toBe(false);
+      expect(internals(fixture).searchTimedOut()).toBe(false);
+    });
+  });
 
   it('starts with searching=false and no results', () => {
     const fixture = setUp();
