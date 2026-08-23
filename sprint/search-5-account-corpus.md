@@ -37,6 +37,29 @@ is answered by the *origin* server's timeline.
 `api.ts:495` is the search call. `api.ts:115` is the timeline call. Nothing in
 between is wrong.
 
+### What this is *not* — a correction
+
+An earlier draft of this plan claimed account search had no query language and
+was a plain name/bio lookup. That is what Mastodon's API docs describe, and it is
+wrong about this app.
+
+`fetchAccounts` (search.ts:2001) runs **two branches** and merges them:
+
+- **bio** — `api.search(q, 'accounts')`, a name/bio lookup;
+- **posts** — `api.search(q, 'statuses')`, the *same full-text post search the
+  Posts tab runs*, whose hits are grouped by author via
+  `condenseStatusesToAuthors`.
+
+`q` reaches both verbatim — pinned by a test ("passes post operators through to
+the posts branch verbatim"). So post operators are live on the accounts tab, and
+an accounts search for "baking cookies" legitimately returns people grouped from
+matching posts. The `What they post` source option selects that branch alone.
+
+This matters for scoping: the app already knows how to build an account-shaped
+result set out of a post search. The gap this sprint fills is not "accounts need
+a query language" — it is that **both** branches read the same thin full-text
+index, so scoping to one author still under-returns.
+
 ## The shape
 
 The obvious move is to reroute `from:` queries to the timeline endpoint. **That
@@ -140,6 +163,12 @@ global index.
    consumes before committing to "let the widget do its thing" — if it is
    coupled to the API response shape rather than to `Status[]`, that decoupling
    is the first task and possibly most of the sprint.
+
+   Encouraging precedent: the accounts tab's posts branch already turns a
+   `Status[]` into rendered results via `condenseStatusesToAuthors`
+   (`account-refine.ts:85`), and `mergeAuthors` merges corpora from two
+   different sources into one list. The seam this sprint wants may largely
+   exist — start by reading those two functions.
 2. **Boosts.** Analytics excludes them server-side (`excludeReblogs: true`).
    Searching someone's posts probably wants the same, but a reader looking for
    "that thing they shared" wants the opposite. Decide, and say which on screen.

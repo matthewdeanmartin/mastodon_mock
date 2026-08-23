@@ -279,10 +279,15 @@ describe('Search', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     expect(el.querySelector('app-account-search-help')).not.toBeNull();
-    // The load-bearing claim: a full address resolves even when the server has
-    // never seen the account, which is the fix for "I searched and found
-    // nothing".
+    // A full address resolves even when the server has never seen the account,
+    // which is the fix for "I searched and found nothing".
     expect(el.textContent).toContain('@name@server.social');
+    // The non-obvious one, and the reason this text exists rather than a "no
+    // operators here" disclaimer: `fetchAccounts` runs `api.search(q,
+    // 'statuses')` as its posts branch and groups the hits by author, so post
+    // operators reach the same endpoint they would from the Posts tab. A reader
+    // told otherwise never tries the thing that works.
+    expect(el.textContent).toContain('from:');
     // Finding people is still offered, as a footnote rather than the headline.
     expect(el.querySelector('a[href="/find-friends"]')).not.toBeNull();
     // The two states it replaced are gone.
@@ -550,6 +555,40 @@ describe('Search', () => {
           .accountItems()
           .map((i) => i.account.id),
       ).toEqual(['a']);
+    });
+
+    /**
+     * Post operators reach the posts branch of an *account* search untouched.
+     *
+     * This is why "find people who post about X" works from the accounts tab,
+     * and it is not obvious: Mastodon's own docs describe account search as a
+     * name/bio lookup with no query language, so reading the API contract alone
+     * leads to the opposite conclusion. What makes it true is Mawkingbird's
+     * composition — `fetchAccounts` runs `api.search(q, 'statuses')` as its
+     * second branch and groups the hits by author.
+     *
+     * Pinned because `account-search-help` documents it. If a future change
+     * starts sanitising `q` for the accounts tab, that help text becomes a lie
+     * and this test is what says so.
+     */
+    it('passes post operators through to the posts branch verbatim', () => {
+      const fixture = setUp();
+      internals(fixture).accountSource.set('both');
+      search(fixture, 'baking -is:reply has:media', 'accounts');
+
+      const posts = httpMock.expectOne(
+        (r) => r.url === '/api/v2/search' && r.params.get('type') === 'statuses',
+      );
+      expect(posts.request.params.get('q')).toBe('baking -is:reply has:media');
+      // The bio branch gets the same string — it simply cannot do anything with
+      // the operators, which is the asymmetry the help text calls out.
+      const bio = httpMock.expectOne(
+        (r) => r.url === '/api/v2/search' && r.params.get('type') === 'accounts',
+      );
+      expect(bio.request.params.get('q')).toBe('baking -is:reply has:media');
+
+      bio.flush({ accounts: [], statuses: [], hashtags: [] });
+      posts.flush({ accounts: [], statuses: [], hashtags: [] });
     });
 
     it("'both' source fans out to account + post search and merges authors", () => {

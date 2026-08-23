@@ -138,11 +138,23 @@ describe('thresholdFor', () => {
 });
 
 describe('describeContext', () => {
-  it('tells the model the operators are off the table for account search', () => {
+  /**
+   * Account search is two searches merged — a name/bio lookup and a full-text
+   * post search grouped by author (`fetchAccounts`) — and `q` reaches both
+   * verbatim, so operators are live on the post half.
+   *
+   * The brief used to say the operators did NOT apply, following Mastodon's API
+   * docs rather than what this app does. That made the helper withhold exactly
+   * the queries "find me people who post about X" needs.
+   */
+  it('tells the model operators reach the post half of an account search', () => {
     const text = describeContext({ target: 'accounts' });
 
     expect(text).toContain('Accounts');
-    expect(text).toContain('do NOT apply');
+    expect(text).toContain('TWO searches');
+    expect(text).toContain('DO apply');
+    // The asymmetry has to survive too: operators do nothing to names and bios.
+    expect(text).toContain('post half');
   });
 
   it('says hashtags want bare words without the #', () => {

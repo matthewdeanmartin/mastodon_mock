@@ -981,7 +981,7 @@
            run. Once a search has run (even to zero results) we show the results
            block's empty state instead, so the button never looks inert. -->
           <div class="search-idle">
-            <app-account-search-help />
+            <app-account-search-help (syntaxHelp)="syntaxHelpOpen.set(true)" />
           </div>
         }
 

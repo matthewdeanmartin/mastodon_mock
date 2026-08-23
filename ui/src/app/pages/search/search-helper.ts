@@ -117,9 +117,18 @@ export function thresholdFor(target: SearchTargetKind): number {
 const TARGET_BRIEF: Record<SearchTargetKind, string> = {
   statuses:
     'The search box is set to Posts, so full-text post search is running and every operator above is available.',
+  // Account search is NOT a name/bio lookup here, whatever Mastodon's API docs
+  // imply. Mawkingbird runs two branches and merges them: a name/bio lookup, and
+  // the same full-text post search the Posts tab runs, whose hits are grouped by
+  // author (see `fetchAccounts`). `q` reaches both verbatim, so operators are
+  // live — and telling the model otherwise made it withhold queries that work,
+  // which is the whole value of "find me people who post about X".
   accounts:
-    'The search box is set to Accounts, so the query is matched against display names, @handles and bios. ' +
-    'The operators above do NOT apply here — return plain words, names, or handle fragments only.',
+    'The search box is set to Accounts. This runs TWO searches and merges them: display names, ' +
+    '@handles and bios; AND a full-text post search whose results are grouped by author. ' +
+    'The operators above DO apply, but only to the post half — the name/bio half matches plain ' +
+    'text and ignores them. Prefer plain words when the user is naming a person; operators are ' +
+    'appropriate when they are describing what someone posts about.',
   hashtags:
     'The search box is set to Hashtags, so the query is matched against tag names. ' +
     'The operators above do NOT apply here — return single words without the leading #.',

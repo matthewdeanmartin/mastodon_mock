@@ -1,22 +1,46 @@
-import { Component } from '@angular/core';
+import { Component, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 /**
  * What you can type when searching for people.
  *
- * The counterpart to `search-syntax-help`, and deliberately a different shape,
- * because account search is a different thing. Post search has an operator
- * language (`from:`, `has:media`, `-is:reply`); **account search has none** —
- * the text box is passed to the server as-is, and every refinement lives in the
- * Advanced form and the facet checkboxes instead.
+ * The counterpart to `search-syntax-help`, documenting the *accounts* tab.
  *
- * So this documents what the box actually does with what you type, and points
- * at where the real filtering is. It is not an operator table, because inventing
- * one would be the exact failure `search-syntax-help` warns about: an operator
- * the server does not honour fails *silently*, returning more results than asked
- * for rather than an error, which teaches people to write queries that lie to
- * them. `from:` typed into a people search is matched as the literal word
- * "from:".
+ * ## Post operators work here, and that is not obvious
+ *
+ * Mastodon's own docs describe account search as a name/bio lookup with no
+ * query language, and reading only the API contract leads to the wrong
+ * conclusion — that operators typed here are matched as literal words. They are
+ * not, because of how Mawkingbird composes this search.
+ *
+ * `fetchAccounts` (search.ts) runs up to **two branches** and merges them:
+ *
+ * - the **bio** branch — `api.search(q, 'accounts')`, a name/bio lookup;
+ * - the **posts** branch — `api.search(q, 'statuses')`, the very same full-text
+ *   post search the Posts tab runs, whose hits are then grouped by author via
+ *   `condenseStatusesToAuthors`.
+ *
+ * `q` is passed through verbatim to both. So an operator on this tab reaches the
+ * post-search endpoint exactly as it would from the Posts tab, and is honoured
+ * wherever it would be honoured there. "Find me people who post about X" is a
+ * first-class use of this box, not an accident — the `What they post` source
+ * option exists to select that branch alone.
+ *
+ * Which is why this documents the operators rather than denying them: a reader
+ * who has been told "no operators here" will not try the thing that works.
+ *
+ * ## What it must not claim
+ *
+ * The bio branch is a plain substring match — an operator means nothing to it,
+ * so a query that leans on operators narrows the *posts* half and does nothing
+ * to the *names* half. That asymmetry is the honest caveat, and it is stated on
+ * screen rather than smoothed over.
+ *
+ * Care is still owed to `search-syntax-help`'s warning: an operator the server
+ * does not honour fails *silently*, returning more results rather than an error.
+ * Nothing here should be documented that is not documented there, and the two
+ * lists are deliberately not duplicated — this one points at the shared
+ * reference instead of restating it and drifting from it.
  *
  * This replaced a list of offsite directories in the idle accounts state. That
  * list was a distractor — finding people has its own hub at `/find-friends`, and
@@ -30,8 +54,9 @@ import { RouterLink } from '@angular/router';
     <section aria-labelledby="account-search-help-title">
       <h3 id="account-search-help-title">Searching for people</h3>
       <p class="muted note">
-        Unlike post search, this box has no operators — what you type is matched as words. Type
-        <code>from:</code> here and it looks for accounts with "from:" in them.
+        Two searches at once: one over names and bios, one over what people
+        <em>post</em> — with the posts grouped by who wrote them. So you can look someone up by
+        name, or find people by what they talk about.
       </p>
 
       <div class="groups">
@@ -61,14 +86,31 @@ import { RouterLink } from '@angular/router';
                 </td>
               </tr>
               <tr>
-                <td class="syntax"><code>words about them</code></td>
+                <td class="syntax"><code>baking cookies</code></td>
                 <td>
-                  Words from a profile bio — "rust compiler", "birding". Turn this on with
-                  <strong>Search in</strong> under Advanced.
+                  Any words. Searches bios <em>and</em> posts, so you get people who describe
+                  themselves this way plus people who write about it.
+                </td>
+              </tr>
+              <tr>
+                <td class="syntax"><code>from:&#64;name&#64;server</code></td>
+                <td>
+                  Post operators work here too — they run against the posts half of the search.
+                  <code>has:media</code>, <code>after:</code>, <code>-is:reply</code> and the rest
+                  all apply.
+                  <span class="example"><code>rust -is:reply has:media</code></span>
                 </td>
               </tr>
             </tbody>
           </table>
+          <p class="muted group-note">
+            One caveat worth knowing: operators only narrow the <em>posts</em> half. The names-and-bios
+            half is a plain text match and ignores them, so a heavily-operatored query still returns
+            whatever accounts matched the words by name.
+            <button type="button" class="linklike" (click)="syntaxHelp.emit()">
+              See all post operators
+            </button>
+          </p>
         </section>
 
         <section>
@@ -82,8 +124,9 @@ import { RouterLink } from '@angular/router';
               <tr>
                 <td class="syntax">Search in</td>
                 <td>
-                  Look in profiles, in the authors of matching posts, or both. "Posts" finds people
-                  by what they write rather than what they say about themselves.
+                  Which half runs: <strong>Bio and posts</strong> (both, the default),
+                  <strong>Name &amp; bio only</strong>, or <strong>What they post</strong>. Pick the
+                  last one when you want people by subject and don't care what their bio says.
                 </td>
               </tr>
               <tr>
@@ -162,6 +205,28 @@ import { RouterLink } from '@angular/router';
     .footer-note {
       margin: 16px 0 0;
     }
+    /* A button that reads as a link, for the inline "See all post operators".
+       Same shape as the one in home.css; component styles are scoped, so it
+       does not carry across. */
+    .linklike {
+      border: none;
+      background: none;
+      color: var(--accent);
+      font: inherit;
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+    }
   `,
 })
-export class AccountSearchHelp {}
+export class AccountSearchHelp {
+  /**
+   * Open the full operator reference.
+   *
+   * Emitted rather than rendering the operator table inline: `search-syntax-help`
+   * is generated from `mastodon-query-serializer.ts` precisely so the documented
+   * operators cannot drift from the emitted ones, and a second copy here would
+   * be the drift it exists to prevent.
+   */
+  readonly syntaxHelp = output<void>();
+}
