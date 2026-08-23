@@ -87,29 +87,32 @@
   </span>
 </a>
 
-@if (!auth.isAnonymous) {
-  <!-- Anonymous accounts have no follow list on a server to import into, and
-       contact matching searches through the authenticated home server. -->
-  <a class="doc-row" routerLink="/settings/import-export" fragment="contacts">
-    <span class="doc-title">Look for your contacts</span>
-    <span class="muted small">
-      @if (canPickContacts) {
-        Pick people from your phone's contacts and see who has an account. Distinctive names work
-        best; common ones will need a second look.
-      } @else {
-        Upload a contacts export and see who has an account. Distinctive names work best; common
-        ones will need a second look.
-      }
-    </span>
-  </a>
+<!--
+  Not gated on sign-in. Account search works anonymously and anonymous follows
+  are kept in this browser, so contact matching works for a visitor who has just
+  declined to log in — which is precisely the person with an empty timeline and
+  the most to gain from it.
+-->
+<a class="doc-row" routerLink="/settings/import-export" fragment="contacts">
+  <span class="doc-title">Look for your contacts</span>
+  <span class="muted small">
+    @if (canPickContacts) {
+      Pick people from your phone's contacts and see who has an account. Distinctive names work
+      best; common ones will need a second look.
+    } @else {
+      Upload a contacts export and see who has an account. Distinctive names work best; common ones
+      will need a second look.
+    }
+  </span>
+</a>
 
-  <a class="doc-row" routerLink="/settings/import-export">
-    <span class="doc-title">Import a follow list</span>
-    <span class="muted small">
-      Bring your follows over from another instance, or from a Twitter archive.
-    </span>
-  </a>
-}
+<a class="doc-row" routerLink="/settings/import-export">
+  <span class="doc-title">Import a follow list</span>
+  <span class="muted small">
+    Bring your follows over from another instance, or from a Twitter archive. Works signed out too —
+    follows are kept in this browser.
+  </span>
+</a>
 
 <a class="doc-row" routerLink="/invites">
   <span class="doc-title">Invite people here</span>

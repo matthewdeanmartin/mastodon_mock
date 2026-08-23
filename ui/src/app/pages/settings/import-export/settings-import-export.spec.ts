@@ -434,3 +434,56 @@ describe('SettingsImportExport', () => {
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
   });
 });
+
+/**
+ * Signed out.
+ *
+ * The whole page used to sit behind `anonymousUnavailableGuard`, so someone who
+ * chose "continue without logging in" could not reach any of it — including the
+ * two tools that build a timeline from nothing, which is what that person needs
+ * most. Found in testing: the contacts feature shipped and was invisible.
+ */
+describe('SettingsImportExport, signed out', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  function render(): HTMLElement {
+    const fixture = TestBed.createComponent(SettingsImportExport);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('still offers the contacts finder and the follow-list importer', () => {
+    const root = render();
+
+    // Account search works anonymously and anonymous follows live in this
+    // browser, so both of these work without credentials.
+    expect(root.querySelector('#contacts')).not.toBeNull();
+    expect(root.querySelector('#import-friends')).not.toBeNull();
+  });
+
+  it('hides the sections whose Follow buttons need a server account', () => {
+    const root = render();
+
+    // These call `api.follow` unconditionally. Rendering them signed out would
+    // offer buttons that cannot work.
+    expect(root.querySelector('#twitter-archive')).toBeNull();
+    expect(root.querySelector('#github-friends')).toBeNull();
+    expect(root.querySelector('#bridge-finder')).toBeNull();
+  });
+
+  it('says plainly where a signed-out follow is saved', () => {
+    // The caveat that makes offering these correct, rather than a silent
+    // difference the reader discovers on their next device.
+    expect(render().textContent).toContain('in this browser');
+  });
+});

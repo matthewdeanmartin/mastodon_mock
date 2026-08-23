@@ -78,6 +78,16 @@ export class SettingsImportExport {
   protected bsky = inject(BlueskySession);
   protected mastodonConnector = inject(MastodonConnector);
 
+  /**
+   * Whether this reader has no server account.
+   *
+   * Several sections here follow via `api.follow`, which needs credentials, and
+   * they hide themselves rather than offering buttons that cannot work. The
+   * contacts finder and the CSV importer both branch on identity internally, so
+   * they stay — and they are the two an anonymous first-run visitor needs.
+   */
+  protected readonly isAnonymous = this.auth.isAnonymous;
+
   protected readonly mockTooling = environment.mockTooling;
   protected pasted = signal('');
   protected fileName = signal<string | null>(null);

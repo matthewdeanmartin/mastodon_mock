@@ -80,11 +80,20 @@ describe('FindFriends', () => {
     expect(href).toContain('type=statuses');
   });
 
-  it('hides importing a follow list from anonymous visitors', () => {
-    // An anonymous account has no follow list on a server to import into.
-    expect(rowTitles(setUp())).not.toContain('Import a follow list');
+  it('offers contacts and follow-list import to anonymous visitors too', () => {
+    // These used to be hidden while signed out, on the assumption that both
+    // needed a server account. Neither does: account search works anonymously
+    // and anonymous follows are kept in this browser. Hiding them put the two
+    // tools that build a timeline out of reach of the one person with an empty
+    // one — someone who just chose "continue without logging in".
+    const titles = rowTitles(setUp());
+    expect(titles).toContain('Look for your contacts');
+    expect(titles).toContain('Import a follow list');
+  });
 
-    anonymous = false;
-    expect(rowTitles(setUp())).toContain('Import a follow list');
+  it('warns a signed-out visitor that follows stay in this browser', () => {
+    // The honest caveat that makes offering it correct: nothing is written to a
+    // server account, because there is no server account.
+    expect((setUp().nativeElement as HTMLElement).textContent).toContain('kept in this browser');
   });
 });

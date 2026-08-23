@@ -525,10 +525,21 @@ export const routes: Routes = [
               import('./pages/settings/account/settings-account').then((m) => m.SettingsAccount),
           },
           {
+            // Reachable while anonymous, unlike its neighbours.
+            //
+            // This page is several tools, and only some of them need an account
+            // on a server. Finding your contacts does not: account search works
+            // anonymously (see `Api.search`, which drops `resolve` against a
+            // search server by design) and anonymous follows are stored in this
+            // browser. Guarding the whole route put the one tool that helps a
+            // brand-new visitor build a timeline behind the sign-in they have
+            // just declined — the exact population it exists for.
+            //
+            // The sections that genuinely need credentials hide themselves; see
+            // `isAnonymous` in the template.
             path: 'import-export',
             title: 'Import and export',
-            canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Import/Export', preloadSettings: true },
+            data: { preloadSettings: true },
             loadComponent: () =>
               import('./pages/settings/import-export/settings-import-export').then(
                 (m) => m.SettingsImportExport,

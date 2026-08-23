@@ -554,3 +554,15 @@
 .bridge-signals {
   flex: 1 1 100%;
 }
+
+/* The signed-out scope note. Set off from the page's other muted text because
+   it is a caveat about where the reader's follows go, not a hint they can skim
+   past. */
+.anonymous-scope-note {
+  border-left: 3px solid var(--accent, var(--border));
+  background: var(--hover);
+  padding: 10px 12px;
+  margin: 0 0 16px;
+  border-radius: 0 4px 4px 0;
+  line-height: 1.5;
+}

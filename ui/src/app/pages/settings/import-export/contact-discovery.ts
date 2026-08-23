@@ -3,6 +3,9 @@ import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
 import { Account } from '../../../models';
+import { Auth } from '../../../auth';
+import { AnonymousFollows } from '../../../providers/anonymous/anonymous-follows';
+import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
 
 export type ContactSearchStatus = 'pending' | 'searching' | 'complete' | 'failed';
 
@@ -333,10 +336,13 @@ export function rankMatch(contact: SearchableContact, account: Account): Contact
   return { account, signals, confidence };
 }
 
-/** Browser-only, sequential contact discovery through the authenticated home server. */
+/** Browser-only, sequential contact discovery through the home or search server. */
 @Injectable({ providedIn: 'root' })
 export class ContactDiscovery {
   private api = inject(Api);
+  private auth = inject(Auth);
+  private anonymousFollows = inject(AnonymousFollows);
+  private anonymous = inject(AnonymousAccount);
   private stopRequested = false;
 
   readonly rows = signal<ContactSearchRow[]>([]);
@@ -345,6 +351,60 @@ export class ContactDiscovery {
   readonly parseResult = signal<ContactParseResult | null>(null);
   /** Small courtesy delay between successful calls; tests set this to zero. */
   delayMs = 350;
+
+  /** Accounts followed from this results list, so the buttons can settle. */
+  readonly followed = signal<ReadonlySet<string>>(new Set());
+  /** Accounts with a follow in flight. */
+  readonly followBusy = signal<ReadonlySet<string>>(new Set());
+  /** Per-account failure text, keyed by account id. */
+  readonly followErrors = signal<ReadonlyMap<string, string>>(new Map());
+
+  /**
+   * Follow one match.
+   *
+   * Branches on identity the way `profile.ts` does, and that branch is the whole
+   * reason this method exists here rather than being borrowed from
+   * `GitHubFriendDiscovery`: that one calls `api.follow` unconditionally, which
+   * an anonymous reader has no credentials for.
+   *
+   * Anonymous readers are the ones who most need this feature — they are the
+   * people with an empty timeline — so a follow path that only works when signed
+   * in would put the button in front of exactly the wrong audience.
+   */
+  async follow(account: Account): Promise<void> {
+    if (this.followBusy().has(account.id) || this.followed().has(account.id)) return;
+    this.followBusy.update((busy) => new Set(busy).add(account.id));
+    this.followErrors.update((errors) => {
+      const next = new Map(errors);
+      next.delete(account.id);
+      return next;
+    });
+    try {
+      if (this.auth.isAnonymous) {
+        const result = this.anonymousFollows.follow(account, this.anonymous.server());
+        if (result.ok) {
+          this.followed.update((set) => new Set(set).add(account.id));
+        } else {
+          this.followErrors.update((errors) => new Map(errors).set(account.id, result.error));
+        }
+      } else {
+        const relationship = await firstValueFrom(this.api.follow(account.id));
+        if (relationship.following || relationship.requested) {
+          this.followed.update((set) => new Set(set).add(account.id));
+        }
+      }
+    } catch {
+      this.followErrors.update((errors) =>
+        new Map(errors).set(account.id, 'Could not follow this account.'),
+      );
+    } finally {
+      this.followBusy.update((busy) => {
+        const next = new Set(busy);
+        next.delete(account.id);
+        return next;
+      });
+    }
+  }
 
   load(text: string): void {
     this.loadContacts(parseContacts(text));
