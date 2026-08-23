@@ -1,6 +1,6 @@
 # RSS Sprint 4 — Starter kit, friend-link extraction, article-view reuse
 
-Status: PLANNED
+Status: PARTIALLY DONE — 4a (starter kits) shipped 2026-08-22; 4b and 4c still planned
 Depends on: [[rss-3-read-tracking-and-filters]]
 
 Renumbered 2026-08-23 from the original Sprint 3 — [[rss-2-split-pane-shell]] was inserted ahead of
@@ -15,22 +15,42 @@ Solve cold-start (nobody has RSS subscriptions on day one), grow subscriptions f
 already in the app (friends' links), and give `/rss` a real long-form reading view by reusing
 already-built machinery instead of writing a second article extractor.
 
-## 4a. First RSS starter kit: 5 news links
+## 4a. RSS starter kits — DONE (2026-08-22)
 
-- Reuses the existing starter-kit pattern — check `bundled-starter-kits` (`pages/bundled-
-  starter-kits/`) for the current shape of a starter kit (it already exists for account-follow
-  kits per the epic overview's "Find Friends hub" mention in `shell.html`'s menu comments). Model
-  the RSS kit the same way rather than inventing a new "kit" concept.
-- Content: 5 hand-picked, well-known, low-friction RSS/Atom feed URLs (the boss said "5 news
-  links" — needs the actual 5 URLs picked before this ships; not a planning-doc decision, flag for
-  the boss when this sprint starts).
-- Entry point: offered from `/rss` when the subscription list is empty (the natural
-  empty-state, matching `showStarterCollection`'s pattern in `lists.ts` for the existing list
-  starter-collection empty state) and/or from the Find Friends hub if that's where other starter
-  kits surface today — check `bundled-starter-kits` usage sites before picking one over the other;
-  likely both.
-- One-click subscribe-to-all, using `RssSubscriptions.adoptAll` (already built for exactly this:
-  bulk-adopt while preserving any existing per-feed flags) rather than looping `add`.
+Pulled forward ahead of Sprint 3 at the boss's request: "people are lazy and won't evaluate a
+feature if they need to track down 20 rss feeds before they see the feature."
+
+**Shipped**: four themed kits (World news 4, Tech 6, Science 4, Fediverse 4 = 18 feeds) in
+`providers/rss/rss-starter-kits.ts`, installed by `RssStarterKitInstall`, offered by
+`pages/rss/starter-kits/`. Each kit files its feeds into its own folder, so the Sprint 2 rail is
+doing visible work from the first click.
+
+Decisions that differ from what this doc originally assumed — all deliberate:
+
+- **Hand-curated, not generated, and `check:static` never fetches them.** The doc said "reuse the
+  existing starter-kit pattern". The account kits' pattern is a script that revalidates 132 live
+  accounts in the quality gate, and that gate had been red for three weeks over one dead account
+  (see `bugs/mastodon_mock/bugs.md`). That machinery exists to honour per-account opt-out flags
+  (`discoverable`/`indexable`/`noindex`) — **RSS has no equivalent signal**, publishing a feed is
+  the opt-in, so a network gate here buys nothing and costs flakiness. Feed list is plain reviewed
+  data.
+- **Not `adoptAll`.** The doc specified it. It is wrong here: it records subscriptions without
+  proving any can be read. Each feed goes through `RssAddFeed` (validate-by-fetching) with the same
+  direct→proxy fallback the manual add and OPML import use, so a subscription only exists once a
+  fetch has worked, and `useProxy` is recorded only per feed that needed it.
+- **CORS is a feed-selection criterion, not a footnote.** First draft was picked on editorial merit:
+  only 4 of 19 feeds sent `Access-Control-Allow-Origin`, and a fresh install of the Fediverse kit
+  subscribed **1 of 4** with three failures — the exact bad first impression kits exist to prevent.
+  Rebuilt around CORS-readable feeds; now **16 of 18** work with no proxy at all, verified at
+  runtime (Fediverse kit: 4/4, Science: 3/4 with Phys.org honestly reported).
+  Useful trick: any Mastodon account's `.rss` sends `ACAO: *`, so a CORS-blocked publisher that also
+  posts to the fediverse can be included via their account feed instead.
+- **The subscription ceiling is surfaced, not hit silently.** Default limit is 10 and the kits total
+  18, so installing two kits truncates. The panel disables kits that do not fit, says how many slots
+  are left, and offers a one-click "Raise the limit to N". Verified at runtime.
+
+Not built: a `/collections/starter`-style standalone kit page. The kits live in the `/rss` pane's
+"All items" view, which is where a cold-start user already is.
 
 ## 4b. Friend-link RSS/Atom extraction
 

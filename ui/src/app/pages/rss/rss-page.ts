@@ -8,6 +8,8 @@ import { PER_FEED_ITEM_CAP, RssProvider } from '../../providers/rss/rss-provider
 import { PageDiagnostics } from '../../page-diagnostics';
 import { StatusCard } from '../../status-card/status-card';
 import { AddFeedDialog } from './add-feed-dialog/add-feed-dialog';
+import { RssStarterKitsPanel } from './starter-kits/rss-starter-kits-panel';
+import { RssStarterKitInstall } from '../../providers/rss/rss-starter-kit-install';
 
 /** A URL's hostname, or null when it isn't a parseable absolute URL. */
 function hostOf(url: string): string | null {
@@ -65,7 +67,7 @@ interface RailGroup {
  */
 @Component({
   selector: 'app-rss-page',
-  imports: [RouterLink, AddFeedDialog, StatusCard],
+  imports: [RouterLink, AddFeedDialog, StatusCard, RssStarterKitsPanel],
   templateUrl: './rss-page.html',
   styleUrl: './rss-page.css',
 })
@@ -74,6 +76,7 @@ export class RssPage {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private rss = inject(RssProvider);
+  private kitInstall = inject(RssStarterKitInstall);
   protected subs = inject(RssSubscriptions);
   protected readonly perFeedCap = PER_FEED_ITEM_CAP;
 
@@ -139,11 +142,18 @@ export class RssPage {
   private loadSeq = 0;
 
   constructor() {
-    // The pane follows the URL, so one effect covers first paint, rail clicks,
-    // back/forward, and a reload on a deep link alike.
+    // The pane follows the URL *and* the subscription list, so one effect covers
+    // first paint, rail clicks, back/forward, a reload on a deep link, and a
+    // starter kit finishing — all of which change what belongs in the pane.
     effect(() => {
       const sel = this.selection();
       const urls = this.feedUrlsFor(sel);
+      // A kit subscribes feeds one at a time, and each write ticks `feeds()`.
+      // Reloading on every one would refetch the whole pane N times over during
+      // a single install; the install's own completion is the interesting edge.
+      if (this.kitInstall.progress() !== null) {
+        return;
+      }
       this.load(urls);
     });
   }

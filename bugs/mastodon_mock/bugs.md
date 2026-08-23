@@ -81,3 +81,50 @@ statuses to show, not drawing them), but it is also sidestepping this.
 Not decided. Out of scope for the RSS sprints; recorded so the next person who
 renders an RSS card in a test knows why it explodes.
 
+---
+
+## `starter-kits:check` is a network-dependent quality gate (flaky by design)
+
+Investigated 2026-08-22 after `npm run check:static` had been failing on a clean
+tree. Diagnosis, so nobody re-derives it:
+
+`scripts/update-bundled-starter-kits.mjs --check` **fetches all 132 candidate
+accounts from their home instances on every run**, re-derives kit membership, and
+fails the build if it differs from `starter-kit-validation.json`. It runs as part
+of `check:static`, which is otherwise entirely offline.
+
+What was actually wrong: `rferl@mastodon.social` now returns HTTP 404 (the account
+is gone). It had already been `excluded`, so *shipped membership never changed* —
+but during the flap the lookup classified inconsistently between runs, and the
+gate went red. Re-running `:update` and re-running `:check` both pass now.
+
+Two separate problems here:
+
+1. **It can fail for reasons that have nothing to do with this repo.** Any of 132
+   accounts 404ing, rate-limiting, moving, or timing out can turn the gate red.
+   That is a build that breaks when someone else's server has a bad afternoon.
+2. **`bundled-starter-kits.generated.ts` bakes in `followers_count`,
+   `following_count` and `statuses_count`** — numbers that change hourly. So
+   running `:update` always produces a diff (~324 lines of count churn last time)
+   even when membership is identical. The generated file can never be clean.
+
+The network check does exist for a real reason and must not simply be deleted:
+Mastodon accounts can set `discoverable=false` / `indexable=false` /
+`noindex=true`, and honouring that opt-out is why membership is re-derived from
+live data rather than trusted to a checked-in file.
+
+**Options:**
+
+1. Move `starter-kits:check` out of `check:static` into its own advisory target
+   (like `vulture`/`deptry` already are), run deliberately or on a schedule.
+   Keeps the opt-out honoured without gating every build on 132 third parties.
+2. Drop the volatile counts from the generated snapshot. They are decoration on a
+   starter-kit card; nothing needs them accurate. Fixes problem (2) outright and
+   makes `:update` diffs meaningful.
+3. Tolerate `unresolved` in the comparison — only fail when an account moves
+   *into* or *out of* `included`. Narrower than (1), fixes the specific flap.
+
+Not decided. Related: RSS starter kits deliberately do **not** copy this pattern
+— see the header comment in `providers/rss/rss-starter-kits.ts` for why (RSS has
+no opt-out signal, so a network gate buys nothing and costs flakiness).
+

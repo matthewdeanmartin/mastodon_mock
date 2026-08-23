@@ -31,14 +31,18 @@ export class RssAddFeed {
    * feed or on hitting the subscription limit — callers already have distinct
    * copy for "couldn't fetch" vs. "you're at your limit" vs. "already
    * subscribed", so this doesn't collapse those into one message.
+   *
+   * `folder` files the new subscription as it is created, which is how a starter
+   * kit lands pre-organised. Absent for the manual add paths: a feed someone
+   * typed in themselves is unfiled until they say otherwise.
    */
-  add(url: string, useProxy: boolean): Observable<AddFeedResult> {
+  add(url: string, useProxy: boolean, folder?: string): Observable<AddFeedResult> {
     if (this.subs.has(url)) {
       return throwError(() => new Error("You're already subscribed to that feed."));
     }
     return this.fetch.fetchFeed(url, { useProxy }).pipe(
       map((feed) => {
-        const limitError = this.subs.add(url, feed.title, useProxy, feed.items.length);
+        const limitError = this.subs.add(url, feed.title, useProxy, feed.items.length, folder);
         if (limitError) {
           throw new Error(limitError);
         }

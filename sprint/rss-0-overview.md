@@ -98,7 +98,7 @@ itself.
    All/Starred filter, scroll-tracking, mark-all-read (scoped correctly to feed vs. category vs.
    all — flagged as the sprint's most embarrassing possible bug), and a headline-density row
    renderer for the right pane (a new lightweight component, not a repurposed `app-status-card`).
-4. **Sprint 4 — PLANNED.** [[rss-4-starter-kit-and-article-reuse]]. First starter kit (5 news
+4. **Sprint 4 — 4a DONE (2026-08-22), rest PLANNED.** [[rss-4-starter-kit-and-article-reuse]]. First starter kit (5 news
    links, URLs not yet chosen). Extract RSS/Atom feed references from links posted by people you
    follow. Long-form article view in the right pane reuses the reader-1 extraction pipeline
    (`ArticleFetch`) instead of building a second one; adds pagination on top of it.

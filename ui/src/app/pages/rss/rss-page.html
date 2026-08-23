@@ -58,8 +58,8 @@
         }
       } @empty {
         <p class="muted rail-empty">
-          No feeds yet. <a routerLink="/settings/rss">Manage RSS feeds</a> to import an OPML file,
-          or add one above.
+          No feeds yet — pick a starter kit on the right, add one above, or
+          <a routerLink="/settings/rss">import an OPML file</a>.
         </p>
       }
     </nav>
@@ -90,16 +90,22 @@
       </p>
     }
 
+    <!-- Kits sit above the items, and only on the "All items" view: they are a
+         cold-start offer, not something to re-read past on every folder. -->
+    @if (isAllActive()) {
+      <app-rss-starter-kits-panel />
+    }
+
     @if (loading()) {
       <p class="muted center">Loading items…</p>
     } @else {
       @for (s of statuses(); track s.id) {
         <app-status-card [status]="s" filterContext="account" />
       } @empty {
-        @if (!subs.feeds().length) {
-          <p class="muted center">Subscribe to a feed to start reading.</p>
-        } @else {
+        @if (subs.feeds().length) {
           <p class="muted center">Nothing to read here.</p>
+        } @else if (!isAllActive()) {
+          <p class="muted center">Subscribe to a feed to start reading.</p>
         }
       }
     }

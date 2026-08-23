@@ -1,0 +1,70 @@
+@if (offered().length) {
+  <div class="kits">
+    <h3>Start with a kit</h3>
+    <p class="muted small">
+      One click subscribes you to a themed set of feeds, filed into its own folder. You can remove
+      any of them later on the
+      <a routerLink="/settings/rss">Manage RSS feeds</a> page.
+    </p>
+
+    <ul class="kit-list">
+      @for (kit of offered(); track kit.slug) {
+        <li class="kit">
+          <span class="kit-icon" aria-hidden="true">{{ kit.icon }}</span>
+          <span class="kit-text">
+            <span class="kit-title">{{ kit.title }}</span>
+            <span class="muted small">{{ kit.blurb }}</span>
+            <span class="muted small kit-feeds">
+              {{ kit.feeds.length }} feed{{ kit.feeds.length === 1 ? '' : 's' }}:
+              {{ kitFeedNames(kit) }}
+            </span>
+          </span>
+          <button
+            class="btn"
+            type="button"
+            [disabled]="busy() || doesNotFit(kit)"
+            (click)="install(kit)"
+          >
+            @if (installing(kit)) {
+              Adding {{ installer.progress()?.done }}/{{ installer.progress()?.total }}…
+            } @else {
+              Add
+            }
+          </button>
+        </li>
+      }
+    </ul>
+
+    @if (anyDoesNotFit()) {
+      <p class="muted small">
+        Some kits are larger than your remaining subscription slots ({{ subs.remaining() }} left of
+        {{ subs.limit() }}).
+        <button class="link-btn" type="button" (click)="raiseLimit()">
+          Raise the limit to {{ neededLimit() }}
+        </button>
+        to fit them all.
+      </p>
+    }
+  </div>
+}
+
+@if (installer.report(); as report) {
+  <p class="kit-report" role="status">
+    @if (report.added) {
+      Added {{ report.added }} feed{{ report.added === 1 ? '' : 's' }}.
+    }
+    @if (report.alreadySubscribed) {
+      {{ report.alreadySubscribed }} already subscribed.
+    }
+    @if (report.skippedForLimit) {
+      {{ report.skippedForLimit }} skipped — you're at your
+      <a routerLink="/settings/rss">subscription limit</a>.
+    }
+    @if (report.failed.length) {
+      <span class="kit-failed">
+        Couldn't load {{ report.failed.length }}: {{ failedNames(report) }}. These usually need a
+        <a routerLink="/settings/rss">CORS proxy</a>.
+      </span>
+    }
+  </p>
+}
