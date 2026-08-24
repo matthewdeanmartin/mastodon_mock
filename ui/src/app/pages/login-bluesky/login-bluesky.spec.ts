@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { Server } from '../../server';
 import { LoginBluesky } from './login-bluesky';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { seedBskyIdentity } from '../../testing/seed-storage';
 import { stubLocation } from '../../testing/stub-location';
 
@@ -34,7 +35,7 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set(handle);
     cmp.appPassword.set(password);
-    cmp.submit();
+    cmp.submitAppPassword();
 
     httpMock.expectOne(CREATE_SESSION).flush({
       did: 'did:plc:abc123',
@@ -66,13 +67,28 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set('someone.bsky.social');
     cmp.appPassword.set('app-pass-1234');
-    cmp.submit();
+    cmp.submitAppPassword();
 
     const req = httpMock.expectOne(CREATE_SESSION);
     expect(req.request.body).toEqual({
       identifier: 'someone.bsky.social',
       password: 'app-pass-1234',
     });
+  });
+
+  it('uses OAuth as the primary sign-in action', () => {
+    const begin = vi
+      .spyOn(TestBed.inject(BlueskySession), 'beginOAuthIdentity')
+      .mockReturnValue(new Promise<never>(() => undefined));
+    const fixture = TestBed.createComponent(LoginBluesky);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance as any;
+    cmp.handle.set('  @someone.bsky.social  ');
+
+    cmp.submit();
+
+    expect(begin).toHaveBeenCalledWith('someone.bsky.social', false);
+    httpMock.expectNone(CREATE_SESSION);
   });
 
   /**
@@ -142,7 +158,7 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set('someone.bsky.social');
     cmp.appPassword.set('wrong');
-    cmp.submit();
+    cmp.submitAppPassword();
 
     httpMock
       .expectOne(CREATE_SESSION)
@@ -167,7 +183,7 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set('me.example.com');
     cmp.appPassword.set('app-pass');
-    cmp.submit();
+    cmp.submitAppPassword();
 
     httpMock.expectOne(CREATE_SESSION).flush(null, { status: 400, statusText: 'Bad Request' });
     fixture.detectChanges();
@@ -185,7 +201,7 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set('someone.bsky.social');
     cmp.appPassword.set('wrong');
-    cmp.submit();
+    cmp.submitAppPassword();
 
     httpMock.expectOne(CREATE_SESSION).flush(null, { status: 401, statusText: 'Unauthorized' });
     fixture.detectChanges();
@@ -199,7 +215,7 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set('someone.bsky.social');
     cmp.appPassword.set('app-pass');
-    cmp.submit();
+    cmp.submitAppPassword();
 
     httpMock
       .expectOne(CREATE_SESSION)
@@ -214,7 +230,7 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set('  @someone.bsky.social  ');
     cmp.appPassword.set('app-pass');
-    cmp.submit();
+    cmp.submitAppPassword();
 
     expect(httpMock.expectOne(CREATE_SESSION).request.body.identifier).toBe('someone.bsky.social');
   });
@@ -233,7 +249,7 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set('someone.bsky.social');
     cmp.appPassword.set('app-pass');
-    cmp.submit();
+    cmp.submitAppPassword();
 
     httpMock.expectOne(CREATE_SESSION).error(new ProgressEvent('error'), { status: 0 });
 
@@ -289,7 +305,7 @@ describe('LoginBluesky', () => {
     const cmp = fixture.componentInstance as any;
     cmp.handle.set('someone.bsky.social');
     cmp.appPassword.set('');
-    cmp.submit();
+    cmp.submitAppPassword();
 
     httpMock.expectNone(CREATE_SESSION);
   });

@@ -1,8 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from './auth';
 import { Server } from './server';
 import { bskyIdentityStored, seedBskyIdentity, seedSessions } from './testing/seed-storage';
+import { saveBlueskyIdentity } from './providers/bluesky/bluesky-identity-store';
+import { BlueskyOAuth } from './providers/bluesky/bluesky-oauth';
 
 /**
  * Auth session/server linkage. The core account-switching bug was that a token's instance
@@ -345,6 +347,20 @@ describe('Auth account kinds', () => {
 
       expect(auth.account()?.acct).toBe('one.bsky.social');
       expect(auth.blueskyAccounts().map((choice) => choice.did)).toEqual(['did:plc:one']);
+    });
+
+    it('revokes the SDK session when an OAuth alt is removed', () => {
+      saveBlueskyIdentity(
+        { service: 'https://pds.example', did: 'did:plc:oauth', handle: 'oauth.example' },
+        { authMethod: 'oauth' },
+      );
+      rebuild();
+      const revoke = vi.spyOn(TestBed.inject(BlueskyOAuth), 'revoke').mockResolvedValue(undefined);
+
+      auth.removeBlueskyIdentity('did:plc:oauth');
+
+      expect(revoke).toHaveBeenCalledWith('did:plc:oauth');
+      expect(auth.blueskyAccounts().some((choice) => choice.did === 'did:plc:oauth')).toBe(false);
     });
 
     it('does not offer a Bluesky row when no identity exists', () => {

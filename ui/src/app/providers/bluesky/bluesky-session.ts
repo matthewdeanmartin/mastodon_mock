@@ -5,6 +5,7 @@ import { externalFetch } from '../external-fetch';
 import { scopedKey } from '../../account-scope';
 import { ProfileAccountKey } from '../account/profile-account-key';
 import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
+import { BlueskyOAuth } from './bluesky-oauth';
 import {
   ACCOUNT_MODE_KEY,
   BSKY_IDENTITY_CREDENTIALS_KEY,
@@ -35,11 +36,12 @@ const CREDENTIALS_KEY_BASE = 'mockingbird_bsky_credentials';
 export const BSKY_SERVICE = 'https://bsky.social';
 
 export interface BskySession extends ExpiringCredential {
+  authMethod?: 'app-password' | 'oauth';
   service: string;
   handle: string;
   did: string;
-  accessJwt: string;
-  refreshJwt: string;
+  accessJwt?: string;
+  refreshJwt?: string;
   displayName?: string;
   avatar?: string;
   /** The account's real PDS host (resolved lazily); chat calls must hit it, not the entryway. */
@@ -53,6 +55,12 @@ export interface BskySession extends ExpiringCredential {
    * re-minted yet.
    */
   appPassword?: string;
+}
+
+interface LegacyBskySession extends BskySession {
+  authMethod: 'app-password';
+  accessJwt: string;
+  refreshJwt: string;
 }
 
 interface SessionResponse {
@@ -75,6 +83,7 @@ interface ProfileResponse {
  * keep working without it.
  */
 interface BskyCredentials extends ExpiringCredential {
+  authMethod?: 'app-password';
   accessJwt: string;
   refreshJwt: string;
   /**
@@ -115,7 +124,10 @@ function isVaultedBskyCredential(value: unknown): value is VaultedBskyCredential
  * secret field silently joining the exportable side is exactly the leak this
  * type exists to prevent.
  */
-type BskyProfile = Omit<BskySession, 'accessJwt' | 'refreshJwt' | 'connectedAt' | 'appPassword'>;
+type BskyProfile = Omit<
+  BskySession,
+  'authMethod' | 'accessJwt' | 'refreshJwt' | 'connectedAt' | 'appPassword'
+>;
 
 /**
  * Rejoin the two halves. A profile with no credentials is not a usable link, so
@@ -196,6 +208,7 @@ export class BlueskySession implements ExpiringConnection {
   private http = inject(HttpClient);
   private bridge = inject(VaultBridge);
   private accountKey = inject(ProfileAccountKey);
+  private oauth = inject(BlueskyOAuth);
 
   /**
    * Whether this instance is the app's identity rather than a connector.
@@ -291,10 +304,18 @@ export class BlueskySession implements ExpiringConnection {
     return this.authenticate(identifier, appPassword).pipe(
       tap((session) => {
         const previouslyActiveDid = blueskyIdentityDid();
-        const { accessJwt, refreshJwt, connectedAt, appPassword: pw, ...profile } = session;
+        const {
+          authMethod: _authMethod,
+          accessJwt,
+          refreshJwt,
+          connectedAt,
+          appPassword: pw,
+          ...profile
+        } = session;
         saveBlueskyIdentity(
           profile,
           {
+            authMethod: 'app-password',
             accessJwt,
             refreshJwt,
             connectedAt,
@@ -323,11 +344,52 @@ export class BlueskySession implements ExpiringConnection {
     );
   }
 
+  /** Redirect to the account's own PDS authorization screen. */
+  async beginOAuthIdentity(identifier: string, adding: boolean): Promise<never> {
+    return this.oauth.signIn(identifier, adding);
+  }
+
+  /**
+   * Finish an OAuth callback and add its DID to the first-class identity stable.
+   *
+   * Only the profile and an OAuth marker go to localStorage. The official SDK
+   * owns the DPoP key and rotating token set in IndexedDB.
+   */
+  async finishOAuthIdentity(): Promise<{ session: BskySession; adding: boolean }> {
+    const result = await this.oauth.callback();
+    const session: BskySession = {
+      ...result.profile,
+      authMethod: 'oauth',
+      connectedAt: Date.now(),
+    };
+    saveBlueskyIdentity(
+      result.profile,
+      { authMethod: 'oauth', connectedAt: session.connectedAt },
+      true,
+    );
+    this.session.set(session);
+    return { session, adding: result.state === 'identity:add' };
+  }
+
+  /** Whether authenticated calls must go through the OAuth DPoP transport. */
+  isOAuthSession(): boolean {
+    return this.session()?.authMethod === 'oauth';
+  }
+
+  /** Authenticated fetch for OAuth callers; refresh and DPoP stay SDK-owned. */
+  oauthFetch(pathname: string, init?: RequestInit): Promise<Response> {
+    const current = this.session();
+    if (!current || current.authMethod !== 'oauth') {
+      return Promise.reject(new Error('No Bluesky OAuth session is active.'));
+    }
+    return this.oauth.fetch(current.did, pathname, init);
+  }
+
   /**
    * The `createSession` round trip, plus the profile fetch that gives the account
    * a display name and avatar. Persists nothing — callers choose where it lands.
    */
-  private authenticate(identifier: string, appPassword: string): Observable<BskySession> {
+  private authenticate(identifier: string, appPassword: string): Observable<LegacyBskySession> {
     return this.http
       .post<SessionResponse>(
         `${BSKY_SERVICE}/xrpc/com.atproto.server.createSession`,
@@ -336,7 +398,8 @@ export class BlueskySession implements ExpiringConnection {
       )
       .pipe(
         map(
-          (res): BskySession => ({
+          (res): LegacyBskySession => ({
+            authMethod: 'app-password',
             service: BSKY_SERVICE,
             handle: res.handle,
             did: res.did,
@@ -373,7 +436,7 @@ export class BlueskySession implements ExpiringConnection {
   /** Swap the refresh token for a fresh access/refresh pair. */
   refresh(): Observable<BskySession> {
     const current = this.session();
-    if (!current) {
+    if (!current || current.authMethod === 'oauth' || !current.refreshJwt) {
       throw new Error('No Bluesky session to refresh.');
     }
     return this.http
@@ -391,7 +454,14 @@ export class BlueskySession implements ExpiringConnection {
   setPdsUrl(url: string): void {
     const current = this.session();
     if (current && current.pdsUrl !== url) {
-      this.persist({ ...current, pdsUrl: url });
+      const updated = { ...current, pdsUrl: url };
+      if (current.authMethod === 'oauth' && this.isIdentity) {
+        const { authMethod: _authMethod, connectedAt, ...profile } = updated;
+        saveBlueskyIdentity(profile, { authMethod: 'oauth', connectedAt }, true);
+        this.session.set(updated);
+      } else {
+        this.persist(updated);
+      }
     }
   }
 
@@ -409,6 +479,11 @@ export class BlueskySession implements ExpiringConnection {
    * reached from Settings → Connections → Unlink.
    */
   unlink(): void {
+    const current = this.session();
+    if (current?.authMethod === 'oauth') {
+      // Revocation is best effort: local removal must still work offline.
+      void this.oauth.revoke(current.did).catch(() => undefined);
+    }
     if (this.isIdentity) {
       clearBlueskyIdentity(this.session()?.did ?? null);
       localStorage.removeItem(ACCOUNT_MODE_KEY);
@@ -421,11 +496,22 @@ export class BlueskySession implements ExpiringConnection {
 
   /** Write the profile and the tokens to their separate keys. */
   private persist(session: BskySession): void {
-    const { accessJwt, refreshJwt, connectedAt, appPassword, ...profile } = session;
+    if (!session.accessJwt || !session.refreshJwt) {
+      throw new Error('An app-password session is missing its token pair.');
+    }
+    const {
+      authMethod: _authMethod,
+      accessJwt,
+      refreshJwt,
+      connectedAt,
+      appPassword,
+      ...profile
+    } = session;
     // Read before the write, so "did this login introduce a new password?" can
     // be answered below.
     const previous = this.storedAppPassword();
     const credentials = {
+      authMethod: 'app-password' as const,
       accessJwt,
       refreshJwt,
       connectedAt,

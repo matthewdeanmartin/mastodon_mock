@@ -10,13 +10,13 @@
 - Include Bluesky identities in Signed-in accounts and Local storage, including DID-scoped cleanup.
 - Keep the existing app-password transport temporarily so the account-model change is independently shippable.
 
-## Phase 2 — AT Protocol OAuth transport
+## Phase 2 — AT Protocol OAuth transport (implemented)
 
 - Add `@atproto/oauth-client-browser` and a public HTTPS OAuth client-metadata document.
 - Implement discovery, authorization redirect, callback handling, PKCE/PAR/DPoP, refresh, and restored sessions through the SDK.
 - Store OAuth session references by DID behind the Phase 1 identity-store API; consumers should not care whether a session came from OAuth or the legacy login.
 - Make OAuth the default Bluesky login and offer app passwords only as an explicitly labelled compatibility path during migration.
-- Add production, preview, and localhost redirect coverage plus end-to-end tests against a real authorization server.
+- Add production, preview, mirror, and localhost redirect coverage. Each static deployment stamps its own discoverable metadata document; the final live authorization-server smoke test is a deployment check because it requires a real account approval.
 
 ## Phase 3 — connector parity and paid-product hardening
 

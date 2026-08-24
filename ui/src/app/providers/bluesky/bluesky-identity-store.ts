@@ -16,12 +16,23 @@ export interface BlueskyIdentityProfile {
   pdsUrl?: string;
 }
 
-export interface BlueskyIdentityCredentials {
+export interface BlueskyLegacyIdentityCredentials {
+  authMethod?: 'app-password';
   accessJwt: string;
   refreshJwt: string;
   connectedAt?: number;
   appPassword?: string;
 }
+
+/** OAuth secrets remain in the official SDK's IndexedDB; this is only a join marker. */
+export interface BlueskyOAuthIdentityCredentials {
+  authMethod: 'oauth';
+  connectedAt?: number;
+}
+
+export type BlueskyIdentityCredentials =
+  | BlueskyLegacyIdentityCredentials
+  | BlueskyOAuthIdentityCredentials;
 
 export interface BlueskyIdentity {
   profile: BlueskyIdentityProfile;
@@ -61,6 +72,11 @@ function normalizedProfile(value: unknown): BlueskyIdentityProfile | null {
 function isCredentials(value: unknown): value is BlueskyIdentityCredentials {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const credentials = value as Record<string, unknown>;
+  if (credentials['authMethod'] === 'oauth') {
+    return (
+      credentials['connectedAt'] === undefined || typeof credentials['connectedAt'] === 'number'
+    );
+  }
   return (
     typeof credentials['accessJwt'] === 'string' &&
     typeof credentials['refreshJwt'] === 'string' &&

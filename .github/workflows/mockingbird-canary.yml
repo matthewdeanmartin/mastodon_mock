@@ -51,6 +51,8 @@ jobs:
       - name: Build Canary
         # Served from the /canary/ sub-path, so build with a matching base href.
         run: make mockingbird MOCKINGBIRD_BASE_HREF=/canary/
+      - name: Stamp Canary Bluesky OAuth metadata
+        run: node ui/scripts/write-bluesky-oauth-metadata.mjs ui/dist-mockingbird/browser https://mawkingbird.com/canary/
       - name: Add canary marker
         # No per-directory 404.html here: GitHub Pages serves only the site-root
         # /404.html (published by production), which is subpath-aware and routes
@@ -103,6 +105,8 @@ jobs:
         # Angular build configuration to keep in step, and no way to produce a
         # bundle that disagrees with itself about which deployment it is.
         run: make mockingbird MOCKINGBIRD_BASE_HREF=/test/
+      - name: Stamp test Bluesky OAuth metadata
+        run: node ui/scripts/write-bluesky-oauth-metadata.mjs ui/dist-mockingbird/browser https://mawkingbird.com/test/
       - name: Add test marker
         run: printf '%s\n' "$GITHUB_SHA" > ui/dist-mockingbird/browser/test-commit.txt
       - name: Verify this really is a test build
@@ -154,6 +158,8 @@ jobs:
         run: node ui/scripts/gen-build-info.mjs
       - name: Build github.io Canary
         run: make mockingbird MOCKINGBIRD_BASE_HREF="$MIRROR_BASE_HREF"
+      - name: Stamp mirror Canary Bluesky OAuth metadata
+        run: node ui/scripts/write-bluesky-oauth-metadata.mjs ui/dist-mockingbird/browser https://matthewdeanmartin.github.io/mawkingbird/canary/
       - name: Add canary marker
         run: printf '%s\n' "$GITHUB_SHA" > ui/dist-mockingbird/browser/canary-commit.txt
       - name: Verify mirror Canary layout

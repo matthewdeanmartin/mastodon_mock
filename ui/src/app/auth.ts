@@ -11,6 +11,7 @@ import {
   clearBlueskyIdentity,
   setActiveBlueskyIdentity,
 } from './providers/bluesky/bluesky-identity-store';
+import { BlueskyOAuth } from './providers/bluesky/bluesky-oauth';
 import {
   clearMastodonConnectorTokenForDid,
   mastodonConnectorToken,
@@ -214,6 +215,7 @@ export class Auth {
   private anonymous = inject(AnonymousAccount);
   private prefs = inject(ClientPrefs);
   private diagnostics = inject(SessionDiagnostics);
+  private blueskyOAuth = inject(BlueskyOAuth);
 
   /** The active account's kind. Null when signed out. */
   readonly kind = signal<AccountKind | null>(storedKind());
@@ -656,6 +658,7 @@ export class Auth {
   /** Forget one saved Bluesky identity without disturbing its alts. */
   removeBlueskyIdentity(did: string): void {
     const wasActive = this.kind() === 'bluesky' && this.blueskyDid() === did;
+    this.revokeBlueskyOAuth(did);
     clearMastodonConnectorTokenForDid(did);
     clearBlueskyIdentity(did);
     this.blueskyRevision.update((revision) => revision + 1);
@@ -730,6 +733,7 @@ export class Auth {
       // reported account-loss bug so hard to notice. See leaveActive().
       const did = this.blueskyDid();
       if (did) clearMastodonConnectorTokenForDid(did);
+      if (did) this.revokeBlueskyOAuth(did);
       clearBlueskyIdentity(did);
       this.blueskyRevision.update((revision) => revision + 1);
       // The Mastodon connector hung off this identity and must not outlive it.
@@ -792,6 +796,7 @@ export class Auth {
     this.persistSessions([]);
     for (const identity of blueskyIdentities()) {
       clearMastodonConnectorTokenForDid(identity.profile.did);
+      this.revokeBlueskyOAuth(identity.profile.did);
     }
     clearAllBlueskyIdentities();
     this.blueskyRevision.update((revision) => revision + 1);
@@ -814,5 +819,13 @@ export class Auth {
     const tokens = Object.fromEntries(sessions.map((s) => [s.id, s.token]));
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(rows));
     localStorage.setItem(SESSION_TOKENS_KEY, JSON.stringify(tokens));
+  }
+
+  /** Revoke only SDK-owned OAuth sessions; legacy app passwords are revoked at bsky.app. */
+  private revokeBlueskyOAuth(did: string): void {
+    if (blueskyIdentity(did)?.credentials.authMethod === 'oauth') {
+      // Forgetting the local account must still complete while offline.
+      void this.blueskyOAuth.revoke(did).catch(() => undefined);
+    }
   }
 }

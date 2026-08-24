@@ -7,30 +7,9 @@
       repost from here.
     </p>
 
-    <!--
-      The app-password explanation is not fine print. Asking a stranger for a
-      password is the single scariest thing this app does, and the honest answer —
-      it is a revocable, purpose-made credential, not your real password — is the
-      thing that makes it reasonable. So it sits above the form, not below it.
-    -->
-    <div class="bsky-appword">
-      <p>
-        Use an <strong>app password</strong>, not your real Bluesky password. Make one at
-        <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noopener noreferrer"
-          >bsky.app → Settings → Privacy and security → App Passwords</a
-        >.
-      </p>
-      <p class="muted small">
-        App passwords are revocable at any time from that page, and this one never leaves your
-        browser except to sign in to Bluesky itself. Tick
-        <em>"Allow access to your direct messages"</em> when creating it if you want your Bluesky
-        DMs in Chat.
-      </p>
-    </div>
-
     <form class="bsky-form" (ngSubmit)="submit()">
       <label class="bsky-field">
-        <span class="bsky-label">Handle</span>
+        <span class="bsky-label">Handle, DID, or PDS</span>
         <input
           type="text"
           name="bskyHandle"
@@ -44,27 +23,19 @@
         />
       </label>
 
-      <label class="bsky-field">
-        <span class="bsky-label">App password</span>
-        <input
-          type="password"
-          name="bskyAppPassword"
-          placeholder="xxxx-xxxx-xxxx-xxxx"
-          autocomplete="off"
-          [ngModel]="appPassword()"
-          (ngModelChange)="appPassword.set($event)"
-          [disabled]="working()"
-        />
-      </label>
-
       <button
         class="bsky-btn bsky-btn-primary bsky-submit"
         type="submit"
-        [disabled]="!handle().trim() || !appPassword() || working()"
+        [disabled]="!handle().trim() || working()"
       >
-        {{ working() ? 'Signing in…' : 'Sign in' }}
+        {{ working() ? 'Opening Bluesky…' : 'Continue with Bluesky' }}
       </button>
     </form>
+
+    <p class="bsky-oauth-note muted small">
+      You’ll approve access on your Bluesky provider. {{ brand }} never sees your password; OAuth
+      uses PKCE and a device-bound DPoP key. Chat access is included so DMs work here too.
+    </p>
 
     @if (error(); as msg) {
       <p class="bsky-error" role="alert">{{ msg }}</p>
@@ -77,6 +48,46 @@
         yet — this form authenticates against bsky.social.
       </p>
     }
+
+    <details class="bsky-compat">
+      <summary>My PDS does not support OAuth yet</summary>
+      <!-- App passwords are retained only as an explicit compatibility path. -->
+      <div class="bsky-appword">
+        <p>
+          Use an <strong>app password</strong>, never your real Bluesky password. Make one at
+          <a
+            href="https://bsky.app/settings/app-passwords"
+            target="_blank"
+            rel="noopener noreferrer"
+            >bsky.app → Settings → Privacy and security → App Passwords</a
+          >.
+        </p>
+        <p class="muted small">
+          Tick <em>“Allow access to your direct messages”</em> if you want Bluesky DMs in Chat.
+        </p>
+      </div>
+      <form class="bsky-form" (ngSubmit)="submitAppPassword()">
+        <label class="bsky-field">
+          <span class="bsky-label">App password</span>
+          <input
+            type="password"
+            name="bskyAppPassword"
+            placeholder="xxxx-xxxx-xxxx-xxxx"
+            autocomplete="off"
+            [ngModel]="appPassword()"
+            (ngModelChange)="appPassword.set($event)"
+            [disabled]="working()"
+          />
+        </label>
+        <button
+          class="bsky-btn bsky-submit"
+          type="submit"
+          [disabled]="!handle().trim() || !appPassword() || working()"
+        >
+          {{ working() ? 'Signing in…' : 'Use app password' }}
+        </button>
+      </form>
+    </details>
 
     <p class="bsky-out small">
       <a routerLink="/login">Use a different network</a> ·

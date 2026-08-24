@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, Observable, switchMap, throwError } from 'rxjs';
+import { catchError, from, Observable, switchMap, throwError } from 'rxjs';
 import { externalFetch } from '../external-fetch';
 import { BlueskySession } from './bluesky-session';
 import { BlueskyPostSearch } from './bluesky-post-search';
@@ -448,6 +448,16 @@ export class BlueskyApi {
     extraHeaders: Record<string, string> = {},
     serviceUrl?: string,
   ): Observable<T> {
+    const query = params.toString();
+    const url = `${serviceUrl ?? this.service()}/xrpc/${nsid}${query ? `?${query}` : ''}`;
+    if (this.session.isOAuthSession()) {
+      return from(
+        this.oauthJson<T>(url, {
+          method: 'GET',
+          headers: extraHeaders,
+        }),
+      );
+    }
     return this.withRefresh((jwt) =>
       this.http.get<T>(`${serviceUrl ?? this.service()}/xrpc/${nsid}`, {
         params,
@@ -487,6 +497,20 @@ export class BlueskyApi {
     extraHeaders: Record<string, string> = {},
     serviceUrl?: string,
   ): Observable<T> {
+    const url = `${serviceUrl ?? this.service()}/xrpc/${nsid}`;
+    if (this.session.isOAuthSession()) {
+      const isBlob = body instanceof Blob;
+      return from(
+        this.oauthJson<T>(url, {
+          method: 'POST',
+          body: isBlob ? body : JSON.stringify(body),
+          headers: {
+            ...(isBlob ? {} : { 'Content-Type': 'application/json' }),
+            ...extraHeaders,
+          },
+        }),
+      );
+    }
     return this.withRefresh((jwt) =>
       this.http.post<T>(`${serviceUrl ?? this.service()}/xrpc/${nsid}`, body, {
         headers: { Authorization: `Bearer ${jwt}`, ...extraHeaders },
@@ -500,10 +524,21 @@ export class BlueskyApi {
     if (!session) {
       return throwError(() => new Error('No Bluesky account linked.'));
     }
+    if (!session.accessJwt) {
+      return throwError(() => new Error('The Bluesky session has no access token.'));
+    }
     return call(session.accessJwt).pipe(
       catchError((err: unknown) =>
         isExpiredToken(err)
-          ? this.session.refresh().pipe(switchMap((fresh) => call(fresh.accessJwt)))
+          ? this.session
+              .refresh()
+              .pipe(
+                switchMap((fresh) =>
+                  fresh.accessJwt
+                    ? call(fresh.accessJwt)
+                    : throwError(() => new Error('Bluesky refresh returned no access token.')),
+                ),
+              )
           : throwError(() => err),
       ),
     );
@@ -511,5 +546,30 @@ export class BlueskyApi {
 
   private service(): string {
     return this.session.session()?.service ?? 'https://bsky.social';
+  }
+
+  /** Convert the SDK's fetch response into the HttpClient-shaped errors callers know. */
+  private async oauthJson<T>(url: string, init: RequestInit): Promise<T> {
+    const response = await this.session.oauthFetch(url, init);
+    let body: unknown = null;
+    if (response.status !== 204) {
+      const text = await response.text();
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch {
+          body = text;
+        }
+      }
+    }
+    if (!response.ok) {
+      throw new HttpErrorResponse({
+        error: body,
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url || url,
+      });
+    }
+    return body as T;
   }
 }

@@ -10,8 +10,7 @@ import { environment } from '../../../environments/environment';
  * Sign in with Bluesky, as the app's **primary identity**.
  *
  * Distinct from Settings → Connections → Bluesky, which links Bluesky as a
- * *connector* under an existing Mastodon or Anonymous account. Same credentials,
- * same `createSession` call, different meaning: here Bluesky *is* who you are,
+ * *connector* under an existing Mastodon or Anonymous account. Here Bluesky *is* who you are,
  * and the app has no Mastodon account at all until Sprint 4 attaches one.
  */
 @Component({
@@ -44,7 +43,24 @@ export class LoginBluesky implements OnInit {
     }
   }
 
+  /** Start the primary OAuth + PKCE + DPoP flow. */
   submit(): void {
+    const identifier = this.handle().trim().replace(/^@/, '');
+    if (!identifier || this.working()) {
+      return;
+    }
+    this.working.set(true);
+    this.error.set(null);
+    void this.bsky.beginOAuthIdentity(identifier, this.adding).catch((err: unknown) => {
+      // The redirect promise normally never resolves; rejection means discovery
+      // or PAR failed, or the visitor came back with browser history.
+      this.working.set(false);
+      this.error.set(this.describeOAuth(err));
+    });
+  }
+
+  /** Legacy compatibility path for PDSes that do not yet implement OAuth. */
+  submitAppPassword(): void {
     const identifier = this.handle().trim().replace(/^@/, '');
     const password = this.appPassword();
     if (!identifier || !password || this.working()) {
@@ -82,6 +98,17 @@ export class LoginBluesky implements OnInit {
         this.error.set(this.describe(err, identifier));
       },
     });
+  }
+
+  private describeOAuth(err: unknown): string {
+    const message = err instanceof Error ? err.message : '';
+    if (/resolve|handle|did/i.test(message)) {
+      return 'That Bluesky handle could not be resolved. Check the spelling or enter your PDS URL.';
+    }
+    if (/network|fetch|failed/i.test(message)) {
+      return 'Could not reach your Bluesky provider. Check your connection and try again.';
+    }
+    return 'Bluesky sign-in could not start. Please try again.';
   }
 
   /**

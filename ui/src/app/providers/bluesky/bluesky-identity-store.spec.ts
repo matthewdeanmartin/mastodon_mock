@@ -89,4 +89,18 @@ describe('Bluesky identity store', () => {
     expect(blueskyIdentities()).toEqual([]);
     expect(setActiveBlueskyIdentity('did:plc:orphan')).toBe(false);
   });
+
+  it('treats an SDK-owned OAuth marker as a usable saved alt', () => {
+    saveBlueskyIdentity(
+      { service: 'https://pds.example', did: 'did:plc:oauth', handle: 'oauth.example' },
+      { authMethod: 'oauth', connectedAt: 2 },
+      true,
+    );
+
+    expect(blueskyIdentities()[0]).toMatchObject({
+      profile: { did: 'did:plc:oauth' },
+      credentials: { authMethod: 'oauth' },
+    });
+    expect(blueskyIdentityDid()).toBe('did:plc:oauth');
+  });
 });

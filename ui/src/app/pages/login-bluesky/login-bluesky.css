@@ -36,6 +36,23 @@
   margin-top: 8px;
 }
 
+.bsky-oauth-note {
+  margin: 12px auto 0;
+  max-width: 48ch;
+}
+
+.bsky-compat {
+  margin-top: 20px;
+  text-align: left;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.bsky-compat summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
 /* --- Form --- */
 .bsky-form {
   display: grid;

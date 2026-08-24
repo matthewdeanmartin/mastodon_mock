@@ -47,6 +47,14 @@ export const routes: Routes = [
     title: 'Sign in with Bluesky',
     loadComponent: () => import('./pages/login-bluesky/login-bluesky').then((m) => m.LoginBluesky),
   },
+  {
+    path: 'oauth/bluesky/callback',
+    title: 'Connecting Bluesky',
+    loadComponent: () =>
+      import('./pages/bluesky-oauth-callback/bluesky-oauth-callback').then(
+        (m) => m.BlueskyOAuthCallback,
+      ),
+  },
   // New-user landing: bookmark this, sign up on your instance, come back and sign in.
   {
     path: 'welcome-back',

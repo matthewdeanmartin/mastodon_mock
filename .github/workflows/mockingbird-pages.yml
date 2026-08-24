@@ -53,6 +53,8 @@ jobs:
         # The custom domain serves the site from the origin root, not a sub-path,
         # so build the Angular app with a root base href.
         run: make mockingbird MOCKINGBIRD_BASE_HREF=/
+      - name: Stamp Bluesky OAuth metadata
+        run: node ui/scripts/write-bluesky-oauth-metadata.mjs ui/dist-mockingbird/browser https://mawkingbird.com/
       - name: Add SPA 404 fallback
         # GitHub Pages serves ONE custom 404 per site: this root /404.html. It is
         # subpath-aware — it boots the production SPA for root deep links, but
@@ -107,6 +109,8 @@ jobs:
         run: node ui/scripts/gen-build-info.mjs
       - name: Build github.io mirror
         run: make mockingbird MOCKINGBIRD_BASE_HREF="$MIRROR_BASE_HREF"
+      - name: Stamp mirror Bluesky OAuth metadata
+        run: node ui/scripts/write-bluesky-oauth-metadata.mjs ui/dist-mockingbird/browser https://matthewdeanmartin.github.io/mawkingbird/
       - name: Add mirror SPA fallback
         # The mirror has production at its project root and canary below it.
         # Rewrite the shared fallback's site base so deep links boot the owner.
