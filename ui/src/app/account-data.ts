@@ -1,4 +1,4 @@
-import { ANONYMOUS_SCOPE_SUFFIX, scopeSuffixForToken } from './account-scope';
+import { ANONYMOUS_SCOPE_SUFFIX, scopeSuffixForDid, scopeSuffixForToken } from './account-scope';
 import {
   formatBytes,
   inspectLocalStorage,
@@ -38,14 +38,27 @@ export function keyBelongsToScope(key: string, suffix: string): boolean {
   return key.endsWith(suffix);
 }
 
-/** The storage scope suffix for a saved account (token, or Anonymous). */
-export function scopeForAccount(token: string | null): string {
-  return token === null ? ANONYMOUS_SCOPE_SUFFIX : scopeSuffixForToken(token);
+export type AccountDataRef =
+  | string
+  | null
+  | { kind: 'mastodon'; token: string }
+  | { kind: 'bluesky'; did: string }
+  | { kind: 'anonymous' };
+
+/** The storage scope suffix for a saved Mastodon, Bluesky, or Anonymous account. */
+export function scopeForAccount(account: AccountDataRef): string {
+  if (account === null || (typeof account === 'object' && account.kind === 'anonymous')) {
+    return ANONYMOUS_SCOPE_SUFFIX;
+  }
+  if (typeof account === 'string') return scopeSuffixForToken(account);
+  return account.kind === 'bluesky'
+    ? scopeSuffixForDid(account.did)
+    : scopeSuffixForToken(account.token);
 }
 
 /** Every localStorage entry belonging to one account, with sizes. */
-export function inspectAccountData(token: string | null): StorageReport {
-  const suffix = scopeForAccount(token);
+export function inspectAccountData(account: AccountDataRef): StorageReport {
+  const suffix = scopeForAccount(account);
   return inspectLocalStorage((key) => keyBelongsToScope(key, suffix));
 }
 
@@ -53,8 +66,8 @@ export function inspectAccountData(token: string | null): StorageReport {
  * Delete every localStorage entry belonging to one account. Returns how many
  * keys were removed, so the caller can report what actually happened.
  */
-export function deleteAccountData(token: string | null): number {
-  const { entries } = inspectAccountData(token);
+export function deleteAccountData(account: AccountDataRef): number {
+  const { entries } = inspectAccountData(account);
   for (const entry of entries) {
     localStorage.removeItem(entry.key);
   }

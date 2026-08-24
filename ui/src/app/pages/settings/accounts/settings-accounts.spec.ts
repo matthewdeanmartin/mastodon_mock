@@ -3,17 +3,18 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { scopeSuffixForToken } from '../../../account-scope';
+import { scopeSuffixForDid, scopeSuffixForToken } from '../../../account-scope';
 import { Auth } from '../../../auth';
 import { SettingsAccounts } from './settings-accounts';
-import { seedSessions } from '../../../testing/seed-storage';
+import { seedBskyIdentity, seedSessions } from '../../../testing/seed-storage';
 
 /** Exposes the component's protected members for white-box testing. */
 interface Internals {
   accounts(): {
     key: string;
     token: string | null;
-    kind: 'mastodon' | 'anonymous';
+    kind: 'mastodon' | 'bluesky' | 'anonymous';
+    did?: string;
     active: boolean;
     keyCount: number;
   }[];
@@ -89,6 +90,27 @@ describe('SettingsAccounts', () => {
     expect(rows.find((r) => r.token === TOKEN_A)!.active).toBe(true);
     expect(rows.find((r) => r.token === TOKEN_B)!.active).toBe(false);
     expect(rows.find((r) => r.token === TOKEN_B)!.keyCount).toBe(1);
+  });
+
+  it('lists and removes an inactive Bluesky alt with its DID-scoped data', () => {
+    seedSessions([{ token: TOKEN_A, server: '', account: null }]);
+    localStorage.setItem('mastodon_mock_token', TOKEN_A);
+    localStorage.setItem('mastodon_mock_account_mode', 'mastodon');
+    seedBskyIdentity({ did: 'did:plc:alt', handle: 'alt.bsky.social' });
+    const suffix = scopeSuffixForDid('did:plc:alt');
+    localStorage.setItem(`mockingbird_rss_feeds${suffix}`, '["alt"]');
+    const fixture = setUp();
+    const alt = internals(fixture)
+      .accounts()
+      .find((row) => row.did === 'did:plc:alt')!;
+
+    expect(alt.keyCount).toBe(1);
+    internals(fixture).askDeleteDataAndLogout(alt);
+    internals(fixture).confirm();
+
+    expect(localStorage.getItem(`mockingbird_rss_feeds${suffix}`)).toBeNull();
+    expect(TestBed.inject(Auth).blueskyAccounts()).toEqual([]);
+    expect(TestBed.inject(Auth).token()).toBe(TOKEN_A);
   });
 
   it('blocks destructive actions on the active account while another exists', () => {

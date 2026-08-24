@@ -130,7 +130,7 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'secret',
-    note: 'JWTs for a Bluesky-PRIMARY account — the one the app is signed in as, not a connector. Unscoped, unlike mockingbird_bsky_credentials: scoping it by the active account would be circular, since the scope suffix is derived from this account’s own DID. Same reasoning (and same treatment) as mastodon_mock_session_tokens.',
+    note: 'DID-keyed JWT and app-password records for Bluesky-primary accounts. Unscoped because the collection contains the DID used to derive each account scope.',
   },
   {
     base: 'mockingbird_mastodon_connector_token',
@@ -262,7 +262,21 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     storage: 'local',
     suffix: 'none',
     sensitivity: 'private',
-    note: 'Who a Bluesky-PRIMARY account is: handle, DID, display name, avatar. Identity, not credentials — the JWTs live in mockingbird_bsky_identity_credentials, exactly as mastodon_mock_sessions splits from its tokens. Exportable so a personal backup can record which account was primary; the export cannot authenticate as it.',
+    note: 'DID-keyed profiles for every saved Bluesky-primary account: handle, DID, display name and avatar. Credentials live in the matching secret collection.',
+  },
+  {
+    base: 'mockingbird_bsky_active_identity_did',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'Which saved Bluesky-primary DID is currently selected. The account mode separately records that Bluesky is active.',
+  },
+  {
+    base: 'mockingbird_bsky_identity_did',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'private',
+    note: 'Deprecated active-DID pointer consumed and removed by the multi-identity migration.',
   },
   {
     base: 'mockingbird_mastodon_connector',
@@ -408,6 +422,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     suffix: 'account',
     sensitivity: 'private',
     note: 'Saved search terms. Reveals interests as directly as a tag subscription does.',
+  },
+  {
+    base: 'mockingbird_recent_searches',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Recent query strings and selected search tabs. Account-scoped and private because search history reveals interests.',
   },
   {
     base: 'mockingbird_local_moderation',

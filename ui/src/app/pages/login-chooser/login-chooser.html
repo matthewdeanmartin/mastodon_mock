@@ -12,7 +12,7 @@
     </p>
 
     <div class="doors">
-      <a class="door" routerLink="/login/mastodon">
+      <a class="door" routerLink="/login/mastodon" [queryParams]="adding ? { add: 1 } : null">
         <span class="door-badge" aria-hidden="true">🐘</span>
         <span class="door-body">
           <span class="door-name">Mastodon</span>
@@ -22,7 +22,7 @@
         </span>
       </a>
 
-      <a class="door" routerLink="/login/bluesky">
+      <a class="door" routerLink="/login/bluesky" [queryParams]="adding ? { add: 1 } : null">
         <span class="door-badge" aria-hidden="true">🦋</span>
         <span class="door-body">
           <span class="door-name">Bluesky</span>

@@ -5,19 +5,20 @@ import {
   scopeSuffixForDid,
   scopedKey,
 } from './account-scope';
+import {
+  saveBlueskyIdentity,
+  setActiveBlueskyIdentity,
+} from './providers/bluesky/bluesky-identity-store';
 
 const TOKEN_KEY = 'mastodon_mock_token';
 const MODE_KEY = 'mastodon_mock_account_mode';
-const BSKY_PROFILE_KEY = 'mockingbird_bsky_identity_profile';
-const BSKY_CREDENTIALS_KEY = 'mockingbird_bsky_identity_credentials';
-
 /** Put a usable Bluesky-primary identity in storage. */
 function seedBlueskyIdentity(did: string, handle = 'someone.bsky.social'): void {
-  localStorage.setItem(BSKY_PROFILE_KEY, JSON.stringify({ did, handle }));
-  localStorage.setItem(
-    BSKY_CREDENTIALS_KEY,
-    JSON.stringify({ accessJwt: 'a', refreshJwt: 'r', connectedAt: Date.now() }),
+  saveBlueskyIdentity(
+    { service: 'https://bsky.social', did, handle },
+    { accessJwt: 'a', refreshJwt: 'r', connectedAt: Date.now() },
   );
+  setActiveBlueskyIdentity(did);
 }
 
 describe('account-scope', () => {

@@ -8,8 +8,11 @@ import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 import {
   ACCOUNT_MODE_KEY,
   BSKY_IDENTITY_CREDENTIALS_KEY,
-  BSKY_IDENTITY_PROFILE_KEY,
+  blueskyIdentity,
+  blueskyIdentityDid,
+  clearBlueskyIdentity,
   blueskyIsPrimaryKind,
+  saveBlueskyIdentity,
 } from './bluesky-identity-store';
 import {
   credentialExpired,
@@ -93,6 +96,16 @@ interface VaultedBskyCredential {
   appPassword: string;
 }
 
+type VaultedBskyIdentityCredentials = Record<string, VaultedBskyCredential>;
+
+function isVaultedBskyCredential(value: unknown): value is VaultedBskyCredential {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const credential = value as Record<string, unknown>;
+  return (
+    typeof credential['identifier'] === 'string' && typeof credential['appPassword'] === 'string'
+  );
+}
+
 /**
  * The exportable half: who is linked.
  *
@@ -102,10 +115,7 @@ interface VaultedBskyCredential {
  * secret field silently joining the exportable side is exactly the leak this
  * type exists to prevent.
  */
-type BskyProfile = Omit<
-  BskySession,
-  'accessJwt' | 'refreshJwt' | 'connectedAt' | 'appPassword'
->;
+type BskyProfile = Omit<BskySession, 'accessJwt' | 'refreshJwt' | 'connectedAt' | 'appPassword'>;
 
 /**
  * Rejoin the two halves. A profile with no credentials is not a usable link, so
@@ -145,6 +155,16 @@ function loadSession(
   } catch {
     return null;
   }
+}
+
+/** Load the currently selected entry from the multi-identity Bluesky stable. */
+function loadIdentitySession(): BskySession | null {
+  const identity = blueskyIdentity();
+  if (!identity) return null;
+  return {
+    ...identity.profile,
+    ...identity.credentials,
+  };
 }
 
 /**
@@ -193,14 +213,12 @@ export class BlueskySession implements ExpiringConnection {
    * reconstructs this against the new account's keys — including switching
    * between the identity pair and a connector pair.
    */
-  private readonly profileKey = this.isIdentity
-    ? BSKY_IDENTITY_PROFILE_KEY
-    : scopedKey(PROFILE_KEY_BASE);
-  private readonly credentialsKey = this.isIdentity
-    ? BSKY_IDENTITY_CREDENTIALS_KEY
-    : scopedKey(CREDENTIALS_KEY_BASE);
+  private readonly profileKey = scopedKey(PROFILE_KEY_BASE);
+  private readonly credentialsKey = scopedKey(CREDENTIALS_KEY_BASE);
   readonly session = signal<BskySession | null>(
-    loadSession(this.profileKey, this.credentialsKey, !this.isIdentity),
+    this.isIdentity
+      ? loadIdentitySession()
+      : loadSession(this.profileKey, this.credentialsKey, true),
   );
   readonly linked = computed(() => this.session() !== null);
 
@@ -272,16 +290,17 @@ export class BlueskySession implements ExpiringConnection {
   loginAsIdentity(identifier: string, appPassword: string): Observable<BskySession> {
     return this.authenticate(identifier, appPassword).pipe(
       tap((session) => {
+        const previouslyActiveDid = blueskyIdentityDid();
         const { accessJwt, refreshJwt, connectedAt, appPassword: pw, ...profile } = session;
-        localStorage.setItem(BSKY_IDENTITY_PROFILE_KEY, JSON.stringify(profile));
-        localStorage.setItem(
-          BSKY_IDENTITY_CREDENTIALS_KEY,
-          JSON.stringify({
+        saveBlueskyIdentity(
+          profile,
+          {
             accessJwt,
             refreshJwt,
             connectedAt,
             ...(pw ? { appPassword: pw } : {}),
-          } satisfies BskyCredentials),
+          },
+          true,
         );
         // Straight to the identity keys rather than through `persist`, so the
         // vault write must be requested here too. Always the identity base:
@@ -289,13 +308,11 @@ export class BlueskySession implements ExpiringConnection {
         // note above), and writing the identity under a connector scope would
         // file it where no later boot looks.
         if (pw) {
-          void this.bridge.writeThrough(
-            BSKY_IDENTITY_CREDENTIALS_KEY,
-            JSON.stringify({
-              identifier: session.handle,
-              appPassword: pw,
-            } satisfies VaultedBskyCredential),
-            null,
+          void this.syncIdentityCredentialToVault(
+            session.did,
+            session.handle,
+            pw,
+            previouslyActiveDid,
           );
         }
         // Reflect it in memory too, so a caller that reads `session()` between the
@@ -392,10 +409,12 @@ export class BlueskySession implements ExpiringConnection {
    * reached from Settings → Connections → Unlink.
    */
   unlink(): void {
-    localStorage.removeItem(this.profileKey);
-    localStorage.removeItem(this.credentialsKey);
     if (this.isIdentity) {
+      clearBlueskyIdentity(this.session()?.did ?? null);
       localStorage.removeItem(ACCOUNT_MODE_KEY);
+    } else {
+      localStorage.removeItem(this.profileKey);
+      localStorage.removeItem(this.credentialsKey);
     }
     this.session.set(null);
   }
@@ -406,16 +425,18 @@ export class BlueskySession implements ExpiringConnection {
     // Read before the write, so "did this login introduce a new password?" can
     // be answered below.
     const previous = this.storedAppPassword();
-    localStorage.setItem(this.profileKey, JSON.stringify(profile));
-    localStorage.setItem(
-      this.credentialsKey,
-      JSON.stringify({
-        accessJwt,
-        refreshJwt,
-        connectedAt,
-        ...(appPassword ? { appPassword } : {}),
-      } satisfies BskyCredentials),
-    );
+    const credentials = {
+      accessJwt,
+      refreshJwt,
+      connectedAt,
+      ...(appPassword ? { appPassword } : {}),
+    } satisfies BskyCredentials;
+    if (this.isIdentity) {
+      saveBlueskyIdentity(profile, credentials, true);
+    } else {
+      localStorage.setItem(this.profileKey, JSON.stringify(profile));
+      localStorage.setItem(this.credentialsKey, JSON.stringify(credentials));
+    }
     this.session.set(session);
     // Vault the app password only when it is *new* to storage.
     //
@@ -438,6 +459,11 @@ export class BlueskySession implements ExpiringConnection {
    * `skipped` in those cases rather than throwing.
    */
   private async syncCredentialToVault(identifier: string, appPassword: string): Promise<void> {
+    if (this.isIdentity) {
+      const did = this.session()?.did;
+      if (did) await this.syncIdentityCredentialToVault(did, identifier, appPassword);
+      return;
+    }
     await this.bridge.writeThrough(
       this.credentialsBase,
       JSON.stringify({ identifier, appPassword } satisfies VaultedBskyCredential),
@@ -459,10 +485,14 @@ export class BlueskySession implements ExpiringConnection {
       return null;
     }
     try {
-      const parsed = JSON.parse(raw) as Partial<VaultedBskyCredential>;
-      return parsed.identifier && parsed.appPassword
-        ? { identifier: parsed.identifier, appPassword: parsed.appPassword }
-        : null;
+      const parsed: unknown = JSON.parse(raw);
+      if (this.isIdentity && !isVaultedBskyCredential(parsed)) {
+        const did = this.session()?.did;
+        return did && parsed && typeof parsed === 'object'
+          ? ((parsed as VaultedBskyIdentityCredentials)[did] ?? null)
+          : null;
+      }
+      return isVaultedBskyCredential(parsed) ? parsed : null;
     } catch {
       return null;
     }
@@ -473,20 +503,23 @@ export class BlueskySession implements ExpiringConnection {
   async syncToVault(): Promise<SyncOutcome> {
     const session = this.session();
     const appPassword = this.storedAppPassword();
-    return session && appPassword
-      ? this.bridge.writeThrough(
-          this.credentialsBase,
-          JSON.stringify({
-            identifier: session.handle,
-            appPassword,
-          } satisfies VaultedBskyCredential),
-          this.vaultAccountKey(),
-        )
-      : { kind: 'skipped' };
+    if (!session || !appPassword) return { kind: 'skipped' };
+    if (this.isIdentity) {
+      return this.syncIdentityCredentialToVault(session.did, session.handle, appPassword);
+    }
+    return this.bridge.writeThrough(
+      this.credentialsBase,
+      JSON.stringify({
+        identifier: session.handle,
+        appPassword,
+      } satisfies VaultedBskyCredential),
+      this.vaultAccountKey(),
+    );
   }
 
   /** The app password from the local credentials blob, when one was stored. */
   private storedAppPassword(): string | null {
+    if (this.isIdentity) return this.session()?.appPassword ?? null;
     try {
       const raw = localStorage.getItem(this.credentialsKey);
       return raw ? ((JSON.parse(raw) as BskyCredentials).appPassword ?? null) : null;
@@ -510,5 +543,44 @@ export class BlueskySession implements ExpiringConnection {
    */
   private vaultAccountKey(): string | null {
     return this.isIdentity ? null : this.accountKey.current();
+  }
+
+  /**
+   * The identity vault remains browser-scoped for backward compatibility, but
+   * its value is now a DID-keyed map so adding an alt cannot overwrite another
+   * identity's app password. A legacy singleton is folded into the map.
+   */
+  private async syncIdentityCredentialToVault(
+    did: string,
+    identifier: string,
+    appPassword: string,
+    legacyDid: string | null = this.session()?.did ?? null,
+  ): Promise<SyncOutcome> {
+    const raw = this.bridge.readThrough(BSKY_IDENTITY_CREDENTIALS_KEY, null);
+    let credentials: VaultedBskyIdentityCredentials = {};
+    if (raw) {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (isVaultedBskyCredential(parsed)) {
+          if (legacyDid) {
+            credentials[legacyDid] = {
+              identifier: parsed.identifier,
+              appPassword: parsed.appPassword,
+            };
+          }
+        } else {
+          credentials =
+            parsed && typeof parsed === 'object' ? (parsed as VaultedBskyIdentityCredentials) : {};
+        }
+      } catch {
+        credentials = {};
+      }
+    }
+    credentials[did] = { identifier, appPassword };
+    return this.bridge.writeThrough(
+      BSKY_IDENTITY_CREDENTIALS_KEY,
+      JSON.stringify(credentials),
+      null,
+    );
   }
 }

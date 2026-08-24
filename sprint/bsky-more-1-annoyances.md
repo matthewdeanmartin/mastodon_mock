@@ -93,28 +93,20 @@ password rotation, and nowhere else.
 
 ---
 
-## Phase 2 — add a Bluesky account (ask 2) ⬜ NOT STARTED
+## Phase 2 — add a Bluesky account (ask 2) ✅ DONE
 
-`shell.ts:447` already carries the note: *"Adding a Bluesky identity is Sprint 3's
-job and will get its own entry point."* This is that entry point.
+The account menu now exposes explicit **Add Mastodon account** and **Add Bluesky
+account** actions. `/login?add=1` retains the two-door chooser and preserves the
+flag on either route, while `/login/bluesky?add=1` accepts an authenticated
+visitor and hard-reloads after activating the new identity.
 
-Today `addAccount()` hard-navigates to `login/mastodon?add=1`, past the chooser,
-because the button lives in the Mastodon switcher. The reader is happy with two
-explicit items — **Add new Mastodon** and **Add new Bsky** — rather than a
-network chooser.
+The former Bluesky singleton is now a DID-keyed profile/credential stable with
+an explicit active DID. Existing singleton objects migrate in place, the account
+switcher lists every inactive alt, Settings can inspect or remove each alt and
+its account-scoped data, and removing one identity leaves the others intact.
 
-Known ground:
-
-- `login-chooser` already exists and already understands `?add=1`
-  (`login-chooser.ts:23`).
-- `loginAsIdentity` already writes to the unscoped identity keys and deliberately
-  does not set the account-kind key, so an abandoned login cannot leave the app
-  claiming to be signed in.
-
-Open question to settle first: `bluesky-identity-store.ts:18` states there is **at
-most one Bluesky-primary account per browser**, keys as singletons. "Bsky alts"
-implies several. Turning those into keyed records is named there as the growth
-path, but it is real work and it is the thing to scope before writing UI.
+The next transport and product phases are tracked in
+`sprint/bluesky-primary-accounts-roadmap.md`.
 
 ## Phase 3 — images (asks 1, 6) ✅ DONE
 

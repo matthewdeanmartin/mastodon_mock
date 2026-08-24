@@ -11,6 +11,7 @@
 
 import { Session } from '../auth';
 import { BskySession } from '../providers/bluesky/bluesky-session';
+import { saveBlueskyIdentity } from '../providers/bluesky/bluesky-identity-store';
 import { GitHubUser } from '../providers/github/github-session';
 
 /** Seed a linked Bluesky account, writing the profile and JWTs to their own keys. */
@@ -47,17 +48,13 @@ export function seedBskyIdentity(
   credentials: { accessJwt?: string; refreshJwt?: string; connectedAt?: number } = {},
 ): void {
   const { did, handle, displayName, avatar } = identity;
-  localStorage.setItem(
-    'mockingbird_bsky_identity_profile',
-    JSON.stringify({ did, handle, displayName, avatar, service: 'https://bsky.social' }),
-  );
-  localStorage.setItem(
-    'mockingbird_bsky_identity_credentials',
-    JSON.stringify({
+  saveBlueskyIdentity(
+    { did, handle, displayName, avatar, service: 'https://bsky.social' },
+    {
       accessJwt: credentials.accessJwt ?? 'access-jwt',
       refreshJwt: credentials.refreshJwt ?? 'refresh-jwt',
       connectedAt: credentials.connectedAt ?? Date.now(),
-    }),
+    },
   );
 }
 

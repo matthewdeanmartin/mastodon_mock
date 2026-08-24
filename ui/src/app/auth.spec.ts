@@ -322,6 +322,31 @@ describe('Auth account kinds', () => {
       expect(auth.otherSessions().some((c) => c.kind === 'bluesky')).toBe(false);
     });
 
+    it('switches between multiple Bluesky alts by DID', () => {
+      seedBskyIdentity({ did: 'did:plc:one', handle: 'one.bsky.social' });
+      seedBskyIdentity({ did: 'did:plc:two', handle: 'two.bsky.social' });
+
+      expect(auth.enterBluesky('did:plc:one')).toBe(true);
+      const alt = auth.otherSessions().find((choice) => choice.did === 'did:plc:two')!;
+      expect(alt.account?.acct).toBe('two.bsky.social');
+
+      expect(auth.switchAccount(alt)).toBe(true);
+      expect(auth.account()?.acct).toBe('two.bsky.social');
+      expect(auth.otherSessions().some((choice) => choice.did === 'did:plc:one')).toBe(true);
+      expect(auth.otherSessions().some((choice) => choice.did === 'did:plc:two')).toBe(false);
+    });
+
+    it('removes one inactive Bluesky alt without touching the active identity', () => {
+      seedBskyIdentity({ did: 'did:plc:one', handle: 'one.bsky.social' });
+      seedBskyIdentity({ did: 'did:plc:two', handle: 'two.bsky.social' });
+      auth.enterBluesky('did:plc:one');
+
+      auth.removeBlueskyIdentity('did:plc:two');
+
+      expect(auth.account()?.acct).toBe('one.bsky.social');
+      expect(auth.blueskyAccounts().map((choice) => choice.did)).toEqual(['did:plc:one']);
+    });
+
     it('does not offer a Bluesky row when no identity exists', () => {
       auth.setToken('art-token');
       expect(auth.otherSessions().some((c) => c.kind === 'bluesky')).toBe(false);

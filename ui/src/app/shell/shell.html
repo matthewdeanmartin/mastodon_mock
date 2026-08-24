@@ -355,8 +355,11 @@
 
               <div class="menu-divider"></div>
               @if (!auth.isAnonymous || auth.shouldOfferLogin) {
-                <button type="button" class="menu-action" (click)="addAccount()">
-                  + Add an account
+                <button type="button" class="menu-action" (click)="addMastodonAccount()">
+                  + Add Mastodon account
+                </button>
+                <button type="button" class="menu-action" (click)="addBlueskyAccount()">
+                  + Add Bluesky account
                 </button>
               }
               <!-- "Log out" is right for a Bluesky-primary identity: it is a real

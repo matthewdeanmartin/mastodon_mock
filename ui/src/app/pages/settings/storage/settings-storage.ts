@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { inspectAccountData } from '../../../account-data';
+import { AccountDataRef, inspectAccountData } from '../../../account-data';
 import { Auth } from '../../../auth';
 import {
   clearIndexedDbStore,
@@ -21,7 +21,7 @@ interface StorageAccount {
   key: string;
   label: string;
   detail: string;
-  token: string | null;
+  scope: AccountDataRef;
   active: boolean;
 }
 
@@ -47,15 +47,26 @@ export class SettingsStorage {
         key: `mastodon:${session.id}`,
         label: account?.display_name || account?.username || 'Unverified account',
         detail: account?.acct ? `@${account.acct}` : host,
-        token: session.token,
+        scope: { kind: 'mastodon', token: session.token },
         active: this.auth.mode() === 'mastodon' && session.token === activeToken,
       };
     });
+    for (const identity of this.auth.blueskyAccounts()) {
+      if (!identity.did) continue;
+      rows.push({
+        key: identity.key,
+        label: identity.account?.display_name || identity.account?.username || 'Bluesky account',
+        detail: identity.account?.acct ? `@${identity.account.acct}` : identity.did,
+        scope: { kind: 'bluesky', did: identity.did },
+        active:
+          this.auth.mode() === 'bluesky' && this.auth.account()?.id === `bsky:${identity.did}`,
+      });
+    }
     rows.push({
       key: 'anonymous',
       label: 'Anonymous (local)',
       detail: `@${this.anonymous.account().acct}`,
-      token: null,
+      scope: { kind: 'anonymous' },
       active: this.auth.mode() === 'anonymous',
     });
     return rows;
@@ -167,6 +178,12 @@ export class SettingsStorage {
         return `mastodon:${active.id}`;
       }
     }
+    if (this.auth.mode() === 'bluesky') {
+      const active = this.auth
+        .blueskyAccounts()
+        .find((account) => account.account?.id === this.auth.account()?.id);
+      if (active) return active.key;
+    }
     return 'anonymous';
   }
 
@@ -176,6 +193,6 @@ export class SettingsStorage {
 
   private inspectSelectedAccount(): StorageReport {
     const account = this.selected();
-    return account ? inspectAccountData(account.token) : { entries: [], totalBytes: 0 };
+    return account ? inspectAccountData(account.scope) : { entries: [], totalBytes: 0 };
   }
 }

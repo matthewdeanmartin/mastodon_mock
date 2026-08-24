@@ -43,7 +43,7 @@
 
 import { Injectable, computed, signal } from '@angular/core';
 import { Account } from '../../models';
-import { scopedKey } from '../../account-scope';
+import { scopedKey, scopeSuffixForDid } from '../../account-scope';
 
 /** Where an opted-in connector points when the user has not chosen otherwise. */
 export const DEFAULT_CONNECTOR_SERVER = 'https://mastodon.social';
@@ -154,6 +154,15 @@ export function mastodonConnectorToken(): string | null {
 export function clearMastodonConnectorToken(): void {
   try {
     localStorage.removeItem(scopedKey(MASTODON_CONNECTOR_TOKEN_KEY));
+  } catch {
+    // Best effort — the caller is already tearing the identity down.
+  }
+}
+
+/** Forget the connector token for a specific Bluesky alt, active or not. */
+export function clearMastodonConnectorTokenForDid(did: string): void {
+  try {
+    localStorage.removeItem(`${MASTODON_CONNECTOR_TOKEN_KEY}${scopeSuffixForDid(did)}`);
   } catch {
     // Best effort — the caller is already tearing the identity down.
   }

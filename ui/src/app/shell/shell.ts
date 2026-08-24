@@ -443,12 +443,13 @@ export class Shell implements OnInit {
     });
   }
 
-  addAccount(): void {
+  addMastodonAccount(): void {
     // ?add=1 tells the login page not to bounce an already-signed-in user back home.
-    // Goes to the Mastodon page rather than the chooser: this button lives in the
-    // Mastodon account switcher. Adding a Bluesky identity is Sprint 3's job and
-    // will get its own entry point.
     location.assign('login/mastodon?add=1');
+  }
+
+  addBlueskyAccount(): void {
+    location.assign('login/bluesky?add=1');
   }
 
   /**

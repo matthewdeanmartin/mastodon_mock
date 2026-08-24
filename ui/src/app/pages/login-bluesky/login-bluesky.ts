@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Auth } from '../../auth';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
@@ -24,6 +24,8 @@ export class LoginBluesky implements OnInit {
   private auth = inject(Auth);
   private bsky = inject(BlueskySession);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private adding = false;
 
   protected brand = environment.brand;
 
@@ -35,8 +37,9 @@ export class LoginBluesky implements OnInit {
   protected selfHostedHint = signal(false);
 
   ngOnInit(): void {
+    this.adding = this.route.snapshot.queryParamMap.has('add');
     // Already signed in and not explicitly adding an account: nothing to do here.
-    if (this.auth.isAuthenticated) {
+    if (this.auth.isAuthenticated && !this.adding) {
       void this.router.navigateByUrl('/home', { replaceUrl: true });
     }
   }
@@ -66,7 +69,13 @@ export class LoginBluesky implements OnInit {
         }
         // Clear the password from memory the moment it is no longer needed.
         this.appPassword.set('');
-        void this.router.navigateByUrl('/home');
+        if (this.adding) {
+          // Services chose their account scope when Angular constructed them.
+          // A hard navigation rebuilds the app under the newly active DID.
+          location.assign('home');
+        } else {
+          void this.router.navigateByUrl('/home');
+        }
       },
       error: (err: unknown) => {
         this.working.set(false);

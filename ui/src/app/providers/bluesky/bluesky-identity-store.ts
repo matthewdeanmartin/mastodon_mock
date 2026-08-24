@@ -1,109 +1,214 @@
-/**
- * Storage for a **Bluesky-primary** account's own session.
- *
- * ## Why this is not just `scopedKey('mockingbird_bsky_profile')`
- *
- * A Bluesky link under a Mastodon-primary account is a *connector*: it is one of
- * several networks hanging off an identity, and it is scoped per account so a
- * link set up as one persona is not visible as another (see `account-scope.ts`).
- *
- * A Bluesky-primary account's session is not that. It **is** the identity. And
- * scoping it by the active account would be circular — the scope suffix is
- * derived from the DID, which lives inside the very thing being scoped.
- *
- * So it is stored the way the Mastodon session stable is stored: unscoped, and
- * split into a non-secret half a settings export may carry and a secret half it
- * never may. Same class, same shape, different storage strategy.
- *
- * The two halves are joined by nothing — there is at most one Bluesky-primary
- * account per browser for now, so the keys are singletons rather than a list.
- * Growing to several is a matter of turning these into keyed records, which is
- * why the reader tolerates (and discards) a half-written pair.
- */
+/** Persistence helpers for first-class Bluesky identities. */
 
-/**
- * The active account kind. Declared here rather than imported from `auth.ts`,
- * which would pull the whole `Auth` service (and its `Server` /
- * `AnonymousAccount` dependencies) into `providers/` and close a cycle. This
- * mirrors what `account-scope.ts` does with the same key and for the same reason.
- */
 export const ACCOUNT_MODE_KEY = 'mastodon_mock_account_mode';
-
-/** Who is linked. Exportable: names an account, carries no credential. */
 export const BSKY_IDENTITY_PROFILE_KEY = 'mockingbird_bsky_identity_profile';
-
-/** The JWTs. Never exported, under any profile. */
 export const BSKY_IDENTITY_CREDENTIALS_KEY = 'mockingbird_bsky_identity_credentials';
+export const BSKY_ACTIVE_IDENTITY_DID_KEY = 'mockingbird_bsky_active_identity_did';
 
-/**
- * The DID of the Bluesky-primary account, or null when there isn't one.
- *
- * Deliberately a bare function reading `localStorage` rather than a method on an
- * injectable: `account-scope.ts` needs it to build a storage suffix, and it is
- * called from constructors and module scope where no injector exists. It also
- * keeps `account-scope.ts` free of any Angular or provider import, which is what
- * stops this from becoming a dependency cycle.
- *
- * Reads only the *profile* half. The DID is not a secret, and asking for it must
- * never require touching the credentials.
- */
-export function blueskyIdentityDid(): string | null {
+const LEGACY_ACTIVE_DID_KEY = 'mockingbird_bsky_identity_did';
+
+export interface BlueskyIdentityProfile {
+  service: string;
+  handle: string;
+  did: string;
+  displayName?: string;
+  avatar?: string;
+  pdsUrl?: string;
+}
+
+export interface BlueskyIdentityCredentials {
+  accessJwt: string;
+  refreshJwt: string;
+  connectedAt?: number;
+  appPassword?: string;
+}
+
+export interface BlueskyIdentity {
+  profile: BlueskyIdentityProfile;
+  credentials: BlueskyIdentityCredentials;
+}
+
+type ProfileMap = Record<string, BlueskyIdentityProfile>;
+type CredentialsMap = Record<string, BlueskyIdentityCredentials>;
+
+function parseObject(key: string): Record<string, unknown> | null {
   try {
-    const raw = localStorage.getItem(BSKY_IDENTITY_PROFILE_KEY);
-    if (!raw) {
-      return null;
-    }
-    const did = (JSON.parse(raw) as { did?: unknown }).did;
-    return typeof did === 'string' && did ? did : null;
+    const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? 'null');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
   } catch {
-    // Unparseable profile: treat as absent rather than throwing from a storage
-    // key builder, which would break every scoped read in the app at once.
     return null;
   }
 }
 
-/**
- * Whether a usable Bluesky-primary identity is present.
- *
- * Both halves are required. A profile with no credentials cannot authenticate,
- * which is exactly the state a machine that imported settings but has not
- * re-authorized Bluesky yet is in — and `Auth` uses this to refuse to activate
- * the `bluesky` account kind, so a stale mode key cannot strand the app in an
- * identity that can't make a request.
- */
-export function blueskyIdentityPresent(): boolean {
-  try {
-    return (
-      localStorage.getItem(BSKY_IDENTITY_PROFILE_KEY) !== null &&
-      localStorage.getItem(BSKY_IDENTITY_CREDENTIALS_KEY) !== null
-    );
-  } catch {
-    return false;
+function normalizedProfile(value: unknown): BlueskyIdentityProfile | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const profile = value as Record<string, unknown>;
+  if (typeof profile['handle'] !== 'string' || typeof profile['did'] !== 'string') return null;
+  return {
+    // The earliest singleton shape did not persist this field. Its login could
+    // only use bsky.social, so that is a lossless migration default.
+    service: typeof profile['service'] === 'string' ? profile['service'] : 'https://bsky.social',
+    handle: profile['handle'],
+    did: profile['did'],
+    ...(typeof profile['displayName'] === 'string' ? { displayName: profile['displayName'] } : {}),
+    ...(typeof profile['avatar'] === 'string' ? { avatar: profile['avatar'] } : {}),
+    ...(typeof profile['pdsUrl'] === 'string' ? { pdsUrl: profile['pdsUrl'] } : {}),
+  };
+}
+
+function isCredentials(value: unknown): value is BlueskyIdentityCredentials {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const credentials = value as Record<string, unknown>;
+  return (
+    typeof credentials['accessJwt'] === 'string' &&
+    typeof credentials['refreshJwt'] === 'string' &&
+    (credentials['connectedAt'] === undefined || typeof credentials['connectedAt'] === 'number')
+  );
+}
+
+function profileMapFromStorage(): { map: ProfileMap; wasLegacy: boolean } {
+  const raw = parseObject(BSKY_IDENTITY_PROFILE_KEY);
+  if (!raw) return { map: {}, wasLegacy: false };
+  const legacy = normalizedProfile(raw);
+  if (legacy) return { map: { [legacy.did]: legacy }, wasLegacy: true };
+
+  const map: ProfileMap = {};
+  for (const [did, value] of Object.entries(raw)) {
+    const profile = normalizedProfile(value);
+    if (profile && profile.did === did) map[did] = profile;
+  }
+  return { map, wasLegacy: false };
+}
+
+function credentialsMapFromStorage(profiles: ProfileMap): {
+  map: CredentialsMap;
+  wasLegacy: boolean;
+} {
+  const raw = parseObject(BSKY_IDENTITY_CREDENTIALS_KEY);
+  if (!raw) return { map: {}, wasLegacy: false };
+  if (isCredentials(raw)) {
+    const did = Object.keys(profiles)[0];
+    return { map: did ? { [did]: raw } : {}, wasLegacy: true };
+  }
+
+  const map: CredentialsMap = {};
+  for (const [did, value] of Object.entries(raw)) {
+    if (isCredentials(value)) map[did] = value;
+  }
+  return { map, wasLegacy: false };
+}
+
+function persistMap(key: string, value: ProfileMap | CredentialsMap): void {
+  if (Object.keys(value).length === 0) {
+    localStorage.removeItem(key);
+  } else {
+    localStorage.setItem(key, JSON.stringify(value));
   }
 }
 
-/** Forget the Bluesky-primary identity. Both halves, always together. */
-export function clearBlueskyIdentity(): void {
+function stores(): { profiles: ProfileMap; credentials: CredentialsMap } {
+  const profilesResult = profileMapFromStorage();
+  const credentialsResult = credentialsMapFromStorage(profilesResult.map);
+  if (profilesResult.wasLegacy) persistMap(BSKY_IDENTITY_PROFILE_KEY, profilesResult.map);
+  if (credentialsResult.wasLegacy) {
+    persistMap(BSKY_IDENTITY_CREDENTIALS_KEY, credentialsResult.map);
+  }
+
+  if (profilesResult.wasLegacy && !localStorage.getItem(BSKY_ACTIVE_IDENTITY_DID_KEY)) {
+    const did = Object.keys(profilesResult.map)[0];
+    if (did) localStorage.setItem(BSKY_ACTIVE_IDENTITY_DID_KEY, did);
+  }
+
+  const legacyActiveDid = localStorage.getItem(LEGACY_ACTIVE_DID_KEY)?.trim();
+  if (legacyActiveDid && !localStorage.getItem(BSKY_ACTIVE_IDENTITY_DID_KEY)) {
+    localStorage.setItem(BSKY_ACTIVE_IDENTITY_DID_KEY, legacyActiveDid);
+  }
+  localStorage.removeItem(LEGACY_ACTIVE_DID_KEY);
+  return { profiles: profilesResult.map, credentials: credentialsResult.map };
+}
+
+/** Return every usable Bluesky identity, preserving insertion order. */
+export function blueskyIdentities(): BlueskyIdentity[] {
+  const { profiles, credentials } = stores();
+  return Object.entries(profiles).flatMap(([did, profile]) => {
+    const identityCredentials = credentials[did];
+    return identityCredentials ? [{ profile, credentials: identityCredentials }] : [];
+  });
+}
+
+/** Return a usable Bluesky identity by DID, or the active identity by default. */
+export function blueskyIdentity(did: string | null = blueskyIdentityDid()): BlueskyIdentity | null {
+  if (!did) return null;
+  const { profiles, credentials } = stores();
+  const profile = profiles[did];
+  const identityCredentials = credentials[did];
+  return profile && identityCredentials ? { profile, credentials: identityCredentials } : null;
+}
+
+/** Persist or replace an identity without affecting any other Bluesky account. */
+export function saveBlueskyIdentity(
+  profile: BlueskyIdentityProfile,
+  credentials: BlueskyIdentityCredentials,
+  activate = false,
+): void {
+  const current = stores();
+  current.profiles[profile.did] = profile;
+  current.credentials[profile.did] = credentials;
+  persistMap(BSKY_IDENTITY_PROFILE_KEY, current.profiles);
+  persistMap(BSKY_IDENTITY_CREDENTIALS_KEY, current.credentials);
+  if (activate) localStorage.setItem(BSKY_ACTIVE_IDENTITY_DID_KEY, profile.did);
+}
+
+/** Select an existing, usable Bluesky identity. */
+export function setActiveBlueskyIdentity(did: string): boolean {
+  if (!blueskyIdentity(did)) return false;
+  localStorage.setItem(BSKY_ACTIVE_IDENTITY_DID_KEY, did);
+  return true;
+}
+
+/** DID of the active first-class Bluesky identity. */
+export function blueskyIdentityDid(): string | null {
+  const activeDid = localStorage.getItem(BSKY_ACTIVE_IDENTITY_DID_KEY)?.trim() || null;
+  if (activeDid) {
+    const { profiles, credentials } = stores();
+    if (profiles[activeDid] && credentials[activeDid]) return activeDid;
+  }
+
+  if (localStorage.getItem(ACCOUNT_MODE_KEY) !== 'bluesky') return null;
+  const first = blueskyIdentities()[0]?.profile.did ?? null;
+  if (first) localStorage.setItem(BSKY_ACTIVE_IDENTITY_DID_KEY, first);
+  return first;
+}
+
+/** True when the requested (or active) identity has both stored halves. */
+export function blueskyIdentityPresent(did: string | null = blueskyIdentityDid()): boolean {
+  return blueskyIdentity(did) !== null;
+}
+
+/** Remove one identity, leaving every other Bluesky alt intact. */
+export function clearBlueskyIdentity(did: string | null = blueskyIdentityDid()): void {
+  if (!did) return;
+  const current = stores();
+  delete current.profiles[did];
+  delete current.credentials[did];
+  persistMap(BSKY_IDENTITY_PROFILE_KEY, current.profiles);
+  persistMap(BSKY_IDENTITY_CREDENTIALS_KEY, current.credentials);
+  if (localStorage.getItem(BSKY_ACTIVE_IDENTITY_DID_KEY) === did) {
+    localStorage.removeItem(BSKY_ACTIVE_IDENTITY_DID_KEY);
+  }
+}
+
+/** Remove all first-class Bluesky identities. */
+export function clearAllBlueskyIdentities(): void {
   localStorage.removeItem(BSKY_IDENTITY_PROFILE_KEY);
   localStorage.removeItem(BSKY_IDENTITY_CREDENTIALS_KEY);
+  localStorage.removeItem(BSKY_ACTIVE_IDENTITY_DID_KEY);
+  localStorage.removeItem(LEGACY_ACTIVE_DID_KEY);
 }
 
-/**
- * Whether the active account kind is Bluesky-primary *and* backed by a real
- * identity — i.e. whether a `BlueskySession` constructed right now is the app's
- * identity rather than a connector.
- *
- * Duplicates the reasoning in `Auth.storedKind()` deliberately. `providers/` must
- * not import `Auth` (it would close a dependency cycle through
- * `account-scope.ts`), and both consult exactly the same two facts — the mode key
- * and the presence of both identity halves — so they cannot disagree about which
- * account is active. A `bluesky` mode key with no identity behind it is a stale
- * key, and is treated as absent in both places.
- */
+/** True only when a complete first-class Bluesky identity is the active mode. */
 export function blueskyIsPrimaryKind(): boolean {
-  try {
-    return localStorage.getItem(ACCOUNT_MODE_KEY) === 'bluesky' && blueskyIdentityPresent();
-  } catch {
-    return false;
-  }
+  return localStorage.getItem(ACCOUNT_MODE_KEY) === 'bluesky' && blueskyIdentityPresent();
 }

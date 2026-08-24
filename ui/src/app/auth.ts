@@ -3,13 +3,16 @@ import { ClientPrefs } from './client-prefs';
 import { Account } from './models';
 import { AnonymousAccount } from './providers/anonymous/anonymous-account';
 import {
-  BSKY_IDENTITY_PROFILE_KEY,
+  blueskyIdentities,
+  blueskyIdentity,
   blueskyIdentityDid,
   blueskyIdentityPresent,
+  clearAllBlueskyIdentities,
   clearBlueskyIdentity,
+  setActiveBlueskyIdentity,
 } from './providers/bluesky/bluesky-identity-store';
 import {
-  clearMastodonConnectorToken,
+  clearMastodonConnectorTokenForDid,
   mastodonConnectorToken,
 } from './providers/mastodon/mastodon-connector';
 import { Server } from './server';
@@ -101,6 +104,8 @@ export interface AccountChoice {
   key: string;
   kind: AccountMode;
   token: string | null;
+  /** Stable identity key for tokenless Bluesky account choices. */
+  did?: string;
   server: string;
   account: Account | null;
 }
@@ -162,16 +167,12 @@ const BSKY_PRIMARY_SERVER = 'https://bsky.app';
  * that look like a tally would be worse than the rail's existing behaviour of
  * omitting the stats row until they arrive.
  */
-function blueskyIdentityAccount(): { did: string; account: Account } | null {
-  if (!blueskyIdentityPresent()) {
-    return null;
-  }
-  let profile: { did?: string; handle?: string; displayName?: string; avatar?: string };
-  try {
-    profile = JSON.parse(localStorage.getItem(BSKY_IDENTITY_PROFILE_KEY) ?? 'null') ?? {};
-  } catch {
-    return null;
-  }
+function blueskyIdentityAccount(
+  requestedDid: string | null = blueskyIdentityDid(),
+): { did: string; account: Account } | null {
+  const identity = blueskyIdentity(requestedDid);
+  if (!identity) return null;
+  const profile = identity.profile;
   const did = profile.did;
   const handle = profile.handle;
   if (!did || !handle) {
@@ -259,6 +260,30 @@ export class Auth {
 
   /** Every account the tester has logged into and not removed. */
   readonly sessions = signal<Session[]>(loadSessions());
+  private readonly blueskyRevision = signal(0);
+
+  /** Every saved first-class Bluesky identity, including the active one. */
+  readonly blueskyAccounts = computed<AccountChoice[]>(() => {
+    // Signals are dependencies; the identity collection itself lives in localStorage.
+    this.kind();
+    this.blueskyDid();
+    this.blueskyRevision();
+    return blueskyIdentities().flatMap((stored) => {
+      const identity = blueskyIdentityAccount(stored.profile.did);
+      return identity
+        ? [
+            {
+              key: `bluesky:${identity.did}`,
+              kind: 'bluesky' as const,
+              token: null,
+              did: identity.did,
+              server: BSKY_PRIMARY_SERVER,
+              account: identity.account,
+            },
+          ]
+        : [];
+    });
+  });
 
   /** Saved sessions other than the active one (for the "switch to" menu). */
   readonly otherSessions = computed<AccountChoice[]>(() => {
@@ -271,20 +296,10 @@ export class Auth {
         server: s.server ?? '',
         account: s.account,
       }));
-    // The Bluesky-primary identity, when one exists and isn't already active.
-    // Unlike Anonymous this is not permanent — it appears only once someone has
-    // signed in with Bluesky.
-    if (this.kind() !== 'bluesky') {
-      const identity = blueskyIdentityAccount();
-      if (identity) {
-        choices.push({
-          key: `bluesky:${identity.did}`,
-          kind: 'bluesky',
-          token: null,
-          server: BSKY_PRIMARY_SERVER,
-          account: identity.account,
-        });
-      }
+    // Every Bluesky-primary identity except the currently active DID.
+    const activeDid = this.kind() === 'bluesky' ? this.blueskyDid() : null;
+    for (const identity of this.blueskyAccounts()) {
+      if (identity.did !== activeDid) choices.push(identity);
     }
     if (this.kind() !== 'anonymous') {
       choices.push({
@@ -360,7 +375,7 @@ export class Auth {
 
   /** Whether Anonymous is the only account available in this browser. */
   get shouldOfferLogin(): boolean {
-    return this.isAnonymous && this.sessions().length === 0;
+    return this.isAnonymous && this.sessions().length === 0 && blueskyIdentities().length === 0;
   }
 
   /**
@@ -540,14 +555,17 @@ export class Auth {
    * does. Returns false when there is no usable identity to enter, rather than
    * activating a kind the app cannot serve.
    */
-  enterBluesky(): boolean {
-    const identity = blueskyIdentityAccount();
+  enterBluesky(did: string | null = blueskyIdentityDid()): boolean {
+    const requestedDid = did ?? blueskyIdentities()[0]?.profile.did ?? null;
+    const identity = blueskyIdentityAccount(requestedDid);
     if (!identity) {
       this.diagnostics.warn('enter-bluesky-without-identity', {
         saved: this.sessions().length,
       });
       return false;
     }
+    if (!setActiveBlueskyIdentity(identity.did)) return false;
+    this.blueskyRevision.update((revision) => revision + 1);
     const saved = this.sessions().length;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.setItem(ACCOUNT_MODE_KEY, 'bluesky');
@@ -574,7 +592,7 @@ export class Auth {
       return true;
     }
     if (choice.kind === 'bluesky') {
-      return this.enterBluesky();
+      return this.enterBluesky(choice.did ?? null);
     }
     return choice.token !== null && this.switchTo(choice.token);
   }
@@ -632,6 +650,17 @@ export class Auth {
       } else {
         this.logout();
       }
+    }
+  }
+
+  /** Forget one saved Bluesky identity without disturbing its alts. */
+  removeBlueskyIdentity(did: string): void {
+    const wasActive = this.kind() === 'bluesky' && this.blueskyDid() === did;
+    clearMastodonConnectorTokenForDid(did);
+    clearBlueskyIdentity(did);
+    this.blueskyRevision.update((revision) => revision + 1);
+    if (wasActive) {
+      this.exitToLoggedOut();
     }
   }
 
@@ -699,12 +728,13 @@ export class Auth {
       // a saved Mastodon account: the app would look like it had *switched*
       // rather than signed out, which is the exact surprise that made the
       // reported account-loss bug so hard to notice. See leaveActive().
-      clearBlueskyIdentity();
+      const did = this.blueskyDid();
+      if (did) clearMastodonConnectorTokenForDid(did);
+      clearBlueskyIdentity(did);
+      this.blueskyRevision.update((revision) => revision + 1);
       // The Mastodon connector hung off this identity and must not outlive it.
-      // An orphaned connector token is worse than untidy: `storedKind()` reads a
-      // bare token as a mastodon-primary account, so leaving one behind lets it
-      // promote itself into the identity on the next reload.
-      clearMastodonConnectorToken();
+      // Remove it while the DID is still known so the account-scoped secret
+      // cannot become unreachable browser residue.
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(ACCOUNT_MODE_KEY);
       this.kind.set(null);
@@ -760,11 +790,11 @@ export class Auth {
   logoutAll(): void {
     const saved = this.sessions().length;
     this.persistSessions([]);
-    clearBlueskyIdentity();
-    // "Every saved session" includes the connector hanging off the Bluesky
-    // identity — the one exit that promises to take everything must not leave a
-    // credential behind. See the same call in logout().
-    clearMastodonConnectorToken();
+    for (const identity of blueskyIdentities()) {
+      clearMastodonConnectorTokenForDid(identity.profile.did);
+    }
+    clearAllBlueskyIdentities();
+    this.blueskyRevision.update((revision) => revision + 1);
     this.diagnostics.transition('logout-all', saved, 0);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(ACCOUNT_MODE_KEY);

@@ -1,11 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { Server } from '../../server';
 import { LoginBluesky } from './login-bluesky';
+import { seedBskyIdentity } from '../../testing/seed-storage';
+import { stubLocation } from '../../testing/stub-location';
 
 const CREATE_SESSION = 'https://bsky.social/xrpc/com.atproto.server.createSession';
 const PROFILE_KEY = 'mockingbird_bsky_identity_profile';
@@ -90,8 +92,10 @@ describe('LoginBluesky', () => {
 
     signIn('someone.bsky.social', 'app-pass-1234');
 
-    const profile = JSON.parse(localStorage.getItem(PROFILE_KEY)!);
-    const credentials = JSON.parse(localStorage.getItem(CREDENTIALS_KEY)!);
+    const profiles = JSON.parse(localStorage.getItem(PROFILE_KEY)!);
+    const credentialMap = JSON.parse(localStorage.getItem(CREDENTIALS_KEY)!);
+    const profile = profiles['did:plc:abc123'];
+    const credentials = credentialMap['did:plc:abc123'];
 
     // The exportable half names the account and carries no credential — not the
     // tokens, and not the app password either.
@@ -243,6 +247,40 @@ describe('LoginBluesky', () => {
     TestBed.createComponent(LoginBluesky).detectChanges();
 
     expect(navigate).toHaveBeenCalledWith('/home', { replaceUrl: true });
+  });
+
+  it('allows an already signed-in visitor to add a Bluesky alt', () => {
+    TestBed.inject(Auth).setToken('mastodon-token');
+    vi.spyOn(TestBed.inject(ActivatedRoute).snapshot.queryParamMap, 'has').mockImplementation(
+      (name) => name === 'add',
+    );
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    const fixture = TestBed.createComponent(LoginBluesky);
+    fixture.detectChanges();
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('form')).not.toBeNull();
+  });
+
+  it('adds a second Bluesky identity without replacing the first', () => {
+    const auth = TestBed.inject(Auth);
+    auth.setToken('mastodon-token');
+    seedBskyIdentity({ did: 'did:plc:first', handle: 'first.bsky.social' });
+    vi.spyOn(TestBed.inject(ActivatedRoute).snapshot.queryParamMap, 'has').mockImplementation(
+      (name) => name === 'add',
+    );
+    const assigned: string[] = [];
+    stubLocation({ onAssign: (url) => assigned.push(url) });
+
+    signIn('second.bsky.social');
+
+    expect(auth.blueskyAccounts().map((choice) => choice.account?.acct)).toEqual([
+      'first.bsky.social',
+      'second.bsky.social',
+    ]);
+    expect(auth.account()?.acct).toBe('second.bsky.social');
+    expect(assigned).toEqual(['home']);
   });
 
   it('requires both fields before it will submit', () => {

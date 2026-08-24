@@ -1,6 +1,11 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { deleteAccountData, formatBytes, inspectAccountData } from '../../../account-data';
+import {
+  AccountDataRef,
+  deleteAccountData,
+  formatBytes,
+  inspectAccountData,
+} from '../../../account-data';
 import { Auth } from '../../../auth';
 import { ConfirmDialog } from '../../../confirm-dialog/confirm-dialog';
 import { Account } from '../../../models';
@@ -10,9 +15,11 @@ import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account
 interface StoredAccount {
   /** Stable row key; also the token for Mastodon rows. */
   key: string;
-  /** null for the browser-local Anonymous account. */
+  /** Mastodon token; null for Bluesky and Anonymous rows. */
   token: string | null;
-  kind: 'mastodon' | 'anonymous';
+  did?: string;
+  kind: 'mastodon' | 'bluesky' | 'anonymous';
+  scope: AccountDataRef;
   account: Account | null;
   /** Base URL this credential belongs to ('' = this server). */
   server: string;
@@ -65,21 +72,37 @@ export class SettingsAccounts {
       key: `mastodon:${session.id}`,
       token: session.token,
       kind: 'mastodon' as const,
+      scope: { kind: 'mastodon' as const, token: session.token },
       account: session.account,
       server: session.server ?? '',
       active: mode === 'mastodon' && session.token === activeToken,
-      ...this.sizeOf(session.token),
+      ...this.sizeOf({ kind: 'mastodon', token: session.token }),
     }));
+    for (const identity of this.auth.blueskyAccounts()) {
+      if (!identity.did) continue;
+      rows.push({
+        key: identity.key,
+        token: null,
+        did: identity.did,
+        kind: 'bluesky',
+        scope: { kind: 'bluesky', did: identity.did },
+        account: identity.account,
+        server: identity.server,
+        active: mode === 'bluesky' && this.auth.account()?.id === `bsky:${identity.did}`,
+        ...this.sizeOf({ kind: 'bluesky', did: identity.did }),
+      });
+    }
     // Anonymous is a permanent local identity, so it is always a row — it owns
     // browser data (follows, posts) whether or not it is the active account.
     rows.push({
       key: 'anonymous',
       token: null,
       kind: 'anonymous',
+      scope: { kind: 'anonymous' },
       account: this.anonymous.account(),
       server: this.anonymous.server(),
       active: mode === 'anonymous',
-      ...this.sizeOf(null),
+      ...this.sizeOf({ kind: 'anonymous' }),
     });
     return rows;
   });
@@ -92,15 +115,15 @@ export class SettingsAccounts {
    * place (the main screen).
    */
   protected isLastAccount = computed(() => {
-    const others = this.accounts().filter((row) => !row.active && row.kind === 'mastodon');
+    const others = this.accounts().filter((row) => !row.active && row.kind !== 'anonymous');
     return others.length === 0;
   });
 
   protected pending = signal<PendingAction | null>(null);
   protected notice = signal('');
 
-  private sizeOf(token: string | null): { keyCount: number; bytes: number } {
-    const report = inspectAccountData(token);
+  private sizeOf(scope: AccountDataRef): { keyCount: number; bytes: number } {
+    const report = inspectAccountData(scope);
     return { keyCount: report.entries.length, bytes: report.totalBytes };
   }
 
@@ -174,7 +197,7 @@ export class SettingsAccounts {
       return;
     }
     const row = action.target;
-    const removed = deleteAccountData(row.token);
+    const removed = deleteAccountData(row.scope);
     const logout = action.kind === 'data-and-logout';
 
     if (logout) {
@@ -182,6 +205,8 @@ export class SettingsAccounts {
         // Anonymous can't be removed from the stable (it's permanent), so the
         // equivalent of "log out" is to leave it for the logged-out screen.
         this.auth.exitAnonymous();
+      } else if (row.kind === 'bluesky' && row.did) {
+        this.auth.removeBlueskyIdentity(row.did);
       } else if (row.token) {
         this.auth.removeSession(row.token);
       }

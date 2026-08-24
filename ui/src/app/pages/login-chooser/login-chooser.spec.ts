@@ -11,7 +11,10 @@ function withQuery(params: Record<string, string>): void {
     useValue: {
       snapshot: {
         queryParams: params,
-        queryParamMap: { get: (key: string) => params[key] ?? null },
+        queryParamMap: {
+          get: (key: string) => params[key] ?? null,
+          has: (key: string) => Object.hasOwn(params, key),
+        },
       },
     },
   });
@@ -121,16 +124,19 @@ describe('LoginChooser', () => {
     });
   });
 
-  it('forwards the add-account flow, which is always a Mastodon one', () => {
+  it('keeps add-account on the chooser and preserves add on both doors', () => {
     withQuery({ add: '1' });
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-    TestBed.createComponent(LoginChooser).detectChanges();
+    const fixture = TestBed.createComponent(LoginChooser);
+    fixture.detectChanges();
+    const hrefs = Array.from(
+      fixture.nativeElement.querySelectorAll('a[href]') as NodeListOf<HTMLAnchorElement>,
+    ).map((a) => a.getAttribute('href'));
 
-    expect(navigate).toHaveBeenCalledWith(['/login/mastodon'], {
-      queryParams: { add: '1' },
-      replaceUrl: true,
-    });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(hrefs).toContain('/login/mastodon?add=1');
+    expect(hrefs).toContain('/login/bluesky?add=1');
   });
 
   it('sends an already signed-in visitor home rather than asking again', () => {
@@ -144,7 +150,7 @@ describe('LoginChooser', () => {
   });
 
   /** ?add=1 is precisely the "yes, I know I'm signed in" signal; it must win. */
-  it('still forwards ?add=1 for a signed-in user instead of bouncing them home', () => {
+  it('keeps ?add=1 on the chooser for a signed-in user instead of bouncing home', () => {
     withQuery({ add: '1' });
     TestBed.inject(Auth).setToken('a-token');
     const router = TestBed.inject(Router);
@@ -153,10 +159,7 @@ describe('LoginChooser', () => {
 
     TestBed.createComponent(LoginChooser).detectChanges();
 
-    expect(navigate).toHaveBeenCalledWith(['/login/mastodon'], {
-      queryParams: { add: '1' },
-      replaceUrl: true,
-    });
+    expect(navigate).not.toHaveBeenCalled();
     expect(navigateByUrl).not.toHaveBeenCalled();
   });
 });

@@ -91,6 +91,22 @@ describe('Shell account switching', () => {
     expect(server.baseUrl()).toBe('https://mastodon.social');
   });
 
+  it('offers separate add-account paths for Mastodon and Bluesky', { timeout: 20_000 }, () => {
+    const fixture = createShell();
+    fixture.detectChanges();
+    drainRailRequests();
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('+ Add Mastodon account');
+    expect(text).toContain('+ Add Bluesky account');
+
+    const assigned: string[] = [];
+    stubLocation({ onAssign: (url) => assigned.push(url) });
+    fixture.componentInstance.addMastodonAccount();
+    fixture.componentInstance.addBlueskyAccount();
+
+    expect(assigned).toEqual(['login/mastodon?add=1', 'login/bluesky?add=1']);
+  });
+
   /** Drive a switch to the social account and have its instance reject the token. */
   function failSwitchToSocial(): any {
     const fixture = createShell();

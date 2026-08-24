@@ -5,7 +5,7 @@ import {
   keyBelongsToScope,
   scopeForAccount,
 } from './account-data';
-import { scopeSuffixForToken } from './account-scope';
+import { scopeSuffixForDid, scopeSuffixForToken } from './account-scope';
 
 describe('account-data', () => {
   beforeEach(() => localStorage.clear());
@@ -21,6 +21,17 @@ describe('account-data', () => {
 
     expect(one).not.toBe(two);
     expect(one).not.toContain('token-one');
+  });
+
+  it('inspects a Bluesky alt by DID without making it active', () => {
+    const one = scopeSuffixForDid('did:plc:one');
+    const two = scopeSuffixForDid('did:plc:two');
+    localStorage.setItem(`mockingbird_rss_feeds${one}`, '["one"]');
+    localStorage.setItem(`mockingbird_rss_feeds${two}`, '["two"]');
+
+    const report = inspectAccountData({ kind: 'bluesky', did: 'did:plc:two' });
+
+    expect(report.entries.map((entry) => entry.key)).toEqual([`mockingbird_rss_feeds${two}`]);
   });
 
   it('never matches unscoped global keys', () => {

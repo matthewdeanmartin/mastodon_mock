@@ -20,9 +20,8 @@ import { ClientPrefs } from '../../client-prefs';
  * `/login/mastodon` instead would work for new flows and silently break any
  * that were already under way.
  *
- * `?add=1` (add-account and re-auth, both raised from Mastodon sessions) is
- * forwarded for the same reason: the caller means "do Mastodon auth", not
- * "ask me which network I use".
+ * `?add=1` deliberately stays on the chooser: adding an account may mean a
+ * Mastodon login or a Bluesky alt, and both doors preserve that flag.
  */
 @Component({
   selector: 'app-login-chooser',
@@ -36,21 +35,22 @@ export class LoginChooser implements OnInit {
   protected prefs = inject(ClientPrefs);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  protected adding = false;
 
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
-    // Hand the Mastodon-specific entry points straight through, preserving the
-    // query string — `code`, `state` and `add` all have to survive.
-    if (params.get('code') || params.get('state') || params.get('add')) {
+    // Hand OAuth callbacks straight through. `add` alone stays on the chooser.
+    if (params.get('code') || params.get('state')) {
       void this.router.navigate(['/login/mastodon'], {
         queryParams: this.route.snapshot.queryParams,
         replaceUrl: true,
       });
       return;
     }
+    this.adding = params.has('add');
     // A signed-in visitor who lands here (bookmark, back button) is not asking
     // to pick a network. Same reasoning as the front page.
-    if (this.auth.isAuthenticated) {
+    if (this.auth.isAuthenticated && !this.adding) {
       void this.router.navigateByUrl('/home', { replaceUrl: true });
     }
   }
