@@ -74,10 +74,18 @@ describe('LoginBluesky', () => {
   });
 
   /**
-   * The worst bug available on this page. A JWT in an exportable key, or the app
-   * password persisted at all, would outlive the browser data it came from.
+   * The worst bug available on this page: a credential in an *exportable* key,
+   * which would outlive the browser data it came from and travel inside a
+   * settings export the user thinks is safe to share.
+   *
+   * This used to also assert the app password was persisted nowhere at all.
+   * That changed deliberately — it is now kept in the secret half so the vault
+   * can sync it, ending the paste-on-every-device problem (see the manifest
+   * entry for `mockingbird_bsky_credentials`). The invariant that mattered is
+   * unchanged and still pinned below: secrets live in the secret half, and the
+   * exportable half names the account and nothing more.
    */
-  it('stores the JWTs in the secret half and the app password nowhere', () => {
+  it('keeps every credential in the secret half, never the exportable one', () => {
     vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
 
     signIn('someone.bsky.social', 'app-pass-1234');
@@ -85,21 +93,25 @@ describe('LoginBluesky', () => {
     const profile = JSON.parse(localStorage.getItem(PROFILE_KEY)!);
     const credentials = JSON.parse(localStorage.getItem(CREDENTIALS_KEY)!);
 
-    // The exportable half names the account and carries no credential.
+    // The exportable half names the account and carries no credential — not the
+    // tokens, and not the app password either.
     expect(profile.handle).toBe('someone.bsky.social');
     expect(profile.did).toBe('did:plc:abc123');
     expect(JSON.stringify(profile)).not.toContain('access-jwt-value');
     expect(JSON.stringify(profile)).not.toContain('refresh-jwt-value');
+    expect(JSON.stringify(profile)).not.toContain('app-pass-1234');
 
-    // The secret half carries the tokens.
+    // The secret half carries the tokens and the app password.
     expect(credentials.accessJwt).toBe('access-jwt-value');
     expect(credentials.refreshJwt).toBe('refresh-jwt-value');
+    expect(credentials.appPassword).toBe('app-pass-1234');
 
-    // The app password is never written anywhere, under any key.
-    const everything = Object.keys(localStorage)
+    // And it appears in exactly one place: the secret key, nowhere else.
+    const elsewhere = Object.keys(localStorage)
+      .filter((k) => k !== CREDENTIALS_KEY)
       .map((k) => localStorage.getItem(k) ?? '')
       .join('|');
-    expect(everything).not.toContain('app-pass-1234');
+    expect(elsewhere).not.toContain('app-pass-1234');
   });
 
   /**

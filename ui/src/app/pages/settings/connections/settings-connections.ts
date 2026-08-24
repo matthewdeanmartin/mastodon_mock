@@ -31,6 +31,7 @@ import {
   CONNECTION_FLAGS,
   CONNECTION_SCOPE_COPY,
   ConnectionCatalogEntry,
+  ConnectionId,
 } from './connection-catalog';
 import { type CredentialLocation, StorageBadge } from './storage-badge';
 
@@ -125,8 +126,39 @@ export class SettingsConnections implements OnInit {
         storage: this.credentialLocation(entry, live.connected),
         flagged: false,
       };
-    }),
+    }).filter((row) => !this.isOwnIdentity(row.entry.id)),
   );
+
+  /**
+   * Whether this connector is the account's *own* network.
+   *
+   * Mastodon under a Mastodon-primary account, and Bluesky under a
+   * Bluesky-primary one, are not connectors at all — you cannot connect to
+   * yourself. They used to render greyed with an explanation, on the general
+   * rule that an unavailable connector is greyed rather than hidden. That rule
+   * is right for something you *could* have and don't (a missing app key, a
+   * rollout flag): the row is an offer, and hiding it hides the offer.
+   *
+   * It is wrong here. "You are signed in already" is not a state that will ever
+   * change while this account is active, so the row is permanent furniture
+   * explaining an impossibility — and it sat directly above the connector list
+   * a reader actually came to use.
+   *
+   * Note the asymmetry with `flagged`: a flagged-off connector keeps greying,
+   * because that one really is a temporary "not right now".
+   */
+  private isOwnIdentity(id: ConnectionId): boolean {
+    if (id === 'bluesky') {
+      return this.auth.isBlueskyPrimary;
+    }
+    if (id === 'mastodon') {
+      // Anonymous is deliberately not included: it reads a Mastodon server, but
+      // the row still offers a real choice (which server), so it keeps its
+      // greyed explanation rather than vanishing.
+      return !this.auth.isBlueskyPrimary && !this.auth.isAnonymous;
+    }
+    return false;
+  }
 
   /** One unlock replaces thirteen trips into child pages when inventory is opaque. */
   protected readonly vaultInventoryNeedsAttention = computed(() =>
@@ -157,8 +189,20 @@ export class SettingsConnections implements OnInit {
           }
           return { entry, connected: this.mastodon.optedIn(), unavailableReason: null };
         case 'bluesky':
-          // Available to every account including Anonymous: the app password is
-          // its own credential and needs no Mastodon token.
+          // The mirror of the Mastodon case: under a Bluesky-primary account,
+          // Bluesky IS the identity and there is no slot to fill. Marked
+          // not-applicable here; `rows` then drops it from the list entirely
+          // (see the note there on why these two vanish rather than grey out).
+          if (this.auth.isBlueskyPrimary) {
+            return {
+              entry,
+              connected: false,
+              unavailableReason:
+                'You are signed in to Bluesky already — it is your account here, not a connector.',
+            };
+          }
+          // Available to every other account including Anonymous: the app
+          // password is its own credential and needs no Mastodon token.
           return { entry, connected: this.bsky.session() !== null, unavailableReason: null };
         case 'openrouter':
           return { entry, connected: this.openrouter.connected(), unavailableReason: null };

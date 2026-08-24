@@ -88,21 +88,40 @@ describe('the manifest is pinned to the registry', () => {
     // Pinned explicitly rather than left to the general rule, because these are
     // the ones somebody will eventually be tempted to add for convenience. The
     // reason they stay out is in NOT_VAULTED; this makes reversing it loud.
-    for (const base of [
-      'mastodon_mock_token',
-      'mastodon_mock_session_tokens',
-      'mockingbird_bsky_credentials',
-    ]) {
+    //
+    // The Bluesky keys used to be on this list and were removed deliberately.
+    // The line these draw is not "session token vs API key" but *who issued it
+    // to whom*: a Mastodon OAuth token IS the account, minted by a sign-in flow
+    // that is cheap to repeat (PKCE). A Bluesky app password is a revocable,
+    // per-app credential the user went and created by hand, with no re-auth
+    // flow to fall back on — the same shape as every other key in VAULTED_KEYS.
+    // The full argument is on the manifest entry.
+    for (const base of ['mastodon_mock_token', 'mastodon_mock_session_tokens']) {
       expect(isVaulted(base)).toBe(false);
     }
   });
 
-  it('vaults the nine live credentials', () => {
+  it('vaults both Bluesky credential keys, connector and identity', () => {
+    // Bluesky is the same credential in two storage locations: scoped per
+    // account when it is a connector, unscoped when it IS the identity (the DID
+    // it would be scoped by lives inside it — see bluesky-identity-store.ts).
+    // Vaulting only the connector half would leave a Bluesky-primary account
+    // still re-pasting, which is the case the change exists to fix.
+    expect(isVaulted('mockingbird_bsky_credentials')).toBe(true);
+    expect(vaultedKey('mockingbird_bsky_credentials')?.scope).toBe('account');
+    expect(isVaulted('mockingbird_bsky_identity_credentials')).toBe(true);
+    expect(vaultedKey('mockingbird_bsky_identity_credentials')?.scope).toBe('browser');
+  });
+
+  it('vaults the eleven live credentials', () => {
     // The roadmap named ten. `mockingbird_raindrop_credentials` was moved to
     // NOT_VAULTED when wiring the connector showed that nothing writes it —
     // `RaindropSession` only ever deletes it. Vaulting a key the app is trying
     // to forget would resurrect it on every device on the next read.
-    expect(VAULTED_KEYS).toHaveLength(9);
+    //
+    // Then the two Bluesky keys came the other way, out of NOT_VAULTED: nine
+    // plus two. See the entries for why that reversal was right.
+    expect(VAULTED_KEYS).toHaveLength(11);
     expect(isVaulted('mockingbird_openrouter_key')).toBe(true);
     expect(vaultedKey('mockingbird_openrouter_key')?.scope).toBe('browser');
     expect(vaultedKey('mockingbird_mataroa_connection')?.scope).toBe('account');

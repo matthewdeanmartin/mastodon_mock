@@ -101,6 +101,42 @@ export const VAULTED_KEYS: readonly VaultedKey[] = [
     connector: 'gist',
     note: 'Gists belong to the account that owns them, not to the browser that made them.',
   },
+  {
+    base: 'mockingbird_bsky_credentials',
+    scope: 'account',
+    connector: 'bluesky',
+    // Moved out of NOT_VAULTED, deliberately and against its stated reason.
+    //
+    // The old reason was "a Bluesky app password is re-issued in under a
+    // minute — identity, not a purchase", filed beside the Mastodon session
+    // tokens. Two things were wrong with it.
+    //
+    // First, the cost was measured once. Re-issuing is cheap; doing it on the
+    // phone, the desktop, and the second browser, repeatedly, is not — and the
+    // failure was loudest precisely for the user who had turned sync ON, saw
+    // every other key arrive, and found Bluesky still asking.
+    //
+    // Second, and the real error: an app password is not identity. It is a
+    // revocable, per-app credential the user went and obtained — the same shape
+    // as every other key in this list, and nothing like a Mastodon OAuth token,
+    // which IS the account and stays out. Bluesky offers no PKCE flow, so
+    // there is no cheap re-auth to fall back on the way Mastodon has.
+    //
+    // The exposure argument also cut the other way once examined: the app
+    // password already had to travel between devices somehow, and the channel
+    // it travelled through (a password manager, a note, a message to oneself)
+    // is weaker than this one. Vaulting it removes a hand-copied secret rather
+    // than adding a synced one.
+    note: 'A revocable per-app password the user obtained, not an identity token. Bluesky has no PKCE re-auth, so re-pasting on every device was the only alternative.',
+  },
+  {
+    base: 'mockingbird_bsky_identity_credentials',
+    // Unscoped in storage (the DID it would be scoped by lives inside it — see
+    // bluesky-identity-store.ts), so it syncs as a browser-level credential.
+    scope: 'browser',
+    connector: 'bluesky',
+    note: 'The same credential when Bluesky is the primary identity rather than a connector. Same reasoning as mockingbird_bsky_credentials.',
+  },
 ];
 
 /**
@@ -121,17 +157,9 @@ export const NOT_VAULTED: readonly { base: string; reason: string }[] = [
     reason: 'Same as mastodon_mock_token, one per saved session.',
   },
   {
-    base: 'mockingbird_bsky_credentials',
-    reason: 'A Bluesky app password is re-issued in under a minute. Identity, not a purchase.',
-  },
-  {
     base: 'mockingbird_raindrop_credentials',
     reason:
       'A dead key from the superseded Raindrop OAuth flow. `RaindropSession` deletes it on every construction and nothing writes it, so vaulting it would sync a credential the app is actively trying to forget — and would resurrect it on every device on the next read. The live Raindrop credential is mockingbird_raindrop_token.',
-  },
-  {
-    base: 'mockingbird_bsky_identity_credentials',
-    reason: 'Same as mockingbird_bsky_credentials.',
   },
   {
     base: 'mockingbird_mastodon_connector_token',

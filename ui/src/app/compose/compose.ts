@@ -31,7 +31,8 @@ import { BlueskyApi } from '../providers/bluesky/bluesky-api';
 import { detectFacets, graphemeLength } from '../providers/bluesky/bluesky-facets';
 import { buildLocalBskyStatus } from '../providers/bluesky/bluesky-local-status';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
-import { BskyFacet } from '../providers/bluesky/bluesky-types';
+import { BskyFacet, BskyImagesEmbed } from '../providers/bluesky/bluesky-types';
+import { prepareImageForBluesky } from '../providers/bluesky/bluesky-image';
 import { PasteHistory } from '../providers/paste/paste-history';
 import { PasteExpiry } from '../providers/paste/paste-provider';
 import { PasteProviderRegistry } from '../providers/paste/paste-provider-registry';
@@ -280,15 +281,75 @@ const POLL_EXPIRY = [
   { label: '7 days', seconds: 604800 },
 ];
 
-/** A media attachment that has been uploaded and is pending attachment to a post. */
+/**
+ * A media attachment that has been uploaded and is pending attachment to a post.
+ *
+ * `file` is the *original* bytes, kept alongside the uploaded Mastodon
+ * attachment. Bluesky cannot reuse Mastodon's upload — its `uploadBlob` wants
+ * the bytes, in its own repo, under its own ~1MB ceiling — so discarding the
+ * File at upload time (which is what used to happen) made a Bluesky image post
+ * impossible to build. Absent for an attachment restored from a draft, where
+ * only the Mastodon reference survived.
+ */
 interface PendingMedia {
   media: MediaAttachment;
   description: string;
+  file?: File;
 }
 
 /** Mastodon accepts images, video and audio as attachments. */
 function isAttachable(file: File): boolean {
   return /^(image|video|audio)\//.test(file.type);
+}
+
+/** Bluesky posts accept images only — no video, no audio. */
+function isBlueskyAttachable(file: File): boolean {
+  return file.type.startsWith('image/');
+}
+
+/**
+ * Bluesky's limit: four images per post.
+ *
+ * Enforced when picking rather than at submit, so the fifth photo is refused
+ * where the reader can see why, not after they have written the post.
+ */
+const BSKY_MAX_IMAGES = 4;
+
+/**
+ * A stand-in attachment for a file held locally, not uploaded anywhere yet.
+ *
+ * A Bluesky-only post has no Mastodon upload to describe, but the composer's
+ * preview and alt-text editor both read a `MediaAttachment`. An object URL gives
+ * them a real image to render; the `id` is marked so nothing mistakes it for a
+ * server-side attachment it could reference by id.
+ */
+function localMedia(file: File): MediaAttachment {
+  const url = URL.createObjectURL(file);
+  return {
+    id: `local:${crypto.randomUUID()}`,
+    type: 'image',
+    url,
+    preview_url: url,
+    description: null,
+  };
+}
+
+/** Whether an attachment is one of the local-only ones {@link localMedia} made. */
+function isLocalMedia(media: MediaAttachment): boolean {
+  return media.id.startsWith('local:');
+}
+
+/**
+ * Revoke a local attachment's object URL.
+ *
+ * An object URL pins the whole file in memory until revoked. Four phone photos
+ * attached and removed a few times is tens of megabytes held for the life of
+ * the tab — worth the two lines, and invisible if it goes wrong.
+ */
+function releaseLocalMedia(media: MediaAttachment): void {
+  if (isLocalMedia(media)) {
+    URL.revokeObjectURL(media.url);
+  }
 }
 
 /** True when the drag carries files (not text selections, links, …). */
@@ -689,6 +750,15 @@ export class Compose implements OnDestroy {
 
   // Media.
   protected media = signal<PendingMedia[]>([]);
+  /**
+   * Why an attachment was refused or trimmed, when one was.
+   *
+   * Attached to the act of picking rather than left as ambient page text: the
+   * old "Bluesky posts are text-only here" hint sat elsewhere on screen while
+   * the submit button silently went dead, which is how a reader concludes the
+   * attach button simply does not work.
+   */
+  protected mediaNotice = signal('');
   protected uploading = signal(false);
 
   // Scheduling. The value is a datetime-local string (browser-local time);
@@ -781,7 +851,17 @@ export class Compose implements OnDestroy {
         ? restorableTarget(this.initialTarget() as PostTarget, this.availability.current())
         : this.auth.isAnonymous && this.featureFlags.enabled('pastebin')
           ? 'paste'
-          : 'fedi',
+          : // A Bluesky-primary account posts to Bluesky by default. 'fedi' was
+            // the unconditional fallback, which meant the one network the account
+            // actually *is* opened un-selected: every quick post started aimed at
+            // Mastodon, and posting where you live took a correction every time.
+            //
+            // Through `restorableTarget` rather than a bare 'bsky' so a session
+            // whose Bluesky credentials have gone stale falls back instead of
+            // opening on a target it cannot post to.
+            this.auth.isBlueskyPrimary
+            ? restorableTarget('bsky', this.availability.current())
+            : 'fedi',
   );
   protected showTargetPicker = computed(() => !this.inReplyToId() && !this.quotedStatusId());
   protected targetIncludesBsky = computed(
@@ -987,13 +1067,17 @@ export class Compose implements OnDestroy {
       }
     }
     if (this.targetIncludesBsky()) {
-      // Bluesky legs are text-only. Threads *are* supported (posted as a chain
-      // of replies), so the only text rule is that the first box has something
-      // in it; per-box length is already covered by `overLimit` above.
+      // Threads are supported (posted as a chain of replies) and so are images,
+      // so the only text rule is that the first box has something in it;
+      // per-box length is already covered by `overLimit` above.
       if (!this.text().trim()) {
         return false;
       }
-      if (this.target() === 'bsky' && (this.media().length > 0 || this.pollOpen())) {
+      // Polls remain the one thing a Bluesky leg cannot carry — the protocol has
+      // no poll record. Media used to be refused here too, which is what made
+      // the submit button go dead with no explanation attached to it after
+      // attaching a photo.
+      if (this.target() === 'bsky' && this.pollOpen()) {
         return false;
       }
       return true;
@@ -1073,6 +1157,7 @@ export class Compose implements OnDestroy {
     }
     const wasPaste = this.target() === 'paste';
     this.target.set(target);
+    this.noteBlueskyMediaLimits();
     if (isBlogTarget(target)) {
       // The CW box doubles as the post title for blogs, which every blog post
       // needs — so open it rather than making the user find it.
@@ -1443,6 +1528,31 @@ export class Compose implements OnDestroy {
     this.uploadFiles(files);
   }
 
+  /**
+   * Say what a Bluesky leg will do with what is already attached.
+   *
+   * Switching target after attaching is the case the pick-time check cannot
+   * cover: four photos and a video are fine on Fedi, and become a problem the
+   * moment Bluesky joins the destinations. Said here, when the target changes,
+   * rather than discovered at submit.
+   */
+  private noteBlueskyMediaLimits(): void {
+    if (!this.targetIncludesBsky() || !this.media().length) {
+      this.mediaNotice.set('');
+      return;
+    }
+    const attached = this.media();
+    const nonImage = attached.filter((m) => m.file && !isBlueskyAttachable(m.file)).length;
+    const overflow = Math.max(0, attached.length - BSKY_MAX_IMAGES);
+    this.mediaNotice.set(
+      nonImage
+        ? 'Bluesky takes images only — the rest will go to Fedi alone.'
+        : overflow
+          ? `Bluesky takes ${BSKY_MAX_IMAGES} images per post — the first ${BSKY_MAX_IMAGES} will go.`
+          : '',
+    );
+  }
+
   /** In-flight uploads; `uploading` stays true until the last one settles. */
   private pendingUploads = 0;
 
@@ -1450,12 +1560,42 @@ export class Compose implements OnDestroy {
     if (!this.canAttachMedia() || !files.length) {
       return;
     }
+    // Where Bluesky is a destination, its narrower rules bind: images only, four
+    // at most. Saying so at the point of picking beats letting a video ride
+    // along and fail at submit, or silently dropping it.
+    if (this.targetIncludesBsky()) {
+      const rejected = files.filter((f) => !isBlueskyAttachable(f));
+      files = files.filter(isBlueskyAttachable);
+      const room = BSKY_MAX_IMAGES - this.media().length;
+      const overflow = Math.max(0, files.length - Math.max(0, room));
+      files = files.slice(0, Math.max(0, room));
+      this.mediaNotice.set(
+        rejected.length
+          ? 'Bluesky posts take images only — video and audio were left out.'
+          : overflow
+            ? `Bluesky takes ${BSKY_MAX_IMAGES} images per post — the extra ${overflow === 1 ? 'one was' : `${overflow} were`} left out.`
+            : '',
+      );
+      if (!files.length) {
+        return;
+      }
+    } else {
+      this.mediaNotice.set('');
+    }
     for (const file of files) {
+      // Bluesky-only: there is no Mastodon post to attach this to, so uploading
+      // it there would spend a call and store a file nothing will reference.
+      // Held locally instead and sent to Bluesky at submit time, which is when
+      // the blob has to exist in that repo anyway.
+      if (this.target() === 'bsky') {
+        this.media.update((list) => [...list, { media: localMedia(file), description: '', file }]);
+        continue;
+      }
       this.pendingUploads++;
       this.uploading.set(true);
       this.api.uploadMedia(file).subscribe({
         next: (media) => {
-          this.media.update((list) => [...list, { media, description: '' }]);
+          this.media.update((list) => [...list, { media, description: '', file }]);
           this.settleUpload();
         },
         error: () => this.settleUpload(),
@@ -1475,7 +1615,13 @@ export class Compose implements OnDestroy {
   }
 
   removeMedia(index: number): void {
-    this.media.update((list) => list.filter((_, i) => i !== index));
+    this.media.update((list) => {
+      const going = list[index];
+      if (going) {
+        releaseLocalMedia(going.media);
+      }
+      return list.filter((_, i) => i !== index);
+    });
   }
 
   togglePoll(): void {
@@ -2132,7 +2278,66 @@ export class Compose implements OnDestroy {
     if (!parts.length) {
       return;
     }
-    this.postBskyPart(parts, 0, null, null, primary);
+    // Images only, four at most — the protocol's cap. A "both" post can carry
+    // more on the Fedi leg, so this trims rather than refusing; the composer
+    // already said so when the target changed (`noteBlueskyMediaLimits`).
+    const images = this.media()
+      .filter((m) => m.file && isBlueskyAttachable(m.file))
+      .slice(0, BSKY_MAX_IMAGES);
+    if (!images.length) {
+      this.postBskyPart(parts, 0, null, null, primary);
+      return;
+    }
+    // Blobs must exist in the repo before the record that references them, so
+    // the uploads finish first and the post carries the finished embed.
+    void this.uploadBskyImages(images).then((embed) => {
+      if (embed === null) {
+        // Nothing was posted yet, so this is a clean failure the reader can
+        // retry — unlike a mid-thread error, where earlier posts are public.
+        this.submitting.set(false);
+        this.crossPostError.set(
+          primary
+            ? "Couldn't upload the image to Bluesky — nothing was posted, try again."
+            : 'Posted to Fedi, but the Bluesky image upload failed — post it there manually.',
+        );
+        return;
+      }
+      this.postBskyPart(parts, 0, null, null, primary, embed);
+    });
+  }
+
+  /**
+   * Downscale and upload each image, then assemble the record's embed.
+   *
+   * Returns null when any image fails, because a post that silently drops one
+   * of four photos is worse than one that did not go out: the reader would have
+   * to notice the omission themselves, after publishing.
+   *
+   * Alt text rides along from the composer's own editor — the same field the
+   * Mastodon leg uses — because Bluesky's lexicon requires the key and an image
+   * with no description is a real accessibility loss, not a formality.
+   */
+  private async uploadBskyImages(items: PendingMedia[]): Promise<BskyImagesEmbed | null> {
+    const images: BskyImagesEmbed['images'] = [];
+    for (const item of items) {
+      const prepared = await prepareImageForBluesky(item.file!);
+      if (!prepared) {
+        return null;
+      }
+      try {
+        const uploaded = await firstValueFrom(
+          this.bskyApi.uploadBlob(prepared.blob, prepared.mimeType),
+        );
+        images.push({
+          image: uploaded.blob,
+          alt: item.description.trim(),
+          aspectRatio: { width: prepared.width, height: prepared.height },
+        });
+      } catch {
+        return null;
+      }
+    }
+    return { $type: 'app.bsky.embed.images', images };
   }
 
   /**
@@ -2149,6 +2354,8 @@ export class Compose implements OnDestroy {
     root: { uri: string; cid: string } | null,
     parent: { uri: string; cid: string } | null,
     primary: boolean,
+    /** Images, on the first post of the thread only — see below. */
+    embed?: BskyImagesEmbed,
   ): void {
     const text = parts[index];
     let sentFacets: BskyFacet[] = [];
@@ -2160,6 +2367,11 @@ export class Compose implements OnDestroy {
             text,
             facets: facets.length ? facets : undefined,
             reply: root && parent ? { root, parent } : undefined,
+            // First post only. The composer's attachments belong to the post
+            // being written, and repeating them down a thread would publish the
+            // same photos several times — the Mastodon leg attaches them to its
+            // root for the same reason.
+            embed: index === 0 ? embed : undefined,
           });
         }),
       )
@@ -2240,7 +2452,13 @@ export class Compose implements OnDestroy {
     this.cwOpen.set(false);
     this.spoilerText.set('');
     this.sensitive.set(false);
+    // Free the object URLs before dropping the list, or the files stay pinned
+    // in memory for the life of the tab.
+    for (const item of this.media()) {
+      releaseLocalMedia(item.media);
+    }
     this.media.set([]);
+    this.mediaNotice.set('');
     this.pollOpen.set(false);
     this.pollOptions.set(['', '']);
     this.pollMultiple.set(false);

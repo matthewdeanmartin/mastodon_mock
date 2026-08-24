@@ -3,6 +3,8 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { map, Observable, switchMap, tap } from 'rxjs';
 import { externalFetch } from '../external-fetch';
 import { scopedKey } from '../../account-scope';
+import { ProfileAccountKey } from '../account/profile-account-key';
+import { VaultBridge, type SyncOutcome } from '../vault/vault-bridge';
 import {
   ACCOUNT_MODE_KEY,
   BSKY_IDENTITY_CREDENTIALS_KEY,
@@ -39,6 +41,15 @@ export interface BskySession extends ExpiringCredential {
   avatar?: string;
   /** The account's real PDS host (resolved lazily); chat calls must hit it, not the entryway. */
   pdsUrl?: string;
+  /**
+   * The app password this session was minted from, when known.
+   *
+   * Carried on the session so both persist paths store it without a second
+   * parameter to thread. Absent for a session loaded from a blob written before
+   * this existed, and for one restored from the vault on a device that has not
+   * re-minted yet.
+   */
+  appPassword?: string;
 }
 
 interface SessionResponse {
@@ -53,14 +64,48 @@ interface ProfileResponse {
   avatar?: string;
 }
 
-/** The secret half: the tokens, plus the retention stamp that governs them. */
+/**
+ * The secret half: the tokens, plus the retention stamp that governs them.
+ *
+ * `appPassword` is optional because it is only present for a session created by
+ * a real login — one restored from an older browser blob predates it, and must
+ * keep working without it.
+ */
 interface BskyCredentials extends ExpiringCredential {
   accessJwt: string;
   refreshJwt: string;
+  /**
+   * The app password the session was created with.
+   *
+   * Kept, rather than discarded after `createSession`, so another device can
+   * mint its *own* session from the vault instead of asking the user to paste
+   * it again. The JWTs deliberately do not travel: they rotate on every
+   * refresh, so two devices sharing one pair would invalidate each other's
+   * tokens in a loop. The stable credential is the app password, which is what
+   * the user was hand-copying between devices anyway.
+   */
+  appPassword?: string;
 }
 
-/** The exportable half: who is linked. */
-type BskyProfile = Omit<BskySession, 'accessJwt' | 'refreshJwt' | 'connectedAt'>;
+/** What travels in the vault: the stable credential and who it belongs to. */
+interface VaultedBskyCredential {
+  identifier: string;
+  appPassword: string;
+}
+
+/**
+ * The exportable half: who is linked.
+ *
+ * `appPassword` is omitted explicitly. It lives on `BskySession` for convenience
+ * in memory, but it is a secret — the whole point of this split is that a
+ * settings export may carry the profile and never the credentials, and a new
+ * secret field silently joining the exportable side is exactly the leak this
+ * type exists to prevent.
+ */
+type BskyProfile = Omit<
+  BskySession,
+  'accessJwt' | 'refreshJwt' | 'connectedAt' | 'appPassword'
+>;
 
 /**
  * Rejoin the two halves. A profile with no credentials is not a usable link, so
@@ -129,6 +174,8 @@ function loadSession(
 @Injectable({ providedIn: 'root' })
 export class BlueskySession implements ExpiringConnection {
   private http = inject(HttpClient);
+  private bridge = inject(VaultBridge);
+  private accountKey = inject(ProfileAccountKey);
 
   /**
    * Whether this instance is the app's identity rather than a connector.
@@ -225,12 +272,32 @@ export class BlueskySession implements ExpiringConnection {
   loginAsIdentity(identifier: string, appPassword: string): Observable<BskySession> {
     return this.authenticate(identifier, appPassword).pipe(
       tap((session) => {
-        const { accessJwt, refreshJwt, connectedAt, ...profile } = session;
+        const { accessJwt, refreshJwt, connectedAt, appPassword: pw, ...profile } = session;
         localStorage.setItem(BSKY_IDENTITY_PROFILE_KEY, JSON.stringify(profile));
         localStorage.setItem(
           BSKY_IDENTITY_CREDENTIALS_KEY,
-          JSON.stringify({ accessJwt, refreshJwt, connectedAt } satisfies BskyCredentials),
+          JSON.stringify({
+            accessJwt,
+            refreshJwt,
+            connectedAt,
+            ...(pw ? { appPassword: pw } : {}),
+          } satisfies BskyCredentials),
         );
+        // Straight to the identity keys rather than through `persist`, so the
+        // vault write must be requested here too. Always the identity base:
+        // this instance may still be holding *connector* keys (see the ordering
+        // note above), and writing the identity under a connector scope would
+        // file it where no later boot looks.
+        if (pw) {
+          void this.bridge.writeThrough(
+            BSKY_IDENTITY_CREDENTIALS_KEY,
+            JSON.stringify({
+              identifier: session.handle,
+              appPassword: pw,
+            } satisfies VaultedBskyCredential),
+            null,
+          );
+        }
         // Reflect it in memory too, so a caller that reads `session()` between the
         // write and the reload (the login page, attributing the new account) sees
         // the account it just signed in as rather than a stale connector.
@@ -258,6 +325,8 @@ export class BlueskySession implements ExpiringConnection {
             did: res.did,
             accessJwt: res.accessJwt,
             refreshJwt: res.refreshJwt,
+            // Kept so `persist` can vault it — see BskyCredentials.appPassword.
+            appPassword,
             // Retention starts here and is carried through every later
             // persist() (refresh, PDS discovery) untouched.
             connectedAt: Date.now(),
@@ -333,12 +402,113 @@ export class BlueskySession implements ExpiringConnection {
 
   /** Write the profile and the tokens to their separate keys. */
   private persist(session: BskySession): void {
-    const { accessJwt, refreshJwt, connectedAt, ...profile } = session;
+    const { accessJwt, refreshJwt, connectedAt, appPassword, ...profile } = session;
+    // Read before the write, so "did this login introduce a new password?" can
+    // be answered below.
+    const previous = this.storedAppPassword();
     localStorage.setItem(this.profileKey, JSON.stringify(profile));
     localStorage.setItem(
       this.credentialsKey,
-      JSON.stringify({ accessJwt, refreshJwt, connectedAt } satisfies BskyCredentials),
+      JSON.stringify({
+        accessJwt,
+        refreshJwt,
+        connectedAt,
+        ...(appPassword ? { appPassword } : {}),
+      } satisfies BskyCredentials),
     );
     this.session.set(session);
+    // Vault the app password only when it is *new* to storage.
+    //
+    // The in-memory session carries it forward across refreshes and PDS
+    // discovery (both go through here), so a bare `if (appPassword)` wrote to
+    // the vault on every token refresh — churn the one-blob vault design is not
+    // shaped for, and the exact cost that keeps `mockingbird_paste_edit_keys`
+    // out of the manifest. Comparing against what was already stored means a
+    // write happens on a real login and a password change, and nowhere else.
+    if (appPassword && appPassword !== previous) {
+      void this.syncCredentialToVault(session.handle, appPassword);
+    }
+  }
+
+  /**
+   * Push the app password to the vault, so the next device does not ask for it.
+   *
+   * Not awaited: connecting should feel instant, and a vault that is locked or
+   * switched off must not fail the login. `VaultBridge.writeThrough` reports
+   * `skipped` in those cases rather than throwing.
+   */
+  private async syncCredentialToVault(identifier: string, appPassword: string): Promise<void> {
+    await this.bridge.writeThrough(
+      this.credentialsBase,
+      JSON.stringify({ identifier, appPassword } satisfies VaultedBskyCredential),
+      this.vaultAccountKey(),
+    );
+  }
+
+  /**
+   * The vaulted app password for this account, or null.
+   *
+   * Read by the login page so a device that has the vault open can offer to
+   * sign in without a paste. Deliberately returns the credential rather than
+   * logging in itself: minting the session is `login`/`loginAsIdentity`'s job,
+   * and which of the two applies is the caller's decision, not this method's.
+   */
+  vaultedCredential(): VaultedBskyCredential | null {
+    const raw = this.bridge.readThrough(this.credentialsBase, this.vaultAccountKey());
+    if (!raw) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw) as Partial<VaultedBskyCredential>;
+      return parsed.identifier && parsed.appPassword
+        ? { identifier: parsed.identifier, appPassword: parsed.appPassword }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Push whatever app password is stored locally, for the settings page's
+   *  explicit "sync now". Returns what happened so the UI can report it. */
+  async syncToVault(): Promise<SyncOutcome> {
+    const session = this.session();
+    const appPassword = this.storedAppPassword();
+    return session && appPassword
+      ? this.bridge.writeThrough(
+          this.credentialsBase,
+          JSON.stringify({
+            identifier: session.handle,
+            appPassword,
+          } satisfies VaultedBskyCredential),
+          this.vaultAccountKey(),
+        )
+      : { kind: 'skipped' };
+  }
+
+  /** The app password from the local credentials blob, when one was stored. */
+  private storedAppPassword(): string | null {
+    try {
+      const raw = localStorage.getItem(this.credentialsKey);
+      return raw ? ((JSON.parse(raw) as BskyCredentials).appPassword ?? null) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The registry base this instance vaults under, matching the storage key it
+   * already chose at construction.
+   */
+  private get credentialsBase(): string {
+    return this.isIdentity ? BSKY_IDENTITY_CREDENTIALS_KEY : CREDENTIALS_KEY_BASE;
+  }
+
+  /**
+   * The vault scope key. The identity credential is registered `browser`-scoped
+   * (its storage key is unscoped, because the DID it would be scoped by lives
+   * inside it), so it passes null; the connector is `account`-scoped.
+   */
+  private vaultAccountKey(): string | null {
+    return this.isIdentity ? null : this.accountKey.current();
   }
 }

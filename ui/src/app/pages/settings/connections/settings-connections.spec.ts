@@ -16,6 +16,7 @@ import { SettingsConnections } from './settings-connections';
 import { VaultService, type VaultState } from '../../../providers/vault/vault-service';
 import { VaultPreference } from '../../../providers/vault/vault-preference';
 import { ProfileAccountKey } from '../../../providers/account/profile-account-key';
+import { Auth } from '../../../auth';
 
 describe('SettingsConnections (catalog)', () => {
   let bskySession: {
@@ -107,11 +108,23 @@ describe('SettingsConnections (catalog)', () => {
     )!;
   }
 
+  /** Every rendered card's heading — for asserting what is and is not listed. */
+  function headings(fixture: ComponentFixture<SettingsConnections>): string[] {
+    return cards(fixture).map(
+      (card) => card.querySelector('.catalog-label')?.textContent?.trim() ?? '',
+    );
+  }
+
   it('lists every connector with its pitch and what it enables', () => {
     const fixture = setUp();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
-    expect(cards(fixture)).toHaveLength(CONNECTION_CATALOG.length);
+    // Every connector except the account's own network. These specs run
+    // Mastodon-primary, so the Mastodon row is not a connector here — you
+    // cannot connect to yourself, and the row it used to render was permanent
+    // furniture explaining an impossibility. See `isOwnIdentity`.
+    expect(cards(fixture)).toHaveLength(CONNECTION_CATALOG.length - 1);
+    expect(text).not.toContain('it is your account here, not a connector');
     for (const label of ['Bluesky', 'Raindrop.io', 'GitHub', 'Dropbox']) {
       expect(text).toContain(label);
     }
@@ -119,6 +132,55 @@ describe('SettingsConnections (catalog)', () => {
     expect(text).toContain('Bluesky posts merged into your home timeline');
     expect(text).toContain('Read your unread notifications');
     expect(text).not.toContain('app password');
+  });
+
+  /**
+   * You cannot connect to your own account.
+   *
+   * Mastodon under a Mastodon-primary account, and Bluesky under a
+   * Bluesky-primary one, used to render greyed with "it is your account here,
+   * not a connector" — a permanent row explaining an impossibility, sitting
+   * above the connectors the reader actually came for. Unlike a missing app key
+   * or a rollout flag, this state never resolves while the account is active,
+   * so the row is not an offer and does not belong in a list of offers.
+   */
+  describe('the account own network', () => {
+    /**
+     * Make Auth report Bluesky-primary.
+     *
+     * `Auth.kind` is seeded from storage at construction, and Auth is a root
+     * singleton — so writing these keys is not enough on its own if the
+     * injector has already built it. Overriding the getter is the honest way to
+     * say "this account is Bluesky-primary" without depending on when the
+     * fixture happens to instantiate Auth.
+     */
+    function beBlueskyPrimary(): void {
+      vi.spyOn(TestBed.inject(Auth), 'isBlueskyPrimary', 'get').mockReturnValue(true);
+    }
+
+    it('hides the Bluesky row when Bluesky is the identity', () => {
+      beBlueskyPrimary();
+      const fixture = setUp();
+
+      expect(headings(fixture)).not.toContain('Bluesky');
+      // Mastodon becomes a real connector for this account, so it comes back.
+      expect(headings(fixture)).toContain('Mastodon');
+    });
+
+    it('hides the Mastodon row when Mastodon is the identity', () => {
+      const fixture = setUp();
+
+      expect(headings(fixture)).not.toContain('Mastodon');
+      expect(headings(fixture)).toContain('Bluesky');
+    });
+
+    it('never hides both at once', () => {
+      // The two rules are complementary, not additive: whichever network you
+      // signed in with, the other is still a connector you can add.
+      beBlueskyPrimary();
+      const withBsky = headings(setUp());
+      expect(withBsky.includes('Mastodon') || withBsky.includes('Bluesky')).toBe(true);
+    });
   });
 
   it('says who each connection belongs to', () => {
@@ -190,8 +252,14 @@ describe('SettingsConnections (catalog)', () => {
     expect(dropbox.textContent).toContain('Unavailable');
     expect(dropbox.textContent).toContain('app key is missing');
 
-    // Nothing disappeared: unavailable is a state, not a removal.
-    expect(cards(fixture)).toHaveLength(CONNECTION_CATALOG.length);
+    // Nothing disappeared: unavailable is a state, not a removal. Dropbox with
+    // no app key is something you *could* have and don't, so the row stays as
+    // an offer.
+    //
+    // That is the opposite of the account's own network (the -1 here), which is
+    // not an offer at all and will never become one while this account is
+    // active. Both rules live in `isOwnIdentity`.
+    expect(cards(fixture)).toHaveLength(CONNECTION_CATALOG.length - 1);
   });
 
   it('governs every credential-bearing session and enforces on init', () => {

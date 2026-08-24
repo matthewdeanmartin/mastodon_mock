@@ -70,6 +70,43 @@ export interface BskyImage {
   alt: string;
 }
 
+/**
+ * A blob reference, as `uploadBlob` returns it and as a record must carry it.
+ *
+ * The `$type: 'blob'` and the `ref.$link` CID are part of the wire format, not
+ * decoration — a record embedding a blob without them is rejected. Passed back
+ * verbatim rather than reconstructed, so a future lexicon change to the shape
+ * does not need a matching change here.
+ */
+export interface BskyBlobRef {
+  $type: 'blob';
+  ref: { $link: string };
+  mimeType: string;
+  size: number;
+}
+
+export interface BlobUploadResponse {
+  blob: BskyBlobRef;
+}
+
+/**
+ * The write-side images embed: what goes *into* a post record.
+ *
+ * Distinct from {@link BskyEmbedView}, which is the read-side shape the API
+ * returns with a hydrated post — that one carries rendered CDN URLs, this one
+ * carries blob references. They are not interchangeable, and conflating them is
+ * how an embed that looks right fails to publish.
+ */
+export interface BskyImagesEmbed {
+  $type: 'app.bsky.embed.images';
+  images: {
+    image: BskyBlobRef;
+    /** Alt text. Required by the lexicon — empty string when none was given. */
+    alt: string;
+    aspectRatio?: { width: number; height: number };
+  }[];
+}
+
 /** A post embed view; `$type` discriminates (images / external / record / recordWithMedia). */
 export interface BskyEmbedView {
   $type: string;

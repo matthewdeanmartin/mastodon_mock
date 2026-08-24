@@ -18,6 +18,8 @@ import {
   BskySearchPosts,
   BskyThreadNode,
   BskyTimeline,
+  BlobUploadResponse,
+  BskyImagesEmbed,
 } from './bluesky-types';
 
 /**
@@ -366,16 +368,35 @@ export class BlueskyApi {
     });
   }
 
-  /** Publish a post record (used for replies; Mockingbird has no top-level bsky compose). */
+  /** Publish a post record. */
   post(record: {
     text: string;
     facets?: BskyFacet[];
     reply?: { root: { uri: string; cid: string }; parent: { uri: string; cid: string } };
+    embed?: BskyImagesEmbed;
   }): Observable<CreateRecordResponse> {
     return this.createRecord('app.bsky.feed.post', {
       $type: 'app.bsky.feed.post',
       createdAt: new Date().toISOString(),
       ...record,
+    });
+  }
+
+  /**
+   * Upload image bytes and get back the blob reference a post embed needs.
+   *
+   * The body is the raw bytes, not JSON and not multipart — `uploadBlob` is the
+   * one XRPC procedure that takes a binary body, with the real media type in
+   * `Content-Type`. `HttpClient` passes a `Blob` through untouched, so this goes
+   * through the same `request` path as everything else and inherits its
+   * expired-token refresh.
+   *
+   * Callers must send bytes that already fit Bluesky's ~1MB blob ceiling — see
+   * `prepareImageForBluesky`, which is what makes a phone photo fit.
+   */
+  uploadBlob(blob: Blob, mimeType: string): Observable<BlobUploadResponse> {
+    return this.request<BlobUploadResponse>('com.atproto.repo.uploadBlob', blob, {
+      'Content-Type': mimeType,
     });
   }
 

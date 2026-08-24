@@ -32,7 +32,11 @@ interface ComposeInternals {
   cwOpen: WritableSignal<boolean>;
   spoilerText: WritableSignal<string>;
   sensitive: WritableSignal<boolean>;
-  media: WritableSignal<{ media: { id: string }; description: string }[]>;
+  // `file` is the original bytes, kept so a Bluesky leg can upload them to its
+  // own repo — Mastodon's upload is not reusable there.
+  media: WritableSignal<{ media: { id: string }; description: string; file?: File }[]>;
+  mediaNotice: WritableSignal<string>;
+  uploadFiles(files: File[]): void;
   pollOpen: WritableSignal<boolean>;
   pollOptions: WritableSignal<string[]>;
   pollMultiple: WritableSignal<boolean>;
@@ -751,6 +755,9 @@ describe('Compose', () => {
   });
 
   it('defaults to Fedi even when Bluesky is linked', () => {
+    // A *connector* is a place you can also post; it does not change where the
+    // composer opens. Contrast the Bluesky-primary case below, where Bluesky is
+    // not a second destination but the account itself.
     linkBsky();
     const f = setUp();
     expect(internals(f).showTargetPicker()).toBe(true);
@@ -759,6 +766,25 @@ describe('Compose', () => {
     internals(f).submit();
     httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
     httpMock.expectNone(CREATE_RECORD);
+  });
+
+  it('defaults to Bluesky when Bluesky is the account', () => {
+    // Every quick post used to open aimed at Mastodon for a Bluesky-primary
+    // account — the one network they actually are — so posting where they live
+    // took a correction every single time.
+    linkBsky();
+    vi.spyOn(TestBed.inject(Auth), 'isBlueskyPrimary', 'get').mockReturnValue(true);
+
+    expect(internals(setUp()).target()).toBe('bsky');
+  });
+
+  it('falls back to Fedi when a Bluesky-primary session cannot post', () => {
+    // Through `restorableTarget`, not a bare 'bsky': with stale or missing
+    // Bluesky credentials the composer must not open on a target it cannot
+    // submit to. No linkBsky() here, so the session is absent.
+    vi.spyOn(TestBed.inject(Auth), 'isBlueskyPrimary', 'get').mockReturnValue(true);
+
+    expect(internals(setUp()).target()).not.toBe('bsky');
   });
 
   /** A finished Blogger OAuth flow with a blog chosen, driven through real state. */
@@ -1376,12 +1402,192 @@ describe('Compose', () => {
     expect(internals(f).crossPostError()).toContain('first post');
   });
 
-  it('blocks a bsky-only post that has media attached', () => {
+  /**
+   * Images to Bluesky.
+   *
+   * This used to be "blocks a bsky-only post that has media attached", which
+   * described the bug rather than a rule: `canAttachMedia` never consulted the
+   * target, so the 📎 was live and a file could be picked — and then `canSubmit`
+   * returned false and the post button silently went dead. The only explanation
+   * was a muted hint elsewhere on screen. The reader's report was "I can't
+   * attach an image", and they were right.
+   */
+  it('allows a bsky-only post with an image attached', () => {
     linkBsky();
     const f = setUp();
     internals(f).target.set('bsky');
     internals(f).text.set('with a picture');
-    internals(f).media.set([{ media: { id: 'm1' }, description: '' }]);
+    internals(f).media.set([
+      { media: { id: 'm1' }, description: '', file: new File([''], 'a.png', { type: 'image/png' }) },
+    ]);
+
+    expect(internals(f).canSubmit()).toBe(true);
+  });
+
+  describe('posting images to Bluesky', () => {
+    const UPLOAD_BLOB = 'https://bsky.social/xrpc/com.atproto.repo.uploadBlob';
+
+    /** A blob ref shaped the way uploadBlob really answers. */
+    const blobRef = (link: string) => ({
+      blob: { $type: 'blob', ref: { $link: link }, mimeType: 'image/jpeg', size: 1000 },
+    });
+
+    beforeEach(() => {
+      // The downscaler is covered on its own in bluesky-image.spec.ts; here it
+      // is stubbed so these tests are about the posting flow.
+      vi.stubGlobal('createImageBitmap', () =>
+        Promise.resolve({ width: 800, height: 600, close: vi.fn() }),
+      );
+    });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    function attach(f: ComponentFixture<Compose>, name = 'a.jpg', description = ''): void {
+      internals(f).media.update((list) => [
+        ...list,
+        {
+          media: { id: `local:${name}` },
+          description,
+          // Small enough that prepareImageForBluesky passes it straight through.
+          file: new File(['x'], name, { type: 'image/jpeg' }),
+        },
+      ]);
+    }
+
+    it('uploads the blob, then posts a record embedding it', async () => {
+      linkBsky();
+      const f = setUp();
+      internals(f).target.set('bsky');
+      internals(f).text.set('look at this');
+      attach(f);
+
+      internals(f).submit();
+      // The upload has to finish before the record exists, so let the promise
+      // chain settle before the request is expected.
+      await new Promise((r) => setTimeout(r, 0));
+
+      const upload = httpMock.expectOne(UPLOAD_BLOB);
+      expect(upload.request.headers.get('Content-Type')).toBe('image/jpeg');
+      upload.flush(blobRef('bafy-1'));
+      await new Promise((r) => setTimeout(r, 0));
+
+      const post = httpMock.expectOne(CREATE_RECORD);
+      const embed = post.request.body.record.embed;
+      expect(embed.$type).toBe('app.bsky.embed.images');
+      expect(embed.images).toHaveLength(1);
+      expect(embed.images[0].image.ref.$link).toBe('bafy-1');
+      post.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/1', cid: 'cid1' });
+    });
+
+    it('carries the alt text through to the embed', async () => {
+      // Bluesky's lexicon requires the key, and an image with no description is
+      // a real accessibility loss — the composer already collects one.
+      linkBsky();
+      const f = setUp();
+      internals(f).target.set('bsky');
+      internals(f).text.set('with alt');
+      attach(f, 'a.jpg', 'a tabby asleep on a keyboard');
+
+      internals(f).submit();
+      await new Promise((r) => setTimeout(r, 0));
+      httpMock.expectOne(UPLOAD_BLOB).flush(blobRef('bafy-1'));
+      await new Promise((r) => setTimeout(r, 0));
+
+      const post = httpMock.expectOne(CREATE_RECORD);
+      expect(post.request.body.record.embed.images[0].alt).toBe('a tabby asleep on a keyboard');
+      post.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/1', cid: 'cid1' });
+    });
+
+    it('posts nothing when an upload fails', async () => {
+      // A post that silently dropped one of the photos would leave the reader to
+      // notice the omission themselves, after publishing.
+      linkBsky();
+      const f = setUp();
+      internals(f).target.set('bsky');
+      internals(f).text.set('should not post');
+      attach(f);
+
+      internals(f).submit();
+      await new Promise((r) => setTimeout(r, 0));
+      httpMock.expectOne(UPLOAD_BLOB).flush('no', { status: 500, statusText: 'Server Error' });
+      await new Promise((r) => setTimeout(r, 0));
+
+      httpMock.expectNone(CREATE_RECORD);
+      expect(internals(f).crossPostError()).toContain('nothing was posted');
+    });
+
+    it('attaches images to the first post of a thread only', async () => {
+      // The attachments belong to the post being written; repeating them down
+      // the chain would publish the same photos several times.
+      linkBsky();
+      const f = setUp();
+      internals(f).target.set('bsky');
+      internals(f).text.set('first');
+      internals(f).thread.set(['second']);
+      attach(f);
+
+      internals(f).submit();
+      await new Promise((r) => setTimeout(r, 0));
+      httpMock.expectOne(UPLOAD_BLOB).flush(blobRef('bafy-1'));
+      await new Promise((r) => setTimeout(r, 0));
+
+      const first = httpMock.expectOne(CREATE_RECORD);
+      expect(first.request.body.record.embed).toBeDefined();
+      first.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/1', cid: 'cid1' });
+
+      const second = httpMock.expectOne(CREATE_RECORD);
+      expect(second.request.body.record.embed).toBeUndefined();
+      second.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/2', cid: 'cid2' });
+    });
+
+    it('does not upload to Mastodon for a Bluesky-only post', () => {
+      // There is no Mastodon post to attach it to, so uploading there would
+      // spend a call and store a file nothing will ever reference.
+      linkBsky();
+      const f = setUp();
+      internals(f).target.set('bsky');
+
+      internals(f).uploadFiles([new File(['x'], 'a.jpg', { type: 'image/jpeg' })]);
+
+      httpMock.expectNone('/api/v1/media');
+      expect(internals(f).media()).toHaveLength(1);
+      expect(internals(f).media()[0].file).toBeDefined();
+    });
+
+    it('leaves video out and says so, rather than failing at submit', () => {
+      linkBsky();
+      const f = setUp();
+      internals(f).target.set('bsky');
+
+      internals(f).uploadFiles([new File(['x'], 'clip.mp4', { type: 'video/mp4' })]);
+
+      expect(internals(f).media()).toHaveLength(0);
+      expect(internals(f).mediaNotice()).toContain('images only');
+    });
+
+    it('caps at four images and says how many were left out', () => {
+      linkBsky();
+      const f = setUp();
+      internals(f).target.set('bsky');
+
+      internals(f).uploadFiles(
+        Array.from({ length: 6 }, (_, i) => new File(['x'], `${i}.jpg`, { type: 'image/jpeg' })),
+      );
+
+      expect(internals(f).media()).toHaveLength(4);
+      expect(internals(f).mediaNotice()).toContain('2 were left out');
+    });
+  });
+
+  it('still blocks a bsky-only post with a poll, which the protocol has no record for', () => {
+    // The one thing a Bluesky leg genuinely cannot carry. Kept as the contrast:
+    // media was lumped in with this and should not have been.
+    linkBsky();
+    const f = setUp();
+    internals(f).target.set('bsky');
+    internals(f).text.set('pick one');
+    internals(f).pollOpen.set(true);
+
     expect(internals(f).canSubmit()).toBe(false);
   });
 
