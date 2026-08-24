@@ -76,7 +76,21 @@ describe('LoginBluesky', () => {
     });
   });
 
-  it('uses OAuth as the primary sign-in action', () => {
+  it('uses the Bluesky entryway as the primary sign-in action', () => {
+    const begin = vi
+      .spyOn(TestBed.inject(BlueskySession), 'beginOAuthIdentity')
+      .mockReturnValue(new Promise<never>(() => undefined));
+    const fixture = TestBed.createComponent(LoginBluesky);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance as any;
+
+    cmp.submitBluesky();
+
+    expect(begin).toHaveBeenCalledWith('https://bsky.social', false);
+    httpMock.expectNone(CREATE_SESSION);
+  });
+
+  it('uses targeted OAuth for a specific handle', () => {
     const begin = vi
       .spyOn(TestBed.inject(BlueskySession), 'beginOAuthIdentity')
       .mockReturnValue(new Promise<never>(() => undefined));

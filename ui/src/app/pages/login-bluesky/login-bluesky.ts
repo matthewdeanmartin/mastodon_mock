@@ -6,6 +6,8 @@ import { Auth } from '../../auth';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { environment } from '../../../environments/environment';
 
+const BLUESKY_ENTRYWAY = 'https://bsky.social';
+
 /**
  * Sign in with Bluesky, as the app's **primary identity**.
  *
@@ -43,10 +45,22 @@ export class LoginBluesky implements OnInit {
     }
   }
 
-  /** Start the primary OAuth + PKCE + DPoP flow. */
+  /** Let Bluesky choose the account and accept its native email/username sign-in. */
+  submitBluesky(): void {
+    this.beginOAuth(BLUESKY_ENTRYWAY);
+  }
+
+  /** Start OAuth for a specific ATProto handle, DID, or PDS. */
   submit(): void {
     const identifier = this.handle().trim().replace(/^@/, '');
     if (!identifier || this.working()) {
+      return;
+    }
+    this.beginOAuth(identifier);
+  }
+
+  private beginOAuth(identifier: string): void {
+    if (this.working()) {
       return;
     }
     this.working.set(true);

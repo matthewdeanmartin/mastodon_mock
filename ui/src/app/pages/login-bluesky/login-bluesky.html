@@ -7,35 +7,48 @@
       repost from here.
     </p>
 
-    <form class="bsky-form" (ngSubmit)="submit()">
-      <label class="bsky-field">
-        <span class="bsky-label">Handle, DID, or PDS</span>
-        <input
-          type="text"
-          name="bskyHandle"
-          placeholder="you.bsky.social"
-          autocomplete="username"
-          autocapitalize="none"
-          spellcheck="false"
-          [ngModel]="handle()"
-          (ngModelChange)="handle.set($event)"
-          [disabled]="working()"
-        />
-      </label>
-
-      <button
-        class="bsky-btn bsky-btn-primary bsky-submit"
-        type="submit"
-        [disabled]="!handle().trim() || working()"
-      >
-        {{ working() ? 'Opening Bluesky…' : 'Continue with Bluesky' }}
-      </button>
-    </form>
+    <button
+      class="bsky-btn bsky-btn-primary bsky-submit bsky-entryway"
+      type="button"
+      [disabled]="working()"
+      (click)="submitBluesky()"
+    >
+      {{ working() ? 'Opening Bluesky…' : 'Continue with Bluesky' }}
+    </button>
 
     <p class="bsky-oauth-note muted small">
-      You’ll approve access on your Bluesky provider. {{ brand }} never sees your password; OAuth
-      uses PKCE and a device-bound DPoP key. Chat access is included so DMs work here too.
+      Sign in on bsky.social with your email address or username, then approve access. Use your
+      account password there; Bluesky does not allow app passwords during OAuth. {{ brand }} never
+      sees your password.
     </p>
+
+    <details class="bsky-advanced">
+      <summary>Use a specific handle, DID, or another PDS</summary>
+      <form class="bsky-form" (ngSubmit)="submit()">
+        <label class="bsky-field">
+          <span class="bsky-label">Handle, DID, or PDS</span>
+          <input
+            type="text"
+            name="bskyHandle"
+            placeholder="you.bsky.social"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            [ngModel]="handle()"
+            (ngModelChange)="handle.set($event)"
+            [disabled]="working()"
+          />
+        </label>
+
+        <button
+          class="bsky-btn bsky-submit"
+          type="submit"
+          [disabled]="!handle().trim() || working()"
+        >
+          {{ working() ? 'Opening provider…' : 'Continue with this account' }}
+        </button>
+      </form>
+    </details>
 
     @if (error(); as msg) {
       <p class="bsky-error" role="alert">{{ msg }}</p>

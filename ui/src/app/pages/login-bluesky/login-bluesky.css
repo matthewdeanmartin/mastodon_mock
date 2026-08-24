@@ -41,6 +41,11 @@
   max-width: 48ch;
 }
 
+.bsky-entryway {
+  width: 100%;
+}
+
+.bsky-advanced,
 .bsky-compat {
   margin-top: 20px;
   text-align: left;
@@ -48,9 +53,14 @@
   padding-top: 16px;
 }
 
+.bsky-advanced summary,
 .bsky-compat summary {
   cursor: pointer;
   font-weight: 600;
+}
+
+.bsky-advanced .bsky-form {
+  margin-top: 14px;
 }
 
 /* --- Form --- */

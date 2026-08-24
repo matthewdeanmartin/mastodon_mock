@@ -1,5 +1,5 @@
 {
-  "testCount": 5308,
+  "testCount": 5309,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -1589,7 +1589,8 @@
     "src/app/pages/login-bluesky/login-bluesky.spec.ts :: LoginBluesky sends the app password to createSession and nowhere else",
     "src/app/pages/login-bluesky/login-bluesky.spec.ts :: LoginBluesky signs in and lands on Home as a Bluesky-primary account",
     "src/app/pages/login-bluesky/login-bluesky.spec.ts :: LoginBluesky tolerates a leading @ and surrounding whitespace in the handle",
-    "src/app/pages/login-bluesky/login-bluesky.spec.ts :: LoginBluesky uses OAuth as the primary sign-in action",
+    "src/app/pages/login-bluesky/login-bluesky.spec.ts :: LoginBluesky uses targeted OAuth for a specific handle",
+    "src/app/pages/login-bluesky/login-bluesky.spec.ts :: LoginBluesky uses the Bluesky entryway as the primary sign-in action",
     "src/app/pages/login-bluesky/login-bluesky.spec.ts :: LoginBluesky writes the identity keys, not the scoped connector keys",
     "src/app/pages/login-chooser/login-chooser.spec.ts :: LoginChooser carries the analytics opt-out, reachable without an account",
     "src/app/pages/login-chooser/login-chooser.spec.ts :: LoginChooser does not show a server picker — that lives on the Mastodon page now",
