@@ -97,19 +97,18 @@ def revoke_collection_item(collection_id: str, item_id: str) -> dict[str, Any]:
     return {}
 
 
-# Mastodon 4.6 and the live mastodon.social API use the ``accounts`` segment.
-# The vendored comparison schema still describes the pre-release path without
-# it, so retain that alias in OpenAPI while serving the real path at runtime.
-@router.get("/api/v1/accounts/{account_id}/collections", include_in_schema=False)
-@router.get("/api/v1/{account_id}/collections")
+# Mastodon 4.6, the live mastodon.social API, and the current upstream schema use
+# the ``accounts`` segment. Keep the pre-release path as a hidden runtime alias.
+@router.get("/api/v1/accounts/{account_id}/collections")
+@router.get("/api/v1/{account_id}/collections", include_in_schema=False)
 def account_collections(account_id: str) -> dict[str, Any]:
     """List collections for an account. The mock keeps no collections."""
     del account_id
     return {"collections": []}
 
 
-@router.get("/api/v1/accounts/{account_id}/in_collections", include_in_schema=False)
-@router.get("/api/v1/{account_id}/in_collections")
+@router.get("/api/v1/accounts/{account_id}/in_collections")
+@router.get("/api/v1/{account_id}/in_collections", include_in_schema=False)
 def account_in_collections(account_id: str) -> dict[str, Any]:
     """List collections an account appears in. The mock keeps no collections."""
     del account_id

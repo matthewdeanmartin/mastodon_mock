@@ -48,7 +48,7 @@ def _heartbeat_seconds(request: Request) -> float:
     return float(request.app.state.config.streaming.heartbeat_seconds)
 
 
-async def _stream(request: Request, bus: EventBus, channel: str) -> StreamingResponse:
+def _stream(request: Request, bus: EventBus, channel: str) -> StreamingResponse:
     """Build a StreamingResponse that drains ``channel`` until the client leaves."""
     heartbeat = _heartbeat_seconds(request)
     sub = bus.subscribe(channel)
@@ -82,49 +82,49 @@ def streaming_health() -> PlainTextResponse:
 async def stream_user(request: Request, account: RequiredAccount) -> StreamingResponse:
     """Home-timeline updates + notifications for the authed account."""
     bus = _require_streaming(request)
-    return await _stream(request, bus, user_channel(account.id))
+    return _stream(request, bus, user_channel(account.id))
 
 
 @router.get("/api/v1/streaming/user/notification")
 async def stream_user_notification(request: Request, account: RequiredAccount) -> StreamingResponse:
     """Legacy split stream: notifications only, same channel as ``stream_user``."""
     bus = _require_streaming(request)
-    return await _stream(request, bus, user_channel(account.id))
+    return _stream(request, bus, user_channel(account.id))
 
 
 @router.get("/api/v1/streaming/public")
 async def stream_public(request: Request, viewer: CurrentAccount) -> StreamingResponse:
     """Every public status event."""
     bus = _require_streaming(request)
-    return await _stream(request, bus, "public")
+    return _stream(request, bus, "public")
 
 
 @router.get("/api/v1/streaming/public/local")
 async def stream_public_local(request: Request, viewer: CurrentAccount) -> StreamingResponse:
     """Public events from local (no-domain) accounts."""
     bus = _require_streaming(request)
-    return await _stream(request, bus, "public:local")
+    return _stream(request, bus, "public:local")
 
 
 @router.get("/api/v1/streaming/public/remote")
 async def stream_public_remote(request: Request, viewer: CurrentAccount) -> StreamingResponse:
     """Public events from remote (domained) accounts."""
     bus = _require_streaming(request)
-    return await _stream(request, bus, "public:remote")
+    return _stream(request, bus, "public:remote")
 
 
 @router.get("/api/v1/streaming/hashtag")
 async def stream_hashtag(request: Request, tag: str, viewer: CurrentAccount) -> StreamingResponse:
     """Public updates for a hashtag."""
     bus = _require_streaming(request)
-    return await _stream(request, bus, hashtag_channel(tag))
+    return _stream(request, bus, hashtag_channel(tag))
 
 
 @router.get("/api/v1/streaming/hashtag/local")
 async def stream_hashtag_local(request: Request, tag: str, viewer: CurrentAccount) -> StreamingResponse:
     """Public updates for a hashtag, local accounts only."""
     bus = _require_streaming(request)
-    return await _stream(request, bus, hashtag_channel(tag, local=True))
+    return _stream(request, bus, hashtag_channel(tag, local=True))
 
 
 @router.get("/api/v1/streaming/list")
@@ -135,14 +135,14 @@ async def stream_list(request: Request, list: str, account: RequiredAccount) -> 
         list_id = int(list)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail="Invalid list id") from exc
-    return await _stream(request, bus, list_channel(list_id))
+    return _stream(request, bus, list_channel(list_id))
 
 
 @router.get("/api/v1/streaming/direct")
 async def stream_direct(request: Request, account: RequiredAccount) -> StreamingResponse:
     """Direct-message conversation events for the authed account."""
     bus = _require_streaming(request)
-    return await _stream(request, bus, direct_channel(account.id))
+    return _stream(request, bus, direct_channel(account.id))
 
 
 def _account_from_query_token(db: DbSession, request: Request | WebSocket) -> Account | None:
@@ -208,7 +208,7 @@ async def stream_legacy(request: Request, db: DbSession) -> StreamingResponse:
     bus = _require_streaming(request)
     account = _account_from_query_token(db, request)
     channel = _resolve_legacy_channel(request.query_params, account)
-    return await _stream(request, bus, channel)
+    return _stream(request, bus, channel)
 
 
 @router.websocket("/api/v1/streaming")

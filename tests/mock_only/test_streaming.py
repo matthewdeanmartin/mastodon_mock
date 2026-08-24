@@ -153,10 +153,7 @@ def test_websocket_user_stream_authenticates_via_query_token(
     bob = mastodon_mock_server.client("bob")
     alice.account_follow(bob.me().id)
 
-    url = (
-        f"{_ws_base(mastodon_mock_server)}/api/v1/streaming"
-        f"?stream=user&access_token={alice.access_token}"
-    )
+    url = f"{_ws_base(mastodon_mock_server)}/api/v1/streaming?stream=user&access_token={alice.access_token}"
     with connect(url) as ws:
         bob.status_post("ws live from bob!")
         frame = json.loads(ws.recv(timeout=5))

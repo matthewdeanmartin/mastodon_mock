@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mastodon API",
-    "version": "4.6.0",
-    "description": "Unofficial documentation for the Mastodon API. Generated with [mastodon-openapi](https://github.com/abraham/mastodon-openapi) from [960eeb0](https://github.com/mastodon/documentation/commit/960eeb05f61209f2f7e8e97456239a3a8e143c6f). Targets [supported](https://github.com/mastodon/mastodon/security/policy#supported-versions) Mastodon versions.",
+    "version": "4.7.0",
+    "description": "Unofficial documentation for the Mastodon API. Generated with [mastodon-openapi](https://github.com/abraham/mastodon-openapi) from [bbf2634](https://github.com/mastodon/documentation/commit/bbf2634464593f8b937adb0515bceab900f54e0e). Targets [supported](https://github.com/mastodon/mastodon/security/policy#supported-versions) Mastodon versions.",
     "license": {
       "name": "GFDL-1.3",
       "url": "https://www.gnu.org/licenses/fdl-1.3.en.html"
@@ -31,298 +31,6 @@
   ],
   "security": [],
   "paths": {
-    "/api/v1/{account_id}/collections": {
-      "get": {
-        "operationId": "getByAccountIdCollections",
-        "summary": "Get all Collections from a given account",
-        "description": "Version history:\n\n4.6.0 (`mastodon` [API version] 10) - added",
-        "tags": [
-          "{account_id}"
-        ],
-        "responses": {
-          "200": {
-            "description": "[Collections]",
-            "headers": {
-              "X-RateLimit-Limit": {
-                "$ref": "#/components/headers/X-RateLimit-Limit"
-              },
-              "X-RateLimit-Remaining": {
-                "$ref": "#/components/headers/X-RateLimit-Remaining"
-              },
-              "X-RateLimit-Reset": {
-                "$ref": "#/components/headers/X-RateLimit-Reset"
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "examples": {
-                  "Error401Example": {
-                    "$ref": "#/components/examples/Error401Example"
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "examples": {
-                  "Error404Example": {
-                    "$ref": "#/components/examples/Error404Example"
-                  }
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "Gone"
-          },
-          "422": {
-            "description": "Unprocessable Content",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
-                },
-                "examples": {
-                  "ValidationError422Example": {
-                    "$ref": "#/components/examples/ValidationError422Example"
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "examples": {
-                  "Error429Example": {
-                    "$ref": "#/components/examples/Error429Example"
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "examples": {
-                  "Error503Example": {
-                    "$ref": "#/components/examples/Error503Example"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "externalDocs": {
-          "url": "https://docs.joinmastodon.org/methods/collections/#get_collections",
-          "description": "Official Mastodon API documentation"
-        },
-        "security": [
-          {
-            "OAuth2": [
-              "read:collections"
-            ]
-          }
-        ],
-        "parameters": [
-          {
-            "name": "account_id",
-            "in": "path",
-            "required": true,
-            "description": "account_id parameter",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "Maximum number of results. Defaults to 40 Collections. Max 80 accounts.",
-            "schema": {
-              "type": "integer",
-              "description": "Maximum number of results. Defaults to 40 Collections. Max 80 accounts.",
-              "default": 40
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "description": "Skip the first n results. Defaults to 0.",
-            "schema": {
-              "type": "integer",
-              "description": "Skip the first n results. Defaults to 0.",
-              "default": 0
-            }
-          }
-        ]
-      }
-    },
-    "/api/v1/{account_id}/in_collections": {
-      "get": {
-        "operationId": "getByAccountIdInCollections",
-        "summary": "Get all Collections an account is featured in",
-        "description": "Version history:\n\n4.6.0 (`mastodon` [API version] 10) - added",
-        "tags": [
-          "{account_id}"
-        ],
-        "responses": {
-          "200": {
-            "description": "[Collections]",
-            "headers": {
-              "X-RateLimit-Limit": {
-                "$ref": "#/components/headers/X-RateLimit-Limit"
-              },
-              "X-RateLimit-Remaining": {
-                "$ref": "#/components/headers/X-RateLimit-Remaining"
-              },
-              "X-RateLimit-Reset": {
-                "$ref": "#/components/headers/X-RateLimit-Reset"
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "examples": {
-                  "Error401Example": {
-                    "$ref": "#/components/examples/Error401Example"
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "examples": {
-                  "Error404Example": {
-                    "$ref": "#/components/examples/Error404Example"
-                  }
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "Gone"
-          },
-          "422": {
-            "description": "Unprocessable Content",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
-                },
-                "examples": {
-                  "ValidationError422Example": {
-                    "$ref": "#/components/examples/ValidationError422Example"
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "examples": {
-                  "Error429Example": {
-                    "$ref": "#/components/examples/Error429Example"
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                },
-                "examples": {
-                  "Error503Example": {
-                    "$ref": "#/components/examples/Error503Example"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "externalDocs": {
-          "url": "https://docs.joinmastodon.org/methods/collections/#in_collections",
-          "description": "Official Mastodon API documentation"
-        },
-        "security": [
-          {
-            "OAuth2": [
-              "read:collections"
-            ]
-          }
-        ],
-        "parameters": [
-          {
-            "name": "account_id",
-            "in": "path",
-            "required": true,
-            "description": "account_id parameter",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "Maximum number of results. Defaults to 40 Collections. Max 80 accounts.",
-            "schema": {
-              "type": "integer",
-              "description": "Maximum number of results. Defaults to 40 Collections. Max 80 accounts.",
-              "default": 40
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "description": "Skip the first n results. Defaults to 0.",
-            "schema": {
-              "type": "integer",
-              "description": "Skip the first n results. Defaults to 0.",
-              "default": 0
-            }
-          }
-        ]
-      }
-    },
     "/api/v1/accounts": {
       "post": {
         "operationId": "createAccount",
@@ -625,6 +333,298 @@
               "items": {
                 "type": "string"
               }
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/accounts/{account_id}/collections": {
+      "get": {
+        "operationId": "getAccountCollections",
+        "summary": "Get all Collections from a given account",
+        "description": "Version history:\n\n4.6.0 (`mastodon` [API version] 10) - added",
+        "tags": [
+          "accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "[Collections]",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "Error401Example": {
+                    "$ref": "#/components/examples/Error401Example"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "Error404Example": {
+                    "$ref": "#/components/examples/Error404Example"
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone"
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "examples": {
+                  "ValidationError422Example": {
+                    "$ref": "#/components/examples/ValidationError422Example"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "Error429Example": {
+                    "$ref": "#/components/examples/Error429Example"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "Error503Example": {
+                    "$ref": "#/components/examples/Error503Example"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "externalDocs": {
+          "url": "https://docs.joinmastodon.org/methods/collections/#get_collections",
+          "description": "Official Mastodon API documentation"
+        },
+        "security": [
+          {
+            "OAuth2": [
+              "read:collections"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "description": "account_id parameter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of results. Defaults to 40 Collections. Max 80 Collections.",
+            "schema": {
+              "type": "integer",
+              "description": "Maximum number of results. Defaults to 40 Collections. Max 80 Collections.",
+              "default": 40
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Skip the first n results. Defaults to 0.",
+            "schema": {
+              "type": "integer",
+              "description": "Skip the first n results. Defaults to 0.",
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/accounts/{account_id}/in_collections": {
+      "get": {
+        "operationId": "getAccountInCollections",
+        "summary": "Get all Collections the current account is featured in",
+        "description": "Version history:\n\n4.6.0 (`mastodon` [API version] 10) - added",
+        "tags": [
+          "accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "[Collections]",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "Error401Example": {
+                    "$ref": "#/components/examples/Error401Example"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "Error404Example": {
+                    "$ref": "#/components/examples/Error404Example"
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone"
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "examples": {
+                  "ValidationError422Example": {
+                    "$ref": "#/components/examples/ValidationError422Example"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "Error429Example": {
+                    "$ref": "#/components/examples/Error429Example"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "Error503Example": {
+                    "$ref": "#/components/examples/Error503Example"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "externalDocs": {
+          "url": "https://docs.joinmastodon.org/methods/collections/#in_collections",
+          "description": "Official Mastodon API documentation"
+        },
+        "security": [
+          {
+            "OAuth2": [
+              "read:collections"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "description": "account_id parameter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of results. Defaults to 40 Collections. Max 80 Collections.",
+            "schema": {
+              "type": "integer",
+              "description": "Maximum number of results. Defaults to 40 Collections. Max 80 Collections.",
+              "default": 40
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Skip the first n results. Defaults to 0.",
+            "schema": {
+              "type": "integer",
+              "description": "Skip the first n results. Defaults to 0.",
+              "default": 0
             }
           }
         ]
@@ -4340,7 +4340,7 @@
       "patch": {
         "operationId": "patchAccountsUpdateCredentials",
         "summary": "Update account credentials",
-        "description": "Update the user's display and preferences.\n\nVersion history:\n\n1.1.1 - added\\\n2.3.0 - added `locked` parameter\\\n2.4.0 - added `source[privacy,sensitive]` parameters\\\n2.4.2 - added `source[language]` parameter\\\n2.7.0 - added `discoverable` parameter\\\n4.1.0 - added `hide_collections` parameter\\\n4.2.0 - added `indexable` parameter\\\n4.4.0 (`mastodon` [API version] 3) - added `attribution_domains` parameter\\\n4.5.0 (`mastodon` [API version] 7) - added `quote_policy` parameter",
+        "description": "Update the user's display and preferences.\n\nVersion history:\n\n1.1.1 - added\\\n2.3.0 - added `locked` parameter\\\n2.4.0 - added `source[privacy,sensitive]` parameters\\\n2.4.2 - added `source[language]` parameter\\\n2.7.0 - added `discoverable` parameter\\\n4.1.0 - added `hide_collections` parameter\\\n4.2.0 - added `indexable` parameter\\\n4.4.0 (`mastodon` [API version] 3) - added `attribution_domains` parameter\\\n4.5.0 (`mastodon` [API version] 7) - added `quote_policy` parameter\\\n4.6.1 (`mastodon` [API version] 11) - added `avatar_description` and `header_description` parameter",
         "tags": [
           "accounts"
         ],
@@ -4481,6 +4481,10 @@
                     "type": "string",
                     "description": "Avatar image encoded using `multipart/form-data`"
                   },
+                  "avatar_description": {
+                    "type": "string",
+                    "description": "A plain-text description of the avatar, for accessibility purposes."
+                  },
                   "bot": {
                     "type": "boolean",
                     "description": "Whether the account has a bot flag."
@@ -4500,6 +4504,10 @@
                   "header": {
                     "type": "string",
                     "description": "Header image encoded using `multipart/form-data`"
+                  },
+                  "header_description": {
+                    "type": "string",
+                    "description": "A plain-text description of the header, for accessibility purposes."
                   },
                   "hide_collections": {
                     "type": "boolean",
@@ -6731,19 +6739,22 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "description": "A name for this Collection, max. 40 characters"
+                    "description": "A name for this Collection, max. 40 characters. String is taken \"as is\", which means there is currently no special handling of URLs and hashtags and no support for custom emoji."
                   },
                   "account_ids": {
-                    "type": "string",
-                    "description": "IDs of the accounts to feature in this Collection"
+                    "type": "array",
+                    "description": "IDs of the accounts to feature in this Collection",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "description": {
                     "type": "string",
-                    "description": "A longer description of this Collection, max. 100 characters"
+                    "description": "A longer description of this Collection, max. 100 characters. String is taken \"as is\", which means there is currently no special handling of URLs a"
                   },
                   "discoverable": {
                     "type": "boolean",
-                    "description": "Whether this Collection should appear in search results and other discovery mechanisms"
+                    "description": "Whether this Collection should appear on the user's profile, in search results and other discovery mechanisms"
                   },
                   "language": {
                     "type": "string",
@@ -21226,7 +21237,7 @@
       "get": {
         "operationId": "getPreferences",
         "summary": "View user preferences",
-        "description": "Preferences defined by the user in their account settings.\n\nVersion history:\n\n2.8.0 - added\\\n4.5.0 (`mastodon` [API version] 7) - added `posting:default:quoted_policy`",
+        "description": "Preferences defined by the user in their account settings.\n\nVersion history:\n\n2.8.0 - added\\\n4.1.0 - added `reading:autoplay:gifs`\\\n4.5.0 (`mastodon` [API version] 7) - added `posting:default:quoted_policy`",
         "tags": [
           "preferences"
         ],
@@ -21613,7 +21624,7 @@
                   },
                   "discoverable": {
                     "type": "boolean",
-                    "description": "Whether the account should be shown in the profile directory."
+                    "description": "Whether the account should be shown in the profile directory and be available for other discovery features, like being included in Collections."
                   },
                   "display_name": {
                     "type": "string",
@@ -21633,7 +21644,7 @@
                   },
                   "hide_collections": {
                     "type": "boolean",
-                    "description": "Whether to hide followers and followed accounts."
+                    "description": "Whether to hide followers and followed accounts. This field predates the Collections feature and has nothing to do with it, despite the name."
                   },
                   "indexable": {
                     "type": "boolean",
@@ -32189,6 +32200,10 @@
             "description": "The account id.",
             "type": "string"
           },
+          "indexable": {
+            "description": "Whether the account allows indexing by search engines.",
+            "type": "boolean"
+          },
           "locked": {
             "description": "Whether the account manually approves follow requests.",
             "type": "boolean"
@@ -32244,13 +32259,6 @@
           },
           "hide_collections": {
             "description": "Whether the user hides the contents of their follows and followers collections.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "indexable": {
-            "description": "Whether the account allows indexing by search engines.",
             "type": [
               "boolean",
               "null"
@@ -32358,6 +32366,7 @@
           "header",
           "header_static",
           "id",
+          "indexable",
           "locked",
           "note",
           "statuses_count",
@@ -32515,6 +32524,10 @@
             "description": "The account id.",
             "type": "string"
           },
+          "indexable": {
+            "description": "Whether the account allows indexing by search engines.",
+            "type": "boolean"
+          },
           "locked": {
             "description": "Whether the account manually approves follow requests.",
             "type": "boolean"
@@ -32541,6 +32554,10 @@
               "follow_requests_count": {
                 "description": "The number of pending follow requests.",
                 "type": "integer"
+              },
+              "indexable": {
+                "description": "Whether public posts should be searchable to anyone.",
+                "type": "boolean"
               },
               "note": {
                 "description": "Profile bio, in plain text instead of HTML.",
@@ -32579,13 +32596,6 @@
                   "null"
                 ]
               },
-              "indexable": {
-                "description": "Whether public posts should be searchable to anyone.",
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
               "language": {
                 "description": "The default posting language for new statuses.",
                 "type": [
@@ -32600,12 +32610,13 @@
                   "string",
                   "null"
                 ],
-                "$ref": "#/components/schemas/CredentialAccountSourceQuotePolicyEnum"
+                "$ref": "#/components/schemas/ScheduledStatusParamsQuoteApprovalPolicyEnum"
               }
             },
             "required": [
               "fields",
               "follow_requests_count",
+              "indexable",
               "note",
               "privacy",
               "sensitive"
@@ -32658,13 +32669,6 @@
           },
           "hide_collections": {
             "description": "Whether the user hides the contents of their follows and followers collections.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "indexable": {
-            "description": "Whether the account allows indexing by search engines.",
             "type": [
               "boolean",
               "null"
@@ -32772,6 +32776,7 @@
           "header",
           "header_static",
           "id",
+          "indexable",
           "locked",
           "note",
           "role",
@@ -32856,6 +32861,10 @@
             "description": "The account id.",
             "type": "string"
           },
+          "indexable": {
+            "description": "Whether the account allows indexing by search engines.",
+            "type": "boolean"
+          },
           "locked": {
             "description": "Whether the account manually approves follow requests.",
             "type": "boolean"
@@ -32911,13 +32920,6 @@
           },
           "hide_collections": {
             "description": "Whether the user hides the contents of their follows and followers collections.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "indexable": {
-            "description": "Whether the account allows indexing by search engines.",
             "type": [
               "boolean",
               "null"
@@ -33033,6 +33035,7 @@
           "header",
           "header_static",
           "id",
+          "indexable",
           "locked",
           "note",
           "statuses_count",
@@ -33107,17 +33110,33 @@
         "properties": {
           "acct": {
             "description": "The WebFinger account URI. Equal to `username` for local users, or `username@domain` for remote users.",
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "avatar": {
             "description": "An image icon that is shown next to statuses and in the profile.",
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
+            "format": "uri"
+          },
+          "avatar_static": {
+            "description": "A static version of the avatar. Equal to `avatar` if its value is a static image; different if `avatar` is an animated GIF.",
+            "type": "string",
+            "format": "uri"
+          },
+          "bot": {
+            "description": "Indicates that the account may perform automated actions, may not be monitored, or identifies as a robot.",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "The account id.",
+            "type": "string"
+          },
+          "locked": {
+            "description": "Whether the account manually approves follow requests.",
+            "type": "boolean"
+          },
+          "url": {
+            "description": "The location of the user's profile page.",
+            "type": "string",
             "format": "uri"
           },
           "avatar_description": {
@@ -33126,45 +33145,17 @@
               "string",
               "null"
             ]
-          },
-          "avatar_static": {
-            "description": "A static version of the avatar. Equal to `avatar` if its value is a static image; different if `avatar` is an animated GIF.",
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uri"
-          },
-          "bot": {
-            "description": "Indicates that the account may perform automated actions, may not be monitored, or identifies as a robot.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "id": {
-            "description": "The account id.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "locked": {
-            "description": "Whether the account manually approves follow requests.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "url": {
-            "description": "The location of the user's profile page.",
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uri"
           }
         },
+        "required": [
+          "acct",
+          "avatar",
+          "avatar_static",
+          "bot",
+          "id",
+          "locked",
+          "url"
+        ],
         "externalDocs": {
           "url": "https://docs.joinmastodon.org/entities/Account/#attributes",
           "description": "Official Mastodon API documentation"
@@ -33596,6 +33587,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "digest": {
+            "description": "The sha256 hex digest of the domain that is not allowed to federated.",
+            "type": "string"
+          },
           "domain": {
             "description": "The domain that is not allowed to federate.",
             "type": "string"
@@ -33621,13 +33616,6 @@
             "type": "string",
             "$ref": "#/components/schemas/AdminDomainBlockSeverityEnum"
           },
-          "digest": {
-            "description": "The sha256 hex digest of the domain that is not allowed to federated.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "private_comment": {
             "description": "",
             "type": [
@@ -33645,6 +33633,7 @@
         },
         "required": [
           "created_at",
+          "digest",
           "domain",
           "id",
           "obfuscate",
@@ -34278,6 +34267,10 @@
         "type": "object",
         "description": "Represents a summary of a user's activity during a given year.",
         "properties": {
+          "year": {
+            "description": "The year this report is from.",
+            "type": "integer"
+          },
           "account_id": {
             "description": "The account ID the report is about.",
             "type": [
@@ -34294,10 +34287,7 @@
             "properties": {
               "archetype": {
                 "description": "Archetype the user corresponds to. This is meant to represent a playful and very coarse overview of the user's posting habits over the year.",
-                "type": [
-                  "string",
-                  "null"
-                ],
+                "type": "string",
                 "enum": [
                   "lurker",
                   "booster",
@@ -34308,10 +34298,7 @@
               },
               "type_distribution": {
                 "description": "Provides a breakdown of the user's posts statistics over the year. Only available in schema version 1.",
-                "type": [
-                  "object",
-                  "null"
-                ]
+                "type": "object"
               },
               "top_statuses": {
                 "description": "Provides a breakdown of the user's most-interacted statuses by type of interaction (reblogs, favourites, replies) over the year.",
@@ -34322,20 +34309,14 @@
               },
               "most_used_apps": {
                 "description": "Provides a breakdown of the apps the user used the most for posting statuses over the year. Only available in schema version 1.",
-                "type": [
-                  "array",
-                  "null"
-                ],
+                "type": "array",
                 "items": {
                   "type": "object"
                 }
               },
               "commonly_interacted_with_accounts": {
                 "description": "Provides a breakdown of the accounts the user have the most frequently replied to over the year. Only available in schema version 1.",
-                "type": [
-                  "array",
-                  "null"
-                ],
+                "type": "array",
                 "items": {
                   "type": "object"
                 }
@@ -34362,22 +34343,24 @@
               },
               "most_reblogged_accounts": {
                 "description": "Provides a breakdown of the accounts the user has reblogged the most over the year. Only available in schema version 1.",
-                "type": [
-                  "array",
-                  "null"
-                ],
+                "type": "array",
                 "items": {
                   "type": "object"
                 }
               },
               "percentiles": {
                 "description": "Which percentile of the most prolific posters on the same server the user is in. Only available in schema version 1.",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "type": "number"
               }
-            }
+            },
+            "required": [
+              "archetype",
+              "type_distribution",
+              "most_used_apps",
+              "commonly_interacted_with_accounts",
+              "most_reblogged_accounts",
+              "percentiles"
+            ]
           },
           "schema_version": {
             "description": "The schema version of the report, defines how to interpret `data`.",
@@ -34393,15 +34376,11 @@
               "null"
             ],
             "format": "uri"
-          },
-          "year": {
-            "description": "The year this report is from.",
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         },
+        "required": [
+          "year"
+        ],
         "externalDocs": {
           "url": "https://docs.joinmastodon.org/entities/AnnualReport/#attributes",
           "description": "Official Mastodon API documentation"
@@ -34472,17 +34451,11 @@
           "redirect_uri": {
             "description": "The registered redirection URI(s) for the application stored as a single string. Multiple URIs are separated by whitespace characters. May contain `\\n` characters when multiple redirect URIs are registered.",
             "deprecated": true,
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "redirect_uris": {
             "description": "The registered redirection URI(s) for the application.",
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string",
               "format": "uri"
@@ -34490,22 +34463,12 @@
           },
           "scopes": {
             "description": "The scopes for the application. This is the registered `scopes` string split on whitespace.",
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/OAuthScopes"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/OAuthScopes"
           },
           "vapid_key": {
             "description": "Used for Push Streaming API. Returned with [POST /api/v1/apps]({{< relref \"methods/apps#create\" >}}). Equivalent to [WebPushSubscription#server_key]({{< relref \"entities/WebPushSubscription#server_key\" >}}) and [Instance#vapid_public_key]({{< relref \"entities/Instance#vapid_public_key\" >}})",
             "deprecated": true,
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "website": {
             "description": "The website associated with the application.",
@@ -34518,7 +34481,11 @@
         },
         "required": [
           "id",
-          "name"
+          "name",
+          "redirect_uri",
+          "redirect_uris",
+          "scopes",
+          "vapid_key"
         ],
         "externalDocs": {
           "url": "https://docs.joinmastodon.org/entities/Application/#attributes",
@@ -34560,27 +34527,14 @@
             "description": "The name of the application.",
             "type": "string"
           },
-          "client_secret_expires_at": {
-            "description": "When the client secret key will expire. Presently this always returns `0` indicating that OAuth Clients do not expire.",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
           "redirect_uri": {
             "description": "The registered redirection URI(s) for the application stored as a single string. Multiple URIs are separated by whitespace characters. May contain `\\n` characters when multiple redirect URIs are registered.",
             "deprecated": true,
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "redirect_uris": {
             "description": "The registered redirection URI(s) for the application.",
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
               "type": "string",
               "format": "uri"
@@ -34588,20 +34542,17 @@
           },
           "scopes": {
             "description": "The scopes for the application. This is the registered `scopes` string split on whitespace.",
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/OAuthScopes"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/OAuthScopes"
           },
           "vapid_key": {
             "description": "Used for Push Streaming API. Returned with [POST /api/v1/apps]({{< relref \"methods/apps#create\" >}}). Equivalent to [WebPushSubscription#server_key]({{< relref \"entities/WebPushSubscription#server_key\" >}}) and [Instance#vapid_public_key]({{< relref \"entities/Instance#vapid_public_key\" >}})",
             "deprecated": true,
+            "type": "string"
+          },
+          "client_secret_expires_at": {
+            "description": "When the client secret key will expire. Presently this always returns `0` indicating that OAuth Clients do not expire.",
             "type": [
-              "string",
+              "integer",
               "null"
             ]
           },
@@ -34618,7 +34569,11 @@
           "client_id",
           "client_secret",
           "id",
-          "name"
+          "name",
+          "redirect_uri",
+          "redirect_uris",
+          "scopes",
+          "vapid_key"
         ],
         "externalDocs": {
           "url": "https://docs.joinmastodon.org/entities/Application/#attributes",
@@ -34680,7 +34635,7 @@
             "type": "string"
           },
           "discoverable": {
-            "description": "Whether the Collection should show up in search results and recommendations.",
+            "description": "Whether the Collection should show up on the owner's profile, in search results and recommendations.",
             "type": "boolean"
           },
           "id": {
@@ -35546,6 +35501,19 @@
         "type": "object",
         "description": "Represents the software instance of Mastodon running on this domain.",
         "properties": {
+          "api_versions": {
+            "description": "Machine-readable API version information that allows clients to determine which API endpoints and features are available on this server. This provides a more reliable method for capability detection than parsing human-readable version strings, especially for forks and development builds. It contains at least a `mastodon` attribute, and other implementations may have their own additional attributes.",
+            "type": "object",
+            "properties": {
+              "mastodon": {
+                "description": "API version number that increments with substantial API changes. Clients can use this value to determine API compatibility rather than parsing complex version strings like \"4.4+hometown-123\" from forks or nightly builds. This number increases independently of the human-readable version number.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "mastodon"
+            ]
+          },
           "configuration": {
             "description": "Configured values and limits for this website.",
             "type": "object",
@@ -35558,6 +35526,17 @@
                     "description": "The maximum number of featured tags allowed for each account.",
                     "type": "integer"
                   },
+                  "max_pinned_statuses": {
+                    "description": "The maximum number of pinned statuses for each account.",
+                    "type": "integer"
+                  },
+                  "max_avatar_description_length": {
+                    "description": "The maximum length allowed for an account's avatar description.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
                   "max_display_name_length": {
                     "description": "The maximum length allowed for an account's display name.",
                     "type": [
@@ -35565,15 +35544,15 @@
                       "null"
                     ]
                   },
-                  "max_note_length": {
-                    "description": "The maximum length allowed for an account's bio.",
+                  "max_header_description_length": {
+                    "description": "The maximum length allowed for an account's profile header description.",
                     "type": [
                       "integer",
                       "null"
                     ]
                   },
-                  "max_pinned_statuses": {
-                    "description": "The maximum number of pinned statuses for each account.",
+                  "max_note_length": {
+                    "description": "The maximum length allowed for an account's bio.",
                     "type": [
                       "integer",
                       "null"
@@ -35602,7 +35581,8 @@
                   }
                 },
                 "required": [
-                  "max_featured_tags"
+                  "max_featured_tags",
+                  "max_pinned_statuses"
                 ]
               },
               "media_attachments": {
@@ -35919,6 +35899,13 @@
             "description": "The WebFinger domain name of the server.",
             "type": "string"
           },
+          "icon": {
+            "description": "The list of available size variants for this server's configured icon.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstanceIcon"
+            }
+          },
           "languages": {
             "description": "Primary languages of the website and its staff.",
             "type": "array",
@@ -36069,38 +36056,21 @@
             "description": "The version of Mastodon installed on the server.",
             "type": "string"
           },
-          "api_versions": {
-            "description": "Machine-readable API version information that allows clients to determine which API endpoints and features are available on this server. This provides a more reliable method for capability detection than parsing human-readable version strings, especially for forks and development builds. It contains at least a `mastodon` attribute, and other implementations may have their own additional attributes.",
+          "wrapstodon": {
+            "description": "The current Wrapstodon ([Annual report]({{< relref \"methods/annual_reports\" >}}) campaign identifier (year), if any.",
             "type": [
-              "object",
+              "string",
               "null"
-            ],
-            "properties": {
-              "mastodon": {
-                "description": "API version number that increments with substantial API changes. Clients can use this value to determine API compatibility rather than parsing complex version strings like \"4.4+hometown-123\" from forks or nightly builds. This number increases independently of the human-readable version number.",
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              }
-            }
-          },
-          "icon": {
-            "description": "The list of available size variants for this server's configured icon.",
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/InstanceIcon"
-            }
+            ]
           }
         },
         "required": [
+          "api_versions",
           "configuration",
           "contact",
           "description",
           "domain",
+          "icon",
           "languages",
           "registrations",
           "rules",
@@ -36809,6 +36779,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "group_key": {
+            "description": "Group key shared by similar notifications, to be used in the grouped notifications feature. Should be considered opaque, but ungrouped notifications can be assumed to have a `group_key` of the form `ungrouped-{notification_id}`.",
+            "type": "string"
+          },
           "id": {
             "description": "The id of the notification in the database.",
             "type": "string"
@@ -36817,6 +36791,17 @@
             "description": "The type of event that resulted in the notification.",
             "type": "string",
             "$ref": "#/components/schemas/NotificationTypeEnum"
+          },
+          "collection": {
+            "description": "Collection that was the object of the notification. Attached when `type` of the notification is `added_to_collection` or `collection_update`.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Collection"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "event": {
             "description": "Summary of the event that caused follow relationships to be severed. Attached when `type` of the notification is `severed_relationships`.",
@@ -36838,13 +36823,6 @@
               {
                 "type": "null"
               }
-            ]
-          },
-          "group_key": {
-            "description": "Group key shared by similar notifications, to be used in the grouped notifications feature. Should be considered opaque, but ungrouped notifications can be assumed to have a `group_key` of the form `ungrouped-{notification_id}`.",
-            "type": [
-              "string",
-              "null"
             ]
           },
           "moderation_warning": {
@@ -36884,6 +36862,7 @@
         "required": [
           "account",
           "created_at",
+          "group_key",
           "id",
           "type"
         ],
@@ -37251,6 +37230,22 @@
         "type": "object",
         "description": "Represents a rich preview card that is generated using OpenGraph tags from a URL.",
         "properties": {
+          "author_name": {
+            "description": "The author of the original resource. Deprecated since 4.3.0, clients should use `authors` instead.",
+            "type": "string"
+          },
+          "author_url": {
+            "description": "A link to the author of the original resource. Deprecated since 4.3.0, clients should use `authors` instead.",
+            "type": "string",
+            "format": "uri"
+          },
+          "authors": {
+            "description": "Fediverse account of the authors of the original resource.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewCardAuthor"
+            }
+          },
           "description": {
             "description": "Description of preview.",
             "type": "string"
@@ -37295,31 +37290,6 @@
             "description": "Width of preview, in pixels.",
             "type": "integer"
           },
-          "author_name": {
-            "description": "The author of the original resource. Deprecated since 4.3.0, clients should use `authors` instead.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "author_url": {
-            "description": "A link to the author of the original resource. Deprecated since 4.3.0, clients should use `authors` instead.",
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uri"
-          },
-          "authors": {
-            "description": "Fediverse account of the authors of the original resource.",
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/PreviewCardAuthor"
-            }
-          },
           "blurhash": {
             "description": "A hash computed by [the BlurHash algorithm](https://github.com/woltapp/blurhash), for generating colorful preview thumbnails when media has not been downloaded yet.",
             "type": [
@@ -37341,9 +37311,20 @@
               "boolean",
               "null"
             ]
+          },
+          "published_at": {
+            "description": "UNIX timestamp of publication date.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         },
         "required": [
+          "author_name",
+          "author_url",
+          "authors",
           "description",
           "embed_url",
           "height",
@@ -37364,6 +37345,22 @@
         "type": "object",
         "description": "Additional entity definition for Trends::Link",
         "properties": {
+          "author_name": {
+            "description": "The author of the original resource. Deprecated since 4.3.0, clients should use `authors` instead.",
+            "type": "string"
+          },
+          "author_url": {
+            "description": "A link to the author of the original resource. Deprecated since 4.3.0, clients should use `authors` instead.",
+            "type": "string",
+            "format": "uri"
+          },
+          "authors": {
+            "description": "Fediverse account of the authors of the original resource.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewCardAuthor"
+            }
+          },
           "description": {
             "description": "Description of preview.",
             "type": "string"
@@ -37434,31 +37431,6 @@
             "description": "Width of preview, in pixels.",
             "type": "integer"
           },
-          "author_name": {
-            "description": "The author of the original resource. Deprecated since 4.3.0, clients should use `authors` instead.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "author_url": {
-            "description": "A link to the author of the original resource. Deprecated since 4.3.0, clients should use `authors` instead.",
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uri"
-          },
-          "authors": {
-            "description": "Fediverse account of the authors of the original resource.",
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/PreviewCardAuthor"
-            }
-          },
           "blurhash": {
             "description": "A hash computed by [the BlurHash algorithm](https://github.com/woltapp/blurhash), for generating colorful preview thumbnails when media has not been downloaded yet.",
             "type": [
@@ -37480,9 +37452,20 @@
               "boolean",
               "null"
             ]
+          },
+          "published_at": {
+            "description": "UNIX timestamp of publication date.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         },
         "required": [
+          "author_name",
+          "author_url",
+          "authors",
           "description",
           "embed_url",
           "height",
@@ -38261,6 +38244,10 @@
         "type": "object",
         "description": "Represents a rule that server users should follow.",
         "properties": {
+          "hint": {
+            "description": "Longer-form description of the rule.",
+            "type": "string"
+          },
           "id": {
             "description": "An identifier for the rule.",
             "type": "string"
@@ -38268,13 +38255,6 @@
           "text": {
             "description": "The rule to be followed.",
             "type": "string"
-          },
-          "hint": {
-            "description": "Longer-form description of the rule.",
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "translations": {
             "description": "Available translations for this rule's `text` and `hint`, as a Hash where keys are locale codes and values are hashes with `text` and `hint` keys.",
@@ -38285,6 +38265,7 @@
           }
         },
         "required": [
+          "hint",
           "id",
           "text"
         ],
@@ -38408,6 +38389,21 @@
                   "hide_totals"
                 ]
               },
+              "quote_approval_policy": {
+                "description": "The quote policy for the Status.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "$ref": "#/components/schemas/ScheduledStatusParamsQuoteApprovalPolicyEnum"
+              },
+              "quoted_status_id": {
+                "description": "ID of the Status being quoted.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "scheduled_at": {
                 "description": "When the status will be scheduled. This will be null because the status is only scheduled once.",
                 "type": [
@@ -38477,6 +38473,16 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Status"
+            }
+          },
+          "collections": {
+            "description": "Collections which match the given query",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Collection"
             }
           }
         },
@@ -39143,24 +39149,15 @@
           },
           "sources": {
             "description": "A list of reasons this account is being suggested. This replaces `source`",
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": "array",
             "items": {
-              "type": "string",
-              "enum": [
-                "featured",
-                "most_followed",
-                "most_interactions",
-                "similar_to_recently_followed",
-                "friends_of_friends"
-              ]
+              "$ref": "#/components/schemas/SuggestionSourcesEnum"
             }
           }
         },
         "required": [
-          "account"
+          "account",
+          "sources"
         ],
         "externalDocs": {
           "url": "https://docs.joinmastodon.org/entities/Suggestion/#attributes",
@@ -39186,6 +39183,10 @@
               "$ref": "#/components/schemas/TagHistory"
             }
           },
+          "id": {
+            "description": "ID of the hashtag in the database. Useful for constructing URLs for the moderation tools & Admin API.",
+            "type": "string"
+          },
           "name": {
             "description": "The value of the hashtag after the # sign.",
             "type": "string"
@@ -39208,17 +39209,11 @@
               "boolean",
               "null"
             ]
-          },
-          "id": {
-            "description": "ID of the hashtag in the database. Useful for constructing URLs for the moderation tools & Admin API.",
-            "type": [
-              "string",
-              "null"
-            ]
           }
         },
         "required": [
           "history",
+          "id",
           "name",
           "url"
         ],
@@ -40206,7 +40201,7 @@
           "type": {
             "description": "The type of event that resulted in the notifications in this group.",
             "type": "string",
-            "$ref": "#/components/schemas/NotificationTypeEnum"
+            "$ref": "#/components/schemas/NotificationGroupTypeEnum"
           },
           "event": {
             "description": "Summary of the event that caused follow relationships to be severed. Attached when `type` of the notification is `severed_relationships`.",
@@ -40814,7 +40809,7 @@
           "direct"
         ]
       },
-      "CredentialAccountSourceQuotePolicyEnum": {
+      "ScheduledStatusParamsQuoteApprovalPolicyEnum": {
         "type": "string",
         "enum": [
           "public",
@@ -40885,7 +40880,9 @@
         "type": "string",
         "enum": [
           "pending",
-          "accepted"
+          "accepted",
+          "rejected",
+          "revoked"
         ]
       },
       "DomainBlockSeverityEnum": {
@@ -40976,7 +40973,9 @@
           "severed_relationships",
           "moderation_warning",
           "quote",
-          "quoted_update"
+          "quoted_update",
+          "added_to_collection",
+          "collection_update"
         ]
       },
       "PreferencesReadingExpandMediaEnum": {
@@ -41025,6 +41024,35 @@
           "domain_block",
           "user_domain_block",
           "account_suspension"
+        ]
+      },
+      "SuggestionSourcesEnum": {
+        "type": "string",
+        "enum": [
+          "featured",
+          "most_followed",
+          "most_interactions",
+          "similar_to_recently_followed",
+          "friends_of_friends"
+        ]
+      },
+      "NotificationGroupTypeEnum": {
+        "type": "string",
+        "enum": [
+          "mention",
+          "status",
+          "reblog",
+          "follow",
+          "follow_request",
+          "favourite",
+          "poll",
+          "update",
+          "admin.sign_up",
+          "admin.report",
+          "severed_relationships",
+          "moderation_warning",
+          "quote",
+          "quoted_update"
         ]
       }
     },
@@ -42752,7 +42780,9 @@
               "scheduled_at": null,
               "spoiler_text": null,
               "application_id": 596551,
-              "in_reply_to_id": null
+              "in_reply_to_id": null,
+              "quoted_status_id": null,
+              "quote_approval_policy": "followers"
             },
             "media_attachments": []
           }

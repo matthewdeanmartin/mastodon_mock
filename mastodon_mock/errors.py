@@ -60,7 +60,7 @@ def _validation_details(exc: RequestValidationError) -> dict[str, list[dict[str,
     return details
 
 
-async def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     detail = exc.detail
     # Starlette's stock text for an unrouted path; real Mastodon says
     # "Record not found" for unknown API resources.
@@ -73,7 +73,7 @@ async def _http_exception_handler(request: Request, exc: StarletteHTTPException)
     )
 
 
-async def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={

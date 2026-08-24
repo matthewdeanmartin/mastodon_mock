@@ -93,7 +93,7 @@ def _required_params(spec: dict[str, Any], where: str) -> dict[Operation, set[st
                     name = param.get("name")
                     if name:
                         names.add(name)
-            out[(method.upper(), norm)] = names
+            out[method.upper(), norm] = names
     return out
 
 
