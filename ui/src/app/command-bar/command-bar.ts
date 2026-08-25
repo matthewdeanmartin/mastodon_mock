@@ -145,7 +145,7 @@ export type FeedView = 'feed' | 'members' | 'analytics' | 'media' | 'articles';
           </span>
         }
         <ng-content />
-        @if (prefs.feedReader()) {
+        @if (prefs.feedReader() && showReaderControls()) {
           <span class="font-controls">
             <button
               class="btn command-item btn-sm"
@@ -260,6 +260,8 @@ export class CommandBar {
   readonly providerChips = input(false);
   /** Images live in Home's compact filter row; other feeds keep them here. */
   readonly showImages = input(true);
+  /** Home owns a fourth, full Reader row; compact feed bars retain these buttons. */
+  readonly showReaderControls = input(true);
   /** Show the 👥 Members / 📊 Analytics view toggles (Home). */
   readonly showFeedViews = input(false);
   /**

@@ -72,6 +72,7 @@
 <app-command-bar
   [providerChips]="!justMyServer.effectiveEnabled()"
   [showImages]="false"
+  [showReaderControls]="false"
   [showRefresh]="!live()"
   [showFeedViews]="true"
   [showFeedDoctor]="true"
@@ -137,6 +138,12 @@
     </button>
     <app-feed-language-picker />
   </div>
+}
+
+<!-- READER: the full long-form control set gets its own fourth row. Keeping it
+     out of HOW prevents these controls from starting beyond the visible edge. -->
+@if (prefs.feedReader()) {
+  <app-reader-toolbar />
 }
 
 <!-- Members and Analytics are views *of the loaded feed*, so they replace the

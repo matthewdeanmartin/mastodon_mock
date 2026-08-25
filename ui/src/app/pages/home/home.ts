@@ -47,6 +47,7 @@ import { ProfileMediaGrid } from '../profile/media/profile-media-grid';
 import { ProfilePhotoView } from '../profile/media/profile-photo-view';
 import { buildMediaItems, ProfileMediaItem } from '../profile/media/profile-media-item';
 import { PreviewCardComponent } from '../../preview-card/preview-card';
+import { ReaderToolbar } from '../../reader-toolbar/reader-toolbar';
 
 /** Below this many follows, nudge toward /find-friends (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -70,6 +71,7 @@ const BOOKMARK_TAIL_SIZE = 40;
     ProfileMediaGrid,
     ProfilePhotoView,
     PreviewCardComponent,
+    ReaderToolbar,
   ],
   templateUrl: './home.html',
   styleUrl: './home.css',

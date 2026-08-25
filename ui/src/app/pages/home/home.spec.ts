@@ -724,6 +724,45 @@ describe('Home', () => {
     expect(el.querySelectorAll('.command-bar .command-row')).toHaveLength(2);
   });
 
+  it('puts the complete Reader controls in a dedicated fourth toolbar row', () => {
+    const fixture = setUp();
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.setFeedReader(true);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const rows = [...el.querySelectorAll('.command-row, .home-filters, .reader-toolbar')];
+    const reader = el.querySelector<HTMLElement>('.reader-toolbar');
+
+    expect(rows).toHaveLength(4);
+    expect(rows[3]).toBe(reader);
+    expect(reader?.textContent).toContain('A−');
+    expect(reader?.textContent).toContain('18px');
+    expect(reader?.textContent).toContain('A+');
+    expect(reader?.querySelector<HTMLSelectElement>('[aria-label="Font family"]')?.value).toBe(
+      'serif',
+    );
+    expect(reader?.querySelector<HTMLSelectElement>('[aria-label="Article theme"]')?.value).toBe(
+      'app',
+    );
+    expect(el.querySelector('.command-bar .font-controls')).toBeNull();
+
+    const larger = [...(reader?.querySelectorAll('button') ?? [])].find((button) =>
+      button.textContent?.includes('A+'),
+    );
+    larger?.click();
+    const family = reader?.querySelector<HTMLSelectElement>('[aria-label="Font family"]');
+    const theme = reader?.querySelector<HTMLSelectElement>('[aria-label="Article theme"]');
+    family!.value = 'sans';
+    family!.dispatchEvent(new Event('change'));
+    theme!.value = 'sepia';
+    theme!.dispatchEvent(new Event('change'));
+
+    expect(prefs.readerFontSize()).toBe(19);
+    expect(prefs.readerFontFamily()).toBe('sans');
+    expect(prefs.readerTheme()).toBe('sepia');
+  });
+
   it('offers Local Feed only while Home is showing Server Friends', () => {
     const auth = TestBed.inject(Auth);
     auth.setToken('test-token');
