@@ -32,8 +32,8 @@ interface HomeInternals {
   loadMore(): void;
   toggleBoosts(): void;
   toggleReplies(): void;
-  view: WritableSignal<'feed' | 'members' | 'analytics'>;
-  setView(view: 'feed' | 'members' | 'analytics'): void;
+  view: WritableSignal<'feed' | 'members' | 'analytics' | 'media' | 'articles'>;
+  setView(view: 'feed' | 'members' | 'analytics' | 'media' | 'articles'): void;
   onPosted(status: Status): void;
   startWriting(): void;
 }
@@ -245,9 +245,7 @@ describe('Home', () => {
     const fixture = TestBed.createComponent(Home);
     fixture.detectChanges();
     httpMock.expectOne('/api/v1/announcements').flush([]);
-    httpMock
-      .expectOne('/api/v1/timelines/home?limit=20')
-      .flush([makeStatus('a'), makeStatus('b')]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([makeStatus('a'), makeStatus('b')]);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -457,6 +455,28 @@ describe('Home', () => {
     expect(internals(fixture).statuses()).toHaveLength(40);
     expect(internals(fixture).autoLoading()).toBe(false);
     httpMock.expectNone((r) => r.url === '/api/v1/timelines/home');
+  });
+
+  it('deduplicates the boundary post repeated by the next page', () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page(20, 0));
+
+    internals(fixture).loadMore();
+    httpMock
+      .expectOne(
+        (request) =>
+          request.url === '/api/v1/timelines/home' && request.params.get('max_id') === '19',
+      )
+      .flush([makeStatus('19'), makeStatus('20')]);
+
+    const ids = internals(fixture)
+      .statuses()
+      .map((status) => status.id);
+    expect(ids).toHaveLength(21);
+    expect(ids.filter((id) => id === '19')).toHaveLength(1);
+    expect(ids.at(-1)).not.toBe('19');
   });
 
   it('does not apply Anonymous canonical deduplication to authenticated Home', () => {
@@ -679,6 +699,8 @@ describe('Home', () => {
       .join(' ');
     expect(labels).toContain('Members');
     expect(labels).toContain('Analytics');
+    expect(labels).toContain('Media');
+    expect(labels).toContain('Articles');
     expect(internals(fixture).view()).toBe('feed');
   });
 
@@ -694,11 +716,12 @@ describe('Home', () => {
     expect(commandBar).not.toContain('Calm');
     expect(filters).toContain('Retweets');
     expect(filters).toContain('Replies');
-    expect(filters).toContain('Images');
-    expect(filters).toContain('All languages');
+    expect(filters).not.toContain('Images');
+    expect(filters).toContain('All');
     expect(filters).toContain('Calm');
-    expect(filters).toContain('Today');
+    expect(filters).toContain('Everything');
     expect(filters).not.toContain('Local Feed');
+    expect(el.querySelectorAll('.command-bar .command-row')).toHaveLength(2);
   });
 
   it('offers Local Feed only while Home is showing Server Friends', () => {

@@ -93,6 +93,16 @@
   color: var(--accent);
 }
 
+.home-articles {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.home-article-meta {
+  margin: 4px 4px 0;
+}
+
 .nudge-copy {
   display: flex;
   flex-direction: column;

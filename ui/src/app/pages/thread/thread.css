@@ -147,14 +147,14 @@
   text-align: left;
 }
 
-/* Blog-style comments: visually distinct from posts — sans-serif, smaller,
-   indented with an accent gutter on a soft background. */
+/* Blog-style comments: visually distinct from posts, but still tied to the
+   reader typography. `em` keeps A-/A+ meaningful for the discussion too. */
 .reader-comments {
   margin-top: 2em;
   border-top: 1px solid var(--border);
   padding-top: 1em;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  font-size: 14px;
+  font-size: 0.9em;
   font-weight: 400;
   line-height: 1.5;
   letter-spacing: normal;
@@ -163,7 +163,7 @@
 }
 
 .comments-title {
-  font-size: 15px;
+  font-size: 1em;
   font-weight: 800;
   margin: 0 0 12px;
 }
@@ -178,6 +178,14 @@
   border-radius: 0 10px 10px 0;
 }
 
+/* A selected reader paper can deliberately disagree with the app theme. Do
+   not put the app's --bg behind paper-coloured text (light paper in dark mode
+   used to produce black text on a black comment card). */
+.reader:not([data-paper='app']) .comment {
+  background: color-mix(in srgb, var(--reader-fg, currentColor) 7%, var(--reader-bg));
+  color: var(--reader-fg, inherit);
+}
+
 .comment-avatar {
   width: 28px;
   height: 28px;
@@ -186,7 +194,7 @@
 }
 
 .comment-meta {
-  font-size: 12.5px;
+  font-size: 0.82em;
   margin-bottom: 2px;
 }
 

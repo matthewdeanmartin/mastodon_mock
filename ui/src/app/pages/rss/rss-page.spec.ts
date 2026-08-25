@@ -434,5 +434,23 @@ describe('RssPage', () => {
       // Derived-from-feed-count would yank the panel away mid-click.
       expect(fixture.componentInstance['showKits']()).toBe(true);
     });
+
+    it('closes the kits and shows articles when a newly added feed is selected', async () => {
+      const url = 'https://a.example.com/f.xml';
+      feeds.set(url, feed('A', 'Installed kit article', '2026-08-20T00:00:00Z'));
+      const fixture = setUp();
+      TestBed.inject(RssSubscriptions).add(url, 'A');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance['showKits']()).toBe(true);
+      fixture.componentInstance['selectFeed'](url);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance['showKits']()).toBe(false);
+      expect(textOf(fixture)).toContain('Installed kit article');
+      expect(textOf(fixture)).not.toContain('Start with a kit');
+    });
   });
 });

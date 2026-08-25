@@ -1,4 +1,4 @@
-import { Component, inject, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
@@ -6,7 +6,7 @@ import { ProviderId } from '../models';
 import { ProviderRegistry } from '../providers/provider-registry';
 
 /** What the host page is showing in place of its timeline. */
-export type FeedView = 'feed' | 'members' | 'analytics';
+export type FeedView = 'feed' | 'members' | 'analytics' | 'media' | 'articles';
 
 /**
  * The timeline command bar: Go Live (owned by the host page), plus the global
@@ -19,11 +19,48 @@ export type FeedView = 'feed' | 'members' | 'analytics';
   imports: [RouterLink],
   template: `
     <div class="command-bar" role="toolbar" aria-label="Feed controls">
-      <!-- "Go live" used to sit here. It is now Blue → "Auto-refresh timeline",
-           opt-in and off by default: a feed that rewrites itself under you is an
-           antipattern, and this row's space is worth more than a toggle most
-           people never want. Home reads the pref directly. -->
-      <span class="command-group" role="group" aria-label="Feed actions">
+      @if (providerChips() && hasSourceControls()) {
+        <!-- WHAT: networks included in this feed. The label is intentionally a
+             code comment rather than visible toolbar furniture. -->
+        <div class="command-row provider-group" role="group" aria-label="Feed sources">
+          @if (!auth.isAnonymous && !auth.isBlueskyPrimary) {
+            <button
+              class="btn command-item"
+              [class.active]="prefs.isProviderVisible('mastodon')"
+              (click)="toggleProvider('mastodon')"
+              title="Show or hide Mastodon posts"
+            >
+              🦣 Fedi
+            </button>
+          }
+          @if (anonymousFedi()) {
+            <button
+              class="btn command-item"
+              [class.active]="prefs.isProviderVisible('anonymous-mastodon')"
+              (click)="toggleProvider('anonymous-mastodon')"
+              title="Show or hide Fediverse posts"
+            >
+              🦣 Fedi
+            </button>
+          }
+          @for (p of sourceProviders(); track p.id) {
+            <button
+              class="btn command-item"
+              [class.active]="prefs.isProviderVisible(p.id)"
+              (click)="toggleProvider(p.id)"
+              [title]="'Show or hide ' + p.label + ' posts'"
+            >
+              {{ p.badge }}
+            </button>
+          }
+        </div>
+      }
+
+      <!-- HOW: ways to load or present the same feed. The row name stays in
+           source only; the controls themselves are the visible explanation. -->
+      <div class="command-row action-row">
+        <!-- "Go live" used to sit here. It is now Blue → "Auto-refresh timeline",
+             opt-in and off by default. Home reads the pref directly. -->
         @if (showRefresh()) {
           <button
             class="btn command-item"
@@ -51,113 +88,111 @@ export type FeedView = 'feed' | 'members' | 'analytics';
             🖼️ {{ imagesHidden() ? 'No images' : 'Images' }}
           </button>
         }
-      </span>
-      @if (providerChips() && (!auth.isAnonymous || registry.linked().length)) {
-        <!-- Keep every network source in one compact group. The outer toolbar
-             may wrap, but Fedi / Bluesky / Twitter never end up stranded on
-             separate rows. -->
-        <span class="command-group provider-group" role="group" aria-label="Feed sources">
-          <!-- No Fedi chip for a Bluesky-primary account: it holds no Mastodon
-               token, so the aggregator never queries that source and a filter
-               for it would toggle nothing. Sprint 4 attaches Mastodon underneath,
-               and the chip becomes meaningful again then. -->
-          @if (!auth.isAnonymous && !auth.isBlueskyPrimary) {
-            <button
-              class="btn command-item"
-              [class.active]="prefs.isProviderVisible('mastodon')"
-              (click)="toggleProvider('mastodon')"
-              title="Show or hide Mastodon posts"
-            >
-              🦣 Fedi
-            </button>
-          }
-          @for (p of registry.linked(); track p.id) {
-            <button
-              class="btn command-item"
-              [class.active]="prefs.isProviderVisible(p.id)"
-              (click)="toggleProvider(p.id)"
-              [title]="'Show or hide ' + p.label + ' posts'"
-            >
-              {{ p.badge }}
-            </button>
-          }
-        </span>
-      }
-      @if (showFeedViews()) {
-        <!-- Views over the feed the page already has, not navigation: they swap
+        @if (showFeedViews()) {
+          <!-- Views over the feed the page already has, not navigation: they swap
              what the timeline area shows, so they read as toggles like the rest
              of the bar. -->
-        <span class="command-group" role="group" aria-label="Feed views">
-          <button
-            class="btn command-item"
-            [class.active]="view() === 'members'"
-            [attr.aria-pressed]="view() === 'members'"
-            (click)="setView('members')"
-            title="Who is in this feed — the accounts whose posts are loaded"
-          >
-            👥 Members
-          </button>
-          <button
-            class="btn command-item"
-            [class.active]="view() === 'analytics'"
-            [attr.aria-pressed]="view() === 'analytics'"
-            (click)="setView('analytics')"
-            title="Analytics for the posts currently loaded in this feed"
-          >
-            📊 Analytics
-          </button>
-          <!-- A link, not a view toggle like its two neighbours: the Doctor
+          <span class="command-group" role="group" aria-label="Feed views">
+            <button
+              class="btn command-item"
+              [class.active]="view() === 'members'"
+              [attr.aria-pressed]="view() === 'members'"
+              (click)="setView('members')"
+              title="Who is in this feed — the accounts whose posts are loaded"
+            >
+              👥 Members
+            </button>
+            <button
+              class="btn command-item"
+              [class.active]="view() === 'analytics'"
+              [attr.aria-pressed]="view() === 'analytics'"
+              (click)="setView('analytics')"
+              title="Analytics for the posts currently loaded in this feed"
+            >
+              📊 Analytics
+            </button>
+            <button
+              class="btn command-item"
+              [class.active]="view() === 'media'"
+              [attr.aria-pressed]="view() === 'media'"
+              (click)="setView('media')"
+              title="Pictures and videos from the posts currently loaded"
+            >
+              🖼️ Media
+            </button>
+            <button
+              class="btn command-item"
+              [class.active]="view() === 'articles'"
+              [attr.aria-pressed]="view() === 'articles'"
+              (click)="setView('articles')"
+              title="Article links from the posts currently loaded"
+            >
+              🔗 Articles
+            </button>
+            <!-- A link, not a view toggle like its two neighbours: the Doctor
                re-samples the feed itself so it works the same whether you arrive
                from here, from the end-of-feed line, or by typing the URL. One
                page, one implementation. -->
-          @if (showFeedDoctor()) {
-            <a
-              class="btn command-item"
-              routerLink="/feed-doctor"
-              title="Why is this feed like this — who is flooding it, and why it ended"
+            @if (showFeedDoctor()) {
+              <a
+                class="btn command-item"
+                routerLink="/feed-doctor"
+                title="Why is this feed like this — who is flooding it, and why it ended"
+              >
+                🩺 Feed Doctor
+              </a>
+            }
+          </span>
+        }
+        <ng-content />
+        @if (prefs.feedReader()) {
+          <span class="font-controls">
+            <button
+              class="btn command-item btn-sm"
+              (click)="prefs.setReaderFontSize(prefs.readerFontSize() - 1)"
+              title="Smaller text"
             >
-              🩺 Feed Doctor
-            </a>
-          }
-        </span>
-      }
-      <ng-content />
-      @if (prefs.feedReader()) {
-        <span class="font-controls">
-          <button
-            class="btn command-item btn-sm"
-            (click)="prefs.setReaderFontSize(prefs.readerFontSize() - 1)"
-            title="Smaller text"
-          >
-            A−
-          </button>
-          <button
-            class="btn command-item btn-sm"
-            (click)="prefs.setReaderFontSize(prefs.readerFontSize() + 1)"
-            title="Larger text"
-          >
-            A+
-          </button>
-        </span>
-      }
+              A−
+            </button>
+            <button
+              class="btn command-item btn-sm"
+              (click)="prefs.setReaderFontSize(prefs.readerFontSize() + 1)"
+              title="Larger text"
+            >
+              A+
+            </button>
+          </span>
+        }
+      </div>
     </div>
   `,
   styles: `
     .command-bar {
+      border-bottom: 1px solid var(--border);
+    }
+    .command-row {
       display: flex;
       align-items: center;
-      gap: 2px 8px;
-      flex-wrap: wrap;
+      gap: 2px;
+      min-width: 0;
       padding: 5px 10px;
+      overflow-x: auto;
+    }
+    .provider-group {
+      flex-wrap: nowrap;
       border-bottom: 1px solid var(--border);
+    }
+    .action-row {
+      flex-wrap: nowrap;
+    }
+    .action-row .command-item {
+      padding: 5px 4px;
+      font-size: 13px;
     }
     .command-group {
       display: inline-flex;
       align-items: center;
       gap: 2px;
-    }
-    .provider-group {
-      flex-wrap: nowrap;
     }
     .command-item {
       flex: 0 0 auto;
@@ -189,6 +224,31 @@ export class CommandBar {
   protected readonly auth = inject(Auth);
   protected readonly prefs = inject(ClientPrefs);
   protected readonly registry = inject(ProviderRegistry);
+
+  /** WHAT row in its deliberate network order; utility providers are not feed networks. */
+  protected readonly sourceProviders = computed(() => {
+    const order = new Map<ProviderId, number>([
+      ['bluesky', 0],
+      ['rss', 1],
+      ['twitter', 2],
+    ]);
+    return this.registry
+      .linked()
+      .filter((provider) => order.has(provider.id))
+      .sort((a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
+  });
+
+  /** Anonymous Mastodon is the Fedi network too; only the storage id differs. */
+  protected readonly anonymousFedi = computed(() =>
+    this.registry.linked().some((provider) => provider.id === 'anonymous-mastodon'),
+  );
+
+  protected readonly hasSourceControls = computed(
+    () =>
+      (!this.auth.isAnonymous && !this.auth.isBlueskyPrimary) ||
+      this.anonymousFedi() ||
+      this.sourceProviders().length > 0,
+  );
 
   /**
    * Whether to show a manual refresh button — for pages where live streaming

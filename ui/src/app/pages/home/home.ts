@@ -43,6 +43,10 @@ import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscri
 import { JustMyServer } from '../../just-my-server';
 import { Terminology } from '../../terminology';
 import { FeatureFlags } from '../../feature-flags';
+import { ProfileMediaGrid } from '../profile/media/profile-media-grid';
+import { ProfilePhotoView } from '../profile/media/profile-photo-view';
+import { buildMediaItems, ProfileMediaItem } from '../profile/media/profile-media-item';
+import { PreviewCardComponent } from '../../preview-card/preview-card';
 
 /** Below this many follows, nudge toward /find-friends (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
@@ -63,6 +67,9 @@ const BOOKMARK_TAIL_SIZE = 40;
     FeedAnalytics,
     FeedMembers,
     FeedLanguagePicker,
+    ProfileMediaGrid,
+    ProfilePhotoView,
+    PreviewCardComponent,
   ],
   templateUrl: './home.html',
   styleUrl: './home.css',
@@ -238,8 +245,35 @@ export class Home implements OnInit, OnDestroy {
   /** Which view the command bar's Members/Analytics toggles have selected. */
   protected view = signal<FeedView>('feed');
 
+  /** The loaded feed rendered with the same media extraction as profile Media. */
+  protected mediaItems = computed(() =>
+    buildMediaItems(this.visible().map((status) => status.reblog ?? status)),
+  );
+
+  /** Link previews from the loaded feed — Home's counterpart to Algo's link view. */
+  protected articles = computed(() =>
+    this.visible().flatMap((status) => {
+      const original = status.reblog ?? status;
+      return original.card?.url ? [{ status: original, card: original.card }] : [];
+    }),
+  );
+
+  /** Media viewer state is visit-local; Home views are toggles, not routes. */
+  protected openPhoto = signal<string | null>(null);
+
   protected setView(view: FeedView): void {
     this.view.set(view);
+    if (view !== 'media') {
+      this.openPhoto.set(null);
+    }
+  }
+
+  protected openPhotoItem(item: ProfileMediaItem): void {
+    this.openPhoto.set(item.key);
+  }
+
+  protected navigatePhoto(item: ProfileMediaItem): void {
+    this.openPhoto.set(item.key);
   }
 
   /**
@@ -782,7 +816,7 @@ export class Home implements OnInit, OnDestroy {
     this.statuses.update((statuses) => {
       const merged = this.auth.isAnonymous
         ? this.dedupeAnonymous([...statuses, ...more])
-        : [...statuses, ...more].sort(
+        : this.dedupeExact([...statuses, ...more]).sort(
             (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
           );
       const max = this.prefs.feedMax();
@@ -795,6 +829,17 @@ export class Home implements OnInit, OnDestroy {
         dropped: merged.length - max,
       });
       return merged.slice(0, max);
+    });
+  }
+
+  /** Remove the inclusive boundary item some timeline sources repeat on page N+1. */
+  private dedupeExact(statuses: Status[]): Status[] {
+    const seen = new Set<string>();
+    return statuses.filter((status) => {
+      const key = `${status.provider ?? 'mastodon'}:${status.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
   }
 

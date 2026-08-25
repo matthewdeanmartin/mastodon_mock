@@ -50,7 +50,7 @@ describe('FeedLanguagePicker', () => {
   it('starts on All languages and offers the languages the user knows', () => {
     const fixture = render();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('.lang-button')!.textContent).toContain('All languages');
+    expect(el.querySelector('.lang-button')!.textContent).toContain('All');
 
     const labels = rows(fixture).map(labelOf);
     expect(labels).toContain('All languages');

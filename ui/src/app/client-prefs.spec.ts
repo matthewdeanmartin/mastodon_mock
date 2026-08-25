@@ -281,22 +281,24 @@ describe('ClientPrefs', () => {
   });
 
   it('defaults the home window to the last 24 hours', () => {
-    // Merging providers that publish at very different rates sorts badly by
-    // date alone, so Home reaches back one rolling day unless asked otherwise.
-    // Rolling rather than since-midnight: "Today" at 00:05 would be empty.
-    expect(TestBed.inject(ClientPrefs).homeWindow()).toBe('today');
+    expect(TestBed.inject(ClientPrefs).homeWindow()).toBe('all');
     expect(homeWindowMs('today')).toBe(24 * 60 * 60 * 1000);
     expect(homeWindowMs('week')).toBe(7 * 24 * 60 * 60 * 1000);
     expect(homeWindowMs('all')).toBeNull();
   });
 
   it('remembers a chosen home window across a reload', () => {
-    TestBed.inject(ClientPrefs).setHomeWindow('all');
+    TestBed.inject(ClientPrefs).setHomeWindow('week');
     // Persistence runs in an effect, so it needs a flush before the value is
     // in localStorage for the next instance to read.
     TestBed.tick();
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
+    expect(TestBed.inject(ClientPrefs).homeWindow()).toBe('week');
+  });
+
+  it('migrates the old persisted Today default to Everything', () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ homeWindow: 'today' }));
     expect(TestBed.inject(ClientPrefs).homeWindow()).toBe('all');
   });
 });

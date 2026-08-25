@@ -505,7 +505,7 @@ export class ClientPrefs {
    * How far back Home reaches. Defaults to the last 24 hours — see
    * {@link HomeWindow} for why this bounds loading rather than only display.
    */
-  readonly homeWindow = signal<HomeWindow>('today');
+  readonly homeWindow = signal<HomeWindow>('all');
 
   readonly showImages = signal<boolean>(true);
 
@@ -1181,11 +1181,10 @@ export class ClientPrefs {
     }
     this.loadBool(stored.feedReader, this.feedReader);
     this.loadBool(stored.autoRefreshTimeline, this.autoRefreshTimeline);
-    if (
-      stored.homeWindow === 'today' ||
-      stored.homeWindow === 'week' ||
-      stored.homeWindow === 'all'
-    ) {
+    // `today` was the old implicit default. Treat a stored copy as that legacy
+    // default so existing browsers move to Everything too; week/all represent
+    // deliberate non-default choices and still round-trip.
+    if (stored.homeWindow === 'week' || stored.homeWindow === 'all') {
       this.homeWindow.set(stored.homeWindow);
     }
     this.loadBool(stored.showImages, this.showImages);

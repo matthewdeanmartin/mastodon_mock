@@ -85,81 +85,96 @@
   }
 </app-command-bar>
 
+<!-- FILTER: content narrowing for every presentation above. Like WHAT and HOW,
+     this name stays in source rather than becoming another visible label. -->
+@if (!nothingFollowed()) {
+  <div class="home-filters" role="group" aria-label="Timeline filters">
+    <button
+      type="button"
+      class="btn btn-outline btn-sm"
+      [class.active]="showBoosts()"
+      [attr.aria-pressed]="showBoosts()"
+      (click)="toggleBoosts()"
+    >
+      🔁 Retweets
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm"
+      [class.active]="showReplies()"
+      [attr.aria-pressed]="showReplies()"
+      (click)="toggleReplies()"
+    >
+      💬 Replies
+    </button>
+    <label class="home-window">
+      📅
+      <select
+        [ngModel]="prefs.homeWindow()"
+        (ngModelChange)="setHomeWindow($event)"
+        aria-label="How far back to load"
+      >
+        <option value="today">Today</option>
+        <option value="week">This week</option>
+        <option value="all">Everything</option>
+      </select>
+    </label>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm feed-filter"
+      [class.active]="prefs.algoCalm()"
+      [attr.aria-pressed]="prefs.algoCalm()"
+      (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
+      [title]="
+        'Calm mode: hide ' +
+        words().posts +
+        ' that read as inflammatory — heated wording, quote-dunks, and ratioed ' +
+        words().posts +
+        ' (all detected on-device)'
+      "
+    >
+      😌 Calm
+    </button>
+    <app-feed-language-picker />
+  </div>
+}
+
 <!-- Members and Analytics are views *of the loaded feed*, so they replace the
      timeline rather than navigating away — the command bar toggles back. -->
 @if (view() === 'members') {
   <app-feed-members [source]="feedSource()" />
 } @else if (view() === 'analytics') {
   <app-feed-analytics [source]="feedSource()" />
-} @else {
-  <!-- Hidden until there is something to filter. Six controls that narrow a
-       feed, above a feed with nothing in it, are six things a first-time
-       visitor has to rule out before finding the one link that helps. -->
-  @if (!nothingFollowed()) {
-    <div class="home-filters" role="group" aria-label="Timeline filters">
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        [class.active]="showBoosts()"
-        [attr.aria-pressed]="showBoosts()"
-        (click)="toggleBoosts()"
-      >
-        🔁 Retweets
-      </button>
-      <button
-        type="button"
-        class="btn btn-outline btn-sm"
-        [class.active]="showReplies()"
-        [attr.aria-pressed]="showReplies()"
-        (click)="toggleReplies()"
-      >
-        💬 Replies
-      </button>
-      <!-- How far back the feed reaches. A select rather than three chips: these
-         choices are mutually exclusive and need to stay compact. -->
-      <label class="home-window">
-        📅
-        <select
-          [ngModel]="prefs.homeWindow()"
-          (ngModelChange)="setHomeWindow($event)"
-          aria-label="How far back to load"
-        >
-          <option value="today">Today</option>
-          <option value="week">This week</option>
-          <option value="all">Everything</option>
-        </select>
-      </label>
-      <button
-        type="button"
-        class="btn btn-outline btn-sm feed-filter"
-        [class.active]="prefs.algoCalm()"
-        [attr.aria-pressed]="prefs.algoCalm()"
-        (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
-        [title]="
-          'Calm mode: hide ' +
-          words().posts +
-          ' that read as inflammatory — heated wording, quote-dunks, and ratioed ' +
-          words().posts +
-          ' (all detected on-device)'
-        "
-      >
-        😌 Calm
-      </button>
-      <button
-        type="button"
-        class="btn btn-outline btn-sm feed-filter"
-        [class.active]="imagesHidden()"
-        [attr.aria-pressed]="imagesHidden()"
-        (click)="toggleImages()"
-        [title]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
-        [attr.aria-label]="imagesHidden() ? 'Show images' : 'Hide images (show 🖼️ chips instead)'"
-      >
-        <span aria-hidden="true">🖼️</span> {{ imagesHidden() ? 'No images' : 'Images' }}
-      </button>
-      <app-feed-language-picker />
-    </div>
+} @else if (view() === 'media') {
+  <app-profile-media-grid
+    [items]="mediaItems()"
+    [loading]="loading()"
+    [loadingMore]="autoLoading()"
+    [exhausted]="!canLoadMore()"
+    (opened)="openPhotoItem($event)"
+    (more)="loadMore()"
+  />
+  @if (openPhoto(); as photoKey) {
+    <app-profile-photo-view
+      [items]="mediaItems()"
+      [activeKey]="photoKey"
+      (closed)="openPhoto.set(null)"
+      (navigated)="navigatePhoto($event)"
+      (wantMore)="loadMore()"
+    />
   }
-
+} @else if (view() === 'articles') {
+  <section class="home-articles" aria-label="Articles from the loaded feed">
+    @for (article of articles(); track article.status.id) {
+      <article class="home-article">
+        <app-preview-card [card]="article.card" />
+        <p class="muted small home-article-meta">&#64;{{ article.status.account.acct }}</p>
+      </article>
+    } @empty {
+      <p class="muted center">No article links in the posts currently loaded.</p>
+    }
+  </section>
+} @else {
   <!-- The "older posts are hidden" offer used to live here, above the feed. It
        is reactive — `olderAvailable()` reads `droppedByWindow()`, which the
        aggregator increments *while paging* — so clicking "Load more" could make

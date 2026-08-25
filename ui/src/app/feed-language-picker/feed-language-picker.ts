@@ -61,7 +61,7 @@ export class FeedLanguagePicker {
    */
   protected readonly label = computed(() => {
     if (this.showingAll()) {
-      return 'All languages';
+      return 'All';
     }
     const chosen = this.prefs.feedLanguages();
     if (!chosen.length) {

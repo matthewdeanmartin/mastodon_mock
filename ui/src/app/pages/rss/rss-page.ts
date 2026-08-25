@@ -265,6 +265,10 @@ export class RssPage {
    * describes what is on screen, which is what makes a pane linkable.
    */
   protected select(sel: Selection): void {
+    // A rail click is an explicit request to read. The starter-kit panel is a
+    // temporary overlay for discovery, so leaving it latched open here would
+    // let the URL and pane heading change while still covering the articles.
+    this.showKits.set(false);
     this.diagnostics.info('RssPage', 'user:select', { kind: sel.kind });
     this.router.navigate([], {
       relativeTo: this.route,
