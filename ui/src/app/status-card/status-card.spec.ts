@@ -634,6 +634,83 @@ describe('StatusCard', () => {
     expect(buttons.some((t) => t?.includes('Record a boost'))).toBe(true);
   });
 
+  it('shows exactly one recycle symbol on an RSS item under unified share', () => {
+    // The bug this fixes: with both the unified control and POSSE on, a feed
+    // item grew *two* 🔁 buttons — one whose menu held only "Share elsewhere…",
+    // and one that recorded a boost on your own blog. Two identical symbols,
+    // and nothing on screen said which was which.
+    TestBed.inject(FeatureFlags).setState('unified-share', 'production');
+    enablePosse();
+    const f = setUp(rssStatus());
+    const element = f.nativeElement as HTMLElement;
+
+    const recycles = [...element.querySelectorAll<HTMLElement>('button.action')].filter((button) =>
+      button.textContent?.includes('🔁'),
+    );
+    expect(recycles.length).toBe(1);
+  });
+
+  it('goes straight to the share dialog on an RSS item, with no middleman menu', () => {
+    // Boost and quote are both impossible on a feed item, so the menu had one
+    // entry. A one-entry menu is not a choice, it is an extra click between the
+    // reader and the dialog they already asked for.
+    TestBed.inject(FeatureFlags).setState('unified-share', 'production');
+    const f = setUp(rssStatus());
+    const element = f.nativeElement as HTMLElement;
+
+    const button = element.querySelector<HTMLButtonElement>('.share-menu-host button.action')!;
+    // It announces a dialog, not a menu, because that is what it opens.
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(button.getAttribute('aria-label')).toBe('Share this article');
+
+    button.click();
+    f.detectChanges();
+
+    expect(element.querySelector('.share-menu')).toBeNull();
+    expect(element.querySelector('app-share-dialog')).not.toBeNull();
+  });
+
+  it('names POSSE in words when the menu carries it beside a real share', () => {
+    // With POSSE on there are two things to choose between, so the menu earns
+    // its existence again — and the blog option says "my blog" rather than
+    // being a second bare recycle symbol.
+    TestBed.inject(FeatureFlags).setState('unified-share', 'production');
+    enablePosse();
+    const f = setUp(rssStatus());
+    const element = f.nativeElement as HTMLElement;
+
+    const button = element.querySelector<HTMLButtonElement>('.share-menu-host button.action')!;
+    expect(button.getAttribute('aria-haspopup')).toBe('menu');
+    button.click();
+    f.detectChanges();
+
+    const items = [
+      ...element.querySelectorAll<HTMLButtonElement>('.share-menu [role="menuitem"]'),
+    ].map((b) => b.textContent?.trim());
+    expect(items).toEqual(['Record a boost on my blog', 'Share elsewhere…']);
+    // Boost and quote are not offered, because a feed has no endpoint for them.
+    expect(items).not.toContain('Boost');
+    expect(items).not.toContain('Quote');
+  });
+
+  it('keeps the three-item menu on a Mastodon post', () => {
+    // The counterpart guarantee: nothing about the RSS fix narrows a real post,
+    // where Boost, Quote and Share are three genuinely different actions.
+    TestBed.inject(FeatureFlags).setState('unified-share', 'production');
+    const f = setUp(makeStatus({ url: 'https://social.example/@alice/1' }));
+    const element = f.nativeElement as HTMLElement;
+
+    const button = element.querySelector<HTMLButtonElement>('.share-menu-host button.action')!;
+    expect(button.getAttribute('aria-haspopup')).toBe('menu');
+    button.click();
+    f.detectChanges();
+
+    const items = [
+      ...element.querySelectorAll<HTMLButtonElement>('.share-menu [role="menuitem"]'),
+    ].map((b) => b.textContent?.trim());
+    expect(items).toEqual(['Boost', 'Quote', 'Share elsewhere…']);
+  });
+
   it('records an RSS like without making any request at all', () => {
     enablePosse();
     const f = setUp(rssStatus());

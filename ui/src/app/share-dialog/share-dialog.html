@@ -15,8 +15,17 @@
   >
     <div class="dialog-heading">
       <div>
-        <h3 id="share-heading">Share elsewhere</h3>
-        <p class="muted small">Choose what to share, then where to send it.</p>
+        <h3 id="share-heading">{{ feedItem() ? 'Share this article' : 'Share elsewhere' }}</h3>
+        <p class="muted small">
+          @if (feedItem()) {
+            <!-- No "choose what to share": for an article there is one thing to
+                 share, and it is the article. -->
+            Going out as <strong>{{ host(targetUrl()) }}</strong
+            >. Pick where to send it.
+          } @else {
+            Choose what to share, then where to send it.
+          }
+        </p>
       </div>
       <button class="close" type="button" aria-label="Close share dialog" (click)="closed.emit()">
         ×
@@ -27,6 +36,10 @@
       <blockquote class="quote">{{ highlighted }}</blockquote>
     }
 
+    <!-- Hidden entirely on a feed article: `contentLinks()` returns nothing
+         there, so this whole fieldset — "This post" vs "Linked page (without the
+         post wrapper)" — never renders. On an article those two named the same
+         URL, which made the choice unanswerable. -->
     @if (contentLinks().length) {
       <fieldset class="targets">
         <legend>Share</legend>
@@ -58,6 +71,25 @@
           </label>
         }
       </fieldset>
+    }
+
+    @if (canRecordOnBlog()) {
+      <!-- POSSE, in words rather than as a second recycle symbol in the action
+           bar. It rides along with the share because it is the same intention:
+           you are telling people about the article, and telling your own site
+           that you did. Nothing is recorded unless the share itself goes
+           through — see recordIfAsked. -->
+      <label class="also-record">
+        <input
+          type="checkbox"
+          [checked]="recordOnBlog()"
+          (change)="recordOnBlog.set(!recordOnBlog())"
+        />
+        <span>
+          <strong>Also record this on my blog</strong>
+          <small>Queues a boost for your own site. Nothing is published until you say so.</small>
+        </span>
+      </label>
     }
 
     <!-- Two sections, and a destination is in exactly one of them: posting

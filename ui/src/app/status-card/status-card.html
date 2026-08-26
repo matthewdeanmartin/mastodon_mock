@@ -361,52 +361,81 @@
           <!-- One control instead of three. The bar is already out of horizontal
                space and wraps on narrow screens, so Boost/Quote/Share collapse
                into a menu rather than Share becoming a sixth icon. Boost stays
-               one press: the menu opens with it focused. -->
+               one press: the menu opens with it focused.
+
+               ...but only when there is something to choose between. See
+               `shareMenuIsUseful`: with one action left the popup is pure
+               middleman, so the button just does the thing. -->
           <div class="share-menu-host">
             <button
               class="action"
               type="button"
-              [class.on]="display.reblogged"
+              [class.on]="
+                display.reblogged || (soleShareAction() === 'posse' && posseQueued('repost'))
+              "
               [disabled]="actionBusy()"
-              [attr.aria-expanded]="shareMenuOpen()"
-              aria-haspopup="menu"
-              title="Boost, quote or share"
-              aria-label="Boost, quote or share"
-              (click)="toggleShareMenu($event)"
+              [attr.aria-expanded]="shareMenuIsUseful() ? shareMenuOpen() : null"
+              [attr.aria-haspopup]="shareMenuIsUseful() ? 'menu' : 'dialog'"
+              [attr.aria-pressed]="soleShareAction() === 'posse' ? posseQueued('repost') : null"
+              [title]="shareButtonLabel()"
+              [attr.aria-label]="shareButtonLabel()"
+              (click)="shareMenuIsUseful() ? toggleShareMenu($event) : runSoleShareAction($event)"
             >
               <span aria-hidden="true">🔁</span>
               @if (display.reblogged) {
                 <span class="did" aria-hidden="true">{{ words().Boosted }}</span>
+              } @else if (soleShareAction() === 'posse' && posseQueued('repost')) {
+                <span class="did" aria-hidden="true">Recorded</span>
               }
             </button>
-            @if (shareMenuOpen()) {
+            @if (shareMenuIsUseful() && shareMenuOpen()) {
               <!-- Focus moves to the first item on open (see focusShareMenu) so
                    Boost stays one press for keyboard users. Done in code rather
                    than with `autofocus`, which the a11y lint rightly rejects. -->
               <div class="share-menu" role="menu" (click)="$event.stopPropagation()">
-                @if (caps.reblog) {
-                  <button
-                    type="button"
-                    role="menuitem"
-                    [disabled]="actionBusy()"
-                    (click)="shareMenuOpen.set(false); toggleReblog($event)"
-                  >
-                    {{ display.reblogged ? words().UndoBoost : words().Boost }}
-                  </button>
-                }
-                @if (!foreign && capabilities.canCompose) {
-                  <button
-                    type="button"
-                    role="menuitem"
-                    (click)="shareMenuOpen.set(false); toggleQuote($event)"
-                  >
-                    Quote
-                  </button>
-                }
-                @if (display.url) {
-                  <button type="button" role="menuitem" (click)="openShare($event)">
-                    Share elsewhere…
-                  </button>
+                @for (action of shareMenuActions(); track action) {
+                  @switch (action) {
+                    @case ('boost') {
+                      <button
+                        type="button"
+                        role="menuitem"
+                        [disabled]="actionBusy()"
+                        (click)="shareMenuOpen.set(false); toggleReblog($event)"
+                      >
+                        {{ display.reblogged ? words().UndoBoost : words().Boost }}
+                      </button>
+                    }
+                    @case ('quote') {
+                      <button
+                        type="button"
+                        role="menuitem"
+                        (click)="shareMenuOpen.set(false); toggleQuote($event)"
+                      >
+                        Quote
+                      </button>
+                    }
+                    @case ('posse') {
+                      <!-- Says "my blog" out loud. The old bare 🔁 beside another
+                           bare 🔁 gave the reader no way to tell which recycle
+                           symbol went to the network and which to their site. -->
+                      <button
+                        type="button"
+                        role="menuitem"
+                        (click)="shareMenuOpen.set(false); togglePosseOnly('repost', $event)"
+                      >
+                        {{
+                          posseQueued('repost')
+                            ? 'Remove boost from my blog'
+                            : 'Record a boost on my blog'
+                        }}
+                      </button>
+                    }
+                    @case ('share') {
+                      <button type="button" role="menuitem" (click)="openShare($event)">
+                        Share elsewhere…
+                      </button>
+                    }
+                  }
                 }
               </div>
             }
@@ -504,22 +533,28 @@
                has no endpoint), so these write to the reader's own site and make
                no request at all. State comes from the queue, not from a server
                flag that does not exist here. -->
-          <button
-            class="action"
-            [class.on]="posseQueued('repost')"
-            (click)="togglePosseOnly('repost', $event)"
-            [title]="
-              posseQueued('repost')
-                ? 'Remove this boost from your blog record'
-                : 'Record a boost on your blog'
-            "
-            [attr.aria-pressed]="posseQueued('repost')"
-          >
-            🔁
-            @if (posseQueued('repost')) {
-              <span class="did">Recorded</span>
-            }
-          </button>
+          @if (!unifiedShare()) {
+            <!-- Without the unified control this is the only boost affordance
+                 there is. With it, "Record a boost on my blog" is a named item
+                 in that menu instead: a second bare 🔁 next to the first one
+                 asked the reader to tell two identical recycle symbols apart. -->
+            <button
+              class="action"
+              [class.on]="posseQueued('repost')"
+              (click)="togglePosseOnly('repost', $event)"
+              [title]="
+                posseQueued('repost')
+                  ? 'Remove this boost from your blog record'
+                  : 'Record a boost on your blog'
+              "
+              [attr.aria-pressed]="posseQueued('repost')"
+            >
+              🔁
+              @if (posseQueued('repost')) {
+                <span class="did">Recorded</span>
+              }
+            </button>
+          }
           <button
             class="action"
             [class.on]="posseQueued('like')"

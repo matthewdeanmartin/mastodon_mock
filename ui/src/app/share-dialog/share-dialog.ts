@@ -7,6 +7,9 @@ import { FocusTrap } from '../a11y/focus-trap';
 import { PageDiagnostics } from '../page-diagnostics';
 import { shareBody } from './share-selection';
 import { intentIdsFor, postTargetsFor } from './share-targets';
+import { HugoSettings } from '../providers/hugo/hugo-settings';
+import { PosseQueue } from '../providers/hugo/posse-queue';
+import { canPosseOnly } from '../providers/provider';
 
 export interface ShareContext {
   url: string;
@@ -75,7 +78,7 @@ export function shareableContentLinks(status: Status): string[] {
  * "post" is an article on somebody's site — both of which change what a share
  * should say.
  */
-function isFeedItem(status: Status): boolean {
+export function isFeedItem(status: Status): boolean {
   return status.id.startsWith('rss:') || (status.account.acct ?? '').startsWith('rss:');
 }
 
@@ -174,6 +177,8 @@ const QUOTE_CARRYING_INTENTS = new Set(['bluesky', 'tumblr']);
 export class ShareDialog {
   private diagnostics = inject(PageDiagnostics);
   private availability = inject(TargetAvailabilitySource);
+  private hugo = inject(HugoSettings);
+  private posse = inject(PosseQueue);
 
   readonly status = input.required<Status>();
   /**
@@ -188,7 +193,26 @@ export class ShareDialog {
   /** Asks the host to open a composer — the dialog never posts anything itself. */
   readonly compose = output<ComposeShareRequest>();
 
-  protected readonly contentLinks = computed(() => shareableContentLinks(this.status()));
+  /**
+   * Whether this is a feed article rather than a post — the picker turns on it.
+   *
+   * A Mastodon post is a wrapper: "hey, check out example.com" behind a link
+   * that may want a login, a follow, and an approved follow request before it
+   * shows you the one sentence it had. Offering to share the *linked page*
+   * instead is a real and useful choice there.
+   *
+   * A feed article is not a wrapper. Its URL already **is** the article on the
+   * publisher's site, so "this post" and "the link, unwrapped" name the same
+   * page — a choice between two identical things, which is not a choice.
+   */
+  protected readonly feedItem = computed(() => isFeedItem(this.status()));
+
+  protected readonly contentLinks = computed(() =>
+    // Suppressed for feed articles: the outbound links in an article's body are
+    // things the *article* links to, not a wrapper around it, so presenting them
+    // as "share this instead" misreads what the reader is holding.
+    this.feedItem() ? [] : shareableContentLinks(this.status()),
+  );
   protected selectedUrl = signal('');
   protected copied = signal(false);
   protected copyFailed = signal(false);
@@ -212,6 +236,43 @@ export class ShareDialog {
   protected readonly quoteMayBeDropped = computed(
     () => !!this.quote() && this.intents().some((d) => !QUOTE_CARRYING_INTENTS.has(d.id)),
   );
+
+  /**
+   * Whether "also record this on my blog" is on offer.
+   *
+   * Same test the action bar uses: a POSSE-enabled Hugo connection, a provider
+   * with no network of its own to boost on, and a URL to record. It rides along
+   * in this dialog rather than as a button in the bar because on a feed item
+   * sharing and recording are the same intention expressed twice — you are
+   * telling people about the article, and telling your own site you did.
+   */
+  protected readonly canRecordOnBlog = computed(
+    () =>
+      this.hugo.posseEnabled() &&
+      // Either tag qualifies. `provider` is optional on a Status and the RSS
+      // adapter is not the only thing that builds one, so a feed item is also
+      // recognised by its `rss:` id — the same shape `isFeedItem` keys on.
+      (canPosseOnly(this.status().provider) || this.feedItem()) &&
+      !!this.status().url &&
+      !this.posse.has('repost', this.status().url!),
+  );
+
+  /** Ticked by the reader; acted on when they actually send the share. */
+  protected recordOnBlog = signal(false);
+
+  /**
+   * Write the POSSE entry, if it was asked for.
+   *
+   * Called from every path that completes a share, and only from those: ticking
+   * the box and then closing the dialog records nothing, because the reader
+   * never went through with the share it was attached to.
+   */
+  private recordIfAsked(): void {
+    if (!this.recordOnBlog() || !this.canRecordOnBlog()) {
+      return;
+    }
+    this.posse.add('repost', this.status());
+  }
 
   protected label(target: PostTarget): string {
     return targetLabel(target);
@@ -244,6 +305,7 @@ export class ShareDialog {
     // missed, so make sure the link is in the body.
     const text = context.text.includes(url) ? context.text : `${context.text}\n\n${url}`;
     this.diagnostics.info('Share', 'compose', { target });
+    this.recordIfAsked();
     this.compose.emit({ target, text });
     this.closed.emit();
   }
@@ -251,6 +313,7 @@ export class ShareDialog {
   protected open(destination: ShareDestination): void {
     const url = destination.buildUrl(shareContext(this.status(), this.targetUrl(), this.quote()));
     window.open(url, '_blank', 'noopener,noreferrer');
+    this.recordIfAsked();
     this.closed.emit();
   }
 
@@ -258,6 +321,7 @@ export class ShareDialog {
     const context = shareContext(this.status(), this.targetUrl(), this.quote());
     try {
       await navigator.share(context);
+      this.recordIfAsked();
       this.closed.emit();
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -271,6 +335,7 @@ export class ShareDialog {
   protected async copyLink(): Promise<void> {
     try {
       await navigator.clipboard.writeText(this.targetUrl());
+      this.recordIfAsked();
       this.copyFailed.set(false);
       this.copied.set(true);
     } catch (error: unknown) {

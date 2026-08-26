@@ -117,6 +117,16 @@ const INTERACTIVE_SELECTOR = [
   'app-account-hover-card',
 ].join(',');
 
+/**
+ * One entry in the unified 🔁 menu.
+ *
+ * `posse` is "record a boost on my own blog" — a POSSE write to the reader's
+ * site with no network request behind it. It sits in this list rather than as a
+ * second 🔁 in the bar, because two recycle symbols side by side is a riddle,
+ * not an interface.
+ */
+type ShareMenuAction = 'boost' | 'quote' | 'posse' | 'share';
+
 interface MastodonPostRef {
   url: string;
   server: string;
@@ -317,6 +327,97 @@ export class StatusCard {
    * fourth — see the `unified-share` flag.
    */
   protected readonly unifiedShare = computed(() => this.featureFlags.enabled('unified-share'));
+
+  /**
+   * The actions the unified menu would actually offer, in menu order.
+   *
+   * Computed rather than left implicit in the template because the *count* is
+   * what decides whether there is a menu at all — see {@link shareMenuItems}.
+   */
+  protected readonly shareMenuActions = computed<readonly ShareMenuAction[]>(() => {
+    const actions: ShareMenuAction[] = [];
+    if (this.caps.reblog) {
+      actions.push('boost');
+    }
+    if (!this.foreign && this.capabilities.canCompose) {
+      actions.push('quote');
+    }
+    // Record-a-boost-on-my-own-blog. On a feed item this is the only thing the
+    // word "boost" can honestly mean: there is no network to boost on.
+    if (this.posseOnly()) {
+      actions.push('posse');
+    }
+    if (this.display.url) {
+      actions.push('share');
+    }
+    return actions;
+  });
+
+  /**
+   * Whether the 🔁 control opens a menu, or just does the one thing.
+   *
+   * A menu holding a single item is not a menu, it is an extra click. That was
+   * the RSS case exactly: boost and quote are both impossible on a feed item, so
+   * the popup opened to offer "Share elsewhere…" and nothing else — a middleman
+   * between the reader and the dialog they were already asking for. Below two
+   * real choices the button skips the popup and performs the action directly; a
+   * Mastodon post still gets its menu, because Boost, Quote and Share there are
+   * three genuinely different things.
+   */
+  protected readonly shareMenuIsUseful = computed(() => this.shareMenuActions().length > 1);
+
+  /** The single action a degenerate menu collapses to, if there is one. */
+  protected readonly soleShareAction = computed<ShareMenuAction | null>(() => {
+    const actions = this.shareMenuActions();
+    return actions.length === 1 ? actions[0] : null;
+  });
+
+  /**
+   * What the 🔁 button does when it is not opening a menu.
+   *
+   * Only reachable when exactly one action exists, so there is nothing to
+   * choose between and no popup is drawn.
+   */
+  protected runSoleShareAction(event: Event): void {
+    switch (this.soleShareAction()) {
+      case 'boost':
+        this.toggleReblog(event);
+        return;
+      case 'quote':
+        this.toggleQuote(event);
+        return;
+      case 'posse':
+        this.togglePosseOnly('repost', event);
+        return;
+      case 'share':
+        this.openShare(event);
+        return;
+      default:
+        event.stopPropagation();
+    }
+  }
+
+  /** Label and tooltip for the 🔁 control, which changes with what it will do. */
+  protected readonly shareButtonLabel = computed(() => {
+    if (this.shareMenuIsUseful()) {
+      return 'Boost, quote or share';
+    }
+    switch (this.soleShareAction()) {
+      case 'boost':
+        return this.display.reblogged ? this.words().UndoBoost : this.words().Boost;
+      case 'quote':
+        return 'Quote';
+      case 'posse':
+        return this.posseQueued('repost')
+          ? 'Remove this boost from your blog record'
+          : 'Record a boost on your blog';
+      case 'share':
+        // Names the dialog it opens, because it opens it on the first press.
+        return 'Share this article';
+      default:
+        return 'Share';
+    }
+  });
 
   // --- content warnings ---
 

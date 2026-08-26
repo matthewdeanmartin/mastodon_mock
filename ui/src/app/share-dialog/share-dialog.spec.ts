@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../models';
+import { HugoSettings } from '../providers/hugo/hugo-settings';
+import { PosseQueue } from '../providers/hugo/posse-queue';
 import {
   SHARE_DESTINATIONS,
   ShareDialog,
@@ -118,6 +120,102 @@ describe('ShareDialog', () => {
     const opened = new URL(String(open.mock.calls[0][0]));
     expect(opened.searchParams.get('url')).toBe('https://example.com/story');
     open.mockRestore();
+  });
+
+  /** The same article, as the RSS adapter builds it: a feed id and a synthetic account. */
+  function feedArticle(
+    content = '<p>Read <a href="https://example.com/story">this</a></p>',
+  ): Status {
+    const article = status(content);
+    return {
+      ...article,
+      id: 'rss:https://blog.example/feed.xml::1',
+      url: 'https://blog.example/posts/hello/',
+      account: {
+        ...article.account,
+        acct: 'rss:https://blog.example/feed.xml',
+        display_name: 'The Blog',
+      },
+    };
+  }
+
+  it('never offers wrapper removal on a feed article', () => {
+    // On a Mastodon post "this post" and "the linked page" are different pages,
+    // and unwrapping saves the reader a login-and-follow dance to see one line
+    // of "hey, check out example.com". A feed item has no wrapper: its URL
+    // already is the article, so the two options named the same thing.
+    const fixture = TestBed.createComponent(ShareDialog);
+    fixture.componentRef.setInput('status', feedArticle());
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.textContent).not.toContain('without the post wrapper');
+    expect(element.querySelectorAll('input[name="share-target"]').length).toBe(0);
+    // ...and says what is actually going out instead of asking an unanswerable
+    // question about it.
+    expect(element.textContent).toContain('Share this article');
+    expect(element.textContent).toContain('blog.example');
+  });
+
+  it('shares the article URL from a feed item with no choice to get wrong', () => {
+    const fixture = TestBed.createComponent(ShareDialog);
+    fixture.componentRef.setInput('status', feedArticle());
+    fixture.detectChanges();
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const element = fixture.nativeElement as HTMLElement;
+
+    Array.from(element.querySelectorAll<HTMLButtonElement>('.destination:not(.post)'))
+      .find((button) => button.textContent?.trim() === 'Reddit')!
+      .click();
+
+    const opened = new URL(String(open.mock.calls[0][0]));
+    expect(opened.searchParams.get('url')).toBe('https://blog.example/posts/hello/');
+    open.mockRestore();
+  });
+
+  it('records a POSSE boost only when the share actually goes through', () => {
+    TestBed.inject(HugoSettings).connect('tok', {
+      owner: 'me',
+      repo: 'blog',
+      branch: 'main',
+      contentPath: 'content',
+      posse: true,
+    } as never);
+    const queue = TestBed.inject(PosseQueue);
+    const fixture = TestBed.createComponent(ShareDialog);
+    fixture.componentRef.setInput('status', feedArticle());
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+
+    // The opt-in replaces the second bare 🔁 that used to sit in the action bar,
+    // and says "my blog" where that symbol said nothing.
+    const box = element.querySelector<HTMLInputElement>('.also-record input')!;
+    expect(element.textContent).toContain('Also record this on my blog');
+    box.click();
+    fixture.detectChanges();
+
+    // Ticking it is not the act. Nothing is recorded until the share happens.
+    expect(queue.count()).toBe(0);
+
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    Array.from(element.querySelectorAll<HTMLButtonElement>('.destination:not(.post)'))
+      .find((button) => button.textContent?.trim() === 'Reddit')!
+      .click();
+    open.mockRestore();
+
+    expect(queue.count()).toBe(1);
+    expect(queue.entries()[0]).toMatchObject({
+      kind: 'repost',
+      targetUrl: 'https://blog.example/posts/hello/',
+    });
+  });
+
+  it('does not offer to record on a blog that is not connected', () => {
+    const fixture = TestBed.createComponent(ShareDialog);
+    fixture.componentRef.setInput('status', feedArticle());
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.also-record')).toBeNull();
   });
 
   /** Buttons in the "Post it" section. */

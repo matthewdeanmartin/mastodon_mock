@@ -90,6 +90,33 @@ h3,
   color: var(--muted);
 }
 
+/* Borrows the `.targets` shape so the POSSE opt-in reads as part of the same
+   form rather than a stray checkbox floating above the buttons. */
+.also-record {
+  margin: 18px 0 14px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.also-record input {
+  margin-top: 3px;
+}
+
+.also-record span,
+.also-record small {
+  display: block;
+}
+
+.also-record small {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
 .destinations {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
