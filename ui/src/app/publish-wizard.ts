@@ -9,7 +9,7 @@
 export type WizardStep = 'targets' | 'preview' | 'quality' | 'when';
 
 /** Fixed order. The wizard never reorders steps; it only omits them. */
-export const WIZARD_STEPS: readonly WizardStep[] = ['preview', 'quality', 'when', 'targets'];
+export const WIZARD_STEPS: readonly WizardStep[] = ['preview', 'quality', 'targets', 'when'];
 
 /** Which steps the user has switched on. */
 export type WizardSteps = Record<WizardStep, boolean>;
@@ -46,8 +46,7 @@ export function nextStep(current: WizardStep, enabled: WizardSteps): WizardStep 
 /**
  * The step before `current`, or null when `current` is the first one.
  *
- * With the preview off, Back from Quality lands on Targets — not on a hidden
- * Preview that would render nothing and appear to be a broken dialog.
+ * With a step off, Back skips it rather than rendering an empty dialog.
  */
 export function previousStep(current: WizardStep, enabled: WizardSteps): WizardStep | null {
   const steps = activeSteps(enabled);

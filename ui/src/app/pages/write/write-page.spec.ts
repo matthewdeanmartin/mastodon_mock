@@ -51,6 +51,7 @@ interface PageInternals {
   openFromBoard(item: DraftItem): void;
   wizardStep: WritableSignal<WizardStep | null>;
   wizardError: WritableSignal<string | null>;
+  wizardScheduleAt: WritableSignal<string>;
   wizardTargets: Signal<PostTarget[]>;
   qualityFindings: Signal<QualityFinding[]>;
   aiFindings: WritableSignal<ProofreadingFinding[]>;
@@ -888,15 +889,18 @@ describe('WritePage', () => {
   });
 
   it('walks forward through the steps and publishes at the end', () => {
-    TestBed.inject(Auth).mode.set('anonymous');
+    signIn();
     const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([]);
     const page = internals(fixture);
     openWizard(fixture, 'the finished piece');
 
     page.wizardForward();
-    expect(page.wizardStep()).toBe('when');
-    page.wizardForward();
     expect(page.wizardStep()).toBe('targets');
+    page.setWizardTarget('fedi');
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('when');
     page.wizardForward();
 
     expect(page.wizardStep()).toBeNull();
@@ -952,7 +956,7 @@ describe('WritePage', () => {
     openWizard(fixture);
 
     page.wizardForward();
-    expect(page.wizardStep()).toBe('when');
+    expect(page.wizardStep()).toBe('targets');
     page.wizardBack();
     // Not a hidden preview step that would render nothing.
     expect(page.wizardStep()).toBe('quality');
@@ -1019,10 +1023,12 @@ describe('WritePage', () => {
     } as unknown as ClipboardEvent);
     page.publish();
     page.wizardForward();
-    page.wizardForward();
     expect(page.wizardStep()).toBe('targets');
 
     page.setWizardTarget('fedi');
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('when');
+    expect(httpMock.match('/api/v2/media')).toHaveLength(0);
     page.wizardForward();
     const upload = httpMock.expectOne('/api/v2/media');
     upload.flush({
@@ -1043,10 +1049,9 @@ describe('WritePage', () => {
     const fixture = setUp();
     const page = internals(fixture);
     openWizard(fixture);
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('targets');
     page.setWizardTarget('paste');
-    page.wizardForward();
-    page.wizardForward();
-    page.wizardForward();
     page.wizardForward();
 
     expect(TestBed.inject(Drafts).takeHandoff()?.snapshot.target).toBe('paste');
@@ -1112,6 +1117,47 @@ describe('WritePage', () => {
     // Advisory only: the step still moves on.
     page.wizardStep.set('quality');
     page.wizardForward();
+    expect(page.wizardStep()).toBe('targets');
+  });
+
+  it('publishes non-Mastodon targets without offering a browser-based schedule', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    openWizard(fixture, 'publish this as a paste');
+
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('targets');
+    page.setWizardTarget('paste');
+    page.wizardForward();
+
+    expect(page.wizardStep()).toBeNull();
+    expect(TestBed.inject(Drafts).takeHandoff()?.snapshot.target).toBe('paste');
+  });
+
+  it('drops a Mastodon schedule when the destination changes', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const page = internals(setUp());
+    page.setWizardScheduleAt('2027-01-01T09:00');
+
+    page.setWizardTarget('paste');
+
+    expect(page.wizardScheduleAt()).toBe('');
+  });
+
+  it('requires a destination choice before an enabled scheduling step', () => {
+    signIn();
+    TestBed.inject(ClientPrefs).setWizardStep('targets', false);
+    const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([]);
+    const page = internals(fixture);
+    openWizard(fixture, 'schedule this on Mastodon');
+
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('targets');
+    page.setWizardTarget('fedi');
+    page.wizardForward();
     expect(page.wizardStep()).toBe('when');
   });
 
@@ -1123,10 +1169,12 @@ describe('WritePage', () => {
     const page = internals(fixture);
     openWizard(fixture, 'later, please');
 
-    page.wizardStep.set('when');
-    page.setWizardScheduleAt('2027-01-01T09:00');
     page.wizardForward();
     expect(page.wizardStep()).toBe('targets');
+    page.setWizardTarget('fedi');
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('when');
+    page.setWizardScheduleAt('2027-01-01T09:00');
     page.wizardForward();
 
     const handoff = TestBed.inject(Drafts).takeHandoff();
@@ -1144,15 +1192,16 @@ describe('WritePage', () => {
     const page = internals(fixture);
     openWizard(fixture, 'refused, but not lost');
 
-    page.wizardStep.set('when');
-    page.setWizardScheduleAt('not-a-date');
     page.wizardForward();
-    expect(page.wizardStep()).toBe('targets');
+    page.setWizardTarget('fedi');
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('when');
+    page.setWizardScheduleAt('not-a-date');
     page.wizardForward();
 
     expect(page.wizardError()).toContain('could not be read');
     expect(page.body()).toBe('refused, but not lost');
-    expect(page.wizardStep()).toBe('targets');
+    expect(page.wizardStep()).toBe('when');
   });
 
   // -------------------------------------------------------------- board panel

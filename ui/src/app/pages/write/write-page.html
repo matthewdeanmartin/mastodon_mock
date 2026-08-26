@@ -763,6 +763,18 @@
                   </label>
                 }
               </div>
+              @if (prefs.wizardSteps().when) {
+                @if (canScheduleSelectedTarget()) {
+                  <p class="muted small">
+                    Mastodon can hold this post server-side. You can choose a publishing time next.
+                  </p>
+                } @else {
+                  <p class="muted small">
+                    This publishes now. Scheduling is offered only for a single Mastodon post;
+                    Mockingbird does not rely on a browser or phone staying open.
+                  </p>
+                }
+              }
             } @else {
               <p class="muted">
                 Nothing is connected that this could be published to. Link a service under
@@ -884,7 +896,7 @@
                 The server holds it and publishes it then. It appears under Parked in your drafts
                 until it does.
               } @else {
-                Leave this empty to publish now. The destination is the final step.
+                Leave this empty to publish to Mastodon now.
               }
             </p>
           }

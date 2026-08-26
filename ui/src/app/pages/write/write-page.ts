@@ -838,7 +838,7 @@ export class WritePage implements OnInit, OnDestroy {
       (target) => !this.targetUnsupportedReason(target),
     );
     if (firstTarget) {
-      this.wizardTarget.set(firstTarget);
+      this.setWizardTarget(firstTarget);
     }
     if (!first) {
       // Every step switched off. An empty dialog would be worse than none.
@@ -882,10 +882,21 @@ export class WritePage implements OnInit, OnDestroy {
   protected readonly stepTitle = stepTitle;
   protected readonly targetLabel = targetLabel;
 
-  protected wizardEnabled = computed(() => ({
-    ...this.prefs.wizardSteps(),
-    preview: this.prefs.wizardSteps().preview && !isObviousSingleton(this.body(), MAX_POST_CHARS),
-  }));
+  protected canScheduleSelectedTarget = computed(
+    () => this.wizardTarget() === 'fedi' && this.segments().length === 1,
+  );
+
+  protected wizardEnabled = computed(() => {
+    const preferred = this.prefs.wizardSteps();
+    return {
+      ...preferred,
+      preview: preferred.preview && !isObviousSingleton(this.body(), MAX_POST_CHARS),
+      // Scheduling is meaningful only after an explicit destination choice.
+      targets: preferred.targets || preferred.when,
+      // Mastodon holds scheduled posts server-side. No browser timer is used.
+      when: preferred.when && this.canScheduleSelectedTarget(),
+    };
+  });
 
   protected wizardPosition = computed(() => {
     const step = this.wizardStep();
@@ -934,6 +945,11 @@ export class WritePage implements OnInit, OnDestroy {
   protected setWizardTarget(target: PostTarget): void {
     if (!this.targetUnsupportedReason(target)) {
       this.wizardTarget.set(target);
+      if (target !== 'fedi') {
+        // A date chosen for Mastodon must not leak into a target that cannot
+        // hold the work server-side.
+        this.wizardScheduleAt.set('');
+      }
     }
   }
 
@@ -1012,7 +1028,7 @@ export class WritePage implements OnInit, OnDestroy {
   }
 
   protected targetUnsupportedReason(target: PostTarget): string | null {
-    const scheduled = !!this.wizardScheduleAt();
+    const scheduled = !!this.wizardScheduleAt() && target === 'fedi';
     const threaded = this.segments().length > 1;
     const hasMedia = this.media().length > 0;
     const hasPoll = this.pollOpen();
@@ -1020,9 +1036,6 @@ export class WritePage implements OnInit, OnDestroy {
     const hasLanguage = !!this.postLanguage();
     if (scheduled && threaded) {
       return 'Scheduling supports one post, not a thread.';
-    }
-    if ((target === 'bsky' || target === 'both') && scheduled) {
-      return 'Scheduling is Mastodon-only.';
     }
     if (target === 'bsky' && hasPoll) {
       return 'Bluesky has no polls.';
