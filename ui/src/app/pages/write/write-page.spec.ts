@@ -1,14 +1,18 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Signal, WritableSignal } from '@angular/core';
+import { Signal, WritableSignal, signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { ClientPrefs } from '../../client-prefs';
-import { Drafts } from '../../drafts';
+import { DraftMedia, Drafts } from '../../drafts';
 import { Account, ScheduledStatus, Status } from '../../models';
 import { PostTarget } from '../../compose/compose';
+import { TranslateResult } from '../../compose/translate-dialog/translate-dialog';
+import { Proofreader, ProofreadingFinding } from '../../compose/proofreader';
+import { AiAvailability } from '../../ai-availability';
+import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
 import { PkmItem } from '../../pkm/pkm-source';
 import { PkmKind } from '../../pkm/pkm-tags';
 import { WIZARD_STEPS, WizardStep } from '../../publish-wizard';
@@ -45,7 +49,16 @@ interface PageInternals {
   wizardError: WritableSignal<string | null>;
   wizardTargets: Signal<PostTarget[]>;
   qualityFindings: Signal<QualityFinding[]>;
+  aiFindings: WritableSignal<ProofreadingFinding[]>;
+  aiProofreading: WritableSignal<boolean>;
   previewHtml: Signal<string[]>;
+  cwOpen: WritableSignal<boolean>;
+  spoilerText: WritableSignal<string>;
+  sensitive: WritableSignal<boolean>;
+  media: WritableSignal<DraftMedia[]>;
+  pollOpen: WritableSignal<boolean>;
+  pollOptions: WritableSignal<string[]>;
+  postLanguage: WritableSignal<string>;
   wizardForward(): void;
   wizardBack(): void;
   wizardCancel(): void;
@@ -63,6 +76,18 @@ interface PageInternals {
   saveAndContinue(): void;
   cancelSwitch(): void;
   onBodyInput(value: string): void;
+  toggleCw(): void;
+  setSpoilerText(value: string): void;
+  toggleSensitive(): void;
+  togglePoll(): void;
+  setPollOption(index: number, value: string): void;
+  setPostLanguage(code: string): void;
+  useSuggestedTags(tags: string[]): void;
+  useTranslation(result: TranslateResult): void;
+  insertEmoji(value: string): void;
+  rememberEditorSelection(event: Event): void;
+  onPaste(event: ClipboardEvent): void;
+  targetUnsupportedReason(target: PostTarget): string | null;
 }
 
 function internals(fixture: ComponentFixture<WritePage>): PageInternals {
@@ -115,7 +140,6 @@ describe('WritePage', () => {
         ]),
       ],
     });
-    httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
@@ -129,6 +153,7 @@ describe('WritePage', () => {
   }
 
   function setUp(): ComponentFixture<WritePage> {
+    httpMock = TestBed.inject(HttpTestingController);
     const fixture = TestBed.createComponent(WritePage);
     fixture.detectChanges();
     return fixture;
@@ -373,6 +398,24 @@ describe('WritePage', () => {
     expect(page.body()).toBe('a saved draft');
   });
 
+  it('does not let Save and continue silently discard transient attachments', () => {
+    saveLocal(['a saved draft']);
+    const page = internals(setUp());
+    page.newDraft();
+    page.onBodyInput('unsaved work with an image');
+    page.onPaste({
+      clipboardData: { files: [new File(['png'], 'shot.png', { type: 'image/png' })] },
+      preventDefault: vi.fn(),
+    } as unknown as ClipboardEvent);
+    page.open(page.sources.items().find((item) => item.preview === 'a saved draft')!);
+
+    page.saveAndContinue();
+
+    expect(page.pendingSwitch()).not.toBeNull();
+    expect(page.body()).toBe('unsaved work with an image');
+    expect(page.media()).toHaveLength(1);
+  });
+
   it('discards and continues, keeping nothing', () => {
     saveLocal(['a saved draft']);
     const fixture = setUp();
@@ -486,8 +529,10 @@ describe('WritePage', () => {
   // ---------------------------------------------------------------- publishing
 
   it('hands the text to the composer rather than posting from here', () => {
-    TestBed.inject(Auth).mode.set('anonymous');
+    signIn();
     const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([]);
     const page = internals(fixture);
     page.newDraft();
     page.onBodyInput('ready to go\n---\nsecond post');
@@ -495,8 +540,9 @@ describe('WritePage', () => {
 
     const handoff = TestBed.inject(Drafts).takeHandoff();
     expect(handoff?.snapshot.segments).toEqual(['ready to go', 'second post']);
-    // Publishing is the composer's job. Asserting the *absence* of a post is
-    // the only thing that really proves this page never publishes by itself.
+    expect(handoff?.publishImmediately).toBe(true);
+    // The existing composer owns provider-specific publishing; the writing
+    // page marks the handoff for immediate send after the target-last review.
     expect(httpMock.match((r) => r.method === 'POST')).toHaveLength(0);
   });
 
@@ -658,6 +704,143 @@ describe('WritePage', () => {
     expect(page.body()).toBe('half a paragraph');
   });
 
+  // ------------------------------------------------------------- authoring tools
+
+  it('saves and restores CW, poll, sensitive, and post-language state', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('A multilingual question');
+    page.toggleCw();
+    page.setSpoilerText('Spoilers');
+    page.togglePoll();
+    page.setPollOption(0, 'Yes');
+    page.setPollOption(1, 'No');
+    page.setPostLanguage('eo');
+    page.sensitive.set(true);
+    page.save();
+
+    const saved = TestBed.inject(Drafts).drafts()[0];
+    expect(saved).toMatchObject({
+      spoilerText: 'Spoilers',
+      sensitive: true,
+      postLanguage: 'eo',
+      poll: { options: ['Yes', 'No'], multiple: false, expiresIn: 86400 },
+    });
+
+    page.newDraft();
+    page.open(page.sources.items().find((item) => item.id === saved.id)!);
+    expect(page.cwOpen()).toBe(true);
+    expect(page.spoilerText()).toBe('Spoilers');
+    expect(page.pollOptions()).toEqual(['Yes', 'No']);
+    expect(page.postLanguage()).toBe('eo');
+  });
+
+  it('attaches pasted images but leaves an ordinary text paste alone', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const page = internals(setUp());
+    page.newDraft();
+    const imagePrevented = vi.fn();
+    page.onPaste({
+      clipboardData: { files: [new File(['png'], 'shot.png', { type: 'image/png' })] },
+      preventDefault: imagePrevented,
+    } as unknown as ClipboardEvent);
+
+    expect(imagePrevented).toHaveBeenCalled();
+    expect(page.media()).toHaveLength(1);
+    expect(page.media()[0].file?.name).toBe('shot.png');
+
+    const textPrevented = vi.fn();
+    page.onPaste({
+      clipboardData: { files: [] },
+      preventDefault: textPrevented,
+    } as unknown as ClipboardEvent);
+    expect(textPrevented).not.toHaveBeenCalled();
+  });
+
+  it('keeps media and polls mutually exclusive and marks attached media sensitive', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const page = internals(setUp());
+    page.newDraft();
+    page.onPaste({
+      clipboardData: { files: [new File(['png'], 'shot.png', { type: 'image/png' })] },
+      preventDefault: vi.fn(),
+    } as unknown as ClipboardEvent);
+
+    page.togglePoll();
+    expect(page.pollOpen()).toBe(false);
+    page.toggleSensitive();
+    expect(page.sensitive()).toBe(true);
+  });
+
+  it('inserts emoji at the caret and appends only new suggested hashtags', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('Hi #Cats');
+    fixture.detectChanges();
+    page.rememberEditorSelection({
+      target: { selectionStart: 2, selectionEnd: 2 },
+    } as unknown as Event);
+
+    page.insertEmoji('🙂');
+    expect(page.body()).toBe('Hi🙂 #Cats');
+    page.useSuggestedTags(['cats', 'NaturePhotography']);
+    expect(page.body()).toBe('Hi🙂 #Cats #NaturePhotography');
+  });
+
+  it('sets language on replacement translation but not on appended bilingual text', () => {
+    TestBed.inject(Auth).mode.set('anonymous');
+    const page = internals(setUp());
+    page.newDraft();
+    page.onBodyInput('Hello');
+    page.useTranslation({ text: 'Saluton', mode: 'replace', code: 'eo' });
+    expect(page.body()).toBe('Saluton');
+    expect(page.postLanguage()).toBe('eo');
+
+    page.useTranslation({ text: 'Hello', mode: 'append', code: 'en' });
+    expect(page.body()).toBe('Saluton\n\nHello');
+    expect(page.postLanguage()).toBe('eo');
+  });
+
+  it('runs local checks before the gated AI proofreader and never applies its prose', async () => {
+    const run = vi.fn();
+    TestBed.overrideProvider(AiAvailability, { useValue: { enabled: signal(true) } });
+    TestBed.overrideProvider(OpenRouterSession, { useValue: { connected: signal(true) } });
+    TestBed.overrideProvider(Proofreader, { useValue: { run } });
+    TestBed.inject(Auth).mode.set('anonymous');
+    const fixture = setUp();
+    const page = internals(fixture);
+    run.mockImplementation(async () => {
+      expect(page.qualityFindings().map((finding) => finding.id)).toContain('repeated-words');
+      return [{ message: 'The word “is” is repeated.' }];
+    });
+    page.newDraft();
+    page.onBodyInput('This is is repeated.');
+    page.publish();
+
+    await vi.waitFor(() => expect(page.aiProofreading()).toBe(false));
+    expect(run).toHaveBeenCalledWith('This is is repeated.');
+    expect(page.aiFindings()).toEqual([{ message: 'The word “is” is repeated.' }]);
+    expect(page.body()).toBe('This is is repeated.');
+  });
+
+  it('does not call the AI proofreader without an enabled OpenRouter connection', async () => {
+    const run = vi.fn();
+    TestBed.overrideProvider(Proofreader, { useValue: { run } });
+    TestBed.inject(Auth).mode.set('anonymous');
+    const page = internals(setUp());
+    page.newDraft();
+    page.onBodyInput('No model call for this.');
+    page.publish();
+
+    await Promise.resolve();
+    expect(run).not.toHaveBeenCalled();
+    expect(page.aiFindings()).toEqual([]);
+  });
+
   // ------------------------------------------------------------ publish wizard
 
   /** Open the wizard with a body ready to go. */
@@ -673,7 +856,8 @@ describe('WritePage', () => {
     const fixture = setUp();
     openWizard(fixture);
 
-    expect(internals(fixture).wizardStep()).toBe('targets');
+    // An obvious one-line singleton skips split preview and starts on checks.
+    expect(internals(fixture).wizardStep()).toBe('quality');
     // Nothing handed over yet.
     expect(TestBed.inject(Drafts).takeHandoff()).toBeNull();
   });
@@ -685,11 +869,9 @@ describe('WritePage', () => {
     openWizard(fixture, 'the finished piece');
 
     page.wizardForward();
-    expect(page.wizardStep()).toBe('preview');
-    page.wizardForward();
-    expect(page.wizardStep()).toBe('quality');
-    page.wizardForward();
     expect(page.wizardStep()).toBe('when');
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('targets');
     page.wizardForward();
 
     expect(page.wizardStep()).toBeNull();
@@ -712,6 +894,31 @@ describe('WritePage', () => {
     expect(TestBed.inject(Drafts).takeHandoff()?.snapshot.segments).toEqual(['straight out']);
   });
 
+  it('still asks for the destination when attachments require target-specific preparation', () => {
+    signIn();
+    const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([]);
+    TestBed.inject(ClientPrefs).wizardSteps.set({
+      targets: false,
+      preview: false,
+      quality: false,
+      when: false,
+    });
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('an attached image');
+    page.onPaste({
+      clipboardData: { files: [new File(['png'], 'shot.png', { type: 'image/png' })] },
+      preventDefault: vi.fn(),
+    } as unknown as ClipboardEvent);
+
+    page.publish();
+
+    expect(page.wizardStep()).toBe('targets');
+    expect(TestBed.inject(Drafts).takeHandoff()).toBeNull();
+  });
+
   it('skips a disabled step in both directions', () => {
     TestBed.inject(Auth).mode.set('anonymous');
     TestBed.inject(ClientPrefs).setWizardStep('preview', false);
@@ -720,10 +927,10 @@ describe('WritePage', () => {
     openWizard(fixture);
 
     page.wizardForward();
-    expect(page.wizardStep()).toBe('quality');
+    expect(page.wizardStep()).toBe('when');
     page.wizardBack();
     // Not a hidden preview step that would render nothing.
-    expect(page.wizardStep()).toBe('targets');
+    expect(page.wizardStep()).toBe('quality');
   });
 
   it('cancel publishes nothing and leaves the body alone', () => {
@@ -771,6 +978,39 @@ describe('WritePage', () => {
     openWizard(fixture);
 
     expect(internals(fixture).wizardTargets()).toContain('fedi');
+  });
+
+  it('uploads local media only after Mastodon is chosen as the final target', async () => {
+    signIn();
+    const fixture = setUp();
+    httpMock.expectOne(SCHEDULED_URL).flush([]);
+    flushStatusScans([]);
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('A picture');
+    page.onPaste({
+      clipboardData: { files: [new File(['png'], 'shot.png', { type: 'image/png' })] },
+      preventDefault: vi.fn(),
+    } as unknown as ClipboardEvent);
+    page.publish();
+    page.wizardForward();
+    page.wizardForward();
+    expect(page.wizardStep()).toBe('targets');
+
+    page.setWizardTarget('fedi');
+    page.wizardForward();
+    const upload = httpMock.expectOne('/api/v2/media');
+    upload.flush({
+      id: 'media-1',
+      type: 'image',
+      url: 'https://example.com/full.png',
+      preview_url: 'https://example.com/preview.png',
+      description: null,
+    });
+
+    const drafts = TestBed.inject(Drafts);
+    await vi.waitFor(() => expect(drafts.hasHandoff()).toBe(true));
+    expect(drafts.takeHandoff()?.media?.[0].media.id).toBe('media-1');
   });
 
   it('carries the chosen target into the handoff', () => {
@@ -861,14 +1101,13 @@ describe('WritePage', () => {
     page.wizardStep.set('when');
     page.setWizardScheduleAt('2027-01-01T09:00');
     page.wizardForward();
+    expect(page.wizardStep()).toBe('targets');
+    page.wizardForward();
 
-    const request = httpMock.expectOne('/api/v1/statuses');
-    expect(request.request.body.scheduled_at).toBeTruthy();
-    request.flush({ id: 'sched-1' });
-
+    const handoff = TestBed.inject(Drafts).takeHandoff();
+    expect(handoff?.scheduleAt).toBe('2027-01-01T09:00');
+    expect(handoff?.publishImmediately).toBe(true);
     expect(page.wizardStep()).toBeNull();
-    // Scheduling is a server call, not a composer handoff.
-    expect(TestBed.inject(Drafts).takeHandoff()).toBeNull();
     httpMock.match(() => true);
   });
 
@@ -881,16 +1120,14 @@ describe('WritePage', () => {
     openWizard(fixture, 'refused, but not lost');
 
     page.wizardStep.set('when');
-    page.setWizardScheduleAt('2124-01-01T09:00');
+    page.setWizardScheduleAt('not-a-date');
     page.wizardForward();
-    httpMock
-      .expectOne('/api/v1/statuses')
-      .flush('nope', { status: 422, statusText: 'Unprocessable' });
+    expect(page.wizardStep()).toBe('targets');
+    page.wizardForward();
 
-    expect(page.wizardError()).toContain('refused');
+    expect(page.wizardError()).toContain('could not be read');
     expect(page.body()).toBe('refused, but not lost');
-    // Still open, so the user can pick a nearer date.
-    expect(page.wizardStep()).toBe('when');
+    expect(page.wizardStep()).toBe('targets');
   });
 
   // -------------------------------------------------------------- board panel

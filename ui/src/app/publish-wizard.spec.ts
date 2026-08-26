@@ -19,11 +19,11 @@ const NONE: WizardSteps = { targets: false, preview: false, quality: false, when
 
 describe('activeSteps', () => {
   it('keeps the fixed order', () => {
-    expect(activeSteps(ALL_STEPS_ON)).toEqual(['targets', 'preview', 'quality', 'when']);
+    expect(activeSteps(ALL_STEPS_ON)).toEqual(['preview', 'quality', 'when', 'targets']);
   });
 
   it('omits switched-off steps without reordering the rest', () => {
-    expect(activeSteps(steps({ preview: false }))).toEqual(['targets', 'quality', 'when']);
+    expect(activeSteps(steps({ preview: false }))).toEqual(['quality', 'when', 'targets']);
   });
 
   it('is empty when every step is off', () => {
@@ -33,9 +33,9 @@ describe('activeSteps', () => {
 
 describe('firstStep', () => {
   it('opens on the first enabled step', () => {
-    expect(firstStep(ALL_STEPS_ON)).toBe('targets');
-    expect(firstStep(steps({ targets: false }))).toBe('preview');
-    expect(firstStep(steps({ targets: false, preview: false, quality: false }))).toBe('when');
+    expect(firstStep(ALL_STEPS_ON)).toBe('preview');
+    expect(firstStep(steps({ preview: false }))).toBe('quality');
+    expect(firstStep(steps({ preview: false, quality: false, when: false }))).toBe('targets');
   });
 
   it('is null when everything is off, so the caller publishes instead', () => {
@@ -46,63 +46,63 @@ describe('firstStep', () => {
 
 describe('nextStep', () => {
   it('walks the enabled steps in order', () => {
-    expect(nextStep('targets', ALL_STEPS_ON)).toBe('preview');
     expect(nextStep('preview', ALL_STEPS_ON)).toBe('quality');
     expect(nextStep('quality', ALL_STEPS_ON)).toBe('when');
+    expect(nextStep('when', ALL_STEPS_ON)).toBe('targets');
   });
 
   it('skips a disabled step', () => {
-    expect(nextStep('targets', steps({ preview: false }))).toBe('quality');
+    expect(nextStep('quality', steps({ when: false }))).toBe('targets');
   });
 
   it('skips several disabled steps at once', () => {
-    expect(nextStep('targets', steps({ preview: false, quality: false }))).toBe('when');
+    expect(nextStep('preview', steps({ quality: false, when: false }))).toBe('targets');
   });
 
   it('is null at the end, which is what triggers publishing', () => {
-    expect(nextStep('when', ALL_STEPS_ON)).toBeNull();
-    expect(nextStep('quality', steps({ when: false }))).toBeNull();
+    expect(nextStep('targets', ALL_STEPS_ON)).toBeNull();
+    expect(nextStep('when', steps({ targets: false }))).toBeNull();
   });
 });
 
 describe('previousStep', () => {
   it('walks backwards over enabled steps', () => {
-    expect(previousStep('when', ALL_STEPS_ON)).toBe('quality');
-    expect(previousStep('preview', ALL_STEPS_ON)).toBe('targets');
+    expect(previousStep('targets', ALL_STEPS_ON)).toBe('when');
+    expect(previousStep('quality', ALL_STEPS_ON)).toBe('preview');
   });
 
   it('skips a disabled step going back', () => {
     // Back from Quality must not land on a hidden Preview.
-    expect(previousStep('quality', steps({ preview: false }))).toBe('targets');
+    expect(previousStep('targets', steps({ when: false }))).toBe('quality');
   });
 
   it('is null on the first step', () => {
-    expect(previousStep('targets', ALL_STEPS_ON)).toBeNull();
-    expect(previousStep('preview', steps({ targets: false }))).toBeNull();
+    expect(previousStep('preview', ALL_STEPS_ON)).toBeNull();
+    expect(previousStep('quality', steps({ preview: false }))).toBeNull();
   });
 
   it('round-trips: forward then back returns where it started', () => {
-    const enabled = steps({ preview: false });
-    const forward = nextStep('targets', enabled)!;
-    expect(previousStep(forward, enabled)).toBe('targets');
+    const enabled = steps({ quality: false });
+    const forward = nextStep('preview', enabled)!;
+    expect(previousStep(forward, enabled)).toBe('preview');
   });
 });
 
 describe('isLastStep and forwardLabel', () => {
   it('the final enabled step publishes', () => {
-    expect(isLastStep('when', ALL_STEPS_ON)).toBe(true);
-    expect(forwardLabel('when', ALL_STEPS_ON)).toBe('Publish');
+    expect(isLastStep('targets', ALL_STEPS_ON)).toBe(true);
+    expect(forwardLabel('targets', ALL_STEPS_ON)).toBe('Publish');
   });
 
   it('moves the Publish button when the last step is switched off', () => {
-    const enabled = steps({ when: false });
-    expect(isLastStep('quality', enabled)).toBe(true);
-    expect(forwardLabel('quality', enabled)).toBe('Publish');
+    const enabled = steps({ targets: false });
+    expect(isLastStep('when', enabled)).toBe(true);
+    expect(forwardLabel('when', enabled)).toBe('Publish');
   });
 
   it('an earlier step continues rather than publishing', () => {
-    expect(isLastStep('targets', ALL_STEPS_ON)).toBe(false);
-    expect(forwardLabel('targets', ALL_STEPS_ON)).toBe('Continue');
+    expect(isLastStep('preview', ALL_STEPS_ON)).toBe(false);
+    expect(forwardLabel('preview', ALL_STEPS_ON)).toBe('Continue');
   });
 
   it('a lone enabled step both opens the wizard and publishes from it', () => {
@@ -115,12 +115,12 @@ describe('isLastStep and forwardLabel', () => {
 
 describe('stepPosition', () => {
   it('numbers the enabled steps from one', () => {
-    expect(stepPosition('targets', ALL_STEPS_ON)).toBe(1);
-    expect(stepPosition('when', ALL_STEPS_ON)).toBe(4);
+    expect(stepPosition('preview', ALL_STEPS_ON)).toBe(1);
+    expect(stepPosition('targets', ALL_STEPS_ON)).toBe(4);
   });
 
   it('renumbers when a step is off', () => {
-    expect(stepPosition('quality', steps({ preview: false }))).toBe(2);
+    expect(stepPosition('when', steps({ quality: false }))).toBe(2);
   });
 
   it('is zero for a step that is not shown', () => {

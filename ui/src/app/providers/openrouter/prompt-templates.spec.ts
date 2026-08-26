@@ -121,4 +121,11 @@ describe('the shipped prompts', () => {
     expect(DEFAULT_PROMPTS.tag).toContain('{{post}}');
     expect(DEFAULT_PROMPTS.tag).toContain('{{feedback}}');
   });
+
+  it('forbids the proofreader from becoming a ghostwriter', () => {
+    expect(DEFAULT_PROMPTS.proofread).toContain('do not rewrite');
+    expect(DEFAULT_PROMPTS.proofread).toContain('Do not compose a better reply');
+    expect(DEFAULT_PROMPTS.proofread).toContain('{{replyContext}}');
+    expect(DEFAULT_PROMPTS.proofread).toContain('{{text}}');
+  });
 });

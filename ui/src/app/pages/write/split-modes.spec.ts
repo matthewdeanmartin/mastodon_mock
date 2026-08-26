@@ -2,11 +2,28 @@ import { describe, expect, it } from 'vitest';
 import {
   autoSplit,
   insertSplitAt,
+  isObviousSingleton,
   isSplitRule,
   segmentsFor,
   splitOnRule,
   splitText,
 } from './split-modes';
+
+describe('isObviousSingleton', () => {
+  it('skips split review for one short line', () => {
+    expect(isObviousSingleton('A concise post.', 500)).toBe(true);
+  });
+
+  it('keeps review for a newline, marker, or the exact limit', () => {
+    expect(isObviousSingleton('line one\nline two', 500)).toBe(false);
+    expect(isObviousSingleton('before --- after', 500)).toBe(false);
+    expect(isObviousSingleton('x'.repeat(500), 500)).toBe(false);
+  });
+
+  it('uses server-style URL weighting', () => {
+    expect(isObviousSingleton(`see https://example.com/${'x'.repeat(700)}`, 500)).toBe(true);
+  });
+});
 
 const LIMIT = 500;
 

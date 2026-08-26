@@ -43,6 +43,19 @@ export interface SplitOptions {
 }
 
 /**
+ * True when split review cannot help: one short physical line with no marker.
+ *
+ * Strictly below the limit follows the product rule; a post exactly at the
+ * boundary still gets reviewed because a server-specific count can differ.
+ */
+export function isObviousSingleton(text: string, limit: number): boolean {
+  const body = text.trim();
+  return (
+    body !== '' && !/[\r\n]/.test(body) && !body.includes(SPLIT_RULE) && postLength(body) < limit
+  );
+}
+
+/**
  * Whether a line is the `---` boundary marker.
  *
  * Deliberately exact rather than "three or more dashes": `----` and `-----` are

@@ -1,4 +1,5 @@
 import { computed, Injectable, signal } from '@angular/core';
+import { MediaAttachment } from './models';
 
 /** Poll state carried in a draft (mirrors the composer's poll builder). */
 export interface DraftPoll {
@@ -20,6 +21,8 @@ export interface Draft {
   sensitive: boolean;
   visibility: string;
   poll: DraftPoll | null;
+  /** ISO 639-1 code, or empty/absent to let the server infer it. */
+  postLanguage?: string;
   inReplyToId?: string;
   quotedStatusId?: string;
   /**
@@ -41,6 +44,14 @@ export interface Draft {
 
 export type DraftSnapshot = Omit<Draft, 'id' | 'updatedAt'>;
 
+/** Media carried across one in-app publish handoff; never written to localStorage. */
+export interface DraftMedia {
+  media: MediaAttachment;
+  description: string;
+  /** Original bytes, needed when a Bluesky leg uploads its own blob. */
+  file?: File;
+}
+
 /** A post handed from /drafts to the composer by "Edit for post". */
 export interface DraftHandoff {
   snapshot: DraftSnapshot;
@@ -51,6 +62,12 @@ export interface DraftHandoff {
    * `pendingSelfCleanup`.
    */
   selfStatusId?: string;
+  /** Uploaded/local media is safe only for the one live navigation. */
+  media?: DraftMedia[];
+  /** datetime-local value already reviewed in the writing wizard. */
+  scheduleAt?: string;
+  /** The destination choice was the final confirmation; send as soon as seeded. */
+  publishImmediately?: boolean;
 }
 
 const DRAFTS_KEY = 'mockingbird_drafts';
@@ -163,8 +180,12 @@ export class Drafts {
   readonly hasHandoff = computed(() => this.handoffSlot() !== null);
 
   /** Park a snapshot for the next composer to open. */
-  handoff(snapshot: DraftSnapshot, selfStatusId?: string): void {
-    this.handoffSlot.set({ snapshot, selfStatusId });
+  handoff(
+    snapshot: DraftSnapshot,
+    selfStatusId?: string,
+    options: Omit<DraftHandoff, 'snapshot' | 'selfStatusId'> = {},
+  ): void {
+    this.handoffSlot.set({ snapshot, selfStatusId, ...options });
   }
 
   /** Take the parked handoff, if any, clearing it so it seeds exactly once. */

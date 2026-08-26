@@ -22,7 +22,7 @@ import { Injectable, signal } from '@angular/core';
 
 const PROMPTS_KEY = 'mockingbird_openrouter_prompts';
 
-export type PromptTemplateId = 'search' | 'blueskySearch' | 'tag' | 'translate';
+export type PromptTemplateId = 'search' | 'blueskySearch' | 'tag' | 'translate' | 'proofread';
 
 export interface PromptTemplateSpec {
   id: PromptTemplateId;
@@ -61,6 +61,13 @@ export const PROMPT_TEMPLATES: readonly PromptTemplateSpec[] = [
     description:
       'Translates a post into your language. The only prompt here that answers with prose rather than a list, so it has no {{feedback}} pass — there is nothing to grade a translation against.',
     placeholders: ['text', 'target'],
+  },
+  {
+    id: 'proofread',
+    label: 'Writing proofreader',
+    description:
+      'Points out specific mistakes or reply-relevance concerns without rewriting the post or supplying replacement prose.',
+    placeholders: ['text', 'replyContext'],
   },
 ];
 
@@ -179,11 +186,39 @@ Rules:
 - Keep the tone. A blunt post stays blunt; a joke stays a joke. Do not smooth it out
   and do not make it more polite than the original.
 - Keep the line breaks roughly as they are.
+- Leave every line containing only --- exactly unchanged; it is a post boundary.
 - If the post is already in {{target}}, reply with it unchanged rather than
   paraphrasing it.
 - If it is too short or too garbled to translate, reply with it unchanged.
 
 The post:
+{{text}}`,
+
+  proofread: `Proofread the social-media post below. Return only short diagnostic findings.
+
+This is a critic, not a ghostwriter. It is imperative that you do not rewrite the
+post, paraphrase it, polish it, continue it, or provide replacement text someone
+might copy and paste. Do not say "here is a revised version". Do not quote more
+than the few words needed to identify an issue.
+
+Good findings name a concrete problem:
+- "daguerotype appears misspelled; the usual spelling is daguerreotype"
+- "cat should be plural in the phrase 'three cat'"
+- "This answers the original poster's question directly."
+
+Rules:
+- Each finding must be one short sentence and under 240 characters.
+- Point to spelling, grammar, ambiguity, accidental repetition, or likely factual
+  inconsistency. Suggestions are advisory, not commands.
+- If original-post context is supplied, say whether the reply answers it or misses
+  its question. Do not compose a better reply.
+- Return no findings when there is nothing useful to say.
+- Never return the full post or a rewritten version of any sentence.
+
+Original-post context, when this is a reply:
+{{replyContext}}
+
+The post being proofread:
 {{text}}`,
 };
 

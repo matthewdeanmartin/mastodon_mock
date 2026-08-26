@@ -7,7 +7,7 @@
          focus actually is in this mode, and a keydown handler on a plain div
          is one a keyboard user can never reach. -->
     <textarea
-      #editorBox
+      #zenEditorBox
       class="zen-box"
       spellcheck="true"
       aria-label="Write"
@@ -199,6 +199,17 @@
 
           <p class="split-hint muted">{{ modeHint(splitMode()) }}</p>
 
+          @if (cwOpen()) {
+            <input
+              class="write-cw"
+              type="text"
+              aria-label="Content warning"
+              placeholder="Content warning or blog title"
+              [ngModel]="spoilerText()"
+              (ngModelChange)="setSpoilerText($event)"
+            />
+          }
+
           <textarea
             #editorBox
             class="editor-box"
@@ -207,7 +218,203 @@
             [attr.placeholder]="'Write. A line of --- starts a new post.'"
             [ngModel]="body()"
             (ngModelChange)="onBodyInput($event)"
+            (paste)="onPaste($event)"
+            (focus)="rememberEditorSelection($event)"
+            (click)="rememberEditorSelection($event)"
+            (select)="rememberEditorSelection($event)"
+            (keyup)="rememberEditorSelection($event)"
           ></textarea>
+
+          @if (media().length) {
+            <div class="write-media" aria-label="Attached media">
+              @for (item of media(); track item.media.id; let i = $index) {
+                <div class="write-media-item">
+                  @if (item.media.type === 'image') {
+                    <img
+                      [src]="item.media.preview_url || item.media.url"
+                      [alt]="item.description"
+                    />
+                  } @else {
+                    <div class="write-media-file">
+                      {{ item.media.type === 'video' ? '🎞️' : '🔊' }}
+                      {{ item.file?.name || item.media.type }}
+                    </div>
+                  }
+                  <input
+                    type="text"
+                    [ngModel]="item.description"
+                    (ngModelChange)="setMediaDescription(i, $event)"
+                    placeholder="Describe this media"
+                    [attr.aria-label]="'Description for attachment ' + (i + 1)"
+                  />
+                  <button
+                    class="btn btn-outline btn-sm"
+                    type="button"
+                    (click)="removeMedia(i)"
+                    [attr.aria-label]="'Remove attachment ' + (i + 1)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
+          @if (pollOpen()) {
+            <div class="write-poll" aria-label="Poll">
+              @for (option of pollOptions(); track $index; let i = $index) {
+                <div class="write-poll-option">
+                  <input
+                    type="text"
+                    [ngModel]="option"
+                    (ngModelChange)="setPollOption(i, $event)"
+                    [placeholder]="'Choice ' + (i + 1)"
+                  />
+                  @if (pollOptions().length > 2) {
+                    <button
+                      class="btn btn-outline btn-sm"
+                      type="button"
+                      (click)="removePollOption(i)"
+                      [attr.aria-label]="'Remove choice ' + (i + 1)"
+                    >
+                      ✕
+                    </button>
+                  }
+                </div>
+              }
+              <div class="write-poll-controls">
+                <button
+                  class="btn btn-outline btn-sm"
+                  type="button"
+                  [disabled]="pollOptions().length >= 4"
+                  (click)="addPollOption()"
+                >
+                  + Add choice
+                </button>
+                <label>
+                  <input
+                    type="checkbox"
+                    [ngModel]="pollMultiple()"
+                    (ngModelChange)="setPollMultiple($event)"
+                  />
+                  Allow multiple
+                </label>
+                <select
+                  aria-label="Poll duration"
+                  [ngModel]="pollExpiresIn()"
+                  (ngModelChange)="setPollExpiry(+$event)"
+                >
+                  @for (expiry of pollExpiry; track expiry.seconds) {
+                    <option [value]="expiry.seconds">{{ expiry.label }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          }
+
+          <div class="write-tools" aria-label="Writing tools">
+            <label
+              class="write-tool"
+              [class.disabled]="pollOpen()"
+              title="Attach media — or paste an image into the writing box"
+            >
+              📎
+              <span class="sr-only">Attach media</span>
+              <input
+                type="file"
+                multiple
+                hidden
+                accept="image/*,video/*,audio/*"
+                [disabled]="pollOpen()"
+                (change)="onFilesSelected($event)"
+              />
+            </label>
+            <button
+              class="write-tool"
+              type="button"
+              [class.on]="pollOpen()"
+              [disabled]="media().length > 0"
+              (click)="togglePoll()"
+              aria-label="Add poll"
+              title="Add poll"
+            >
+              📊
+            </button>
+            <button
+              class="write-tool"
+              type="button"
+              [class.on]="cwOpen()"
+              (click)="toggleCw()"
+              title="Content warning"
+            >
+              CW
+            </button>
+            <button
+              class="write-tool"
+              type="button"
+              [class.on]="sensitive()"
+              [disabled]="!media().length"
+              (click)="toggleSensitive()"
+              aria-label="Mark attached media sensitive"
+              title="Mark attached media sensitive"
+            >
+              ⚠️
+            </button>
+            <span class="write-emoji-anchor">
+              <button
+                class="write-tool"
+                type="button"
+                [class.on]="emojiOpen()"
+                (click)="toggleEmoji()"
+                aria-label="Insert emoji"
+                title="Insert emoji"
+              >
+                🙂
+              </button>
+              @if (emojiOpen()) {
+                <div class="write-emoji-popover">
+                  <app-emoji-picker (picked)="insertEmoji($event)" />
+                </div>
+              }
+            </span>
+            @if (canUseAi()) {
+              <button
+                class="write-tool"
+                type="button"
+                (click)="tagHelperOpen.set(true)"
+                aria-label="Suggest hashtags"
+                title="Suggest hashtags"
+              >
+                🤖#️⃣
+              </button>
+              <button
+                class="write-tool"
+                type="button"
+                (click)="translateOpen.set(true)"
+                aria-label="Translate writing"
+                title="Translate writing"
+              >
+                🤖🌐
+              </button>
+            }
+            <span class="bar-gap"></span>
+            <select
+              class="write-language"
+              [ngModel]="postLanguage()"
+              (ngModelChange)="setPostLanguage($event)"
+              [title]="words().Post + ' language'"
+              [attr.aria-label]="words().Post + ' language'"
+            >
+              <option value="">🌐 Not specified</option>
+              @for (language of languageOptions(); track language.code) {
+                <option [value]="language.code">{{ language.name }}</option>
+              }
+            </select>
+          </div>
+
+          @if (mediaNotice()) {
+            <p class="write-warning" role="status">{{ mediaNotice() }}</p>
+          }
 
           @if (saveError()) {
             <p class="write-warning" role="alert">⚠ {{ saveError() }}</p>
@@ -482,14 +689,26 @@
     >
       <h3 id="unsaved-title">You have unsaved writing</h3>
       <p id="unsaved-message">
-        Save it as a local draft before moving on, or discard it. Discarding cannot be undone.
+        @if (media().length) {
+          Attachments remain only in this open editor. Publish or remove them before switching, or
+          discard everything. Discarding cannot be undone.
+        } @else {
+          Save it as a local draft before moving on, or discard it. Discarding cannot be undone.
+        }
       </p>
       <div class="unsaved-actions">
         <button class="btn btn-outline" type="button" (click)="cancelSwitch()">Cancel</button>
         <button class="btn btn-outline btn-danger" type="button" (click)="discardAndContinue()">
           Discard
         </button>
-        <button class="btn" type="button" (click)="saveAndContinue()">Save and continue</button>
+        <button
+          class="btn"
+          type="button"
+          [disabled]="media().length > 0"
+          (click)="saveAndContinue()"
+        >
+          Save and continue
+        </button>
       </div>
     </div>
   </div>
@@ -530,9 +749,17 @@
                       name="wizard-target"
                       [value]="target"
                       [checked]="wizardTarget() === target"
+                      [disabled]="!!targetUnsupportedReason(target)"
                       (change)="setWizardTarget(target)"
                     />
-                    <span>{{ targetLabel(target) }}</span>
+                    <span>
+                      {{ targetLabel(target) }}
+                      @if (targetUnsupportedReason(target); as reason) {
+                        <small class="muted">{{ reason }}</small>
+                      } @else if (targetCompatibilityNote(target); as note) {
+                        <small class="muted">{{ note }}</small>
+                      }
+                    </span>
                   </label>
                 }
               </div>
@@ -569,7 +796,7 @@
           }
 
           @case ('quality') {
-            @if (qualityFindings().length) {
+            @if (qualityFindings().length || aiFindings().length) {
               <ul class="wizard-findings">
                 @for (finding of qualityFindings(); track finding.id) {
                   <li class="finding" [class.warn]="finding.severity === 'warn'">
@@ -588,13 +815,22 @@
                     </span>
                   </li>
                 }
+                @for (finding of aiFindings(); track finding.message) {
+                  <li class="finding ai-finding">
+                    <span class="finding-mark" aria-hidden="true">🤖</span>
+                    <span>{{ finding.message }}</span>
+                  </li>
+                }
               </ul>
-              <p class="muted small">
-                All advisory — none of this stops you publishing. Spelling is your browser's job; it
-                underlines as you type.
-              </p>
-            } @else {
-              <p class="muted">Nothing worth mentioning. Spelling is your browser's job.</p>
+              <p class="muted small">All advisory — none of this stops you publishing.</p>
+            } @else if (!aiProofreading()) {
+              <p class="muted">Nothing worth mentioning.</p>
+            }
+            @if (aiProofreading()) {
+              <p class="muted small" role="status">Asking the proofreader for diagnostic notes…</p>
+            }
+            @if (aiProofreadError(); as error) {
+              <p class="muted small" role="status">AI proofreader unavailable: {{ error }}</p>
             }
           }
 
@@ -613,8 +849,7 @@
                 The server holds it and publishes it then. It appears under Parked in your drafts
                 until it does.
               } @else {
-                Leave this empty to publish now. You'll get the composer, with a moment to change
-                your mind.
+                Leave this empty to publish now. The destination is the final step.
               }
             </p>
           }
@@ -632,11 +867,27 @@
           <button class="btn btn-outline" type="button" (click)="wizardBack()">Back</button>
         }
         <button class="btn" type="button" [disabled]="wizardBusy()" (click)="wizardForward()">
-          {{ wizardBusy() ? 'Scheduling…' : wizardForwardLabel() }}
+          {{ wizardBusy() ? 'Publishing…' : wizardForwardLabel() }}
         </button>
       </div>
     </div>
   </div>
+}
+
+@if (tagHelperOpen()) {
+  <app-tag-helper-dialog
+    [post]="body()"
+    (useTags)="useSuggestedTags($event)"
+    (closed)="tagHelperOpen.set(false)"
+  />
+}
+
+@if (translateOpen()) {
+  <app-translate-dialog
+    [post]="body()"
+    (applied)="useTranslation($event)"
+    (closed)="translateOpen.set(false)"
+  />
 }
 
 <!-- The board, as a panel over the workspace. Overlaying rather than displacing

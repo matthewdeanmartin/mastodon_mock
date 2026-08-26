@@ -1418,7 +1418,11 @@ describe('Compose', () => {
     internals(f).target.set('bsky');
     internals(f).text.set('with a picture');
     internals(f).media.set([
-      { media: { id: 'm1' }, description: '', file: new File([''], 'a.png', { type: 'image/png' }) },
+      {
+        media: { id: 'm1' },
+        description: '',
+        file: new File([''], 'a.png', { type: 'image/png' }),
+      },
     ]);
 
     expect(internals(f).canSubmit()).toBe(true);
@@ -1718,6 +1722,36 @@ describe('Compose', () => {
     httpMock.expectOne('/api/v1/statuses').flush({ id: 'new-1' });
 
     expect(internals(f).pendingSelfCleanup()).toBe('self-99');
+  });
+
+  it('immediately publishes a handoff already reviewed by the writing wizard', () => {
+    vi.useFakeTimers();
+    TestBed.inject(Drafts).handoff(
+      {
+        segments: ['reviewed and ready'],
+        spoilerText: 'A warning',
+        sensitive: true,
+        visibility: 'unlisted',
+        poll: null,
+        postLanguage: 'eo',
+        target: 'fedi',
+      },
+      undefined,
+      { publishImmediately: true },
+    );
+
+    const f = setUp();
+    vi.advanceTimersByTime(0);
+    const request = httpMock.expectOne('/api/v1/statuses');
+    expect(request.request.body).toMatchObject({
+      status: 'reviewed and ready',
+      spoiler_text: 'A warning',
+      sensitive: true,
+      visibility: 'unlisted',
+      language: 'eo',
+    });
+    request.flush({ id: 'new-1' });
+    expect(internals(f).text()).toBe('');
   });
 
   it('never offers cleanup when the publish fails', () => {

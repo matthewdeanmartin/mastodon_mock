@@ -22,7 +22,7 @@ import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
 import { TranslateDialog, TranslateResult } from './translate-dialog/translate-dialog';
 import { CustomEmojis } from '../custom-emojis';
-import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
+import { Draft, DraftMedia, DraftSnapshot, Drafts, draftHasContent } from '../drafts';
 import { PkmKind, pkmKinds, pkmLabel } from '../pkm/pkm-tags';
 import { TargetAvailability, restorableTarget } from './post-targets';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
@@ -291,11 +291,7 @@ const POLL_EXPIRY = [
  * impossible to build. Absent for an attachment restored from a draft, where
  * only the Mastodon reference survived.
  */
-interface PendingMedia {
-  media: MediaAttachment;
-  description: string;
-  file?: File;
-}
+type PendingMedia = DraftMedia;
 
 /** Mastodon accepts images, video and audio as attachments. */
 function isAttachable(file: File): boolean {
@@ -661,11 +657,24 @@ export class Compose implements OnDestroy {
         });
         this.applySnapshot(saved);
       }
+      if (handoff?.media?.length) {
+        this.media.set(handoff.media);
+      }
+      if (handoff?.scheduleAt) {
+        this.scheduleOpen.set(true);
+        this.scheduleAt.set(handoff.scheduleAt);
+      }
       if (draft) {
         // The draft moves into the composer (and its autosave slot).
         this.drafts.remove(draft.id);
       }
       this.restored = true;
+      if (handoff?.publishImmediately) {
+        // The writing wizard already ran every editable/review step and made
+        // destination the final confirmation. Reopening confirmations here
+        // would put "I made a mistake" decisions after that final choice.
+        setTimeout(() => this.send());
+      }
     });
 
     effect(() => this.previewOn.set(!this.compact()));
@@ -1688,6 +1697,7 @@ export class Compose implements OnDestroy {
             expiresIn: this.pollExpiresIn(),
           }
         : null,
+      postLanguage: this.postLanguage(),
       inReplyToId: this.inReplyToId(),
       quotedStatusId: this.quotedStatusId(),
       target: this.target(),
@@ -1722,6 +1732,7 @@ export class Compose implements OnDestroy {
     this.spoilerText.set(d.spoilerText);
     this.cwOpen.set(!!d.spoilerText);
     this.sensitive.set(d.sensitive);
+    this.postLanguage.set(d.postLanguage ?? '');
     if (!this.lockVisibility()) {
       this.visibility.set(d.visibility);
     }

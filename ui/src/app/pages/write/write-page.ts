@@ -12,6 +12,7 @@ import {
 import { LowerCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { FocusTrap } from '../../a11y/focus-trap';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -21,9 +22,18 @@ import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { BloggerSession } from '../../providers/blogger/blogger-session';
 import { HugoSettings } from '../../providers/hugo/hugo-settings';
 import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
-import { Draft, DraftSnapshot, Drafts, draftHasContent } from '../../drafts';
+import { Draft, DraftMedia, DraftSnapshot, Drafts, draftHasContent } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { MAX_POST_CHARS, PostTarget } from '../../compose/compose';
+import { EmojiPicker } from '../../emoji-picker/emoji-picker';
+import { CustomEmojis } from '../../custom-emojis';
+import { TagHelperDialog } from '../../compose/tag-helper-dialog/tag-helper-dialog';
+import { TranslateDialog, TranslateResult } from '../../compose/translate-dialog/translate-dialog';
+import { AiAvailability } from '../../ai-availability';
+import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
+import { Proofreader, ProofreadingFinding } from '../../compose/proofreader';
+import { KnownLanguages } from '../../trend-language-filter';
+import { LANG_NAMES, LangCode } from '../../language-detect';
 import { TargetAvailability, targetLabel, usableTargets } from '../../compose/post-targets';
 import { applyMinimalMarkdown } from '../../markdown';
 import { stripHtml } from '../../sentiment';
@@ -48,6 +58,7 @@ import {
   SPLIT_MODES,
   SplitMode,
   insertSplitAt,
+  isObviousSingleton,
   segmentsFor,
   splitModeHint,
   splitModeLabel,
@@ -103,7 +114,17 @@ interface PendingSwitch {
  */
 @Component({
   selector: 'app-write-page',
-  imports: [FocusTrap, FormsModule, HumanTimePipe, LowerCasePipe, RouterLink, WriteBoard],
+  imports: [
+    FocusTrap,
+    FormsModule,
+    HumanTimePipe,
+    LowerCasePipe,
+    RouterLink,
+    WriteBoard,
+    EmojiPicker,
+    TagHelperDialog,
+    TranslateDialog,
+  ],
   templateUrl: './write-page.html',
   styleUrl: './write-page.css',
 })
@@ -124,6 +145,11 @@ export class WritePage implements OnInit, OnDestroy {
   private mataroa = inject(MataroaSettings);
   private blogger = inject(BloggerSession);
   private hugo = inject(HugoSettings);
+  private customEmojis = inject(CustomEmojis);
+  private ai = inject(AiAvailability);
+  private openrouter = inject(OpenRouterSession);
+  private proofreader = inject(Proofreader);
+  private knownLanguages = inject(KnownLanguages);
 
   /**
    * What is linked, flagged on and signed in — the same snapshot the composer
@@ -147,10 +173,45 @@ export class WritePage implements OnInit, OnDestroy {
   private router = inject(Router);
 
   private readonly editorBox = viewChild<ElementRef<HTMLTextAreaElement>>('editorBox');
+  private readonly zenEditorBox = viewChild<ElementRef<HTMLTextAreaElement>>('zenEditorBox');
   private readonly zenButton = viewChild<ElementRef<HTMLButtonElement>>('zenButton');
 
   /** The editor body. One textarea; segmentation is computed, never typed into. */
   protected body = signal('');
+  protected cwOpen = signal(false);
+  protected spoilerText = signal('');
+  protected sensitive = signal(false);
+  protected media = signal<DraftMedia[]>([]);
+  protected uploading = signal(false);
+  protected mediaNotice = signal('');
+  protected pollOpen = signal(false);
+  protected pollOptions = signal<string[]>(['', '']);
+  protected pollMultiple = signal(false);
+  protected pollExpiresIn = signal(86400);
+  protected readonly pollExpiry = [
+    { label: '5 minutes', seconds: 300 },
+    { label: '1 hour', seconds: 3600 },
+    { label: '6 hours', seconds: 21600 },
+    { label: '1 day', seconds: 86400 },
+    { label: '3 days', seconds: 259200 },
+    { label: '7 days', seconds: 604800 },
+  ];
+  protected emojiOpen = signal(false);
+  private editorSelection: { start: number; end: number } | null = null;
+  protected tagHelperOpen = signal(false);
+  protected translateOpen = signal(false);
+  protected postLanguage = signal('');
+  protected readonly canUseAi = computed(() => this.ai.enabled() && this.openrouter.connected());
+  protected readonly languageOptions = computed(() =>
+    [...this.knownLanguages.codes()]
+      .map((code) => ({ code, name: LANG_NAMES[code as LangCode] ?? code.toUpperCase() }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  protected aiFindings = signal<ProofreadingFinding[]>([]);
+  protected aiProofreading = signal(false);
+  protected aiProofreadError = signal<string | null>(null);
+  private proofreadGeneration = 0;
+  private mediaTransferred = false;
   protected editing = signal<Editing | null>(null);
   /** True once the body differs from what was last saved. */
   protected dirty = signal(false);
@@ -359,12 +420,192 @@ export class WritePage implements OnInit, OnDestroy {
     if (this.noticeTimer) {
       clearTimeout(this.noticeTimer);
     }
+    if (!this.mediaTransferred) {
+      for (const item of this.media()) {
+        releaseDraftMedia(item);
+      }
+    }
   }
 
   // ------------------------------------------------------------------ editing
 
   protected onBodyInput(value: string): void {
     this.body.set(value);
+    this.dirty.set(true);
+    this.resetProofreading();
+  }
+
+  protected setSpoilerText(value: string): void {
+    this.spoilerText.set(value);
+    this.dirty.set(true);
+  }
+
+  protected toggleCw(): void {
+    this.cwOpen.update((open) => !open);
+    if (!this.cwOpen()) {
+      this.spoilerText.set('');
+    }
+    this.dirty.set(true);
+  }
+
+  protected toggleSensitive(): void {
+    this.sensitive.update((value) => !value);
+    this.dirty.set(true);
+  }
+
+  protected togglePoll(): void {
+    if (this.media().length) {
+      return;
+    }
+    this.pollOpen.update((open) => !open);
+    if (!this.pollOpen()) {
+      this.pollOptions.set(['', '']);
+      this.pollMultiple.set(false);
+    }
+    this.dirty.set(true);
+  }
+
+  protected setPollOption(index: number, value: string): void {
+    this.pollOptions.update((options) =>
+      options.map((option, at) => (at === index ? value : option)),
+    );
+    this.dirty.set(true);
+  }
+
+  protected addPollOption(): void {
+    if (this.pollOptions().length < 4) {
+      this.pollOptions.update((options) => [...options, '']);
+      this.dirty.set(true);
+    }
+  }
+
+  protected removePollOption(index: number): void {
+    if (this.pollOptions().length > 2) {
+      this.pollOptions.update((options) => options.filter((_, at) => at !== index));
+      this.dirty.set(true);
+    }
+  }
+
+  protected setPollMultiple(value: boolean): void {
+    this.pollMultiple.set(value);
+    this.dirty.set(true);
+  }
+
+  protected setPollExpiry(value: number): void {
+    this.pollExpiresIn.set(value);
+    this.dirty.set(true);
+  }
+
+  protected toggleEmoji(): void {
+    this.emojiOpen.update((open) => !open);
+    if (this.emojiOpen()) {
+      this.customEmojis.ensureLoaded();
+    }
+  }
+
+  protected insertEmoji(value: string): void {
+    const box = this.editorBox()?.nativeElement;
+    const start = this.editorSelection?.start ?? this.body().length;
+    const end = this.editorSelection?.end ?? start;
+    this.onBodyInput(this.body().slice(0, start) + value + this.body().slice(end));
+    this.emojiOpen.set(false);
+    if (box) {
+      setTimeout(() => {
+        const caret = start + value.length;
+        box.focus();
+        box.setSelectionRange(caret, caret);
+      });
+    }
+  }
+
+  protected rememberEditorSelection(event: Event): void {
+    const box = event.target as HTMLTextAreaElement;
+    this.editorSelection = {
+      start: box.selectionStart ?? this.body().length,
+      end: box.selectionEnd ?? this.body().length,
+    };
+  }
+
+  protected useSuggestedTags(tags: string[]): void {
+    this.tagHelperOpen.set(false);
+    const current = this.body();
+    const existing = new Set(
+      (current.match(/#[\p{L}\p{N}_]+/gu) ?? []).map((tag) => tag.slice(1).toLowerCase()),
+    );
+    const additions = tags
+      .map((tag) => tag.replace(/^#/, '').trim())
+      .filter((tag) => tag && !existing.has(tag.toLowerCase()))
+      .map((tag) => `#${tag}`);
+    if (additions.length) {
+      const separator = !current.trim() || /\s$/.test(current) ? '' : ' ';
+      this.onBodyInput(current + separator + additions.join(' '));
+    }
+  }
+
+  protected useTranslation(result: TranslateResult): void {
+    this.translateOpen.set(false);
+    if (result.mode === 'replace') {
+      this.prefs.addKnownLanguage(result.code);
+      this.postLanguage.set(result.code);
+      this.onBodyInput(result.text);
+      return;
+    }
+    const current = this.body().trimEnd();
+    this.onBodyInput(current ? `${current}\n\n${result.text}` : result.text);
+  }
+
+  protected setPostLanguage(code: string): void {
+    this.postLanguage.set(code);
+    this.dirty.set(true);
+  }
+
+  protected onFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.addFiles(Array.from(input.files ?? []));
+    input.value = '';
+  }
+
+  protected onPaste(event: ClipboardEvent): void {
+    const files = Array.from(event.clipboardData?.files ?? []).filter(isAttachable);
+    if (!files.length) {
+      return;
+    }
+    event.preventDefault();
+    this.addFiles(files);
+  }
+
+  private addFiles(files: File[]): void {
+    if (this.pollOpen()) {
+      this.mediaNotice.set('Remove the poll before attaching media.');
+      return;
+    }
+    const accepted = files.filter(isAttachable);
+    if (!accepted.length) {
+      return;
+    }
+    this.media.update((items) => [...items, ...accepted.map(localDraftMedia)]);
+    this.mediaNotice.set('');
+    this.dirty.set(true);
+  }
+
+  protected setMediaDescription(index: number, description: string): void {
+    this.media.update((items) =>
+      items.map((item, at) => (at === index ? { ...item, description } : item)),
+    );
+    this.dirty.set(true);
+  }
+
+  protected removeMedia(index: number): void {
+    this.media.update((items) => {
+      const removed = items[index];
+      if (removed) {
+        releaseDraftMedia(removed);
+      }
+      return items.filter((_, at) => at !== index);
+    });
+    if (!this.media().length) {
+      this.sensitive.set(false);
+    }
     this.dirty.set(true);
   }
 
@@ -402,6 +643,7 @@ export class WritePage implements OnInit, OnDestroy {
   /** Start a fresh draft, guarding whatever is open. */
   protected newDraft(): void {
     this.guard(() => {
+      this.resetAuthoringState();
       this.body.set('');
       this.editing.set({
         key: `new:${Date.now()}`,
@@ -430,6 +672,8 @@ export class WritePage implements OnInit, OnDestroy {
         return;
       }
       const snapshot = toSnapshot(item.source, this.prefs.defaultVisibility());
+      this.resetAuthoringState();
+      this.applyFeatureSnapshot(snapshot);
       this.body.set(joinSegments(snapshot.segments));
       this.editing.set({
         key: item.key,
@@ -444,6 +688,8 @@ export class WritePage implements OnInit, OnDestroy {
   }
 
   private openLocal(draft: Draft): void {
+    this.resetAuthoringState();
+    this.applyFeatureSnapshot(draft);
     this.body.set(joinSegments(draft.segments));
     this.editing.set({
       key: `local:${draft.id}`,
@@ -508,19 +754,63 @@ export class WritePage implements OnInit, OnDestroy {
       savedAt: new Date().toISOString(),
     });
     this.dirty.set(false);
-    this.flash(message);
+    this.flash(
+      this.media().length ? `${message} Attachments remain only in this open editor.` : message,
+    );
   }
 
   private snapshot(): DraftSnapshot {
     const segments = splitText(this.body(), this.splitMode(), { limit: MAX_POST_CHARS });
     return {
       segments: segments.length ? segments : [this.body()],
-      spoilerText: '',
-      sensitive: false,
+      spoilerText: this.cwOpen() ? this.spoilerText() : '',
+      sensitive: this.sensitive(),
       visibility: this.prefs.defaultVisibility(),
-      poll: null,
+      poll: this.pollOpen()
+        ? {
+            options: this.pollOptions(),
+            multiple: this.pollMultiple(),
+            expiresIn: this.pollExpiresIn(),
+          }
+        : null,
+      postLanguage: this.postLanguage(),
       target: 'fedi',
     };
+  }
+
+  private applyFeatureSnapshot(snapshot: DraftSnapshot): void {
+    this.spoilerText.set(snapshot.spoilerText);
+    this.cwOpen.set(!!snapshot.spoilerText);
+    this.sensitive.set(snapshot.sensitive);
+    this.postLanguage.set(snapshot.postLanguage ?? '');
+    if (snapshot.poll) {
+      this.pollOpen.set(true);
+      this.pollOptions.set(snapshot.poll.options.length >= 2 ? snapshot.poll.options : ['', '']);
+      this.pollMultiple.set(snapshot.poll.multiple);
+      this.pollExpiresIn.set(snapshot.poll.expiresIn);
+    }
+  }
+
+  private resetAuthoringState(): void {
+    for (const item of this.media()) {
+      releaseDraftMedia(item);
+    }
+    this.media.set([]);
+    this.mediaNotice.set('');
+    this.cwOpen.set(false);
+    this.spoilerText.set('');
+    this.sensitive.set(false);
+    this.pollOpen.set(false);
+    this.pollOptions.set(['', '']);
+    this.pollMultiple.set(false);
+    this.pollExpiresIn.set(86400);
+    const defaultLanguage =
+      this.auth.account()?.source?.language?.toLowerCase().split(/[-_]/)[0] ?? '';
+    this.postLanguage.set(
+      defaultLanguage && this.knownLanguages.knows(defaultLanguage) ? defaultLanguage : '',
+    );
+    this.editorSelection = null;
+    this.resetProofreading();
   }
 
   /**
@@ -535,13 +825,25 @@ export class WritePage implements OnInit, OnDestroy {
     if (!this.hasContent()) {
       return;
     }
-    const first = firstStep(this.prefs.wizardSteps());
+    const first = firstStep(this.wizardEnabled());
+    const firstTarget = this.wizardTargets().find(
+      (target) => !this.targetUnsupportedReason(target),
+    );
+    if (firstTarget) {
+      this.wizardTarget.set(firstTarget);
+    }
     if (!first) {
       // Every step switched off. An empty dialog would be worse than none.
+      // Attachments are the exception: their destination determines whether
+      // they must be uploaded to Mastodon, so that choice cannot be skipped.
+      if (this.media().length) {
+        this.enterWizardStep('targets');
+        return;
+      }
       this.handOffToComposer();
       return;
     }
-    this.wizardStep.set(first);
+    this.enterWizardStep(first);
   }
 
   /**
@@ -572,7 +874,10 @@ export class WritePage implements OnInit, OnDestroy {
   protected readonly stepTitle = stepTitle;
   protected readonly targetLabel = targetLabel;
 
-  protected wizardEnabled = computed(() => this.prefs.wizardSteps());
+  protected wizardEnabled = computed(() => ({
+    ...this.prefs.wizardSteps(),
+    preview: this.prefs.wizardSteps().preview && !isObviousSingleton(this.body(), MAX_POST_CHARS),
+  }));
 
   protected wizardPosition = computed(() => {
     const step = this.wizardStep();
@@ -599,6 +904,10 @@ export class WritePage implements OnInit, OnDestroy {
       limit: MAX_POST_CHARS,
       segments: this.segments().map((s) => s.text),
       vocab: this.prefs.pkmVocabulary(),
+      missingAltText: this.media().some(
+        (item) => item.media.type === 'image' && !item.description.trim(),
+      ),
+      requireAltText: this.prefs.requireAltText(),
     }),
   );
 
@@ -615,7 +924,9 @@ export class WritePage implements OnInit, OnDestroy {
   );
 
   protected setWizardTarget(target: PostTarget): void {
-    this.wizardTarget.set(target);
+    if (!this.targetUnsupportedReason(target)) {
+      this.wizardTarget.set(target);
+    }
   }
 
   protected setWizardScheduleAt(at: string): void {
@@ -626,7 +937,10 @@ export class WritePage implements OnInit, OnDestroy {
     const step = this.wizardStep();
     if (step) {
       this.wizardError.set(null);
-      this.wizardStep.set(previousStep(step, this.wizardEnabled()));
+      const previous = previousStep(step, this.wizardEnabled());
+      if (previous) {
+        this.enterWizardStep(previous);
+      }
     }
   }
 
@@ -645,59 +959,197 @@ export class WritePage implements OnInit, OnDestroy {
     const next = nextStep(step, this.wizardEnabled());
     if (next) {
       this.wizardError.set(null);
-      this.wizardStep.set(next);
+      this.enterWizardStep(next);
       return;
     }
-    this.wizardFinish();
+    void this.wizardFinish();
+  }
+
+  private enterWizardStep(step: WizardStep): void {
+    this.wizardStep.set(step);
+    if (step === 'quality') {
+      void this.runAiProofreader();
+    }
+  }
+
+  private resetProofreading(): void {
+    this.proofreadGeneration++;
+    this.aiFindings.set([]);
+    this.aiProofreading.set(false);
+    this.aiProofreadError.set(null);
+  }
+
+  private async runAiProofreader(): Promise<void> {
+    this.resetProofreading();
+    if (!this.canUseAi()) {
+      return;
+    }
+    const generation = this.proofreadGeneration;
+    this.aiProofreading.set(true);
+    try {
+      const findings = await this.proofreader.run(this.body());
+      if (generation === this.proofreadGeneration) {
+        this.aiFindings.set(findings);
+      }
+    } catch (error: unknown) {
+      if (generation === this.proofreadGeneration) {
+        this.aiProofreadError.set(
+          error instanceof Error ? error.message : "The AI proofreader couldn't be reached.",
+        );
+      }
+    } finally {
+      if (generation === this.proofreadGeneration) {
+        this.aiProofreading.set(false);
+      }
+    }
+  }
+
+  protected targetUnsupportedReason(target: PostTarget): string | null {
+    const scheduled = !!this.wizardScheduleAt();
+    const threaded = this.segments().length > 1;
+    const hasMedia = this.media().length > 0;
+    const hasPoll = this.pollOpen();
+    const hasCw = this.cwOpen() && !!this.spoilerText().trim();
+    const hasLanguage = !!this.postLanguage();
+    if (scheduled && threaded) {
+      return 'Scheduling supports one post, not a thread.';
+    }
+    if ((target === 'bsky' || target === 'both') && scheduled) {
+      return 'Scheduling is Mastodon-only.';
+    }
+    if (target === 'bsky' && hasPoll) {
+      return 'Bluesky has no polls.';
+    }
+    if (target === 'bsky' && hasCw) {
+      return 'Bluesky has no content warnings.';
+    }
+    if (target === 'bsky' && this.sensitive()) {
+      return 'Sensitive-media marking is not available for Bluesky-only publishing here.';
+    }
+    if (target === 'bsky' && hasLanguage) {
+      return 'Post-language metadata is not available for Bluesky-only publishing here.';
+    }
+    if (target === 'bsky' && this.media().some((item) => !item.file?.type.startsWith('image/'))) {
+      return 'Bluesky accepts images here, not video or audio.';
+    }
+    if (target === 'bsky' && this.media().length > 4) {
+      return 'Bluesky accepts at most four images.';
+    }
+    if (target === 'paste' && (hasMedia || hasPoll || threaded || scheduled || hasLanguage)) {
+      return 'Paste services accept one text document without media, polls, threads, or scheduling.';
+    }
+    if ((target === 'blog' || target === 'blogger' || target === 'hugo') && !hasCw) {
+      return 'Add a title with the CW control before publishing to a blog.';
+    }
+    if (
+      (target === 'blog' || target === 'blogger' || target === 'hugo') &&
+      (hasMedia || hasPoll || threaded || scheduled || hasLanguage)
+    ) {
+      return 'Blog targets accept one titled text document without media, polls, threads, or scheduling.';
+    }
+    return null;
+  }
+
+  protected targetCompatibilityNote(target: PostTarget): string | null {
+    if (
+      target === 'both' &&
+      (this.pollOpen() ||
+        (this.cwOpen() && this.spoilerText().trim()) ||
+        this.sensitive() ||
+        this.postLanguage())
+    ) {
+      return 'The poll, warning, sensitive flag, or language metadata applies to Mastodon; the text still goes to both.';
+    }
+    if (target === 'both' && this.media().some((item) => !item.file?.type.startsWith('image/'))) {
+      return 'Video and audio go to Mastodon; Bluesky receives images only.';
+    }
+    if (target === 'both' && this.media().length > 4) {
+      return 'Mastodon gets every attachment; Bluesky gets the first four images.';
+    }
+    return null;
   }
 
   /**
    * The end of the wizard.
    *
-   * A scheduled post is sent from here, because scheduling is a fire-and-forget
-   * server call with nothing left to edit. An immediate one is handed to the
-   * composer instead — that is where visibility, media, polls and the
-   * thoughtful-posting gate live, and re-implementing them here would mean two
-   * publish paths drifting apart.
+   * The composer remains the single provider-specific publishing path. This
+   * page prepares destination-dependent attachments, then hands it the fully
+   * reviewed post with an instruction to publish immediately (or schedule at
+   * the reviewed time), avoiding another round of confirmations.
    */
-  private wizardFinish(): void {
+  private async wizardFinish(): Promise<void> {
     const at = this.wizardScheduleAt();
-    if (!at) {
-      this.handOffToComposer();
-      return;
-    }
-    const when = new Date(at);
-    if (Number.isNaN(when.getTime())) {
+    if (at && Number.isNaN(new Date(at).getTime())) {
       this.wizardError.set('That date could not be read. Pick a time, or publish now.');
       return;
     }
-    const text = this.segments()
-      .map((s) => s.text)
-      .join('\n\n');
+    const incompatibility = this.targetUnsupportedReason(this.wizardTarget());
+    if (incompatibility) {
+      this.wizardError.set(incompatibility);
+      return;
+    }
+    if (
+      this.prefs.requireAltText() &&
+      this.media().some((item) => item.media.type === 'image' && !item.description.trim())
+    ) {
+      this.wizardError.set('Describe every attached image before publishing.');
+      return;
+    }
+    if (this.pollOpen() && this.pollOptions().filter((option) => option.trim()).length < 2) {
+      this.wizardError.set('A poll needs at least two choices.');
+      return;
+    }
     this.wizardBusy.set(true);
     this.wizardError.set(null);
-    this.api
-      .postStatus(text, {
-        visibility: this.prefs.defaultVisibility(),
-        scheduledAt: when.toISOString(),
-      })
-      .subscribe({
-        next: () => {
-          this.wizardBusy.set(false);
-          this.wizardStep.set(null);
-          this.dirty.set(false);
-          this.flash('Scheduled. It is in your drafts under Parked until it publishes.');
-          this.sources.load();
-        },
-        error: () => {
-          this.wizardBusy.set(false);
-          // Refusal is ordinary error handling — some instances simply decline a
-          // date. Nothing was published and the body is untouched.
-          this.wizardError.set(
-            'That publish time was refused. Try a nearer one — nothing was published.',
-          );
-        },
+    try {
+      if (
+        (this.wizardTarget() === 'fedi' || this.wizardTarget() === 'both') &&
+        this.media().some((item) => item.media.id.startsWith('local:'))
+      ) {
+        await this.prepareMediaForTarget(this.wizardTarget());
+      }
+      this.drafts.handoff({ ...this.snapshot(), target: this.wizardTarget() }, undefined, {
+        media: this.media(),
+        scheduleAt: at,
+        publishImmediately: true,
       });
+      this.mediaTransferred = true;
+      this.dirty.set(false);
+      this.wizardStep.set(null);
+      await this.router.navigate(['/home']);
+    } catch (error: unknown) {
+      this.wizardError.set(
+        error instanceof Error ? error.message : "The attachments couldn't be prepared.",
+      );
+    } finally {
+      this.wizardBusy.set(false);
+    }
+  }
+
+  private async prepareMediaForTarget(target: PostTarget): Promise<void> {
+    if (target !== 'fedi' && target !== 'both') {
+      return;
+    }
+    this.uploading.set(true);
+    try {
+      const prepared: DraftMedia[] = [];
+      for (const item of this.media()) {
+        if (!item.media.id.startsWith('local:')) {
+          prepared.push(item);
+          continue;
+        }
+        if (!item.file) {
+          throw new Error(
+            'One attachment no longer has its original file. Remove it and attach it again.',
+          );
+        }
+        const media = await firstValueFrom(this.api.uploadMedia(item.file, item.description));
+        prepared.push({ ...item, media });
+      }
+      this.media.set(prepared);
+    } finally {
+      this.uploading.set(false);
+    }
   }
 
   // --------------------------------------------------------- unsaved guarding
@@ -730,6 +1182,11 @@ export class WritePage implements OnInit, OnDestroy {
 
   /** Save the unsaved body first, then continue. */
   protected saveAndContinue(): void {
+    // Local drafts intentionally contain serializable post state only. Do not
+    // let a reassuringly named action silently dispose of attached File data.
+    if (this.media().length) {
+      return;
+    }
     const pending = this.pendingSwitch();
     this.pendingSwitch.set(null);
     this.save();
@@ -780,7 +1237,9 @@ export class WritePage implements OnInit, OnDestroy {
   }
 
   private focusEditor(): void {
-    setTimeout(() => this.editorBox()?.nativeElement.focus());
+    setTimeout(() =>
+      (this.zen.active() ? this.zenEditorBox() : this.editorBox())?.nativeElement.focus(),
+    );
   }
 
   private flash(message: string): void {
@@ -824,6 +1283,39 @@ function escapeHtml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function isAttachable(file: File): boolean {
+  return /^(image|video|audio)\//.test(file.type);
+}
+
+function localDraftMedia(file: File): DraftMedia {
+  const url = typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : '';
+  const id =
+    typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return {
+    media: {
+      id: `local:${id}`,
+      type: file.type.split('/', 1)[0] || 'unknown',
+      url,
+      preview_url: url,
+      description: null,
+    },
+    description: '',
+    file,
+  };
+}
+
+function releaseDraftMedia(item: DraftMedia): void {
+  if (
+    item.media.id.startsWith('local:') &&
+    item.media.url &&
+    typeof URL.revokeObjectURL === 'function'
+  ) {
+    URL.revokeObjectURL(item.media.url);
+  }
 }
 
 function kindTitle(kind: DraftKind): string {

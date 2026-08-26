@@ -9,7 +9,7 @@
 export type WizardStep = 'targets' | 'preview' | 'quality' | 'when';
 
 /** Fixed order. The wizard never reorders steps; it only omits them. */
-export const WIZARD_STEPS: readonly WizardStep[] = ['targets', 'preview', 'quality', 'when'];
+export const WIZARD_STEPS: readonly WizardStep[] = ['preview', 'quality', 'when', 'targets'];
 
 /** Which steps the user has switched on. */
 export type WizardSteps = Record<WizardStep, boolean>;
@@ -73,7 +73,7 @@ export function stepPosition(step: WizardStep, enabled: WizardSteps): number {
 export function stepTitle(step: WizardStep): string {
   switch (step) {
     case 'targets':
-      return 'Where is this going?';
+      return 'Where should this be published?';
     case 'preview':
       return 'How it will look';
     case 'quality':
