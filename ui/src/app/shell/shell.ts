@@ -1,4 +1,13 @@
-import { Component, computed, ElementRef, inject, OnInit, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  ElementRef,
+  HostListener,
+  inject,
+  OnInit,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NgOptimizedImage } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -123,6 +132,69 @@ export class Shell implements OnInit {
   );
   protected readonly plusPriceUsd = PLUS_PRICE_USD_PER_YEAR;
 
+  /**
+   * Whether the plan card is open.
+   *
+   * This used to be a hover popover, and hover is the wrong pattern for a card
+   * you are meant to *reach*: the badge and the card are separated by a gap,
+   * the pointer travels diagonally, and any moment the cursor is over neither
+   * closes it — so the card vanishes on the way to the thing you wanted to
+   * click. A disclosure has none of that quality by construction. It opens on
+   * click, stays open until you dismiss it, and closes on Escape, on an outside
+   * click, or on navigation.
+   */
+  private planCardOpen = signal(false);
+  protected readonly planOpen = this.planCardOpen.asReadonly();
+  /** The toggle, so focus can return to it when the card closes. */
+  private readonly planTrigger = viewChild<ElementRef<HTMLButtonElement>>('planTrigger');
+
+  protected togglePlanCard(): void {
+    this.planCardOpen.update((open) => !open);
+  }
+
+  /**
+   * Close, optionally putting focus back on the badge.
+   *
+   * Focus returns for keyboard dismissals (Escape, or the card's own close
+   * button) — a pointer dismissal must not yank focus back, because the click
+   * that closed it is usually a click on something else.
+   */
+  protected closePlanCard(restoreFocus = false): void {
+    if (!this.planCardOpen()) {
+      return;
+    }
+    this.planCardOpen.set(false);
+    if (restoreFocus) {
+      this.planTrigger()?.nativeElement.focus();
+    }
+  }
+
+  /**
+   * An outside click closes the card.
+   *
+   * Bound on the document rather than with a full-screen backdrop element so
+   * the rest of the header stays clickable while the card is up: dismissing it
+   * should not cost the reader the click they actually meant to make.
+   */
+  @HostListener('document:pointerdown', ['$event'])
+  protected onDocumentPointerDown(event: Event): void {
+    if (!this.planCardOpen()) {
+      return;
+    }
+    const target = event.target;
+    if (target instanceof Node && this.planWrap()?.nativeElement.contains(target)) {
+      return;
+    }
+    this.closePlanCard();
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onDocumentEscape(): void {
+    this.closePlanCard(true);
+  }
+
+  private readonly planWrap = viewChild<ElementRef<HTMLElement>>('planWrap');
+
   /** Whether the current account holds a staff role (drives the Admin nav link). */
   protected isStaff = computed(() => {
     const role = this.auth.account()?.role;
@@ -161,6 +233,9 @@ export class Shell implements OnInit {
         // The outlet renders during navigation, but the new component's own
         // view may not be committed yet; wait a tick so focus lands on a
         // <main> that already holds the new page.
+        // A route change is a dismissal: the card is header chrome, and leaving
+        // it open over a page the reader just navigated to is stale furniture.
+        this.closePlanCard();
         setTimeout(() => this.focusMain());
       });
   }

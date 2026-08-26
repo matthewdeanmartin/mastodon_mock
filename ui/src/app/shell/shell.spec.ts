@@ -232,14 +232,19 @@ describe('Shell account switching', () => {
     expect(banner?.querySelector('a')?.getAttribute('href')).toBe('https://mawkingbird.com/');
   });
 
-  it('links the Free and Plus plan badges to an accurate benefits popover', () => {
+  it('links the Free and Plus plan badges to an accurate benefits card', () => {
     const fixture = createShell();
     const plan = TestBed.inject(PlusBadgeEntitlement) as unknown as FakePlusBadgeEntitlement;
-    const badge = () => fixture.nativeElement.querySelector('.plan-badge') as HTMLAnchorElement;
+    const badge = () => fixture.nativeElement.querySelector('.plan-badge') as HTMLButtonElement;
     const popover = fixture.nativeElement.querySelector('.plan-popover') as HTMLElement;
 
     expect(badge().textContent).toContain('Free');
-    expect(badge().getAttribute('href')).toBe('/settings/mawkingbird-plus');
+    // The badge no longer navigates: it discloses. The link to the Plus page is
+    // inside the card, where a pointer can actually reach it.
+    expect(badge().tagName).toBe('BUTTON');
+    expect(popover.querySelector('.plan-cta')?.getAttribute('href')).toBe(
+      '/settings/mawkingbird-plus',
+    );
     expect(popover.textContent).toContain('Mawkingbird Free');
     // The free column is shown to a free reader and the Plus column beside it,
     // so the badge is a comparison. No numbers: the popover has no room to say
@@ -248,6 +253,31 @@ describe('Shell account switching', () => {
     expect(popover.textContent).toContain('A couple of full articles a day');
     expect(popover.textContent).toContain('Open as many as you like');
     expect(popover.textContent).toContain('$30 a year');
+
+    // The card is a disclosure, not a hover popover: it opens on click and
+    // survives the pointer leaving the badge, which is the whole point of the
+    // change. Nothing but an explicit dismissal closes it.
+    expect(badge().getAttribute('aria-expanded')).toBe('false');
+    expect(popover.classList.contains('plan-popover-open')).toBe(false);
+
+    badge().click();
+    fixture.detectChanges();
+    expect(badge().getAttribute('aria-expanded')).toBe('true');
+    expect(popover.classList.contains('plan-popover-open')).toBe(true);
+
+    // Escape closes it and hands focus back to the badge.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    expect(popover.classList.contains('plan-popover-open')).toBe(false);
+    expect(document.activeElement).toBe(badge());
+
+    // An outside click closes it too.
+    badge().click();
+    fixture.detectChanges();
+    expect(popover.classList.contains('plan-popover-open')).toBe(true);
+    document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    fixture.detectChanges();
+    expect(popover.classList.contains('plan-popover-open')).toBe(false);
 
     plan.state.set('plus');
     fixture.detectChanges();

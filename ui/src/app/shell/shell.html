@@ -38,21 +38,26 @@
           <span class="deployment-label">{{ deployment }}</span>
         }
 
-        <div class="plan-badge-wrap">
-          <a
+        <div class="plan-badge-wrap" #planWrap>
+          <button
+            #planTrigger
             class="plan-badge"
+            type="button"
             [class.plan-badge-plus]="plusBadge.state() === 'plus'"
             [class.plan-badge-unavailable]="plusBadge.state() === 'unavailable'"
-            routerLink="/settings/mawkingbird-plus"
+            [class.plan-badge-open]="planOpen()"
+            [attr.aria-expanded]="planOpen()"
+            aria-controls="plan-card"
             [attr.aria-label]="
               plusBadge.state() === 'plus'
-                ? 'Mawkingbird Plus active — view plan details'
+                ? 'Mawkingbird Plus active — show plan details'
                 : plusBadge.state() === 'checking'
-                  ? 'Checking Mawkingbird plan'
+                  ? 'Checking Mawkingbird plan — show plan details'
                   : plusBadge.state() === 'unavailable'
-                    ? 'Could not check Mawkingbird plan — open account settings'
-                    : 'Mawkingbird Free — see Plus benefits and upgrade'
+                    ? 'Could not check Mawkingbird plan — show plan details'
+                    : 'Mawkingbird Free — show what Plus adds'
             "
+            (click)="togglePlanCard()"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -77,9 +82,18 @@
                 }
               }
             </span>
-          </a>
+            <svg class="plan-caret" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m7 10 5 5 5-5" />
+            </svg>
+          </button>
 
-          <section class="plan-popover" aria-label="Mawkingbird plan benefits">
+          <section
+            id="plan-card"
+            class="plan-popover"
+            [class.plan-popover-open]="planOpen()"
+            [attr.inert]="planOpen() ? null : ''"
+            aria-label="Mawkingbird plan benefits"
+          >
             <header>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -104,6 +118,16 @@
                   }
                 </span>
               </div>
+              <button
+                class="plan-close"
+                type="button"
+                aria-label="Close plan details"
+                (click)="closePlanCard(true)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
             </header>
 
             <div class="plan-benefits">
@@ -121,11 +145,16 @@
             </div>
 
             <footer>
-              @if (plusBadge.state() === 'plus') {
-                Click Plus for your subscription details and diagnostics.
-              } @else {
-                Mawkingbird Plus is ${{ plusPriceUsd }} a year. Click Free to see the upgrade page.
-              }
+              <!-- The card is now the only way to the Plus page from the header,
+                   so the link that used to be the badge itself lives here as a
+                   real, clickable target that no pointer travel can take away. -->
+              <a class="plan-cta" routerLink="/settings/mawkingbird-plus" (click)="closePlanCard()">
+                @if (plusBadge.state() === 'plus') {
+                  Subscription details and diagnostics
+                } @else {
+                  See the Plus page — ${{ plusPriceUsd }} a year
+                }
+              </a>
             </footer>
           </section>
         </div>

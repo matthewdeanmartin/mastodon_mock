@@ -456,7 +456,7 @@ a.tab:hover {
 
 .plan-badge {
   min-height: 28px;
-  padding: 3px 9px 3px 6px;
+  padding: 3px 6px 3px 6px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -464,16 +464,32 @@ a.tab:hover {
   border-radius: 999px;
   background: var(--col-bg);
   color: var(--muted);
+  font: inherit;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
+  cursor: pointer;
 }
 
 .plan-badge:hover,
-.plan-badge:focus-visible {
+.plan-badge:focus-visible,
+.plan-badge-open {
   border-color: var(--accent);
   color: var(--accent);
   text-decoration: none;
+}
+
+/* The caret is the whole promise of the disclosure: it says the badge opens
+   something rather than navigating, which is the difference between a reader
+   clicking it on purpose and a reader being surprised by a page change. */
+.plan-caret {
+  width: 14px !important;
+  height: 14px !important;
+  transition: transform 120ms ease;
+}
+
+.plan-badge-open .plan-caret {
+  transform: rotate(180deg);
 }
 
 .plan-badge-plus {
@@ -522,28 +538,47 @@ a.tab:hover {
     visibility 120ms;
 }
 
-.plan-badge-wrap:hover .plan-popover,
-.plan-badge-wrap:focus-within .plan-popover {
+/* Open is a state the reader set, not a state their cursor happens to be in.
+   Nothing about pointer position can close this — only Escape, the close
+   button, an outside click, or navigating away. */
+.plan-popover-open {
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
 }
 
-/* Keep hover alive across the visual gap between the badge and card. */
-.plan-popover::before {
-  content: '';
-  position: absolute;
-  top: -10px;
-  right: 0;
-  left: 0;
-  height: 10px;
-}
-
 .plan-popover header {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+}
+
+.plan-close {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.plan-close:hover,
+.plan-close:focus-visible {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.plan-close svg {
+  width: 16px;
+  height: 16px;
 }
 
 .plan-popover header > svg {
@@ -606,6 +641,24 @@ a.tab:hover {
   font-weight: 600;
 }
 
+.plan-cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.plan-cta:hover,
+.plan-cta:focus-visible {
+  filter: brightness(1.08);
+  text-decoration: none;
+}
+
 @media (max-width: 720px) {
   .brand-lockup {
     gap: 5px;
@@ -623,8 +676,22 @@ a.tab:hover {
     padding-right: 7px;
   }
 
+  /* This was `display: none` while the card was hover-only, since a phone has
+     no hover to open it with. A tap opens a disclosure fine, so on phones the
+     card stays — pinned to the viewport rather than to the badge, which on a
+     narrow screen is close enough to the edge that a left-anchored card would
+     hang off it. */
   .plan-popover {
-    display: none;
+    position: fixed;
+    top: 60px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-height: calc(100dvh - 76px);
+  }
+
+  .plan-benefits {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

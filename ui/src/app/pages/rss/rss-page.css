@@ -9,11 +9,25 @@
    taking the article's height away from it. */
 .rss-page {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  /* Vertically in harmony with the top bar, deliberately.
+
+     The shell's header is a `290px | --col-width | 320px` grid with a 16px gap,
+     inside a `min(1460px, 100%)` container with 16px of side padding — and
+     `.layout` repeats that grid exactly so the brand sits over the left rail,
+     the tab nav over the feed and the account menu over the right rail. On /rss
+     the shell goes wide (one `1fr` column) but the *container* is unchanged, so
+     matching the header's first track and gap here puts the subscription rail
+     under the app name and the reading pane under Home/Algo/Inbox/Chat through
+     to the account menu. Same idea as a Twitter home feed: one set of column
+     edges from the top of the page to the bottom.
+
+     So this number is not a taste choice — it is the header's `290px`, and it
+     must move with it. There is no `max-width` and no `margin: auto` any more:
+     re-centering a narrower page inside the shell's container is exactly what
+     knocked the two grids out of register. */
+  grid-template-columns: 290px minmax(0, 1fr);
   gap: 16px;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 16px 4px;
+  padding: 16px 0;
   align-items: start;
 }
 
@@ -200,13 +214,18 @@
   text-align: center;
 }
 
-@media (max-width: 800px) {
+/* 1000px, matching the shell exactly: that is where `.layout` drops to a single
+   centered column and the header abandons its three-track grid, so a 290px rail
+   here would be lining up with a header that no longer has a first column. Above
+   this the two grids agree; below it, neither has columns to agree about. */
+@media (max-width: 1000px) {
   /* One column. Unlike /conversations there is no toggle button: the rail is a
      short list of feeds rather than a transcript's worth of history, so it
      stacks above the pane and the whole page scrolls as one — which also means
      it must stop sticking, or it would cover the article on the way down. */
   .rss-page {
     grid-template-columns: minmax(0, 1fr);
+    padding-inline: 12px;
   }
 
   .rss-rail {
