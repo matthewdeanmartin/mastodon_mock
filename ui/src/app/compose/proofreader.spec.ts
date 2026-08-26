@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenRouterChat } from '../providers/openrouter/openrouter-chat';
+import { OpenRouterModelChoice } from '../providers/openrouter/openrouter-model-choice';
 import { PromptTemplateStore } from '../providers/openrouter/prompt-templates';
 import {
   MAX_PROOFREADING_FINDING_CHARS,
@@ -34,6 +35,7 @@ describe('Proofreader', () => {
       providers: [
         Proofreader,
         { provide: OpenRouterChat, useValue: { suggest } },
+        { provide: OpenRouterModelChoice, useValue: { modelId: () => 'test/proofreader' } },
         {
           provide: PromptTemplateStore,
           useValue: {
@@ -62,5 +64,16 @@ describe('Proofreader', () => {
       expect.objectContaining({ prompt: expect.stringContaining('Why does this happen?') }),
     );
     expect(findings).toEqual([{ message: 'This answers the original question directly.' }]);
+  });
+
+  it('previews the exact connector, model, and prompt without making a request', () => {
+    const proofreader = TestBed.inject(Proofreader);
+
+    expect(proofreader.preview('  Check this  ')).toEqual({
+      connector: 'OpenRouter',
+      model: 'test/proofreader',
+      prompt: '\nCheck this',
+    });
+    expect(suggest).not.toHaveBeenCalled();
   });
 });

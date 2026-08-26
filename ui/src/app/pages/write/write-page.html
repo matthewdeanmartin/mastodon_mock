@@ -823,11 +823,46 @@
                 }
               </ul>
               <p class="muted small">All advisory — none of this stops you publishing.</p>
-            } @else if (!aiProofreading()) {
-              <p class="muted">Nothing worth mentioning.</p>
+            } @else {
+              <p class="muted">The built-in checks found nothing worth mentioning.</p>
+            }
+
+            @if (proofreadingRequest(); as request) {
+              <section class="proofread-consent" aria-labelledby="proofread-consent-title">
+                <h4 id="proofread-consent-title">Optional AI proofreader</h4>
+                <p class="muted small">
+                  This is an OpenRouter connector feature. Nothing is sent until you confirm below,
+                  and sending it may consume paid OpenRouter credits.
+                </p>
+                <p class="small">
+                  <strong>Connector:</strong> {{ request.connector }}
+                  <br />
+                  <strong>Model:</strong> <code>{{ request.model }}</code>
+                </p>
+                <p class="small"><strong>Exact prompt that will be sent:</strong></p>
+                <pre class="proofread-prompt">{{ request.prompt }}</pre>
+                <button
+                  class="btn btn-outline"
+                  type="button"
+                  [disabled]="aiProofreading()"
+                  (click)="confirmAiProofreader()"
+                >
+                  @if (aiProofreading()) {
+                    Asking OpenRouter…
+                  } @else if (aiProofreadComplete()) {
+                    Send again
+                  } @else {
+                    Send to OpenRouter
+                  }
+                </button>
+              </section>
             }
             @if (aiProofreading()) {
-              <p class="muted small" role="status">Asking the proofreader for diagnostic notes…</p>
+              <p class="muted small" role="status">
+                OpenRouter is asking the selected model for diagnostic notes…
+              </p>
+            } @else if (aiProofreadComplete() && !aiFindings().length) {
+              <p class="muted small" role="status">The model returned no diagnostic notes.</p>
             }
             @if (aiProofreadError(); as error) {
               <p class="muted small" role="status">AI proofreader unavailable: {{ error }}</p>
@@ -866,7 +901,12 @@
         @if (wizardCanGoBack()) {
           <button class="btn btn-outline" type="button" (click)="wizardBack()">Back</button>
         }
-        <button class="btn" type="button" [disabled]="wizardBusy()" (click)="wizardForward()">
+        <button
+          class="btn"
+          type="button"
+          [disabled]="wizardBusy() || aiProofreading()"
+          (click)="wizardForward()"
+        >
           {{ wizardBusy() ? 'Publishing…' : wizardForwardLabel() }}
         </button>
       </div>

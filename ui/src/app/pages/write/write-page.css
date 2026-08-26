@@ -761,6 +761,29 @@
   margin-right: 6px;
 }
 
+.proofread-consent {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.proofread-consent h4 {
+  margin: 0 0 6px;
+}
+
+.proofread-prompt {
+  max-height: 220px;
+  margin: 6px 0 12px;
+  padding: 10px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  background: var(--hover);
+  font-size: 12px;
+}
+
 .wizard-when {
   display: flex;
   align-items: center;

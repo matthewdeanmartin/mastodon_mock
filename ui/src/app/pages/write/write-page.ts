@@ -31,7 +31,11 @@ import { TagHelperDialog } from '../../compose/tag-helper-dialog/tag-helper-dial
 import { TranslateDialog, TranslateResult } from '../../compose/translate-dialog/translate-dialog';
 import { AiAvailability } from '../../ai-availability';
 import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
-import { Proofreader, ProofreadingFinding } from '../../compose/proofreader';
+import {
+  Proofreader,
+  ProofreadingFinding,
+  ProofreadingRequestPreview,
+} from '../../compose/proofreader';
 import { KnownLanguages } from '../../trend-language-filter';
 import { LANG_NAMES, LangCode } from '../../language-detect';
 import { TargetAvailability, targetLabel, usableTargets } from '../../compose/post-targets';
@@ -209,7 +213,11 @@ export class WritePage implements OnInit, OnDestroy {
   );
   protected aiFindings = signal<ProofreadingFinding[]>([]);
   protected aiProofreading = signal(false);
+  protected aiProofreadComplete = signal(false);
   protected aiProofreadError = signal<string | null>(null);
+  protected proofreadingRequest = computed<ProofreadingRequestPreview | null>(() =>
+    this.canUseAi() ? this.proofreader.preview(this.body()) : null,
+  );
   private proofreadGeneration = 0;
   private mediaTransferred = false;
   protected editing = signal<Editing | null>(null);
@@ -967,19 +975,17 @@ export class WritePage implements OnInit, OnDestroy {
 
   private enterWizardStep(step: WizardStep): void {
     this.wizardStep.set(step);
-    if (step === 'quality') {
-      void this.runAiProofreader();
-    }
   }
 
   private resetProofreading(): void {
     this.proofreadGeneration++;
     this.aiFindings.set([]);
     this.aiProofreading.set(false);
+    this.aiProofreadComplete.set(false);
     this.aiProofreadError.set(null);
   }
 
-  private async runAiProofreader(): Promise<void> {
+  protected async confirmAiProofreader(): Promise<void> {
     this.resetProofreading();
     if (!this.canUseAi()) {
       return;
@@ -990,6 +996,7 @@ export class WritePage implements OnInit, OnDestroy {
       const findings = await this.proofreader.run(this.body());
       if (generation === this.proofreadGeneration) {
         this.aiFindings.set(findings);
+        this.aiProofreadComplete.set(true);
       }
     } catch (error: unknown) {
       if (generation === this.proofreadGeneration) {

@@ -10,7 +10,11 @@ import { DraftMedia, Drafts } from '../../drafts';
 import { Account, ScheduledStatus, Status } from '../../models';
 import { PostTarget } from '../../compose/compose';
 import { TranslateResult } from '../../compose/translate-dialog/translate-dialog';
-import { Proofreader, ProofreadingFinding } from '../../compose/proofreader';
+import {
+  Proofreader,
+  ProofreadingFinding,
+  ProofreadingRequestPreview,
+} from '../../compose/proofreader';
 import { AiAvailability } from '../../ai-availability';
 import { OpenRouterSession } from '../../providers/openrouter/openrouter-session';
 import { PkmItem } from '../../pkm/pkm-source';
@@ -51,6 +55,8 @@ interface PageInternals {
   qualityFindings: Signal<QualityFinding[]>;
   aiFindings: WritableSignal<ProofreadingFinding[]>;
   aiProofreading: WritableSignal<boolean>;
+  aiProofreadComplete: WritableSignal<boolean>;
+  proofreadingRequest: Signal<ProofreadingRequestPreview | null>;
   previewHtml: Signal<string[]>;
   cwOpen: WritableSignal<boolean>;
   spoilerText: WritableSignal<string>;
@@ -88,6 +94,7 @@ interface PageInternals {
   rememberEditorSelection(event: Event): void;
   onPaste(event: ClipboardEvent): void;
   targetUnsupportedReason(target: PostTarget): string | null;
+  confirmAiProofreader(): Promise<void>;
 }
 
 function internals(fixture: ComponentFixture<WritePage>): PageInternals {
@@ -805,11 +812,16 @@ describe('WritePage', () => {
     expect(page.postLanguage()).toBe('eo');
   });
 
-  it('runs local checks before the gated AI proofreader and never applies its prose', async () => {
+  it('previews the billable AI request and waits for confirmation before sending it', async () => {
     const run = vi.fn();
+    const preview = vi.fn(() => ({
+      connector: 'OpenRouter' as const,
+      model: 'test/proofreader',
+      prompt: 'Exact proofread prompt\nThis is is repeated.',
+    }));
     TestBed.overrideProvider(AiAvailability, { useValue: { enabled: signal(true) } });
     TestBed.overrideProvider(OpenRouterSession, { useValue: { connected: signal(true) } });
-    TestBed.overrideProvider(Proofreader, { useValue: { run } });
+    TestBed.overrideProvider(Proofreader, { useValue: { preview, run } });
     TestBed.inject(Auth).mode.set('anonymous');
     const fixture = setUp();
     const page = internals(fixture);
@@ -821,9 +833,22 @@ describe('WritePage', () => {
     page.onBodyInput('This is is repeated.');
     page.publish();
 
-    await vi.waitFor(() => expect(page.aiProofreading()).toBe(false));
+    expect(run).not.toHaveBeenCalled();
+    expect(page.proofreadingRequest()).toEqual({
+      connector: 'OpenRouter',
+      model: 'test/proofreader',
+      prompt: 'Exact proofread prompt\nThis is is repeated.',
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Nothing is sent until you confirm');
+    expect(fixture.nativeElement.textContent).toContain('test/proofreader');
+    expect(fixture.nativeElement.textContent).toContain('Exact proofread prompt');
+
+    await page.confirmAiProofreader();
+
     expect(run).toHaveBeenCalledWith('This is is repeated.');
     expect(page.aiFindings()).toEqual([{ message: 'The word “is” is repeated.' }]);
+    expect(page.aiProofreadComplete()).toBe(true);
     expect(page.body()).toBe('This is is repeated.');
   });
 

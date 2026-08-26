@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { OpenRouterChat } from '../providers/openrouter/openrouter-chat';
+import { OpenRouterModelChoice } from '../providers/openrouter/openrouter-model-choice';
 import { PromptTemplateStore } from '../providers/openrouter/prompt-templates';
 
 /** A diagnostic observation. There is deliberately no replacement-text field. */
@@ -10,6 +11,13 @@ export interface ProofreadingFinding {
 export interface ProofreadingContext {
   /** Plain text from the original post when the writing is a reply. */
   originalPost?: string;
+}
+
+/** The billable request shown to the author before anything leaves the browser. */
+export interface ProofreadingRequestPreview {
+  connector: 'OpenRouter';
+  model: string;
+  prompt: string;
 }
 
 /** Long enough to explain a problem, too short to smuggle in a replacement post. */
@@ -50,18 +58,29 @@ export function cleanProofreadingFindings(values: string[]): ProofreadingFinding
 @Injectable({ providedIn: 'root' })
 export class Proofreader {
   private chat = inject(OpenRouterChat);
+  private choice = inject(OpenRouterModelChoice);
   private prompts = inject(PromptTemplateStore);
+
+  /** Build exactly the request the model will receive, without sending it. */
+  preview(text: string, context: ProofreadingContext = {}): ProofreadingRequestPreview {
+    return {
+      connector: 'OpenRouter',
+      model: this.choice.modelId(),
+      prompt: this.prompts.render('proofread', {
+        text: text.trim(),
+        replyContext: context.originalPost?.trim() ?? '',
+      }),
+    };
+  }
 
   async run(text: string, context: ProofreadingContext = {}): Promise<ProofreadingFinding[]> {
     const source = text.trim();
     if (!source) {
       return [];
     }
+    const request = this.preview(source, context);
     const reply = await this.chat.suggest({
-      prompt: this.prompts.render('proofread', {
-        text: source,
-        replyContext: context.originalPost?.trim() ?? '',
-      }),
+      prompt: request.prompt,
       schemaName: 'writing_proofreading_findings',
       max: MAX_FINDINGS,
     });
