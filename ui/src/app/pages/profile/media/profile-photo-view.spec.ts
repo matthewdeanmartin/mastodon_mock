@@ -2,10 +2,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../../../models';
 import { ProfilePhotoView } from './profile-photo-view';
 import { ProfileMediaItem } from './profile-media-item';
+import { Auth } from '../../../auth';
+import { seedBskyIdentity } from '../../../testing/seed-storage';
 
 function makeStatus(overrides: Partial<Status> = {}): Status {
   return {
@@ -119,5 +121,76 @@ describe('ProfilePhotoView comments', () => {
     // server; asking would 404 every time.
     setUp(makeStatus({ provider: 'rss' }));
     httpMock.expectNone('/api/v1/statuses/s1/context');
+  });
+
+  it('deletes an owned Bluesky photo post through its AT URI', () => {
+    seedBskyIdentity({ did: 'did:plc:me', handle: 'me.bsky.social' });
+    expect(TestBed.inject(Auth).enterBluesky()).toBe(true);
+    const status = makeStatus({
+      id: 'bsky:at://did:plc:me/app.bsky.feed.post/photo',
+      provider: 'bluesky',
+      account: {
+        ...makeStatus().account,
+        id: 'bsky:did:plc:me',
+        username: 'me.bsky.social',
+        acct: 'me.bsky.social',
+      },
+      providerRef: {
+        uri: 'at://did:plc:me/app.bsky.feed.post/photo',
+        cid: 'photo-cid',
+        likeUri: null,
+        repostUri: null,
+        replyRoot: { uri: 'at://did:plc:me/app.bsky.feed.post/photo', cid: 'photo-cid' },
+        replyParentUri: null,
+        externalUri: null,
+      },
+    });
+    const fixture = setUp(status);
+    const deleted = vi.fn();
+    const closed = vi.fn();
+    fixture.componentInstance.deleted.subscribe(deleted);
+    fixture.componentInstance.closed.subscribe(closed);
+    (fixture.componentInstance as unknown as { deletePost(): void }).deletePost();
+
+    const request = httpMock.expectOne('https://bsky.social/xrpc/com.atproto.repo.deleteRecord');
+    expect(request.request.body).toEqual({
+      repo: 'did:plc:me',
+      collection: 'app.bsky.feed.post',
+      rkey: 'photo',
+    });
+    request.flush({});
+    expect(deleted).toHaveBeenCalledWith(status);
+    expect(closed).toHaveBeenCalled();
+    httpMock.expectNone('/api/v1/statuses/bsky:at://did:plc:me/app.bsky.feed.post/photo');
+  });
+
+  it('bookmarks a Bluesky photo post with the native cross-device API', () => {
+    seedBskyIdentity({ did: 'did:plc:me', handle: 'me.bsky.social' });
+    expect(TestBed.inject(Auth).enterBluesky()).toBe(true);
+    const status = makeStatus({
+      id: 'bsky:at://did:plc:them/app.bsky.feed.post/photo',
+      provider: 'bluesky',
+      providerRef: {
+        uri: 'at://did:plc:them/app.bsky.feed.post/photo',
+        cid: 'photo-cid',
+        likeUri: null,
+        repostUri: null,
+        replyRoot: { uri: 'at://did:plc:them/app.bsky.feed.post/photo', cid: 'photo-cid' },
+        replyParentUri: null,
+        externalUri: null,
+      },
+    });
+    const fixture = setUp(status);
+    (fixture.componentInstance as unknown as { toggleBookmark(): void }).toggleBookmark();
+
+    const request = httpMock.expectOne('https://bsky.social/xrpc/app.bsky.bookmark.createBookmark');
+    expect(request.request.body).toEqual({
+      uri: 'at://did:plc:them/app.bsky.feed.post/photo',
+      cid: 'photo-cid',
+    });
+    request.flush({});
+    const post = (fixture.componentInstance as unknown as { post(): Status | null }).post();
+    expect(post?.bookmarked).toBe(true);
+    httpMock.expectNone('/api/v1/statuses/bsky:at://did:plc:them/app.bsky.feed.post/photo/bookmark');
   });
 });

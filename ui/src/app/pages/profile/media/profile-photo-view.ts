@@ -28,6 +28,8 @@ import { AnonymousPublicRef } from '../../../providers/anonymous/anonymous-route
 import { accountRoutePath } from '../../../account-route';
 import { Status } from '../../../models';
 import { ProfileMediaItem } from './profile-media-item';
+import { BlueskyApi } from '../../../providers/bluesky/bluesky-api';
+import { BskyRef } from '../../../providers/bluesky/bluesky-types';
 
 /**
  * The photo-first viewer behind a profile's media wall.
@@ -55,6 +57,7 @@ export class ProfilePhotoView {
   private trusted = inject(TrustedAccounts);
   private localMod = inject(LocalModeration);
   private actions = inject(StatusActions);
+  private blueskyApi = inject(BlueskyApi);
   private capabilities = inject(AnonymousCapabilities);
   private router = inject(Router);
   protected auth = inject(Auth);
@@ -343,6 +346,17 @@ export class ProfilePhotoView {
       return;
     }
     this.menuOpen.set(false);
+    if (target.provider === 'bluesky') {
+      const ref = target.providerRef as BskyRef;
+      const call = target.bookmarked
+        ? this.blueskyApi.deleteBookmark(ref.uri)
+        : this.blueskyApi.createBookmark(ref.uri, ref.cid);
+      call.subscribe({
+        next: () => this.applyPatch({ ...target, bookmarked: !target.bookmarked }),
+        error: () => this.actionError.set('Could not bookmark this post on Bluesky.'),
+      });
+      return;
+    }
     const call = target.bookmarked ? this.api.unbookmark(target.id) : this.api.bookmark(target.id);
     call.subscribe({
       next: (updated) => this.applyPatch(updated),
@@ -472,7 +486,11 @@ export class ProfilePhotoView {
     if (!status || !this.isOwnPost()) {
       return;
     }
-    this.api.deleteStatus(status.id).subscribe({
+    const request =
+      status.provider === 'bluesky'
+        ? this.blueskyApi.deleteRecord((status.providerRef as BskyRef).uri)
+        : this.api.deleteStatus(status.id);
+    request.subscribe({
       next: () => {
         this.deleted.emit(status);
         this.closed.emit();

@@ -20,7 +20,7 @@ import { TranslationPreference } from '../translation-preference';
 import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
 import { PosseQueue } from '../providers/hugo/posse-queue';
-import { seedBskySession } from '../testing/seed-storage';
+import { seedBskyIdentity, seedBskySession } from '../testing/seed-storage';
 
 /** Expose protected signals/methods for white-box testing. */
 interface StatusCardInternals {
@@ -1059,6 +1059,49 @@ describe('StatusCard', () => {
     httpMock.expectNone('https://bsky.social/xrpc/app.bsky.bookmark.createBookmark');
   });
 
+  it('routes own Bluesky post deletion natively and hides Mastodon-only owner actions', () => {
+    seedBskyIdentity({ did: 'did:plc:me', handle: 'me.bsky.social' });
+    expect(TestBed.inject(Auth).enterBluesky()).toBe(true);
+    const status = makeStatus({
+      id: 'bsky:at://did:plc:me/app.bsky.feed.post/1',
+      provider: 'bluesky',
+      account: makeAccount('bsky:did:plc:me'),
+      providerRef: {
+        uri: 'at://did:plc:me/app.bsky.feed.post/1',
+        cid: 'post-cid',
+        likeUri: null,
+        repostUri: null,
+        replyRoot: { uri: 'at://did:plc:me/app.bsky.feed.post/1', cid: 'post-cid' },
+        replyParentUri: null,
+        externalUri: null,
+      },
+    });
+    const f = setUp(status);
+    expect(TestBed.inject(Auth).account()?.id).toBe('bsky:did:plc:me');
+    expect((f.componentInstance as unknown as { isOwn: Signal<boolean> }).isOwn()).toBe(true);
+    const html = f.nativeElement as HTMLElement;
+    expect(html.querySelector('[aria-label="Delete"]')).not.toBeNull();
+    expect(html.querySelector('[aria-label="Pin"]')).toBeNull();
+    expect(html.querySelector('[aria-label="Mute thread"]')).toBeNull();
+    expect(html.querySelector('[aria-label="Edit"]')).toBeNull();
+
+    const deleted = vi.fn();
+    f.componentInstance.deleted.subscribe(deleted);
+    const confirmDelete = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    f.componentInstance.remove(fakeEvent());
+    const request = httpMock.expectOne('https://bsky.social/xrpc/com.atproto.repo.deleteRecord');
+    expect(request.request.body).toEqual({
+      repo: 'did:plc:me',
+      collection: 'app.bsky.feed.post',
+      rkey: '1',
+    });
+    request.flush({});
+
+    expect(deleted).toHaveBeenCalledWith(status);
+    httpMock.expectNone('/api/v1/statuses/bsky:at://did:plc:me/app.bsky.feed.post/1');
+    confirmDelete.mockRestore();
+  });
+
   it('offers AI translation on a tweet, since the server cannot translate it', () => {
     // Translation for a read-only provider means "ask the autorouter". The
     // server button needs canUseServerActions and the AI button needed
@@ -1785,8 +1828,8 @@ describe('StatusCard', () => {
       expect(el.querySelector('button[title="Boost"]')).toBeTruthy();
       expect(el.querySelector('button[title="Favourite"]')).toBeTruthy();
       expect(el.querySelector('a.open-original')).toBeTruthy();
-      // Mastodon-only actions stay hidden on foreign posts.
-      expect(el.querySelector('button[title="Bookmark"]')).toBeNull();
+      // Bookmark is now a Bluesky-native action; Mastodon-only actions stay hidden.
+      expect(el.querySelector('button[title="Bookmark"]')).not.toBeNull();
       expect(el.querySelector('button[title="Quote"]')).toBeNull();
       expect(el.querySelector('button[title="Translate"]')).toBeNull();
       expect(el.querySelector('.provider-badge')?.textContent).toContain('Bluesky');

@@ -77,9 +77,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Cheap and fast, so they run first and fail before anything expensive.
+      # Cheap and substantive, so they run first and fail before anything expensive.
       - name: Static checks
-        run: npm run check:static
+        run: npm run check:storage && npm run check:subpaths && npm run starter-kits:check
+
+      # Formatting is useful feedback, but it must not block a substantive change.
+      - name: Formatting (reported, not enforced)
+        continue-on-error: true
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
@@ -97,7 +102,7 @@ jobs:
       # They move up into the enforcing steps above as each backlog is cleared.
       # `check:storage` already did: its 15 findings were resolved (12 keys
       # classified, 2 stale entries replaced by their successor, 1 false positive
-      # fixed in the script), so it is enforced in `check:static` now.
+      # fixed in the script), so it is enforced in the static checks above.
       - name: Known-failing checks (reported, not enforced)
         continue-on-error: true
         run: npm run check:known-failing

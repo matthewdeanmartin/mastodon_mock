@@ -766,6 +766,14 @@ export class StatusCard {
     if (!confirm('Delete this post?')) {
       return;
     }
+    if (this.display.provider === 'bluesky') {
+      const ref = this.display.providerRef as BskyRef;
+      this.blueskyApi.deleteRecord(ref.uri).subscribe({
+        next: () => this.deleted.emit(this.status()),
+        error: () => this.actionError.set(this.actionFailureMessage('delete this post')),
+      });
+      return;
+    }
     this.api.deleteStatus(this.display.id).subscribe(() => this.deleted.emit(this.status()));
   }
 

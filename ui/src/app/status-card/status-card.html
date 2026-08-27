@@ -488,7 +488,7 @@
           >
             <span aria-hidden="true">❝</span>
           </button>
-          @if (capabilities.canUseServerActions) {
+          @if (capabilities.canUseServerActions && display.provider !== 'bluesky') {
             <button
               class="action count-link"
               (click)="openAccountList('reblogged_by', $event)"
@@ -578,7 +578,7 @@
             <span>{{ display.favourites_count }}</span> <span class="sr-only">favourites</span>
           </span>
         } @else if (!foreign) {
-          @if (capabilities.canUseServerActions) {
+          @if (capabilities.canUseServerActions && display.provider !== 'bluesky') {
             <button
               class="action count-link"
               (click)="openAccountList('favourited_by', $event)"
@@ -632,7 +632,7 @@
              already got: bookmark, translate, and the ••• menu with local
              block/mute. None of these touch the origin server, so "this post is
              foreign" was never the right reason to withhold them. -->
-        @if (!foreign || auth.isAnonymous || readOnlyStats) {
+        @if (!foreign || display.provider === 'bluesky' || auth.isAnonymous || readOnlyStats) {
           @if (capabilities.canBookmark) {
             <button
               class="action"
@@ -649,7 +649,11 @@
           <!-- Server translation needs a status the server actually has. For a
                read-only provider it could only 404 on an id it cannot resolve,
                so those posts get the AI button below instead. -->
-          @if (capabilities.canUseServerActions && !serverCannotTranslate) {
+          @if (
+            capabilities.canUseServerActions &&
+            display.provider !== 'bluesky' &&
+            !serverCannotTranslate
+          ) {
             <button
               class="action"
               [class.on]="!!translation()"
@@ -691,62 +695,66 @@
               </button>
             }
             @if (isOwn()) {
-              <button
-                class="action"
-                [class.on]="display.pinned"
-                (click)="togglePin($event)"
-                title="Pin"
-                aria-label="Pin"
-              >
-                <span aria-hidden="true">📌</span>
-              </button>
-              <button
-                class="action"
-                [class.on]="display.muted"
-                (click)="toggleMute($event)"
-                title="Mute thread"
-                aria-label="Mute thread"
-              >
-                <span aria-hidden="true">🔕</span>
-              </button>
-              <div class="policy-wrap">
+              @if (display.provider !== 'bluesky') {
                 <button
                   class="action"
-                  (click)="togglePolicyMenu($event)"
-                  title="Who can quote"
-                  aria-label="Who can quote"
+                  [class.on]="display.pinned"
+                  (click)="togglePin($event)"
+                  title="Pin"
+                  aria-label="Pin"
                 >
-                  <span aria-hidden="true">💬🔒</span>
+                  <span aria-hidden="true">📌</span>
                 </button>
-                @if (showPolicyMenu()) {
-                  <div class="policy-menu" (click)="$event.stopPropagation()">
-                    <div class="policy-title muted small">Who can quote</div>
-                    @for (p of quotePolicies; track p) {
-                      <button
-                        class="policy-option"
-                        [class.active]="display.quote_approval_policy === p"
-                        (click)="setPolicy(p)"
-                      >
-                        {{ p }}
-                      </button>
-                    }
-                  </div>
-                }
-              </div>
-              <button class="action" (click)="startEdit($event)" title="Edit" aria-label="Edit">
-                <span aria-hidden="true">✏️</span>
-              </button>
+                <button
+                  class="action"
+                  [class.on]="display.muted"
+                  (click)="toggleMute($event)"
+                  title="Mute thread"
+                  aria-label="Mute thread"
+                >
+                  <span aria-hidden="true">🔕</span>
+                </button>
+                <div class="policy-wrap">
+                  <button
+                    class="action"
+                    (click)="togglePolicyMenu($event)"
+                    title="Who can quote"
+                    aria-label="Who can quote"
+                  >
+                    <span aria-hidden="true">💬🔒</span>
+                  </button>
+                  @if (showPolicyMenu()) {
+                    <div class="policy-menu" (click)="$event.stopPropagation()">
+                      <div class="policy-title muted small">Who can quote</div>
+                      @for (p of quotePolicies; track p) {
+                        <button
+                          class="policy-option"
+                          [class.active]="display.quote_approval_policy === p"
+                          (click)="setPolicy(p)"
+                        >
+                          {{ p }}
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+                <button class="action" (click)="startEdit($event)" title="Edit" aria-label="Edit">
+                  <span aria-hidden="true">✏️</span>
+                </button>
+              }
               <button class="action" (click)="remove($event)" title="Delete" aria-label="Delete">
                 <span aria-hidden="true">🗑️</span>
               </button>
-              <button
-                class="action"
-                (click)="deleteAndRedraft($event)"
-                [title]="'Delete &amp; ' + words().boost"
-                [aria-label]="'Delete &amp; ' + words().boost"
-              >
-                <span aria-hidden="true">♻️</span>
-              </button>
+              @if (display.provider !== 'bluesky') {
+                <button
+                  class="action"
+                  (click)="deleteAndRedraft($event)"
+                  [title]="'Delete &amp; ' + words().boost"
+                  [aria-label]="'Delete &amp; ' + words().boost"
+                >
+                  <span aria-hidden="true">♻️</span>
+                </button>
+              }
               @if (display.url || display.account.url) {
                 <details class="danger-menu" (click)="$event.stopPropagation()">
                   <summary class="action" [aria-label]="'More ' + words().post + ' actions'">
@@ -844,7 +852,7 @@
                       Block &#64;{{ display.account.acct }}
                     </button>
                   }
-                  @if (capabilities.canManageRelationships) {
+                  @if (capabilities.canManageRelationships && display.provider !== 'bluesky') {
                     <button type="button" (click)="openReport($event)">Report post</button>
                   }
                 </div>
