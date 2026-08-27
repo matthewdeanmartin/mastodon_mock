@@ -9,6 +9,7 @@ import { Terminology } from '../../terminology';
 import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { ProfileStack } from './profile-stack/profile-stack';
+import { FollowState } from '../../follow-state';
 
 interface SuggestionCandidate {
   account: Account;
@@ -42,6 +43,7 @@ export class LeftRail implements OnInit {
   private homeTimelineFeed = inject(HomeTimelineFeed);
   private anonymousFollows = inject(AnonymousFollows);
   private anonymous = inject(AnonymousAccount);
+  private follows = inject(FollowState);
   protected words = inject(Terminology).words;
   private candidates = new Map<string, SuggestionCandidate>();
 
@@ -106,18 +108,12 @@ export class LeftRail implements OnInit {
         return;
       }
       const ids = ranked.map((candidate) => candidate.account.id);
-      this.api.relationships(ids).subscribe({
-        next: (rels) => {
-          const excluded = new Set(
-            rels.filter((r) => r.following || r.requested || r.blocking).map((r) => r.id),
-          );
-          this.suggestions.set(
-            ranked
-              .map((candidate) => candidate.account)
-              .filter((account) => !excluded.has(account.id)),
-          );
-        },
-        error: () => this.suggestions.set(ranked.map((candidate) => candidate.account)),
+      void this.follows.resolve(ids).then(() => {
+        this.suggestions.set(
+          ranked
+            .map((candidate) => candidate.account)
+            .filter((account) => !this.follows.excludesSuggestion(account.id)),
+        );
       });
     });
   }
@@ -131,11 +127,11 @@ export class LeftRail implements OnInit {
       }
       return;
     }
-    this.api.follow(account.id).subscribe({
-      next: () => this.followed.update((set) => new Set(set).add(account.id)),
-      error: () => {
-        // Leave the button as-is; the user can retry.
-      },
+    void this.follows.toggle(account.id).then((ok) => {
+      if (ok) {
+        this.followed.update((set) => new Set(set).add(account.id));
+        this.suggestions.update((items) => items.filter((item) => item.id !== account.id));
+      }
     });
   }
 }

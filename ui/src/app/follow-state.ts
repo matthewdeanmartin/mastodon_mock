@@ -4,6 +4,8 @@ import { Api } from './api';
 import { Auth } from './auth';
 import { qualifiedHandle } from './account-handle';
 import { Account, Relationship } from './models';
+import { BlueskyGraph } from './providers/bluesky/bluesky-graph';
+import { BlueskySession } from './providers/bluesky/bluesky-session';
 
 /**
  * Who the viewer follows, resolved in batches and shared across the app.
@@ -50,6 +52,8 @@ export type FollowStatus =
 export class FollowState {
   private api = inject(Api);
   private auth = inject(Auth);
+  private blueskyGraph = inject(BlueskyGraph);
+  private blueskySession = inject(BlueskySession);
 
   private known = signal<Record<string, Relationship>>({});
   /** Foreign `user@host` → the local account record for them, or null if none. */
@@ -75,6 +79,12 @@ export class FollowState {
     return this.busy().has(id);
   }
 
+  /** Already connected or blocked, so this person should not be suggested. */
+  excludesSuggestion(id: string): boolean {
+    const rel = this.known()[id];
+    return !!rel && (rel.following || rel.requested || rel.blocking);
+  }
+
   /**
    * Resolve these accounts, skipping any already known.
    *
@@ -92,10 +102,12 @@ export class FollowState {
       .map((id) => this.pending.get(id))
       .filter((p): p is Promise<void> => !!p);
     const wanted = unique.filter((id) => !this.known()[id] && !this.pending.has(id));
+    const bluesky = wanted.filter((id) => isBlueskyId(id) && this.blueskySession.linked());
+    const mastodon = wanted.filter((id) => !isBlueskyId(id));
 
     const batches: Promise<void>[] = [];
-    for (let i = 0; i < wanted.length; i += RELATIONSHIP_BATCH) {
-      const slice = wanted.slice(i, i + RELATIONSHIP_BATCH);
+    for (let i = 0; i < mastodon.length; i += RELATIONSHIP_BATCH) {
+      const slice = mastodon.slice(i, i + RELATIONSHIP_BATCH);
       const batch = this.fetch(slice).finally(() => {
         for (const id of slice) {
           this.pending.delete(id);
@@ -105,6 +117,11 @@ export class FollowState {
         this.pending.set(id, batch);
       }
       batches.push(batch);
+    }
+    for (const id of bluesky) {
+      const request = this.fetchBluesky(id).finally(() => this.pending.delete(id));
+      this.pending.set(id, request);
+      batches.push(request);
     }
     await Promise.all([...batches, ...inFlight]);
   }
@@ -119,6 +136,15 @@ export class FollowState {
     }
   }
 
+  private async fetchBluesky(id: string): Promise<void> {
+    try {
+      const relationship = await firstValueFrom(this.blueskyGraph.relationship(blueskyDid(id)));
+      this.write([relationship]);
+    } catch {
+      // As above, an unknown button is safer than inventing relationship state.
+    }
+  }
+
   /**
    * Follow, or unfollow, updating optimistically.
    *
@@ -130,7 +156,11 @@ export class FollowState {
    * Returns whether it worked, so a caller can surface the failure.
    */
   async toggle(id: string): Promise<boolean> {
-    if (this.auth.isAnonymous || this.busyWith(id)) {
+    if (
+      this.auth.isAnonymous ||
+      this.busyWith(id) ||
+      (isBlueskyId(id) && !this.blueskySession.linked())
+    ) {
       return false;
     }
     const before = this.known()[id];
@@ -145,7 +175,15 @@ export class FollowState {
     ]);
 
     try {
-      const rel = await firstValueFrom(wasConnected ? this.api.unfollow(id) : this.api.follow(id));
+      const rel = await firstValueFrom(
+        isBlueskyId(id)
+          ? wasConnected
+            ? this.blueskyGraph.unfollow(blueskyDid(id))
+            : this.blueskyGraph.follow(blueskyDid(id))
+          : wasConnected
+            ? this.api.unfollow(id)
+            : this.api.follow(id),
+      );
       // The server's answer wins — it is the one that knows about locked
       // accounts, and it is what turns an optimistic "Following" into the
       // honest "Requested".
@@ -253,6 +291,14 @@ export class FollowState {
       return next;
     });
   }
+}
+
+function isBlueskyId(id: string): boolean {
+  return id.startsWith('bsky:did:');
+}
+
+function blueskyDid(id: string): string {
+  return id.slice('bsky:'.length);
 }
 
 /**

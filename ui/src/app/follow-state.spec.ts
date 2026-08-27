@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Auth } from './auth';
 import { FollowState, RELATIONSHIP_BATCH } from './follow-state';
 import { Account, Relationship } from './models';
+import { BlueskySession } from './providers/bluesky/bluesky-session';
 
 function relationship(id: string, overrides: Partial<Relationship> = {}): Relationship {
   return {
@@ -121,6 +122,49 @@ describe('FollowState', () => {
     http.expectOne('/api/v1/accounts/3/unfollow').flush(relationship('3'));
     expect(await toggled).toBe(true);
     expect(follows.status('3')).toBe('not-following');
+  });
+
+  it('resolves and follows a Bluesky account through the native graph', async () => {
+    TestBed.inject(BlueskySession).session.set({
+      service: 'https://bsky.social',
+      did: 'did:plc:me',
+      handle: 'me.bsky.social',
+      accessJwt: 'access-jwt',
+      refreshJwt: 'refresh-jwt',
+    });
+    const id = 'bsky:did:plc:them';
+
+    const resolved = follows.resolve([id]);
+    const profile = http.expectOne((r) => r.url.endsWith('/xrpc/app.bsky.actor.getProfile'));
+    expect(profile.request.params.get('actor')).toBe('did:plc:them');
+    profile.flush({ did: 'did:plc:them', handle: 'them.bsky.social', viewer: {} });
+    await resolved;
+    expect(follows.status(id)).toBe('not-following');
+    http.expectNone(RELATIONSHIPS);
+
+    const toggled = follows.toggle(id);
+    const follow = http.expectOne('https://bsky.social/xrpc/com.atproto.repo.createRecord');
+    expect(follow.request.body).toMatchObject({
+      repo: 'did:plc:me',
+      collection: 'app.bsky.graph.follow',
+      record: { subject: 'did:plc:them' },
+    });
+    follow.flush({
+      uri: 'at://did:plc:me/app.bsky.graph.follow/f1',
+      cid: 'follow-cid',
+    });
+    expect(await toggled).toBe(true);
+    expect(follows.status(id)).toBe('following');
+    http.expectNone('/api/v1/accounts/bsky:did:plc:them/follow');
+  });
+
+  it('never sends an unlinked Bluesky id to Mastodon relationships or follow', async () => {
+    const id = 'bsky:did:plc:them';
+    await follows.resolve([id]);
+    expect(follows.status(id)).toBe('unknown');
+    expect(await follows.toggle(id)).toBe(false);
+    http.expectNone(RELATIONSHIPS);
+    http.expectNone('/api/v1/accounts/bsky:did:plc:them/follow');
   });
 
   // ------------------------------------------------- foreign (shipped kits)
