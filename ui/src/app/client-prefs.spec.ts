@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ACCENT_PRESETS, ClientPrefs, homeWindowMs } from './client-prefs';
+import { ACCENT_PRESETS, ClientPrefs, homeWindowMs, READER_FONT_OPTIONS } from './client-prefs';
 
 const PREFS_KEY = 'mockingbird_client_prefs';
 const TOKEN_KEY = 'mastodon_mock_token';
@@ -139,6 +139,36 @@ describe('ClientPrefs', () => {
   it('ships at least the classic blue plus five alternative accents', () => {
     expect(ACCENT_PRESETS[0].id).toBe('blue');
     expect(ACCENT_PRESETS.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('offers named readable reader faces without collapsing them into generic families', () => {
+    const labels = READER_FONT_OPTIONS.map((font) => font.label);
+    expect(labels).toEqual([
+      'Georgia',
+      'Charter',
+      'Palatino',
+      'System Sans',
+      'Helvetica Neue',
+      'Inter',
+      'Verdana',
+      'Monospace',
+    ]);
+  });
+
+  it('applies the literal Helvetica Neue and Inter local font stacks', () => {
+    const prefs = create();
+
+    prefs.setReaderFontFamily('helvetica-neue');
+    TestBed.tick();
+    expect(document.documentElement.style.getPropertyValue('--reader-font-family')).toContain(
+      "'Helvetica Neue', Helvetica, Arial",
+    );
+
+    prefs.setReaderFontFamily('inter');
+    TestBed.tick();
+    expect(document.documentElement.style.getPropertyValue('--reader-font-family')).toContain(
+      'Inter, -apple-system',
+    );
   });
 
   // ---------------------------------------------------------------- feed size

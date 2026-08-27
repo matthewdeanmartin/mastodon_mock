@@ -90,8 +90,53 @@ export function asVisibility(value: unknown): Visibility | null {
 
 /** When the blue verification check shows on other accounts. */
 export type VerifiedMode = 'fixed' | 'famous' | 'everyone';
-export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
+export type ReaderFontFamily =
+  | 'serif'
+  | 'charter'
+  | 'palatino'
+  | 'sans'
+  | 'helvetica-neue'
+  | 'inter'
+  | 'verdana'
+  | 'mono';
 export type ReaderTextAlign = 'left' | 'justify';
+
+/** Readable, local-only typeface choices shared by every reader control. */
+export const READER_FONT_OPTIONS: readonly {
+  id: ReaderFontFamily;
+  label: string;
+  stack: string;
+}[] = [
+  { id: 'serif', label: 'Georgia', stack: "Georgia, 'Times New Roman', serif" },
+  { id: 'charter', label: 'Charter', stack: "Charter, 'Bitstream Charter', Georgia, serif" },
+  {
+    id: 'palatino',
+    label: 'Palatino',
+    stack: "Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif",
+  },
+  {
+    id: 'sans',
+    label: 'System Sans',
+    stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  },
+  {
+    id: 'helvetica-neue',
+    label: 'Helvetica Neue',
+    stack:
+      "'Helvetica Neue', Helvetica, Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  {
+    id: 'inter',
+    label: 'Inter',
+    stack: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
+  },
+  { id: 'verdana', label: 'Verdana', stack: 'Verdana, Geneva, sans-serif' },
+  {
+    id: 'mono',
+    label: 'Monospace',
+    stack: "'Cascadia Code', Consolas, 'Courier New', monospace",
+  },
+];
 
 /**
  * Paper colour for reader mode.
@@ -308,11 +353,9 @@ export const ACCENT_PRESETS: AccentPreset[] = [
   { id: 'green', label: 'Green', accent: '#00ba7c', accentHover: '#00a56e', accentSoft: '#e0f7ef' },
 ];
 
-const FONT_STACKS: Record<ReaderFontFamily, string> = {
-  serif: "Georgia, 'Times New Roman', serif",
-  sans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-  mono: "'Cascadia Code', Consolas, 'Courier New', monospace",
-};
+const FONT_STACKS = Object.fromEntries(
+  READER_FONT_OPTIONS.map(({ id, stack }) => [id, stack]),
+) as Record<ReaderFontFamily, string>;
 
 interface StoredPrefs {
   themeMode?: ThemeMode;

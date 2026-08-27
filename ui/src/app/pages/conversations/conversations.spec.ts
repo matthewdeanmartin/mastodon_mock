@@ -18,6 +18,7 @@ interface ConversationsInternals {
   bskyConvos: WritableSignal<BskyConvoView[]>;
   pendingOpen: WritableSignal<string | null>;
   pendingWith: WritableSignal<string | null>;
+  pendingContext: WritableSignal<string | null>;
   draftChat: WritableSignal<Chat | null>;
   selectedKey: WritableSignal<string | null>;
   messages: WritableSignal<Status[]>;
@@ -285,6 +286,54 @@ describe('Conversations', () => {
     expect(realChats(fixture).some((c) => c.key === 'pub:alice')).toBe(true);
     expect(internals(fixture).selected()?.key).toBe('pub:alice');
     expect(internals(fixture).messages()).toEqual([]);
+  });
+
+  it('shows the originating post when a deep link drafts a chat with no history', () => {
+    const alice = makeAccount('2', 'alice');
+    const origin = makeStatus('source-1', { visibility: 'public', account: alice });
+    const fixture = setUp();
+
+    internals(fixture).pendingOpen.set('pub:alice');
+    internals(fixture).pendingWith.set('2');
+    internals(fixture).pendingContext.set('source-1');
+    fixture.detectChanges();
+
+    httpMock.expectOne('/api/v1/accounts/2').flush(alice);
+    httpMock.expectOne('/api/v1/statuses/source-1').flush(origin);
+    expect(internals(fixture).selected()?.key).toBe('pub:alice');
+    httpMock
+      .expectOne('/api/v1/statuses/source-1/context')
+      .flush({ ancestors: [], descendants: [] });
+
+    expect(
+      internals(fixture)
+        .messages()
+        .map((status) => status.id),
+    ).toEqual(['source-1']);
+  });
+
+  it('uses the originating post instead of stale history for an existing chat deep link', () => {
+    const alice = makeAccount('2', 'alice');
+    const stale = makeStatus('old-1', { visibility: 'public', account: alice });
+    const origin = makeStatus('source-2', { visibility: 'public', account: alice });
+    const fixture = setUp([], [makeMention('n1', stale)]);
+
+    internals(fixture).pendingOpen.set('pub:alice');
+    internals(fixture).pendingWith.set('2');
+    internals(fixture).pendingContext.set('source-2');
+    fixture.detectChanges();
+
+    httpMock.expectNone('/api/v1/statuses/old-1/context');
+    httpMock.expectOne('/api/v1/statuses/source-2').flush(origin);
+    httpMock
+      .expectOne('/api/v1/statuses/source-2/context')
+      .flush({ ancestors: [], descendants: [] });
+
+    expect(
+      internals(fixture)
+        .messages()
+        .map((status) => status.id),
+    ).toEqual(['source-2', 'old-1']);
   });
 
   it('prefers an existing chat over drafting when one already matches ?open', () => {

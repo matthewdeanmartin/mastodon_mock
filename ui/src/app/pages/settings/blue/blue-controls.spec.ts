@@ -42,4 +42,25 @@ describe('BlueControls terminology', () => {
     expect(el.querySelector('.terminology-preview')?.textContent).toContain('Peeps');
     expect(el.querySelector('.terminology-preview')?.textContent).toContain('Repeeped by Riley');
   });
+
+  it('offers the complete shared reader font catalog', () => {
+    const fixture = TestBed.createComponent(BlueControls);
+    fixture.detectChanges();
+    const labels = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLSelectElement>(
+        'select[name="reader_font_family"] option',
+      ),
+    ].map((option) => option.textContent?.trim());
+
+    expect(labels).toEqual([
+      'Georgia',
+      'Charter',
+      'Palatino',
+      'System Sans',
+      'Helvetica Neue',
+      'Inter',
+      'Verdana',
+      'Monospace',
+    ]);
+  });
 });

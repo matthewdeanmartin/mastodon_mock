@@ -1,7 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ACCENT_PRESETS, ClientPrefs, CustomTerminologyKey } from '../../../client-prefs';
+import {
+  ACCENT_PRESETS,
+  ClientPrefs,
+  CustomTerminologyKey,
+  READER_FONT_OPTIONS,
+} from '../../../client-prefs';
 import { Terminology } from '../../../terminology';
 
 /**
@@ -19,6 +24,7 @@ import { Terminology } from '../../../terminology';
 export class BlueControls {
   protected readonly prefs = inject(ClientPrefs);
   protected readonly accents = ACCENT_PRESETS;
+  protected readonly readerFonts = READER_FONT_OPTIONS;
 
   /**
    * The selected post/re-share vocabulary, per the setting this page sets.

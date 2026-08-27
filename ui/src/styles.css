@@ -14,6 +14,10 @@
   --accent-soft: #e8f5fe;
   --hover: #eff3f4;
   --col-width: 600px;
+  /* Classic Twitter's Helvetica Neue first, with honest platform fallbacks.
+     No face is downloaded: each visitor gets the first one installed locally. */
+  --app-font-family:
+    'Helvetica Neue', Helvetica, Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   /* The two rails and the gap between all three tracks. Variables rather than
      numbers inlined in shell.css because `--layout-width` below is derived from
      them, and a rail that changed width without the derived total following
@@ -171,9 +175,26 @@ body {
   overflow-anchor: auto;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--app-font-family);
   font-size: 15px;
   line-height: 1.4;
+}
+
+/* RSS bodies and post HTML arrive through innerHTML, so Angular's component-
+   scoped selectors cannot reach their descendants. Keep every supplied image
+   inside the reader's central text channel, regardless of width attributes or
+   intrinsic dimensions from the source article. */
+.reader :is(.reader-post, .reader-article-body, .comment-content) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.reader :is(.reader-post, .reader-article-body, .comment-content) img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 a {

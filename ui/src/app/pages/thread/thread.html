@@ -22,9 +22,9 @@
           [value]="prefs.readerFontFamily()"
           (change)="setReaderFont($event)"
         >
-          <option value="serif">Serif</option>
-          <option value="sans">Sans-serif</option>
-          <option value="mono">Monospace</option>
+          @for (font of readerFonts; track font.id) {
+            <option [value]="font.id">{{ font.label }}</option>
+          }
         </select>
 
         <select

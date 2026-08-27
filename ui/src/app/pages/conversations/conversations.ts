@@ -156,6 +156,9 @@ export class Conversations implements OnInit, OnDestroy {
   /** Partner account id from `?with=…`, letting us draft a fresh 1:1 chat when no
    *  history exists yet (the thread page's "open in chat" for a de-novo chat). */
   private pendingWith = signal<string | null>(null);
+  /** Status clicked on the thread page; it anchors the transcript even when the
+   *  selected correspondent has no existing chat history. */
+  private pendingContext = signal<string | null>(null);
   /** True once we've honoured a pending `?open=…` so it can't re-fire on re-select. */
   private openHandled = false;
 
@@ -250,7 +253,7 @@ export class Conversations implements OnInit, OnDestroy {
         if (this.prefs.chatAudience() === 'mutuals' && chat.kind === 'bot') {
           this.prefs.setChatAudience('all');
         }
-        this.select(chat);
+        this.selectWithContext(chat, this.pendingContext());
         return;
       }
       // No existing row. If we can draft one for the requested partner, do so
@@ -258,7 +261,7 @@ export class Conversations implements OnInit, OnDestroy {
       const withId = this.pendingWith();
       if (withId && !this.loading() && !this.draftChat()) {
         this.openHandled = true;
-        this.draftFor(want, withId);
+        this.draftFor(want, withId, this.pendingContext());
       }
     });
     effect(() => {
@@ -604,6 +607,7 @@ export class Conversations implements OnInit, OnDestroy {
       this.pendingOpen.set(open);
     }
     this.pendingWith.set(this.route.snapshot.queryParamMap.get('with'));
+    this.pendingContext.set(this.route.snapshot.queryParamMap.get('context'));
     this.load();
     // The IM feel: streams are live while this page is open, closed on leave.
     this.subs.push(
@@ -717,7 +721,7 @@ export class Conversations implements OnInit, OnDestroy {
     });
   }
 
-  select(chat: Chat): void {
+  select(chat: Chat, anchor: Status | null = chat.lastStatus): void {
     this.selectedKey.set(chat.key);
     // Narrow screens show the chat list as a drawer over the transcript; once a
     // chat is chosen the list has done its job and the conversation should have
@@ -736,7 +740,28 @@ export class Conversations implements OnInit, OnDestroy {
       return;
     }
     this.markRead(chat);
-    this.loadThread(chat);
+    this.loadThread(chat, anchor);
+  }
+
+  /**
+   * Select a route-linked chat and load the exact post that supplied the link.
+   * Selecting with a null anchor paints the header and composer immediately;
+   * the status request then replaces the blank transcript with useful context.
+   */
+  private selectWithContext(chat: Chat, contextId: string | null): void {
+    if (!contextId) {
+      this.select(chat);
+      return;
+    }
+    this.select(chat, null);
+    this.threadLoading.set(true);
+    this.api.getStatus(contextId).subscribe({
+      next: (anchor) => this.loadThread(chat, anchor),
+      error: () => {
+        this.threadLoading.set(false);
+        this.loadThread(chat);
+      },
+    });
   }
 
   /**
@@ -750,7 +775,7 @@ export class Conversations implements OnInit, OnDestroy {
    * the real row transparently takes over from this stub (see `addPublicStatus`
    * and `chats()`).
    */
-  private draftFor(key: string, withId: string): void {
+  private draftFor(key: string, withId: string, contextId: string | null): void {
     this.api.getAccount(withId).subscribe({
       next: (account) => {
         // Guard the race: a real row for this key may have arrived while the
@@ -758,7 +783,7 @@ export class Conversations implements OnInit, OnDestroy {
         const existing = this.chats().find((c) => c.key === key);
         if (existing) {
           this.prefs.setChatKind(existing.kind);
-          this.select(existing);
+          this.selectWithContext(existing, contextId);
           return;
         }
         const draft: Chat = {
@@ -775,7 +800,7 @@ export class Conversations implements OnInit, OnDestroy {
         if (this.prefs.chatKind() !== 'all') {
           this.prefs.setChatKind('public');
         }
-        this.select(draft);
+        this.selectWithContext(draft, contextId);
       },
       // A failed lookup leaves the normal "select a conversation" empty state.
       error: () => undefined,
@@ -814,8 +839,7 @@ export class Conversations implements OnInit, OnDestroy {
 
   // ---------------------------------------------------------------- thread
 
-  private loadThread(chat: Chat): void {
-    const anchor = chat.lastStatus;
+  private loadThread(chat: Chat, anchor: Status | null = chat.lastStatus): void {
     // Merged private chats span several threads; their last statuses at least
     // belong in the history even though only the anchor's context is fetched.
     const known =
@@ -826,6 +850,7 @@ export class Conversations implements OnInit, OnDestroy {
             .map((c) => c.last_status!);
     if (!anchor) {
       this.messages.set([]);
+      this.threadLoading.set(false);
       return;
     }
     this.threadLoading.set(true);

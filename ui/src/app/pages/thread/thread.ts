@@ -14,7 +14,12 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Terminology } from '../../terminology';
-import { ClientPrefs, ReaderFontFamily, ReaderTheme } from '../../client-prefs';
+import {
+  ClientPrefs,
+  ReaderFontFamily,
+  ReaderTheme,
+  READER_FONT_OPTIONS,
+} from '../../client-prefs';
 import { Account, Status } from '../../models';
 import { Compose } from '../../compose/compose';
 import { StatusCard } from '../../status-card/status-card';
@@ -103,6 +108,7 @@ export class Thread implements OnInit {
   private log = inject(PageDiagnostics);
   private readingZen = inject(ReadingZen);
   private loadSub = new Subscription();
+  protected readonly readerFonts = READER_FONT_OPTIONS;
 
   protected readonly prefs = inject(ClientPrefs);
   protected words = inject(Terminology).words;
@@ -556,12 +562,15 @@ export class Thread implements OnInit {
    * Query params for the "open in chat" link. `open` selects (or, on the chat
    * page, seeds) the 1:1 chat by its public key; `with` carries the partner's
    * account id so the chat page can fetch the full record and draft a fresh chat
-   * even when no message history exists yet. Null when not eligible.
+   * even when no message history exists yet; `context` identifies the post the
+   * user clicked, so the transcript never opens as an unexplained blank. Null
+   * when not eligible.
    */
   protected chatQueryParams = computed<Record<string, string> | null>(() => {
     const partner = this.chatPartner();
     const key = this.chatKey();
-    return partner && key ? { open: key, with: partner.id } : null;
+    const context = this.status()?.id;
+    return partner && key && context ? { open: key, with: partner.id, context } : null;
   });
 
   /** Id of the chain post whose inline reply composer is open (reader mode). */

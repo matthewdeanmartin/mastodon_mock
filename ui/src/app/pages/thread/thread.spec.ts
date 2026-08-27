@@ -615,6 +615,7 @@ describe('Thread', () => {
   interface ChatInternals {
     chatKey: () => string | null;
     chatPartner: () => Account | null;
+    chatQueryParams: () => Record<string, string> | null;
   }
 
   function chatInternals(fixture: ComponentFixture<Thread>): ChatInternals {
@@ -635,6 +636,11 @@ describe('Thread', () => {
 
     expect(chatInternals(fixture).chatPartner()?.acct).toBe('them');
     expect(chatInternals(fixture).chatKey()).toBe('pub:them');
+    expect(chatInternals(fixture).chatQueryParams()).toEqual({
+      open: 'pub:them',
+      with: 'them',
+      context: '1',
+    });
     const link = (fixture.nativeElement as HTMLElement).querySelector(
       'a.btn[href*="/conversations"]',
     );
