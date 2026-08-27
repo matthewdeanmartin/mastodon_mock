@@ -12,6 +12,9 @@ import {
 import { StatusCard } from '../../status-card/status-card';
 import { BookmarkGroup, groupByAuthor, groupByHashtag, withMedia } from './bookmark-groups';
 import { PageDiagnostics } from '../../page-diagnostics';
+import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
+import { adaptPost } from '../../providers/bluesky/bluesky-adapter';
+import { BskyRef, isBskyPostView } from '../../providers/bluesky/bluesky-types';
 
 type BookmarkProvider = 'native' | 'raindrop';
 type LibraryView = 'all' | 'authors' | 'hashtags' | 'media';
@@ -31,6 +34,7 @@ export class Bookmarks implements OnInit {
   private anonymousBookmarks = inject(AnonymousBookmarks);
   protected raindrop = inject(RaindropSession);
   private diagnostics = inject(PageDiagnostics);
+  private blueskyApi = inject(BlueskyApi);
 
   protected provider = signal<BookmarkProvider>('native');
   protected statuses = signal<Status[]>([]);
@@ -46,6 +50,7 @@ export class Bookmarks implements OnInit {
   protected raindropFilter = signal('');
 
   private nativePages = signal<Status[][]>([]);
+  private blueskyPageCursors = signal<(string | null)[]>([]);
   protected nativePage = signal(0);
 
   protected collections = signal<RaindropCollection[]>([]);
@@ -178,6 +183,8 @@ export class Bookmarks implements OnInit {
       await this.raindrop.addBookmark(status, 'post');
       if (this.auth.isAnonymous) {
         this.anonymousBookmarks.toggle(status);
+      } else if (status.provider === 'bluesky') {
+        await firstValueFrom(this.blueskyApi.deleteBookmark((status.providerRef as BskyRef).uri));
       } else {
         await firstValueFrom(this.api.unbookmark(status.id));
       }
@@ -199,6 +206,14 @@ export class Bookmarks implements OnInit {
     try {
       if (this.auth.isAnonymous) {
         throw new Error('Sign in to Mastodon to turn a Raindrop link into a native bookmark.');
+      }
+      if (this.auth.isBlueskyPrimary) {
+        const native = await this.bookmarkBlueskyUrl(bookmark.link);
+        await this.raindrop.removeBookmark(bookmark._id);
+        this.raindropBookmarks.update((items) => items.filter((item) => item._id !== bookmark._id));
+        this.prependNative(native);
+        this.message.set('Moved to Bluesky bookmarks.');
+        return;
       }
       const result = await firstValueFrom(
         this.api.search(bookmark.link, 'statuses', { resolve: true, limit: 5 }),
@@ -223,7 +238,7 @@ export class Bookmarks implements OnInit {
   }
 
   onChanged(updated: Status): void {
-    if (this.auth.isAnonymous && !updated.bookmarked) {
+    if (!updated.bookmarked) {
       this.removeNative(updated.id);
       return;
     }
@@ -240,6 +255,10 @@ export class Bookmarks implements OnInit {
   }
 
   private loadNativePage(index: number): void {
+    if (this.auth.isBlueskyPrimary) {
+      this.loadBlueskyPage(index);
+      return;
+    }
     const previous = index === 0 ? undefined : this.nativePages()[index - 1]?.at(-1)?.id;
     if (index > 0 && !previous) return;
     this.loadingMore.set(index > 0);
@@ -263,6 +282,57 @@ export class Bookmarks implements OnInit {
         this.error.set("Couldn't load Native bookmarks.");
       },
     });
+  }
+
+  private loadBlueskyPage(index: number): void {
+    const cursor = index === 0 ? null : this.blueskyPageCursors()[index - 1];
+    if (index > 0 && !cursor) return;
+    this.loadingMore.set(index > 0);
+    if (index === 0) this.loading.set(true);
+    this.blueskyApi.getBookmarks(cursor, PAGE_SIZE).subscribe({
+      next: (page) => {
+        const bookmarks = page.bookmarks
+          .map((bookmark) => bookmark.item)
+          .filter(isBskyPostView)
+          .map((post) => ({ ...adaptPost(post), bookmarked: true }));
+        this.nativePages.update((pages) => {
+          const next = pages.slice(0, index);
+          next[index] = bookmarks;
+          return next;
+        });
+        this.blueskyPageCursors.update((cursors) => {
+          const next = cursors.slice(0, index);
+          next[index] = page.cursor ?? null;
+          return next;
+        });
+        this.nativePage.set(index);
+        this.statuses.set(bookmarks);
+        this.exhausted.set(!page.cursor);
+        this.loading.set(false);
+        this.loadingMore.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.loadingMore.set(false);
+        this.error.set("Couldn't load Bluesky bookmarks.");
+      },
+    });
+  }
+
+  private async bookmarkBlueskyUrl(url: string): Promise<Status> {
+    const match = /^https:\/\/bsky\.app\/profile\/([^/]+)\/post\/([^/?#]+)/.exec(url);
+    if (!match) throw new Error('That Raindrop is not a Bluesky post.');
+    const actor = decodeURIComponent(match[1]);
+    const rkey = match[2];
+    const did = actor.startsWith('did:')
+      ? actor
+      : (await firstValueFrom(this.blueskyApi.resolveHandle(actor))).did;
+    const uri = `at://${did}/app.bsky.feed.post/${rkey}`;
+    const result = await firstValueFrom(this.blueskyApi.getPosts([uri]));
+    const post = result.posts[0];
+    if (!post) throw new Error('That Bluesky post is unavailable.');
+    await firstValueFrom(this.blueskyApi.createBookmark(post.uri, post.cid));
+    return { ...adaptPost(post), bookmarked: true };
   }
 
   private showNativePage(index: number): void {

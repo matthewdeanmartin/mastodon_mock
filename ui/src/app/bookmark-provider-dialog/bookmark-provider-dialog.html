@@ -15,7 +15,7 @@
     <button type="button" class="provider-choice" (click)="chosen.emit('mastodon')">
       <span class="choice-icon" aria-hidden="true">🐘</span>
       <span>
-        <strong>{{ anonymous() ? 'This browser' : 'Mastodon' }}</strong>
+        <strong>{{ anonymous() ? 'This browser' : nativeLabel() }}</strong>
         <small>{{
           nativeBookmarked() ? 'Remove the native bookmark' : 'Save the native bookmark'
         }}</small>

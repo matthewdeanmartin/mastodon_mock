@@ -280,7 +280,7 @@ export function adaptPost(post: BskyPostView): Status {
     favourites_count: post.likeCount ?? 0,
     favourited: !!post.viewer?.like,
     reblogged: !!post.viewer?.repost,
-    bookmarked: false,
+    bookmarked: !!post.viewer?.bookmarked,
     muted: false,
     pinned: false,
     sensitive: false,

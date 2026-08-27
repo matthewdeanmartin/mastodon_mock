@@ -36,6 +36,22 @@ export interface BskyProfile {
   viewer?: BskyViewerState;
 }
 
+/** The mutable `app.bsky.actor.profile/self` repository record. */
+export interface BskyProfileRecord extends Record<string, unknown> {
+  $type?: 'app.bsky.actor.profile';
+  displayName?: string;
+  description?: string;
+  avatar?: BskyBlobRef;
+  banner?: BskyBlobRef;
+}
+
+/** A repository record plus the CID used for optimistic replacement. */
+export interface BskyRepoRecord<T extends Record<string, unknown>> {
+  uri: string;
+  cid: string;
+  value: T;
+}
+
 export interface BskyFacet {
   index: { byteStart: number; byteEnd: number };
   features: {
@@ -135,7 +151,25 @@ export interface BskyPostView {
   repostCount?: number;
   likeCount?: number;
   indexedAt: string;
-  viewer?: { like?: string; repost?: string };
+  viewer?: { like?: string; repost?: string; bookmarked?: boolean };
+}
+
+/** Private bookmark page; blocked/not-found items do not have a post record. */
+export interface BskyBookmarks {
+  cursor?: string;
+  bookmarks: { subject: { uri: string; cid: string }; createdAt?: string; item: unknown }[];
+}
+
+/** Narrow an open-union bookmark item to the post view the shared UI can render. */
+export function isBskyPostView(item: unknown): item is BskyPostView {
+  if (!item || typeof item !== 'object') return false;
+  const value = item as Partial<BskyPostView>;
+  return (
+    typeof value.uri === 'string' &&
+    typeof value.cid === 'string' &&
+    !!value.author &&
+    !!value.record
+  );
 }
 
 export interface BskyFeedItem {

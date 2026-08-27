@@ -2,6 +2,8 @@
   <h1>Public profile</h1>
   @if (auth.isAnonymous) {
     <p>Your browser-local identity. Nothing here is published to {{ anonymous.server() }}.</p>
+  } @else if (auth.isBlueskyPrimary) {
+    <p>How you appear to people on Bluesky.</p>
   } @else {
     <p>How you appear to other people on this server.</p>
   }
@@ -17,7 +19,7 @@
           [ngModel]="displayName()"
           (ngModelChange)="displayName.set($event)"
           name="display_name"
-          maxlength="30"
+          [maxlength]="auth.isBlueskyPrimary ? 64 : 30"
         />
       </div>
     </div>
@@ -46,62 +48,65 @@
           [ngModel]="note()"
           (ngModelChange)="note.set($event)"
           name="note"
+          [maxlength]="auth.isBlueskyPrimary ? 256 : null"
         ></textarea>
         <span class="hint">Describe yourself. Appears on your public profile.</span>
       </div>
     </div>
   </div>
 
-  <div class="ssection">
-    <div class="srow">
-      <span class="slabel">Profile metadata</span>
-      <div class="scontrol">
-        @for (f of fields(); track $index; let i = $index) {
-          <div class="meta-row" [class.meta-verified]="verifiedAt()[f.name]">
-            <input
-              type="text"
-              placeholder="Label"
-              [ngModel]="f.name"
-              (ngModelChange)="setField(i, 'name', $event)"
-              [name]="'field_name_' + i"
-            />
-            <input
-              type="text"
-              placeholder="Content"
-              [ngModel]="f.value"
-              (ngModelChange)="setField(i, 'value', $event)"
-              [name]="'field_value_' + i"
-            />
-            <button
-              type="button"
-              class="btn btn-outline btn-sm"
-              (click)="removeField(i)"
-              aria-label="Remove field"
-            >
-              ✕
-            </button>
-            @if (verifiedAt()[f.name]; as when) {
-              <span
-                class="meta-verified-badge"
-                [title]="'Link ownership verified via rel=me on ' + (when | date: 'mediumDate')"
-                >✓ verified</span
+  @if (!auth.isBlueskyPrimary) {
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">Profile metadata</span>
+        <div class="scontrol">
+          @for (f of fields(); track $index; let i = $index) {
+            <div class="meta-row" [class.meta-verified]="verifiedAt()[f.name]">
+              <input
+                type="text"
+                placeholder="Label"
+                [ngModel]="f.name"
+                (ngModelChange)="setField(i, 'name', $event)"
+                [name]="'field_name_' + i"
+              />
+              <input
+                type="text"
+                placeholder="Content"
+                [ngModel]="f.value"
+                (ngModelChange)="setField(i, 'value', $event)"
+                [name]="'field_value_' + i"
+              />
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                (click)="removeField(i)"
+                aria-label="Remove field"
               >
-            }
-          </div>
-        }
-        @if (fields().length < 4) {
-          <button type="button" class="btn btn-outline btn-sm add-field" (click)="addField()">
-            + Add field
-          </button>
-        }
-        <span class="hint">
-          Up to 4 table rows shown on your profile (links, pronouns, ...). A link whose page links
-          back to your profile with rel="me" shows as ✓ verified (checked by the server when you
-          save).
-        </span>
+                ✕
+              </button>
+              @if (verifiedAt()[f.name]; as when) {
+                <span
+                  class="meta-verified-badge"
+                  [title]="'Link ownership verified via rel=me on ' + (when | date: 'mediumDate')"
+                  >✓ verified</span
+                >
+              }
+            </div>
+          }
+          @if (fields().length < 4) {
+            <button type="button" class="btn btn-outline btn-sm add-field" (click)="addField()">
+              + Add field
+            </button>
+          }
+          <span class="hint">
+            Up to 4 table rows shown on your profile (links, pronouns, ...). A link whose page links
+            back to your profile with rel="me" shows as ✓ verified (checked by the server when you
+            save).
+          </span>
+        </div>
       </div>
     </div>
-  </div>
+  }
 
   <div class="ssection">
     <div class="srow">

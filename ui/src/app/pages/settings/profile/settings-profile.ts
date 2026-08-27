@@ -1,11 +1,16 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
 import { Auth } from '../../../auth';
 import { AccountField } from '../../../models';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
 import { PageDiagnostics } from '../../../page-diagnostics';
+import { BlueskyApi } from '../../../providers/bluesky/bluesky-api';
+import { prepareImageForBluesky } from '../../../providers/bluesky/bluesky-image';
+import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
+import { BskyBlobRef, BskyProfile } from '../../../providers/bluesky/bluesky-types';
 
 /** Public profile: display name, bio, metadata fields, avatar/header. */
 @Component({
@@ -19,6 +24,8 @@ export class SettingsProfile implements OnInit {
   protected auth = inject(Auth);
   protected anonymous = inject(AnonymousAccount);
   private diagnostics = inject(PageDiagnostics);
+  private blueskyApi = inject(BlueskyApi);
+  private blueskySession = inject(BlueskySession);
 
   protected displayName = signal('');
   protected username = signal('');
@@ -40,7 +47,25 @@ export class SettingsProfile implements OnInit {
       this.loadAccount(this.anonymous.account());
       return;
     }
+    if (this.auth.isBlueskyPrimary) {
+      this.blueskyApi.getProfile().subscribe({
+        next: (profile) => this.loadBlueskyProfile(profile),
+        error: (error) => {
+          this.diagnostics.error('ProfileSettings', 'load-bluesky:error', error);
+          this.saveError.set('Could not load your Bluesky profile.');
+        },
+      });
+      return;
+    }
     this.api.verifyCredentials().subscribe((acc) => this.loadAccount(acc));
+  }
+
+  private loadBlueskyProfile(profile: BskyProfile): void {
+    this.displayName.set(profile.displayName ?? profile.handle);
+    this.username.set(profile.handle);
+    this.note.set(profile.description ?? '');
+    this.fields.set([]);
+    this.verifiedAt.set({});
   }
 
   private loadAccount(acc: import('../../../models').Account): void {
@@ -95,6 +120,10 @@ export class SettingsProfile implements OnInit {
       void this.saveAnonymousProfile();
       return;
     }
+    if (this.auth.isBlueskyPrimary) {
+      void this.saveBlueskyProfile();
+      return;
+    }
 
     const form = new FormData();
     form.append('display_name', this.displayName());
@@ -122,6 +151,45 @@ export class SettingsProfile implements OnInit {
       },
       error: () => this.saving.set(false),
     });
+  }
+
+  private async saveBlueskyProfile(): Promise<void> {
+    try {
+      const current = await firstValueFrom(this.blueskyApi.getOwnProfileRecord());
+      const [avatar, banner] = await Promise.all([
+        this.uploadBlueskyImage(this.avatar()),
+        this.uploadBlueskyImage(this.header()),
+      ]);
+      const record = {
+        ...current.value,
+        displayName: this.displayName(),
+        description: this.note(),
+        ...(avatar ? { avatar } : {}),
+        ...(banner ? { banner } : {}),
+      };
+      await firstValueFrom(this.blueskyApi.putProfile(record, current.cid));
+
+      // The AppView image URL may lag the repository write, so keep the existing
+      // avatar snapshot while updating the name immediately.
+      this.blueskySession.updateProfileSnapshot({ displayName: this.displayName() });
+      this.auth.refreshBlueskyAccount();
+      this.avatar.set(null);
+      this.header.set(null);
+      this.saved.set(true);
+    } catch (error) {
+      this.diagnostics.error('ProfileSettings', 'save-bluesky:error', error);
+      this.saveError.set('Could not save your Bluesky profile. Please try again.');
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  private async uploadBlueskyImage(file: File | null): Promise<BskyBlobRef | null> {
+    if (!file) return null;
+    const prepared = await prepareImageForBluesky(file);
+    if (!prepared) throw new Error('The selected image could not be prepared for Bluesky.');
+    return (await firstValueFrom(this.blueskyApi.uploadBlob(prepared.blob, prepared.mimeType)))
+      .blob;
   }
 
   private async saveAnonymousProfile(): Promise<void> {

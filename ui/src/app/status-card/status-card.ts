@@ -56,6 +56,9 @@ import { TrustedAccounts } from '../trusted-accounts';
 import { StatusVisibility } from '../status-visibility';
 import { serverKnowsStatus, ProviderCapabilities } from '../providers/provider';
 import { BskyReply } from '../providers/bluesky/bluesky-reply';
+import { BlueskyApi } from '../providers/bluesky/bluesky-api';
+import { BlueskySession } from '../providers/bluesky/bluesky-session';
+import { BskyRef } from '../providers/bluesky/bluesky-types';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
 import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
 import { toNitterUrl } from '../providers/twitter/nitter';
@@ -222,6 +225,8 @@ export class StatusCard {
   private posse = inject(PosseQueue);
   private anonymousBookmarks = inject(AnonymousBookmarks);
   private anonymousPublic = inject(AnonymousPublicApi);
+  private blueskyApi = inject(BlueskyApi);
+  private blueskySession = inject(BlueskySession);
   private raindrop = inject(RaindropSession);
   private server = inject(Server);
 
@@ -1031,7 +1036,8 @@ export class StatusCard {
   }
 
   protected bookmarkActive(): boolean {
-    return this.auth.isAnonymous
+    return this.auth.isAnonymous ||
+      (this.display.provider === 'bluesky' && !this.blueskySession.linked())
       ? this.anonymousBookmarks.has(this.display)
       : this.display.bookmarked;
   }
@@ -1529,7 +1535,18 @@ export class StatusCard {
    */
   private toggleNativeBookmark(): void {
     const s = this.display;
-    if (this.auth.isAnonymous || !serverKnowsStatus(s.provider)) {
+    if (s.provider === 'bluesky' && this.blueskySession.linked()) {
+      const ref = s.providerRef as BskyRef;
+      const call = s.bookmarked
+        ? this.blueskyApi.deleteBookmark(ref.uri)
+        : this.blueskyApi.createBookmark(ref.uri, ref.cid);
+      call.subscribe({
+        next: () => this.changed.emit({ ...s, bookmarked: !s.bookmarked }),
+        error: () => this.actionError.set(this.actionFailureMessage('bookmark this post')),
+      });
+      return;
+    }
+    if (this.auth.isAnonymous || s.provider === 'bluesky' || !serverKnowsStatus(s.provider)) {
       this.changed.emit(this.anonymousBookmarks.toggle(s));
       return;
     }

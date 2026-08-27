@@ -168,4 +168,58 @@ describe('BlueskyApi', () => {
     });
     req.flush({});
   });
+
+  it('reads and safely replaces the viewer profile record', () => {
+    const api = TestBed.inject(BlueskyApi);
+    api.getOwnProfileRecord().subscribe();
+
+    const get = httpMock.expectOne((request) =>
+      request.url.endsWith('/xrpc/com.atproto.repo.getRecord'),
+    );
+    expect(get.request.params.get('repo')).toBe('did:plc:me');
+    expect(get.request.params.get('collection')).toBe('app.bsky.actor.profile');
+    expect(get.request.params.get('rkey')).toBe('self');
+    get.flush({ uri: 'at://did:plc:me/app.bsky.actor.profile/self', cid: 'old', value: {} });
+
+    api
+      .putProfile({ displayName: 'New name', pinnedPost: { uri: 'at://post' } }, 'old')
+      .subscribe();
+    const put = httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.repo.putRecord`);
+    expect(put.request.body).toEqual({
+      repo: 'did:plc:me',
+      collection: 'app.bsky.actor.profile',
+      rkey: 'self',
+      swapRecord: 'old',
+      record: {
+        $type: 'app.bsky.actor.profile',
+        displayName: 'New name',
+        pinnedPost: { uri: 'at://post' },
+      },
+    });
+    put.flush({ uri: 'at://did:plc:me/app.bsky.actor.profile/self', cid: 'new' });
+  });
+
+  it('creates, deletes, and pages private bookmarks through Bluesky', () => {
+    const api = TestBed.inject(BlueskyApi);
+    api.createBookmark('at://did:plc:them/app.bsky.feed.post/1', 'post-cid').subscribe();
+    const create = httpMock.expectOne(`${SERVICE}/xrpc/app.bsky.bookmark.createBookmark`);
+    expect(create.request.body).toEqual({
+      uri: 'at://did:plc:them/app.bsky.feed.post/1',
+      cid: 'post-cid',
+    });
+    create.flush({});
+
+    api.deleteBookmark('at://did:plc:them/app.bsky.feed.post/1').subscribe();
+    const remove = httpMock.expectOne(`${SERVICE}/xrpc/app.bsky.bookmark.deleteBookmark`);
+    expect(remove.request.body).toEqual({ uri: 'at://did:plc:them/app.bsky.feed.post/1' });
+    remove.flush({});
+
+    api.getBookmarks('next-cursor', 20).subscribe();
+    const list = httpMock.expectOne((request) =>
+      request.url.endsWith('/xrpc/app.bsky.bookmark.getBookmarks'),
+    );
+    expect(list.request.params.get('cursor')).toBe('next-cursor');
+    expect(list.request.params.get('limit')).toBe('20');
+    list.flush({ bookmarks: [] });
+  });
 });

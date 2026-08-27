@@ -20,6 +20,7 @@ import { TranslationPreference } from '../translation-preference';
 import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
 import { HugoSettings } from '../providers/hugo/hugo-settings';
 import { PosseQueue } from '../providers/hugo/posse-queue';
+import { seedBskySession } from '../testing/seed-storage';
 
 /** Expose protected signals/methods for white-box testing. */
 interface StatusCardInternals {
@@ -1005,6 +1006,57 @@ describe('StatusCard', () => {
     const req = httpMock.expectOne('/api/v1/statuses/8/unbookmark');
     expect(req.request.method).toBe('POST');
     req.flush(makeStatus({ id: '8' }));
+  });
+
+  it('toggleBookmark: uses Bluesky private bookmarks for a linked Bluesky post', () => {
+    seedBskySession({
+      service: 'https://bsky.social',
+      handle: 'me.bsky.social',
+      did: 'did:plc:me',
+      accessJwt: 'access',
+      refreshJwt: 'refresh',
+    });
+    const f = setUp(
+      makeStatus({
+        id: 'bsky:at://did:plc:them/app.bsky.feed.post/1',
+        provider: 'bluesky',
+        providerRef: {
+          uri: 'at://did:plc:them/app.bsky.feed.post/1',
+          cid: 'post-cid',
+          likeUri: null,
+          repostUri: null,
+          replyRoot: { uri: 'at://did:plc:them/app.bsky.feed.post/1', cid: 'post-cid' },
+          replyParentUri: null,
+          externalUri: null,
+        },
+      }),
+    );
+    const changed = vi.fn();
+    f.componentInstance.changed.subscribe(changed);
+    f.componentInstance.toggleBookmark(fakeEvent());
+
+    const req = httpMock.expectOne('https://bsky.social/xrpc/app.bsky.bookmark.createBookmark');
+    expect(req.request.body).toEqual({
+      uri: 'at://did:plc:them/app.bsky.feed.post/1',
+      cid: 'post-cid',
+    });
+    req.flush({});
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ bookmarked: true }));
+    httpMock.expectNone('/api/v1/statuses/bsky:at://did:plc:them/app.bsky.feed.post/1/bookmark');
+  });
+
+  it('toggleBookmark: keeps a Bluesky post local when no Bluesky account is linked', () => {
+    const f = setUp(
+      makeStatus({
+        id: 'bsky:at://did:plc:them/app.bsky.feed.post/1',
+        provider: 'bluesky',
+      }),
+    );
+    f.componentInstance.toggleBookmark(fakeEvent());
+
+    expect(TestBed.inject(AnonymousBookmarks).bookmarks()).toHaveLength(1);
+    httpMock.expectNone('/api/v1/statuses/bsky:at://did:plc:them/app.bsky.feed.post/1/bookmark');
+    httpMock.expectNone('https://bsky.social/xrpc/app.bsky.bookmark.createBookmark');
   });
 
   it('offers AI translation on a tweet, since the server cannot translate it', () => {

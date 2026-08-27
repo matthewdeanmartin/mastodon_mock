@@ -13,6 +13,7 @@ export type BookmarkChoice = 'mastodon' | 'raindrop-post' | 'raindrop-link';
 export class BookmarkProviderDialog {
   readonly nativeBookmarked = input(false);
   readonly anonymous = input(false);
+  readonly nativeLabel = input('Mastodon');
   readonly externalUrl = input<string | null>(null);
   readonly chosen = output<BookmarkChoice>();
   readonly closed = output<void>();

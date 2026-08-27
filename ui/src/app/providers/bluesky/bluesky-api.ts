@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, from, Observable, switchMap, throwError } from 'rxjs';
+import { catchError, from, Observable, of, switchMap, throwError } from 'rxjs';
 import { externalFetch } from '../external-fetch';
 import { BlueskySession } from './bluesky-session';
 import { BlueskyPostSearch } from './bluesky-post-search';
@@ -20,6 +20,9 @@ import {
   BskyTimeline,
   BlobUploadResponse,
   BskyImagesEmbed,
+  BskyProfileRecord,
+  BskyRepoRecord,
+  BskyBookmarks,
 } from './bluesky-types';
 
 /**
@@ -313,6 +316,23 @@ export class BlueskyApi {
     return this.request('app.bsky.notification.updateSeen', { seenAt });
   }
 
+  /** Create a private, server-synced Bluesky bookmark. */
+  createBookmark(uri: string, cid: string): Observable<unknown> {
+    return this.request('app.bsky.bookmark.createBookmark', { uri, cid });
+  }
+
+  /** Remove a private Bluesky bookmark. */
+  deleteBookmark(uri: string): Observable<unknown> {
+    return this.request('app.bsky.bookmark.deleteBookmark', { uri });
+  }
+
+  /** Page the authenticated viewer's private Bluesky bookmarks. */
+  getBookmarks(cursor: string | null, limit = 20): Observable<BskyBookmarks> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (cursor) params = params.set('cursor', cursor);
+    return this.get<BskyBookmarks>('app.bsky.bookmark.getBookmarks', params);
+  }
+
   /**
    * Hydrate posts by at-uri, up to 25 per call.
    *
@@ -416,6 +436,41 @@ export class BlueskyApi {
     // `viewer` block, so follow state comes back unknown rather than false —
     // callers must not read a missing viewer as "not following".
     return this.publicGet<BskyProfile>('app.bsky.actor.getProfile', params);
+  }
+
+  /** Read the source record before editing so Bluesky-only fields survive the update. */
+  getOwnProfileRecord(): Observable<BskyRepoRecord<BskyProfileRecord>> {
+    const did = this.session.session()?.did ?? '';
+    const params = new HttpParams()
+      .set('repo', did)
+      .set('collection', 'app.bsky.actor.profile')
+      .set('rkey', 'self');
+    return this.get<BskyRepoRecord<BskyProfileRecord>>('com.atproto.repo.getRecord', params).pipe(
+      catchError((error: unknown) => {
+        const code =
+          error instanceof HttpErrorResponse
+            ? (error.error as { error?: string } | null)?.error
+            : undefined;
+        if (code !== 'RecordNotFound') return throwError(() => error);
+        return of({
+          uri: `at://${did}/app.bsky.actor.profile/self`,
+          cid: '',
+          value: { $type: 'app.bsky.actor.profile' as const },
+        });
+      }),
+    );
+  }
+
+  /** Replace the singleton profile record, guarded by the CID that was edited. */
+  putProfile(record: BskyProfileRecord, swapRecord?: string): Observable<CreateRecordResponse> {
+    const did = this.session.session()?.did ?? '';
+    return this.request<CreateRecordResponse>('com.atproto.repo.putRecord', {
+      repo: did,
+      collection: 'app.bsky.actor.profile',
+      rkey: 'self',
+      record: { ...record, $type: 'app.bsky.actor.profile' },
+      ...(swapRecord ? { swapRecord } : {}),
+    });
   }
 
   resolveHandle(handle: string): Observable<{ did: string }> {

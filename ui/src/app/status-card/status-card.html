@@ -1043,6 +1043,7 @@
     <app-bookmark-provider-dialog
       [nativeBookmarked]="bookmarkActive()"
       [anonymous]="auth.isAnonymous"
+      [nativeLabel]="display.provider === 'bluesky' ? 'Bluesky' : 'Mastodon'"
       [externalUrl]="externalBookmarkUrl()"
       (chosen)="chooseBookmark($event)"
       (closed)="showBookmarkProviders.set(false)"

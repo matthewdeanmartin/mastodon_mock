@@ -587,6 +587,13 @@ export class Auth {
     return true;
   }
 
+  /** Re-read an updated Bluesky identity snapshot without switching accounts. */
+  refreshBlueskyAccount(): void {
+    if (!this.isBlueskyPrimary) return;
+    this.blueskyRevision.update((revision) => revision + 1);
+    this.blueskyDid.set(blueskyIdentityDid());
+  }
+
   /** Switch to the virtual account, the Bluesky identity, or a saved Mastodon token. */
   switchAccount(choice: AccountChoice): boolean {
     if (choice.kind === 'anonymous') {

@@ -465,6 +465,21 @@ export class BlueskySession implements ExpiringConnection {
     }
   }
 
+  /** Refresh the small identity snapshot used by the account switcher and shell. */
+  updateProfileSnapshot(profile: { displayName: string; avatar?: string }): void {
+    const current = this.session();
+    if (!current) return;
+    const updated = { ...current, ...profile };
+    if (this.isIdentity) {
+      const identity = blueskyIdentity(current.did);
+      if (!identity) return;
+      saveBlueskyIdentity({ ...identity.profile, ...profile }, identity.credentials, true);
+      this.session.set(updated);
+      return;
+    }
+    this.persist(updated);
+  }
+
   /**
    * Forget the linked account (tokens dropped; revoke the app password on bsky.app).
    *

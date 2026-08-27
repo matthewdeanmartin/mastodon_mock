@@ -16,6 +16,8 @@ import {
 } from '../../providers/raindrop/raindrop-session';
 import { BookmarkGroup } from './bookmark-groups';
 import { Bookmarks } from './bookmarks';
+import { Auth } from '../../auth';
+import { seedBskyIdentity } from '../../testing/seed-storage';
 
 /** Exposes Bookmarks' protected signals for white-box testing. */
 interface BookmarksInternals {
@@ -119,6 +121,39 @@ describe('Bookmarks', () => {
 
     expect(internals(fixture).loading()).toBe(false);
     expect(internals(fixture).statuses()).toEqual([s1, s2]);
+  });
+
+  it('loads Bluesky-primary bookmarks from the private Bluesky library', () => {
+    seedBskyIdentity({ did: 'did:plc:me', handle: 'me.bsky.social' });
+    expect(TestBed.inject(Auth).enterBluesky()).toBe(true);
+    const fixture = setUp();
+    const request = httpMock.expectOne((req) =>
+      req.url.endsWith('/xrpc/app.bsky.bookmark.getBookmarks'),
+    );
+    expect(request.request.params.get('limit')).toBe('20');
+    request.flush({
+      bookmarks: [
+        {
+          subject: { uri: 'at://did:plc:alice/app.bsky.feed.post/1', cid: 'cid-1' },
+          item: {
+            uri: 'at://did:plc:alice/app.bsky.feed.post/1',
+            cid: 'cid-1',
+            author: { did: 'did:plc:alice', handle: 'alice.bsky.social' },
+            record: {
+              $type: 'app.bsky.feed.post',
+              text: 'Saved on Bluesky',
+              createdAt: '2026-01-01T00:00:00Z',
+            },
+            indexedAt: '2026-01-01T00:00:00Z',
+          },
+        },
+      ],
+    });
+
+    expect(internals(fixture).statuses()).toHaveLength(1);
+    expect(internals(fixture).statuses()[0].provider).toBe('bluesky');
+    expect(internals(fixture).statuses()[0].bookmarked).toBe(true);
+    httpMock.expectNone('/api/v1/bookmarks?limit=20');
   });
 
   it('clears loading on HTTP error', () => {
