@@ -14,7 +14,42 @@
   --accent-soft: #e8f5fe;
   --hover: #eff3f4;
   --col-width: 600px;
+  /* The two rails and the gap between all three tracks. Variables rather than
+     numbers inlined in shell.css because `--layout-width` below is derived from
+     them, and a rail that changed width without the derived total following
+     would put the rails-off pages back out of register with the top bar. */
+  --rail-left-width: 290px;
+  --rail-right-width: 320px;
+  --layout-gap: 16px;
+  /* Rail-to-rail: the outer edge of the left rail to the outer edge of the
+     right one, which is the width /home actually occupies. The three-track
+     grid centres itself at this width inside a wider container, so the
+     rails-off pages must cap themselves here too or they run wider than the
+     page they sit beside. */
+  --layout-width: calc(
+    var(--rail-left-width) + var(--col-width) + var(--rail-right-width) + 2 * var(--layout-gap)
+  );
   color-scheme: light;
+}
+
+/* Rail-to-rail narrows as rails drop out, and the rails-off pages follow.
+
+   These live here rather than in shell.css because component styles are scoped
+   — a `:root` written there is rewritten by Angular's emulated encapsulation
+   and never matches <html>. The breakpoints are the shell's own: 1240 is where
+   `.layout` drops the right rail, 1000 where it drops both. */
+@media (max-width: 1240px) {
+  :root {
+    --layout-width: calc(var(--rail-left-width) + var(--col-width) + var(--layout-gap));
+  }
+}
+
+@media (max-width: 1000px) {
+  /* No rails left, so a rails-off page gets the viewport the way it did before
+     any of this — there are no header columns to line up with either. */
+  :root {
+    --layout-width: 100%;
+  }
 }
 
 /* Dark theme (2018-Twitter "dim"). Applied by ClientPrefs as data-theme on <html>. */

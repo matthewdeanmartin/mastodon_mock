@@ -16,10 +16,12 @@
   margin: 0 auto;
   padding: 0 16px;
   display: grid;
-  grid-template-columns: 290px minmax(0, var(--col-width)) 320px;
+  grid-template-columns:
+    var(--rail-left-width) minmax(0, var(--col-width))
+    var(--rail-right-width);
   justify-content: center;
   align-items: center;
-  gap: 16px;
+  gap: var(--layout-gap);
 }
 
 .brand-lockup {
@@ -353,10 +355,12 @@
   width: min(1460px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 290px minmax(0, var(--col-width)) 320px;
+  grid-template-columns:
+    var(--rail-left-width) minmax(0, var(--col-width))
+    var(--rail-right-width);
   justify-content: center;
   align-items: start;
-  gap: 16px;
+  gap: var(--layout-gap);
   padding: 0 16px;
 }
 
@@ -395,9 +399,17 @@
   min-width: 0;
 }
 
-/* Full-width mode (settings): one column, no rails, page-background canvas. */
+/* Full-width mode (settings, search, chat, /rss): one column, no rails,
+   page-background canvas.
+
+   Capped at `--layout-width` rather than left as a bare `1fr`. The container is
+   `min(1460px, 100%)`, but the three-track grid only *uses* 1242px of it and
+   centres that — so an uncapped single track ran ~186px wider than the page it
+   sits beside, and a rails-off page came out visibly broader than /home at the
+   same viewport. The cap is the rail-to-rail width itself, so these pages end
+   exactly where the right rail ends and begin where the left rail begins. */
 .layout.layout-wide {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, var(--layout-width));
 }
 
 .layout-wide .column {
@@ -423,8 +435,10 @@
 }
 
 @media (max-width: 1240px) {
+  /* `--layout-width` narrows to match at this breakpoint — see styles.css,
+     which owns it because component styles are scoped and cannot reach :root. */
   .layout {
-    grid-template-columns: 290px minmax(0, var(--col-width));
+    grid-template-columns: var(--rail-left-width) minmax(0, var(--col-width));
   }
 
   .rail-right {
@@ -447,7 +461,7 @@
    the tab nav over the center column; actions collapse to the far right. */
 @media (max-width: 1240px) {
   .topbar-inner {
-    grid-template-columns: 290px minmax(0, var(--col-width)) max-content;
+    grid-template-columns: var(--rail-left-width) minmax(0, var(--col-width)) max-content;
   }
 }
 
