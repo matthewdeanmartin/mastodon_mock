@@ -671,10 +671,16 @@ export class StatusCard {
 
   openReport(event: Event): void {
     event.stopPropagation();
-    if (!this.capabilities.canUseServerActions) {
+    if (!this.canReport) {
       return;
     }
     this.showReport.set(true);
+  }
+
+  protected get canReport(): boolean {
+    return this.display.provider === 'bluesky'
+      ? this.blueskySession.linked()
+      : this.capabilities.canManageRelationships && !this.foreign;
   }
 
   onReported(): void {

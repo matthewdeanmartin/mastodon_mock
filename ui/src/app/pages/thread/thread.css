@@ -116,6 +116,12 @@
   text-align: left;
 }
 
+.reader-action-error {
+  margin: 4px 0 0;
+  color: var(--danger, #c0392b);
+  font-size: 0.875rem;
+}
+
 .raction {
   border: none;
   background: none;

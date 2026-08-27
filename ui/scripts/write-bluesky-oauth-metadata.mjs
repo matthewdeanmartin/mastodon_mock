@@ -24,7 +24,8 @@ const metadata = {
   logo_uri: new URL('android-chrome-192x192.png', root).href,
   tos_uri: new URL('terms', root).href,
   redirect_uris: [new URL('oauth/bluesky/callback', root).href],
-  scope: 'atproto transition:generic transition:chat.bsky',
+  scope:
+    'atproto transition:generic transition:chat.bsky rpc:com.atproto.moderation.createReport?aud=*',
   grant_types: ['authorization_code', 'refresh_token'],
   response_types: ['code'],
   token_endpoint_auth_method: 'none',

@@ -50,6 +50,11 @@ h3 {
   margin-top: 8px;
 }
 
+.report-error {
+  color: var(--danger, #c0392b);
+  font-size: 13px;
+}
+
 .btn.warn {
   background: #e0245e;
 }

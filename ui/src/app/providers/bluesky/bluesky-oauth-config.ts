@@ -1,7 +1,8 @@
 import type { AuthorizeOptions, OAuthClientMetadataInput } from '@atproto/oauth-client-browser';
 
 /** Permissions Mawkingbird needs to provide its existing Bluesky feature set. */
-export const BSKY_OAUTH_SCOPE = 'atproto transition:generic transition:chat.bsky';
+export const BSKY_OAUTH_SCOPE =
+  'atproto transition:generic transition:chat.bsky rpc:com.atproto.moderation.createReport?aud=*';
 export type BlueskyOAuthRedirectUri = NonNullable<AuthorizeOptions['redirect_uri']>;
 
 /** The application root, including a deployment subpath such as `/canary/`. */

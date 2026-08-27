@@ -298,6 +298,9 @@
               <span aria-hidden="true">🔖</span>
             </button>
           </div>
+          @if (readerActionError(); as actionError) {
+            <p class="reader-action-error" role="alert">{{ actionError }}</p>
+          }
           @if (replyingTo() === post.id) {
             <div class="reader-reply">
               @if (isBluesky(post)) {

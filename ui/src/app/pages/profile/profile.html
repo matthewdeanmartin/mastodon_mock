@@ -187,7 +187,7 @@
               @if (canCopyAccount()) {
                 <button type="button" (click)="openCopyAccount()">Copy account…</button>
               }
-              @if (capabilities.canManageRelationships) {
+              @if (capabilities.canManageRelationships || (isBluesky() && bskySession.linked())) {
                 @if (relationship()?.following) {
                   <button type="button" (click)="toggleAccountBoosts()">
                     {{ relationship()?.showing_reblogs === false ? 'Show' : 'Hide' }}
@@ -230,7 +230,7 @@
                    guard; they sit last because they are the rarest, not because they
                    matter least. -->
               @if (capabilities.canManageRelationships) {
-                @if (relationship()?.followed_by) {
+                @if (relationship()?.followed_by && !isBluesky()) {
                   <button class="menu-danger" type="button" (click)="requestRemoveFollower()">
                     Remove follower
                   </button>
@@ -696,6 +696,7 @@
     <app-report-dialog
       [username]="a.username"
       [accountId]="a.id"
+      [provider]="isBluesky() ? 'bluesky' : 'mastodon'"
       (closed)="showReport.set(false)"
       (submitted)="onReported()"
     />

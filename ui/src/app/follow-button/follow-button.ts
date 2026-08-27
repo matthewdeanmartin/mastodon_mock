@@ -171,7 +171,11 @@ export class FollowButton {
 
     const ok = await this.follows.toggle(id);
     if (!ok) {
-      this.error.set("Couldn't do that — try again.");
+      this.error.set(
+        id.startsWith('bsky:')
+          ? "Couldn't update this follow on Bluesky — your link may have expired. Re-link in Settings → Connections."
+          : "Couldn't update this follow on Mastodon — try again.",
+      );
       return;
     }
     this.changed.emit();

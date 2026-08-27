@@ -136,7 +136,7 @@ Legend:
 | Follow/unfollow | Yes | Yes on Bluesky profiles/cards that use `BlueskyGraph` | Partial | Route every shared Follow button, especially suggestions and find-friends results, by provider. |
 | Show follows-you/mutual context | Yes | Viewer state contains it and profile adapts some relationship state | Partial | Surface known followers and mutual context consistently in cards and profile headers. |
 | Remove a follower | Yes | Not surfaced; Bluesky's product behavior differs | N/A/Partial | Do not reuse the Mastodon button blindly. Model the Bluesky-supported relationship operation, if any, explicitly. |
-| View the account's likes | Favourites library exists for self | `getActorLikes` exists but no profile Likes tab/library | **No** | Add self Likes first; decide whether other actors' likes should be shown according to current visibility rules. |
+| View the account's likes | Favourites library exists for self | Self Likes are available in the provider-routed `/favourites` library; no profile Likes tab | Partial | Decide whether other actors' likes should be shown according to current visibility rules. |
 | View the account's feeds/lists | Mastodon lists/collections | Saved feeds exist globally, but actor-created feeds/lists are not profile tabs | **No** | Add Feeds, Lists, and Starter Packs sections to Bluesky profiles. |
 | View known followers | No close Mastodon equivalent | Bluesky supports known-followers views | **No** | High-value social-context feature for hover cards/profile pages. |
 | Endorse/recommend accounts | Mastodon endorsements and collections are surfaced | Starter packs are not | **No** | Use Bluesky starter packs rather than forcing Mastodon endorsements onto Bluesky. |
@@ -174,7 +174,7 @@ Legend:
 | Repost/undo | Yes | Yes | Yes | Add reposted-by list. |
 | View who liked/reposted | Yes | Counts render, actor lists do not | **No** | Route count dialogs to `getLikes` and `getRepostedBy`. |
 | View quotes | Mastodon quote APIs are represented | Count/link is not surfaced through `getQuotes` | **No** | Add quotes list and native quote navigation. |
-| Bookmark privately and sync | Yes. Mastodon bookmarks are private server-side records and `/bookmarks` is implemented | No. A signed-in Bluesky post does not get the local bookmark path, and native Bluesky bookmarks are unused | **No** | Implement `app.bsky.bookmark.createBookmark`, `deleteBookmark`, and `getBookmarks`; route the shared library by identity/provider. |
+| Bookmark privately and sync | Yes. Mastodon bookmarks are private server-side records and `/bookmarks` is implemented | Yes. Cards and reader mode write native private bookmarks, and `/bookmarks` pages them by active identity | Yes | Keep Raindrop as an explicit alternative rather than replacing native storage. |
 | Pin own post | Yes | Not surfaced | **No** | Confirm current Bluesky profile-pinning representation before implementing; do not call Mastodon pin with a `bsky:` ID. |
 | Mute thread | Yes | Bluesky API supports it, not surfaced | **No** | Route the bell/mute-thread action to `muteThread`/`unmuteThread`. |
 | Hide a reply | Mastodon moderation differs | Bluesky post owners can hide replies; not surfaced | **No** | Add owner-only reply controls in thread menus. |
@@ -258,6 +258,15 @@ These are not just Mastodon parity work. They are reasons a Bluesky user may pre
 
 ## Priority plan
 
+### Implementation progress (2026-08-27)
+
+- Completed: Bluesky profile editing, provider-routed own-post deletion, native account/post reporting, and provider-aware shared Follow controls.
+- Completed by safe suppression: Bluesky quote actions do not appear unless a native quote embed can be written.
+- Completed ahead of the original ordering: native private Bluesky bookmarks and the shared `/bookmarks` library.
+- Completed from P1: the shared Likes library now reads and pages the Bluesky-primary account's native self Likes.
+- Completed trust follow-up: reader-mode actions and shared Follow failures name the target network, and reader bookmarks no longer route Bluesky post IDs through Mastodon.
+- Still cross-cutting: finish the capability/adaptor boundary audit, replace remaining Mastodon-only routes, and make every error identify its target network and operation.
+
 ### P0: correctness and trust
 
 These should precede feature expansion because the current UI can imply an operation works against Bluesky when it is Mastodon-backed or incomplete.
@@ -274,7 +283,7 @@ These should precede feature expansion because the current UI can imply an opera
 ### P1: daily-client parity
 
 1. Native Bluesky bookmarks plus the `/bookmarks` library.
-2. Self Likes, liked-by, reposted-by, and quotes lists.
+2. Liked-by, reposted-by, and quotes lists (self Likes are complete).
 3. Start a DM; add conversation requests, mute, leave, and provider-aware moderation.
 4. Video/GIF upload, external link cards, native quote embeds, `langs`, and self-labels.
 5. Thread mute, reply/quote controls, hide reply, and detach quote.

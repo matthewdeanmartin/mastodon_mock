@@ -5,6 +5,11 @@ import { WritableSignal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Status } from '../../models';
 import { Favourites } from './favourites';
+import { Auth } from '../../auth';
+import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
+import { of } from 'rxjs';
+import { vi } from 'vitest';
 
 /** Exposes Favourites' protected signals for white-box testing. */
 interface FavouritesInternals {
@@ -93,6 +98,20 @@ describe('Favourites', () => {
     expect(internals(fixture).statuses()).toEqual([]);
   });
 
+  it('loads Bluesky-primary likes from Bluesky and never calls Mastodon', () => {
+    vi.spyOn(TestBed.inject(Auth), 'isBlueskyPrimary', 'get').mockReturnValue(true);
+    TestBed.inject(BlueskySession).session.set({ did: 'did:plc:me' } as never);
+    const getActorLikes = vi
+      .spyOn(TestBed.inject(BlueskyApi), 'getActorLikes')
+      .mockReturnValue(of({ feed: [], cursor: 'likes-2' }));
+
+    const fixture = setUp();
+
+    expect(getActorLikes).toHaveBeenCalledWith('did:plc:me', null);
+    expect(internals(fixture).loading()).toBe(false);
+    httpMock.expectNone('/api/v1/favourites');
+  });
+
   it('onChanged replaces the status at the given index', () => {
     const fixture = setUp();
     const s1 = makeStatus('1');
@@ -103,6 +122,17 @@ describe('Favourites', () => {
     internals(fixture).onChanged(1, updated);
 
     expect(internals(fixture).statuses()).toEqual([s1, updated]);
+  });
+
+  it('removes a post from the library when it is unliked', () => {
+    const fixture = setUp();
+    const s1 = makeStatus('1');
+    const s2 = makeStatus('2');
+    httpMock.expectOne('/api/v1/favourites').flush([s1, s2]);
+
+    internals(fixture).onChanged(0, { ...s1, favourited: false });
+
+    expect(internals(fixture).statuses()).toEqual([s2]);
   });
 
   it('onDeleted removes the matching status by id', () => {

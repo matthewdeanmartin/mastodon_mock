@@ -15,6 +15,9 @@
     <p class="muted small">
       Please review this carefully. Reports cannot be undone after they are sent.
     </p>
+    @if (provider() === 'bluesky') {
+      <p class="muted small">This report will be sent to Bluesky's moderation service.</p>
+    }
 
     <label class="field">
       Category
@@ -34,6 +37,10 @@
         placeholder="What's wrong?"
       ></textarea>
     </label>
+
+    @if (error()) {
+      <p class="report-error" role="alert">{{ error() }}</p>
+    }
 
     <div class="dialog-actions">
       <button class="btn btn-outline" (click)="closed.emit()">Cancel</button>

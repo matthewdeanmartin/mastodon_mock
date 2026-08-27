@@ -684,9 +684,9 @@ export const routes: Routes = [
       },
       {
         path: 'favourites',
-        title: 'Favourites',
+        title: 'Likes',
         canActivate: [anonymousUnavailableGuard],
-        data: { anonymousFeature: 'Favourites' },
+        data: { anonymousFeature: 'Likes' },
         loadComponent: () => import('./pages/favourites/favourites').then((m) => m.Favourites),
       },
       {

@@ -114,6 +114,18 @@ describe('BlueskyApi', () => {
     req.flush({ feed: [] });
   });
 
+  it('pages the signed-in actor own likes', () => {
+    const api = TestBed.inject(BlueskyApi);
+    api.getActorLikes('did:plc:me', 'likes-2').subscribe();
+
+    const req = httpMock.expectOne((r) => r.url === `${SERVICE}/xrpc/app.bsky.feed.getActorLikes`);
+    expect(req.request.params.get('actor')).toBe('did:plc:me');
+    expect(req.request.params.get('cursor')).toBe('likes-2');
+    expect(req.request.params.get('limit')).toBe('50');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer access-1');
+    req.flush({ feed: [], cursor: undefined });
+  });
+
   it('follow writes a graph.follow record into the viewer own repo', () => {
     const api = TestBed.inject(BlueskyApi);
     api.follow('did:plc:them').subscribe();
@@ -221,5 +233,44 @@ describe('BlueskyApi', () => {
     expect(list.request.params.get('cursor')).toBe('next-cursor');
     expect(list.request.params.get('limit')).toBe('20');
     list.flush({ bookmarks: [] });
+  });
+
+  it('reports Bluesky accounts and posts with protocol-native subjects', () => {
+    const api = TestBed.inject(BlueskyApi);
+    api
+      .reportAccount(
+        'did:plc:them',
+        'tools.ozone.report.defs#reasonMisleadingSpam',
+        ' repeated promos ',
+      )
+      .subscribe();
+    const account = httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.moderation.createReport`);
+    expect(account.request.body).toEqual({
+      reasonType: 'tools.ozone.report.defs#reasonMisleadingSpam',
+      reason: 'repeated promos',
+      subject: { $type: 'com.atproto.admin.defs#repoRef', did: 'did:plc:them' },
+      modTool: { name: 'mawkingbird/web' },
+    });
+    account.flush({});
+
+    api
+      .reportPost(
+        'at://did:plc:them/app.bsky.feed.post/1',
+        'post-cid',
+        'tools.ozone.report.defs#reasonRuleOther',
+        '',
+      )
+      .subscribe();
+    const post = httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.moderation.createReport`);
+    expect(post.request.body).toEqual({
+      reasonType: 'tools.ozone.report.defs#reasonRuleOther',
+      subject: {
+        $type: 'com.atproto.repo.strongRef',
+        uri: 'at://did:plc:them/app.bsky.feed.post/1',
+        cid: 'post-cid',
+      },
+      modTool: { name: 'mawkingbird/web' },
+    });
+    post.flush({});
   });
 });

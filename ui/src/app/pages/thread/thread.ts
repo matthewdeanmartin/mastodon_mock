@@ -27,8 +27,9 @@ import { HumanTimePipe } from '../../human-time.pipe';
 import { readerChain } from './reader-chain';
 import { ReadingZen } from '../../reading-zen';
 import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { adaptPost } from '../../providers/bluesky/bluesky-adapter';
-import { BskyThreadNode } from '../../providers/bluesky/bluesky-types';
+import { BskyRef, BskyThreadNode } from '../../providers/bluesky/bluesky-types';
 import { BskyReply } from '../../providers/bluesky/bluesky-reply';
 import { StatusActions } from '../../providers/status-actions';
 import { serverKnowsStatus, capabilitiesFor } from '../../providers/provider';
@@ -94,6 +95,7 @@ export class Thread implements OnInit {
   private api = inject(Api);
   private auth = inject(Auth);
   private bsky = inject(BlueskyApi);
+  private bskySession = inject(BlueskySession);
   private rss = inject(RssProvider);
   private twitterApi = inject(TwitterApi);
   private twitterFeed = inject(TwitterFeed);
@@ -123,6 +125,8 @@ export class Thread implements OnInit {
   /** True while viewing a message serialized into the URL: a synthetic, read-only
    *  post with no network identity — no replies, boosts, favourites or bookmarks. */
   protected isMessageStatus = signal(false);
+  /** Reader-mode action failures belong beside the controls that caused them. */
+  protected readerActionError = signal<string | null>(null);
   protected publicContextUnavailable = signal(false);
   protected publicOriginalUrl = signal<string | null>(null);
 
@@ -594,11 +598,25 @@ export class Thread implements OnInit {
   }
 
   toggleFavourite(post: Status): void {
-    this.actions.toggleFavourite(post).subscribe((updated) => this.patch(updated));
+    this.readerActionError.set(null);
+    this.actions.toggleFavourite(post).subscribe({
+      next: (updated) => this.patch(updated),
+      error: () => this.readerActionError.set(this.actionFailureMessage(post, 'like this post')),
+    });
   }
 
   toggleReblog(post: Status): void {
-    this.actions.toggleReblog(post).subscribe((updated) => this.patch(updated.reblog ?? updated));
+    this.readerActionError.set(null);
+    this.actions.toggleReblog(post).subscribe({
+      next: (updated) => this.patch(updated.reblog ?? updated),
+      error: () => this.readerActionError.set(this.actionFailureMessage(post, 'repost this post')),
+    });
+  }
+
+  private actionFailureMessage(post: Status, action: string): string {
+    return post.provider === 'bluesky'
+      ? `Couldn't ${action} on Bluesky — your link may have expired. Re-link in Settings → Connections.`
+      : `Couldn't ${action} on Mastodon — try again.`;
   }
 
   /**
@@ -610,12 +628,34 @@ export class Thread implements OnInit {
    */
   toggleBookmark(post: Status): void {
     const provider = post.provider ?? 'mastodon';
-    if (provider === 'anonymous-mastodon' || !serverKnowsStatus(provider)) {
+    this.readerActionError.set(null);
+    if (provider === 'bluesky' && this.bskySession.linked()) {
+      const ref = post.providerRef as BskyRef;
+      const call = post.bookmarked
+        ? this.bsky.deleteBookmark(ref.uri)
+        : this.bsky.createBookmark(ref.uri, ref.cid);
+      call.subscribe({
+        next: () => this.patch({ ...post, bookmarked: !post.bookmarked }),
+        error: () =>
+          this.readerActionError.set(this.actionFailureMessage(post, 'bookmark this post')),
+      });
+      return;
+    }
+    if (
+      this.auth.isAnonymous ||
+      provider === 'bluesky' ||
+      provider === 'anonymous-mastodon' ||
+      !serverKnowsStatus(provider)
+    ) {
       this.patch(this.anonymousBookmarks.toggle(post));
       return;
     }
     const call = post.bookmarked ? this.api.unbookmark(post.id) : this.api.bookmark(post.id);
-    call.subscribe((updated) => this.patch(updated));
+    call.subscribe({
+      next: (updated) => this.patch(updated),
+      error: () =>
+        this.readerActionError.set(this.actionFailureMessage(post, 'bookmark this post')),
+    });
   }
 
   /** Latest route id and `?reader` value, tracked so either stream can recompute reader mode. */

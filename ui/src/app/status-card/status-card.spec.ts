@@ -1835,6 +1835,56 @@ describe('StatusCard', () => {
       expect(el.querySelector('.provider-badge')?.textContent).toContain('Bluesky');
     });
 
+    it('reports a Bluesky post through its native moderation service', () => {
+      seedBskySession({
+        service: 'https://bsky.social',
+        did: 'did:plc:me',
+        handle: 'me.bsky.social',
+        accessJwt: 'access-jwt',
+        refreshJwt: 'refresh-jwt',
+      });
+      const ref = {
+        uri: 'at://did:plc:them/app.bsky.feed.post/1',
+        cid: 'post-cid',
+        likeUri: null,
+        repostUri: null,
+        replyRoot: { uri: 'at://did:plc:them/app.bsky.feed.post/1', cid: 'post-cid' },
+        replyParentUri: null,
+        externalUri: null,
+      };
+      const f = setUp(
+        makeStatus({
+          id: `bsky:${ref.uri}`,
+          provider: 'bluesky',
+          account: makeAccount('bsky:did:plc:them'),
+          providerRef: ref,
+        }),
+      );
+      const report = Array.from(
+        (f.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+      ).find((button) => button.textContent?.includes('Report post'));
+      expect(report).toBeTruthy();
+      report!.click();
+      f.detectChanges();
+      const confirm = Array.from(
+        (f.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+      ).find((button) => button.textContent?.includes('Confirm report'));
+      confirm!.click();
+
+      const request = httpMock.expectOne(
+        'https://bsky.social/xrpc/com.atproto.moderation.createReport',
+      );
+      expect(request.request.body).toMatchObject({
+        subject: {
+          $type: 'com.atproto.repo.strongRef',
+          uri: ref.uri,
+          cid: ref.cid,
+        },
+      });
+      request.flush({});
+      httpMock.expectNone('/api/v1/reports');
+    });
+
     it('replying to a Bluesky post opens the Bluesky composer, not the Mastodon one', () => {
       const f = setUp(
         makeStatus({

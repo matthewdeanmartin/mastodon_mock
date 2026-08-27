@@ -50,7 +50,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: ['g', 'e'], label: 'Explore' },
       { keys: ['g', 'l'], label: 'Public timeline' },
       { keys: ['g', 'd'], label: 'Direct messages' },
-      { keys: ['g', 'f'], label: 'Favourites' },
+      { keys: ['g', 'f'], label: 'Likes' },
       { keys: ['g', 'u'], label: 'Your profile' },
       { keys: ['g', 'b'], label: 'Blocked users' },
       { keys: ['g', 'm'], label: 'Muted users' },
@@ -194,7 +194,7 @@ export class ShortcutHelp {
       'Quote focused post',
       'Notifications',
       'Direct messages',
-      'Favourites',
+      'Likes',
       'Blocked users',
       'Muted users',
     ]);

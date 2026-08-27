@@ -852,7 +852,7 @@
                       Block &#64;{{ display.account.acct }}
                     </button>
                   }
-                  @if (capabilities.canManageRelationships && display.provider !== 'bluesky') {
+                  @if (canReport) {
                     <button type="button" (click)="openReport($event)">Report post</button>
                   }
                 </div>
@@ -926,6 +926,9 @@
                   <button type="button" (click)="blockAuthorLocally($event)">
                     Block &#64;{{ display.account.acct }}
                   </button>
+                }
+                @if (canReport) {
+                  <button type="button" (click)="openReport($event)">Report post</button>
                 }
               </div>
             </details>
@@ -1009,6 +1012,8 @@
       [username]="display.account.username"
       [accountId]="display.account.id"
       [statusId]="display.id"
+      [provider]="display.provider"
+      [statusRef]="display.provider === 'bluesky' ? $any(display.providerRef) : null"
       (closed)="showReport.set(false)"
       (submitted)="onReported()"
     />

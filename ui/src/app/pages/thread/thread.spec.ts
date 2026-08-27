@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../../client-prefs';
 import { Auth } from '../../auth';
@@ -13,6 +13,8 @@ import { anonymousStatusRouteRef } from '../../providers/anonymous/anonymous-rou
 import { settleRssCache } from '../../testing/settle-rss-cache';
 import { TwitterApi } from '../../providers/twitter/twitter-api';
 import { TwitterFeed } from '../../providers/twitter/twitter-feed';
+import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
+import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 
 interface ThreadInternals {
   status: WritableSignal<Status | null>;
@@ -435,6 +437,43 @@ describe('Thread', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('.reader-reply app-bsky-reply')).not.toBeNull();
     expect(el.querySelector('.reader-reply app-compose')).toBeNull();
+  });
+
+  it('stores reader-mode Bluesky bookmarks on Bluesky, never Mastodon', () => {
+    const createBookmark = vi.fn(() => of({}));
+    TestBed.overrideProvider(BlueskyApi, { useValue: { createBookmark } });
+    TestBed.overrideProvider(BlueskySession, { useValue: { linked: () => true } });
+    const fixture = setUpWithId('1');
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+
+    const post = makeBskyStatus();
+    internals(fixture).status.set(post);
+    fixture.componentInstance.toggleBookmark(post);
+
+    expect(createBookmark).toHaveBeenCalledWith('at://did:plc:x/app.bsky.feed.post/1', 'cid-1');
+    expect(internals(fixture).status()?.bookmarked).toBe(true);
+    httpMock.expectNone((request) => request.url.includes('/bookmark'));
+  });
+
+  it('names Bluesky when a reader-mode bookmark fails', () => {
+    TestBed.overrideProvider(BlueskyApi, {
+      useValue: { createBookmark: () => throwError(() => new Error('expired')) },
+    });
+    TestBed.overrideProvider(BlueskySession, { useValue: { linked: () => true } });
+    const fixture = setUpWithId('1');
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
+
+    const post = makeBskyStatus();
+    internals(fixture).status.set(post);
+    fixture.componentInstance.toggleReader();
+    fixture.componentInstance.toggleBookmark(post);
+    fixture.detectChanges();
+
+    const alert = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('on Bluesky');
+    expect(alert?.textContent).toContain('Settings → Connections');
   });
 
   // ---------------------------------------------------------------------- RSS

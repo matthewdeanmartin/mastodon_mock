@@ -1,9 +1,18 @@
 @if (loading()) {
   <p class="muted center">Loading…</p>
+} @else if (error()) {
+  <p class="notice error" role="alert">{{ error() }}</p>
 } @else if (!statuses().length) {
-  <p class="muted center">You haven't favourited anything yet.</p>
+  <p class="muted center">You haven't liked anything yet.</p>
 } @else {
   @for (s of statuses(); track s.id; let i = $index) {
     <app-status-card [status]="s" (changed)="onChanged(i, $event)" (deleted)="onDeleted($event)" />
+  }
+  @if (auth.isBlueskyPrimary && cursor()) {
+    <div class="center">
+      <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+      </button>
+    </div>
   }
 }

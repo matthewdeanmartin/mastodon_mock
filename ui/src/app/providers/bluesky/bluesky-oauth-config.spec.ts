@@ -16,6 +16,7 @@ describe('Bluesky OAuth deployment configuration', () => {
     ]);
     expect(metadata.client_uri).toBe('https://mawkingbird.com/canary/');
     expect(metadata.scope).toBe(BSKY_OAUTH_SCOPE);
+    expect(metadata.scope).toContain('rpc:com.atproto.moderation.createReport?aud=*');
     expect(metadata.token_endpoint_auth_method).toBe('none');
     expect(metadata.dpop_bound_access_tokens).toBe(true);
   });

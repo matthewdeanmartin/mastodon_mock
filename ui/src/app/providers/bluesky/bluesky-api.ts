@@ -46,6 +46,11 @@ interface CreateRecordResponse {
   cid: string;
 }
 
+export type BskyReportReason =
+  | 'tools.ozone.report.defs#reasonMisleadingSpam'
+  | 'tools.ozone.report.defs#reasonRuleOther'
+  | 'tools.ozone.report.defs#reasonOther';
+
 /** Shared params for the cursor-paged graph list endpoints. */
 function peoplePage(actor: string, cursor: string | null): HttpParams {
   const params = new HttpParams().set('actor', actor).set('limit', '50');
@@ -105,6 +110,15 @@ export class BlueskyApi {
     // what lets an anonymous visitor follow a handful of Bluesky accounts and
     // get a real Home feed out of it, with no login on either network.
     return this.publicGet<BskyTimeline>('app.bsky.feed.getAuthorFeed', params);
+  }
+
+  /** Posts liked by the signed-in actor. Bluesky permits this only for self. */
+  getActorLikes(actor: string, cursor: string | null): Observable<BskyTimeline> {
+    let params = new HttpParams().set('actor', actor).set('limit', '50');
+    if (cursor) {
+      params = params.set('cursor', cursor);
+    }
+    return this.get<BskyTimeline>('app.bsky.feed.getActorLikes', params);
   }
 
   /**
@@ -331,6 +345,41 @@ export class BlueskyApi {
     let params = new HttpParams().set('limit', String(limit));
     if (cursor) params = params.set('cursor', cursor);
     return this.get<BskyBookmarks>('app.bsky.bookmark.getBookmarks', params);
+  }
+
+  /** Report an account to the moderation service configured by the viewer's PDS. */
+  reportAccount(did: string, reasonType: BskyReportReason, reason: string): Observable<unknown> {
+    return this.createReport(reasonType, reason, {
+      $type: 'com.atproto.admin.defs#repoRef',
+      did,
+    });
+  }
+
+  /** Report one exact post record, addressed by its stable AT URI and CID. */
+  reportPost(
+    uri: string,
+    cid: string,
+    reasonType: BskyReportReason,
+    reason: string,
+  ): Observable<unknown> {
+    return this.createReport(reasonType, reason, {
+      $type: 'com.atproto.repo.strongRef',
+      uri,
+      cid,
+    });
+  }
+
+  private createReport(
+    reasonType: BskyReportReason,
+    reason: string,
+    subject: Record<string, string>,
+  ): Observable<unknown> {
+    return this.request('com.atproto.moderation.createReport', {
+      reasonType,
+      ...(reason.trim() ? { reason: reason.trim() } : {}),
+      subject,
+      modTool: { name: 'mawkingbird/web' },
+    });
   }
 
   /**
