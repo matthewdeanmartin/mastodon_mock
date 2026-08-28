@@ -11,6 +11,7 @@ import { SavedSearches } from '../search/saved-searches';
 import { ClientList, ClientLists } from '../../lists/client-lists';
 import { TagBundle, TagBundles } from '../../lists/tag-bundles';
 import { FeedCapability } from '../../feed-capability';
+import { RelayStatus, TagsPub } from '../../tags-pub';
 import { SERVER_FEEDS, ServerFeedDef } from '../../lists/server-feeds';
 import { RssCache } from '../../providers/rss/rss-cache';
 import { PER_FEED_ITEM_CAP } from '../../providers/rss/rss-provider';
@@ -100,6 +101,7 @@ export class Lists implements OnInit {
 
   private api = inject(Api);
   protected auth = inject(Auth);
+  protected tagsPub = inject(TagsPub);
   private feedCaps = inject(FeedCapability);
   private router = inject(Router);
   private anonymousLists = inject(AnonymousLists);
@@ -865,5 +867,25 @@ export class Lists implements OnInit {
     this.rssSubs.remove(feed.url);
     // Reclaim the cached copy; an unsubscribed feed should not keep megabytes.
     void this.rssCache.evict(feed.url);
+  }
+
+  /** Ask tags.pub about every hashtag currently followed. */
+  protected checkTagsPub(): void {
+    void this.tagsPub.check(this.followedTags().map((tag) => tag.name));
+  }
+
+  protected relayLabel(status: RelayStatus): string {
+    switch (status) {
+      case 'checking':
+        return 'checking…';
+      case 'following':
+        return 'relay followed ✓';
+      case 'not_following':
+        return 'relay available';
+      case 'missing':
+        return 'no relay';
+      default:
+        return '';
+    }
   }
 }

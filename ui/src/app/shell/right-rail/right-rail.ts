@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Terminology } from '../../terminology';
+import { AnnouncementStore } from '../../announcements/announcement-store';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { FeedCapability } from '../../feed-capability';
@@ -28,6 +29,7 @@ import { networkSources } from '../network-sources';
 })
 export class RightRail implements OnInit {
   private api = inject(Api);
+  protected announcements = inject(AnnouncementStore);
   protected auth = inject(Auth);
   protected words = inject(Terminology).words;
   /** Template-facing: the rail hides trend rows this server doesn't serve. */
@@ -193,6 +195,9 @@ export class RightRail implements OnInit {
     if (!this.usableMastodon()) {
       return;
     }
+    // Shared with the banner above the timeline: whichever loads first pays for
+    // the request, and `load()` is idempotent so both asking costs one call.
+    this.announcements.load();
     if (this.justMyServer.enabled()) {
       this.justMyServer.checkList();
     }

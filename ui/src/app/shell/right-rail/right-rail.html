@@ -189,6 +189,38 @@
           <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
           <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
         }
+        <!-- The server's own announcements, counted here because this card is
+             where "what is this server" already lives. The callout fires only
+             on something the server marks unread — every live announcement is
+             "published", so keying on that would shout forever. -->
+        @if (announcements.total()) {
+          <a
+            class="server-announcements"
+            [class.has-unread]="announcements.hasUnread()"
+            routerLink="/server"
+          >
+            <span>📣 Announcements</span>
+            <span class="announcement-count">
+              @if (announcements.activeCount()) {
+                {{ announcements.activeCount() }}
+                @if (announcements.hasUnread()) {
+                  <span class="announcement-new">new</span>
+                }
+              } @else {
+                all read
+              }
+            </span>
+          </a>
+          @if (announcements.activeCount()) {
+            <button
+              type="button"
+              class="btn btn-outline btn-sm dismiss-all"
+              (click)="announcements.dismissAll()"
+            >
+              Dismiss all
+            </button>
+          }
+        }
         <button
           type="button"
           class="btn btn-outline btn-sm share-server"

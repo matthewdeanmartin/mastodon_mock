@@ -10,9 +10,23 @@ import { AnonymousPublicRef } from './anonymous-route-ref';
 const REQUEST_TIMEOUT_MS = 8_000;
 const ANONYMOUS_POST_SEARCH_TAG_LIMIT = 10;
 
+/**
+ * Operators the Mastodon query serializer emits, with an optional `-` prefix.
+ *
+ * Stripped before the query becomes hashtags. Anonymous post search is a
+ * hashtag transform — it cannot honour an operator — but it used to *shred*
+ * them instead of ignoring them: `from:@jcrabapple@dmv.community` became the
+ * tags `from`, `jcrabapple`, `dmv` and `community`, so the reader got posts
+ * tagged #from and #dmv and no sign that the operator had been dropped. A word
+ * that only ever appeared inside an operator is not a topic anyone searched
+ * for.
+ */
+const OPERATOR_TOKEN = /(^|\s)-?(?:from|after|before|during|language|lang|has|is|in):\S*/giu;
+
 function searchTags(query: string): string[] {
+  const words = query.replace(OPERATOR_TOKEN, ' ');
   return [
-    ...new Set((query.match(/[\p{L}\p{N}_]+/gu) ?? []).map((word) => word.toLocaleLowerCase())),
+    ...new Set((words.match(/[\p{L}\p{N}_]+/gu) ?? []).map((word) => word.toLocaleLowerCase())),
   ].slice(0, ANONYMOUS_POST_SEARCH_TAG_LIMIT);
 }
 

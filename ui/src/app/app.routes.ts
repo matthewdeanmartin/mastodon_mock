@@ -773,6 +773,17 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/plans/plans').then((m) => m.Plans),
       },
       {
+        // The server as a profile: its identity plus every announcement it has
+        // posted, dismissed ones included. The banner above the timeline shows
+        // what you have not seen; this is where the rest stay findable.
+        path: 'server',
+        title: 'This server',
+        loadComponent: () =>
+          import('./pages/server-announcements/server-announcements').then(
+            (m) => m.ServerAnnouncements,
+          ),
+      },
+      {
         path: 'server-rules',
         title: 'Server rules',
         loadComponent: () => import('./pages/server-rules/server-rules').then((m) => m.ServerRules),

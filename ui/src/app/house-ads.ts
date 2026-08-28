@@ -98,6 +98,22 @@ export const HOUSE_ADS: HouseAd[] = [
     kind: 'endorsement',
   },
   {
+    id: 'pinafore',
+    title: '🥞 Pinafore',
+    text: 'A fast, lightweight Mastodon client that works well on slow connections.',
+    url: 'https://pinafore.social/',
+    cta: 'Open Pinafore ↗',
+    kind: 'endorsement',
+  },
+  {
+    id: 'nicolium',
+    title: '💠 Nicolium',
+    text: 'Another take on the Mastodon web client, worth a look.',
+    url: 'https://nicolium.app/',
+    cta: 'Open Nicolium ↗',
+    kind: 'endorsement',
+  },
+  {
     id: 'mastui',
     title: '⌨️ Mastui',
     text: 'Mastodon in your terminal.',

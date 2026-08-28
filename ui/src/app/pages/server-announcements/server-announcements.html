@@ -1,0 +1,82 @@
+@if (instance(); as info) {
+  <!-- The header a profile would have, for the entity that has no account. -->
+  <header class="server-header">
+    @if (info.thumbnail.url; as thumb) {
+      <img class="server-avatar" [src]="thumb" alt="" aria-hidden="true" />
+    }
+    <div class="server-identity">
+      <h1>{{ info.title }}</h1>
+      <p class="muted server-handle">&#64;{{ info.domain }}</p>
+      @if (info.description) {
+        <p class="server-bio">{{ info.description }}</p>
+      }
+      <p class="muted small server-stats">
+        {{ info.usage.users.active_month }} active this month · v{{ info.version }} ·
+        {{ store.total() }} announcement{{ store.total() === 1 ? '' : 's' }}
+      </p>
+    </div>
+  </header>
+} @else {
+  <div class="page-head">Server announcements</div>
+}
+
+<div class="server-announcement-actions">
+  @if (store.activeCount()) {
+    <button type="button" class="btn btn-outline btn-sm" (click)="store.dismissAll()">
+      Dismiss all ({{ store.activeCount() }})
+    </button>
+  }
+  <!-- The undo for the button beside it. Dismissing is per-browser and
+       irreversible without this, and "I cleared them and now I can't find the
+       one about the outage" is the obvious next problem. -->
+  @if (dismissedCount()) {
+    <button type="button" class="btn btn-outline btn-sm" (click)="store.restoreAll()">
+      Undismiss all ({{ dismissedCount() }})
+    </button>
+  }
+</div>
+
+@if (!store.loaded()) {
+  <p class="muted center">Loading…</p>
+} @else if (!announcements().length) {
+  <p class="muted center small">This server hasn't posted any announcements.</p>
+} @else {
+  @for (a of announcements(); track a.id) {
+    <article class="server-announcement" [class.dismissed]="isDismissed(a.id)">
+      <div class="announcement-meta">
+        @if (a.published_at) {
+          <time [attr.datetime]="a.published_at">{{ a.published_at | date: 'mediumDate' }}</time>
+        }
+        @if (isDismissed(a.id)) {
+          <span class="muted small">dismissed</span>
+        } @else if (!a.read) {
+          <span class="announcement-new">new</span>
+        }
+      </div>
+      <div class="content" [innerHTML]="a.content"></div>
+      <div class="reactions">
+        @for (r of a.reactions; track r.name) {
+          <button class="reaction" [class.on]="r.me" (click)="store.toggleReaction(a, r.name)">
+            {{ r.name }} <span>{{ r.count }}</span>
+          </button>
+        }
+        <span class="picker">
+          @for (e of quickReactions; track e) {
+            <button
+              class="add-reaction"
+              [title]="'React ' + e"
+              (click)="store.toggleReaction(a, e)"
+            >
+              {{ e }}
+            </button>
+          }
+        </span>
+      </div>
+      @if (!isDismissed(a.id)) {
+        <button class="link dismiss-one" type="button" (click)="store.dismiss(a.id)">
+          dismiss
+        </button>
+      }
+    </article>
+  }
+}

@@ -271,6 +271,60 @@
       }
     }
 
+    <!-- tags.pub: one relay account per hashtag, boosting posts from across the
+         network. Following a tag only surfaces what your own server already
+         has, which on a small instance is a fraction — this fills the gap.
+         Checking costs a resolve per tag, so it runs on request, never on
+         load. -->
+    @if (followedTags().length && !auth.isAnonymous) {
+      <div class="tags-pub">
+        <p class="muted small">
+          Missing posts on these tags? <strong>tags.pub</strong> runs a relay account per hashtag
+          that boosts from across the network — following one fills in what this server never saw.
+        </p>
+        <div class="tags-pub-actions">
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [disabled]="tagsPub.checking() || tagsPub.following()"
+            (click)="checkTagsPub()"
+          >
+            {{ tagsPub.checking() ? 'Checking…' : 'Check tags.pub' }}
+          </button>
+          @if (tagsPub.pending().length && !tagsPub.checking()) {
+            <button
+              type="button"
+              class="btn btn-sm"
+              [disabled]="tagsPub.following()"
+              (click)="tagsPub.followAll()"
+            >
+              Follow {{ tagsPub.pending().length }} relay{{
+                tagsPub.pending().length === 1 ? '' : 's'
+              }}
+            </button>
+          }
+          @if (tagsPub.following()) {
+            <button type="button" class="btn btn-outline btn-sm" (click)="tagsPub.stop()">
+              Stop
+            </button>
+          }
+        </div>
+        @if (tagsPub.error(); as error) {
+          <p class="small tags-pub-error" role="alert">{{ error }}</p>
+        }
+        @if (tagsPub.rows().length) {
+          <ul class="tags-pub-rows">
+            @for (row of tagsPub.rows(); track row.handle) {
+              <li>
+                <span>#{{ row.tag }}</span>
+                <span class="muted small">{{ relayLabel(row.status) }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
     <!-- The bulk door, kept as a link rather than a paste box inline: this
        section's whole argument above is "look at one before you follow it",
        and a textarea that follows fifty at once sitting under that would
@@ -287,9 +341,8 @@
   @if (shows('tags') && showsSection('tag-bundles')) {
     <div class="section-head">Tag bundles</div>
     <p class="muted small section-note">
-      Several hashtags read as one feed, on purpose — unlike following a tag, which folds it into
-      Home forever. Up to {{ tagBundles.maxTags }} tags each, because every tag is a request when
-      the feed opens.
+      Several hashtags read as one feed, without folding them into Home. Up to
+      {{ tagBundles.maxTags }} tags each.
     </p>
 
     <div class="new-list">

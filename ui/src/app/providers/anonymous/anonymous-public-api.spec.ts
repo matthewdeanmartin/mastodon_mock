@@ -173,6 +173,17 @@ describe('AnonymousPublicApi', () => {
     http.expectOne('https://social.example/api/v1/timelines/tag/cats?limit=20&max_id=99').flush([]);
   });
 
+  it('hashtagsForQuery drops search operators instead of shredding them into tags', () => {
+    // Reported as a 404: `from:@jcrabapple@dmv.community` became the tags
+    // `from`, `jcrabapple`, `dmv` and `community`, so anonymous post search
+    // fetched #from and #dmv timelines. Anonymous search cannot honour an
+    // operator, but it must not invent topics out of one either.
+    expect(api.hashtagsForQuery('from:@jcrabapple@dmv.community dmv', 10)).toEqual(['dmv']);
+    expect(api.hashtagsForQuery('from:@jcrabapple@dmv.community', 10)).toEqual([]);
+    expect(api.hashtagsForQuery('rust -is:reply has:media', 10)).toEqual(['rust']);
+    expect(api.hashtagsForQuery('after:2026-01-01 baking', 10)).toEqual(['baking']);
+  });
+
   it('hashtagsForQuery returns distinct lowercased tags capped to the limit', () => {
     expect(api.hashtagsForQuery('Cats, DOGS cats', 5)).toEqual(['cats', 'dogs']);
     expect(api.hashtagsForQuery('a b c', 2)).toEqual(['a', 'b']);

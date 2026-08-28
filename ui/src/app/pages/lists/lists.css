@@ -125,3 +125,33 @@ p.muted.center.small {
 .tag-bulk-link {
   padding: 4px 12px 8px;
 }
+
+/* tags.pub relay follows, under the followed-tag list. */
+.tags-pub {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.tags-pub-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
+.tags-pub-error {
+  color: var(--danger, #e0245e);
+}
+
+.tags-pub-rows {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.tags-pub-rows li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+}

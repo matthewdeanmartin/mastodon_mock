@@ -782,10 +782,26 @@ describe('Home', () => {
     httpMock.expectOne('/api/v1/timelines/list/server-list?limit=20').flush([]);
     fixture.detectChanges();
 
+    // The pinned toolbar probes each server feed's capability, exactly as the
+    // Feeds page does, so a server that refuses one gets no link to it.
+    for (const url of [
+      '/api/v1/timelines/public?limit=20&local=true',
+      '/api/v1/trends/statuses',
+      '/api/v1/trends/links',
+    ]) {
+      for (const req of httpMock.match(url)) {
+        req.flush([]);
+      }
+    }
+    fixture.detectChanges();
+
+    // Moved out of the command bar into its own row: projected into the bar it
+    // lacked the bar's `command-item` class, so it shrank and scrolled out of
+    // sight under the right rail.
     const shortcut = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
-      '.command-bar a[href="/feeds/local"]',
+      '.pinned-feeds a[href="/feeds/local"]',
     );
-    expect(shortcut?.textContent).toContain('Local Feed');
+    expect(shortcut?.textContent).toContain('Local');
     expect(shortcut?.textContent).not.toContain('Server Friends');
   });
 

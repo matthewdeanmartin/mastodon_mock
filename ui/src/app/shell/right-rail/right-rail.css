@@ -389,3 +389,42 @@
   justify-content: flex-end;
   margin-top: 16px;
 }
+
+/* Server announcements: count on the server card, callout when unread. */
+.server-announcements {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.server-announcements:hover {
+  color: var(--accent);
+}
+
+.announcement-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.server-announcements.has-unread .announcement-count {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.announcement-new {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.dismiss-all {
+  margin-bottom: 6px;
+}

@@ -72,7 +72,9 @@ describe('Shell account switching', () => {
       (r) =>
         r.url.includes('/api/v1/trends/') ||
         r.url.includes('/api/v2/instance') ||
-        r.url.includes('/api/v1/followed_tags'),
+        r.url.includes('/api/v1/followed_tags') ||
+        // The server card counts the server's announcements.
+        r.url.includes('/api/v1/announcements'),
     );
   }
 

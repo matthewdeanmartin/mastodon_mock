@@ -40,6 +40,7 @@ import { isElizaId } from '../../eliza/eliza-identity';
 import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
 import { PasteFeedSubscriptions } from '../../providers/paste/paste-feed-subscriptions';
+import { PinnedServerFeeds } from '../../pinned-server-feeds/pinned-server-feeds';
 import { JustMyServer } from '../../just-my-server';
 import { Terminology } from '../../terminology';
 import { FeatureFlags } from '../../feature-flags';
@@ -72,6 +73,7 @@ const BOOKMARK_TAIL_SIZE = 40;
     ProfilePhotoView,
     PreviewCardComponent,
     ReaderToolbar,
+    PinnedServerFeeds,
   ],
   templateUrl: './home.html',
   styleUrl: './home.css',
