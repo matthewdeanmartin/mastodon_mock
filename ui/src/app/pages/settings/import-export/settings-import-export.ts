@@ -106,6 +106,7 @@ export class SettingsImportExport {
   protected tagFileName = signal<string | null>(null);
   protected tagParseNote = signal<string | null>(null);
   protected exportingTags = signal(false);
+  protected tagExportCount = signal(0);
   protected tagExportError = signal<string | null>(null);
   protected readonly tagSampleSize = SAMPLE_SIZE;
   /** Which suggestion source last ran, so the results carry their provenance. */
@@ -703,10 +704,9 @@ export class SettingsImportExport {
     if (this.exportingTags()) return;
     this.exportingTags.set(true);
     this.tagExportError.set(null);
+    this.tagExportCount.set(0);
     try {
-      const tags = this.isAnonymous
-        ? this.anonymousTags.tags()
-        : (await firstValueFrom(this.api.followedTags())).map((tag) => tag.name);
+      const tags = this.isAnonymous ? this.anonymousTags.tags() : await this.allFollowedTags();
       if (!tags.length) {
         this.tagExportError.set('You don’t follow any hashtags yet.');
         return;
@@ -716,6 +716,36 @@ export class SettingsImportExport {
       this.tagExportError.set('Could not export your hashtags. Please try again.');
     } finally {
       this.exportingTags.set(false);
+    }
+  }
+
+  /**
+   * Every followed hashtag, walking the `Link` cursor to the end.
+   *
+   * One page used to be the whole export, which silently truncated for anyone
+   * following more tags than a page holds — the failure mode being a file that
+   * looks complete and isn't.
+   */
+  private async allFollowedTags(): Promise<string[]> {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    let maxId: string | undefined;
+    while (true) {
+      const page = await firstValueFrom(this.api.followedTagsPage(maxId));
+      for (const tag of page.tags) {
+        if (!seen.has(tag.name)) {
+          seen.add(tag.name);
+          names.push(tag.name);
+        }
+      }
+      this.tagExportCount.set(names.length);
+      // No cursor, or one that did not advance, means the list ended. The mock
+      // answers with everything at once and no Link header, so that is the
+      // normal path there rather than an error.
+      if (!page.nextMaxId || page.nextMaxId === maxId || !page.tags.length) {
+        return names;
+      }
+      maxId = page.nextMaxId;
     }
   }
 

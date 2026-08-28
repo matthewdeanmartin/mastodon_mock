@@ -22,6 +22,7 @@ interface SettingsImportExportInternals {
   exportCount: WritableSignal<number>;
   pastedTags: WritableSignal<string>;
   tagExportError: WritableSignal<string | null>;
+  tagExportCount: WritableSignal<number>;
   previewTags(): void;
   useSuggestedTags(): void;
   suggestTagsFromFavourites(): Promise<void>;
@@ -460,10 +461,29 @@ describe('SettingsImportExport', () => {
     const fixture = setUp();
     const exported = internals(fixture).exportTags();
     httpMock
-      .expectOne('/api/v1/followed_tags')
+      .expectOne('/api/v1/followed_tags?limit=100')
       .flush([{ name: 'photography' }, { name: 'baking' }]);
     await exported;
 
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
+    expect(internals(fixture).tagExportError()).toBeNull();
+  });
+
+  it('exportTags() follows the Link cursor so a long list is not truncated', async () => {
+    const fixture = setUp();
+    const exported = internals(fixture).exportTags();
+
+    httpMock
+      .expectOne('/api/v1/followed_tags?limit=100')
+      .flush([{ name: 'photography' }, { name: 'baking' }], {
+        headers: { Link: '<https://x/api/v1/followed_tags?max_id=42>; rel="next"' },
+      });
+    await Promise.resolve();
+    httpMock.expectOne('/api/v1/followed_tags?limit=100&max_id=42').flush([{ name: 'caturday' }]);
+    await exported;
+
+    // Three tags across two pages: one page used to be the whole export.
+    expect(internals(fixture).tagExportCount()).toBe(3);
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
     expect(internals(fixture).tagExportError()).toBeNull();
   });
@@ -494,7 +514,7 @@ describe('SettingsImportExport', () => {
   it('exportTags() says so rather than downloading an empty file', async () => {
     const fixture = setUp();
     const exported = internals(fixture).exportTags();
-    httpMock.expectOne('/api/v1/followed_tags').flush([]);
+    httpMock.expectOne('/api/v1/followed_tags?limit=100').flush([]);
     await exported;
 
     expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();

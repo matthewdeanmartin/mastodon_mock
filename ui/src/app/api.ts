@@ -868,6 +868,31 @@ export class Api {
     return this.http.get<Tag[]>('/api/v1/followed_tags');
   }
 
+  /**
+   * One page of followed hashtags, plus where the next page starts.
+   *
+   * Followed tags paginate by the *tag-follow* id, which — like favourites and
+   * the mute/block lists — appears nowhere in the `Tag` objects returned, so the
+   * cursor is only ever in the `Link` header. The plain `followedTags()` above
+   * reads the first page and is what the Feeds screen wants; this is for
+   * walking the whole list, which exporting has to do.
+   */
+  followedTagsPage(
+    maxId?: string,
+    limit = 100,
+  ): Observable<{ tags: Tag[]; nextMaxId: string | null }> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
+    return this.http.get<Tag[]>('/api/v1/followed_tags', { params, observe: 'response' }).pipe(
+      map((response) => ({
+        tags: response.body ?? [],
+        nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
+      })),
+    );
+  }
+
   featuredTags(): Observable<FeaturedTag[]> {
     return this.http.get<FeaturedTag[]>('/api/v1/featured_tags', {
       context: serverRole('background'),

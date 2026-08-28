@@ -322,7 +322,7 @@
       [disabled]="exportingTags()"
       (click)="exportTags()"
     >
-      {{ exportingTags() ? 'Exporting…' : 'Export all hashtags' }}
+      {{ exportingTags() ? 'Exporting ' + tagExportCount() + '…' : 'Export all hashtags' }}
     </button>
     @if (tagExportError(); as error) {
       <p class="export-error" role="alert">{{ error }}</p>
