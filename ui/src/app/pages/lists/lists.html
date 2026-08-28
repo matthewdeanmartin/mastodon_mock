@@ -270,6 +270,18 @@
         </a>
       }
     }
+
+    <!-- The bulk door, kept as a link rather than a paste box inline: this
+       section's whole argument above is "look at one before you follow it",
+       and a textarea that follows fifty at once sitting under that would
+       contradict it. Arriving with a list from elsewhere is a different job,
+       and it has a page. -->
+    <p class="muted center small tag-bulk-link">
+      Arriving with a list?
+      <a routerLink="/settings/import-export" fragment="import-tags">
+        Import or export hashtags in bulk
+      </a>
+    </p>
   }
 
   @if (shows('tags') && showsSection('tag-bundles')) {

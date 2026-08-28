@@ -142,9 +142,7 @@ describe('prepareImageForBluesky', () => {
     // Decoded pixel data is several megabytes; four photos without this is a
     // real spike on a phone.
     const close = vi.fn();
-    vi.stubGlobal('createImageBitmap', () =>
-      Promise.resolve({ width: 4032, height: 3024, close }),
-    );
+    vi.stubGlobal('createImageBitmap', () => Promise.resolve({ width: 4032, height: 3024, close }));
     encodedSizes = [800_000];
 
     await prepareImageForBluesky(fakeFile(4_000_000));

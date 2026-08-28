@@ -5,6 +5,8 @@ import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
 import { Auth } from '../../../auth';
 import { ImportFollows, parseHandles } from '../../../import-follows';
+import { followedTagsCsv, ImportTags, parseTags } from '../../../import-tags';
+import { AnonymousTags } from '../../../providers/anonymous/anonymous-tags';
 import { Account, ImportReport } from '../../../models';
 import { environment } from '../../../../environments/environment';
 import { ContactDiscovery } from './contact-discovery';
@@ -70,6 +72,8 @@ export class SettingsImportExport {
   private api = inject(Api);
   private auth = inject(Auth);
   protected importer = inject(ImportFollows);
+  protected tagImporter = inject(ImportTags);
+  private anonymousTags = inject(AnonymousTags);
   protected contactDiscovery = inject(ContactDiscovery);
   protected github = inject(GitHubSession);
   protected githubDiscovery = inject(GitHubFriendDiscovery);
@@ -95,6 +99,11 @@ export class SettingsImportExport {
   protected exportingFriends = signal(false);
   protected exportCount = signal(0);
   protected exportError = signal<string | null>(null);
+  protected pastedTags = signal('');
+  protected tagFileName = signal<string | null>(null);
+  protected tagParseNote = signal<string | null>(null);
+  protected exportingTags = signal(false);
+  protected tagExportError = signal<string | null>(null);
   protected contactFileName = signal<string | null>(null);
   protected contactCallLimit = signal(20);
   protected githubCallLimit = signal(20);
@@ -120,6 +129,15 @@ export class SettingsImportExport {
   );
   protected followedCount = computed(
     () => this.importer.rows().filter((row) => row.status === 'followed').length,
+  );
+  protected tagDoneCount = computed(
+    () =>
+      this.tagImporter
+        .rows()
+        .filter((row) => row.status !== 'pending' && row.status !== 'following').length,
+  );
+  protected tagFollowedCount = computed(
+    () => this.tagImporter.rows().filter((row) => row.status === 'followed').length,
   );
   protected contactMisses = computed(() =>
     this.contactDiscovery
@@ -555,6 +573,80 @@ export class SettingsImportExport {
     this.fileName.set(null);
     this.parseNote.set(null);
     this.importer.reset();
+  }
+
+  protected onTagFile(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.tagFileName.set(file.name);
+    file.text().then((text) => {
+      this.pastedTags.set(text);
+      this.previewTags();
+    });
+    input.value = '';
+  }
+
+  protected previewTags(): void {
+    const tags = parseTags(this.pastedTags());
+    this.tagImporter.reset();
+    this.tagImporter.load(tags);
+    this.tagParseNote.set(
+      tags.length
+        ? `Found ${tags.length} hashtag${tags.length === 1 ? '' : 's'} to follow.`
+        : 'No hashtags found — expected #tag names, one per line, or tag page URLs.',
+    );
+  }
+
+  protected startTagImport(): void {
+    void this.tagImporter.start();
+  }
+
+  protected clearTagImport(): void {
+    this.pastedTags.set('');
+    this.tagFileName.set(null);
+    this.tagParseNote.set(null);
+    this.tagImporter.reset();
+  }
+
+  protected tagStatusLabel(status: string): string {
+    switch (status) {
+      case 'pending':
+        return 'waiting';
+      case 'following':
+        return 'following…';
+      case 'followed':
+        return 'followed ✓';
+      default:
+        return 'failed';
+    }
+  }
+
+  /**
+   * Download the followed hashtags as a list this page can read back.
+   *
+   * Mastodon's own account archive does not include followed tags, so there is
+   * no standard format to match — this is the simplest thing that round-trips:
+   * a header line and one bare tag per line, which `parseTags` reads.
+   */
+  protected async exportTags(): Promise<void> {
+    if (this.exportingTags()) return;
+    this.exportingTags.set(true);
+    this.tagExportError.set(null);
+    try {
+      const tags = this.isAnonymous
+        ? this.anonymousTags.tags()
+        : (await firstValueFrom(this.api.followedTags())).map((tag) => tag.name);
+      if (!tags.length) {
+        this.tagExportError.set('You don’t follow any hashtags yet.');
+        return;
+      }
+      saveCsv(followedTagsCsv(tags), 'followed_tags.csv');
+    } catch {
+      this.tagExportError.set('Could not export your hashtags. Please try again.');
+    } finally {
+      this.exportingTags.set(false);
+    }
   }
 
   protected statusLabel(status: string): string {

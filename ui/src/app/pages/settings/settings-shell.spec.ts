@@ -34,7 +34,7 @@ describe('SettingsShell', () => {
     expect(labels).not.toContain('Posting & Privacy');
     expect(labels).not.toContain('Blocked accounts');
     expect(labels).toContain('Approve follow requests');
-    expect(labels).toContain('Import/Export Friends');
+    expect(labels).toContain('Import/Export Friends & Tags');
     expect(labels).toContain('Import/Export Config');
     // Mock build shows the _mock-backed pages too.
     expect(labels).toContain('Invite links');

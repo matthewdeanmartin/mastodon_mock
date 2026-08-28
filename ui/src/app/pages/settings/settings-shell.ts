@@ -149,7 +149,7 @@ export class SettingsShell {
       // password changes and session revocation are not in the public API. An
       // entry that leads somewhere nothing can be done is worse than no entry.
       { label: 'Account', path: 'account', exact: true, mockOnly: true },
-      { label: 'Import/Export Friends', path: 'import-export', exact: true },
+      { label: 'Import/Export Friends & Tags', path: 'import-export', exact: true },
       { label: 'Import/Export Config', path: 'config', exact: true, anonymous: true },
       // "Invite links", not "Invite people": /invites is the page that invites
       // people, and two menu entries reading the same thing is a maze.

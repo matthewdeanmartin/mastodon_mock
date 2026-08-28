@@ -1,8 +1,8 @@
 <div class="spage-head">
-  <h1>Import/Export Friends</h1>
+  <h1>Import/Export Friends & Tags</h1>
   <p>
-    Move your friends between accounts with a portable CSV file, and find the people you already
-    follow on your other network.
+    Move your friends and followed hashtags between accounts with portable CSV files, and find the
+    people you already follow on your other network.
   </p>
 </div>
 
@@ -123,6 +123,118 @@
           </li>
         }
       </ul>
+    }
+  </section>
+
+  <!--
+    Hashtags, not people. Kept next to Import Friends because it is the same
+    move — arrive with a list, leave with a populated timeline — and because a
+    new account's fastest route to a non-empty Home is following a handful of
+    topics, which needs no one to have heard of you first.
+
+    Anonymous-safe: ImportTags writes to AnonymousTags when signed out, subject
+    to the same cap the rest of the app enforces.
+  -->
+  <section id="import-tags" class="friend-section">
+    <h2>Import hashtags</h2>
+    <p class="muted small">
+      Paste hashtags, one per line or separated by commas — with or without the
+      <code>#</code>. Tag page URLs like <code>https://mastodon.social/tags/caturday</code> work
+      too. Each one is followed in turn, and shows up in your Home timeline.
+    </p>
+    <textarea
+      rows="6"
+      [ngModel]="pastedTags()"
+      (ngModelChange)="pastedTags.set($event)"
+      placeholder="#photography&#10;#baking&#10;caturday, foss&#10;…"
+      [disabled]="tagImporter.running()"
+      aria-label="Hashtags to follow"
+    ></textarea>
+    <div class="import-actions">
+      <label class="btn btn-outline file-btn">
+        Upload list…
+        <input type="file" accept=".csv,.txt" (change)="onTagFile($event)" hidden />
+      </label>
+      <button
+        type="button"
+        class="btn btn-outline"
+        [disabled]="!pastedTags().trim() || tagImporter.running()"
+        (click)="previewTags()"
+      >
+        Preview
+      </button>
+      @if (tagImporter.rows().length && !tagImporter.running()) {
+        <button type="button" class="btn" (click)="startTagImport()">
+          Follow all ({{ tagImporter.rows().length }})
+        </button>
+      }
+      @if (tagImporter.running()) {
+        <button type="button" class="btn btn-outline" (click)="tagImporter.stop()">Stop</button>
+      }
+      @if (pastedTags() || tagImporter.rows().length) {
+        <button type="button" class="link" (click)="clearTagImport()">clear</button>
+      }
+    </div>
+    @if (tagFileName(); as name) {
+      <p class="muted small">
+        Loaded <code>{{ name }}</code>
+      </p>
+    }
+    @if (tagParseNote(); as note) {
+      <p class="muted small">{{ note }}</p>
+    }
+    @if (tagImporter.rows().length) {
+      @if (tagImporter.running() || tagDoneCount()) {
+        <div
+          class="progress-track"
+          role="progressbar"
+          [attr.aria-valuenow]="tagDoneCount()"
+          [attr.aria-valuemin]="0"
+          [attr.aria-valuemax]="tagImporter.rows().length"
+        >
+          <div
+            class="progress-fill"
+            [style.width.%]="(tagDoneCount() / tagImporter.rows().length) * 100"
+          ></div>
+        </div>
+        <p class="muted small">
+          {{ tagDoneCount() }} / {{ tagImporter.rows().length }} processed ·
+          {{ tagFollowedCount() }} followed
+        </p>
+      }
+      <ul class="import-rows">
+        @for (row of tagImporter.rows(); track row.tag) {
+          <li class="import-row" [class]="'row-' + row.status">
+            <a [routerLink]="['/tags', row.tag]">#{{ row.tag }}</a>
+            <span class="row-status muted" [title]="row.error || ''">
+              {{ tagStatusLabel(row.status) }}
+            </span>
+          </li>
+        }
+      </ul>
+    }
+    <p class="muted small">
+      <a routerLink="/feeds" [queryParams]="{ section: 'tags' }">See every hashtag you follow →</a>
+    </p>
+  </section>
+
+  <section class="friend-section">
+    <h2>Export hashtags</h2>
+    <p class="muted small">
+      Download the hashtags you follow as a <code>followed_tags.csv</code> you can import above on
+      another account. Mastodon's own account archive leaves followed tags out, so this file is the
+      only way to carry them across.
+    </p>
+    <button
+      type="button"
+      class="btn btn-outline"
+      [disabled]="exportingTags()"
+      (click)="exportTags()"
+    >
+      {{ exportingTags() ? 'Exporting…' : 'Export all hashtags' }}
+    </button>
+    @if (tagExportError(); as error) {
+      <p class="export-error" role="alert">{{ error }}</p>
     }
   </section>
 

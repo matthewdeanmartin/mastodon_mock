@@ -41,8 +41,7 @@ describe('Lightbox', () => {
     const overlay = (fixture.nativeElement as HTMLElement).querySelector(
       '.lightbox-overlay',
     ) as HTMLElement;
-    const at = (x: number, y: number) =>
-      ({ clientX: x, clientY: y }) as unknown as Touch;
+    const at = (x: number, y: number) => ({ clientX: x, clientY: y }) as unknown as Touch;
     overlay.dispatchEvent(
       new TouchEvent('touchstart', { touches: [at(startX, startY)], bubbles: true }),
     );
@@ -107,9 +106,7 @@ describe('Lightbox', () => {
     overlay.dispatchEvent(
       new TouchEvent('touchstart', { touches: [at(200), at(260)], bubbles: true }),
     );
-    overlay.dispatchEvent(
-      new TouchEvent('touchend', { changedTouches: [at(60)], bubbles: true }),
-    );
+    overlay.dispatchEvent(new TouchEvent('touchend', { changedTouches: [at(60)], bubbles: true }));
     fixture.detectChanges();
     // Pinching a photo is worth more than a page turn, so a multi-touch gesture
     // is dropped at touchstart rather than measured.

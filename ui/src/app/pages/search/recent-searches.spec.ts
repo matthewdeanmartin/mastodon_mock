@@ -101,7 +101,11 @@ describe('RecentSearches', () => {
     // A fresh injector reads the same scoped localStorage key.
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
-    expect(TestBed.inject(RecentSearches).all().map((r) => r.query)).toEqual(['birds']);
+    expect(
+      TestBed.inject(RecentSearches)
+        .all()
+        .map((r) => r.query),
+    ).toEqual(['birds']);
   });
 
   it('starts empty rather than throwing on a corrupt blob', () => {
@@ -138,6 +142,10 @@ describe('RecentSearches', () => {
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
-    expect(TestBed.inject(RecentSearches).all().map((r) => r.query)).toEqual(['good']);
+    expect(
+      TestBed.inject(RecentSearches)
+        .all()
+        .map((r) => r.query),
+    ).toEqual(['good']);
   });
 });

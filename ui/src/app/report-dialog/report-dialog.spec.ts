@@ -45,9 +45,7 @@ describe('ReportDialog', () => {
     fixture.componentInstance.submitted.subscribe(submitted);
     fixture.componentInstance.submit();
 
-    const request = http.expectOne(
-      'https://bsky.social/xrpc/com.atproto.moderation.createReport',
-    );
+    const request = http.expectOne('https://bsky.social/xrpc/com.atproto.moderation.createReport');
     expect(request.request.body).toMatchObject({
       reasonType: 'tools.ozone.report.defs#reasonMisleadingSpam',
       subject: { $type: 'com.atproto.admin.defs#repoRef', did: 'did:plc:them' },
@@ -69,9 +67,7 @@ describe('ReportDialog', () => {
     const fixture = setUp(ref);
     fixture.componentInstance.submit();
 
-    const request = http.expectOne(
-      'https://bsky.social/xrpc/com.atproto.moderation.createReport',
-    );
+    const request = http.expectOne('https://bsky.social/xrpc/com.atproto.moderation.createReport');
     expect(request.request.body).toMatchObject({
       subject: {
         $type: 'com.atproto.repo.strongRef',

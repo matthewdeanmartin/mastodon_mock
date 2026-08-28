@@ -48,9 +48,7 @@ describe('LeftRail', () => {
       cid: 'follow-cid',
     });
     await vi.waitFor(() => {
-      const followed = (
-        rail as unknown as { followed(): ReadonlySet<string> }
-      ).followed();
+      const followed = (rail as unknown as { followed(): ReadonlySet<string> }).followed();
       expect(followed.has(account.id)).toBe(true);
     });
     http.expectNone('/api/v1/accounts/bsky:did:plc:them/follow');

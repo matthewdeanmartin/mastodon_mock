@@ -19,6 +19,10 @@ interface SettingsImportExportInternals {
   csvText: WritableSignal<string>;
   report: WritableSignal<ImportReport | null>;
   exportCount: WritableSignal<number>;
+  pastedTags: WritableSignal<string>;
+  tagExportError: WritableSignal<string | null>;
+  previewTags(): void;
+  exportTags(): Promise<void>;
   hideGithubFollowed: WritableSignal<boolean>;
   twitterArchive: WritableSignal<TwitterArchiveSummary | null>;
   download(kind: 'following' | 'mutes' | 'blocks'): void;
@@ -433,6 +437,43 @@ describe('SettingsImportExport', () => {
     expect(internals(fixture).exportCount()).toBe(81);
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
   });
+
+  it('previewTags() loads the parsed hashtags without following any of them', () => {
+    const fixture = setUp();
+    internals(fixture).pastedTags.set('#photography\nbaking, #Rust\nnot-a-tag');
+
+    internals(fixture).previewTags();
+
+    expect(fixture.componentInstance['tagImporter'].rows().map((r) => r.tag)).toEqual([
+      'photography',
+      'baking',
+      'rust',
+    ]);
+    // Preview is a parse, not a run: nothing has been followed yet.
+    expect(fixture.componentInstance['tagImporter'].running()).toBe(false);
+  });
+
+  it('exportTags() downloads the followed hashtags', async () => {
+    const fixture = setUp();
+    const exported = internals(fixture).exportTags();
+    httpMock
+      .expectOne('/api/v1/followed_tags')
+      .flush([{ name: 'photography' }, { name: 'baking' }]);
+    await exported;
+
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
+    expect(internals(fixture).tagExportError()).toBeNull();
+  });
+
+  it('exportTags() says so rather than downloading an empty file', async () => {
+    const fixture = setUp();
+    const exported = internals(fixture).exportTags();
+    httpMock.expectOne('/api/v1/followed_tags').flush([]);
+    await exported;
+
+    expect(HTMLAnchorElement.prototype.click).not.toHaveBeenCalled();
+    expect(internals(fixture).tagExportError()).toContain('don');
+  });
 });
 
 /**
@@ -469,6 +510,12 @@ describe('SettingsImportExport, signed out', () => {
     // browser, so both of these work without credentials.
     expect(root.querySelector('#contacts')).not.toBeNull();
     expect(root.querySelector('#import-friends')).not.toBeNull();
+  });
+
+  it('still offers the hashtag importer, which writes browser-local follows', () => {
+    // AnonymousTags backs this signed out, so it works with no credentials —
+    // and following a few topics is the emptiest timeline's fastest fix.
+    expect(render().querySelector('#import-tags')).not.toBeNull();
   });
 
   it('hides the sections whose Follow buttons need a server account', () => {

@@ -3,10 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Api } from '../api';
 import { FocusTrap } from '../a11y/focus-trap';
 import { ProviderId } from '../models';
-import {
-  BlueskyApi,
-  BskyReportReason,
-} from '../providers/bluesky/bluesky-api';
+import { BlueskyApi, BskyReportReason } from '../providers/bluesky/bluesky-api';
 import { BskyRef } from '../providers/bluesky/bluesky-types';
 
 const CATEGORIES = ['spam', 'violation', 'other'] as const;

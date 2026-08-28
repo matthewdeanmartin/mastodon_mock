@@ -120,3 +120,8 @@ p.muted.center.small {
   flex: 1;
   min-width: 0;
 }
+
+/* Bulk import/export door, below the followed-tag list. */
+.tag-bulk-link {
+  padding: 4px 12px 8px;
+}

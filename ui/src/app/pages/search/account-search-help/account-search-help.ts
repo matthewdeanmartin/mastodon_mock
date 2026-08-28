@@ -104,9 +104,9 @@ import { RouterLink } from '@angular/router';
             </tbody>
           </table>
           <p class="muted group-note">
-            One caveat worth knowing: operators only narrow the <em>posts</em> half. The names-and-bios
-            half is a plain text match and ignores them, so a heavily-operatored query still returns
-            whatever accounts matched the words by name.
+            One caveat worth knowing: operators only narrow the <em>posts</em> half. The
+            names-and-bios half is a plain text match and ignores them, so a heavily-operatored
+            query still returns whatever accounts matched the words by name.
             <button type="button" class="linklike" (click)="syntaxHelp.emit()">
               See all post operators
             </button>

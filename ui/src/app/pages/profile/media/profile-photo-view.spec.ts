@@ -191,6 +191,8 @@ describe('ProfilePhotoView comments', () => {
     request.flush({});
     const post = (fixture.componentInstance as unknown as { post(): Status | null }).post();
     expect(post?.bookmarked).toBe(true);
-    httpMock.expectNone('/api/v1/statuses/bsky:at://did:plc:them/app.bsky.feed.post/photo/bookmark');
+    httpMock.expectNone(
+      '/api/v1/statuses/bsky:at://did:plc:them/app.bsky.feed.post/photo/bookmark',
+    );
   });
 });

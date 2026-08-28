@@ -212,10 +212,10 @@ const BLUESKY_GROUPS: SyntaxGroup[] = [
         {{ network() === 'bluesky' ? 'Bluesky search syntax' : 'Mastodon search syntax' }}
       </h3>
       <p class="muted note">
-        These work in a <strong>post</strong> search — and in an
-        <strong>account</strong> search, which runs this same post search as one of its two halves
-        and groups the hits by author (they narrow that half only; names and bios are matched as
-        plain text). Hashtag search matches plain text only.
+        These work in a <strong>post</strong> search — and in an <strong>account</strong> search,
+        which runs this same post search as one of its two halves and groups the hits by author
+        (they narrow that half only; names and bios are matched as plain text). Hashtag search
+        matches plain text only.
       </p>
       <div class="groups">
         @for (group of groups(); track group.title) {

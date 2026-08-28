@@ -180,7 +180,12 @@ describe('BlueskySession vault sync', () => {
     session.refresh().subscribe();
     httpMock
       .expectOne((r) => r.url.includes('refreshSession'))
-      .flush({ accessJwt: 'access-2', refreshJwt: 'refresh-2', did: 'did:plc:abc123', handle: 'someone.bsky.social' });
+      .flush({
+        accessJwt: 'access-2',
+        refreshJwt: 'refresh-2',
+        did: 'did:plc:abc123',
+        handle: 'someone.bsky.social',
+      });
     await Promise.resolve();
 
     expect(vault.write.mock.calls.length).toBe(afterLogin);

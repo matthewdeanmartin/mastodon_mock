@@ -126,7 +126,11 @@ export async function prepareImageForBluesky(file: File): Promise<PreparedImage 
       return passthrough(file, bitmap.width, bitmap.height);
     }
 
-    for (let maxEdge = MAX_EDGE; maxEdge >= MIN_EDGE; maxEdge = Math.round(maxEdge * EDGE_FALLOFF)) {
+    for (
+      let maxEdge = MAX_EDGE;
+      maxEdge >= MIN_EDGE;
+      maxEdge = Math.round(maxEdge * EDGE_FALLOFF)
+    ) {
       const size = scaledSize(bitmap.width, bitmap.height, maxEdge);
       for (const quality of QUALITY_STEPS) {
         const blob = await encode(bitmap, size, quality);
