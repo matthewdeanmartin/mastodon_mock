@@ -762,8 +762,14 @@ export const routes: Routes = [
         // outside `/settings`, and reachable signed out: it is the page the
         // upgrade pitch links to for its numbers, and someone weighing whether
         // to sign up at all must be able to read it without an account.
+        // Gated with the Plus tab it prices. The page quotes a yearly figure
+        // and exists to sell the subscription, so wherever Plus cannot be
+        // bought this must not be readable either — otherwise the flag hides
+        // the checkout and leaves the price list standing.
         path: 'plans',
         title: 'Plans',
+        canActivate: [featureFlagGuard],
+        data: { featureFlag: 'mawkingbird-plus' },
         loadComponent: () => import('./pages/plans/plans').then((m) => m.Plans),
       },
       {

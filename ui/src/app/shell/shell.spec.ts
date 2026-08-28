@@ -17,6 +17,7 @@ import {
   PlusBadgeEntitlement,
   type PlusBadgeState,
 } from '../providers/account/plus-badge-entitlement';
+import { FeatureFlags } from '../feature-flags';
 
 class FakePlusBadgeEntitlement {
   readonly state = signal<PlusBadgeState>('free');
@@ -232,7 +233,22 @@ describe('Shell account switching', () => {
     expect(banner?.querySelector('a')?.getAttribute('href')).toBe('https://mawkingbird.com/');
   });
 
+  it('hides the plan badge entirely when Plus is flagged off', () => {
+    // Shipped broken: the flag defaults to `test`, so production showed a
+    // "Free" badge whose card pitched a $30/year subscription and linked to a
+    // route the guard bounced. Off means the badge is not there at all.
+    TestBed.inject(FeatureFlags).setState('mawkingbird-plus', 'off');
+    const fixture = createShell();
+
+    expect(fixture.nativeElement.querySelector('.plan-badge')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.plan-popover')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('a year');
+  });
+
   it('links the Free and Plus plan badges to an accurate benefits card', () => {
+    // The badge only renders where Plus can actually be bought; see the flag
+    // test below.
+    TestBed.inject(FeatureFlags).setState('mawkingbird-plus', 'production');
     const fixture = createShell();
     const plan = TestBed.inject(PlusBadgeEntitlement) as unknown as FakePlusBadgeEntitlement;
     const badge = () => fixture.nativeElement.querySelector('.plan-badge') as HTMLButtonElement;

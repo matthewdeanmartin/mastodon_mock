@@ -1,5 +1,6 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FeatureFlags } from '../../feature-flags';
 import { SearchServer } from '../../search-server';
 import { SearchServerAbout } from '../../search-server-about';
 import { ServerAbout } from '../../server-about';
@@ -17,6 +18,7 @@ import { ServerAbout } from '../../server-about';
   styleUrl: './docs.css',
 })
 export class Docs implements OnInit {
+  protected featureFlags = inject(FeatureFlags);
   protected serverAbout = inject(ServerAbout);
   protected searchServerAbout = inject(SearchServerAbout);
   protected searchServer = inject(SearchServer);

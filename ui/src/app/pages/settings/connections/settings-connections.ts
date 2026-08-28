@@ -89,7 +89,7 @@ export class SettingsConnections implements OnInit {
   // because a stored secret obeys the retention policy wherever it was created.
   private pastepileKey = inject(PastepileKey);
   protected lifetimes = inject(CredentialLifetimeStore);
-  private flags = inject(FeatureFlags);
+  protected flags = inject(FeatureFlags);
   private vault = inject(VaultService);
   private vaultPreference = inject(VaultPreference);
   private accountKey = inject(ProfileAccountKey);

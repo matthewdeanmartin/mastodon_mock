@@ -16,8 +16,13 @@
   @if (vaultInventoryNeedsAttention()) {
     <p class="muted small">
       The encrypted inventory is closed, so some badges cannot be verified.
-      <a [routerLink]="['/settings/mawkingbird-plus']">Open Mawkingbird Plus</a> once to unlock it
-      or see why it is unavailable.
+      <!-- The unlock route is flag-gated; with the flag off this link led
+           nowhere, so the sentence stops at the symptom rather than offering a
+           fix the reader cannot reach. -->
+      @if (flags.enabled('mawkingbird-plus')) {
+        <a [routerLink]="['/settings/mawkingbird-plus']">Open Mawkingbird Plus</a> once to unlock it
+        or see why it is unavailable.
+      }
     </p>
   }
   <ul class="catalog" aria-label="Available connections">
