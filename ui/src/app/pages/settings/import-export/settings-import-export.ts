@@ -14,10 +14,12 @@ import { contactPickerAvailable, pickContacts } from './contact-picker';
 import { GitHubSession } from '../../../providers/github/github-session';
 import { GitHubFriendDiscovery, GitHubFriendStatus } from './github-friend-discovery';
 import {
+  extractArchiveHashtags,
   extractTwitterArchive,
   TwitterArchiveSummary,
   twitterArchiveCsv,
 } from '../../../twitter-archive';
+import { SAMPLE_SIZE, TagSources } from './tag-sources';
 import {
   isBotOrMirrorTwitterCandidate,
   isInactiveTwitterCandidate,
@@ -73,6 +75,7 @@ export class SettingsImportExport {
   private auth = inject(Auth);
   protected importer = inject(ImportFollows);
   protected tagImporter = inject(ImportTags);
+  protected tagSources = inject(TagSources);
   private anonymousTags = inject(AnonymousTags);
   protected contactDiscovery = inject(ContactDiscovery);
   protected github = inject(GitHubSession);
@@ -104,6 +107,10 @@ export class SettingsImportExport {
   protected tagParseNote = signal<string | null>(null);
   protected exportingTags = signal(false);
   protected tagExportError = signal<string | null>(null);
+  protected readonly tagSampleSize = SAMPLE_SIZE;
+  /** Which suggestion source last ran, so the results carry their provenance. */
+  protected tagSourceUsed = signal<'twitter' | 'bluesky' | 'favourites' | null>(null);
+  protected tagArchiveReading = signal(false);
   protected contactFileName = signal<string | null>(null);
   protected contactCallLimit = signal(20);
   protected githubCallLimit = signal(20);
@@ -607,6 +614,69 @@ export class SettingsImportExport {
     this.tagFileName.set(null);
     this.tagParseNote.set(null);
     this.tagImporter.reset();
+  }
+
+  /**
+   * Rank the hashtags in a Twitter archive's own tweets.
+   *
+   * Reads only tweets.js, and reads it here rather than reusing the people
+   * extraction above because the two answer different questions and someone may
+   * well want the tags without the contact CSV.
+   */
+  protected async onTagArchive(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = [...(input.files ?? [])].filter((file) =>
+      ['tweets.js', 'deleted-tweets.js'].includes(file.name.toLowerCase()),
+    );
+    input.value = '';
+    this.tagSources.reset();
+    this.tagSourceUsed.set('twitter');
+    if (!files.length) {
+      this.tagSources.error.set(
+        'No tweets found. Choose the unzipped archive folder or its data/tweets.js file.',
+      );
+      return;
+    }
+    this.tagArchiveReading.set(true);
+    try {
+      const sources = await Promise.all(
+        files.map(async (file) => ({
+          name: file.webkitRelativePath || file.name,
+          text: await file.text(),
+        })),
+      );
+      const hashtags = extractArchiveHashtags(sources);
+      this.tagSources.loadCounts(
+        new Map(hashtags.map((entry) => [entry.tag, entry.count])),
+        hashtags.reduce((total, entry) => total + entry.count, 0),
+      );
+    } catch (err) {
+      this.tagSources.error.set(
+        err instanceof Error ? err.message : 'That archive could not be read.',
+      );
+    } finally {
+      this.tagArchiveReading.set(false);
+    }
+  }
+
+  protected async suggestTagsFromBluesky(): Promise<void> {
+    this.tagSourceUsed.set('bluesky');
+    await this.tagSources.loadFromBluesky();
+  }
+
+  protected async suggestTagsFromFavourites(): Promise<void> {
+    this.tagSourceUsed.set('favourites');
+    await this.tagSources.loadFromFavourites();
+  }
+
+  /** Move the ticked suggestions into the importer above, ready to follow. */
+  protected useSuggestedTags(): void {
+    const tags = this.tagSources.selectedTags();
+    if (!tags.length) {
+      return;
+    }
+    this.pastedTags.set(tags.map((tag) => `#${tag}`).join('\n'));
+    this.previewTags();
   }
 
   protected tagStatusLabel(status: string): string {

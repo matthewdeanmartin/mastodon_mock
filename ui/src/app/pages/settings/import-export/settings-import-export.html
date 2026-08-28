@@ -218,6 +218,97 @@
     </p>
   </section>
 
+  <!--
+    Where the list comes from when you don't have one.
+
+    Nobody keeps a file of hashtags — there is no export to bring. So these read
+    what you have already written or liked and count the tags in it: the same
+    question three ways, answered from whichever history a given person happens
+    to own. The result is a ranked, ticked list, not an immediate follow — it
+    fills the box above so you still press Follow yourself.
+  -->
+  <section id="suggest-tags" class="friend-section">
+    <h2>Suggest hashtags from what you already read</h2>
+    <p class="muted small">
+      Reads about {{ tagSampleSize }} of your posts or favourites and counts the hashtags in them.
+      Nothing is followed until you send the results to the box above.
+    </p>
+    <div class="import-actions">
+      <label class="btn btn-outline file-btn">
+        From a Twitter archive…
+        <input type="file" accept=".js" multiple (change)="onTagArchive($event)" hidden />
+      </label>
+      @if (bsky.linked()) {
+        <button
+          type="button"
+          class="btn btn-outline"
+          [disabled]="tagSources.loading()"
+          (click)="suggestTagsFromBluesky()"
+        >
+          From my Bluesky posts
+        </button>
+      }
+      @if (!isAnonymous) {
+        <button
+          type="button"
+          class="btn btn-outline"
+          [disabled]="tagSources.loading()"
+          (click)="suggestTagsFromFavourites()"
+        >
+          From posts I've favourited
+        </button>
+      }
+    </div>
+    @if (tagArchiveReading() || tagSources.loading()) {
+      <p class="muted small" role="status">Reading…</p>
+    }
+    @if (tagSources.error(); as error) {
+      <p class="export-error" role="alert">{{ error }}</p>
+    }
+    @if (tagSources.suggestions().length) {
+      <p class="muted small">
+        {{ tagSources.suggestions().length }} hashtag{{
+          tagSources.suggestions().length === 1 ? '' : 's'
+        }}
+        found across {{ tagSources.sampled() }} post{{ tagSources.sampled() === 1 ? '' : 's' }}. The
+        most-used are ticked.
+      </p>
+      <ul class="suggest-tags">
+        @for (row of tagSources.suggestions(); track row.tag) {
+          <li>
+            <label>
+              <input
+                type="checkbox"
+                [checked]="row.selected"
+                (change)="tagSources.toggle(row.tag)"
+              />
+              <span>#{{ row.tag }}</span>
+              <span class="muted small">
+                {{ row.count }} post{{ row.count === 1 ? '' : 's' }}
+              </span>
+            </label>
+          </li>
+        }
+      </ul>
+      <div class="import-actions">
+        <button
+          type="button"
+          class="btn"
+          [disabled]="!tagSources.selectedTags().length"
+          (click)="useSuggestedTags()"
+        >
+          Send {{ tagSources.selectedTags().length }} to the box above
+        </button>
+        <button type="button" class="link" (click)="tagSources.setAllSelected(true)">
+          select all
+        </button>
+        <button type="button" class="link" (click)="tagSources.setAllSelected(false)">
+          select none
+        </button>
+      </div>
+    }
+  </section>
+
   <section class="friend-section">
     <h2>Export hashtags</h2>
     <p class="muted small">

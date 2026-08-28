@@ -58,6 +58,7 @@ interface ArchiveTweet {
     in_reply_to_screen_name?: unknown;
     entities?: {
       user_mentions?: unknown;
+      hashtags?: unknown;
     };
   };
 }
@@ -400,4 +401,65 @@ function isLater(candidate: string | null, current: string | null | undefined): 
 
 function csvCell(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+/** One hashtag the archive owner used, and how often. */
+export interface ArchiveHashtag {
+  tag: string;
+  count: number;
+  lastUsedAt: string | null;
+}
+
+/**
+ * Count the hashtags the archive owner wrote, most-used first.
+ *
+ * Separate from `extractTwitterArchive` because it answers a different question
+ * — what this person posts *about*, rather than who they talked to — and needs
+ * only tweets.js. Retweets are skipped for the same reason they are there: the
+ * tags in them are somebody else's.
+ *
+ * The raw list is long and mostly noise (a tag used once, years ago, in a reply
+ * to a conference), so callers rank and cut it rather than following all of it.
+ */
+export function extractArchiveHashtags(sources: readonly TwitterArchiveSource[]): ArchiveHashtag[] {
+  const selected = sources.filter((source) =>
+    ['tweets.js', 'deleted-tweets.js'].includes(baseName(source.name)),
+  );
+  if (!selected.length) {
+    throw new Error('No tweets.js was found in the selected files.');
+  }
+
+  const counts = new Map<string, ArchiveHashtag>();
+  for (const source of selected) {
+    const filename = baseName(source.name);
+    for (const row of parseArchiveAssignment(source.text, filename) as ArchiveTweet[]) {
+      const tweet = row.tweet;
+      if (!tweet || tweet.retweeted === true) {
+        continue;
+      }
+      const at = normalizeDate(tweet.created_at);
+      const hashtags = Array.isArray(tweet.entities?.hashtags)
+        ? (tweet.entities.hashtags as { text?: unknown }[])
+        : [];
+      for (const hashtag of hashtags) {
+        const text = asString(hashtag.text)?.replace(/^#/, '').toLowerCase();
+        // Twitter's tag rules are looser than Mastodon's; anything Mastodon
+        // cannot represent as a tag is dropped rather than mangled.
+        if (!text || !/^[\p{L}\p{N}_]+$/u.test(text) || /^\p{N}+$/u.test(text)) {
+          continue;
+        }
+        const existing = counts.get(text);
+        if (existing) {
+          existing.count += 1;
+          if (isLater(at, existing.lastUsedAt)) {
+            existing.lastUsedAt = at;
+          }
+        } else {
+          counts.set(text, { tag: text, count: 1, lastUsedAt: at });
+        }
+      }
+    }
+  }
+
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }

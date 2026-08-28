@@ -11,6 +11,7 @@ import { followingAccountsCsv, SettingsImportExport } from './settings-import-ex
 import { GitHubFriendDiscovery } from './github-friend-discovery';
 import { TwitterArchiveSummary } from '../../../twitter-archive';
 import { TwitterFriendDiscovery } from './twitter-friend-discovery';
+import { TagSources } from './tag-sources';
 import { seedGitHubConnection } from '../../../testing/seed-storage';
 
 /** Exposes SettingsImportExport's protected signals for white-box testing. */
@@ -22,6 +23,8 @@ interface SettingsImportExportInternals {
   pastedTags: WritableSignal<string>;
   tagExportError: WritableSignal<string | null>;
   previewTags(): void;
+  useSuggestedTags(): void;
+  suggestTagsFromFavourites(): Promise<void>;
   exportTags(): Promise<void>;
   hideGithubFollowed: WritableSignal<boolean>;
   twitterArchive: WritableSignal<TwitterArchiveSummary | null>;
@@ -463,6 +466,29 @@ describe('SettingsImportExport', () => {
 
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
     expect(internals(fixture).tagExportError()).toBeNull();
+  });
+
+  it('useSuggestedTags() moves the ticked suggestions into the importer', async () => {
+    const fixture = setUp();
+    const sources = TestBed.inject(TagSources);
+    const suggested = internals(fixture).suggestTagsFromFavourites();
+    httpMock
+      .expectOne('/api/v1/favourites?limit=40')
+      .flush([
+        { tags: [{ name: 'cats', url: '' }] },
+        { tags: [{ name: 'cats', url: '' }] },
+        { tags: [{ name: 'baking', url: '' }] },
+        { tags: [{ name: 'baking', url: '' }] },
+      ]);
+    await suggested;
+
+    sources.toggle('baking');
+    internals(fixture).useSuggestedTags();
+
+    // Suggesting never follows on its own: the picks land in the box above,
+    // still needing a deliberate Follow.
+    expect(fixture.componentInstance['tagImporter'].rows().map((r) => r.tag)).toEqual(['cats']);
+    expect(fixture.componentInstance['tagImporter'].running()).toBe(false);
   });
 
   it('exportTags() says so rather than downloading an empty file', async () => {

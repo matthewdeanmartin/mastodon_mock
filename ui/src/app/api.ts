@@ -456,6 +456,30 @@ export class Api {
     return this.http.get<Status[]>('/api/v1/favourites');
   }
 
+  /**
+   * One page of favourites, plus where the next page starts.
+   *
+   * Favourites paginate by *favourite* id, which — like mutes and blocks above —
+   * appears nowhere in the statuses returned, so the cursor is only ever in the
+   * `Link` header. The plain `favourites()` above reads the first page and is
+   * what the Favourites screen wants; this is for walking the whole list.
+   */
+  favouritesPage(
+    maxId?: string,
+    limit = 40,
+  ): Observable<{ statuses: Status[]; nextMaxId: string | null }> {
+    let params = new HttpParams().set('limit', String(limit));
+    if (maxId) {
+      params = params.set('max_id', maxId);
+    }
+    return this.http.get<Status[]>('/api/v1/favourites', { params, observe: 'response' }).pipe(
+      map((response) => ({
+        statuses: response.body ?? [],
+        nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
+      })),
+    );
+  }
+
   bookmarks(maxId?: string, limit?: number): Observable<Status[]> {
     let params = new HttpParams();
     if (maxId) {

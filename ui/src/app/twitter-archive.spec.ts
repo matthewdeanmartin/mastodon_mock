@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { extractTwitterArchive, TwitterArchiveSource, twitterArchiveCsv } from './twitter-archive';
+import {
+  extractArchiveHashtags,
+  extractTwitterArchive,
+  TwitterArchiveSource,
+  twitterArchiveCsv,
+} from './twitter-archive';
 
 function archiveFile(name: string, variable: string, rows: unknown[]): TwitterArchiveSource {
   return {
@@ -157,5 +162,51 @@ describe('twitterArchiveCsv', () => {
       'alice,Alice Example,1,following|replied|mentioned,2,3,2020-01-01T00:00:00.000Z,2021-01-01T00:00:00.000Z',
     );
     expect(csv).toContain('alice_old,https://twitter.com/intent/user?user_id=1');
+  });
+});
+
+describe('extractArchiveHashtags', () => {
+  function tweet(hashtags: string[], retweeted = false) {
+    return {
+      tweet: {
+        created_at: 'Wed Jul 22 01:25:10 +0000 2026',
+        retweeted,
+        entities: { hashtags: hashtags.map((text) => ({ text })) },
+      },
+    };
+  }
+
+  it('counts the owner’s own hashtags, most-used first', () => {
+    const tags = extractArchiveHashtags([
+      archiveFile('data/tweets.js', 'tweets', [
+        tweet(['baking', 'Cats']),
+        tweet(['cats']),
+        tweet(['cats']),
+      ]),
+    ]);
+
+    expect(tags.map((t) => [t.tag, t.count])).toEqual([
+      ['cats', 3],
+      ['baking', 1],
+    ]);
+    expect(tags[0].lastUsedAt).not.toBeNull();
+  });
+
+  it('skips retweets and tags Mastodon cannot represent', () => {
+    const tags = extractArchiveHashtags([
+      archiveFile('data/tweets.js', 'tweets', [
+        tweet(['mine']),
+        tweet(['notmine'], true),
+        tweet(['2026']),
+      ]),
+    ]);
+
+    expect(tags.map((t) => t.tag)).toEqual(['mine']);
+  });
+
+  it('rejects a selection with no tweets file', () => {
+    expect(() =>
+      extractArchiveHashtags([archiveFile('data/following.js', 'following', [])]),
+    ).toThrow(/tweets\.js/);
   });
 });

@@ -109,13 +109,10 @@ describe('ImportTags', () => {
   });
 
   it('saves anonymous follows locally and surfaces the cap as the row error', async () => {
-    const follow = vi
-      .fn()
-      .mockReturnValueOnce({ ok: true })
-      .mockReturnValueOnce({
-        ok: false,
-        error: 'Anonymous accounts can follow up to 10 hashtags.',
-      });
+    const follow = vi.fn().mockReturnValueOnce({ ok: true }).mockReturnValueOnce({
+      ok: false,
+      error: 'Anonymous accounts can follow up to 10 hashtags.',
+    });
     TestBed.configureTestingModule({
       providers: [
         { provide: Api, useValue: {} },
